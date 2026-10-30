@@ -1,6 +1,6 @@
 # Slack watch verification
 
-Date: 2026-10-30 for the two latest full `tests/fm-slack-watch.test.sh` runs, which added X24 through X32 and then X33 through X40; the 2026-10-23 targeted suite run, the 2026-10-22 replay refresh, and the 2026-10-19 live read-only probe are recorded separately below.
+Date: 2026-10-30 for the three latest full `tests/fm-slack-watch.test.sh` runs, which added X24 through X32, then X33 through X40, then X41 through X43; the 2026-10-23 targeted suite run, the 2026-10-22 replay refresh, and the 2026-10-19 live read-only probe are recorded separately below.
 Host: macOS arm64, shared operator host.
 Validation tool: no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
 No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
@@ -25,6 +25,7 @@ The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3,
 The 2026-10-30 run of `tests/fm-slack-watch.test.sh` on host `Mac-Studio.local` printed an `ok -` line for DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X32, then `ok - all Slack watch checks`, and exited 0.
 A later 2026-10-30 run of the same suite on the same host printed an `ok -` line for the same checks and for X1 through X40, then `ok - all Slack watch checks`, and exited 0.
 The logs of both runs record the markers and the exit status but not the command line or the commit, so neither is quoted for either run.
+A third 2026-10-30 run, `bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-slack-watch.test.sh`, printed an `ok -` line for the same checks and for X1 through X43, then `ok - all Slack watch checks`, and exited 0; its log records the command and the exit status but not the host or the commit.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
 ## Live read-only probe
@@ -248,10 +249,10 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
-## X1..X40 - review-round regressions
+## X1..X43 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
-X24 through X32 passed in the first 2026-10-30 run, and X33 through X40 in the later one; each entry quotes its `ok -` line and states what that case asserts.
+X24 through X32 passed in the first 2026-10-30 run, X33 through X40 in the second, and X41 through X43 in the third; each entry quotes its `ok -` line and states what that case asserts.
 
 - X1: after a hold was released and set again, a reaction on the older thread and an answer staged before the re-hold (held back by a failing intake wrapper, not by a fault seam) both left the newer hold open; the staged answer surfaced a `replaced hold` check line and its thread was told `Answer not applied`; the older thread was retired. A live hold still took its own thread's answer.
 - X2: with `slack-dm` unbound, neither the armed `check` nor `poll` delivered an answer; rebinding let the next `check` answer.
@@ -294,6 +295,9 @@ X24 through X32 passed in the first 2026-10-30 run, and X33 through X40 in the l
 - X38 (`ok - X38`): with `FM_SLACK_POLL_MAX_ANSWERS=1` and every `chat.postMessage` failing with status 400, the first poll exited nonzero, printed `closed: dup-a`, and left `dup-b` open. With that failure cleared and `conversations.replies` for `dup-a`'s thread `900.000001` failing with status 400, the second poll at the same cap exited nonzero, printed `closed: dup-b`, and kept one row in the pending journal.
 - X39 (`ok - X39`): with `FM_SLACK_POLL_MAX_ANSWERS=1`, `dup-a`'s reply changed to the reserved value `reconcile`, and every `chat.postMessage` failing with status 400, the first poll exited nonzero, printed `refused: dup-a`, and left both `dup-a` and `dup-b` open. With `chat.postMessage` set to fail only once more, the second poll at the same cap exited nonzero, printed `closed: dup-b`, did not print `refused: dup-a`, and left the pending journal empty.
 - X40 (`ok - X40`): with `FM_SLACK_POLL_MAX_ANSWERS=1` and every `chat.postMessage` failing with status 400, the first poll exited nonzero, printed `closed: dup-a`, closed `dup-a`, and left `dup-b` open. With `chat.postMessage` set to fail only once more, the second poll at the same cap exited nonzero, printed `closed: dup-b`, printed no `unmatched reply`, and left the pending journal empty.
+- X41 (`ok - X41`): with an unread owner reply on `open-a`'s old-DM thread and nothing in the pending journal, `retarget` to a changed owner exited nonzero with `dm_user_changed_with_pending_work`, left one row in the pending journal, kept the stored owner and all 4 threads, and left `open-a` open; the old owner's next poll printed `closed: open-a` and emptied the journal, and the `retarget` after that exited 0 and printed `retargeted:`. With `conversations.replies` for `open-b`'s thread failing with status 400, `retarget` exited nonzero with `slack: refused:` and kept all 4 threads. With an unread reply on `open-a`'s thread and the call-state probe failing, `retarget` exited nonzero with `slack: refused: hold_state_unreadable`, kept all 4 threads, and left `open-a` open; the next poll printed `closed: open-a`.
+- X42 (`ok - X42`): with the recorded channel set to the DM-shaped `D0OTHERDM01` instead of the owner's DM and a new held call to mirror, the mirror exited nonzero with `stored_channel_not_owner_dm` and wrote nothing to `D0OTHERDM01`; in a fresh home the mirror posted the new call's card to the owner's DM `D0123456789`; with `conversations.open` failing with status 503, the mirror exited nonzero and sent no `chat.postMessage`.
+- X43 (`ok - X43`): with a tap on `reaction-call`'s card and `users.info` failing with status 400, `retarget` to a changed owner exited nonzero with `slack: refused: api_error`, kept the thread, and left `reaction-call` open; once `users.info` recovered, the next poll printed `closed: reaction-call`.
 
 ## ACT-1 - live answer
 
