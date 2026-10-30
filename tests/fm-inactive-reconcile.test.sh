@@ -711,6 +711,33 @@ test_report_keeps_unknown_done_owed_unless_forced() {
   pass "an unknown done: acceptance stays owed without --force and is delivered marked unknown with it"
 }
 
+# The unknown acceptance belongs to the pending receipt, not to one invocation:
+# a forced report whose parent write fails leaves a pending delivery, and the
+# plain retry after the binding is repaired (the daemon still silent) must
+# publish the same unknown-qualified line, never the ordinary accepted form.
+test_pending_unknown_acceptance_survives_a_failed_delivery_and_retry() {
+  local key line
+  make_world report-unknown-retry; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  cp "$MATE/.fm-secondmate-parent" "$WORLD/parent-binding"
+  printf 'schema=fm-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.fm-secondmate-parent"
+  if FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child --force; then
+    fail "a forced report claimed delivery through an unusable parent binding"
+  fi
+  [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "the failed forced delivery did not leave a pending receipt"
+  [ -s "$WORLD/nm-calls" ] || fail "the gate never asked the no-mistakes daemon"
+  cp "$WORLD/parent-binding" "$MATE/.fm-secondmate-parent"
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child \
+    || fail "the plain retry did not deliver the pending outcome"
+  key=$(reported_outcome_key "$MATE" child 'done') || fail "the retry receipt key is missing"
+  line="done [key=$key]: child child done (acceptance unknown: no-mistakes read stalled): PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
+  sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$line" \
+    || fail "the retry lost the unknown-acceptance qualifier: $(cat "$MAIN/state/mate.status")"
+  ! grep -Fq "child child done: PR" "$MAIN/state/mate.status" \
+    || fail "the retry published the unknown outcome as accepted"
+  pass "a pending unknown acceptance keeps its qualifier through a failed delivery and a plain retry"
+}
+
 # A silent daemon must not hold the secondmate's poll for one stall interval per
 # waiting child, and must not get the whole scan killed either: at the default
 # scan budget the first gate read is judged by its own silence interval inside
@@ -1290,6 +1317,7 @@ test_secondmate_partial_ledger_line_waits_for_newline
 test_secondmate_remote_route_ledger_delivery
 test_report_subcommand_delivers_and_refuses
 test_report_keeps_unknown_done_owed_unless_forced
+test_pending_unknown_acceptance_survives_a_failed_delivery_and_retry
 test_scan_pays_one_stall_interval_for_silent_gate_reads
 test_scan_slow_working_gate_read_is_not_cut
 test_pending_ledger_done_is_delivered_after_worktree_removal

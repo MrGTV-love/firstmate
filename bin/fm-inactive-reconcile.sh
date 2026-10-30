@@ -36,7 +36,8 @@
 # scan leaves it for the next poll and `report` exits 75 (the sweeps' retry
 # status) so teardown keeps the records and asks to be retried, except that
 # `report --force` (the captain's forced teardown) delivers it marked
-# `(acceptance unknown: no-mistakes read stalled)`, never as accepted. Inside a
+# `(acceptance unknown: no-mistakes read stalled)`, never as accepted; the mark is
+# kept in the pending receipt, so a retry after a failed parent write keeps it. Inside a
 # scan each gate read is stopped after FM_DOD_NM_STALL_SECS of silence (120 when
 # unset), and the first silent read makes every later read in that scan unknown
 # at once, so a silent daemon costs one poll one interval.
@@ -442,7 +443,7 @@ claim_inactive_report_for_ledger() { # <task> <incarnation> <state> <ledger-fing
 # acceptance is unknown without --force.
 report_child_ledger_locked() { # <id> <meta> [--force]
   local id=$1 meta=$2 force=${3:-} status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
-  local gate_rc=0 acceptance=''
+  local gate_rc=0 acceptance='' unknown_label=' (acceptance unknown: no-mistakes read stalled)'
   status="$STATE/$id.status"
   last=$(child_terminal_ledger_line "$status") || return 0
   state=$(status_line_verb "$last")
@@ -458,13 +459,21 @@ report_child_ledger_locked() { # <id> <meta> [--force]
       0) ;;
       2)
         [ "$force" = --force ] || return 75
-        acceptance=' (acceptance unknown: no-mistakes read stalled)' ;;
+        acceptance=$unknown_label ;;
       *) return 0 ;;
     esac
   fi
   outcome_key="child-outcome-$id-$state-${fingerprint:0:8}"
   ensure_record "$fingerprint" "$id" "$incarnation" "$state" "$outcome_key" direct upstream "$pr" || return 1
   [ -n "$RECORD_PENDING" ] || return 0
+  # The unknown acceptance belongs to the pending receipt: a failed parent write
+  # leaves the receipt behind, and the retry skips the gate, so it must read the
+  # stored state instead of publishing the ordinary accepted form.
+  if [ -n "$acceptance" ]; then
+    record_field_set "$RECORD_PENDING" acceptance unknown || return 1
+  elif [ "$(record_value "$RECORD_PENDING" acceptance)" = unknown ]; then
+    acceptance=$unknown_label
+  fi
   if last_status_line "$status" previous >/dev/null; then
     predecessor_head=$(sha256_text "$previous")
     if claim_inactive_report_for_ledger "$id" "$incarnation" "$state" "$fingerprint" "$predecessor_head"; then
