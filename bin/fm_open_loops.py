@@ -1545,6 +1545,9 @@ class WaitVerifier:
         A GitHub PR keeps the ledger's own marker read. Any other PR is read through the canonical marker
         reader fm_pr_poll_merge_marker_matches, and a PR identity or marker area it cannot read fails closed:
         it raises, so the wait is never admitted, kept or renewed on a PR whose landing cannot be checked.
+        A marker file that fails the canonical private-file validation (fm_pr_private_file_valid: regular,
+        not a symlink, mode 600, same device, one link) or is unreadable is such a case; only a validated
+        marker naming another PR continues the scan, and no marker at all means open.
         """
         if GITHUB_PR.fullmatch(pr):
             return merge_marker(self.collector.state, pr)
@@ -1552,7 +1555,9 @@ class WaitVerifier:
             verdict = self.collector.bash(
                 '. "$1/fm-pr-lib.sh"; fm_pr_url_parse "$3" || { echo "prerequisite PR identity is unreadable" >&2; exit 3; }; '
                 'device=$(fm_pr_file_device "$2") || { echo "prerequisite merge records are unreadable" >&2; exit 3; }; '
-                'for marker in "$2"/*.pr-poll-merge-notified; do [ -e "$marker" ] || continue; '
+                'for marker in "$2"/*.pr-poll-merge-notified; do [ -e "$marker" ] || [ -L "$marker" ] || continue; '
+                'fm_pr_private_file_valid "$marker" 600 "$device" && [ -r "$marker" ] || '
+                '{ echo "prerequisite merge records are unreadable" >&2; exit 3; }; '
                 'fm_pr_poll_merge_marker_matches "$marker" "$device" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" '
                 '"$FM_PR_NUMBER" && { echo merged; exit 0; }; done; echo open',
                 BIN, self.collector.state, pr).strip()

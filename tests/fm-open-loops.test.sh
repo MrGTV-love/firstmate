@@ -4131,6 +4131,23 @@ gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
 fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 291',
          '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
 assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a merge record for another MR leaves the wait'
+# A merge record the canonical reader cannot validate is unreadable, never "open": the wait is not kept or renewed.
+fx = waiting_fixture('unreadable-marker-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a valid merge record ends the wait'
+marker = fx['home'] / 'state/repair-owner.pr-poll-merge-notified'
+marker.chmod(0)
+try:
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable merge record does not keep the wait'
+    unreadable_marker = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+    assert unreadable_marker.returncode == 1 and 'unreadable' in unreadable_marker.stdout, \
+        ('no wait on an unreadable merge record', unreadable_marker)
+finally:
+    marker.chmod(0o600)
 # A prerequisite whose PR identity the landing check cannot read never keeps or admits a wait.
 fx = waiting_fixture('unreadable-pr-identity')
 gitlab_done(fx, 'https://gitlab.com/test/project/merge_requests/290')
