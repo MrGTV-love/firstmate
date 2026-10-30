@@ -609,7 +609,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - Pi logical-run latching.
 - Missing-`jq` behavior.
 - All five primary registrations.
-- Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion.
+- Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion, also under a Stop payload larger than the stdin pipe buffer.
 - Helper-tool exclusion and both authoritative Bash protections.
 - Grok native and legacy selection.
 - Typed field precedence.
