@@ -167,7 +167,8 @@ PERL
 # Echoes the case dir.
 # BEGIN temporary phase diagnostic definition
 fm_teardown_phase_selected() {
-  case "${test_case:-}" in
+  # The cleanup suite's fm_test_before_case hook owns the running case's name.
+  case "${teardown_cpu_case:-}" in
     test_local_only_force_overrides_unpushed|test_docker_all_failure_channels_retain_forced_tasks_until_retry) return 0 ;;
     *) return 1 ;;
   esac
