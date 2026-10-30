@@ -1,6 +1,6 @@
 # Slack watch verification
 
-Date: 2026-10-23 (UTC) for the latest targeted suite run; the 2026-10-22 replay refresh and the 2026-10-19 live read-only probe are recorded separately below.
+Date: 2026-10-30 for the latest full `tests/fm-slack-watch.test.sh` run, which added X24 through X32; the 2026-10-23 targeted suite run, the 2026-10-22 replay refresh, and the 2026-10-19 live read-only probe are recorded separately below.
 Host: macOS arm64, shared operator host.
 Validation tool: no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
 No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
@@ -22,6 +22,8 @@ Its logs record each suite's markers and results but not the full command line, 
 The same phase also drove the real entry points by hand against replay transcripts: a card carrying `<source-id>`, `&`, `>`, and a literal `&lt;` was posted with every one escaped and no raw `<` or `>`; cards whose budget cut fell at each offset inside an `&amp;` or `&lt;` stayed at or under 38,000 characters with no split entity; a 45,000-character post of `&amp;` was cut without splitting an entity; a typed-reply conflict posted its candidates escaped while its wake line stayed plain; and reaction, single-character, and tap-versus-typed answers behaved as before.
 An earlier 2026-10-23 test phase, at commit `ca4fcbe71`, passed the same three suites and drove by hand the removal of the `:two:` reaction alone, which left the call open, then a fresh typed `3`, which recorded `abort` once; its widest conflict wake line measured 473 characters.
 The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X23; DOD-11, S4, and ACT-1 were not run.
+The 2026-10-30 run of `tests/fm-slack-watch.test.sh` on host `Mac-Studio.local` printed an `ok -` line for DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X32, then `ok - all Slack watch checks`, and exited 0.
+Its log records the markers and the exit status but not the command line or the commit, so neither is quoted for that run.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
 ## Live read-only probe
@@ -245,9 +247,10 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
-## X1..X23 - review-round regressions
+## X1..X32 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
+X24 through X32 passed in the 2026-10-30 run; each entry quotes its `ok -` line and states what that case asserts.
 
 - X1: after a hold was released and set again, a reaction on the older thread and an answer staged before the re-hold (held back by a failing intake wrapper, not by a fault seam) both left the newer hold open; the staged answer surfaced a `replaced hold` check line and its thread was told `Answer not applied`; the older thread was retired. A live hold still took its own thread's answer.
 - X2: with `slack-dm` unbound, neither the armed `check` nor `poll` delivered an answer; rebinding let the next `check` answer.
@@ -273,6 +276,15 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X21: with stdout and stderr captured apart, an explicit `arm` named its failure on stderr, wrote nothing to stdout, and exited nonzero on every run: after `FM_SLACK_DM_USER` changed (`dm_user_changed`, run twice with the failure already recorded by the standing check in between), with a state file of the wrong schema (`invalid_state_schema`), with a symlinked state directory (`unsafe_state_path`), and with a missing transcript (`replay_transcript_unreadable`). The standing `check` was silent on both streams with exit 0 while healthy, reported `dm_user_changed` once on stdout when it changed, and was silent on the repeat.
 - X22: with `FM_SLACK_POLL_MAX_ANSWERS=1`, a live thread with an owner reply and a thread whose call was closed in the terminal after the owner replied late: the first poll answered the live thread and did not retire the closed one (no `Resolved:` post, `retired` false); the second poll emitted `unmatched reply` for the late reply; the third poll posted `Resolved:` and retired the thread.
 - X23: a card whose title, held question, and option text carried `R&D <beta>`, `bind <source-id> & confirm`, and `Keep <old> & new ... a > b` reached Slack as `R&amp;D &lt;beta&gt;`, `bind &lt;source-id&gt; &amp; confirm`, and `Keep &lt;old&gt; &amp; new ... a &gt; b`, with no raw angle bracket and no bare ampersand; an oversized card whose question held 45,000 `<` stayed within 38,000 characters, kept the disagreement rule, and split no entity; a staged 9,000-copy `&amp;` notice was cut at the post bound without splitting an entity; two typed replies `use &lt;source-id&gt; &amp; go` and `skip &amp; wait` posted the notice `Conflicting signals: skip &amp; wait vs use &lt;source-id&gt; &amp; go. No answer was recorded. Please reply once.`, emitted the plain wake line `conflicting signals: skip & wait vs use <source-id> & go. Please reply once.`, and recorded nothing.
+- X24 (`ok - X24`): a card mirrored while the call-state probe failed recorded identity `uncertain`; while the probe still failed, a poll closed nothing, left `reaction-call` open, and posted nothing to thread `900.000001`; once the probe read again, the next poll still closed nothing and the call stayed open.
+- X25 (`ok - X25`): a typed-reply poll faulted with `FM_SLACK_FAULT` at each of `after-stage`, `after-delivery`, `after-answer`, `after-ack`, `after-cursor`, and `before-emit` exited 75 and printed nothing; the next poll printed `closed: typed-call`, the task was closed with one resolution record, the thread held one `Answer recorded` acknowledgement, and a further poll printed nothing. An unmatched-reply poll faulted at `after-notice-post` and at `before-emit` exited 75 and printed nothing; the next poll printed one check line, the thread held one `No open decision matches` notice, and a further poll printed nothing. An armed `check` faulted at `before-emit` exited 75; the next `check` printed the one check line, and the one after printed nothing.
+- X26 (`ok - X26`): with `FM_SLACK_DM_USER` changed after the DM existed, `fm-slack-poll.sh` printed `dm_user_changed`; `fm-slack-check.sh retarget` exited 0 and printed `retargeted:`; `arm` then printed `armed:`; mirroring again gave 4 threads, posted cards to the new owner's DM, and posted nothing more to the old DM. In a fresh home, `retarget` with the owner unchanged exited 0, printed `unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget`, did not print `retargeted:`, and left the state file unchanged. With one notice staged in the pending journal, `retarget` to a changed owner exited nonzero with `dm_user_changed_with_pending_work` and left the one pending row. On an unconfigured home, `retarget` exited nonzero with `slack: refused: unconfigured`.
+- X27 (`ok - X27`): with `SLACK_SIGNING_SECRET` and `SLACK_APP_TOKEN` set in the poll's environment, every local child the poll ran (wrappers around `fm-captain-hold.sh` and `fm-fleet-snapshot.sh`) saw both unset.
+- X28 (`ok - X28`): with the recorded channel set to the non-DM conversation `C0PUBLIC0001` and a new held call to mirror, the mirror exited nonzero with `target_is_not_a_DM` and sent nothing to `C0PUBLIC0001`; `fm_slack_watch.py post` exited 2 with `unknown command`; and `fm_slack.py chat.postMessage channel=... text=x`, run without a token, printed nothing.
+- X29 (`ok - X29`): with `conversations.history` failing with status 400 while a new held call needed a card, the poll still printed `closed: reaction-call` for the tap on the existing thread, printed `transport failure: api_error`, and exited nonzero; the next poll did not repeat the transport failure.
+- X30 (`ok - X30`): with `conversations.replies` for thread `900.000001` failing with status 400, the poll exited nonzero, printed `closed: dup-b` and `transport failure: api_error`, did not print `closed: dup-a`, and left `dup-a` open.
+- X31 (`ok - X31`): with `slack-dm` unbound by the call-state probe after the poll began, the poll closed nothing, left `typed-call` open, and posted nothing to the thread; after the source was bound again, the next poll printed `closed: typed-call`.
+- X32 (`ok - X32`): with two 300-character wake lines journaled in an armed home and an unmatched reply waiting, the first `check` printed one line of at most 480 characters, exactly the first journaled line followed by `; +2 queued`; the second `check` printed the second journaled line in full followed by `; check: slack 900.000001 - unmatched reply 900.000002`; the third printed nothing.
 
 ## ACT-1 - live answer
 
