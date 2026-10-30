@@ -247,13 +247,10 @@ serial.each do |id, job|
   n = Integer(id[/\d+\z/])
   raise "#{id} must be named Behavior portable serial #{n}, got #{job["name"].inspect}" unless job["name"] == "Behavior portable serial #{n}"
   raise "#{id} must need the plan" unless Array(job["needs"]) == ["plan"]
-  raise "#{id} must run when the plan has at least #{n} shards, got #{job["if"].inspect}" \
-    unless job["if"].to_s.strip == "fromJSON(needs.plan.outputs.serial_count) >= #{n}"
   steps = job.fetch("steps")
   shard = steps.find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
   raise "#{id} must run the portable-serial-shard action" unless shard
   raise "#{id} must pass its own shard number" unless shard.fetch("with").fetch("shard").to_i == n
-  raise "#{id} must pass the planned total" unless shard.fetch("with").fetch("total").to_s.include?("needs.plan.outputs.serial_count")
   normalized = Marshal.load(Marshal.dump(job))
   normalized["name"] = nil
   normalized["if"] = nil
@@ -284,22 +281,65 @@ RUBY
 
 # Every behavior-test job waits for the plan and runs only when the plan asks for
 # it. A job the plan leaves out is skipped, which the forge reports as a skipped
-# check rather than a pending one, so no required result is left waiting.
+# check rather than a pending one, so no required result is left waiting. Each
+# job's `if` and each serial shard's planned total are evaluated against what
+# the runner plans for the full suite, an empty selection and a selection of one
+# portable parallel 1 script and one serial script; a condition this evaluator
+# does not understand fails the check rather than passing it.
 test_every_behavior_test_job_is_planned() {
-  ruby -ryaml - "$CI_WORKFLOW" <<'RUBY' || fail "behavior test jobs must be planned"
+  local scratch parallel serial
+  scratch=$(fm_test_tmproot fm-ci-planned)
+  parallel=$("$ROOT/bin/fm-test-run.sh" --list --lane portable-parallel-1 | head -n 1)
+  serial=$("$ROOT/bin/fm-test-run.sh" --list --lane portable-serial-1of25 | head -n 1)
+  [ -n "$parallel" ] && [ -n "$serial" ] || fail "could not list a portable parallel 1 and a serial script"
+  : >"$scratch/none"
+  printf '%s\n%s\n' "$parallel" "$serial" >"$scratch/two"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci >"$scratch/full.plan" || fail "cannot plan the full suite"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci --select-file "$scratch/none" >"$scratch/none.plan" || fail "cannot plan an empty selection"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci --select-file "$scratch/two" >"$scratch/two.plan" || fail "cannot plan a two-script selection"
+  ruby -ryaml - "$CI_WORKFLOW" "$scratch/full.plan" "$scratch/none.plan" "$scratch/two.plan" <<'RUBY' || fail "behavior test jobs must be planned"
 jobs = YAML.load_file(ARGV[0]).fetch("jobs")
-(%w[tests-portable-parallel-1 tests-portable-parallel-2 tests-herdr] + (1..25).map { |n| "tests-portable-serial-#{n}" }).each do |name|
-  job = jobs.fetch(name)
-  needs = Array(job["needs"])
-  raise "#{name} must need the plan" unless needs.include?("plan")
-  condition = job["if"].to_s
-  raise "#{name} must run only when the plan asks for it, got #{condition.inspect}" unless condition.include?("needs.plan.outputs.")
+OUTPUT = /\Aneeds\.plan\.outputs\.([a-z_0-9]+)\z/
+def output(ref, plan)
+  key = ref[OUTPUT, 1] or raise "unsupported reference #{ref.inspect}"
+  plan.fetch(key) { raise "the plan prints no #{key}" }
+end
+def holds(condition, plan)
+  condition.to_s.split(" && ").all? do |term|
+    case term.strip
+    when "always()" then true
+    when /\A(\S+) == '([^']*)'\z/ then output($1, plan) == $2
+    when /\AfromJSON\((\S+)\) >= ([0-9]+)\z/ then Integer(output($1, plan)) >= Integer($2)
+    else raise "unsupported condition #{term.inspect}"
+    end
+  end
+end
+def template(value, plan)
+  match = value.to_s.match(/\A\$\{\{\s*(\S+)\s*\}\}\z/) or raise "unsupported template #{value.inspect}"
+  output(match[1], plan)
+end
+behavior = %w[tests-portable-parallel-1 tests-portable-parallel-2 tests-herdr] + (1..25).map { |n| "tests-portable-serial-#{n}" }
+behavior.each { |name| raise "#{name} must need the plan" unless Array(jobs.fetch(name)["needs"]).include?("plan") }
+plans = ARGV[1..].map { |f| [File.basename(f, ".plan"), File.readlines(f, chomp: true).map { |l| l.split("=", 2) }.select { |p| p.length == 2 }.to_h] }
+expected = {
+  "full" => behavior + ["tests-timing-aggregate"],
+  "none" => [],
+  "two" => %w[tests-portable-parallel-1 tests-portable-serial-1 tests-timing-aggregate],
+}
+plans.each do |label, plan|
+  running = (behavior + ["tests-timing-aggregate"]).select { |name| holds(jobs.fetch(name)["if"], plan) }
+  raise "#{label} plan runs #{running.inspect}, expected #{expected.fetch(label).inspect}" unless running.sort == expected.fetch(label).sort
+  running.grep(/\Atests-portable-serial-/).each do |name|
+    shard = jobs.fetch(name).fetch("steps").find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
+    total = template(shard.fetch("with").fetch("total"), plan)
+    raise "#{name} gets total #{total} under the #{label} plan, expected #{plan["serial_count"]}" unless total == plan.fetch("serial_count")
+  end
 end
 %w[lint test-coverage invariants macos-stock-bash].each do |name|
   raise "#{name} runs on every change and must not depend on the plan" if Array(jobs.fetch(name)["needs"]).include?("plan")
 end
 RUBY
-  pass "every behavior-test job is gated on the plan and the always-on jobs are not"
+  pass "every behavior-test job runs exactly when the plan asks for it, each shard gets the planned total, and the always-on jobs do not wait for the plan"
 }
 
 # The plan step is the shell that decides full or selected. Run it as written

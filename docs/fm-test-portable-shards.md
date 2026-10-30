@@ -347,12 +347,17 @@ The `plan` job in `.github/workflows/ci.yml` runs both and hands every behavior 
 Every tracked file is a node, and one file depends on another when its code runs, sources, copies, reads or lists it.
 In shell code that means the command word, the file given to `source` or `.`, the script given to an interpreter, any other whole word that names a file, a glob over a repository directory, and a repository directory that `cp -R`, `rsync`, `tar`, `find`, `ls`, `git ls-files` or a `for` loop walks.
 A name with a variable inside it (`backends/$name.sh`) counts as the files it could mean, up to sixteen.
+The default word of `${NAME:-word}`, `${NAME-word}`, `${NAME:=word}` and `${NAME=word}` counts as a word of its own.
+A path spelled under some other directory (`$dir/code-root/bin/x.sh`, where `code-root/bin` links to `bin/`) names the tracked file with the longest suffix of it that keeps a directory and a name.
+A glob given to `git ls-files`, `git grep` or `git archive`, or a glob literal in Python or JavaScript code that runs `git ls-files`, is a git pathspec: `*` crosses `/` and a bare pattern such as `*.md` matches anywhere in the tree.
+A here-document given to an interpreter as its script (`python3 - <<PY`) is read as code in that language.
 A root-level file such as `AGENTS.md`, or a whole directory, counts only when it is named through a repository-root variable (`$ROOT`, `$FM_ROOT`) or a command substitution, because the same name under `$home` or `$repo` belongs to a fixture.
 A `bash -c` argument counts only where the inline code runs it.
 A message that merely mentions a script, a comment, a document that mentions a script, and a production script's reference to a test file name nothing.
 Tests also depend on everything their text mentions, because a test may assert on a file it never runs, and Python, JavaScript and TypeScript depend on every whole string literal that names a file.
 A test is selected when a changed file is reachable from it through code files; documents and data are leaves.
 A `tests/` helper that at least half of the tests load (today `tests/lib.sh` and the helpers it sources) is infrastructure: the scripts it starts for its own setup and teardown are included with the libraries they load, but the scripts those start are not followed.
+A script that a test's own chain of runs also reaches is followed in full, whichever path the walk finds first.
 
 **What forces the full suite.**
 A push to `main`, a manual run that names no `base`, a pull request labeled `ci-full`, a checkout that is not a pull request merge commit, a change to `tests/lib.sh`, `bin/fm-test-run.sh`, `bin/fm-test-select.py` or anything under `.github/`, a change that reaches nine tenths of the tests (a library sourced almost everywhere), a changed path in neither the base nor the head tree, any error reading the tree or the diff, and a selected test that no lane owns.
@@ -369,12 +374,12 @@ A skipped job is reported by the forge as skipped under its own name, which sati
 Lint, the coverage guard, the invariants and the stock macOS Bash job do not depend on the plan and always run.
 
 **What it cannot see.**
-A path built at run time from pieces the code does not spell out, a file named only inside a longer string that a program later parses, a file reached through a program's own search path or an environment variable, a directory listed from a bare name with no path around it, a call whose script is passed to a shell function that runs it, and behavior that depends on a file's content but not on its name.
+A path built at run time from pieces the code does not spell out, a file named only inside a longer string that a program later parses, a file reached through a program's own search path or an environment variable, a directory listed from a bare name with no path around it, a here-document piped into an interpreter rather than given to it as its script, a pathspec a program builds from data it reads, a call whose script is passed to a shell function that runs it, and behavior that depends on a file's content but not on its name.
 It also follows only source and library edges past a shared test helper, so a test that reaches a script only through that helper's teardown is not selected for a change to that script.
 The full run on every push to `main` is the backstop for all of these: a regression the selection missed is caught there, not shipped silently.
 
 **Verification.**
-`tests/fm-test-select.test.sh` builds fixture repositories and checks the selected set for a changed sourced library, a regression planted in a file no test names, a message and a comment, a `bash -c` argument, a deleted file, a walked and a globbed directory, a document, a variable name, the shared-helper boundary, every full-suite trigger and the fail-closed paths; `tests/fm-test-run.test.sh` checks `--select-file` and `--plan-ci`; `tests/fm-ci-workflow.test.sh` checks the jobs, the plan step for each event and the shard-to-lane match.
+`tests/fm-test-select.test.sh` builds fixture repositories and checks the selected set for a changed sourced library, a regression planted in a file no test names, a message and a comment, a `bash -c` argument, a deleted file, a walked and a globbed directory, a document, a variable name, a `${NAME:-word}` default, a path under a linked fixture directory, an interpreter here-document and a bare `git ls-files` pattern, the shared-helper boundary and a script that helper reaches before the test's own chain does, every full-suite trigger and the fail-closed paths; `tests/fm-test-run.test.sh` checks `--select-file` and `--plan-ci`; `tests/fm-ci-workflow.test.sh` checks the jobs, the plan step for each event and the shard-to-lane match.
 Preview a selection with `bin/fm-test-select.py --base origin/main --explain` and the plan it implies with `bin/fm-test-run.sh --plan-ci --select-file <file>`.
 
 ## Portable serial remainder
@@ -391,8 +396,9 @@ On [PR 1495](https://github.com/kunchenguid/firstmate/pull/1495), its main step 
 Each shard is still strictly serial in itself, and separate runners mean no two of these stateful scripts ever share a machine, so the split needs no concurrency isolation proof.
 
 `bin/fm-test-run.sh` owns `n` and refuses any lane whose `of<n>` disagrees with it.
-`.github/workflows/ci.yml` has one job per shard and passes the lane the shard count the plan reports (`bin/fm-test-run.sh --plan-ci` prints `serial_count`) rather than a literal, so changing the shard count in either file without the other fails the lane loudly instead of leaving part of the required suite unrun.
-`tests/fm-ci-workflow.test.sh` holds the shard jobs identical but for their number and equal to the lanes the runner defines.
+`.github/workflows/ci.yml` has one job per shard and passes the lane the shard count the plan reports (`bin/fm-test-run.sh --plan-ci` prints `serial_count`) rather than a literal.
+A lane therefore never refuses a planned count, so it is not the lane that catches a shard count changed in one file but not the other: `tests/fm-ci-workflow.test.sh` does, by holding the shard jobs identical but for their number and equal in count to the lanes the runner defines for the full plan.
+That test runs before merge on any such change, because a change to `bin/fm-test-run.sh` or to anything under `.github/` selects the full suite.
 
 Assignment is longest-processing-time bin packing over per-script duration hints embedded in `bin/fm-test-run.sh`.
 [Verification inputs](#verification-inputs) owns the measurement provenance and exceptions.

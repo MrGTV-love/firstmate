@@ -34,7 +34,14 @@ on file B when A runs, sources, copies, reads or lists B:
     ("backends/$name.sh") names the files it could mean, up to sixteen. A
     root-level file ("AGENTS.md") or a whole directory counts only when it is
     named through a repository-root variable ($ROOT, $FM_ROOT, ...) or a command
-    substitution, because the same name under $home or $repo is a fixture's own;
+    substitution, because the same name under $home or $repo is a fixture's own.
+    The default word of ${NAME:-word}, ${NAME-word}, ${NAME:=word} and
+    ${NAME=word} is a word of its own. A path spelled under some other
+    directory ("$dir/code-root/bin/x.sh") names the tracked file with the
+    longest suffix of it that keeps a directory and a name. A glob given to git
+    ls-files, git grep or git archive is a pathspec: "*" crosses "/" and a bare
+    pattern ("*.md") matches anywhere in the tree. A here-document given to an
+    interpreter as its script ("python3 - <<PY") is code in that language;
   - a "bash -c CODE _ args" call passes an argument on only where CODE runs it;
   - a longer string that merely mentions B (a message, a usage text), a comment,
     a here-document that is only text, a file test ([ -f B ]) and a production
@@ -42,7 +49,7 @@ on file B when A runs, sources, copies, reads or lists B:
   - tests/*.test.sh also depend on every file their text mentions, because a
     test may assert on a file it never runs;
   - Python, JavaScript and TypeScript depend on every whole string literal that
-    names a file.
+    names a file; in code that runs git ls-files a glob literal is a pathspec.
 A test is affected by a changed file when that file is reachable from the test
 through code files. Documents, data and other non-code files are leaves,
 because mentioning a script inside a document never runs it. Tests are
@@ -55,7 +62,8 @@ A shared tests/ helper that at least half of the tests load (tests/lib.sh) is
 infrastructure: past it only sourced libraries are followed, so the scripts it
 starts for its own setup and teardown are dependencies of every test, but the
 scripts those start are not, or one teardown call would tie the whole tree to
-every test.
+every test. A script that a test's own chain also reaches is followed in full,
+whichever path the walk finds first.
 
 Fail-closed rules, each printing mode=full with its reason:
   - the infrastructure that runs or defines the tests changed: tests/lib.sh,
@@ -71,7 +79,8 @@ spell out (for example "$dir/$name" with $name read from input), a file named
 only inside a longer string that a program later parses, a script passed to a
 shell function that runs it, a file reached only through a program's own search
 path or an environment variable's value, a directory listed from a bare name
-with no path around it, what a shared test helper's teardown starts beyond the
+with no path around it, a here-document piped into an interpreter rather than
+given to it as its script, a pathspec a program builds from data, what a shared test helper's teardown starts beyond the
 libraries it loads, and behavior that depends on a file's content but not on
 its name or location. A full suite runs on every push to main, so a miss is
 caught there; docs/fm-test-portable-shards.md "Change-based test selection"
@@ -105,6 +114,9 @@ MAX_READ_BYTES = 2 * 1024 * 1024
 # ambiguous to follow.
 MAX_DYNAMIC_MATCHES = 16
 
+# ${NAME:-word}, ${NAME-word}, ${NAME:=word} and ${NAME=word} stand for word
+# whenever NAME is unset, so the word is a name of its own.
+DEFAULT_EXPANSION = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=]([^{}]*)\}")
 LEADING_VARIABLE = re.compile(r"^(?:\$\{[^}]*\}|\$\(…\)|\$[A-Za-z_][A-Za-z0-9_]*)")
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\+?=")
 PATHLIKE = re.compile(r"[A-Za-z0-9_.@+~/${}*?-]+")
@@ -117,6 +129,12 @@ WRAPPERS = frozenset(("exec", "command", "env", "nohup", "time", "timeout", "nic
 INTERPRETERS = frozenset(("bash", "sh", "zsh", "dash", "ksh", "python", "python3", "node",
                           "ruby", "perl", "tsx", "bun"))
 ENUMERATORS = frozenset(("rsync", "tar", "find", "ls", "du", "tree", "zip", "unzip"))
+# A here-document given to one of these, as its script on standard input, is
+# code in that language rather than text.
+HEREDOC_LANGUAGES = {"bash": "shell", "sh": "shell", "zsh": "shell", "dash": "shell",
+                     "ksh": "shell", "python": ".py", "python3": ".py", "node": ".js",
+                     "bun": ".js", "tsx": ".ts", "ruby": ".rb", "perl": ".rb"}
+HEREDOC_CODE = "\0heredoc"
 # A printed or logged line names nothing; these lines in Python and JavaScript
 # are messages.
 MESSAGE_LINE = re.compile(r"^\s*(?:print|raise|throw|console\.|logging\.|logger\.|sys\.std(?:err|out)\.write)")
@@ -282,7 +300,9 @@ def scan(text, bodies):
     that came from inside quotes keeps its spaces, which is how a message is told
     from a path. bodies decides which here-documents are read as shell:
     "all", "redirected" (only one whose command writes a file, such as a stub
-    script) or "none".
+    script) or "none". A here-document that is the script of a shell is read as
+    shell whatever bodies says, and one that is the script of another
+    interpreter becomes the command [HEREDOC_CODE, suffix, code].
     """
     commands = []
     words = []
@@ -339,7 +359,7 @@ def scan(text, bodies):
         elif kind == "nl":
             writes_file = redirected
             end_command()
-            for delimiter, strip in pending:
+            for delimiter, strip, language in pending:
                 lines = []
                 while i < size:
                     j = text.find("\n", i)
@@ -348,14 +368,16 @@ def scan(text, bodies):
                     if (line.strip("\t") if strip else line) == delimiter:
                         break
                     lines.append(line)
-                if bodies == "all" or (bodies == "redirected" and writes_file):
+                if language and language != "shell":
+                    commands.append([HEREDOC_CODE, language, "\n".join(lines)])
+                elif language or bodies == "all" or (bodies == "redirected" and writes_file):
                     commands.extend(scan("\n".join(lines), bodies))
             pending = []
         elif kind == "heredoc":
             end_word()
             strip = token.startswith("<<-")
             delimiter = token.lstrip("<-").strip().strip("'\"").lstrip("\\")
-            pending.append((delimiter, strip))
+            pending.append((delimiter, strip, heredoc_language(words)))
         elif kind == "sq":
             buf.append(token[1:-1])
             have = True
@@ -391,6 +413,30 @@ def scan(text, bodies):
     return commands
 
 
+def heredoc_language(words):
+    """The language of the script a command reads from a here-document, or None.
+
+    words are the command's words before the here-document. An interpreter
+    given no script file, or "-", reads its script from standard input; with a
+    script file or -c/-e code the here-document is only that program's input.
+    """
+    i = 0
+    while i < len(words) and ASSIGNMENT.match(words[i]):
+        i += 1
+    while i < len(words) and words[i] in WRAPPERS:
+        i += 1
+        while i < len(words) and words[i].startswith("-") and words[i] != "-":
+            i += 1
+    if i >= len(words):
+        return None
+    for arg in words[i + 1:]:
+        if arg == "-":
+            break
+        if arg in ("-c", "-e") or not arg.startswith("-"):
+            return None
+    return HEREDOC_LANGUAGES.get(os.path.basename(words[i]))
+
+
 def positional_roles(commands, args):
     """Words of CODE, run with positional parameters args ($0 first), that name files.
 
@@ -424,9 +470,12 @@ def command_words(words, enumerating):
     interpreter, and values assigned for later use. reads: every other whole
     word. sources: the files loaded into the shell, a subset of runs. A longer
     string is a message and is left out by the caller's whole-word test.
-    enumerating collects True when the command walks a whole directory.
+    enumerating collects True when the command walks a whole directory, and
+    "git" when git lists or reads files by pathspec.
     """
     runs, reads, sources = [], [], []
+    if words[:1] == [HEREDOC_CODE]:
+        return runs, reads, sources
     i = 0
     while i < len(words) and ASSIGNMENT.match(words[i]):
         runs.append(words[i].split("=", 1)[1])
@@ -478,10 +527,11 @@ def command_words(words, enumerating):
                 reads.append(arg.split("=", 1)[1])
             continue
         reads.append(arg.split("=", 1)[1] if ASSIGNMENT.match(arg) else arg)
-    if (base in ENUMERATORS
+    if base == "git" and any(a in ("ls-files", "grep", "archive", "clone") for a in args):
+        enumerating.append("git")
+    elif (base in ENUMERATORS
             or (base == "cp" and any(set(f[1:]) & set("rRa") for f in flags))
-            or (base == "grep" and any("r" in f[1:].lower() for f in flags))
-            or (base == "git" and any(a in ("ls-files", "grep", "archive", "clone") for a in args))):
+            or (base == "grep" and any("r" in f[1:].lower() for f in flags))):
         enumerating.append(True)
     return runs, reads, sources
 
@@ -544,7 +594,16 @@ class Tree:
         base = os.path.basename(trimmed)
         cands = self.by_base.get(base, ())
         if "/" in trimmed:
-            found.update(c for c in cands if c.endswith("/" + trimmed))
+            # A path spelled under some other directory ("$dir/code-root/bin/x.sh"
+            # where code-root/bin links to bin/) names the tracked file with the
+            # longest suffix of it that keeps at least a directory and a name.
+            parts = trimmed.split("/")
+            for i in range(len(parts) - 1):
+                suffix = "/".join(parts[i:])
+                hits = {c for c in cands if c == suffix or c.endswith("/" + suffix)}
+                if hits:
+                    found.update(hits)
+                    break
         else:
             for cand in cands:
                 if "/" in cand:
@@ -567,6 +626,16 @@ class Tree:
                     found.add(real)
         self.word_cache[key] = found
         return found
+
+    def pathspec_files(self, pattern):
+        """Files a git pathspec glob matches: "*" crosses "/", and a bare pattern
+        ("*.md") matches anywhere in the tree."""
+        key = ("pathspec", pattern)
+        if key not in self.glob_cache:
+            regex = re.compile("".join(".*" if c == "*" else "." if c == "?" else re.escape(c)
+                                       for c in pattern) + "$")
+            self.glob_cache[key] = {c for c in self.files if regex.match(c)}
+        return self.glob_cache[key]
 
     def dirs_named(self, trimmed, qualified):
         out = set()
@@ -595,13 +664,30 @@ class Tree:
         return found
 
 
-def word_references(tree, raw, enumerating):
-    """Tracked files one whole word names, or nothing for a message."""
-    key = (raw, enumerating)
+def word_references(tree, raw, enumerating, pathspec=False):
+    """Tracked files one whole word names, or nothing for a message.
+
+    pathspec says a glob in the word is a git pathspec.
+    """
+    key = (raw, enumerating, pathspec)
     cached = tree.reference_cache.get(key)
     if cached is None:
-        cached = tree.reference_cache[key] = _word_references(tree, raw, enumerating)
+        found = _word_references(tree, raw, enumerating, pathspec)
+        defaulted = expand_defaults(raw)
+        if defaulted != raw:
+            found = found | word_references(tree, defaulted, enumerating, pathspec)
+        cached = tree.reference_cache[key] = found
     return cached
+
+
+def expand_defaults(text):
+    """text with each ${NAME:-word} (and -, :=, =) replaced by its word."""
+    for _ in range(3):
+        expanded = DEFAULT_EXPANSION.sub(lambda m: m.group(1).replace('"', "").replace("'", ""), text)
+        if expanded == text:
+            break
+        text = expanded
+    return text
 
 
 def normal_path(word):
@@ -624,7 +710,7 @@ def normal_path(word):
     return "/".join(parts).rstrip(".")
 
 
-def _word_references(tree, raw, enumerating):
+def _word_references(tree, raw, enumerating, pathspec):
     variable = LEADING_VARIABLE.match(raw)
     qualified = False
     if variable:
@@ -647,7 +733,7 @@ def _word_references(tree, raw, enumerating):
     if not trimmed:
         return set()
     if "*" in trimmed or "?" in trimmed:
-        matched = tree.glob_files(trimmed)
+        matched = tree.pathspec_files(trimmed) if pathspec else tree.glob_files(trimmed)
         return matched if not dynamic or len(matched) <= MAX_DYNAMIC_MATCHES else set()
     found = set(tree.files_named(trimmed.rstrip("/"), qualified))
     if enumerating:
@@ -658,7 +744,7 @@ def _word_references(tree, raw, enumerating):
 def mention_references(tree, text):
     """Files a text mentions anywhere, in any string or word (generous)."""
     found = set()
-    for word in set(PATHLIKE.findall(text)):
+    for word in set(PATHLIKE.findall(text)) | set(PATHLIKE.findall(expand_defaults(text))):
         found |= word_references(tree, word, False)
     return found
 
@@ -666,7 +752,7 @@ def mention_references(tree, text):
 STRING_LITERAL = re.compile(r"\"([^\"\\\n]*)\"|'([^'\\\n]*)'|`([^`]*)`")
 
 
-def literal_references(tree, text):
+def literal_references(tree, text, pathspec=False):
     """Files named by a whole string literal (Python, JavaScript, TypeScript).
 
     A literal that is a path or a file name names it; a sentence that mentions
@@ -674,8 +760,19 @@ def literal_references(tree, text):
     """
     found = set()
     for match in STRING_LITERAL.finditer(text):
-        found |= word_references(tree, next(g for g in match.groups() if g is not None), False)
+        found |= word_references(tree, next(g for g in match.groups() if g is not None), False, pathspec)
     return found
+
+
+def code_references(tree, path, text):
+    """Files the string literals of Python, JavaScript or TypeScript code name.
+
+    Code that lists tracked files hands its glob literals to git, where a bare
+    pattern ("*.md") matches anywhere in the tree.
+    """
+    lines = [l for l in strip_foreign_comments(path, text).split("\n") if not MESSAGE_LINE.match(l)]
+    code = "\n".join(lines)
+    return literal_references(tree, code, "ls-files" in code)
 
 
 VARIABLE_NAME = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
@@ -685,6 +782,8 @@ def assigned_values(commands):
     """name -> the first value the file assigns it, for names that hold a path."""
     values = {}
     for words in commands:
+        if words[:1] == [HEREDOC_CODE]:
+            continue
         for word in words:
             if ASSIGNMENT.match(word):
                 name, _, value = word.partition("=")
@@ -709,10 +808,14 @@ def shell_references(tree, text, bodies):
     commands = scan(text, bodies)
     values = assigned_values(commands)
     for words in commands:
+        if words[:1] == [HEREDOC_CODE]:
+            found |= code_references(tree, "here-document" + words[1], words[2])
+            continue
         enumerating = []
         runs, reads, sources = command_words(words, enumerating)
         for word in runs + reads:
-            found |= word_references(tree, expand_assigned(word, values), bool(enumerating))
+            found |= word_references(tree, expand_assigned(word, values), bool(enumerating),
+                                     "git" in enumerating)
         for word in sources:
             sourced |= word_references(tree, expand_assigned(word, values), False)
     return found, sourced
@@ -738,8 +841,7 @@ def references(tree, path):
             refs |= mention_references(tree, "\n".join(
                 l for l in text.split("\n") if not l.lstrip().startswith("#")))
     else:
-        lines = [l for l in strip_foreign_comments(path, text).split("\n") if not MESSAGE_LINE.match(l)]
-        refs = literal_references(tree, "\n".join(lines))
+        refs = code_references(tree, path, text)
     refs.discard(path)
     sourced.discard(path)
     if not path.startswith("tests/"):
@@ -770,20 +872,23 @@ class Graph:
         test does not inherit the whole tree through it.
         """
         parent = {test: None}
-        expanded = set()
+        # A file first reached past an ambient file, where only its loaded
+        # libraries are followed, is followed again in full when the test's own
+        # chain reaches it too, whichever path the walk finds first.
+        full, loaded = set(), set()
         queue = [(test, False)]
         while queue:
             node, loaded_only = queue.pop(0)
-            if node in expanded:
+            if node in full or (loaded_only and node in loaded):
                 continue
-            expanded.add(node)
+            (loaded if loaded_only else full).add(node)
             edges = self.source_edges if loaded_only else self.edges
             for nxt in sorted(edges.get(node, ())):
-                if nxt not in parent:
-                    parent[nxt] = node
-                if nxt not in expanded:
-                    # Past an ambient file only loaded libraries are followed.
-                    queue.append((nxt, loaded_only or node in ambient))
+                parent.setdefault(nxt, node)
+                # Past an ambient file only loaded libraries are followed.
+                nxt_loaded = loaded_only or node in ambient
+                if nxt not in full and not (nxt_loaded and nxt in loaded):
+                    queue.append((nxt, nxt_loaded))
         return parent
 
     def find_ambient(self):

@@ -58,9 +58,9 @@ runs:
       env:
         FM_SHARD_MODE: ${{ inputs.mode }}
         FM_SHARD_SELECTION: ${{ inputs.selection }}
-        # The planned total rather than a literal, so a plan and the runner that
-        # owns the shard count cannot disagree without bin/fm-test-run.sh
-        # refusing the lane instead of quietly leaving part of the suite unrun.
+        # The planned total rather than a literal, which the runner always
+        # accepts; tests/fm-ci-workflow.test.sh, not this lane, catches a shard
+        # count the runner and the workflow's shard jobs disagree on.
         FM_SERIAL_LANE: portable-serial-${{ inputs.shard }}of${{ inputs.total }}
         FM_SERIAL_SHARD: ${{ inputs.shard }}
       run: |

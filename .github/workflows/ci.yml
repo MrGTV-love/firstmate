@@ -347,8 +347,9 @@ jobs:
   # ambiguous, and other stateful tests. Real Herdr stays in tests-herdr.
   # Split across separate runners so no two of these stateful scripts ever share
   # a machine: each shard is still strictly serial in itself. Shard membership
-  # and the shard count both belong to bin/fm-test-run.sh, which refuses a lane
-  # whose "ofN" disagrees with it (docs/fm-test-portable-shards.md).
+  # and the shard count both belong to bin/fm-test-run.sh. Each job passes the
+  # planned count, which the runner accepts, so tests/fm-ci-workflow.test.sh is
+  # what catches a count these jobs disagree with (docs/fm-test-portable-shards.md).
   #
   # One job per shard rather than a matrix, so that a shard the plan does not
   # need is a skipped job under its own name and still reports (a skipped job

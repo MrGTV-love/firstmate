@@ -333,6 +333,134 @@ echo deeper')
   pass "the shared library's own teardown chain is followed one script deep, no further"
 }
 
+# The shared library reaches a script before the test's own chain does. The
+# walk past the library follows only what that script loads, but the test runs
+# the script itself through two hops, so what the script starts is the test's
+# dependency too, whichever path the walk finds first.
+test_a_script_the_shared_library_reaches_first_is_still_followed_from_the_tests_chain() {
+  local repo base out n
+  repo=$(new_repo ambient-first)
+  put "$repo" bin/fm-cleanup.sh '#!/usr/bin/env bash
+"$(dirname "${BASH_SOURCE[0]}")/fm-deep.sh"'
+  put "$repo" bin/fm-deep.sh '#!/usr/bin/env bash
+echo deep'
+  put "$repo" bin/fm-k1.sh '#!/usr/bin/env bash
+"$(dirname "${BASH_SOURCE[0]}")/fm-k2.sh"'
+  put "$repo" bin/fm-k2.sh '#!/usr/bin/env bash
+"$(dirname "${BASH_SOURCE[0]}")/fm-cleanup.sh"'
+  put "$repo" tests/lib.sh '"$ROOT/bin/fm-cleanup.sh"'
+  put "$repo" tests/k.test.sh '#!/usr/bin/env bash
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+"$ROOT/bin/fm-k1.sh"'
+  for n in $(seq 1 30); do
+    put "$repo" "tests/pad-$n.test.sh" '#!/usr/bin/env bash
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"'
+  done
+  commit_all "$repo" ambient-first
+  base=$(change "$repo" bin/fm-deep.sh '#!/usr/bin/env bash
+echo deeper')
+  out=$(decide "$repo" "$base" --explain)
+  assert_equals tests/k.test.sh "$(picked "$out")" "the test that runs fm-cleanup.sh through its own chain reaches what it starts; the tests that only load the library do not"
+  assert_contains "$out" 'why=bin/fm-deep.sh <- bin/fm-cleanup.sh <- ' "the chain names the script that starts the changed file"
+  pass "a script first reached through the shared library is still followed in full from the test's own chain"
+}
+
+# A name given as the default of ${NAME:-word} is the file the code uses when
+# NAME is unset, in a test's own assignment and in a production script.
+test_the_default_word_of_a_parameter_expansion_names_a_file() {
+  local repo base out
+  repo=$(new_repo defaults)
+  put "$repo" bin/fm-helper.sh '#!/usr/bin/env bash
+echo helped'
+  put "$repo" assets/board.html '<html></html>'
+  put "$repo" bin/fm-board.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+template=${FM_BOARD_TEMPLATE:-$ROOT/assets/board.html}
+cat "$template"'
+  put "$repo" tests/d1.test.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HELPER=${HELPER:-$ROOT/bin/fm-helper.sh}
+"$HELPER"'
+  put "$repo" tests/d2.test.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+: "${FM_BOARD:=$ROOT/bin/fm-board.sh}"
+"$FM_BOARD" | grep -q html'
+  commit_all "$repo" defaults
+  base=$(change "$repo" bin/fm-helper.sh '#!/usr/bin/env bash
+echo helped # touched')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/d1.test.sh "$(picked "$out")" "\${HELPER:-\$ROOT/bin/fm-helper.sh} runs bin/fm-helper.sh"
+  base=$(change "$repo" assets/board.html '<html>changed</html>')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/d2.test.sh "$(picked "$out")" "\${FM_BOARD:=...} runs bin/fm-board.sh, whose \${FM_BOARD_TEMPLATE:-...} reads the template"
+  pass "the default word of \${NAME:-word} and \${NAME:=word} names a file in tests and in production scripts"
+}
+
+# A path spelled under a fixture directory that links to a repository
+# directory ("$dir/code-root/bin/x.sh") names the tracked file it ends with.
+test_a_path_under_a_linked_fixture_directory_names_the_file_it_ends_with() {
+  local repo base out
+  repo=$(new_repo linked)
+  put "$repo" bin/fm-sweep.sh '#!/usr/bin/env bash
+echo swept'
+  put "$repo" tests/l.test.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+dir=$(mktemp -d)
+mkdir -p "$dir/code-root"
+ln -s "$ROOT/bin" "$dir/code-root/bin"
+"$dir/code-root/bin/fm-sweep.sh"'
+  commit_all "$repo" linked
+  base=$(change "$repo" bin/fm-sweep.sh '#!/usr/bin/env bash
+echo swept # touched')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/l.test.sh "$(picked "$out")" "\$dir/code-root/bin/fm-sweep.sh is bin/fm-sweep.sh through the link"
+  pass "a path under a linked fixture directory names the tracked file it ends with"
+}
+
+# A here-document given to python3 as its script is Python: its string literals
+# name files, and a bare pattern it hands to git ls-files matches anywhere in
+# the tree. A shell command that runs git ls-files with a bare pattern does too.
+test_an_interpreter_here_document_and_a_git_pathspec_name_files() {
+  local repo base out
+  repo=$(new_repo pathspec)
+  put "$repo" data/inventory.json '{}'
+  put "$repo" docs/guide.md '# guide'
+  put "$repo" conf/z.cfg 'z'
+  put "$repo" bin/fm-doccheck.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+exec python3 - "$@" <<'"'"'PY'"'"'
+import json
+import subprocess
+PATTERNS = ["*.md"]
+inventory = json.load(open("data/inventory.json"))
+listed = subprocess.run(["git", "ls-files", "-z", "--", *PATTERNS], stdout=subprocess.PIPE, check=True)
+PY'
+  put "$repo" bin/fm-conflist.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+git -C "$ROOT" ls-files -- '"'"'*.cfg'"'"''
+  put "$repo" tests/p1.test.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+"$ROOT/bin/fm-doccheck.sh"'
+  put "$repo" tests/p2.test.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+"$ROOT/bin/fm-conflist.sh"'
+  commit_all "$repo" pathspec
+  base=$(change "$repo" data/inventory.json '{"changed": true}')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/p1.test.sh "$(picked "$out")" "the Python here-document reads data/inventory.json"
+  base=$(change "$repo" docs/guide.md '# changed guide')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/p1.test.sh "$(picked "$out")" "the bare *.md handed to git ls-files lists docs/guide.md"
+  base=$(change "$repo" README.md '# changed fixture')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/p1.test.sh "$(picked "$out")" "and the root-level README.md"
+  base=$(change "$repo" conf/z.cfg 'changed')
+  out=$(decide "$repo" "$base")
+  assert_equals tests/p2.test.sh "$(picked "$out")" "git ls-files '*.cfg' in shell lists conf/z.cfg"
+  pass "an interpreter's here-document is read as its language, and a bare git pathspec matches the whole tree"
+}
+
 test_explain_prints_the_chain_from_the_change_to_the_test() {
   local repo base out
   repo=$(new_repo explain)
@@ -394,6 +522,10 @@ fm_test_run_cases \
   test_a_document_is_a_leaf_and_a_test_that_reads_it_is_selected \
   test_a_name_built_from_a_directory_selects_the_files_it_could_be \
   test_what_the_shared_library_starts_for_its_teardown_is_not_followed \
+  test_a_script_the_shared_library_reaches_first_is_still_followed_from_the_tests_chain \
+  test_the_default_word_of_a_parameter_expansion_names_a_file \
+  test_a_path_under_a_linked_fixture_directory_names_the_file_it_ends_with \
+  test_an_interpreter_here_document_and_a_git_pathspec_name_files \
   test_a_root_level_file_is_named_only_through_the_repository_root \
   test_explain_prints_the_chain_from_the_change_to_the_test \
   test_the_real_tree_selects_an_edited_test_for_itself \
