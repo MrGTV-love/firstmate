@@ -1,0 +1,497 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-30T08:33:54Z tests/fm-watch-open-loops.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-30T08:33:54Z tests/fm-daemon.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - fm-afk-start.sh fails before daemon startup when the afk flag cannot be written
+ok - fm-afk-start.sh ignores stale pidfile-only live pids
+ok - fm-afk-start.sh reclaims stale daemon locks whose live pid identity no longer matches
+ok - supervise daemon state root is scoped by FM_HOME
+ok - routine signal self-handles
+ok - captain-relevant status verbs escalate
+ok - check + unknown escalate; heartbeat self-handles
+ok - a delivered unknown wake is acknowledged once per away session; a new one and ordinary escalations still fire
+ok - a failed unknown-wake acknowledgement write does not re-inject a delivered digest
+ok - transient stale self-handles and records a persistence marker
+ok - enriched stale wedges bypass status absorption except under a declared wait, without disturbing busy workers
+ok - an enriched wedge under a declared wait uses the pause cadence and restores wedge detection on resume
+ok - stale + terminal status escalates immediately
+ok - stale escalation and current wait cadence remain independent
+ok - paused reasons with captain phrases remain pause-classified
+ok - a foreign resolved line keeps a pause, while the worker's own resolved line retracts it
+ok - a captain-held transfer classifies as pause, not as a wedge candidate
+ok - handle_wake on a paused stale records a pause marker, drops the wedge marker, and does not escalate
+ok - handle_wake records a declared pause from a routine signal for long-cadence rechecks
+ok - a terminal signal clears pause and stale tracking across both supervisors
+ok - housekeeping migrates a normal-watcher's declared pause into daemon tracking
+ok - housekeeping clears an already-resumed watcher pause across both supervisors
+ok - housekeeping seeds pause tracking from status without a watcher marker
+ok - persistent stale escalates after threshold and clears its marker
+ok - resumed (busy) stale clears its marker without escalating
+ok - housekeeping re-surfaces a stale declared pause on the long cadence and resets its window
+ok - housekeeping re-surfaces a forgotten captain hold on the long cadence and resets its window
+ok - housekeeping silences a captain hold only under an away record, never under quiet mode's
+ok - a busy pane cannot gate the pause clear once its crew's status no longer declares the wait
+ok - housekeeping matures a busy pane's declared-wait window into exactly one recheck per window
+ok - housekeeping bounds a distant declared time, defers to a near one, and rechecks a passed one at once
+ok - housekeeping clears a paused marker once the crew is no longer declaring the pause
+ok - housekeeping clears the pause marker once a captain hold is answered
+ok - housekeeping moves an existing stale marker to pause before wedge escalation
+ok - housekeeping moves a captain hold's existing stale marker to pause before wedge escalation
+ok - housekeeping clears tracking when a crew leaves pause
+ok - persistent herdr stale resolves the target from metadata and escalates
+ok - herdr idle busy-footer stale clears through capture corroboration
+ok - resumed herdr stale clears through backend-aware busy state
+ok - persistent Orca stale resolves the terminal from metadata
+ok - multiple escalations flush as a single batched digest
+ok - batch flush measures max-delay from the first append, not the last
+ok - catch-all scan escalates a missed terminal once, not twice
+ok - handle_wake routes routine->self and captain->escalate
+ok - a decision-owned queued row escalates once as the decision, then suppresses until the status changes
+ok - a captain-held decision-owned row is self-handled without escalation, now and on repeat
+ok - INJECT_SKIP forces self-handle, bypassing captain-relevant classification
+ok - is_wake_reason distinguishes watcher wake reasons from singleton-status stdout
+ok - terminal-stale escalate removes its marker so housekeeping does not re-escalate
+ok - captain signal escalate marks seen so the catch-all scan does not re-fire
+ok - _collapse_newlines replaces newlines with literal separator
+ok - afk flag absent: daemon does not inject, buffer preserved
+ok - busy-guard defers injection when supervisor pane is busy
+ok - working omp empty boxes defer afk injection; idle omp boxes submit the retained digest
+ok - marker detection: marker -> stay afk, no marker -> exit afk
+ok - /afk invocation is exempt from afk exit (no self-cancel)
+ok - should_exit_afk returns false when afk is not active
+ok - strip_injection_marker removes the sentinel marker cleanly
+ok - a marker-preserving primary still receives the typed U+2063 away-supervisor envelope and no record
+ok - record-backed doorbell: only a doorbell naming this home's own record stays afk; a bare ASCII label, a missing record, and another home's record exit
+ok - pane_input_pending detects partial input on the cursor line
+ok - pane_input_pending: a blank unidentified cursor row defers (strict container-proof rule)
+ok - pane_input_pending: only proven empty agent prompts pass
+ok - fm_tmux_composer_state: a bare shell prompt ($/%/#/>) reads unknown, never empty (dead-shell injection safety)
+ok - fm_tmux_composer_state: a bordered composer box and bare agent glyphs (❯/›) still read empty
+ok - fm_tmux_composer_state: only matching edge borders form a composer box
+ok - pane_input_pending preserves bright placeholder-like drafts in styled captures
+ok - classify_signal dedupes against the catch-all scan seen marker
+ok - daemon migrates device-only status identity without repeating an old result or swallowing growth
+ok - turn-end markers stay routine while mixed actionable status batches escalate
+ok - an actionable event is escalated to an away captain despite later routine appends
+ok - the daemon commits exactly the endpoint captured by classification
+ok - a stale wake escalates a blocker hidden by later progress
+ok - a stale span read failure surfaces without advancing its marker
+ok - a recreated status rejects the old captured identity
+ok - an unverifiable status identity surfaces without advancing markers
+ok - a status read failure surfaces without advancing the daemon suppressor
+ok - catch-all routine scans advance before later actionable appends
+ok - failed escalation writes retain durable wakes and classification positions
+ok - away mode acknowledges handled wakes past one new overdue row, forwards it once per change, return to the gate or resurface, and writes no receipt
+ok - stuck inbox escalation reaches supervision in away mode and survives buffering failure
+ok - stuck inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - write inbox escalation reaches supervision in away mode and survives buffering failure
+ok - write inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in away mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - inbox dispatch preserves ordinary stale, busy-turn, and other doorbell routing
+ok - catch-all markers advance only after escalation buffering succeeds
+ok - classification failure retains the complete durable wake batch
+ok - missing-status stale wakes remain ordinary and acknowledgeable
+ok - transient unreadable signals recover without advancing their position
+ok - daemon catch-all reclassifies permission-recovered status content
+ok - a permanent classification failure is reported, acknowledged, and never advances its position
+ok - the away-mode catch-all scan surfaces a masked event once
+ok - classify_stale dedupes against the signal path seen marker
+ok - AFK nonterminal working:+merged keeps wedge aging and re-escalates at bound
+ok - genuine done: and merge-check events still escalate
+ok - pane_input_pending: an idle bordered composer is NOT pending (afk-invx-i5)
+ok - pane_input_pending: text inside a bordered composer is still pending
+ok - submit-ACK confirms a submit when the composer returns to a bordered-empty box
+ok - submit-ACK reports pending on a persistently swallowed Enter (type-once)
+ok - max-defer on an empty stuck pane types once, alarms, and preserves the buffer
+ok - max-defer flushes and clears the buffer on an empty bordered pane
+ok - max-defer on a pending composer alarms without typing
+ok - normal flush clears a stale wedge marker
+ok - an oversized buffered digest is delivered bounded, with the full text kept durable
+ok - a digest past its byte budget counts the omitted events and keeps them in the full text
+ok - an initial-send failure logs its stage, bytes, and stderr, and the wedge alarm names it
+ok - an Enter-confirmation failure logs its own stage and byte count
+ok - a bounded digest's full-text file survives a failure after typing, and a deferral writes none
+ok - below MAX_DEFER: no inject, no alarm, buffer preserved
+ok - max-defer does not flush or alarm while afk is inactive
+ok - library mode: sourcing the daemon defaults FM_WEDGE_ALARM_EXEC to discard (no test can fire a real notification)
+ok - wake helpers replace inherited notifier overrides with the safe recorder
+ok - the discard seam suppresses every notifier, including command: (fires nothing)
+ok - direct notifier helpers honor the discard seam, including command:
+ok - osascript channel routes through the notifier seam with the summary (never a real notification)
+ok - herdr channel routes through the notifier seam with the summary (never a real notification)
+ok - command channel runs the captain command with the summary on $1 and on stdin
+ok - command channel failures redact configured commands while logging their exit status
+ok - unknown channel directives are redacted while the alarm keeps running
+ok - off disables every active alert regardless of directive position (marker and tmux flash are unaffected)
+ok - auto resolves to the macOS osascript notifier on Darwin (default-on)
+ok - auto on a non-macOS platform selects no built-in OS channel (the marker or a configured command carries it)
+ok - config/wedge-alarm selects every configured channel and skips comment and blank lines
+ok - a failing channel logs and falls back to the next channel, never crashing the alarm
+ok - a hung notifier is bounded, logged, and falls through to the next channel
+ok - a backgrounded command notifier remains bounded until its process group is reaped
+ok - a hung notifier override is bounded, logged, and proceeds to the next channel
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-supervise-daemon.sh: line 979: 41749 Terminated: 15          sh -c 'sleep 30 & printf "%s" "$!" > "$1"; wait' sh "$child_file"
+ok - daemon shutdown stops and reaps the active notifier process group
+ok - inject_wedge_alarm writes the marker AND emits the active alert even with no tmux status-line (herdr backend)
+ok - in-process wedge throttle prevents alert spam when the marker cannot persist
+ok - fm-send returns 3 with a non-error no-resend warning when confirmation stays pending
+ok - fm-send exits non-zero when initial text send fails
+ok - fm-send exits non-zero unless delivery is proven empty
+ok - discover_supervisor_backend: override > TMUX_PANE > HERDR_ENV+HERDR_PANE_ID > tmux fallback
+ok - discover_supervisor_target: override > TMUX_PANE > herdr '<session>:<pane-id>' composition > firstmate:0 fallback
+ok - pane_is_busy: herdr native busy_state='busy' short-circuits without a capture fallback
+ok - primary busy guard isolates rendered signatures by detected harness
+ok - pane_is_busy: omitted backend defaults to tmux for Grok's isolated fallback
+ok - pane_input_pending: dispatches through fm_backend_composer_state for backend=herdr
+ok - inject_msg: herdr busy-guard defers before ever attempting a submit
+ok - inject_msg: herdr composer-guard defers before ever attempting a submit
+ok - inject_msg: herdr pane-gone check defers before any busy/composer/submit call
+ok - inject_msg: dispatches busy-guard/composer-guard/submit through the herdr backend and succeeds on a confirmed empty composer
+ok - inject_msg: defers on a dead-shell/unreadable composer (unknown), never typing the escalation into a shell
+ok - inject_msg: unrecognized composer states defer by default
+FM_TEST_END 2026-10-30T08:35:22Z tests/fm-daemon.test.sh exit=0 duration_ms=87290 gate_skip=false
+ok - an overdue ledger row wakes firstmate and leaves a durable queue row
+ok - unchanged evidence stays quiet; new rows and changed evidence wake immediately
+watcher fixture: owned child 30348 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-split/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-split/watch.out.err
+ok - row changes wake without the periodic list; the resurface wake carries it once per interval
+watcher fixture: owned child 38885 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-clean/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-clean/watch.out.err
+ok - a ledger with no overdue rows is silent
+ok - the watcher runs the reconciler detached and a partly blind ledger still wakes
+watcher fixture: owned child 66864 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-large-interval/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-large-interval/watch.out.err
+ok - a missing ledger collects with a large interval and its fresh publication stays throttled
+ok - a ledger the reconciler stopped publishing is its own wake
+watcher fixture: owned child 87352 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2800: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 11022 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-queue/watch.out.err
+watcher fixture: owned child 22998 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2797: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 38881 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-sequence/watch.out.err
+watcher fixture: owned child 47142 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 61817 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-overdue-recovery/watch.out.err
+watcher fixture: owned child 67806 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2800: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 79991 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-queue/watch.out.err
+watcher fixture: owned child 89489 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2797: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 11361 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-sequence/watch.out.err
+watcher fixture: owned child 18423 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 33777 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-stale-recovery/watch.out.err
+watcher fixture: owned child 44395 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2800: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 61263 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-queue/watch.out.err
+watcher fixture: owned child 68431 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/bin/fm-wake-lib.sh: line 2797: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 85165 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-sequence/watch.out.err
+watcher fixture: owned child 92781 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 5566 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-retry-missing-recovery/watch.out.err
+ok - queue, sequence, and recovery publication failures retry identical overdue and stale ledgers without losing cooldown
+ok - overdue and stale publication wait for their queue lock before committing cooldown
+ok - a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation
+tests/fm-watch-open-loops.test.sh: line 44: 44040 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 44040 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-0100/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-0100/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 67659 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 67659 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 79780 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 79780 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 92655 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 92655 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44:  5188 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 5188 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-interval-invalid/watch.out.err
+ok - leading-zero intervals use decimal refresh/stale thresholds and all zero spellings fall back
+tests/fm-watch-open-loops.test.sh: line 44: 56312 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 56312 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 75073 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 75073 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 94716 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 94716 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 16185 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 16185 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-overdue-invalid/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 66974 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 66974 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 88170 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 88170 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44:  9587 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 9587 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 28171 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 28171 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-resurface-stale-invalid/watch.out.err
+ok - both stale and overdue cooldowns use decimal resurface seconds and all zero spellings fall back
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349494
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846664694,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349502
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846664702,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+watcher fixture: owned child 56691 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-aged/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-aged/watch.out.err
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349507
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846664707,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349515
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846664715,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+watcher fixture: owned child 93454 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-missing/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-recovery-missing/watch.out.err
+ok - real publication between stopped watchers rearms aged/missing stale incidents without resetting overdue cooldown
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349520
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846664720,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349528
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846664728,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349535
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846664735,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793349542
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846664742,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+ok - fresh observation rearms aged/missing outages after real recovery races a blocked stale append
+watcher fixture: owned child 50159 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-1/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-1/watch.out.err
+watcher fixture: owned child 7061 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-2/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-2/watch.out.err
+watcher fixture: owned child 55674 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-3/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-3/watch.out.err
+watcher fixture: owned child 89297 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-4/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-4/watch.out.err
+watcher fixture: owned child 50290 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-5/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-5/watch.out.err
+watcher fixture: owned child 95063 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-6/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-6/watch.out.err
+watcher fixture: owned child 42471 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-7/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-7/watch.out.err
+watcher fixture: owned child 88786 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-8/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-8/watch.out.err
+watcher fixture: owned child 27131 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-9/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-9/watch.out.err
+watcher fixture: owned child 59852 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-10/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-10/watch.out.err
+watcher fixture: owned child 5498 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-11/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-11/watch.out.err
+watcher fixture: owned child 29196 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-12/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.zNvbJk/w1/tmp/fm-watch-open-loops-tests.w3XnCU/ledger-corrupt-recovery-12/watch.out.err
+ok - fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents
+FM_TEST_END 2026-10-30T08:42:13Z tests/fm-watch-open-loops.test.sh exit=0 duration_ms=498956 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T08:42:13Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - host: parked child-exit sampling uses ordinary half-second sleeps
+ok - report surface: only the branch actor's current turn may report, and only on the tasks its wake names
+ok - report surface: visible late outcomes queue a relay, while silent outcomes remain stored without a wake or note
+ok - dispatch entry: the host reads branch eligibility, the offer rule, and the wake prompt from the Pi branch's own owner
+ok - drain: BRANCH OUTCOMES runs on a Claude home by default and on another primary with the file, never with off, and never on Pi
+ok - drain: captain outcomes come first, and routine overflow collapses into a count one drain clears
+ok - drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers
+ok - drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again
+ok - drain: the BRANCH OUTCOMES budgets count bytes, cutting multibyte summaries by whole characters in any locale
+ok - drain: branch outcomes stay unread when a projection of the store fails
+ok - drain: branch outcomes stay unread and the drain fails when jq is missing
+ok - drain: branch outcomes stay unread when the drain cannot print them
+ok - drain: a legacy backlog is presented with each outcome's age and a check-first instruction, never adopted
+ok - drain: a keyed decision survives acknowledgement through a newer outcome for its task
+ok - drain: an outcome carried across a switch off Pi comes back with its age, never adopted
+ok - drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing
+ok - drain: an outcome the host drain presented but main never acknowledged stays unprocessed across a switch to Pi
+ok - drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair
+ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+ok - host: an attended captain outcome wakes main once and stays in its drain until main acknowledges it
+ok - host: a captain outcome recorded after the captain left waits for the return, then reaches main's drain
+ok - host: a quiet record without its daemon is a present captain, so outcomes and decisions reach main
+ok - host: an attended decision close stays main's exactly as the plain arm delivers it
+ok - host: an off written while the host is parked sends the next attended close to main, naming the opt-out
+ok - host: a main-only pass-through leaves the successor watcher running and the close undelivered for main
+ok - host: a successor slower than the readiness notice window does not hold the close and is left running
+ok - host: a successor that reports failure ends the readiness wait at once
+ok - host: a successor that fails after its still-starting close delivers its failure through the wake queue
+ok - host: an attended close whose main session cannot be identified reaches main and runs no engine turn
+ok - host: a decision close accepted away whose turn starts attended still reaches main unchanged
+ok - host: an attended close whose task turns main-only before its turn still reaches main unchanged
+ok - host: a primary with no verified dialog mirror keeps every attended close on main, and its away posture still runs
+ok - host: each wake carries the captain's dialog since the last wake, without operational input
+ok - host: the dialog mirror, its feed, and the wake file are owner-only
+ok - host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn
+tests/fm-supervision-host-helpers.sh: line 159: 89078 Terminated: 15          FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" MIRROR_ROOT="$MIRROR_ROOT" "$FAKE_CLAUDE" -c '
+      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
+      while [ ! -e "$FM_HOME/session.stop" ]; do
+        if [ -e "$FM_HOME/park.go" ]; then
+          rm -f "$FM_HOME/park.go"
+          for seed in "$FM_HOME"/mirror-seed.*; do
+            [ -f "$seed" ] || continue
+            FM_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/fm-host-mirror.sh" hook claude < "$seed"
+          done
+          "$0" park > "$FM_HOME/host.out" 2>&1
+          printf "%s\n" "$?" > "$FM_HOME/host.rc"
+        fi
+        sleep 0.1
+      done
+    ' "$HOST" 2>> "$home/claude.err"
+ok - host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+tests/fm-supervision-host-helpers.sh: line 159: 71370 Terminated: 15          FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" MIRROR_ROOT="$MIRROR_ROOT" "$FAKE_CLAUDE" -c '
+      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
+      while [ ! -e "$FM_HOME/session.stop" ]; do
+        if [ -e "$FM_HOME/park.go" ]; then
+          rm -f "$FM_HOME/park.go"
+          for seed in "$FM_HOME"/mirror-seed.*; do
+            [ -f "$seed" ] || continue
+            FM_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/fm-host-mirror.sh" hook claude < "$seed"
+          done
+          "$0" park > "$FM_HOME/host.out" 2>&1
+          printf "%s\n" "$?" > "$FM_HOME/host.rc"
+        fi
+        sleep 0.1
+      done
+    ' "$HOST" 2>> "$home/claude.err"
+ok - host: an away wake is handled on the engine through the branch contract and never reaches main
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a captain return during an engine turn hands that turn's outcomes to main
+ok - host: silent outcomes are excluded from both captain-return handoff paths
+ok - host: an early visible outcome survives more than 1,000 same-turn receipts
+ok - host: an outcome lookup failure forces a visible main handoff
+ok - host: an outcome recorded after the return reaches main even when its host dies at the turn's end
+ok - host: a killed predecessor's engine is reaped and the next host removes its turn files
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: a captain return during a failed engine turn still hands that turn's outcomes to main
+ok - host: an engine turn whose result is incomplete hands its wake to main
+ok - host: two engine errors latch the session, main keeps every away wake in the cooldown, a failed probe doubles it up to its cap, and a report recovers it silently
+ok - host: an attended close in a latched session reaches main as the arm printed it and leaves the latch as it was, and a home that opted out with off never reads it
+ok - host: attended, two engine errors latch the session, main keeps every close unchanged in the cooldown, a failed probe doubles it up to its cap, and a routine probe's recovery stays in the ledger, off main
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+ok - host: a restarted host stops, by recorded identity, the cycle a killed predecessor left running
+ok - host: the park ends itself with a boundary wake and a stopped watcher
+ok - host: waiting closes cannot carry the park past its boundary
+ok - host: a close whose margin runs out while the successor starts reaches main at the boundary without a turn
+ok - host: the park's test clock is inert without the test marker
+ok - host: a park at or beyond the Stop-hook registration falls back to the default boundary
+ok - host: an owner's later park limit lets a turn outlive the boundary, and no other limit does
+ok - host: the first cycle's status streams once, --restart replaces a stale watcher, and an owner predecessor makes a handling successor
+ok - host: an unchanged held outcome reaches the captain once across cadences, and a later decision on the task still does
+ok - host: a home naming an unverified engine hands every away wake to main with the reason
+ok - host: a host outside the session-lock owner stands down without arming
+tests/fm-supervision-host-helpers.sh: line 159: 21946 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+tests/fm-supervision-host-helpers.sh: line 159: 21946 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+ok - host: a host under a superseded auto-arm generation stands down without touching the owner
+FM_TEST_END 2026-10-30T08:53:37Z tests/fm-supervision-host.test.sh exit=0 duration_ms=683136 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=1182926
+FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=683136 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=586246 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-supervision-host.test.sh duration_ms=683136
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-open-loops.test.sh duration_ms=498956
+FM_TEST_SLOWEST rank=3 script=tests/fm-daemon.test.sh duration_ms=87290
+exit=0

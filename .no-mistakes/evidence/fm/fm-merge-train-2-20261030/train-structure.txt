@@ -1,0 +1,27 @@
+# Train structure proof, 2026-10-30T08:32:16Z
+HEAD=f05b585acc361c6d23f581485bbfc63dd63914d5
+origin/main=386a4fdf40ef952e5f3ce0cf46228caf05c49906
+commits on origin/main missing from HEAD: 0
+$ git merge-base --is-ancestor 386a4fdf40ef952e5f3ce0cf46228caf05c49906 HEAD -> exit 0 (ancestor)
+$ git merge-base --is-ancestor fc98d581c4ad6d14953b1d4fa5be771a979e2435 HEAD -> exit 0 (ancestor)
+$ git merge-base --is-ancestor a1746d269926b5771302a0ac51b3577e3d451844 HEAD -> exit 0 (ancestor)
+$ git merge-base --is-ancestor c7332e064eed5bbee73e7d6586a03f20b91e1af8 HEAD -> exit 0 (ancestor)
+$ git merge-base --is-ancestor 140f93d71c660d8ef134ecaf083f76cb14596f1e HEAD -> exit 0 (ancestor)
+
+Live GitHub PR heads:
+PR 315 state=OPEN draft=false head=fc98d581c4ad6d14953b1d4fa5be771a979e2435
+PR 319 state=OPEN draft=false head=a1746d269926b5771302a0ac51b3577e3d451844
+PR 266 state=OPEN draft=false head=c7332e064eed5bbee73e7d6586a03f20b91e1af8
+PR 318 state=OPEN draft=false head=140f93d71c660d8ef134ecaf083f76cb14596f1e
+
+Merge-commit tree vs fresh automatic merge of its parents:
+05068b8de parents=386a4fdf4,fc98d581c auto_tree=36c7aa11d60ad3a0d44f698222693f4952119d52 actual_tree=36c7aa11d60ad3a0d44f698222693f4952119d52 EQUAL
+04af570bd parents=05068b8de,a1746d269 auto_tree=13d69370e43d8dde1a3b30964064c79df2069700 actual_tree=13d69370e43d8dde1a3b30964064c79df2069700 EQUAL
+9dc87e0c8 parents=04af570bd,c7332e064 auto_tree=fd45ef89be09f591e116d6c21d0d9ea7c260be11 actual_tree=fd45ef89be09f591e116d6c21d0d9ea7c260be11 EQUAL
+f05b585ac parents=9dc87e0c8,140f93d71 auto_tree=3b2dbd2bbf2913d1f88053c6d358a0f0700bd9b7 actual_tree=3b2dbd2bbf2913d1f88053c6d358a0f0700bd9b7 EQUAL
+
+First-parent chain:
+f05b585ac Merge https://github.com/MrGTV-love/firstmate/pull/318 at head 140f93d71c660d8ef134ecaf083f76cb14596f1e
+9dc87e0c8 Merge https://github.com/MrGTV-love/firstmate/pull/266 at head c7332e064eed5bbee73e7d6586a03f20b91e1af8
+04af570bd Merge https://github.com/MrGTV-love/firstmate/pull/319 at head a1746d269926b5771302a0ac51b3577e3d451844
+05068b8de Merge https://github.com/MrGTV-love/firstmate/pull/315 at head fc98d581c4ad6d14953b1d4fa5be771a979e2435

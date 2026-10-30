@@ -1,0 +1,328 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65YRH1GHFY8SFTF07A3SZ1H/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-30T08:33:55Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention coordinator/scan lock failures warn and run ungated
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry
+ok - SKIP (host cannot enforce the bounded envelope): root deadline kill check
+ok - SKIP (host cannot enforce the bounded envelope): memory-limit death check
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - the resident-memory watch ends its command when the owner dies
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+ok - a root whose footprint crosses the bound while its resident size does not is ended and retried narrower
+ok - a reader that misses one deadline is replaced and footprint ends the root on the next tick
+ok - a reader whose first reply is 1 s late keeps footprint in use
+ok - a later reply 1 s late is sampled by ps for that tick only
+ok - a replacement reader that exits before replying is retried and footprint still ends the root
+ok - three failed replacement readers in a row give the reader up as restarts-failed
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+FM_TEST_END 2026-10-30T08:36:47Z tests/fm-lint-slots.test.sh exit=0 duration_ms=172136 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T08:36:47Z tests/fm-wake-queue.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-30T08:36:47Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture
+ok - a watcher past the alarm limit stays silent about its own and the daemon's singleton locks
+ok - a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock
+ok - an alarm exit spills a consumed source's pending wake and the next watcher queues it first
+ok - a queue lock freed during the alarm check lands the pending append before after-output work
+ok - spilled rows wait for a held queue lock, then replay in order ahead of newer rows
+ok - the drain presents a pending append ahead of the alarm that interrupted its wait
+ok - a failed lock observation inside a queue wait keeps waiting and lands the pending append
+ok - every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row
+ok - exit cleanup's bounded recovery-marker wait never delivers a second wake
+ok - an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter
+ok - a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict
+ok - multiline /proc comm uses the state after the last closing parenthesis and keeps unreadable state alive
+ok - dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms
+ok - a dead owner alarms only after two consecutive blocked checks, revalidated before publication
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue
+ok - local observation covers foreign-indexed state locks and never-owned external locks without touching the foreign index
+ok - a timed-out waiter is pruned without alarming on or changing the fresh live owner
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent
+ok - failed and empty ps results retain live lock ownership
+ok - waiter warns after 60s once per owner and continues to acquire
+ok - wait deadline diagnoses and reaps a stopped test child without hanging
+ok - simultaneous watcher starts leave exactly one live process
+ok - fm_pid_identity real ps fallback is locale-invariant
+ok - fm_pid_identity is locale-invariant across LC_ALL/LC_TIME
+ok - fm_pid_identity ps fallback is terminal-width-invariant
+ok - /proc process identity ignores simulated btime changes
+ok - /proc process identity detects pid reuse
+ok - MSYS /proc process identity regression skipped on non-Windows host
+ok - killed watcher stale lock is reclaimed
+tests/fm-watcher-lock.test.sh: line 1798: 95837 Killed: 9               FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_remove_path() {
+      if [ "$1" = "$STATE/.watch.lock" ]; then
+        kill -KILL "${BASHPID:-$$}"
+      fi
+      return 1
+    }
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" > /dev/null 2>&1
+ok - stale watcher reclaim publishes durable recovery evidence before clear
+ok - live watcher lock with stale heartbeat is actionable
+ok - bounded check returns output and failure status without launching per-tick sleep processes
+ok - group cleanup without perl stops a TERM-ignoring descendant with one sleep per bounded wait
+ok - slow bounded check stays fresh; stopped live poll goes stale and resumes
+ok - decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers
+ok - live watcher lock proven stalled for the hard bound is replaced; an unproven old beacon is kept
+ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+ok - concurrent fm_lock_try_acquire yields exactly one winner
+ok - dead-pid stale lock is reclaimed by a single acquirer
+ok - concurrent stale-lock steal yields exactly one winner
+ok - dead steal owner is reclaimed once without a nested steal marker
+ok - dead nested steal chain from an interrupted reclaim is recovered
+ok - a competing reaper cannot remove the successor's steal mutex
+ok - a steal mutex abandoned by this process does not block its own reclaim
+ok - a steal reap interrupted in this process is resumed from its own tombstone
+ok - live steal mutex is not reclaimed
+ok - live-held lock is not stolen
+ok - empty mid-acquire lock keeps a minimum grace
+ok - late original claimant cannot claim a recreated lock
+ok - paused mid-acquire claimant backs off to active stealer
+ok - watch restart preserves recovery without signaling a reused pid
+ok - watch restart attaches to a verified healthy peer and later surfaces a successor gap
+ok - watcher self-evicts when the lock pid no longer names it
+ok - arm turns clean self-eviction without a successor into a typed failure
+ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+ok - attached arm signals record a classified lifecycle entry
+ok - arm starts cleanly and resurfaces recovery after a dead-pid lock
+ok - arm cleans child watcher and temp output on HUP
+ok - arm defers TERM until startup watcher can run its lock cleanup
+ok - arm TERM stops a startup watcher that never becomes cleanup-ready
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 96023.1793349636.4vcFs5
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - arm propagates an immediate watcher wake before confirmation
+ok - arm attaches to a peer watcher after child stands down and surfaces a missing successor
+watcher: lock held by live pid 43632 but heartbeat is stale for 846643252s (>300s); inspect or stop that watcher before re-arming.
+ok - arm reports FAILED and exits non-zero when no fresh watcher can be confirmed
+ok - cycle-exit ledger links a verified successor and remains size-capped
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-30T08:41:17Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=269813 gate_skip=false
+ok - --queued returns exact append-order rows without presentation, locks, or acknowledgement side effects
+ok - --queued succeeds empty for missing state/queue and marker-only state without creating records
+ok - --queued filters live branch ownership and reads stale grants without repairing state
+ok - --queued rejects invalid arguments, unreadable paths, failed reads, and malformed rows without returning work
+ok - re-emit serializes claim publication and preserves queued and empty downtime episodes
+ok - an abandoned same-process lock hold is reclaimed; a parent's live hold is not
+ok - all lock waiters refuse an unremovable self-held lock without waiting or claiming success
+ok - all lock waiters refuse a dead lock they cannot reclaim instead of waiting on their own steal mutex
+ok - a lock wait ends when its lock directory is gone and survives a brief absence
+ok - lock-wait diagnostics never recreate a vanished state directory
+ok - without BASHPID a subshell cannot release or reclaim its parent lock and owns its own hold
+ok - bounded acquire hands ownership to the waiting caller after contention
+ok - bounded deadline preserves contention when the observed holder releases
+ok - a malformed steal mutex reports acquisition error instead of contention
+drain timing: queue held=1298ms control=1691ms
+drain timing: presentation held=2715ms control=1722ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+ok - malformed presentation locks report acquire failure instead of contention
+tests/wake-helpers.sh: line 327: 33090 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+tests/wake-helpers.sh: line 327: 37360 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+tests/wake-helpers.sh: line 327: 53784 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+ok - declared external-wait pause rows do not feed secondmate wake-loop escalation
+ok - a reprovisioned queue generation starts a fresh no-progress interval
+ok - an active turn defers the secondmate stall escalation without cancelling it
+ok - a long-lived mate mid-turn is not a stall, but a queue frozen past the busy bound still alarms
+ok - a proven-idle mate with a proven-empty composer is rung so its child home drains without a parent alarm
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - TERM stops a watcher blocked in the drain-ring idle capture and runs its cleanup
+ok - busy panes defer without a ring and unknown panes keep the parent alarm
+ok - a leftover row that survives a proven-idle ring still surfaces as a genuine stall
+ok - idle omp retains the bounded durable parent alarm without input or foreign queue changes
+ok - secondmate stall markers reject symlinks without touching their targets
+ok - stall publication acknowledgement closes the pre-marker crash window
+ok - empty prefix mate cleanup preserves another mate's stall receipt
+ok - self-announced appends suppress only their own bytes and fail toward waking
+ok - separate self-announced answers after a fold stay owned; worker decisions and later lines still wake
+ok - an unreadable status still reads as unreported, with or without owned growth
+ok - a worker resolved in fold lag still wakes after this home's close
+ok - owned growth suppresses the wake without hiding the turn-ended annotation
+ok - historical annotations replay nothing already announced and keep everything new
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 91646.1793349546.gTY7Fs
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - concurrent append plus drain preserves durable records through acknowledgement
+ok - signal written while no watcher runs is caught on next run
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 21233.1793349579.xQdX7x
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - stale wake is queued before suppressor state is advanced
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 40089.1793349584.FT88nl
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - a not-provably-working stale wake is queued before its suppressor is advanced
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 53505.1793349587.OynaxT
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - registered custom check output is queued before cadence suppression
+ok - concurrent drains replay until one post-handling acknowledgement consumes records
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 69133.1793349592.YrJmFc
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - drain collapses obvious duplicate heartbeat and signal records
+ok - drain asserts watcher liveness: warns on a lapse, stays silent for a live watcher with a fresh beacon
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 79029.1793349596.584FmJ
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - structural signal enrichment is separate, deduped, home-local, and tier-zero for other wakes
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 84945.1793349599.ELGcER
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - every readable unread status line is annotated in full while invalid status files preserve their raw wakes
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 93680.1793349602.sV44Do
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 93680.1793349602.sV44Do
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - slow annotation releases the append lock and a deleted status file fails open
+ok - a branch-actor scoped ack never swallows an unacked main-owned row, and main's later drain sees exactly what remains
+ok - main drain and acknowledgement exclude an active branch grant
+ok - a branch-actor acknowledgement commits secondmate stall receipts for exactly its granted rows
+ok - a branch-held row raises no queued-wake warning for main, and the same row is presented and acknowledged once the grant clears
+ok - a queue that cannot be counted keeps the queued-wake alarm up
+ok - structurally unusable rows are retired by main alone, leaving every remaining row presentable and acknowledgeable
+ok - branch grant cannot take a row already claimed by main
+ok - main's acknowledgement leaves a row that arrived after its drain for whichever actor takes it next
+ok - actor ownership filtering precedes same-key deduplication
+ok - main reclaims rows granted to an exited branch owner
+ok - a branch-actor drain with no eligible-row snapshot refuses loudly instead of draining nothing
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation existing
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.bkphPk/w2/tmp/fm-wake-tangle-root.C5FAEm/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - wake append publishes atomic recovery evidence before durable rows
+ok - recovery mint and delivery log avoid sibling $()
+ok - wake drain: generation-less legacy wakes are adopted and acknowledged
+ok - a handover undoes only the downtime its own stop published over an acknowledged episode
+ok - wake drain: a stale acknowledgement cannot retire or consume a newer recovery episode
+ok - wake drain: an acknowledgement that consumes nothing says so and names the exact command for the current wake
+ok - wake drain: a branch acknowledgement that consumes nothing names the exact command for its granted wake
+ok - wake drain: recovery acknowledgement failures are explicit and retryable
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 13913.1793349674.HAMtcc
+ok - interruptions preserve durable rows until post-handling acknowledgement
+ok - fm_wake_queue_prune_task: prunes wakes for target task without touching other tasks
+ok - drain rotates scratch files an interrupted drain left under the queue lock
+ok - watch liveness: a dead secondmate is relaunched once, ledgered, and quiet afterwards
+ok - watch liveness: policy refuses before endpoint removal and attempt ledger mutation
+ok - watch liveness: a missing secondmate endpoint is relaunched without a pre-kill
+ok - watch liveness: one tick relaunches every dead mate, queues a row each, and wakes once
+ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+ok - watch liveness: the cadence marker gates probing and survives across legs
+ok - watch liveness: the attempt bound parks a flapping mate once and a live probe rearms a full budget
+ok - watch liveness: a failed auto-relaunch wakes once with its cause and is ledgered
+ok - watch liveness: an unwritable or unreadable relaunch ledger refuses to kill or spawn
+ok - watch liveness: a per-mate error keeps scanning, recovers later mates, and still wakes
+ok - watch liveness: an outcome that could not be queued surfaces as an error, not a wake
+ok - watch liveness: a mate mid-episode under the shared liveness lock is skipped entirely
+ok - watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over
+FM_TEST_END 2026-10-30T08:42:54Z tests/fm-wake-queue.test.sh exit=0 duration_ms=366692 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T08:42:54Z tests/fm-proc-budget.test.sh family=unclassified expected_gate_skip=none
+ok - invalid memory bounds refuse before launch
+ok - no memory option needs no reader or watcher
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+ok - default budget is the current count plus 1500
+ok - explicit extra sets the budget
+ok - a budget only ever tightens the limit it inherits
+ok - a retained soft limit seals the inherited hard limit
+ok - exit status and arguments pass through
+ok - bad calls and an unreadable process count never run the command
+ok - a budgeted runaway tree stops at depth 300 while an unbudgeted probe forks freely
+ok - invalid or combined own-procs calls refuse before launch
+ok - a Linux /proc row yields parent, group, start identity and zombie state
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - own-procs passes the exit status and arguments through
+ok - an unreadable sample is skipped and reported; only an unreadable launch table refuses
+ok - a background job left behind by a finished command is ended and the wrapper returns
+ok - TERM to the wrapper ends the whole tree and returns 128 plus the signal
+ok - a TERM caught at the release ends the started command and returns 128 plus the signal
+ok - a supervisor killed mid-run, alone or with its caller's group, leaves no tree member running
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a lower outer own-tree limit counts and ends a nested wrapper's tree
+ok - the kernel limit still stops a tree the own-tree limit cannot reach
+ok - neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower
+ok - neighbours starve a fixed count of 128 but not the suites' own-tree leash, with the tree's work five times slower
+ok - a runaway suite tree is stopped by the leash and leaves no process behind
+FM_TEST_END 2026-10-30T08:44:01Z tests/fm-proc-budget.test.sh exit=0 duration_ms=66757 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=606515
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=172136 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=66757 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=636505 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-wake-queue.test.sh duration_ms=366692
+FM_TEST_SLOWEST rank=2 script=tests/fm-watcher-lock.test.sh duration_ms=269813
+FM_TEST_SLOWEST rank=3 script=tests/fm-lint-slots.test.sh duration_ms=172136
+FM_TEST_SLOWEST rank=4 script=tests/fm-proc-budget.test.sh duration_ms=66757
