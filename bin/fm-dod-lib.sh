@@ -1467,15 +1467,28 @@ fm_dod_nm_expected_plan() {  # <state> <task-id>
   printf '%s/%s/verification-plan.md\n' "$data" "$2"
 }
 
-# Single owner of the bounded `axi status` read used by the custody and
-# completion-evidence checks. It reuses the existing custody read's
-# grandfathered bound rather than introducing a second time limit.
+# Single owner of the `axi status` read used by the custody and
+# completion-evidence checks. It is a read-only query to a shared daemon that can
+# sit quiet while the host is busy, so it is stopped by silence (no output and no
+# process-tree CPU progress for FM_DOD_NM_STALL_SECS, default the repo-wide quiet
+# interval), never by a wall clock. Returns 0 with the status on stdout; 2 when
+# the read went silent, which is unknown rather than a failed run (the caller
+# says so, sets FM_NM_READ_STALLED so later reads in its process are unknown at
+# once, and the read is tried again later); 1 when the status is unreadable.
 fm_dod_nm_status_out() {  # <worktree>
-  local wt=$1 out
-  if ! out=$(fm_nm_run_checked "$wt" 15 axi status) || ! printf '%s\n' "$out" | grep -q '^run:'; then
+  local wt=$1 out rc=0 stall=${FM_DOD_NM_STALL_SECS:-}
+  case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
+  out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_checked "$wt" "$stall" axi status) || rc=$?
+  [ "$rc" -ne 124 ] || return 2
+  if [ "$rc" -ne 0 ] || ! printf '%s\n' "$out" | grep -q '^run:'; then
     return 1
   fi
   printf '%s\n' "$out"
+}
+
+# Reason line for a status read that went silent: unknown, not a verdict.
+fm_dod_nm_unanswered() {  # <what the read was for>
+  printf '%s\n' "the no-mistakes run for this copy did not answer (no output or CPU progress), so $1 is unknown, not a verdict; read it again"
 }
 
 # 0 when the run for this copy exposes usable revision-bound verification-plan
@@ -1484,13 +1497,19 @@ fm_dod_nm_status_out() {  # <worktree>
 # This proves the plan and revision were accounted for, never that the reviewer
 # graded every item correctly.
 fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id> [meta]
-  local wt=$1 state=$2 id=$3 meta=${4:-} out expected reason recorded=
+  local wt=$1 state=$2 id=$3 meta=${4:-} out expected reason recorded='' rc
   if [ -z "$state" ] || [ -z "$id" ]; then
     printf '%s\n' "the task data path is unavailable, so its verification-plan evidence cannot be bound"
     return 1
   fi
   expected=$(fm_dod_nm_expected_plan "$state" "$id")
-  if ! out=$(fm_dod_nm_status_out "$wt"); then
+  rc=0
+  out=$(fm_dod_nm_status_out "$wt") || rc=$?
+  if [ "$rc" -eq 2 ]; then
+    FM_NM_READ_STALLED=1
+    fm_dod_nm_unanswered "its verification-plan evidence"
+    return 2
+  elif [ "$rc" -ne 0 ]; then
     printf '%s\n' "the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable"
     return 1
   fi
@@ -1514,8 +1533,13 @@ fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id> [meta]
 # rewrites the branch's messages. An unreadable status refuses, as an unreadable
 # change does. 1 when refused; stdout then holds a one-line reason.
 fm_dod_nm_custody_returned() {  # <worktree>
-  local wt=$1 out outcome code pipeline_head head_tree pipeline_tree
-  if ! out=$(fm_dod_nm_status_out "$wt"); then
+  local wt=$1 out outcome code pipeline_head head_tree pipeline_tree rc=0
+  out=$(fm_dod_nm_status_out "$wt") || rc=$?
+  if [ "$rc" -eq 2 ]; then
+    FM_NM_READ_STALLED=1
+    fm_dod_nm_unanswered "whether its fixes are recovered"
+    return 2
+  elif [ "$rc" -ne 0 ]; then
     printf '%s\n' "the no-mistakes run for this copy could not be read, so its fixes cannot be proven recovered"
     return 1
   fi
@@ -1572,8 +1596,10 @@ fm_dod_pr_merged_on_forge() {  # <state> <id> <url>
 # only an actually merged PR whose worker copy is gone skips that re-read. A
 # merge-time registration call (scope=registration) is not a ready report: the
 # merge's own live checks authorize it, so it does not re-read completion.
-# Returns 0 for an accepted or ungated claim, or 1 when refused;
-# only refusal prints a one-line reason. <state> <id> <meta> supply pr=,
+# Returns 0 for an accepted or ungated claim, 1 when refused, or 2 when the
+# no-mistakes run did not answer in time (unknown: nothing was refused and the
+# claim is judged again on a later read); only a nonzero return prints a one-line
+# reason. <state> <id> <meta> supply pr=,
 # pr_head=, and the merge-notified marker; <meta> may be a captured copy
 # (bin/fm-fleet-snapshot.sh), so the marker is read from <state>.
 fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> [<scope>]]
@@ -1618,7 +1644,7 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
     fi
     case "$mode" in
       no-mistakes|'')
-        fm_dod_nm_custody_returned "$wt" || return 1 ;;
+        fm_dod_nm_custody_returned "$wt" || return $? ;;
     esac
   fi
   # A final no-mistakes ready report always needs the run's task-bound plan
@@ -1626,7 +1652,7 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
   # validation of this task's plan. On Gerrit the custody check above runs
   # first so recovery remains the prerequisite, never an evidence-path error.
   if [ "$mode" = no-mistakes ] && [ -n "$state" ] && [ -n "$id" ] && [ "$scope" != registration ]; then
-    fm_dod_nm_evidence_required "$wt" "$state" "$id" "$meta" || return 1
+    fm_dod_nm_evidence_required "$wt" "$state" "$id" "$meta" || return $?
   fi
   if [ -n "$url" ] && fm_dod_recorded_pr_on_forge "$state" "$id" "$meta" "$mode" "$url"; then
     return 0

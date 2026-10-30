@@ -1327,16 +1327,29 @@ resurface_absorbed() {  # <window> <throttle-marker> <age> <reason> [scope] [min
 # counter is left alone: it is neither advanced (this is not an escalation) nor
 # reset (a later genuine escalation must still carry the demand-deep-inspection
 # history it had already earned).
-wedge_defer_writing() {  # <window> <since-file> <triage-label> <idle-age>
-  local win=$1 since_file=$2 label=$3 age=$4 key wsf wage
+#
+# The same deferral also answers a probe that could not look (<evidence> unknown:
+# crew_worktree_written_since returned 2 because its walk went silent, a hung
+# mount). That is neither a write nor the absence of one, so it must not be read
+# as the wedge it would otherwise escalate: the idle timer restarts, the next
+# window probes again, and the same chain marker still re-surfaces the pane once
+# per PAUSE_RESURFACE_SECS, worded as an unreadable worktree instead of a wedge.
+wedge_defer_writing() {  # <window> <since-file> <triage-label> <idle-age> [writing|unknown]
+  local win=$1 since_file=$2 label=$3 age=$4 evidence=${5:-writing} key wsf wage reason note
   key=$(window_key "$win")
   wsf="$STATE/.writing-since-$key"
   [ -e "$wsf" ] || date +%s > "$wsf"
   wage=$(age_of "$wsf")
   date +%s > "$since_file"
-  resurface_absorbed "$win" "$STATE/.writing-resurfaced-$key" "$wage" \
-    "stale: $win (idle ${age}s, writing its worktree for ${wage}s, rechecked on a long cadence not a wedge; confirm the writes are real progress)"
-  triage_log "absorbed $label (worktree written since the idle window opened, idle ${age}s): $win"
+  if [ "$evidence" = unknown ]; then
+    reason="stale: $win (idle ${age}s, worktree write probe could not finish for ${wage}s, unknown not a wedge verdict, rechecked on a long cadence; confirm the worktree is readable)"
+    note="the worktree write probe did not finish"
+  else
+    reason="stale: $win (idle ${age}s, writing its worktree for ${wage}s, rechecked on a long cadence not a wedge; confirm the writes are real progress)"
+    note="worktree written since the idle window opened"
+  fi
+  resurface_absorbed "$win" "$STATE/.writing-resurfaced-$key" "$wage" "$reason"
+  triage_log "absorbed $label ($note, idle ${age}s): $win"
 }
 
 # One wait record, carrying every field a recheck needs to be correct. Emitting
@@ -1653,7 +1666,7 @@ wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-h
 # already own on their existing bounded cadences and only a pane that would
 # otherwise alarm pays for a backend read.
 wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-file> <task> <pane-hash>
-  local win=$1 since_file=$2 label=$3 escalation_file=$4 task=$5 hash=$6 since age n reason evidence
+  local win=$1 since_file=$2 label=$3 escalation_file=$4 task=$5 hash=$6 since age n reason evidence probe
   since=$(cat "$since_file" 2>/dev/null || true)
   case "$since" in
     ''|*[!0-9]*)
@@ -1671,11 +1684,19 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
            wedge_defer_wait "$win" "$since_file" "$label" "$age" "$evidence"; then
           return 0
         fi
-        if crew_worktree_written_since "$task" "$STATE" "$since_file"; then
+        probe=0
+        crew_worktree_written_since "$task" "$STATE" "$since_file" || probe=$?
+        if [ "$probe" -eq 0 ]; then
           wedge_defer_writing "$win" "$since_file" "$label" "$age"
           return 0
         fi
         if wedge_dead_record "$win" "$since_file" "$label" "$age" "$hash" "$task"; then
+          return 0
+        fi
+        # A probe that could not look (2) proves nothing about the crew, so it
+        # defers like a write does instead of escalating a wedge it never saw.
+        if [ "$probe" -eq 2 ]; then
+          wedge_defer_writing "$win" "$since_file" "$label" "$age" unknown
           return 0
         fi
         n=$(( $(cat "$escalation_file" 2>/dev/null || echo 0) + 1 ))
@@ -2760,20 +2781,24 @@ watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
 # Ready-PR registration belongs with housekeeping repairs, not the backed-off
 # heartbeat: a missed supervisor command must not keep capacity occupied. The
 # helper owns the scan and refusal memory; detach forge reads like the existing
-# repair sweeps so a slow forge cannot stall supervision. The pass runs under a
-# hard limit (fm-timeout-lib.sh) and, like the other detached sweeps, outlives a
-# watcher that exits on a wake; a hung forge call dies with its pass and the
-# persisted admission cursor lets the next tick start after that record.
+# repair sweeps so a slow forge cannot stall supervision. The pass is stopped only
+# when it goes silent (no output and no process-tree CPU progress) for the stall
+# interval below (fm_run_progress), never for taking long: a pass over many ships
+# on a loaded host is healthy work that a wall-clock cap would cut mid-registration.
+# Like the other detached sweeps it outlives a watcher that exits on a wake; a hung
+# forge call dies with its pass and the persisted admission cursor lets the next
+# tick start after that record.
 PR_READY_RECONCILE_PID=
 PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
-# measured: value=120 date=2026-10-27 host=Mac-Studio.local margin=1.02 (basis: conservative 16-ship workload across at least two eight-record passes, so 120 s / (7.32 s per ship x 16, the firstmate capacity in the cited config/project-capacity) = 120 / 117.12; one ship costs 7.32 s: 3.81 s for the slowest of ten real fm-crew-state.sh fallback reads on 2026-10-27, plus 3.51 s to register measured on 2026-10-20 as the slowest live registration pass over a 200,000-line log 2s with a stand-in forge, plus slowest of three real gh isDraft reads 0.87s and of three real gh headRefOid reads 0.64s)
+# Seconds of silence that stop one pass; the helper reads the same setting for each of its own reads.
 case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then
     kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
     wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
   fi
-  ( fm_run_timed "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  ( fm_run_progress "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_PR_READY_RECONCILE_TIMEOUT="$PR_READY_RECONCILE_TIMEOUT" \
     "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
   PR_READY_RECONCILE_PID=$!
 }

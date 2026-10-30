@@ -148,8 +148,8 @@ Some digest work remains local but unbounded:
 
 So the whole digest still runs as one bounded child, default 120s via `FM_SESSION_START_TIMEOUT`.
 
-Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
-So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.
+Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by this host's measured read duration with `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default) as the cold-start floor.
+So a read that does not answer in time becomes that task's own `endpoint: unknown` line (not a verdict that the endpoint is dead), a read that dies becomes `endpoint: error`, and the digest continues.
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
 
 [`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns reconciliation's conditional bulk-read fast path and per-worker metadata and lifecycle lock handling.

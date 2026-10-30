@@ -205,6 +205,7 @@ case "$mode" in
   lock) exit 75 ;;
   lease) exit 6 ;;
   timeout) exit 124 ;;
+  silent) exec sleep 30 ;;
   ineligible) echo "REFUSED: automatic reap ineligible: active: busy state busy" >&2; exit 1 ;;
   lifecycle) echo "error: another lifecycle action is already running for task $1; nothing was changed" >&2; exit 1 ;;
   pipeline) echo "REFUSED: no-mistakes run for $1 is still parked after axi abort" >&2; exit 1 ;;
@@ -2175,6 +2176,21 @@ test_transient_refusals_back_off_silently_then_succeed() {
   pass "co-tenant, lease, timeout, not-ready and lifecycle refusals retry on later ticks and then succeed, silently"
 }
 
+# The prune stops its teardown only when it goes silent, never for taking long, and
+# a stopped teardown is a quiet retry that names the silence.
+test_silent_teardown_is_stopped_and_retried() {
+  make_world
+  printf 'silent\n' > "$W/stub.mode"
+  prune arm t1 >/dev/null 2>&1
+  FM_MERGE_PRUNE_TEARDOWN_STALL_SECS=2 prune run t1 --now >/dev/null 2>&1
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || fail "a silent teardown's copy was touched"
+  [ "$(rec_field t1 state)" = pending ] && [ "$(rec_field t1 attempts)" = 1 ] || fail "a silent teardown was not a pending retry: $(cat "$STATE/t1.merge-prune")"
+  grep -q 'teardown made no output or CPU progress for 2s' "$DATA/t1/merge-prune.log" \
+    || fail "the retry does not name the silence: $(cat "$DATA/t1/merge-prune.log")"
+  [ "$(wake_count)" = 0 ] || fail "a silent teardown raised a wake"
+  pass "a teardown that goes silent is stopped and retried quietly, and the log names the silence"
+}
+
 test_flaky_contention_retries_through_the_sweep() {
   make_world
   printf 'flaky\n' > "$W/stub.mode"
@@ -2683,6 +2699,54 @@ test_e2e_transient_contention_retries_then_succeeds() {
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
 }
 
+# A no-mistakes daemon that goes silent while the real teardown asks it whether a
+# run is parked: teardown's own read judges the silence and exits 75 with nothing
+# closed, so the prune retries quietly and names the unknown answer, never a
+# teardown cut for time. Once the daemon answers, the retry reaps the copy.
+test_e2e_silent_daemon_is_unknown_and_retried() {
+  make_e2e_world
+  cat > "$W/bin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-} ${3:-}" != "axi status " ] || exec sleep 60
+exit 0
+SH
+  prune_real arm t1
+  FM_TEARDOWN_NM_STALL_SECS=2 prune_real run t1 --now >/dev/null 2>&1
+  [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "a silent daemon closed something: the copy or record is gone"
+  [ "$(rec_field t1 state)" = pending ] && [ "$(rec_field t1 attempts)" = 1 ] || fail "a silent daemon was not a pending retry: $(cat "$STATE/t1.merge-prune")"
+  grep -q 'UNKNOWN: the no-mistakes daemon went silent' "$DATA/t1/merge-prune.log" \
+    || fail "the retry does not name the unknown no-mistakes answer: $(cat "$DATA/t1/merge-prune.log")"
+  ! grep -q 'made no output or CPU progress\|exceeded' "$DATA/t1/merge-prune.log" \
+    || fail "the prune cut the teardown instead of letting its read judge the daemon: $(cat "$DATA/t1/merge-prune.log")"
+  [ "$(wake_count_real)" = 0 ] || fail "a silent daemon raised a wake"
+  assert_not_destroyed "e2e silent daemon"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/no-mistakes"
+  set_rec t1 next_at 0
+  prune_real run t1 >/dev/null 2>&1
+  [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the daemon answered did not reap: $(cat "$DATA/t1/merge-prune.log")"
+  assert_copy_removed
+  pass "end to end: a silent daemon makes the real teardown exit 75 as unknown, the prune retries without a wake, and then reaps"
+}
+
+# A daemon on a loaded host answers, but only after a quiet wait longer than the
+# prune's own stall interval. Teardown prints progress while it waits on that read,
+# so the prune does not cut a teardown that is only waiting, and the copy is reaped.
+test_e2e_slow_daemon_teardown_is_not_cut() {
+  make_e2e_world
+  cat > "$W/bin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-} ${3:-}" != "axi status " ] || sleep 15
+exit 0
+SH
+  prune_real arm t1
+  FM_MERGE_PRUNE_TEARDOWN_STALL_SECS=6 FM_TEARDOWN_NM_STALL_SECS=60 FM_DURATION_NO_PROGRESS_SECS=20 \
+    prune_real run t1 --now >/dev/null 2>&1
+  [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "a teardown waiting on a slow daemon was cut: $(cat "$DATA/t1/merge-prune.log")"
+  assert_copy_removed
+  grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
+  pass "end to end: a teardown waiting quietly on a slow daemon prints progress, is not cut, and reaps the copy"
+}
+
 # The slot teardown returned cannot be removed (the pool refuses): the copy and
 # the prune record stay, the one wake names the copy, and no force is tried. The
 # task record is already gone, so the retry that follows the cleared refusal
@@ -2832,6 +2896,7 @@ ALL_TESTS=(
   test_missing_task_or_changed_pr_drops_the_record
   test_merge_cleanup_runs_teardown_unforced
   test_transient_refusals_back_off_silently_then_succeed
+  test_silent_teardown_is_stopped_and_retried
   test_flaky_contention_retries_through_the_sweep
   test_backoff_doubles_to_a_cap_and_wakes_once
   test_sweep_runs_only_due_records_and_at_most_three
@@ -2932,6 +2997,8 @@ ALL_TESTS=(
   test_fallback_removes_a_copy_whose_preserve_paths_are_empty
   test_e2e_merge_prunes_the_copy_with_the_real_teardown
   test_e2e_transient_contention_retries_then_succeeds
+  test_e2e_silent_daemon_is_unknown_and_retried
+  test_e2e_slow_daemon_teardown_is_not_cut
   test_e2e_removal_refused_after_teardown_keeps_the_record_and_wakes_once
   test_e2e_worker_exited_before_the_merge_is_pruned
   test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback

@@ -566,11 +566,14 @@ EOF
     fi
   fi
   # One aggregate deadline covers both deferred operations. The inactive scan
-  # retains its own tighter per-scan bound inside this outer bound. Findings
+  # checks its own per-scan budget between children inside this outer bound,
+  # and waits at most that budget for a watcher scan's lock before it leaves its
+  # pass to the next cadence scan. Findings
   # need no report translation: the scan writes its ordinary durable
   # inactive-outcome wakes directly. A child shell composes the two executable
   # owners only so fm_run_timed can govern them as one process group.
-  # The sweeps get whatever the lock waits above left of the stage budget.
+  # The sweeps get whatever the lock waits above and the scan left of the stage
+  # budget.
   budget=$(seconds_until "$stage_deadline")
   if [ "$sweep_locked" -eq 1 ]; then
     # shellcheck disable=SC2016  # Child-shell variables expand inside the bound.
