@@ -1742,7 +1742,10 @@ def steer_record_epoch(state, row, record):
 
 
 def merge_marker(state, url):
-    """This PR has a merge recorded by bin/fm-merge-outcome-lib.sh (fm-pr-poll-merge-notified-v1)."""
+    """This GitHub PR has a merge recorded by bin/fm-merge-outcome-lib.sh (fm-pr-poll-merge-notified-v1).
+
+    Any other URL is never merged here; WaitVerifier.pr_merged reads other providers' markers.
+    """
     match = GITHUB_PR.fullmatch(url)
     if not match:
         return False
