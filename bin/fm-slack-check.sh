@@ -22,12 +22,12 @@ case "${1:-}" in
       'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]' \
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
       'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed; arm then opens the new one.' \
-      'Retarget refuses while the old DM has pending work and the poll refuses a changed owner, so: restore the old' \
+      'Retarget fails while the old DM has pending work and the poll fails on a changed owner, so: restore the old' \
       'FM_SLACK_DM_USER, run fm-slack-poll.sh until the pending journal is empty, set the new value, then disarm,' \
       'retarget, arm. A poll can print nothing while work is still pending. The journal is empty when, in the home' \
       'with the old value restored, this prints 0:' \
       "  python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))'" \
-      'A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.' \
+      'A retarget that still fails with dm_user_changed_with_pending_work means: restore the old value, poll again.' \
       'Disarm is the hard off switch. Unconfigured is silent/off; an explicit arm names the refusal.' \
       'See docs/configuration.md "Slack decision plane".'
     exit 0
