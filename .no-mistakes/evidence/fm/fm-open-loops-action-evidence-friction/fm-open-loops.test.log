@@ -69,5 +69,5 @@ PASS: a red PR row waits on a named live task, idle or parked, and resurfaces wh
 PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; one older than the episode is refused; a row no longer overdue closes its episode
 PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows are refused that form and still wait through a delivery naming them
 ok - open-work reconciliation reports owned obligations from live records
-bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-open-loops.test.sh  506.71s user 685.78s system 71% cpu 27:51.53 total
+bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-open-loops.test.sh  434.51s user 515.70s system 84% cpu 18:42.33 total
 exit=0

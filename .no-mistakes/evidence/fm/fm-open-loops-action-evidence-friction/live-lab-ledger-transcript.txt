@@ -1,0 +1,344 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.mC99O2 TMUX_TMPDIR=/tmp/fml.iGDVcP
+no-mistakes on PATH: /Users/charlesabrooker/.local/bin/no-mistakes NM_HOME=/tmp/fm-live-drv/nm-home
+red row 56f5a2e40f7ed20c32dd5f58 green row d35806919a1c11e982f7a291
+
+=== S5: green PR next_action points at AGENTS.md section 7, never asks for merge approval ===
+  green next_action: route the green PR's review; merge it under AGENTS.md section 7
+
+=== S6: a row with no handling stays overdue and blocks acknowledgement ===
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7204,"",false
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7204,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346747	1	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 42502.1793346747.VSmUlj
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7207,"",false
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7207,"Behavior portable serial 17",false
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 42502.1793346747.VSmUlj
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7207,"",false
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7207,"Behavior portable serial 17",false
+
+=== S1: steer once with a real fm-send delivery; re-presentation still counts it, no new message ===
+$ bin/fm-send.sh parked-job Hold PR 283 until repair-owner lands the main fix; then rebase.
+  rc=0
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mC99O2
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  inbox records: ['001.msg']
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 steered --evidence 001.msg
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: steered
+$ bin/fm-open-loops.sh action d35806919a1c11e982f7a291 deferred --evidence review lane still running --recheck 2026-10-30T07:53:48Z
+  rc=0
+  | action: "d35806919a1c11e982f7a291"
+  | kind: deferred
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 42502.1793346747.VSmUlj
+  rc=0
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7219,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7219,"",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346761	2	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 86364.1793346761.xwgqzq
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7220,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 steered --evidence 001.msg
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: steered
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 86364.1793346761.xwgqzq
+  rc=0
+  -> re-presented red row accepted as steered with the same 001.msg (no new message sent)
+
+=== S1-neg: a delivery sent BEFORE the row went overdue is refused as steer evidence ===
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 steered --evidence 000.msg
+  rc=1
+  | error: "steered evidence must be a new delivery sent after this row became overdue or its evidence last changed"
+
+=== S3: second deferral while first stands, then after it lapses; printed captain_visible matches refusal ===
+$ bin/fm-open-loops.sh action d35806919a1c11e982f7a291 deferred --evidence again --recheck 2026-10-30T08:52:44Z
+  rc=1
+  | error: "a deferral already stands until 2026-10-30T07:53:48Z; one deferral per row, so follow up when it lapses"
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7299,"",true
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7299,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346842	3	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 36100.1793346842.kwx2Un
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  printed green row after lapse: ['  "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR\'s review; merge it under AGENTS.md section 7",7300,"",true']
+$ bin/fm-open-loops.sh action d35806919a1c11e982f7a291 deferred --evidence again --recheck 2026-10-30T08:54:03Z
+  rc=1
+  | error: "second deferral refused; row is captain-visible; steer, merge, wait on a named live task or escalate it"
+  published captain_visible for green row: True
+$ bin/fm-open-loops.sh action d35806919a1c11e982f7a291 escalated --evidence deferral lapsed; captain sees PR 284
+  rc=0
+  | action: "d35806919a1c11e982f7a291"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+
+=== S2a: waiting on a task that is not live is refused (no session; unknown task) ===
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task gone-task --recheck 2026-10-30T08:54:04Z
+  rc=1
+  | error: "prerequisite task is not live (its session is gone, dead, failed or unreadable); follow up on it"
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task no-such-task --recheck 2026-10-30T08:54:04Z
+  rc=1
+  | error: "[Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.mC99O2/state/no-such-task.meta'"
+
+=== S2b: waiting --prerequisite-task on a live task is accepted and stands across a re-presentation ===
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T08:54:04Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 36100.1793346842.kwx2Un
+  rc=0
+$ bin/fm-wake-drain.sh
+  rc=0
+  | 1793346849	4	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 54559.1793346849.J5fNv8
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 54559.1793346849.J5fNv8
+  rc=0
+
+=== S2c: prerequisite reports done with a PR; wait stands until the merge record lands, then the row resurfaces ===
+$ bin/fm-crew-state.sh repair-owner
+  rc=0
+  | state: working · source: pane · harness busy (claude-hook)
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bash -c . "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner github github.com test/project 290 _ bin/fm-pr-lib.sh /Users/charlesabrooker/tmp/fm-lab.mC99O2/state
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7312,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T08:54:16Z
+  rc=1
+  | error: "prerequisite task's PR has merged; follow up on its result"
+
+=== S2d: prerequisite fails -> the wait ends and the row resurfaces ===
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7317,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7317,"",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346859	5	check	report	check: open-loops overdue
+  | STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+  | repair-owner done [at=1793346854]: PR https://github.com/test/project/pull/290
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 83395.1793346860.htKnEb
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-two --recheck 2026-10-30T08:54:22Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 83395.1793346860.htKnEb
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-busy-event.sh apply /Users/charlesabrooker/tmp/fm-lab.mC99O2/state repair-two idle --current-gen --source claude-hook --event Stop
+  rc=0
+$ bin/fm-crew-state.sh repair-two
+  rc=0
+  | state: failed · source: status-log · could not fix main
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7322,"Behavior portable serial 17",false
+
+=== S2e: prerequisite session dies (stall/gone) -> the wait ends and the row resurfaces ===
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7325,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7325,"",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346868	6	check	report	check: open-loops overdue
+  | STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+  | repair-two failed [at=1793346864]: could not fix main
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 99174.1793346868.TkAB08
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-three --recheck 2026-10-30T08:54:30Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 99174.1793346868.TkAB08
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ tmux kill-window -t fm:fm-repair-three
+  rc=0
+$ bin/fm-crew-state.sh repair-three
+  rc=0
+  | state: unknown · source: none · backend target gone: fm:fm-repair-three
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7331,"Behavior portable serial 17",false
+
+=== S7: GitLab prerequisite: other-MR record keeps wait; record failing private-file check fails closed ===
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7336,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7336,"",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346879	7	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 24362.1793346879.xvqqwT
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-four --recheck 2026-10-30T08:54:41Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 24362.1793346879.xvqqwT
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bash -c . "$1"; fm_pr_poll_merge_mark_notified "$2" repair-four gitlab gitlab.com test/project 291 _ bin/fm-pr-lib.sh /Users/charlesabrooker/tmp/fm-lab.mC99O2/state
+  rc=0
+  marker mode 0o600
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7346,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-four --recheck 2026-10-30T08:54:50Z
+  rc=1
+  | error: "prerequisite PR landing cannot be read; prerequisite merge records are unreadable"
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-four --recheck 2026-10-30T08:54:51Z
+  rc=1
+  | error: "prerequisite PR landing cannot be read; prerequisite merge records are unreadable"
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-four --recheck 2026-10-30T08:54:52Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+
+=== S7b: the GitLab prerequisite MR 290 itself lands -> wait ends; a new wait is refused as merged ===
+$ bash -c . "$1"; fm_pr_poll_merge_mark_notified "$2" repair-four gitlab gitlab.com test/project 290 _ bin/fm-pr-lib.sh /Users/charlesabrooker/tmp/fm-lab.mC99O2/state
+  rc=0
+  marker: ['fm-pr-poll-merge-notified-v1', 'gitlab', 'gitlab.com', 'test/project', '290'] 0o600
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7350,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-four --recheck 2026-10-30T08:54:55Z
+  rc=1
+  | error: "prerequisite task's PR has merged; follow up on its result"
+
+=== S2g: adversarial - prerequisite ship reports done with no PR (uninitialized no-mistakes repo) -> wait refused ===
+$ bin/fm-busy-event.sh apply /Users/charlesabrooker/tmp/fm-lab.mC99O2/state repair-six idle --current-gen --source claude-hook --event Stop
+  rc=0
+$ bin/fm-crew-state.sh repair-six
+  rc=0
+  | state: done · source: status-log · no change needed
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7357,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7357,"",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346900	8	check	report	check: open-loops overdue
+  | STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+  | repair-four done [at=1793346886]: PR https://gitlab.com/test/project/-/merge_requests/290
+  | repair-six done [at=1793346896]: no change needed
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 86810.1793346900.cus6jD
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-six --recheck 2026-10-30T08:55:02Z
+  rc=1
+  | error: "prerequisite task is done with no PR; its report is its delivery; follow up on its result"
+
+=== S2f: prerequisite stalls (stalled_worker row crosses its limit) -> wait ends; new wait refused as stalled ===
+$ bin/fm-wake-drain.sh
+  rc=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7364,"Behavior portable serial 17",false
+  | STANDING (a receipt stands; no action needed):
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d35806919a1c11e982f7a291","firstmate","https://github.com/test/project/pull/284","route the green PR's review; merge it under AGENTS.md section 7",7364,"",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793346907	9	check	report	check: open-loops overdue
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 86810.1793346900.cus6jD
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-five --recheck 2026-10-30T08:55:09Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 86810.1793346900.cus6jD
+  rc=0
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-five --recheck 2026-10-31T06:08:33Z
+  rc=0
+  | action: "56f5a2e40f7ed20c32dd5f58"
+  | kind: waiting
+$ bin/fm-open-loops.sh --check-actions
+  rc=0
+  stalled rows at clock+3700s: [('green-job', True), ('parked-job', True), ('repair-five', True), ('repair-four', True), ('repair-owner', True)]
+$ bin/fm-open-loops.sh --check-actions
+  rc=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "56f5a2e40f7ed20c32dd5f58","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",11072,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 56f5a2e40f7ed20c32dd5f58 waiting --evidence PR 283 is red because main is red; parked until repair-owner merges --prerequisite-task repair-five --recheck 2026-10-30T09:56:55Z
+  rc=1
+  | error: "prerequisite task is stalled, missing or failed; follow up on it"
+
+ALL LIVE LAB SCENARIOS PASSED
+driver exit=0
+lab torn down: /Users/charlesabrooker/tmp/fm-lab.mC99O2
