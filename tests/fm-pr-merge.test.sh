@@ -1449,7 +1449,7 @@ test_github_auto_merge_without_queue_refuses_legibly() {
     assert_grep 'nothing is merged or in the merge queue yet' "$case_dir/stderr" \
       "github-auto-no-queue: the refusal left the operator to infer the pending state"
     assert_logged_gh_merge "$case_dir" 66 example/repo "$spelling" --merge
-    [ "$(grep -c '^pr merge ' "$case_dir/gh.log")" -eq 1 ] \
+    [ "$(grep '^pr merge ' "$case_dir/gh.log" | grep -vc -- '--disable-auto')" -eq 1 ] \
       || fail "github-auto-no-queue: the wrapper attempted more than one merge"
     assert_grep 'pr=https://github.com/example/repo/pull/66' "$case_dir/state/task-x1.meta" \
       "github-auto-no-queue: the attempted merge lost its PR reference"

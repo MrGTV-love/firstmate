@@ -787,7 +787,12 @@ test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_aliv
   # foreground view shows only the shell (a suspended or backgrounded agent).
   sh -c "'$lab/pi' 300; :" &
   shell_pid=$!
-  sleep 0.3
+  # Wait for the agent-named child (after its exec), with no time cap: stop once it
+  # exists under the shell or the shell dies.
+  while ! pgrep -P "$shell_pid" -x pi >/dev/null 2>&1; do
+    kill -0 "$shell_pid" 2>/dev/null || fail "the shell died before its agent-named child appeared"
+    sleep 0.05
+  done
   out=$(stale_registration_case descendant idle "$(shell_only_process_info "$shell_pid")")
   pkill -P "$shell_pid" 2>/dev/null || true
   kill "$shell_pid" 2>/dev/null || true
@@ -818,7 +823,12 @@ test_agent_descendant_under_a_spaced_install_path_stays_alive() {
   ln -sf "$standin" "$lab/pi"
   sh -c "'$lab/pi' 300; :" &
   shell_pid=$!
-  sleep 0.3
+  # Wait for the agent-named child (after its exec), with no time cap: stop once it
+  # exists under the shell or the shell dies.
+  while ! pgrep -P "$shell_pid" -x pi >/dev/null 2>&1; do
+    kill -0 "$shell_pid" 2>/dev/null || fail "the shell died before its agent-named child appeared"
+    sleep 0.05
+  done
   out=$(stale_registration_case spaced-descendant idle "$(shell_only_process_info "$shell_pid")")
   pkill -P "$shell_pid" 2>/dev/null || true
   kill "$shell_pid" 2>/dev/null || true
