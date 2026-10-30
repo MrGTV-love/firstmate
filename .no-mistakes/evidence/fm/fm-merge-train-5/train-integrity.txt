@@ -1,0 +1,101 @@
+## Train ancestry (M1)
+HEAD=5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c
+ancestor OK: ba40458055a70fa9ec7e6408a185f4581570e783
+ancestor OK: 9a121dff67d3407a46808570c89402deffde6266
+ancestor OK: 13a5ff134775684c22710c306eb245b03522085a
+ancestor OK: e2df4a1b4b0129dbdd01cd4705e85ff545e0d945
+
+## Merge commits vs fresh git merge-tree (M3)
+643e3729c parents=ba40458055a70fa9ec7e6408a185f4581570e783 13a5ff134775684c22710c306eb245b03522085a
+  actual tree=e5ea84e4a5939e5e7ae54e52013913207381e528 fresh=290fe8ca4a95968e936c71f1431c367689811139
+  differs:
+     docs/guards/registry.json | 8 ++------
+     1 file changed, 2 insertions(+), 6 deletions(-)
+7f0b082fd parents=643e3729ce1673a184372c5614c5ec19119e487d 9a121dff67d3407a46808570c89402deffde6266
+  actual tree=29605fec48708c2340a523cd2da7629d497592f4 fresh=29605fec48708c2340a523cd2da7629d497592f4
+  IDENTICAL to fresh merge
+5ad471a2b parents=161033c766b2448145b33cd40ef41baf2ab3195e e2df4a1b4b0129dbdd01cd4705e85ff545e0d945
+  actual tree=38202b99eb945630588286dee09d91b76cca111b fresh=7790fec3288dbaa204ba88f1fe9bf2ba19aedd35
+  differs:
+     docs/guards/registry.json | 6 ------
+     1 file changed, 6 deletions(-)
+
+## Non-merge train commits
+161033c76 chore: drop the graft ignore lines that PR 298's pipeline commit added to .gitignore
+9bd492d63 test: update guard-audit closure pins to 44 guards and 17 post-audit entries
+
+## Net diff of train commits 9bd492d63 and 161033c76
+9bd492d63 test: update guard-audit closure pins to 44 guards and 17 post-audit entries
+
+ tests/fm-guard-audit-closure.test.sh | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+161033c76 chore: drop the graft ignore lines that PR 298's pipeline commit added to .gitignore
+
+ .gitignore | 3 ---
+ 1 file changed, 3 deletions(-)
+
+## .gitignore net diff vs base
+       0
+### 643e3729c
+8ff8202e30f4221a85ca636bf6621dd614ebde0f
+docs/guards/registry.json
+
+Auto-merging docs/configuration.md
+Auto-merging docs/guards/registry.json
+CONFLICT (content): Merge conflict in docs/guards/registry.json
+merge-tree exit=1
+diff --git a/docs/guards/registry.json b/docs/guards/registry.json
+index 2583d1f2c..811cec8fe 100644
+--- a/docs/guards/registry.json
++++ b/docs/guards/registry.json
+@@ -18,13 +18,9 @@
+     "spawn-write-confinement",
+     "status-log-size-cap",
+     "teardown-superseded-slot-lease",
+-<<<<<<< 643e3729c^1
+     "captain-hold-withdraw-ruling",
+-    "slack-dm-retarget-pending-work"
+-=======
+-    "open-loops-one-deferral",
+-    "captain-hold-withdraw-ruling"
+->>>>>>> 643e3729c^2
++    "slack-dm-retarget-pending-work",
++    "open-loops-one-deferral"
+   ],
+   "guards": [
+     {
+### 5ad471a2b
+df37f5f4bf8ea498ba9ab1553b67794f811b5897
+docs/guards/registry.json
+
+Auto-merging docs/guards/registry.json
+CONFLICT (content): Merge conflict in docs/guards/registry.json
+merge-tree exit=1
+diff --git a/docs/guards/registry.json b/docs/guards/registry.json
+index bd43ebfd0..811cec8fe 100644
+--- a/docs/guards/registry.json
++++ b/docs/guards/registry.json
+@@ -18,15 +18,9 @@
+     "spawn-write-confinement",
+     "status-log-size-cap",
+     "teardown-superseded-slot-lease",
+-<<<<<<< 5ad471a2b^1
+     "captain-hold-withdraw-ruling",
+     "slack-dm-retarget-pending-work",
+     "open-loops-one-deferral"
+-=======
+-    "open-loops-one-deferral",
+-    "captain-hold-withdraw-ruling",
+-    "slack-dm-retarget-pending-work"
+->>>>>>> 5ad471a2b^2
+   ],
+   "guards": [
+     {
+### registry semantic check
+{
+  "guards": 44,
+  "beyond": 17,
+  "dup_beyond": 0,
+  "dup_guards": 0
+}
+["slot-provision-attestation","spawn-local-source-selection","jev-tool-coverage","jev-egress-grant","jev-github-write-op","omp-worker-url-reads-off","spawn-brief-out-of-scope","verification-plan-dod-shape","git-commit-credential-shapes","git-push-credential-shapes","spawn-confinement-coverage","spawn-write-confinement","status-log-size-cap","teardown-superseded-slot-lease","captain-hold-withdraw-ruling","slack-dm-retarget-pending-work","open-loops-one-deferral"]

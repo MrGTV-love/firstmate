@@ -1,0 +1,4 @@
+exit=0 : bash tests/fm-guard-audit-closure.test.sh
+exit=0 : bin/fm-guard-lint.sh --mode enforce --counts
+exit=0 : env FM_TEST_ONLY=test_claude_staged_native_hook_suppression bash tests/fm-spawn-herdr-launch-shell.test.sh
+exit=0 : bash tests/fm-backend.test.sh

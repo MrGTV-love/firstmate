@@ -1,0 +1,13 @@
+# PR 309 adversarial: real bin/fm-backend.sh and bin/fm-supervisor-target-lib.sh in a clean env -i bash
+1. TMUX set + FM_HERDR_RUNTIME=1 + HERDR_PANE_ID (nested tmux must still win):
+backend=tmux signal=TMUX supervisor_backend=tmux(rc=0) supervisor_target=%3(rc=0)
+2. FM_HERDR_RUNTIME=1 without HERDR_PANE_ID (marker alone must not grant a supervisor target):
+backend=herdr signal=FM_HERDR_RUNTIME supervisor_backend=tmux(rc=1) supervisor_target=firstmate:0(rc=1)
+3. FM_HERDR_RUNTIME=0 + HERDR_PANE_ID (only the value 1 selects herdr):
+backend=tmux signal= supervisor_backend=tmux(rc=1) supervisor_target=firstmate:0(rc=1)
+4. FM_HERDR_RUNTIME=1 + HERDR_PANE_ID + HERDR_SESSION (Claude child shape):
+backend=herdr signal=FM_HERDR_RUNTIME supervisor_backend=herdr(rc=0) supervisor_target=lab:w1:p1(rc=0)
+5. HERDR_ENV=1 + FM_HERDR_RUNTIME=1 (native wins the signal label):
+backend=herdr signal=HERDR_ENV supervisor_backend=herdr(rc=0) supervisor_target=default:w1:p1(rc=0)
+6. Nothing set (fallback):
+backend=tmux signal= supervisor_backend=tmux(rc=1) supervisor_target=firstmate:0(rc=1)

@@ -1,0 +1,75 @@
+# PR 309 live: real bin/fm-spawn.sh into a real Herdr 0.9.5 lab session (fm-herdr-lab.sh), lab FM_HOME from fm-lab-home.sh
+# Spawn ran inside a real Herdr lab pane (launcher). Harness binaries are probes that record allowlisted env keys and run the real backend/supervisor discovery libs, then exit (no model call).
+lab home: /Users/charlesabrooker/tmp/fm-lab.GWApuL
+lab session: fm-lab-pr309-30871-31756
+== fresh lab pane resolves:
+alias claude='"/Users/charlesabrooker/Projects/teamclaude/src/index.js" run --'
+codex
+(fresh panes run the user's zsh; normal-mode spawns are skipped; probes launch by absolute path only)
+launcher pane: w2:p1
+== p309raw spawn rc=0
+window=fm-lab-pr309-30871-31756:w2:p2
+harness=claude
+spawn_gen=s1793396029.36065.22027
+backend=herdr
+herdr_session=fm-lab-pr309-30871-31756
+herdr_pane_id=w2:p2
+== p309codex spawn rc=0
+window=fm-lab-pr309-30871-31756:w2:p3
+harness=codex
+spawn_gen=s1793396060.6372.11285
+backend=herdr
+herdr_session=fm-lab-pr309-30871-31756
+herdr_pane_id=w2:p3
+== probe record from worker p309raw (claude)
+argv=--session-id 4602fa36-3b68-4f16-8ea2-c2a624154358 --model haiku
+probe_path=/Users/charlesabrooker/tmp/fm309drv.CjiAjM/fakebin/claude
+cwd=/Users/charlesabrooker/.treehouse/proj-f3cd50/3/proj
+HERDR_ENV=<unset>
+FM_HERDR_RUNTIME=1
+HERDR_PANE_ID=w2:p2
+HERDR_SESSION=fm-lab-pr309-30871-31756
+FM_SPAWN_GEN=s1793396029.36065.22027
+TMUX=<unset>
+FM_WRITE_CONFINEMENT=seatbelt-v1
+fm_backend_name=herdr
+detect_signal=FM_HERDR_RUNTIME
+supervisor_backend=herdr
+supervisor_target=fm-lab-pr309-30871-31756:w2:p2
+== probe record from worker p309codex (codex)
+argv=--model gpt-5
+probe_path=/Users/charlesabrooker/tmp/fm309drv.CjiAjM/fakebin/codex
+cwd=/Users/charlesabrooker/.treehouse/proj-f3cd50/1/proj
+HERDR_ENV=1
+FM_HERDR_RUNTIME=<unset>
+HERDR_PANE_ID=w2:p3
+HERDR_SESSION=fm-lab-pr309-30871-31756
+FM_SPAWN_GEN=s1793396060.6372.11285
+TMUX=<unset>
+FM_WRITE_CONFINEMENT=unconfined-macos-codex
+fm_backend_name=herdr
+detect_signal=HERDR_ENV
+supervisor_backend=herdr
+supervisor_target=fm-lab-pr309-30871-31756:w2:p3
+== launcher pane env (control: what Herdr injects into an ordinary pane)
+HERDR_ENV=1
+HERDR_PANE_ID=w2:p1
+HERDR_SESSION=fm-lab-pr309-30871-31756
+FM_HERDR_RUNTIME=<unset>
+claude_resolves_to=/Users/charlesabrooker/tmp/fm309drv.CjiAjM/fakebin/claude
+codex_resolves_to=/Users/charlesabrooker/tmp/fm309drv.CjiAjM/fakebin/codex
+== p309raw spawn stderr (tail)
+skill selection for p309raw: undelivered - raw launch command has no supported brief transport
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+== p309codex spawn stderr (tail)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.GWApuL
+warning: task p309codex: /Users/charlesabrooker/tmp/fm-lab.GWApuL/data/p309codex/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.GWApuL/data/p309codex/launch-brief.md records no ship branch; defaulting to legacy branch fm/p309codex
+warning: /Users/charlesabrooker/tmp/fm-lab.GWApuL/data/p309codex/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for p309codex: undelivered - raw launch command has no supported brief transport
+== herdr version: herdr 0.9.5
+herdr lab teardown rc=0
+lab home teardown rc=0
