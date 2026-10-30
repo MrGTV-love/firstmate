@@ -7598,6 +7598,11 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
       fi
       ;;
   esac
+  # The profile refuses every packed-refs rewrite, and pruning a packed
+  # remote-tracking ref needs one, so a host fetch.prune=true would fail every
+  # fetch after the remote deletes a branch. This entry outranks that setting.
+  # shellcheck disable=SC2016 # The launch shell expands these references.
+  LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; '"$LAUNCH"
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then

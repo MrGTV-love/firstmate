@@ -131,6 +131,9 @@ while [ $# -gt 0 ]; do
 done
 printf '%s\\n' "$command" >> "$gate/fixture-daemon.log"
 '''
+PACKED_HEADER = "# pack-refs with: peeled fully-peeled sorted \n"
+# This task's own archive branch, packed as Main's gc leaves it.
+OWN_PACKED_ARCHIVE = "archive/task-submitted-fedcba98"
 # Results that must be false in the unconfined control: each proves the
 # fixture write is possible without the profile.
 CONTROL_KEYS = ("a", "b", "c", "e-other.status", "e-task.other.status", "foreign-audit-denied", "symlink")
@@ -222,11 +225,35 @@ def child(manifest):
                             and git("--git-dir", str(own_gate), "rev-parse", "refs/heads/fm/task").stdout.strip() == head
                             and daemon_log.exists() and daemon_log.read_text().split() == ["admit-push", "notify-push"])
     results["push-upstream"] = git("-C", str(worktree), "config", "branch.fm/task.remote").stdout.strip() == "no-mistakes"
+    # The gate deleted fm/gone, whose remote-tracking ref is packed, and the
+    # repository asks fetch to prune. Pruning it needs a packed-refs rewrite.
+    packed_refs = Path(manifest["packed_refs"])
+    packed_before = packed_refs.read_bytes()
+    refusal = f"unable to create file {packed_refs}.new: Operation not permitted"
+    gone = "refs/remotes/no-mistakes/fm/gone"
+
+    def resolves(ref, sha):
+        return git("-C", str(worktree), "rev-parse", "--verify", "-q", ref).stdout.strip() == sha
+
     fetch = git("-C", str(worktree), "fetch", "no-mistakes")
-    results["fetch"] = fetch.returncode == 0 and git("-C", str(worktree), "rev-parse", "refs/remotes/no-mistakes/fm/task").returncode == 0
+    results["fetch"] = (fetch.returncode == 0 and git("-C", str(worktree), "rev-parse", "refs/remotes/no-mistakes/fm/task").returncode == 0
+                        and resolves(gone, manifest["forged_sha"]))
+    pruned = git("-C", str(worktree), "fetch", "--prune", "no-mistakes")
+    results["refused-fetch-prune-packed"] = (pruned.returncode == 1 and f"could not delete reference {gone}: {refusal}" in pruned.stderr
+                                             and resolves(gone, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
+    # The shared stash holds one packed entry. Popping that last entry applies
+    # it and exits 0 with the stash list empty, but Git is refused the
+    # packed-refs rewrite, so refs/stash still resolves to the popped commit.
     (worktree / "new-file").write_text("stashed change")
     stash = git("-C", str(worktree), "stash", "push", "-m", "probe")
-    results["stash"] = stash.returncode == 0 and git("-C", str(worktree), "stash", "drop").returncode == 0
+    dropped = git("-C", str(worktree), "stash", "drop")
+    popped = git("-C", str(worktree), "stash", "pop")
+    results["stash"] = (stash.returncode == 0 and dropped.returncode == 0 and popped.returncode == 0
+                        and (worktree / "README").read_text() == "stashed in fixture"
+                        and git("-C", str(worktree), "stash", "list").stdout == "")
+    results["refused-packed-stash-removal-ref-kept"] = (f"error: {refusal}" in popped.stderr and resolves("refs/stash", manifest["stash_sha"])
+                                                        and packed_refs.read_bytes() == packed_before)
+    git("-C", str(worktree), "checkout", "--", "README")
     foreign_push = git("-C", str(worktree), "push", str(other_gate), "fm/task")
     results["refused-other-gate-push"] = (foreign_push.returncode != 0
                                           and git("--git-dir", str(other_gate), "rev-parse", "--verify", "-q", "refs/heads/fm/task").returncode != 0)
@@ -270,8 +297,13 @@ def child(manifest):
                         ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
                         ("outside-archive", "task-submitted-0123abcd")):
         results[f"refused-archive-{label}"] = ref_refused(name)
+    deleted = git("-C", str(worktree), "branch", "-d", OWN_PACKED_ARCHIVE)
+    results["refused-packed-own-archive-delete"] = (
+        deleted.returncode == 1 and f"error: could not delete reference refs/heads/{OWN_PACKED_ARCHIVE}: {refusal}" in deleted.stderr
+        and resolves("refs/heads/" + OWN_PACKED_ARCHIVE, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
     # The primary checkout's HEAD stays refused; a failed attempt changes nothing.
     primary = str(Path(manifest["home"]) / "projects/project")
+    results.update(packed_refs_results(manifest, primary, worktree))
     before = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
     git("-C", primary, "symbolic-ref", "HEAD", "refs/heads/fm/pool")
     after = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
@@ -481,6 +513,117 @@ console.log(JSON.stringify({ foreignDenied }));
     return results
 
 
+def packed_refs_results(manifest, primary, worktree):
+    """Rewrite another task's packed branch every way a plain file write can."""
+    packed = Path(manifest["packed_refs"])
+    original = packed.read_text()
+    forged = PACKED_HEADER + f"{manifest['forged_sha']} refs/heads/fm/packed\n"
+    stray = [packed.with_name(name) for name in ("packed-refs.lock", "packed-refs.new")]
+
+    def resolved():
+        return git("-C", primary, "rev-parse", "fm/packed").stdout.strip()
+
+    def unchanged(attempt, restore=True):
+        # True only when the attempt was refused and the branch still resolves
+        # to its real commit. The unconfined control leaves the file as found
+        # (a pack that rewrote every other ref is the one thing not undone).
+        try:
+            attempt()
+        except PermissionError:
+            held = packed.read_text() == original and resolved() == manifest["packed_sha"]
+        else:
+            held = False
+        for path in stray:
+            path.unlink(missing_ok=True)
+        if restore and packed.read_text() != original:
+            packed.write_text(original)
+        return held
+
+    def in_place():
+        with packed.open("w") as stream:
+            stream.write(forged)
+
+    def by_rename():
+        stray[0].write_text(forged)
+        os.replace(stray[0], packed)
+
+    def by_new_file():
+        stray[1].write_text(forged)
+
+    def by_git(*args):
+        def run():
+            if git("-C", primary, *args).returncode:
+                raise PermissionError
+        return run
+
+    results = {"packed-branch-resolves": resolved() == manifest["packed_sha"],
+               "refused-packed-refs-write": unchanged(in_place),
+               "refused-packed-refs-rename-over": unchanged(by_rename),
+               "refused-packed-refs-new-file": unchanged(by_new_file),
+               # Refused at the loose refs/heads lock before Git reaches packed-refs.
+               "refused-packed-branch-delete": unchanged(by_git("update-ref", "-d", "refs/heads/fm/packed")),
+               "refused-pack-refs": unchanged(by_git("pack-refs", "--all"), restore=False)}
+    # A packed ref outside refs/heads has no loose lock deny, so deleting it
+    # reaches the packed-refs rewrite itself.
+    gone = "refs/remotes/no-mistakes/fm/gone"
+    deleted = git("-C", str(worktree), "update-ref", "-d", gone)
+    results["refused-packed-remote-ref-delete"] = (
+        deleted.returncode != 0 and f"unable to create file {packed}.new: Operation not permitted" in deleted.stderr
+        and packed.read_text() == original
+        and git("-C", primary, "rev-parse", "--verify", "-q", gone).stdout.strip() == manifest["forged_sha"])
+    # A commondir file in the shared Git directory makes the primary checkout
+    # read its refs from the folder it names, here one with a forged branch.
+    scratch = Path(os.environ["TMPDIR"])
+    forged_common = scratch / "forged-common"
+    (forged_common / "refs/heads/fm").mkdir(parents=True)
+    (forged_common / "objects").symlink_to(Path(primary) / ".git/objects")
+    (forged_common / "HEAD").write_text("ref: refs/heads/main\n")
+    (forged_common / "refs/heads/fm/packed").write_text(manifest["forged_sha"] + "\n")
+    commondir = packed.with_name("commondir")
+    results["refused-commondir"] = unchanged(lambda: commondir.write_text(str(forged_common) + "\n"), restore=False)
+    commondir.unlink(missing_ok=True)
+    # The shared config is writable, so it can select reftable storage; a
+    # reftable folder built elsewhere would then hold every ref Git reads.
+    # This covers only the payload-less value; a reftable:///<path> or
+    # files://<path> value is not refused.
+    forged_reftable = scratch / "forged-reftable.git"
+    assert git("init", "-q", "--bare", "--ref-format=reftable", str(forged_reftable)).returncode == 0
+    (forged_reftable / "objects/info/alternates").write_text(str(Path(primary) / ".git/objects") + "\n")
+    assert git("--git-dir", str(forged_reftable), "update-ref", "refs/heads/fm/packed", manifest["forged_sha"]).returncode == 0
+    config, reftable = packed.with_name("config"), packed.with_name("reftable")
+    saved = config.read_bytes()
+    switched = all(git("-C", primary, "config", key, value).returncode == 0
+                   for key, value in (("core.repositoryformatversion", "1"), ("extensions.refStorage", "reftable")))
+    try:
+        shutil.copytree(forged_reftable / "reftable", reftable)
+        planted = True
+    except PermissionError:
+        planted = False
+    switched_sha = resolved()
+    config.write_bytes(saved)
+    shutil.rmtree(reftable, ignore_errors=True)
+    results["refused-reftable-switch"] = (switched and not planted and switched_sha != manifest["forged_sha"]
+                                          and resolved() == manifest["packed_sha"])
+    # A new hard link to packed-refs would be a second name for the file. The
+    # worktree and a task-owned ~/tmp entry are both places the worker writes.
+    for key, link in (("refused-packed-refs-link-create", Path(manifest["worktree"]) / "packed-refs-alias"),
+                      ("refused-packed-refs-link-create-outside", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias")):
+        try:
+            os.link(packed, link)
+            results[key] = False
+        except PermissionError:
+            results[key] = not link.exists()
+        link.unlink(missing_ok=True)  # leave the unconfined control without an alias
+    # A replace ref makes every Git command in the primary checkout show other
+    # objects for a commit, so it changes what a branch holds.
+    head = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()
+    replaced = git("-C", str(worktree), "replace", "-f", head, manifest["forged_sha"])
+    results["refused-replace-ref"] = (replaced.returncode != 0
+                                      and git("-C", primary, "rev-parse", "--verify", "-q", "refs/replace/" + head).returncode != 0)
+    git("-C", str(worktree), "replace", "-d", head)  # leave the unconfined control clean
+    return results
+
+
 def pid_identity(repo, pid, state):
     """The shared process identity, read through bin/fm-wake-lib.sh."""
     return subprocess.run(["bash", "-c", '. "$0/bin/fm-wake-lib.sh"; fm_pid_identity "$1"', repo, str(pid)],
@@ -514,6 +657,29 @@ def fixture(repo, base, harness, user_home, other):
                  ["-C", str(project), "worktree", "add", "-q", "-b", "fm/pool", str(pool)]):
         result = git(*args)
         assert result.returncode == 0, (args, result.stderr)
+    # Refs as Git leaves them once packed: no loose file, one line in
+    # packed-refs. Another task's branch sits on a commit that differs from the
+    # one a forged line would name; this task's own archive, a remote-tracking
+    # ref of a branch the gate no longer has and the shared stash's one entry
+    # are packed beside it.
+    init_sha = git("-C", str(project), "rev-parse", "HEAD").stdout.strip()
+    packed = git("-C", str(project), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                 "commit-tree", init_sha + "^{tree}", "-p", init_sha, "-m", "packed").stdout.strip()
+    assert git("-C", str(project), "update-ref", "refs/heads/fm/packed", packed).returncode == 0
+    (project / ".git/refs/heads/fm/packed").unlink()
+    write(worktree / "README", "stashed in fixture")
+    assert git("-C", str(worktree), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+               "stash", "push", "-q", "-m", "fixture").returncode == 0
+    stash_sha = git("-C", str(project), "rev-parse", "refs/stash").stdout.strip()
+    (project / ".git/refs/stash").unlink()
+    lines = {"refs/heads/fm/packed": packed, "refs/heads/" + OWN_PACKED_ARCHIVE: init_sha,
+             "refs/remotes/no-mistakes/fm/gone": init_sha, "refs/stash": stash_sha}
+    write(project / ".git/packed-refs", PACKED_HEADER + "".join(f"{sha} {name}\n" for name, sha in sorted(lines.items())))
+    for name, sha in lines.items():
+        assert git("-C", str(project), "rev-parse", name).stdout.strip() == sha
+    # Stands in for a host's global fetch.prune=true, which GIT_CONFIG_GLOBAL
+    # hides here; the launch's own GIT_CONFIG entry outranks both.
+    assert git("-C", str(project), "config", "fetch.prune", "true").returncode == 0
     own_gate = nm / "repos" / (hashlib.sha256(str(project).encode()).hexdigest()[:12] + ".git")
     other_gate = nm / "repos/000000000000.git"
     fake_client = base / "bin/no-mistakes"
@@ -579,7 +745,8 @@ def fixture(repo, base, harness, user_home, other):
     protected.update(late)
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
-               "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees"}
+               "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees",
+               "git-packed-refs": project / ".git/packed-refs"}
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(worktree))
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
@@ -617,6 +784,7 @@ def fixture(repo, base, harness, user_home, other):
                                "omp-session": user_home / ".omp/agent/sessions/session.jsonl",
                                "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
     return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
+            "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha, "stash_sha": stash_sha,
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
             "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
@@ -625,9 +793,15 @@ def fixture(repo, base, harness, user_home, other):
             "renamed": {name: str(path) for name, path in renamed.items()}}
 
 
-def build_profile(repo, manifest, harness, profile, env, agent_dir=None):
+def launch_git_env(env):
+    """The child's environment with the GIT_CONFIG entry fm-spawn.sh appends to a confined launch."""
+    count = int(env.get("GIT_CONFIG_COUNT") or 0)
+    return dict(env, GIT_CONFIG_COUNT=str(count + 1), **{f"GIT_CONFIG_KEY_{count}": "fetch.prune", f"GIT_CONFIG_VALUE_{count}": "false"})
+
+
+def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None):
     home = Path(manifest["home"])
-    command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", manifest["worktree"],
+    command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", worktree or manifest["worktree"],
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
                "--data", str(home / "data/task"), "--state", str(home / "state"), "--task", "task", "--branch", "fm/task",
                "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
@@ -653,6 +827,94 @@ def invalid_project_source(repo, manifest, base, env):
     finally:
         shutil.rmtree(project)
     print("invalid project source: refused with project and failed command; no profile published")
+
+
+def hardlink_alias(repo, manifest, base, harness, env):
+    # The lane review's E4: an alias to a protected shared ref file made before
+    # the profile is built lets a confined write through the alias bypass the
+    # path rules. The build must refuse, say which file and how many links,
+    # and publish no profile, whatever path the alias sits at.
+    common = Path(manifest["home"]) / "projects/project/.git"
+    aliases = {"worktree": (common / "packed-refs", Path(manifest["worktree"]) / "packed-refs-alias"),
+               "outside-worktree": (common / "packed-refs", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias"),
+               "task-data": (common / "packed-refs", Path(manifest["home"]) / "data/task/packed-refs-alias"),
+               "loose-ref": (common / "refs/heads/fm/other", Path(manifest["worktree"]) / "loose-ref-alias"),
+               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias")}
+    aliases.update({f"other-worktree-{name}": (common / "worktrees/fm-other" / name, Path(manifest["worktree"]) / f"other-worktree-{name}-alias")
+                    for name in ("HEAD", "index", "commondir")})
+    for name, (target, alias) in aliases.items():
+        profile = base / f"alias-{name}-{harness}.sb"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        os.link(target, alias)
+        try:
+            build_profile(repo, manifest, harness, profile, env)
+        except subprocess.CalledProcessError as error:
+            assert error.returncode == 1 and "another hard link" in error.stderr, (name, error.stderr)
+            assert str(target) in error.stderr and "(2 links)" in error.stderr, (name, error.stderr)
+            assert not profile.exists(), f"{name}: a refused build published a profile"
+        else:
+            raise AssertionError(f"{harness}: a profile was built while {target} had a second link at {alias}")
+        finally:
+            alias.unlink()
+    # A symbolic link at a protected path, or at a folder above one, sends a
+    # confined write and Git's read of the ref to wherever it points.
+    ref, forged_ref = common / "refs/heads/fm/other", Path(manifest["worktree"]) / "forged-ref"
+    folder, forged_folder = common / "refs/heads/aliased", Path(manifest["user_tmp"]) / "fm-task-ref-folder"
+    real_ref = ref.read_bytes()
+    forged_ref.write_text(manifest["forged_sha"] + "\n")
+    forged_folder.mkdir(parents=True)
+    (forged_folder / "other").write_text(manifest["forged_sha"] + "\n")
+    symlinks = {"symlinked-ref": (ref, forged_ref), "symlinked-folder": (folder, forged_folder)}
+    for name, (path, target) in symlinks.items():
+        profile = base / f"alias-{name}-{harness}.sb"
+        path.unlink(missing_ok=True)
+        path.symlink_to(target)
+        try:
+            build_profile(repo, manifest, harness, profile, env)
+        except subprocess.CalledProcessError as error:
+            assert error.returncode == 1 and f"{path} (symbolic link to {target})" in error.stderr, (name, error.stderr)
+            assert not profile.exists(), f"{name}: a refused build published a profile"
+        else:
+            raise AssertionError(f"{harness}: a profile was built while {path} was a symbolic link to {target}")
+        finally:
+            path.unlink()
+    ref.write_bytes(real_ref)
+    forged_ref.unlink()
+    shutil.rmtree(forged_folder)
+    # Git's core.preferSymlinkRefs HEAD names a branch and is never followed.
+    real_head = (common / "HEAD").read_bytes()
+    (common / "HEAD").unlink()
+    (common / "HEAD").symlink_to("refs/heads/main")
+    try:
+        build_profile(repo, manifest, harness, base / f"alias-symlink-head-{harness}.sb", env)
+    finally:
+        (common / "HEAD").unlink()
+        (common / "HEAD").write_bytes(real_head)
+    clean = base / f"alias-clean-{harness}.sb"
+    build_profile(repo, manifest, harness, clean, env)
+    assert clean.exists(), "the build still refuses after every alias was removed"
+    print(f"{harness} aliases: " + ", ".join([*aliases, *symlinks]) + " refused naming path and link count or target;"
+          " symbolic-link HEAD and clean builds still work")
+
+
+def reftable_source(repo, manifest, base, env):
+    # Reftable keeps every ref, the task's own and every other task's, in files
+    # no packed-refs or refs/heads rule names, so the builder must refuse it.
+    source, linked = base / "rs", base / "rw"
+    for args in (["init", "-q", "--ref-format=reftable", "-b", "main", str(source)],
+                 ["-C", str(source), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"],
+                 ["-C", str(source), "worktree", "add", "-q", "-b", "fm/task", str(linked)]):
+        result = git(*args)
+        assert result.returncode == 0, (args, result.stderr)
+    profile = base / "rs.sb"
+    try:
+        build_profile(repo, manifest, "claude", profile, env, worktree=str(linked))
+    except subprocess.CalledProcessError as error:
+        assert error.returncode == 1 and "reftable ref storage cannot be confined" in error.stderr, error.stderr
+        assert not profile.exists(), "reftable repository published a confinement profile"
+    else:
+        raise AssertionError("a reftable repository was confined as if its refs were files")
+    print("reftable source: refused; no profile published")
 
 
 # A new config root holds none of Claude's session folders; fm-spawn.sh creates
@@ -786,7 +1048,8 @@ for harness in ("claude", "omp"):
             remove_archive_folders(manifest)
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
-            result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+            result = subprocess.run(invocation, capture_output=True, text=True, env=launch_git_env(env))
+            git("-C", manifest["worktree"], "update-ref", "-d", "refs/heads/" + OWN_PACKED_ARCHIVE)
             expected_identity = pid_identity(str(repo), unusual.pid, base / "identity-state")
             unusual.kill()
             unusual.wait()
@@ -814,3 +1077,6 @@ for harness in ("claude", "omp"):
                     assert actual[name] is False, (harness, mode, name, actual)
         else:
             assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
+            hardlink_alias(repo, manifest, base, harness, env)
+            if harness == "claude":
+                reftable_source(repo, manifest, base, env)
