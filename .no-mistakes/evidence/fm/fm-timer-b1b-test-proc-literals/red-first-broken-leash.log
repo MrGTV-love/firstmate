@@ -1,0 +1,63 @@
+=== leash=retired ($ROOT/bin/fm-proc-budget.sh $FM_TEST_TREE_PROCS -- $@) case=test_suite_tree_leash_survives_neighbours_on_a_slow_host
+/tmp/fm-red.Z24OnI/retired/tests/lib.sh: line 39: /tmp/fm-red.Z24OnI/retired/tests/git-config-helpers.sh: No such file or directory
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+not ok - a suite tree under the leash while neighbours spend the shared count: expected exit 0, got 1
+exit=1
+=== leash=retired ($ROOT/bin/fm-proc-budget.sh $FM_TEST_TREE_PROCS -- $@) case=test_suite_tree_leash_stops_a_runaway_tree
+/tmp/fm-red.Z24OnI/retired/tests/lib.sh: line 39: /tmp/fm-red.Z24OnI/retired/tests/git-config-helpers.sh: No such file or directory
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+not ok - a suite tree past the leash: expected exit 98, got 128
+exit=1
+=== leash=disabled ($ROOT/bin/fm-proc-budget.sh --own-procs 100000 -- $@) case=test_suite_tree_leash_stops_a_runaway_tree (timeout 120 s)
+/tmp/fm-red.Z24OnI/disabled/tests/lib.sh: line 39: /tmp/fm-red.Z24OnI/disabled/tests/git-config-helpers.sh: No such file or directory
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+exit=124 (124 = killed by the 120 s timeout: the runaway tree was never stopped)
+note: the case's temp root is removed by its EXIT trap; after the timeout, pgrep -f 'sleep 5003' finds 0 processes (the outer wrapper's TERM ended the held tree).

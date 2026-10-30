@@ -1,0 +1,11 @@
+=== base (20 fixed-count-128 sites; 0 own-tree leash sites) case=test_lock_receipts_retire_with_release, 300 neighbours start after the leashed fixture launches
+user processes when the fixture started:     1062; after 300 neighbours:     1347
+ok - disposable watcher refuses inherited state outside its marked lab
+/tmp/fm-red.Z24OnI/shim/python3: fork: Resource temporarily unavailable
+not ok - lock receipt retirement failed
+exit=1
+=== head (0 fixed-count-128 sites; 20 own-tree leash sites) case=test_lock_receipts_retire_with_release, 300 neighbours start after the leashed fixture launches
+user processes when the fixture started:     1083; after 300 neighbours:     1378
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+exit=0

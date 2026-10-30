@@ -1,0 +1,8 @@
+$ bin/fm-proc-budget.sh --own-procs 64 -- env HOLD_LEVELS=150 member.sh   # a tree that grows to 150 members and holds
+fm-proc-budget: command tree held 70 processes, over the own-tree limit of 64; ended
+exit=98  members recorded: 69
+members alive after the stop: 0
+$ bin/fm-proc-budget.sh --own-procs 50 -- env HOLD_LEVELS=150 member.sh   # a tree that grows to 150 members and holds
+fm-proc-budget: command tree held 75 processes, over the own-tree limit of 50; ended
+exit=98  members recorded: 76
+members alive after the stop: 0
