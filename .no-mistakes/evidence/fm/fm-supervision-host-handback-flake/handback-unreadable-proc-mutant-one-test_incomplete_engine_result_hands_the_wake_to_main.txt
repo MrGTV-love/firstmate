@@ -1,0 +1,3 @@
+# mutant (old fm-wake-lib.sh), tests/one-test_incomplete_engine_result_hands_the_wake_to_main.test.sh, bash 5.2, fake unreadable /proc
+not ok - emptyresult: the host never started a watcher cycle
+exit=1

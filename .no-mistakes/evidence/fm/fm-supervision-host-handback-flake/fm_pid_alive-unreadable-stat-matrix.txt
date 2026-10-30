@@ -1,0 +1,18 @@
+# fm_pid_alive under set -u; the stat passes [ -r ] but open/read fails (process exits mid-read)
+# base=28bb500b2 bin/fm-wake-lib.sh ; target=a1746d269 bin/fm-wake-lib.sh
+bash 3.2.57  base   directory live -> rc=0 
+bash 3.2.57  base   directory dead -> rc=1 
+bash 3.2.57  base   socket    live -> rc=0 
+bash 3.2.57  base   socket    dead -> rc=1 
+bash 3.2.57  target directory live -> rc=0 
+bash 3.2.57  target directory dead -> rc=1 
+bash 3.2.57  target socket    live -> rc=0 
+bash 3.2.57  target socket    dead -> rc=1 
+bash 5.2.37  base   directory live -> bin/fm-wake-lib.sh: line 104: state: unbound variable 
+bash 5.2.37  base   directory dead -> rc=1 
+bash 5.2.37  base   socket    live -> bin/fm-wake-lib.sh: line 104: state: unbound variable 
+bash 5.2.37  base   socket    dead -> rc=1 
+bash 5.2.37  target directory live -> rc=0 
+bash 5.2.37  target directory dead -> rc=1 
+bash 5.2.37  target socket    live -> rc=0 
+bash 5.2.37  target socket    dead -> rc=1 

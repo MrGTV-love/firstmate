@@ -1,0 +1,4 @@
+# Live race: a perl loop renames <root>/<pid>/stat away and back as fast as it can while one
+# bash 5.2 'set -u' shell calls fm_pid_alive 20000 times on a live pid. Tally of answers, or the abort.
+base: bin/fm-wake-lib.sh: line 104: state: unbound variable
+target: finished: alive=20000 dead=0

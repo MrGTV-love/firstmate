@@ -1,0 +1,12 @@
+# mutant (old fm-wake-lib.sh), away no-report hand-back case, bash 5.2, fake unreadable /proc, with host output dumped on failure
+--- away-noreport/host.out
+/tmp/fm-bash5-nUnZVL/mutant/bin/fm-wake-lib.sh: line 104: state: unbound variable
+watcher: FAILED - watcher cycle exited 1 without an actionable reason
+--- away-noreport/host.rc
+0
+--- away-noreport/claude.err
+not ok - the handed-back close must carry the reason line
+--- /Users/charlesabrooker/tmp/fm-supervision-host.4ypf7D/away-noreport/host.out ---
+/tmp/fm-bash5-nUnZVL/mutant/bin/fm-wake-lib.sh: line 104: state: unbound variable
+watcher: FAILED - watcher cycle exited 1 without an actionable reason
+exit=1

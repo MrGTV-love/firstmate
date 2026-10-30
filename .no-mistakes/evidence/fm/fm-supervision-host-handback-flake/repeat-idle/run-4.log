@@ -1,0 +1,5 @@
+ok - host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: an engine turn whose result is incomplete hands its wake to main

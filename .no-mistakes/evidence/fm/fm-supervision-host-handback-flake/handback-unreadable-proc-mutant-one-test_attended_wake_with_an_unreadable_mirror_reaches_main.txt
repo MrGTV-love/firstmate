@@ -1,0 +1,4 @@
+# mutant (old fm-wake-lib.sh), tests/one-test_attended_wake_with_an_unreadable_mirror_reaches_main.test.sh, bash 5.2, fake unreadable /proc
+not ok - bad mirror: the first wake was not handled: 1793328609	start	gen=host-92731-1793328609	primary=claude
+1793328617	pass-through	a close without a wake
+exit=1
