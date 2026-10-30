@@ -1593,74 +1593,59 @@ SH
 }
 
 test_returned_custom_check_descendants_are_drained() {
-  local backend dir state fakebin ready direct_done child_pid_file child_pid check rc force_fallback
-  for backend in installed-timeout fallback-timeout; do
-    dir=$(make_case "returned-custom-descendant-$backend")
-    state="$dir/home/state"
-    fakebin="$dir/fakebin"
-    ready="$dir/descendant-ready"
-    direct_done="$dir/direct-check-done"
-    child_pid_file="$dir/descendant.pid"
-    # The descendant ignores TERM and never exits on its own while this case's
-    # directory exists, so its absence can only mean the watcher drained it.
-    cat > "$state/custom.check.sh" <<'SH'
+  local dir state fakebin ready direct_done child_pid_file child_pid check rc
+  dir=$(make_case returned-custom-descendant)
+  state="$dir/home/state"
+  fakebin="$dir/fakebin"
+  ready="$dir/descendant-ready"
+  direct_done="$dir/direct-check-done"
+  child_pid_file="$dir/descendant.pid"
+  # The descendant ignores TERM and never exits on its own while this case's
+  # directory exists, so its absence can only mean the watcher drained it.
+  cat > "$state/custom.check.sh" <<'SH'
 #!/usr/bin/env bash
 perl -e '$SIG{TERM}="IGNORE"; open my $ready, ">", $ENV{FM_TEST_DESCENDANT_READY} or die $!; print {$ready} "ready\n"; close $ready; select undef, undef, undef, 0.2 while -d $ENV{FM_TEST_DESCENDANT_HOLD}' &
 printf '%s\n' "$!" > "$FM_TEST_DESCENDANT_PID"
 while [ ! -s "$FM_TEST_DESCENDANT_READY" ]; do sleep 0.01; done
 : > "$FM_TEST_DIRECT_DONE"
 SH
-    # The watcher runs this check next in the same cycle, only after it has
-    # finished with the returned one, so its wake both records whether the
-    # descendant outlived that drain and stops the watcher.
-    cat > "$state/z-drain-witness.check.sh" <<'SH'
+  # The watcher runs this check next in the same cycle, only after it has
+  # finished with the returned one, so its wake both records whether the
+  # descendant outlived that drain and stops the watcher.
+  cat > "$state/z-drain-witness.check.sh" <<'SH'
 #!/usr/bin/env bash
 case "$(ps -o stat= -p "$(cat "$FM_TEST_DESCENDANT_PID")" 2>/dev/null)" in
   ''|Z*) printf 'descendant drained\n' ;;
   *) printf 'descendant alive\n' ;;
 esac
 SH
-    for check in custom z-drain-witness; do
-      chmod 0700 "$state/$check.check.sh"
-      FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
-        || fail "could not register $backend returned-descendant $check check"
-    done
-    if [ "$backend" = installed-timeout ]; then
-      cat > "$fakebin/timeout" <<'SH'
-#!/usr/bin/env bash
-shift
-exec "$@"
-SH
-      chmod 0700 "$fakebin/timeout"
-      force_fallback=0
-    else
-      rm -f "$fakebin/timeout" "$fakebin/gtimeout"
-      force_fallback=1
-    fi
-
-    rc=0
-    FM_TEST_CHECK_TIMEOUT=10 FM_CHECK_FORCE_FALLBACK="$force_fallback" \
-      FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
-      FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
-      run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
-    child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
-    if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
-      kill -KILL "$child_pid" 2>/dev/null || true
-      fail "$backend watcher left a returned check descendant alive"
-    fi
-    [ "$rc" -eq 0 ] \
-      || fail "$backend watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
-    [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
-      || fail "$backend watcher did not complete the direct custom check"
-    grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
-      || fail "$backend watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
-    ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private custom check snapshot"
-    ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private check output file"
-    [ ! -e "$state/.watch.lock/pid" ] || fail "$backend watcher left its singleton lock"
+  for check in custom z-drain-witness; do
+    chmod 0700 "$state/$check.check.sh"
+    FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
+      || fail "could not register returned-descendant $check check"
   done
-  pass "returned custom check descendants are drained on installed and fallback timeout paths"
+  rc=0
+  FM_TEST_CHECK_TIMEOUT=10 \
+    FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
+    FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
+    run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
+  child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
+  if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
+    kill -KILL "$child_pid" 2>/dev/null || true
+    fail "watcher left a returned check descendant alive"
+  fi
+  [ "$rc" -eq 0 ] \
+    || fail "watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
+  [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
+    || fail "watcher did not complete the direct custom check"
+  grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
+    || fail "watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
+  ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
+    || fail "watcher left a private custom check snapshot"
+  ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
+    || fail "watcher left a private check output file"
+  [ ! -e "$state/.watch.lock/pid" ] || fail "watcher left its singleton lock"
+  pass "returned custom check descendants are drained before the next check runs"
 }
 
 test_teardown_removes_poll_artifacts() {

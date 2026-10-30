@@ -385,7 +385,7 @@ test_disarmed_check_starts_a_new_stop_episode() {
 }
 
 test_progressing_poll_survives_fivefold_slowdown() {
-  local tmpbin home factor out
+  local tmpbin home factor delay out
   tmpbin="$TMP_ROOT/progress/bin"
   mkdir -p "$tmpbin"
   cp "$CHECK" "$tmpbin/"
@@ -398,10 +398,13 @@ for ((step=0; step<10; step++)); do printf 'progress\n' >&2; sleep "$FM_TEST_DEL
 printf 'fm-mail: woke for 42\n'
 SH
   chmod +x "$tmpbin/fm-mail.sh"
+  # Ten steps of 0.4 s, then of 2 s: the 5x poll runs 20 s, past the 15 s
+  # wall budget main enforced, while each step stays under any inactivity stop.
   for factor in 1 5; do
+    case "$factor" in 1) delay=0.4 ;; *) delay=2 ;; esac
     home=$(make_home "progress-$factor")
     out="$home/out.txt"
-    run_check "$home" "$out" "$tmpbin/fm-mail-check.sh" FM_TEST_DELAY="0.$factor"
+    run_check "$home" "$out" "$tmpbin/fm-mail-check.sh" FM_TEST_DELAY="$delay"
     assert_contains "$(cat "$out")" 'mail: new mail: woke for 42' "${factor}x poll lost its new mail"
   done
   pass 'mail polls deliver new mail at 1x and 5x while making progress'

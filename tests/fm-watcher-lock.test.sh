@@ -446,6 +446,65 @@ test_stopped_check_wakes_once_per_episode() {
   pass 'a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one'
 }
 
+test_check_runs_without_posix_python() {
+  local dir state fakebin
+  dir=$(make_case check-no-posix-python)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  # A python3 that is no POSIX interpreter, like a native Windows one on Git Bash.
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/python3"
+  chmod +x "$fakebin/python3"
+  printf '#!/usr/bin/env bash\nprintf "check-ran\\n"\n' > "$state/plain-check.sh"
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_check_capture plain "$STATE/plain-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-ran ] || exit 22
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a check did not run without a POSIX python3: $(cat "$dir/capture.err")"
+  pass 'without a POSIX python3 a check still runs and returns its result'
+}
+
+test_check_owner_loss_terms_a_detached_child() {
+  local dir fifo pid grandchild i
+  dir=$(make_case check-owner-term)
+  fifo="$dir/owner"
+  mkfifo "$fifo"
+  # A child in its own session, the way fm_run_progress starts a read, under a
+  # parent that stays alive in the check's group.
+  cat > "$dir/grandchild.sh" <<'SH'
+#!/usr/bin/env bash
+trap 'printf term > "$FM_TEST_DIR/termed"; exit 0' TERM
+printf '%s\n' "$$" > "$FM_TEST_DIR/grandchild.pid"
+while :; do sleep 0.1; done
+SH
+  chmod +x "$dir/grandchild.sh"
+  # shellcheck disable=SC2016 # The generated check expands its own test directory.
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'exec python3 -c "import subprocess, sys, time; subprocess.Popen([sys.argv[1]], start_new_session=True); time.sleep(60)" "$FM_TEST_DIR/grandchild.sh"' \
+    > "$dir/check.sh"
+  FM_TEST_DIR="$dir" python3 "$ROOT/bin/fm-check-run.py" 3 -- bash "$dir/check.sh" 3< "$fifo" &
+  pid=$!
+  exec 4> "$fifo"
+  for ((i = 0; i < 300; i++)); do
+    [ ! -s "$dir/grandchild.pid" ] || break
+    sleep 0.1
+  done
+  [ -s "$dir/grandchild.pid" ] || { exec 4>&-; wait "$pid"; fail 'the detached child never started'; }
+  IFS= read -r grandchild < "$dir/grandchild.pid"
+  exec 4>&-
+  wait "$pid" || true
+  if kill -0 "$grandchild" 2>/dev/null; then
+    kill -KILL "$grandchild" 2>/dev/null || true
+    fail 'owner loss left the check'"'"'s detached child running'
+  fi
+  [ -e "$dir/termed" ] || fail 'the detached child was killed without a TERM first'
+  pass 'owner loss sends a check'"'"'s detached child TERM before any KILL'
+}
+
 test_check_stderr_capture_keeps_a_capped_tail() {
   local dir state
   dir=$(make_case check-stderr-cap)
@@ -458,7 +517,7 @@ test_check_stderr_capture_keeps_a_capped_tail() {
       CHECK_STDERR_CAP_BYTES=4096
       CHECK_STDERR_TAIL_BYTES=1024
       seen_tick() { cp "$FM_CHECK_OUTPUT.stderr" "$STATE/stderr-seen" 2>/dev/null || true; }
-      FM_CAPTURE_TICK=seen_tick run_owned_capture 10 0 discard bash -c '\''head -c 100000 /dev/zero | tr "\\0" x >&2; printf "\\nTAIL-MARK\\n" >&2; sleep 3; printf check-finished'\'' || exit 21
+      FM_CAPTURE_OWNER=1 FM_CAPTURE_TICK=seen_tick run_owned_capture 10 0 discard bash -c '\''head -c 100000 /dev/zero | tr "\\0" x >&2; printf "\\nTAIL-MARK\\n" >&2; sleep 3; printf check-finished'\'' || exit 21
       [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
       size=$(wc -c < "$STATE/stderr-seen") || exit 23
       [ "$size" -le 4096 ] || exit 24
@@ -3267,6 +3326,8 @@ test_check_progress_survives_fivefold_slowdown
 test_check_sigkill_owner_cleans_progressing_tree
 test_check_absolute_limit_stops_endless_progress_as_unknown
 test_stopped_check_wakes_once_per_episode
+test_check_runs_without_posix_python
+test_check_owner_loss_terms_a_detached_child
 test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings

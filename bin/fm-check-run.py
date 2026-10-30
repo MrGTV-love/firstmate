@@ -9,6 +9,10 @@ on owner loss, launcher death, or normal completion. No wall-clock limit or
 polling CPU is introduced: progress-check must observe work, not a supervisor.
 The watcher owns the inactivity policy and closes all writer copies before
 launch; this private bridge owns only lifetime and result propagation.
+The guardian's TERM-then-KILL sweep reads the tree through libproc, so on any
+other host the launcher first sends the tree TERM itself, reading /proc through
+fm-proc-budget-tree.py's table, and KILLs what ignores it after that module's
+LEFTOVER_GRACE; the guardian's KILL then covers the group.
 """
 import os
 from pathlib import Path
@@ -16,7 +20,35 @@ import runpy
 import select
 import signal
 import sys
+import time
 from types import SimpleNamespace
+
+
+def end_tree_portable(root, skip):
+    """TERM the check tree, then KILL what ignores it, without libproc."""
+    tree = SimpleNamespace(**runpy.run_path(str(Path(__file__).with_name("fm-proc-budget-tree.py"))))
+    table, known = tree.Table(), {}
+
+    def live():
+        try:
+            return {pid: row[2] for pid, row in tree.members_of(table.read(), root, known, skip).items()
+                    if not row[3]}
+        except tree.SampleError:
+            return {}
+
+    def send(members, number):
+        for pid, identity in members.items():
+            try:
+                if table.identity(pid) == identity:
+                    os.kill(pid, number)
+            except (LookupError, OSError):
+                pass
+
+    send(live(), signal.SIGTERM)
+    deadline = time.monotonic() + tree.LEFTOVER_GRACE
+    while live() and time.monotonic() < deadline:
+        time.sleep(tree.RESCAN_INTERVAL)
+    send(live(), signal.SIGKILL)
 
 
 def run(owner, command):
@@ -63,6 +95,8 @@ def run(owner, command):
                     os.killpg(child.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+            if sys.platform != "darwin":
+                end_tree_portable(child.pid, {os.getpid(), guardian.process.pid})
             # EOF invokes the shared guardian's cleanup. Await that actual
             # completion, never kill the guardian on a guessed read deadline.
             guardian.process.stdin.close()
@@ -86,6 +120,6 @@ if __name__ == "__main__":
         if len(sys.argv) < 4 or sys.argv[2] != "--":
             raise ValueError("expected OWNER_FD -- COMMAND...")
         sys.exit(run(int(sys.argv[1]), sys.argv[3:]))
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, AttributeError) as error:
         print(f"fm-check-run: {error}", file=sys.stderr)
         sys.exit(125)

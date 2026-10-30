@@ -860,6 +860,19 @@ test_sweep_is_independent_of_watcher_inactivity() {
   pass 'tool sweeps do not derive a deadline from the watcher interval'
 }
 
+test_arm_disarm_and_help_print_no_calibration_noise() {
+  local home action err
+  home=$(make_home quiet-actions)
+  write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
+  for action in arm disarm --help; do
+    err="$home/stderr-$action"
+    FM_HOME="$home" FM_DURATION_FILE="$home/empty-durations.jsonl" "$CHECK" "$action" > /dev/null 2> "$err" \
+      || fail "$action failed: $(cat "$err")"
+    [ ! -s "$err" ] || fail "$action printed calibration noise: $(cat "$err")"
+  done
+  pass 'arm, disarm and --help read no duration ledger and print nothing on stderr'
+}
+
 test_invalid_environment_and_action_refuse() {
   local home status
   home=$(make_home refuse)
@@ -1088,6 +1101,7 @@ test_a_finding_past_the_cut_is_still_reported
 test_probes_are_skipped_between_intervals
 test_a_repeated_unknown_is_silent_until_the_result_changes
 test_sweep_is_independent_of_watcher_inactivity
+test_arm_disarm_and_help_print_no_calibration_noise
 test_invalid_environment_and_action_refuse
 test_arm_registers_the_check_and_disarm_removes_it
 test_arm_refuses_a_symlink_at_the_shim_path

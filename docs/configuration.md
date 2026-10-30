@@ -1044,8 +1044,8 @@ The enforcing response headers, not `gh api rate_limit`, are the quota evidence 
 
 When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
 The helper's header owns the refusal interface; every REST read checks the floor before each request, including the unconditional repeat of a full last page, and publishes no partial response when refused.
-The contributions poll checks the local quota record before budget exits and after incomplete observations.
-It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
+The contributions poll checks the local quota record before each URL and after an incomplete observation; it has no sweep budget, and a read stops only after it makes no output and no process-tree CPU progress.
+It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason, and reports that once per resource/reset-window episode.
 Completed observations remain measured.
 Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
 The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its retained-result behavior.

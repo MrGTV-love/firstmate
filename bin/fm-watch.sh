@@ -381,11 +381,11 @@ case "$CHECK_TIMEOUT" in
      if [ "$CHECK_TIMEOUT" -gt 0 ]; then FM_CHECK_TIMEOUT=$CHECK_TIMEOUT; else unset FM_CHECK_TIMEOUT; fi ;;
 esac
 CHECK_TIMEOUT=$(fm_duration_limit check.inactivity "${FM_CHECK_TIMEOUT:-30}")
-# Harm: checks and status reads run inline in this loop, so one that keeps
-# progressing forever (a CPU spin, or a retry loop writing stderr) starves every
-# later watcher duty. Progress-supervised work stops only at fm-duration.py's
-# absolute extreme (6 hours wall clock, FM_DURATION_ABSOLUTE_SECS), read from
-# its one definition. Expiry means unknown, retry next pass, never a result.
+# Harm: checks run inline in this loop, so one that keeps progressing forever
+# (a CPU spin, or a retry loop writing stderr) starves every later watcher duty.
+# A progressing check stops only at fm-duration.py's absolute extreme (6 hours
+# wall clock, FM_DURATION_ABSOLUTE_SECS), read from its one definition. Expiry
+# means unknown, retry next pass, never a result.
 CAPTURE_ABSOLUTE=$(python3 -c 'import runpy, sys
 d = runpy.run_path(sys.argv[1])
 print(d["positive_override"]("FM_DURATION_ABSOLUTE_SECS", d["ABSOLUTE_LIMIT"]))' \
@@ -2272,9 +2272,15 @@ procevent_surface_queued() {
   wake "$reason"
 }
 
+# Without a POSIX python3 there is no owner bridge: the check runs directly, as
+# fm_progress_check degrades, rather than not at all.
 run_check_process() {
   local c=$1
   shift
+  if ! fm_posix_python; then
+    eval "exec $FM_CHECK_OWNER_FD<&-"
+    exec bash "$c" "$@"
+  fi
   exec python3 "$SCRIPT_DIR/fm-check-run.py" "$FM_CHECK_OWNER_FD" -- bash "$c" "$@"
 }
 
@@ -2286,6 +2292,7 @@ run_check() {
 FM_ACTIVE_CHECK_PID=
 FM_ACTIVE_CHECK_PGID=
 FM_ACTIVE_CHECK_GRACE=0
+FM_ACTIVE_CHECK_OWNED=
 FM_CHECK_OUTPUT=
 FM_CHECK_RESULT=
 FM_CHECK_STATUS=0
@@ -2335,7 +2342,7 @@ fm_check_wait_open() {
   eval "exec $FM_CHECK_WAIT_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_WAIT_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
   rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
   FM_CHECK_WAIT_FIFO=
-  if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
+  if [ "${FM_CAPTURE_OWNER:-}" = 1 ]; then
     FM_CHECK_OWNER_WRITER=$(fm_timeout_free_fd $((FM_CHECK_WAIT_FD + 1))) || return 1
     FM_CHECK_OWNER_FD=$(fm_timeout_free_fd $((FM_CHECK_OWNER_WRITER + 1))) || return 1
     FM_CHECK_WAIT_FIFO="$FM_CHECK_OUTPUT.owner"
@@ -2367,7 +2374,13 @@ fm_active_check_stop() {
   [ -n "$pid" ] || [ -n "$pgid" ] || return 0
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
-  [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
+  if [ -n "$FM_ACTIVE_CHECK_OWNED" ] && [ -n "$pid" ]; then
+    # The check launcher exits only after its guardian has cleaned the
+    # check's own group, so its actual exit is the end of that cleanup.
+    wait "$pid" 2>/dev/null || true
+  else
+    [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
+  fi
   [ -z "$pgid" ] || kill -KILL -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -KILL "$pid" 2>/dev/null || true
   [ -z "$pid" ] || wait "$pid" 2>/dev/null || true
@@ -2378,6 +2391,7 @@ fm_active_check_stop() {
   FM_ACTIVE_CHECK_PID=
   FM_ACTIVE_CHECK_PGID=
   FM_ACTIVE_CHECK_GRACE=0
+  FM_ACTIVE_CHECK_OWNED=
 }
 
 # Stop-signal dispositions, installed with the EXIT trap below. HUP and TERM
@@ -2412,7 +2426,7 @@ run_check_capture() {  # <check-id> <check> [args...]
   FM_CHECK_STOP_NOTICE=
   episode="$STATE/$name.check-stopped"
   started=$SECONDS
-  FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
+  FM_CAPTURE_OWNER=1 FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
   if [ -n "$FM_CHECK_STOPPED" ]; then
     notice="check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
     triage_log "$notice"
@@ -2438,22 +2452,27 @@ fm_check_stderr_cap() {  # <file>
 
 # With FM_CAPTURE_PROGRESS=1 the timeout is an inactivity bound, not a
 # wall-clock one: from the second liveness tick, fm_progress_check samples the
-# capture's process tree and private output streams. Only a tree with no CPU
-# or output progress is stopped as stalled (124). Without a POSIX python3
-# nothing is proven stalled. Progressing work still stops at CAPTURE_ABSOLUTE.
-# FM_CHECK_STOPPED names why a capture was stopped.
+# capture's process tree, and only a tree with no CPU progress for the timeout
+# is stopped as stalled (124). Without a POSIX python3 nothing is proven stalled.
+# FM_CAPTURE_OWNER=1 marks a watcher check: it gets the owner pipe, keeps its
+# stderr in a capped private file that also counts as progress, and still stops
+# at CAPTURE_ABSOLUTE while progressing. FM_CHECK_STOPPED names why a capture
+# was stopped.
 run_owned_capture() {
   local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
-  local progress_rc stop_reason progress_sampled=
+  local progress_rc stop_reason progress_sampled='' owned=${FM_CAPTURE_OWNER:-} bridged=''
+  local -a progress_paths=()
   shift 3
+  [ -z "$owned" ] || ! fm_posix_python || bridged=1
   fm_check_output_cleanup
   FM_CHECK_RESULT=
   FM_CHECK_STATUS=0
   FM_CHECK_STOPPED=
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
-  if [ "$capture_stderr" = discard ]; then
+  if [ -n "$owned" ] && [ "$capture_stderr" = discard ]; then
     (umask 077; : > "$FM_CHECK_OUTPUT.stderr") || { fm_check_output_cleanup; return 1; }
+    progress_paths=("$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.stderr")
   fi
   fm_check_wait_open || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
@@ -2468,8 +2487,10 @@ run_owned_capture() {
     # Only the watcher retains this writer. SIGKILL therefore gives the shared
     # guardian an independent owner-loss signal even when EXIT cannot run.
     [ -z "$FM_CHECK_OWNER_WRITER" ] || eval "exec $FM_CHECK_OWNER_WRITER>&-"
-    if [ "$capture_stderr" = discard ]; then
+    if [ "${#progress_paths[@]}" -gt 0 ]; then
       "$@" 2>> "$FM_CHECK_OUTPUT.stderr"
+    elif [ "$capture_stderr" = discard ]; then
+      "$@" 2>/dev/null
     else
       "$@" 2>&1
     fi
@@ -2477,6 +2498,7 @@ run_owned_capture() {
   FM_ACTIVE_CHECK_PID=$!
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
   FM_ACTIVE_CHECK_GRACE=$capture_grace
+  FM_ACTIVE_CHECK_OWNED=$bridged
   set +m
   eval "exec $FM_CHECK_WAIT_WRITER>&-"
   FM_CHECK_WAIT_WRITER=
@@ -2495,16 +2517,16 @@ run_owned_capture() {
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
     [ -z "${FM_CAPTURE_TICK:-}" ] || "$FM_CAPTURE_TICK"
-    [ "$capture_stderr" != discard ] || fm_check_stderr_cap "$FM_CHECK_OUTPUT.stderr"
+    [ "${#progress_paths[@]}" -eq 0 ] || fm_check_stderr_cap "$FM_CHECK_OUTPUT.stderr"
     stop_reason='no progress'
     if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
       progress_rc=0
       [ -z "$progress_sampled" ] \
         || fm_progress_check "$FM_CHECK_OUTPUT.progress" "$FM_ACTIVE_CHECK_PID" "$capture_timeout" \
-          "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.stderr" \
+          ${progress_paths[@]+"${progress_paths[@]}"} \
         || progress_rc=$?
       progress_sampled=1
-      if [ "$progress_rc" != 124 ] && [ -n "$CAPTURE_ABSOLUTE" ] \
+      if [ "$progress_rc" != 124 ] && [ -n "$owned" ] && [ -n "$CAPTURE_ABSOLUTE" ] \
         && [ "$((SECONDS - check_started))" -gt "$CAPTURE_ABSOLUTE" ]; then
         progress_rc=124
         stop_reason='absolute limit'
@@ -3491,6 +3513,9 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  # A stop that lands inside `read -t` can leave bash's read alarm armed; it
+  # must not end this cleanup while it waits for a check launcher to finish.
+  trap '' ALRM
   FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1

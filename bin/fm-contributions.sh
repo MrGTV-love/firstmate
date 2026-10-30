@@ -46,8 +46,9 @@
 #
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_duration_progress under a stable
-# contributions.read.<read> key: its sample is recorded, and only output and
-# process-tree CPU silence past that key's bound stops it. The bound starts at
+# contributions.read.<read> key: the key's bound is read once per poll, each
+# read's sample is recorded in one batch when the poll ends, and only output
+# and process-tree CPU silence past that bound stops it. The bound starts at
 # 30 seconds, main's per-check allowance, so no read stops sooner than on main;
 # measured samples can only raise it. There is no sweep deadline or observation
 # reservation. A stopped read is unknown: keep that URL's saved observation
@@ -216,6 +217,11 @@ write_record() { # task record-json-file
   mv -f -- "$staged" "$file"
 }
 
+read_bound() { # read name: its key's inactivity bound, read from the ledger once per poll
+  [ -s "$TMP/bound.$1" ] || fm_duration_limit "contributions.read.$1" 30 2>/dev/null > "$TMP/bound.$1" || true
+  cat "$TMP/bound.$1"
+}
+
 forge() {
   local rc=0 forge_err=${FORGE_ERR:-$TMP/forge.err} read
   read=${forge_err##*/}
@@ -227,11 +233,12 @@ forge() {
     set -- gh "$@"
   fi
   if [ "$rc" -eq 0 ]; then
-    fm_duration_progress "contributions.read.${read%.err}" 30 env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
-      "$@" 2> "$forge_err" || rc=$?
+    fm_duration_progress "contributions.read.${read%.err}" "$(read_bound "${read%.err}")" "$TMP/durations.tsv" \
+      env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 "$@" 2> "$forge_err" || rc=$?
   fi
   if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
-    head -1 "$forge_err" > "$TMP/quota-low"
+    # The progress runner shares this stream, so take the refusal by its text.
+    grep -m1 -F ' quota low (' "$forge_err" > "$TMP/quota-low" || head -1 "$forge_err" > "$TMP/quota-low"
     return "$rc"
   fi
   # Inactivity means unknown, not forge failure; only a completed nonzero
@@ -283,11 +290,11 @@ wait_forges() { # background forge pids from one independent read wave
 
 observe() { # canonical GitHub URL -> normalized JSON
   local url=$1 part number kind endpoint head after label
+  rm -f -- "$TMP/read-unknown" "$TMP/forge-unavailable" "$TMP/quota-low"
+  READ_UNKNOWN=0
   case "$url" in https://github.com/*) ;; *) return 1 ;; esac
   part=${url#https://github.com/}; number=${part##*/}; part=${part%/*}; kind=${part##*/}; part=${part%/*}
   case "$kind" in pull) endpoint="repos/$part/pulls/$number" ;; issues) endpoint="repos/$part/issues/$number" ;; *) return 1 ;; esac
-  rm -f -- "$TMP/read-unknown" "$TMP/forge-unavailable" "$TMP/quota-low"
-  READ_UNKNOWN=0
   forge api "$endpoint" > "$TMP/core.json" || return 1
   jq -e '(.state == "open" or .state == "closed") and (.user.login | type == "string")' "$TMP/core.json" >/dev/null || return 1
   if [ "$kind" = pull ]; then
@@ -493,6 +500,7 @@ poll() {
   mv -f -- "$DEFERRED_TMP" "$STATE/.contributions-deferred"
   DEFERRED_TMP=
   [ "$QUOTA_ANNOUNCE" -eq 0 ] || printf 'contributions: %s; last observations kept, marked stale\n' "$QUOTA_REASON"
+  [ ! -s "$TMP/durations.tsv" ] || fm_duration_record_batch < "$TMP/durations.tsv"
   ring_undrained
 }
 

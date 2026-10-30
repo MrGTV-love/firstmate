@@ -124,9 +124,11 @@ fi
 
 # Harm: a silent, CPU-idle probe can hold a sweep indefinitely. Progress,
 # rather than elapsed sweep time, decides when its answer becomes unknown.
+# The ledger bound is read only by the check action, which keeps its
+# diagnostics private, so arm, disarm and --help print none.
 # shellcheck source=bin/fm-duration-lib.sh
 . "$SCRIPT_DIR/fm-duration-lib.sh"
-PROBE_SECS=$(fm_duration_limit tool-update.probe "${FM_TOOL_UPDATE_PROBE_SECS:-5}")
+PROBE_SECS=${FM_TOOL_UPDATE_PROBE_SECS:-5}
 case "$PROBE_SECS" in
   ''|*[!0-9]*|0*)
     printf 'fm-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a positive whole number\n' >&2
@@ -609,6 +611,7 @@ action_check() {
     && [ "$now" -ge "$RECORD_EPOCH" ] && [ $((now - RECORD_EPOCH)) -lt "$INTERVAL" ]; then
     return 0
   fi
+  PROBE_SECS=$(fm_duration_limit tool-update.probe "$PROBE_SECS" 2>/dev/null) || return 1
 
   if ! config_validate; then
     emit "watched tool registry: $CONFIG_PROBLEM"

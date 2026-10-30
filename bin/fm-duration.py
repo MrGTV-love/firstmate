@@ -1209,7 +1209,7 @@ def run(key, command, calibration_file, *, inactivity=None):
 
 
 BOUND = re.compile(r'''(?ix)
-    (?:\bfm_(?:run|exec)_timed\s+|\b(?:fm_nm_(?:bounded|run_bounded|run_checked|run)|fm_duration_(?:limit|timed|progress))\s+(?:"(?!\$@)[^"]*"|'[^']*'|[^\s"']+)\s+)["']?(?P<call>\d+(?:\.\d+)?)(?:["']|\b)(?![>\d])
+    (?:\bfm_(?:run|exec)_timed\s+|\b(?:fm_nm_(?:bounded|run_bounded|run_checked|run)|fm_duration_(?:limit|timed))\s+(?:"(?!\$@)[^"]*"|'[^']*'|[^\s"']+)\s+)["']?(?P<call>\d+(?:\.\d+)?)(?:["']|\b)(?![>\d])
     |\b(?:g?timeout)\s+(?:-\w+\s+\d+\s+)?(?P<external>\d+(?:\.\d+)?)(?:ms|[smhd])?\b
     |--(?:[\w-]*timeout[\w-]*|max-time|connect-timeout|wait|deadline)(?:[=\s]+)(?P<flag>\d+(?:\.\d+)?)(?:ms|[smhd])?\b
     |\b[\w]*(?:TIMEOUT|DEADLINE|SECONDS|_SECS|_MS|_GRACE)[\w]*\s*=\s*["']?(?:\$\{[^}\n]*:-)?["']?(?P<assignment>\d+(?:\.\d+)?)\b
