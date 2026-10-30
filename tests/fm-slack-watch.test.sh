@@ -1323,9 +1323,7 @@ out=$(wake)
 [ "${#out}" -le 480 ] || fail "X32 the wake line is unbounded"
 assert_eq "$out" "$held_a; +2 queued" "X32 the first journaled line with the queue marker"
 out=$(wake)
-assert_contains "$out" "^$held_b; " "X32 the held line was lost or cut"
-assert_contains "$out" 'unmatched reply 900.000002' "X32 the queued notice was lost"
-assert_not_contains "$out" 'queued' "X32 an empty queue left a marker"
+assert_eq "$out" "$held_b; check: slack 900.000001 - unmatched reply 900.000002" "X32 the held line or the queued notice was lost or cut"
 assert_eq "$(wake)" "" "X32 a printed line repeated"
 printf 'ok - X32\n'
 
