@@ -2188,7 +2188,11 @@ command_withdraw() {
   WITHDRAW_BASIS="moot under the recorded captain ruling $ruling"
   WITHDRAW_OWNER=$owner
   WITHDRAW_RUN_ROLE=$(fm_answered_by_home_role "$FM_HOME" "$STATE")
-  [ "$replay" = 1 ] || write_resolution_record "$id" withdrawn "$body"
+  if [ "$replay" = 1 ]; then
+    WITHDRAW_BASIS=$(decode_shown_value "$body" | sed -n 's/^Withdrawn by: //p' | head -1)
+  else
+    write_resolution_record "$id" withdrawn "$body"
+  fi
   if closes_on_decision "$id" "$state" "$(show_field_value "$show" kind)" "$body"; then
     apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for withdrawn task $id"
     tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \

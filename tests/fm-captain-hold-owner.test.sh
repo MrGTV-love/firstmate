@@ -565,6 +565,36 @@ test_a_withdraw_retried_with_edited_evidence_resolves_the_original_key() {
   pass "a withdraw retried with edited evidence writes one record and resolves the key its hold opened"
 }
 
+# A withdrawal retried with a different valid ruling after its release failed
+# publishes the basis its durable record names, never the retry's ruling.
+test_a_withdraw_retried_with_another_ruling_publishes_the_recorded_basis() {
+  local mate channel show line
+  mate=$(make_mate_home retry-basis)
+  channel=$(mate_channel "$mate")
+  tasks_in "$mate" add basis-work "Basis work" --kind ship --repo sample >/dev/null
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$mate" hold basis-work --reason "pick one" >/dev/null || fail "hold failed"
+  printf 'basis-work is moot.\n' > "$mate/ruling.txt"
+  for ruling in ruling-one ruling-two; do
+    run_captain "$mate" hold "$ruling" --title "Ruling $ruling" --reason "choose" --repo sample >/dev/null
+    run_captain "$mate" answer "$ruling" --decision-file "$mate/ruling.txt" >/dev/null || fail "could not record $ruling"
+  done
+  printf 'Moot under the ruling.\n' > "$mate/evidence.txt"
+  fail_tasks_axi_once "$mate" unhold
+  if run_captain "$mate" withdraw basis-work --evidence-file "$mate/evidence.txt" --ruling ruling-one >/dev/null 2>&1; then
+    fail "the injected unhold failure did not stop withdraw"
+  fi
+  run_captain "$mate" withdraw basis-work --evidence-file "$mate/evidence.txt" --ruling ruling-two >/dev/null \
+    || fail "the retried withdraw with another ruling failed"
+  show=$(tasks_in "$mate" show basis-work --full)
+  assert_contains "$show" "held: no" "the retried withdraw did not release the hold"
+  assert_contains "$show" "Withdrawn by: moot under the recorded captain ruling ruling-one" "the record lost its first ruling"
+  assert_not_contains "$show" "ruling ruling-two" "the record names the retry's ruling"
+  line=$(grep 'resolved \[key=captain-hold-basis-work-1\]' "$channel") || fail "the original key was not resolved: $(cat "$channel")"
+  assert_contains "$line" "moot under the recorded captain ruling ruling-one" "the parent line does not name the recorded ruling"
+  assert_not_contains "$line" "ruling-two" "the parent line names the retry's ruling instead of the recorded one"
+  pass "a withdraw retried with another ruling publishes the basis its record names"
+}
+
 # Retention archives a question row a withdrawal closed; the gate still accepts
 # it and lists it apart from the captain's answered calls.
 test_the_gate_accepts_an_archived_withdrawal() {
@@ -710,6 +740,7 @@ test_recording_the_owner_keeps_a_freeze_in_force
 test_lifecycle_readers_and_the_gate_know_withdrawn_records
 test_a_retried_withdraw_finishes_without_a_second_record
 test_a_withdraw_retried_with_edited_evidence_resolves_the_original_key
+test_a_withdraw_retried_with_another_ruling_publishes_the_recorded_basis
 test_the_gate_accepts_an_archived_withdrawal
 test_withdraw_closes_finished_work_teardown_retained
 test_an_expired_dated_hold_is_still_withdrawn
