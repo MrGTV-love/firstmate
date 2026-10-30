@@ -1037,7 +1037,7 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
       TEARDOWN_SLOT_SUPERSEDED=1
       TEARDOWN_SLOT_SUPERSEDED_NAME=$FM_TASK_COPY_SLOT_NAME
     else
-      echo "warning: pool slot $slot cannot be placed in the project's current Treehouse pool because treehouse status cannot be read; keeping project custody through its return by path instead of reserving it by slot name" >&2
+      echo "warning: pool slot $slot cannot be placed in the project's current Treehouse pool because treehouse status cannot be read, so it is not leased by slot name" >&2
     fi
     TEARDOWN_SLOT_CUSTODY=project
     return 0

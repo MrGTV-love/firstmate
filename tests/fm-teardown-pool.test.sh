@@ -2503,7 +2503,7 @@ test_unreadable_pool_status_never_leases_by_name() {
     FM_POOL_STATUS_FAILS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "an unreadable pool status must not refuse cleanup: $(cat "$case_dir/stderr")"
-  assert_grep 'keeping project custody' "$case_dir/stderr" 'teardown did not say it kept project custody'
+  assert_grep 'because treehouse status cannot be read, so it is not leased by slot name' "$case_dir/stderr" 'teardown did not say it left the slot unleased by name'
   assert_no_log_line '^lease ' "$case_dir/treehouse.log" 'teardown leased a slot it could not place in the current pool'
   returns=$(grep -c "^return --force $SUPER_SLOT\$" "$case_dir/treehouse.log" || true)
   assert_equals 1 "$returns" 'the recorded copy must be returned once, by its own path'
