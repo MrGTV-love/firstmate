@@ -3447,7 +3447,7 @@ Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`, which print the reason to
 Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, partially valid lists, and handles are refused rather than interpreted as authority.
 Typed messages carrying a bot marker (`bot_id`, `app_id`, or `bot_profile`) are refused even when their user id is allowlisted; a Slack message subtype alone, such as `thread_broadcast` for a thread reply also sent to the main window, does not refuse an allowlisted owner's reply.
 Reaction authors also require a read-only user lookup proving they are not a bot or app user.
-`FM_SLACK_FAULT` is a test-only crash-injection value (`after-delivery` or `after-answer`) read from the process environment only, never from `.env`; unset means normal operation.
+`FM_SLACK_FAULT` is a test-only crash-injection value (`after-stage`, `after-delivery`, `after-answer`, `after-ack`, `after-cursor`, `after-notice-post`, or `before-emit`, each a commit point named for what is already done) read from the process environment only, never from `.env`; unset means normal operation.
 
 Before activation, grant `chat:write`, `im:write` (opening the owner DM), and `im:history` (reading the DM and its threads).
 Reaction answering additionally requires `reactions:read` and `users:read`; `reactions:write` is optional and lets the mirror seed numbered reactions on the card.
@@ -3457,8 +3457,14 @@ Inspect granted scopes with read-only `auth.test` before deployment rather than 
 To opt in, first run `bin/fm-captain-hold.sh bind slack-dm`, then `bin/fm-slack-check.sh arm` in the intended home.
 Arming refuses an unbound source, establishes the DM and proves it readable, then writes and registers `state/slack.check.sh` on the watcher's existing slow-check cadence.
 `bin/fm-slack-check.sh disarm` removes the check and its trust binding immediately, whatever the token or allowlist say, and exits non-zero when the removal is refused; `bin/fm-captain-hold.sh unbind slack-dm` stops the standing check and any manual poll from feeding answers.
-The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters.
-Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed`; remove `state/slack-watch/` to start a fresh DM.
+The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
+Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
+`bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
+`arm` itself still refuses a changed owner, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, so run `bin/fm-slack-poll.sh` until it prints nothing first.
+The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
+Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
+Re-running `bin/fm-slack-check.sh arm` is the one step that takes the change: it stops tracking the old DM's threads, posts nothing more there, opens and proves the new DM, and lets the mirror post the open calls again.
+It refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, so finish that poll first.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
@@ -3480,8 +3486,9 @@ Notices (conflicts and unmatched replies) surface in the order they arose, and a
 The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
 A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.
 A poll retires a closed or replaced thread only after it has read that thread's replies; a thread the poll did not reach because the per-poll answer cap ran out stays tracked, so its late reply is read and surfaced as unmatched by the next poll before the thread is retired.
-When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable is treated as replaced as soon as the call reads as open under a verified hold, so it never answers one.
+When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable never answers a call, not even while the state is still unreadable, and is treated as replaced as soon as the call reads as open under a verified hold.
 Each tap is attributed to the member who made it, and a staged answer is dropped if that member has left the allowlist before delivery.
+The `slack-dm` binding is checked again at the moment of delivery, so a source unbound after the poll began feeds nothing; the staged answer waits for the next bound poll.
 Typing an option number, or tapping its reaction, records the option's value as the keyed answer and its label as the label, the same record the board leaves; all other typed words are passed through within the intake's existing field constraints, after Slack's own message escaping is undone (`&amp;`, `&lt;`, `&gt;` become `&`, `<`, `>`, and a link Slack wrapped as `<url>` or `<url|text>` becomes the url or the text), so the record holds what the owner typed.
 The reserved `reconcile` value never answers a call.
 A long or multiline reply is flattened to one line for the intake, which keeps its existing truncation; the full text stays in the Slack thread, and the only copy kept in this home is the journal row that stages it, which is removed when its publication completes.
@@ -3495,7 +3502,11 @@ It is transport state, not a second decision store; `fm-captain-hold.sh answers`
 Recovery repeats an unfinished intake row through that same intake before committing its cursor; the intake accepts an exact replay of a row it already applied, in both close modes, so the acknowledgement says the answer was recorded.
 The test-only `after-delivery` fault fires after the intake has applied the row and before that is journaled; `after-answer` fires after it is journaled and before the acknowledgement.
 A crash after notification publication may duplicate a notification but cannot discard the staged answer.
+Every wake line is journaled in `state.json` by the same commit that earns it and is dropped from the journal only after it has been printed, so a run that dies between its last commit and its print has its lines printed by the next run; the worst case is a repeated line, never a lost one.
+A mirror failure, or the failure of one thread's own read, is reported once and held back until the other threads' replies have been read, so one card Slack will not accept, or one card the owner deleted, never keeps the other answers unread.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
+Only the owner's DM is ever written to: a stored conversation that is not a DM of the configured owner is refused with `target_is_not_a_DM` before any post or reaction, the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
+No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
 

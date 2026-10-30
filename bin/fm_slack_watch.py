@@ -31,6 +31,10 @@ CHECK_ID = 'slack'
 STATE_KEY = 'slack-watch'
 REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
+DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
+# A failure of one thread's own read must not stop the other threads' replies from being read.
+THREAD_ERRORS = ('api_error', 'channel_not_found')
+OUTBOX_LIMIT = 100
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
@@ -40,9 +44,15 @@ SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
 PARTIAL_ENTITY = re.compile(r'&[a-z]*$')
 
 
+def fault(point):
+    """Test-only crash injection, read from the process environment and never from .env."""
+    if env_value('FM_SLACK_FAULT') == point:
+        raise RuntimeError('FM_SLACK_FAULT=' + point)
+
+
 def run(script, *args, text=None):
-    env = dict(os.environ)
-    env.pop('SLACK_BOT_TOKEN', None)
+    # No local child needs a Slack credential: drop the token and the signing secret.
+    env = {key: value for key, value in os.environ.items() if not key.startswith('SLACK_')}
     env['PYTHONDONTWRITEBYTECODE'] = '1'
     return subprocess.run(['bash', str(ROOT / script), *args], input=text,
                           text=True, capture_output=True, check=False, env=env)
@@ -222,7 +232,9 @@ class Watch:
         self.authors = set(a for a in re.split(r'[\s,]+', env_value('FM_SLACK_ALLOWED_AUTHORS').strip()) if a)
         self.cap = answer_cap()
         self.changed = False
-        self.output = []
+        # Wake lines are journaled with the state change that earned them and cleared only
+        # after they are printed, so a run that dies in between prints them next time.
+        self.output = list(self.state['outbox'])
         self.detail = ''
         self.noticed_threads = set()
         self.read_threads = set()
@@ -240,9 +252,10 @@ class Watch:
             state = json.loads(self.path.read_text())
             if state.get('schema') != 'fm-slack-watch.v1':
                 raise SlackError('invalid_state_schema')
+            state.setdefault('outbox', [])
             return state
         state = {'schema': 'fm-slack-watch.v1', 'threads': {}, 'seen': {},
-                 'pending': [], 'failure': ''}
+                 'pending': [], 'failure': '', 'outbox': []}
         if self.replay and isinstance(self.replay.transcript.get('seed_state'), dict):
             seed = self.replay.transcript['seed_state']
             state['threads'] = seed.get('threads', {})
@@ -260,6 +273,14 @@ class Watch:
         line = flat(line)
         if line and (not self.output or self.output[-1] != line):
             self.output.append(line)
+            self.state['outbox'] = self.output[-OUTBOX_LIMIT:]
+
+    def printed(self, count):
+        """Drop the first count wake lines from the journal once they have been printed."""
+        self.output = self.output[count:]
+        if self.state['outbox'] != self.output:
+            self.state['outbox'] = list(self.output)
+            self.commit()
 
     def has_room(self, line):
         if not self.output:
@@ -288,7 +309,8 @@ class Watch:
             return 'closed'
         if rc == 0:
             return 'live' if identity == record['identity'] else 'replaced'
-        return 'live' if record['identity'] == 'uncertain' else 'unknown'
+        # An unreadable state proves nothing, even for a thread mirrored while it was unreadable.
+        return 'unknown'
 
     def backlog(self):
         result = run('fm-fleet-snapshot.sh', '--contribution-input')
@@ -403,10 +425,17 @@ class Watch:
         return self.api.call('conversations.history', channel=channel, limit=100,
                              include_all_metadata=True).get('messages', [])
 
-    def post(self, event, text, thread=None):
+    def owner_channel(self):
+        """The one conversation this plane may write to: the owner's DM, and nothing else."""
         channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
+        if not DM_CHANNEL.fullmatch(channel) or self.state.get('user') != self.dm_user():
+            raise SlackError('target_is_not_a_DM')
+        return channel
+
+    def post(self, event, text, thread=None):
+        channel = self.owner_channel()
         marker = hashlib.sha256(event.encode()).hexdigest()
         for message in self.recent(thread):
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
@@ -421,12 +450,23 @@ class Watch:
             args['thread_ts'] = thread
         return self.api.call('chat.postMessage', **args)['ts']
 
+    def retarget(self):
+        """Re-point the plane at a changed owner DM; only an explicit retarget may do this."""
+        if not self.state.get('user') or self.state['user'] == self.dm_user():
+            return
+        if self.state['pending']:
+            # Pending rows belong to threads in the old DM; they must finish there first.
+            raise SlackError('dm_user_changed_with_pending_work')
+        # The old DM's threads stop being tracked and nothing more is posted there.
+        self.state.update(user='', channel='', team='', scopes=[], threads={})
+        self.commit()
+
     def prepare(self):
         if not self.bound():
             raise SlackError('source_not_bound')
         result = self.api.call('auth.test')
         channel = self.api.call('conversations.open', users=self.dm_user(), return_im=True).get('channel', {})
-        if not channel.get('id') or not channel.get('is_im'):
+        if not DM_CHANNEL.fullmatch(channel.get('id') or '') or not channel.get('is_im'):
             raise SlackError('target_is_not_a_DM')
         self.api.call('conversations.history', channel=channel['id'], limit=1)
         self.state.update(team=result.get('team_id'), user=self.dm_user(),
@@ -458,6 +498,7 @@ class Watch:
                 self.notices_held = True
                 return
             self.post('ack:' + pending['event'], pending['text'], pending['thread'])
+            fault('after-notice-post')
             self.say(pending['line'])
             self.mark_seen(pending['event'], pending['key'])
             self.consume(pending.get('contributing', []), pending['key'])
@@ -465,6 +506,10 @@ class Watch:
             self.commit()
             return
         if pending['stage'] == 'intake':
+            fault('after-stage')
+            # The source must still be bound at the moment of delivery, not only when the poll began.
+            if not self.bound():
+                return
             standing = self.hold(pending)
             if standing == 'unknown':
                 return
@@ -487,22 +532,22 @@ class Watch:
                 pending['accepted'] = any(line.startswith('closed: ') for line in lines)
                 if not pending['accepted'] and not any(line.startswith(('skipped: ', 'refused: ')) for line in lines):
                     self.say('check: slack %s - answer not applied: %s' % (pending['thread'], pending['key']))
-            if env_value('FM_SLACK_FAULT') == 'after-delivery':
-                raise RuntimeError('FM_SLACK_FAULT=after-delivery')
+            fault('after-delivery')
             pending['stage'] = 'ack'
             self.commit()
-            if env_value('FM_SLACK_FAULT') == 'after-answer':
-                raise RuntimeError('FM_SLACK_FAULT=after-answer')
+            fault('after-answer')
         if pending['stage'] == 'ack':
             text = ('Answer recorded.' if pending['accepted'] else
                     'Answer not applied: no matching open held decision, changed call, or reserved value. Firstmate has been notified.')
             self.post('ack:' + pending['event'], text, pending['thread'])
+            fault('after-ack')
             pending['stage'] = 'cursor'
             self.commit()
         if pending['stage'] == 'cursor':
             self.mark_seen(pending['event'], pending['key'])
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()
+            fault('after-cursor')
 
     def resume(self):
         remaining = self.cap
@@ -553,7 +598,7 @@ class Watch:
             if usable and 'reactions:write' in getattr(self.api, 'scopes', set()) and options:
                 for name in REACTIONS[:len(options)]:
                     try:
-                        self.api.call('reactions.add', channel=self.state['channel'], timestamp=ts, name=name)
+                        self.api.call('reactions.add', channel=self.owner_channel(), timestamp=ts, name=name)
                     except SlackError:
                         # A missing or rejected seed reaction must not hide the card;
                         # the captain can still add the reaction or type the number.
@@ -654,77 +699,95 @@ class Watch:
             return
         if self.state['threads'] and not self.state.get('channel'):
             self.prepare()
+        # Mirroring new cards must never keep the replies on existing threads unread:
+        # a mirror failure is held back and reported after the replies are handled.
+        deferred = None
         if not (self.replay and self.replay.transcript.get('skip_mirror')):
-            self.mirror()
+            try:
+                self.mirror()
+            except SlackError as error:
+                deferred = error
         if self.state['threads']:
             self.scope_notice()
         for occurrence, record in self.tracked():
             if remaining <= 0:
                 break
-            key = record['key']
-            new_replies = [r for r in self.typed_candidates(record) if r['event'] not in self.state['seen']]
-            self.read_threads.add(record['ts'])
-            taps = self.reaction_choices(record) if record.get('reactions') and record.get('options') else []
-            signature = ','.join(tap['name'] for tap in taps)
-            if record.get('blocked') is not None:
-                if new_replies or signature != record['blocked']:
-                    record['blocked'] = None
-                    self.commit()
-                else:
-                    taps = []
-            taps = [tap for tap in taps if tap['event'] not in self.state['seen']]
-            if not new_replies and not taps:
-                continue
-            standing = self.hold(record)
-            if standing == 'unknown':
-                continue
-            if standing != 'live':
-                for reply in new_replies:
-                    if remaining <= 0:
-                        break
-                    self.notice(reply['event'], key, record['ts'],
-                                'No open decision matches this reply. Firstmate has been notified.',
-                                'check: slack %s - unmatched reply %s' % (record['ts'], reply['ts']))
-                    remaining -= 1
-                continue
-            typed = {r['answer']: r['label'] for r in new_replies}
-            tapped = {tap['answer']: tap['label'] for tap in taps}
-            if len(typed) > 1 or len(tapped) > 1 or (typed and tapped and typed.keys() != tapped.keys()):
-                record['conflicts'] = record.get('conflicts', 0) + 1
-                record['blocked'] = signature
-                candidates = sorted(set(typed.values()) | set(tapped.values()))
-                labels = ' vs '.join(short(flat(label)) for label in candidates[:2])
-                if len(candidates) > 2:
-                    labels += ' (+%d more)' % (len(candidates) - 2)
-                event = new_replies[0]['event'] if new_replies else self.event(
-                    record, 'conflict', str(record['conflicts']))
-                if len(tapped) > 1:
-                    remedy = 'Remove all but one reaction.'
-                elif tapped:
-                    remedy = 'Remove the :%s: reaction and reply again, or type %d.' % (
-                        taps[0]['name'], REACTIONS.index(taps[0]['name']) + 1)
-                else:
-                    remedy = 'Please reply once.'
-                self.notice(event, key, record['ts'],
-                            'Conflicting signals: ' + slack_escape(labels) + '. No answer was recorded. ' + remedy,
-                            'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
-                            [r['event'] for r in new_replies])
-                remaining -= 1
-                continue
-            if new_replies:
-                chosen = new_replies[0]
-            else:
-                chosen = taps[0]
-            answer, label, author = chosen['answer'], chosen['label'], chosen['user']
-            self.consume([c['event'] for c in new_replies + taps if c is not chosen], key)
-            pending = self.stage({'event': chosen['event'], 'occurrence': occurrence,
-                                  'identity': record['identity'], 'thread': record['ts'],
-                                  'key': key, 'mode': record.get('mode', 'done'),
-                                  'answer': answer, 'label': label, 'author': author,
-                                  'kind': 'answer', 'stage': 'intake'})
-            self.publish(pending)
-            remaining -= 1
+            try:
+                remaining = self.read_thread(occurrence, record, remaining)
+            except SlackError as error:
+                # One thread's own failure (for example a card the owner deleted) is held
+                # back and reported once; every other thread is still read.
+                if str(error) not in THREAD_ERRORS:
+                    raise
+                deferred = deferred or error
         self.resolve()
+        if deferred:
+            raise deferred
+
+    def read_thread(self, occurrence, record, remaining):
+        """Read one tracked thread and stage at most the answers the cap allows; returns the cap left."""
+        key = record['key']
+        new_replies = [r for r in self.typed_candidates(record) if r['event'] not in self.state['seen']]
+        self.read_threads.add(record['ts'])
+        taps = self.reaction_choices(record) if record.get('reactions') and record.get('options') else []
+        signature = ','.join(tap['name'] for tap in taps)
+        if record.get('blocked') is not None:
+            if new_replies or signature != record['blocked']:
+                record['blocked'] = None
+                self.commit()
+            else:
+                taps = []
+        taps = [tap for tap in taps if tap['event'] not in self.state['seen']]
+        if not new_replies and not taps:
+            return remaining
+        standing = self.hold(record)
+        if standing == 'unknown':
+            return remaining
+        if standing != 'live':
+            for reply in new_replies:
+                if remaining <= 0:
+                    break
+                self.notice(reply['event'], key, record['ts'],
+                            'No open decision matches this reply. Firstmate has been notified.',
+                            'check: slack %s - unmatched reply %s' % (record['ts'], reply['ts']))
+                remaining -= 1
+            return remaining
+        typed = {r['answer']: r['label'] for r in new_replies}
+        tapped = {tap['answer']: tap['label'] for tap in taps}
+        if len(typed) > 1 or len(tapped) > 1 or (typed and tapped and typed.keys() != tapped.keys()):
+            record['conflicts'] = record.get('conflicts', 0) + 1
+            record['blocked'] = signature
+            candidates = sorted(set(typed.values()) | set(tapped.values()))
+            labels = ' vs '.join(short(flat(label)) for label in candidates[:2])
+            if len(candidates) > 2:
+                labels += ' (+%d more)' % (len(candidates) - 2)
+            event = new_replies[0]['event'] if new_replies else self.event(
+                record, 'conflict', str(record['conflicts']))
+            if len(tapped) > 1:
+                remedy = 'Remove all but one reaction.'
+            elif tapped:
+                remedy = 'Remove the :%s: reaction and reply again, or type %d.' % (
+                    taps[0]['name'], REACTIONS.index(taps[0]['name']) + 1)
+            else:
+                remedy = 'Please reply once.'
+            self.notice(event, key, record['ts'],
+                        'Conflicting signals: ' + slack_escape(labels) + '. No answer was recorded. ' + remedy,
+                        'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
+                        [r['event'] for r in new_replies])
+            return remaining - 1
+        if new_replies:
+            chosen = new_replies[0]
+        else:
+            chosen = taps[0]
+        answer, label, author = chosen['answer'], chosen['label'], chosen['user']
+        self.consume([c['event'] for c in new_replies + taps if c is not chosen], key)
+        pending = self.stage({'event': chosen['event'], 'occurrence': occurrence,
+                              'identity': record['identity'], 'thread': record['ts'],
+                              'key': key, 'mode': record.get('mode', 'done'),
+                              'answer': answer, 'label': label, 'author': author,
+                              'kind': 'answer', 'stage': 'intake'})
+        self.publish(pending)
+        return remaining - 1
 
     def event(self, record, *parts):
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], *parts])
@@ -732,9 +795,10 @@ class Watch:
     def report_failure(self, error):
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
         if self.state.get('failure') != name:
+            # The wake line and the failure class are journaled by the same commit.
+            self.say('slack: transport failure: ' + name + (': ' + self.detail if self.detail else ''))
             self.state['failure'] = name
             self.commit()
-            self.say('slack: transport failure: ' + name + (': ' + self.detail if self.detail else ''))
         return 1
 
     def clear_failure(self):
@@ -771,7 +835,7 @@ def help_text(command):
     return {
         'mirror': 'Usage: fm-slack-mirror.sh [--replay transcript.json]\nMirror open captain calls into owner DM threads.',
         'poll': 'Usage: fm-slack-poll.sh [--replay transcript.json]\nDeliver authorized Slack signals through the keyed-answer intake.',
-        'check': 'Usage: fm-slack-check.sh [arm|check|disarm] [--replay transcript.json]',
+        'check': 'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]',
     }.get(command, 'Usage: fm-slack-{mirror,poll,check}.sh [--replay transcript.json]')
 
 
@@ -780,22 +844,30 @@ def state_home():
 
 
 def emit(watch, command):
+    fault('before-emit')
+    lines = list(watch.output)
     queued = watch.queued() if command in ('poll', 'check') else 0
     if command == 'check':
-        if watch.output:
-            print(wake_line(watch.output, queued))
+        # Only the lines the wake line holds are printed (and cleared from the journal);
+        # the rest wait for the next run behind the queue marker.
+        shown = len(lines)
+        while shown > 1 and len(wake_line(lines[:shown], queued + len(lines) - shown)) > WAKE_LIMIT:
+            shown -= 1
+        if lines:
+            print(wake_line(lines[:shown], queued + len(lines) - shown), flush=True)
+            watch.printed(shown)
         return
-    lines = list(watch.output)
     if lines and queued:
         lines[-1] += '; +%d queued' % queued
     for line in lines:
-        print(line)
+        print(line, flush=True)
+    watch.printed(len(watch.output))
 
 
 def main(argv):
     os.umask(0o077)
     action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
-    refusals = sys.stderr if action == 'arm' else sys.stdout
+    refusals = sys.stderr if action in ('arm', 'retarget') else sys.stdout
     if not argv:
         print('error: missing command')
         return 2
@@ -811,7 +883,7 @@ def main(argv):
         return disarm()
     state, reason = mode()
     if state != 'on':
-        if action == 'arm':
+        if action in ('arm', 'retarget'):
             print('slack: refused: ' + reason, file=sys.stderr)
             return 1
         if state == 'refused' and command != 'check':
@@ -823,7 +895,9 @@ def main(argv):
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
-        watch.verify_target()
+        if action != 'retarget':
+            # Only an explicit retarget may move the plane to a changed owner DM.
+            watch.verify_target()
         if command == 'mirror':
             if not watch.bound():
                 return 0
@@ -834,13 +908,14 @@ def main(argv):
             watch.clear_failure()
         else:
             code = check(watch, action)
-        emit(watch, command)
+        if action not in ('arm', 'retarget'):
+            emit(watch, command)
         return code
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         # Report once per failure episode. Pending rows and state remain durable;
         # lines said before the failure belong to state already committed.
         name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
-        if action == 'arm':
+        if action in ('arm', 'retarget'):
             print('slack: refused: ' + name, file=sys.stderr)
         elif watch is not None:
             watch.report_failure(error)
@@ -864,6 +939,10 @@ def main(argv):
 
 def check(watch, action):
     state_dir = state_home()
+    if action == 'retarget':
+        watch.retarget()
+        print('retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER')
+        return 0
     if action == 'arm':
         try:
             watch.prepare()

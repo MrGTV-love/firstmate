@@ -23,6 +23,11 @@ Usage:
   fm_slack_watch_test.py stage-notice <state.json> <thread-ts> <task-id> <length> [fill]
   fm_slack_watch_test.py react <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py unreact <replay-state.json> <ts> <name> <user>
+  fm_slack_watch_test.py set-state <state.json> <field> <value>
+  fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status>
+  fm_slack_watch_test.py move-transcript <transcript.json> <out.json> <channel>
+  fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
+  fm_slack_watch_test.py outbound-targets <outbound.jsonl> <method>
 """
 import glob
 import json
@@ -155,6 +160,25 @@ def main(argv):
             if command == 'unreact':
                 entry['users'] = [u for u in entry['users'] if u != argv[4]]
         edit(argv[1], toggle)
+    elif command == 'set-state':
+        edit(argv[1], lambda data: data.__setitem__(argv[2], argv[3]))
+    elif command == 'fail-call':
+        edit(argv[1], lambda data: data['failures'].__setitem__(argv[2], {'status': int(argv[3])}))
+    elif command == 'move-transcript':
+        def move(data):
+            data['channel'] = argv[3]
+            data['messages'] = []
+        data = json.load(open(argv[1]))
+        move(data)
+        json.dump(data, open(argv[2], 'w'))
+    elif command == 'add-failure':
+        data = json.load(open(argv[1]))
+        data.setdefault('failures', {})[argv[3]] = {'status': int(argv[4])}
+        json.dump(data, open(argv[2], 'w'))
+    elif command == 'outbound-targets':
+        rows = [json.loads(line) for line in open(argv[1])]
+        print(' '.join(sorted({'%s@%s' % (r.get('recipient'), r.get('channel'))
+                               for r in rows if r.get('method') == argv[2]})))
     elif command == 'replay-file':
         paths = glob.glob(os.path.join(argv[1], 'replay-state-*.json'))
         print(paths[0] if paths else '')

@@ -560,12 +560,18 @@ make_shim() {
   cat > "$dir/fm-fleet-snapshot.sh" <<SH
 #!/usr/bin/env bash
 [ -z "\${FM_SHIM_ENVLOG:-}" ] || printf '%s\\n' "\${SLACK_BOT_TOKEN:-unset}" >> "\$FM_SHIM_ENVLOG"
+[ -z "\${FM_SHIM_SECRETLOG:-}" ] || printf '%s\\n' "\${SLACK_SIGNING_SECRET:-unset}/\${SLACK_APP_TOKEN:-unset}" >> "\$FM_SHIM_SECRETLOG"
 exec bash "$ROOT/bin/fm-fleet-snapshot.sh" "\$@"
 SH
   cat > "$dir/fm-captain-hold.sh" <<SH
 #!/usr/bin/env bash
 [ -z "\${FM_SHIM_LOG:-}" ] || printf '%s\\n' "\$*" >> "\$FM_SHIM_LOG"
 [ -z "\${FM_SHIM_ENVLOG:-}" ] || printf '%s\\n' "\${SLACK_BOT_TOKEN:-unset}" >> "\$FM_SHIM_ENVLOG"
+[ -z "\${FM_SHIM_SECRETLOG:-}" ] || printf '%s\\n' "\${SLACK_SIGNING_SECRET:-unset}/\${SLACK_APP_TOKEN:-unset}" >> "\$FM_SHIM_SECRETLOG"
+if [ "\${1:-}" = open ] && [ -f "\${FM_SHIM_UNBIND_ON_OPEN:-/nonexistent}" ]; then
+  rm -f "\$FM_SHIM_UNBIND_ON_OPEN"
+  bash "$ROOT/bin/fm-captain-hold.sh" unbind slack-dm >/dev/null
+fi
 if [ "\${1:-}" = open ] && [ -f "\${FM_SHIM_OPEN_FAIL:-/nonexistent}" ]; then exit 2; fi
 if [ "\${1:-}" = answers ] && [ -f "\${FM_SHIM_ANSWERS_FAIL:-/nonexistent}" ]; then
   echo 'fm-captain-hold: simulated backlog read bound' >&2
@@ -1130,5 +1136,179 @@ assert_contains "$notice" 'Conflicting signals: skip &amp; wait vs use &lt;sourc
 assert_contains "$out" 'conflicting signals: skip & wait vs use <source-id> & go. Please reply once.' "X23 the conflict wake line is not plain text"
 assert_open resolve-call 0 "X23 the conflict records nothing"
 printf 'ok - X23\n'
+
+# X24: an unreadable call state never verifies a hold, even for a thread mirrored while it was unreadable
+new_home reaction-answer
+bind
+: > "$TMP/open-fail"
+env FM_SHIM_OPEN_FAIL="$TMP/open-fail" "$SHIM/fm-slack-mirror.sh" --replay "$FIX/reaction-answer/transcript.json" >/dev/null
+assert_eq "$(thread_field reaction-call identity)" uncertain "X24 the thread was mirrored while the state was unreadable"
+SHIM_FIXTURE=reaction-answer
+out=$(shim_poll FM_SHIM_OPEN_FAIL="$TMP/open-fail" 2>&1)
+assert_eq "$(closed_count "$out")" 0 "X24 an unverifiable thread answered a call"
+assert_open reaction-call 0 "X24 the call stays open while its state is unreadable"
+assert_eq "$(outbound_count chat.postMessage 900.000001)" 0 "X24 an unverifiable tap was acknowledged"
+rm -f "$TMP/open-fail"
+out=$(poll reaction-answer)
+assert_eq "$(closed_count "$out")" 0 "X24 the unverifiable thread answered once the state was readable"
+assert_open reaction-call 0 "X24 the call is still open after the state is readable"
+printf 'ok - X24\n'
+
+# X25: a wake line is journaled with the change that earned it, so a fault up to the print never loses it
+for point in after-stage after-delivery after-answer after-ack after-cursor before-emit; do
+  new_home typed-reply
+  bind
+  set +e
+  out=$(FM_SLACK_FAULT=$point "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/typed-reply/transcript.json" 2>&1); rc=$?
+  set -e
+  assert_eq "$rc" 75 "X25 [$point] the fault did not fire"
+  assert_eq "$out" "" "X25 [$point] a faulted poll printed"
+  out=$(poll typed-reply)
+  assert_contains "$out" 'closed: typed-call' "X25 [$point] the wake line was lost"
+  assert_eq "$(resolution_count typed-call)" 1 "X25 [$point] one record"
+  assert_closed typed-call 1 "X25 [$point] closed"
+  assert_eq "$(thread_texts 900.000001 | grep -c 'Answer recorded' || true)" 1 "X25 [$point] one acknowledgement"
+  assert_eq "$(poll typed-reply)" "" "X25 [$point] a printed line is printed once"
+done
+for point in after-notice-post before-emit; do
+  new_home unmatched
+  bind
+  set +e
+  out=$(FM_SLACK_FAULT=$point "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/unmatched/transcript.json" 2>&1); rc=$?
+  set -e
+  assert_eq "$rc" 75 "X25 [$point] the notice fault did not fire"
+  assert_eq "$out" "" "X25 [$point] a faulted notice poll printed"
+  out=$(poll unmatched)
+  assert_eq "$(check_count "$out")" 1 "X25 [$point] the notice line was lost"
+  assert_eq "$(thread_texts 900.000001 | grep -c 'No open decision matches' || true)" 1 "X25 [$point] the notice was posted twice"
+  assert_eq "$(poll unmatched)" "" "X25 [$point] a printed notice line is printed once"
+done
+new_home unmatched
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/unmatched/transcript.json" >/dev/null
+set +e
+out=$(FM_SLACK_FAULT=before-emit "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/unmatched/transcript.json" 2>&1); rc=$?
+set -e
+assert_eq "$rc" 75 "X25 the check fault did not fire"
+out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/unmatched/transcript.json")
+assert_eq "$(check_count "$out")" 1 "X25 the armed check lost the line a killed run had earned"
+assert_eq "$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/unmatched/transcript.json")" "" "X25 the armed check repeated a printed line"
+printf 'ok - X25\n'
+
+# X26: a changed owner DM takes effect through an explicit retarget, and nowhere else
+new_home mirror
+bind
+mirror mirror >/dev/null
+python3 "$HELPER" move-transcript "$FIX/mirror/transcript.json" "$TMP/moved.json" D0NEWOWNER01
+old_posts=$(grep chat.postMessage "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" | grep -c D0123456789 || true)
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/moved.json" 2>&1)
+set -e
+assert_contains "$out" 'dm_user_changed' "X26 a poll followed a changed owner without a retarget"
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$TMP/moved.json" 2>&1); rc=$?
+set -e
+assert_eq "$rc" 0 "X26 retarget refused the changed owner"
+assert_contains "$out" 'retargeted:' "X26 retarget did not say what it did"
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" arm --replay "$TMP/moved.json" 2>&1)
+assert_contains "$out" 'armed:' "X26 arm refused the retargeted owner"
+FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/moved.json" >/dev/null
+assert_eq "$(thread_count)" 4 "X26 the open calls were mirrored again for the new owner"
+assert_contains "$(python3 "$HELPER" outbound-targets "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" chat.postMessage)" 'U0OTHEROWNER1@D0NEWOWNER01' "X26 the new owner got no card"
+assert_eq "$(grep chat.postMessage "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" | grep -c D0123456789 || true)" "$old_posts" "X26 the old DM was posted to after the change"
+new_home mirror
+bind
+mirror mirror >/dev/null
+python3 "$HELPER" stage-notice "$(state_file)" 900.000001 open-a 10
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$TMP/moved.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X26 retarget moved the plane while work was pending in the old DM"
+assert_contains "$out" 'dm_user_changed_with_pending_work' "X26 named refusal"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X26 a refused retarget touched the journal"
+new_home config
+set +e
+out=$("$ROOT/bin/fm-slack-check.sh" retarget 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X26 retarget of an unconfigured plane claimed success"
+assert_contains "$out" 'slack: refused: unconfigured' "X26 unconfigured retarget names its refusal"
+printf 'ok - X26\n'
+
+# X27: no local child process inherits any Slack credential
+new_home typed-reply
+bind
+SHIM_FIXTURE=typed-reply
+rm -f "$TMP/secret.log"
+shim_poll FM_SHIM_SECRETLOG="$TMP/secret.log" SLACK_SIGNING_SECRET=fixture-signing-not-a-secret \
+  SLACK_APP_TOKEN=fixture-app-not-a-secret >/dev/null
+[ -s "$TMP/secret.log" ] || fail "X27 no local child ran"
+assert_eq "$(sort -u "$TMP/secret.log")" 'unset/unset' "X27 a local child inherited a Slack credential"
+printf 'ok - X27\n'
+
+# X28: nothing can post outside the owner DM
+new_home mirror
+bind
+mirror mirror >/dev/null
+python3 "$HELPER" move-transcript "$FIX/mirror/transcript.json" "$TMP/public.json" C0PUBLIC0001
+python3 "$HELPER" set-state "$(state_file)" channel C0PUBLIC0001
+(cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+set +e
+out=$("$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/public.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X28 the mirror posted into a conversation that is not a DM"
+assert_contains "$out" 'target_is_not_a_DM' "X28 named refusal"
+assert_eq "$(grep -c C0PUBLIC0001 "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" || true)" 0 "X28 something was sent outside the owner DM"
+set +e
+out=$(python3 "$ROOT/bin/fm_slack_watch.py" post 2>&1); rc=$?
+set -e
+assert_eq "$rc" 2 "X28 a raw post command exists"
+assert_contains "$out" 'unknown command' "X28 raw post refusal"
+assert_eq "$(env -u SLACK_BOT_TOKEN python3 "$ROOT/bin/fm_slack.py" chat.postMessage channel=D0123456789 text=x 2>&1)" "" "X28 the transport answers a command line"
+printf 'ok - X28\n'
+
+# X29: a card that cannot be posted never keeps the replies on existing threads unread
+new_home reaction-answer
+bind
+mirror reaction-answer >/dev/null
+(cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+python3 "$HELPER" fail-call "$(replay_file)" conversations.history 400
+set +e
+out=$(poll reaction-answer); rc=$?
+set -e
+assert_contains "$out" 'closed: reaction-call' "X29 a mirror failure kept a tapped answer unread"
+assert_contains "$out" 'transport failure: api_error' "X29 the mirror failure was not reported"
+[ "$rc" -ne 0 ] || fail "X29 the mirror failure reported success"
+out=$(poll reaction-answer || true)
+assert_not_contains "$out" 'transport failure' "X29 the failure episode repeated"
+printf 'ok - X29\n'
+
+# X30: one thread that cannot be read never keeps the other threads' replies unread
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/thread-fail.json" conversations.replies:900.000001 400
+set +e
+out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/thread-fail.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X30 the unreadable thread reported success"
+assert_contains "$out" 'closed: dup-b' "X30 an unreadable thread kept another thread's reply unread"
+assert_not_contains "$out" 'closed: dup-a' "X30 the unreadable thread was answered"
+assert_open dup-a 0 "X30 the unreadable thread's call stays open"
+assert_contains "$out" 'transport failure: api_error' "X30 the unreadable thread was not reported"
+printf 'ok - X30\n'
+
+# X31: a source unbound after the poll began still feeds nothing
+new_home typed-reply
+bind
+SHIM_FIXTURE=typed-reply
+: > "$TMP/unbind-on-open"
+out=$(shim_poll FM_SHIM_UNBIND_ON_OPEN="$TMP/unbind-on-open" 2>&1 || true)
+assert_eq "$(closed_count "$out")" 0 "X31 an answer was delivered after the source was unbound"
+assert_open typed-call 0 "X31 an unbound source closed a call"
+assert_eq "$(outbound_count chat.postMessage 900.000001)" 0 "X31 an undelivered answer was acknowledged"
+bind
+out=$(poll typed-reply)
+assert_contains "$out" 'closed: typed-call' "X31 the staged answer is delivered once the source is bound again"
+printf 'ok - X31\n'
 
 printf 'ok - all Slack watch checks\n'

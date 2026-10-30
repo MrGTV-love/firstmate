@@ -51,8 +51,10 @@ class Replay:
             out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         self.save()
 
-    def fail(self, method):
-        rule = self.state['failures'].get(method)
+    def fail(self, method, target=None):
+        # A rule keyed "<method>:<ts>" fails only the call about that one message.
+        rule = (self.state['failures'].get('%s:%s' % (method, target)) if target else None) \
+            or self.state['failures'].get(method)
         if not rule:
             return None
         if rule.get('times') is not None:
@@ -65,7 +67,7 @@ class Replay:
     def call(self, method, **fields):
         if not self.token_present:
             raise SlackError('missing_token')
-        rule = self.fail(method)
+        rule = self.fail(method, fields.get('ts') or fields.get('timestamp'))
         if rule:
             status = int(rule.get('status', 503))
             if status == 429:
