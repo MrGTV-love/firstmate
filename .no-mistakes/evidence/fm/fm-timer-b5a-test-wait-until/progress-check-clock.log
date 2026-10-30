@@ -1,0 +1,17 @@
+== E. production wrapper fm_progress_check (python3 = Python 3.13.6) ==
+no_progress: "pid=5699 no CPU or watched-file progress for 2.2s"
+prod-silent: samples(rc every 0.5s, inactivity=2s): 0 0 0 124  record_clock=uptime_raw
+prod-busy: samples(rc every 0.5s, inactivity=2s): 0 0 0 0 0 0 0  record_clock=uptime_raw
+== F. bare CLI, each sample a new interpreter: /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 (Python 3.13.6) ==
+no_progress: "pid=5699 no CPU or watched-file progress for 2.1s"
+cli-silent-13: samples(rc every 0.5s, inactivity=2s): 0 0 0 124  record_clock=uptime_raw
+cli-busy-13: samples(rc every 0.5s, inactivity=2s): 0 0 0 0 0 0 0  record_clock=uptime_raw
+== F. bare CLI, each sample a new interpreter: /usr/bin/python3 (Python 3.9.6) ==
+no_progress: "pid=5699 no CPU or watched-file progress for 2.2s"
+cli-silent-9: samples(rc every 0.5s, inactivity=2s): 0 0 0 124  record_clock=uptime_raw
+cli-busy-9: samples(rc every 0.5s, inactivity=2s): 0 0 0 0 0 0 0  record_clock=uptime_raw
+== G. a record written under the old 'clock_monotonic' label starts a fresh window ==
+first sample rc=0; with forged old-label record since=0: rc=0 (expect 0, not 124)
+rewritten record: {"pid": 5699, "identity": ["Fri", "Oct", "30", "00:34:05", "2026"], "files": [], "cpu": [[5699, ["Fri", "Oct", "30", "00:34:05", "2026"], 0]], "clock": "uptime_raw", "since": 138860.972033041, "sampled": 138860.972033041}
+no_progress: "pid=5699 no CPU or watched-file progress for 2.7s"
+after 2.5s more silence in the new clock domain: rc=124 (expect 124)

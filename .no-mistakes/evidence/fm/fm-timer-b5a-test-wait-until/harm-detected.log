@@ -1,0 +1,11 @@
+== A. dead peer: the producer exits without publishing ==
+wait_rc=1 waited=1.4s stderr: fm_test_wait_until: condition unmet (3, pid=90326)
+== B. silent live peer: alive, no outcome observable changes (--inactivity 2) ==
+wait_rc=1 waited=2.7s peer_still_alive_after_wait=yes stderr: no_progress: "pid=94648 no CPU or watched-file progress for 2.6s"
+fm_test_wait_until: condition unmet (124, pid=94648)
+== C. outcome wins at peer exit: producer publishes then exits at once ==
+wait_rc=0 stderr: 
+== D. bad arguments are refused (exit 2), not treated as a wait ==
+old capped form 'fm_test_wait_until 20 true': rc=2
+no observable '-- true': rc=2
+own pid as peer: rc=2

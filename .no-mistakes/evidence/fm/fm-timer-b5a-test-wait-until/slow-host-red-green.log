@@ -1,0 +1,6 @@
+== baseline (quiet publisher, ~2s of work) ==
+old  helper  dilation=1x cpu_burn=0  wait_rc=0  waited=5.0s  publisher_result=published  load1=8.46
+new  helper  dilation=1x cpu_burn=0  wait_rc=0  waited=7.7s  publisher_result=published  load1=12.91
+== slow host: 6x sleep dilation plus 18 CPU-burn neighbours (~12s+ of work) ==
+old  helper  dilation=6x cpu_burn=1  wait_rc=1  waited=11.3s  publisher_result=published  load1=19.14
+new  helper  dilation=6x cpu_burn=1  wait_rc=0  waited=14.4s  publisher_result=published  load1=20.79

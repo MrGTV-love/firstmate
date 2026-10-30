@@ -1,0 +1,15 @@
+== I. zombie peer: child exits at once, parent never reaps it ==
+zombie pid=77834 ps stat=Z    kill-0=succeeds
+wait_rc=1 waited=0.1s stderr: fm_test_wait_until: condition unmet (3, pid=77834)
+== J. progress-check CLI argument surface ==
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+PID 0 without watched files: rc=2
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+PID 0 with --while-alive: rc=2
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+negative PID: rc=2
+inactivity 'default' with FM_DURATION_NO_PROGRESS_SECS=1 on a silent sleep, sampled every 0.5s: 0 0 124
+inactivity 'default' (operational 15-minute policy) after 1.5s of silence: rc=0 then rc=0 (expect 0 0)
