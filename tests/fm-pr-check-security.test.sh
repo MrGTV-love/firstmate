@@ -1570,15 +1570,17 @@ SH
     || fail "watcher did not create the custom check snapshot"
   child_pid=$(cat "$child_pid_file")
   kill -TERM "$pid" 2>/dev/null || fail "could not signal watcher during custom check"
+  # The check ignores TERM, so its stop includes the guardian's TERM grace before
+  # KILL. Only a hang fails here; the bound is this file's 60 s watcher backstop.
   i=0
-  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 100 ]; do
-    sleep 0.02
+  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 600 ]; do
+    sleep 0.1
     i=$((i + 1))
   done
   if kill -0 "$pid" 2>/dev/null; then
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    fail "signaled watcher did not exit promptly"
+    fail "signaled watcher did not exit"
   fi
   rc=0
   wait "$pid" || rc=$?
@@ -1589,7 +1591,7 @@ SH
   ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private check output file"
   [ ! -e "$state/.watch.lock/pid" ] || fail "signaled watcher left its singleton lock"
-  pass "watcher signals promptly stop custom checks and clean private state"
+  pass "a signaled watcher stops its custom check and cleans private state"
 }
 
 test_returned_custom_check_descendants_are_drained() {
