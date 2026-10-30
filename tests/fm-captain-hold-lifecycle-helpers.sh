@@ -94,9 +94,17 @@ tasks_in() {  # <home> <tasks-axi args...>
   (cd "$home" && tasks-axi "$@")
 }
 
+# A secondmate home must declare the owner of every hold it files, because its
+# parent channel carries both the captain's calls and the parent's own. These
+# suites exercise the captain-owned lifecycle, so a `hold` run inside a mate home
+# declares that owner here unless the caller passes one itself.
 run_captain() {  # <home> <command args...>
-  local home=$1
+  local home=$1 arg owner_given=0
   shift
+  if [ "${1-}" = hold ] && [ -e "$home/.fm-secondmate-home" ]; then
+    for arg in "$@"; do [ "$arg" != --owner ] || owner_given=1; done
+    [ "$owner_given" = 1 ] || set -- "$@" --owner captain
+  fi
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"

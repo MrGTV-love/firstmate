@@ -887,6 +887,16 @@ hold_fixture_task() {
     || fail "could not place the fixture task under a captain hold"
 }
 
+# The same fixture task held for a secondmate home, which must name the captain
+# as the owner of every hold it files. Args: case_dir
+hold_fixture_task_owned() {
+  FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/state" TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
+      --title 'Fixture call' --owner captain \
+      --reason 'the landing choice has not been made yet' >/dev/null \
+    || fail "could not place the fixture task under a captain-owned hold"
+}
+
 # Count the guard events in <log> matching a guard and decision, so a test can
 # assert one event per decision without depending on line order.
 count_guard_events() {  # <log> <guard> <decision>
