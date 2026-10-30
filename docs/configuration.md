@@ -3465,6 +3465,8 @@ The poll also refuses a changed owner, so drain that work in this order: restore
 A poll can print nothing while work is still pending, so silence is not the signal.
 The journal is empty when `python3 -c 'import json; print(len(json.load(open("state/slack-watch/state.json"))["pending"]))'`, run in the home with the old value restored, prints `0`.
 A `retarget` with the new value set that still refuses with `dm_user_changed_with_pending_work` means the old DM is not drained yet: restore the old value and poll again.
+If a pending row can never drain because its thread or channel is gone, the last resort is to run `bin/fm-slack-check.sh disarm`, check the pending rows in `state/slack-watch/state.json` by hand, and then remove `state/slack-watch/` to start a fresh DM.
+That reset can re-read replies that were already answered, so do it only after that check.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 

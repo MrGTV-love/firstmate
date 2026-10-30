@@ -1084,7 +1084,7 @@
       "layer": "runtime-block",
       "source": "the pending journal in state/slack-watch/state.json, read by Watch.retarget() in bin/fm_slack_watch.py against the owner id stored for the established DM and FM_SLACK_DM_USER",
       "trigger": "bin/fm-slack-check.sh retarget runs after FM_SLACK_DM_USER changed while the pending journal still holds an answer or a notice for a thread in the old DM",
-      "remedy": "restore the old FM_SLACK_DM_USER in .env, run bin/fm-slack-poll.sh until python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))' prints 0, set the new value, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm",
+      "remedy": "restore the old FM_SLACK_DM_USER in .env, run bin/fm-slack-poll.sh until python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))' prints 0, set the new value, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm; last resort, when a pending row can never drain because its thread or channel is gone: run bin/fm-slack-check.sh disarm, check the pending rows by hand, then remove state/slack-watch/ to start a fresh DM, which can re-read replies that were already answered",
       "budget": 1,
       "test": "tests/fm-slack-watch.test.sh",
       "tier": "C",

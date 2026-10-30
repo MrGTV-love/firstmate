@@ -241,6 +241,7 @@ class Watch:
         self.detail = ''
         self.noticed_threads = set()
         self.read_threads = set()
+        self.advanced = 0
         self.notices_held = False
 
     def dm_user(self):
@@ -538,6 +539,7 @@ class Watch:
                     self.say('check: slack %s - answer not applied: %s' % (pending['thread'], pending['key']))
             fault('after-delivery')
             pending['stage'] = 'ack'
+            self.advanced += 1
             self.commit()
             fault('after-answer')
         if pending['stage'] == 'ack':
@@ -558,14 +560,14 @@ class Watch:
         for pending in list(self.state['pending']):
             if remaining <= 0:
                 break
+            advanced = self.advanced
             try:
                 self.publish(pending)
             except SlackError as error:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 deferred = deferred or error
-            if pending.get('kind') != 'notice':
-                remaining -= 1
+            remaining -= self.advanced - advanced
         return remaining, deferred
 
     def mirror(self):
@@ -728,6 +730,7 @@ class Watch:
         for occurrence, record in self.tracked():
             if remaining <= 0:
                 break
+            advanced = self.advanced
             try:
                 remaining = self.read_thread(occurrence, record, remaining)
             except SlackError as error:
@@ -736,9 +739,7 @@ class Watch:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 self.read_threads.discard(record['ts'])
-                if any(p.get('kind') == 'answer' and p.get('thread') == record['ts']
-                       for p in self.state['pending']):
-                    remaining -= 1
+                remaining -= self.advanced - advanced
                 deferred = deferred or error
         deferred = self.resolve() or deferred
         if deferred:

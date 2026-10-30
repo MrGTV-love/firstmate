@@ -11,6 +11,9 @@
 # is empty when, in the home with the old value restored, this prints 0:
 #   python3 -c 'import json; print(len(json.load(open("state/slack-watch/state.json"))["pending"]))'
 # A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.
+# Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the
+# pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were
+# already answered, so do it only after that check.
 #   fm-slack-check.sh --help
 set -euo pipefail
 # shellcheck source=bin/fm-slack-lib.sh
@@ -28,6 +31,9 @@ case "${1:-}" in
       'with the old value restored, this prints 0:' \
       "  python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))'" \
       'A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.' \
+      'Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the' \
+      'pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were' \
+      'already answered, so do it only after that check.' \
       'Disarm is the hard off switch. Unconfigured is silent/off; an explicit arm names the refusal.' \
       'See docs/configuration.md "Slack decision plane".'
     exit 0

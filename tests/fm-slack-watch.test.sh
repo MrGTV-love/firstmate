@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X37.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X38.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1426,5 +1426,25 @@ assert_contains "$printed" 'check: slack held-101; ' "X37 the oldest unprinted w
 assert_contains "$printed" 'closed: typed-call' "X37 the line the dying run earned was lost"
 assert_closed typed-call 1 "X37 the answer was not delivered"
 printf 'ok - X37\n'
+
+# X38: a journaled row stuck before its acknowledgement never uses up the answer cap of a later poll
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/stuck-cap.json" chat.postMessage 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/stuck-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X38 the failed acknowledgement reported success"
+assert_contains "$out" 'closed: dup-a' "X38 the first thread was not answered"
+assert_open dup-b 0 "X38 one poll delivered more answers than the cap"
+python3 "$HELPER" clear-fail "$(replay_file)" chat.postMessage
+python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:900.000001 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/stuck-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X38 the gone thread reported success"
+assert_contains "$out" 'closed: dup-b' "X38 a row stuck before its acknowledgement used up the answer cap"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X38 the row for the gone thread left the journal"
+printf 'ok - X38\n'
 
 printf 'ok - all Slack watch checks\n'
