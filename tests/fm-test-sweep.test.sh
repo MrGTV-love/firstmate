@@ -303,8 +303,49 @@ test_wide_sweep_stops_a_dead_records_process_first() {
   pass "the wide sweep stops a process inside a dead shell's record before it removes the record"
 }
 
+# A live owner keeps its roots and record even when the sweep cannot prove who
+# holds its PID: the identity probe cannot run, or the marker has no identity.
+test_sweep_keeps_live_owner_when_identity_probe_fails() {
+  local tmp="$TMP_ROOT/probe" stubs="$TMP_ROOT/probe-stubs" pid tries=0 root record bare sleeper
+  mkdir -p "$tmp" "$stubs"
+  printf '#!/bin/sh\nexit 1\n' > "$stubs/bash"
+  chmod +x "$stubs/bash"
+  env TMPDIR="$tmp" bash -c '
+    . "$1"
+    d=$(fm_test_tmproot fm-test-sweep-probe)
+    printf "%s\n" "$d" > "$2"
+    while :; do sleep 0.1; done
+  ' _ "$LIB" "$TMP_ROOT/probe-root" >/dev/null 2>&1 &
+  pid=$!
+  while [ ! -s "$TMP_ROOT/probe-root" ] && [ "$tries" -lt 200 ]; do tries=$((tries + 1)); sleep 0.05; done
+  [ -s "$TMP_ROOT/probe-root" ] || fail "the live shell never made its fixture root"
+  root=$(cat "$TMP_ROOT/probe-root")
+  record=$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 -type d -name "$pid.*")
+  [ -f "$record/.fm-test-fixture" ] || fail "the live shell left no marked record"
+  sleep 300 &
+  sleeper=$!
+  bare="$tmp/fm-test-sweep-bare.AAAAAA"
+  mkdir -p "$bare"
+  printf '%s\n' "$sleeper" > "$bare/.fm-test-fixture"
+  touch -t 202001010000 "$root/.fm-test-fixture" "$record/.fm-test-fixture" "$bare/.fm-test-fixture"
+  env TMPDIR="$tmp" FM_TEST_SKIP_ORPHAN_REAP=1 FM_TEST_ORPHAN_MAX_AGE_SECONDS=0 bash -c '
+    . "$1"
+    PATH="$2:$PATH"
+    fm_test_reap_orphans
+  ' _ "$LIB" "$stubs"
+  assert_present "$root" "the sweep removed a live owner's root when the identity probe could not run"
+  assert_present "$record" "the sweep removed a live owner's record when the identity probe could not run"
+  assert_present "$bare" "the sweep removed a root whose live owner's marker has no identity line"
+  kill -TERM "$pid" "$sleeper" 2>/dev/null || true
+  wait "$pid" "$sleeper" 2>/dev/null || true
+  sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0
+  assert_absent "$bare" "the sweep left a root whose owner has died"
+  pass "the sweep keeps a live owner's root and record when it cannot prove the owner gone"
+}
+
 test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it
 test_wide_sweep_stops_a_dead_records_process_first
+test_sweep_keeps_live_owner_when_identity_probe_fails
 test_owners_dir_must_be_ours
 test_sweep_keeps_live_owner_and_unmarked_entries
 test_sweep_finds_legacy_marked_roots

@@ -328,27 +328,23 @@ if [ ! -d "$FM_TEST_OWNERS_DIR" ] || [ -L "$FM_TEST_OWNERS_DIR" ] || [ ! -O "$FM
   printf 'tests/lib.sh: %s is not a directory this user owns\n' "$FM_TEST_OWNERS_DIR" >&2
   return 1
 fi
-FM_TEST_SHELL_DIR=$(umask 077; mktemp -d "$FM_TEST_OWNERS_DIR/$$.XXXXXX") || return 1
-FM_TEST_SHELL_DIR=$(cd -P -- "$FM_TEST_SHELL_DIR" && pwd -P) || return 1
-
-FM_TEST_CLEANUP_DIRS=()
-FM_TEST_CLEANUP_REGISTRY="$FM_TEST_SHELL_DIR/cleanup"
-: > "$FM_TEST_CLEANUP_REGISTRY" || return 1
-
 fm_test_pid_identity() {
   local pid=$1
   FM_STATE_OVERRIDE="$FM_TEST_TMPDIR" bash -c \
     '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$pid"
 }
 
-FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
-  rm -rf "$FM_TEST_SHELL_DIR"
-  return 1
-}
+FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || return 1
+FM_TEST_SHELL_DIR=$(umask 077; mktemp -d "$FM_TEST_OWNERS_DIR/$$.XXXXXX") || return 1
 printf '%s\n%s\n' "$$" "$FM_TEST_OWNER_IDENTITY" > "$FM_TEST_SHELL_DIR/.fm-test-fixture" || {
   rm -rf "$FM_TEST_SHELL_DIR"
   return 1
 }
+FM_TEST_SHELL_DIR=$(cd -P -- "$FM_TEST_SHELL_DIR" && pwd -P) || return 1
+
+FM_TEST_CLEANUP_DIRS=()
+FM_TEST_CLEANUP_REGISTRY="$FM_TEST_SHELL_DIR/cleanup"
+: > "$FM_TEST_CLEANUP_REGISTRY" || return 1
 
 # --- process-event runner reaping -------------------------------------------
 #
@@ -751,9 +747,10 @@ fm_test_reap_orphans() {
     case "$owner_pid" in
       '' | *[!0-9]*) ;;
       *)
-        current_identity=$(fm_test_pid_identity "$owner_pid" 2>/dev/null) || current_identity=
-        if [ -n "$owner_identity" ] && [ "$current_identity" = "$owner_identity" ]; then
-          continue
+        if kill -0 "$owner_pid" 2>/dev/null; then
+          [ -n "$owner_identity" ] || continue
+          current_identity=$(fm_test_pid_identity "$owner_pid" 2>/dev/null) || continue
+          [ "$current_identity" != "$owner_identity" ] || continue
         fi
         ;;
     esac
