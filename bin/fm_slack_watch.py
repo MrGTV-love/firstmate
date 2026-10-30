@@ -724,6 +724,8 @@ class Watch:
                 # back and reported once; every other thread is still read.
                 if str(error) not in THREAD_ERRORS:
                     raise
+                self.read_threads.discard(record['ts'])
+                remaining -= 1
                 deferred = deferred or error
         self.resolve()
         if deferred:

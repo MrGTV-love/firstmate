@@ -26,6 +26,7 @@ Usage:
   fm_slack_watch_test.py set-state <state.json> <field> <value>
   fm_slack_watch_test.py journal-line <state.json> <line>
   fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status>
+  fm_slack_watch_test.py clear-fail <replay-state.json> <method[:ts]>
   fm_slack_watch_test.py move-transcript <transcript.json> <out.json> <channel>
   fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
   fm_slack_watch_test.py outbound-targets <outbound.jsonl> <method>
@@ -167,6 +168,8 @@ def main(argv):
         edit(argv[1], lambda data: data.__setitem__(argv[2], argv[3]))
     elif command == 'fail-call':
         edit(argv[1], lambda data: data['failures'].__setitem__(argv[2], {'status': int(argv[3])}))
+    elif command == 'clear-fail':
+        edit(argv[1], lambda data: data['failures'].pop(argv[2], None))
     elif command == 'move-transcript':
         def move(data):
             data['channel'] = argv[3]

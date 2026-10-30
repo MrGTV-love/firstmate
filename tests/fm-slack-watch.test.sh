@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X32.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X34.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1334,5 +1334,42 @@ out=$(wake)
 assert_eq "$out" "$held_b; check: slack 900.000001 - unmatched reply 900.000002" "X32 the held line or the queued notice was lost or cut"
 assert_eq "$(wake)" "" "X32 a printed line repeated"
 printf 'ok - X32\n'
+
+# X33: a thread whose reactions cannot be read is never retired with its late reply unread
+new_home reaction-answer
+bind
+mirror reaction-answer >/dev/null
+ts=$(thread_field reaction-call ts)
+close_terminal reaction-call
+reply_to "$ts" 900.000201 late
+python3 "$HELPER" fail-call "$(replay_file)" "reactions.get:$ts" 400
+set +e
+out=$(poll reaction-answer); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X33 the unreadable thread reported success"
+assert_contains "$out" 'transport failure: api_error' "X33 the unreadable thread was not reported"
+assert_eq "$(thread_field reaction-call retired)" False "X33 a thread whose taps were not read was retired"
+assert_not_contains "$(thread_texts "$ts")" 'Resolved:' "X33 a thread whose taps were not read was resolved"
+python3 "$HELPER" clear-fail "$(replay_file)" "reactions.get:$ts"
+out=$(poll reaction-answer)
+assert_contains "$out" "unmatched reply 900.000201" "X33 the late reply was never surfaced"
+assert_eq "$(thread_field reaction-call retired)" False "X33 the thread was retired with its notice"
+poll reaction-answer >/dev/null
+assert_eq "$(thread_field reaction-call retired)" True "X33 the read thread was not retired"
+assert_contains "$(thread_texts "$ts")" 'Resolved: reaction-call' "X33 the retired thread was not resolved"
+printf 'ok - X33\n'
+
+# X34: a failed acknowledgement never lets one poll deliver more answers than the cap
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/ack-fail.json" chat.postMessage 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/ack-fail.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X34 the failed acknowledgement reported success"
+assert_eq "$(closed_count "$out")" 1 "X34 one poll delivered more answers than the cap"
+assert_contains "$out" 'transport failure: api_error' "X34 the failed acknowledgement was not reported"
+assert_open dup-b 0 "X34 the call past the cap was answered"
+printf 'ok - X34\n'
 
 printf 'ok - all Slack watch checks\n'
