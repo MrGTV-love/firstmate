@@ -16,9 +16,8 @@
 #                        through fm_backlog_relaunch_admission without mutation
 #   bin/fm-teardown.sh   meta removed => `tasks-axi done`, or `tasks-axi reopen`
 #                        with the deliverable recorded when the row is still an
-#                        open captain call or parent decision
-#                        (bin/fm-captain-hold.sh `open --any-owner`), so
-#                        cleanup never retires a decision still owed
+#                        open captain call (bin/fm-captain-hold.sh `open`), so
+#                        cleanup never retires the captain's own question
 #   bin/fm-bootstrap.sh  replays whatever a crash left behind, THIS HOME ONLY.
 # bin/fm-fleet-snapshot.sh's classifier and bin/fm-secondmate-reconcile.sh's
 # cross-home nudge stay defense in depth, not the primary mechanism.
@@ -61,9 +60,8 @@
 # the evidence that the row is owed a start.
 # A captain-held row uses the same record with a `mode=retain` line. Replay
 # records the deliverable and reopens the row only while it remains an open
-# captain call or parent decision (FM_BACKLOG_ROW_OPEN_DECISION), never
-# closing it. If the hold was released before replay, the finished row closes
-# instead of reopening unheld work. If an answer already
+# captain call, never closing it. If the hold was released before replay, the
+# finished row closes instead of reopening unheld work. If an answer already
 # closed a retained row, replay simply retires the satisfied record.
 
 # Set by fm_backlog_transition_applies for a return-1 exemption.
@@ -78,12 +76,6 @@ FM_BACKLOG_ROW_ERROR=
 # the row is not held.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_ROW_HOLD_KIND=
-# Set by fm_backlog_row_probe on a found row: captain while it is an open
-# captain call, parent while it is an open hold recorded as the parent
-# firstmate's (external, with a `Decision owner: parent` body line), else empty.
-# Either one is a decision still owed, so no close may complete the row.
-# shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-FM_BACKLOG_ROW_OPEN_DECISION=
 # Set by fm_backlog_close_marker_replay: closed | closed_incomplete | retained |
 # retained_incomplete | answered | stale | noop.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
@@ -533,7 +525,6 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   FM_BACKLOG_ROW_RESULT=error
   FM_BACKLOG_ROW_STATE=
   FM_BACKLOG_ROW_HOLD_KIND=
-  FM_BACKLOG_ROW_OPEN_DECISION=
   FM_BACKLOG_ROW_KIND=
   FM_BACKLOG_ROW_ERROR=
   fm_backlog_source_present "$data" "$authorized_data"
@@ -575,16 +566,6 @@ fm_backlog_row_probe() {  # <data-dir> <id>
     ''|'"-"'|-) FM_BACKLOG_ROW_HOLD_KIND= ;;
     *) FM_BACKLOG_ROW_HOLD_KIND=$hold_kind ;;
   esac
-  if [ "$state" != "done" ]; then
-    case "$FM_BACKLOG_ROW_HOLD_KIND" in
-      captain) FM_BACKLOG_ROW_OPEN_DECISION=captain ;;
-      external)
-        printf '%s\n' "$out" | sed -n 's/^  body: *//p' | head -1 \
-          | grep -Eq '(^"|\\n)Decision owner: parent(\\n|"$)' \
-          && FM_BACKLOG_ROW_OPEN_DECISION=parent
-        ;;
-    esac
-  fi
   return 0
 }
 
@@ -1453,7 +1434,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
   fi
   if fm_backlog_row_probe "$data" "$id"; then
     row_state=$FM_BACKLOG_ROW_STATE
-    if [ -n "$FM_BACKLOG_ROW_OPEN_DECISION" ]; then
+    if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
     elif [ "${row_state%% *}" != "done" ]; then
       if [ "$mode" = retain ] && [ "${args[0]-}" = --report ] \

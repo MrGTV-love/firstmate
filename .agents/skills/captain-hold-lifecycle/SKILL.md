@@ -31,8 +31,7 @@ Only `answer` with the captain's words, an evidence-backed `reconcile close`, or
 
 A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
 A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
-A parent-owned hold is an `external` hold whose record carries `Decision owner: parent` from filing, which `hold` never writes: it is never a captain call, only `bin/fm-captain-hold.sh decide` with the parent's decision resolves it, and the captain's `answer` refuses it.
-A captain-owned hold is never released by `decide`; only the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it can release one.
+A captain-owned hold is released only by the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it.
 
 Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
 When verified evidence establishes that all answers were already recorded elsewhere or the premise is moot, use the evidence-only reconciliation path rather than inventing new captain words.

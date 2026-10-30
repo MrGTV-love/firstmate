@@ -17,14 +17,13 @@
 # Teardown reports manual follow-up for exempt homes; an automatic transition
 # failure is fatal and loud rather than reporting cleanup success.
 # The close - and only the close - is replaced by `tasks-axi reopen` with the
-# deliverable recorded while the backlog item is still an open captain call or
-# an open parent decision (bin/fm-captain-hold.sh `open --any-owner` owns that
-# predicate), because the policy holds the very work item a question gates and
-# cleanup must never retire a decision still owed.
-# NOTE: this uses `open`'s silent output and depends only on its unchanged
-# 0/1/2 exit-code contract; `open --parent-owned` only picks whose decision the
-# retention message names. The optional `--identity` output that
-# bin/fm-watch.sh asks for prints only on an exit 0 and changes nothing read here.
+# deliverable recorded while the backlog item is still an open captain call
+# (bin/fm-captain-hold.sh `open` owns that predicate), because the policy holds
+# the very work item a question gates and cleanup must never retire the
+# captain's own question.
+# NOTE: this uses `open`'s silent default and depends only on its unchanged
+# 0/1/2 exit-code contract. The optional `--identity` output that bin/fm-watch.sh
+# asks for prints only on an exit 0 and changes nothing read here.
 # The same pending-close record carries that intent as
 # `mode=retain`, so an interrupted cleanup replays the retention rather than a
 # close. "Cannot tell" refuses before any destructive step, --force does not
@@ -1168,24 +1167,16 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   fi
   [ "$TEARDOWN_LEGACY_PENDING" = 1 ] || TEARDOWN_META_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 fi
-# Cleanup never closes a captain call or an open parent decision (see the
-# header). Asked here, before any
+# Cleanup never closes a captain call (see the header). Asked here, before any
 # destructive step, so "cannot tell" can refuse while everything is intact.
 TEARDOWN_BACKLOG_TRANSITION=close
-TEARDOWN_RETAIN_OWNER=captain
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   TEARDOWN_CAPTAIN_OPEN_STATUS=0
   TEARDOWN_CAPTAIN_OPEN_OUT=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
-    "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --any-owner 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
+    "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
   case "$TEARDOWN_CAPTAIN_OPEN_STATUS" in
-    0)
-      TEARDOWN_BACKLOG_TRANSITION=retain
-      if FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
-        "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --parent-owned >/dev/null 2>&1; then
-        TEARDOWN_RETAIN_OWNER=parent
-      fi
-      ;;
+    0) TEARDOWN_BACKLOG_TRANSITION=retain ;;
     1) ;;
     *)
       echo "error: task $ID cannot be torn down because whether its backlog item is still held for the captain could not be read; fix that read and retry rather than risk closing a captain call with no recorded answer" >&2
@@ -2614,9 +2605,7 @@ backlog_refresh_reminder() {
   else
     backlog_display="${DATA%/}/backlog.md"
   fi
-  if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ] && [ "$TEARDOWN_RETAIN_OWNER" = parent ]; then
-    printf '%s\n' "Backlog: $ID stays open in $backlog_display, still waiting on the parent firstmate's decision with its deliverable recorded. Record that decision only with bin/fm-captain-hold.sh decide."
-  elif [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ]; then
+  if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ]; then
     printf '%s\n' "Backlog: $ID stays open in $backlog_display, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer."
   elif [ "$BACKLOG_CLOSED" = 1 ]; then
     printf '%s\n' "Backlog: $ID is closed in $backlog_display. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due."

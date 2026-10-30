@@ -467,15 +467,13 @@
       "id": "merge-held-task",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-held-task deny", "count": 2},
-        {"file": "bin/fm-pr-merge.sh", "match": "refusing to merge, and nothing was merged", "count": 2},
-        {"file": "bin/fm-merge-local.sh", "match": "refusing to merge\" >&2", "count": 2}
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-held-task deny"}
       ],
-      "invariant": "a merge never runs while its task is still held for the captain or still waiting on the parent firstmate's decision",
+      "invariant": "a merge never runs while its task is still held for the captain",
       "layer": "runtime-block",
-      "source": "bin/fm-captain-hold.sh open and open --parent-owned exit status for the task",
-      "trigger": "the task still has an open captain hold, or an open hold whose decision the parent firstmate owns, or either hold cannot be read",
-      "remedy": "bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release for a captain hold, or bin/fm-captain-hold.sh decide <task> --decision-file <parent-decision-file> for a hold the parent firstmate owns",
+      "source": "bin/fm-captain-hold.sh open exit status for the task",
+      "trigger": "the task still has an open captain hold",
+      "remedy": "bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",

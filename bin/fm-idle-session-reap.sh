@@ -20,9 +20,8 @@
 #     canonical status_declared_wait_line reader and predicates;
 #   - its newest status event is `done` and the keyed decision fold has nothing
 #     open;
-#   - the durable captain-hold `open --any-owner` predicate confirms no open
-#     captain call or parent decision (an open one or an inconclusive read is
-#     parked, not reaped);
+#   - the durable captain-hold `open` predicate confirms no open captain call
+#     (an open call or an inconclusive read is parked, not reaped);
 #   - no open captain hold in this home, or in any local home above a
 #     secondmate home, declares the task's project frozen
 #     (`fm-captain-hold.sh frozen`, asked last, once every other gate here

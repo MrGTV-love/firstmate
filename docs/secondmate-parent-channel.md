@@ -26,7 +26,7 @@ Every captain-facing outcome that leaves durable evidence in the mate home is pu
 | Scout child findings | the child's `done:` line plus `data/<child>/report.md` | `bin/fm-inactive-reconcile.sh` on the next poll, with the report pointer |
 | Child failed | the child's `failed:` line | `bin/fm-inactive-reconcile.sh` on the next poll |
 | Child decision escalated to the captain | the task held for the captain in the mate backlog, with `Decision owner: captain` | `bin/fm-captain-hold.sh hold --owner captain`, and its answer by `answer` |
-| Child decision the main firstmate makes itself | never held: a `needs-decision` line for the main firstmate, and the work continues on its answer; only a hold whose record carries `Decision owner: parent` from filing is the parent's | the mate's own appended line; a parent-owned hold's decision by `bin/fm-captain-hold.sh decide` |
+| Child decision the main firstmate makes itself | never held: a keyed `needs-decision` line for the main firstmate, and the work continues on its answer | the mate's own appended line |
 | PR merged | the merge poll or the mate's own merge | `bin/fm-merge-outcome-lib.sh` |
 | Child leaving the home | its final ledger line | `bin/fm-teardown.sh`, which refuses to remove the child while that line is undelivered |
 | Child ended silently | terminal current state with a silent ledger | the existing inactive-outcome scan in `bin/fm-inactive-reconcile.sh` |
@@ -54,7 +54,7 @@ A missed-reply escalation includes the complete first sighting path and line num
 
 `tests/fm-inactive-reconcile.test.sh` covers the ledger delivery against real ledgers with no harness: immediate done and failed delivery with note, PR, mode, posture, and report pointer, once-only delivery across polls, a ship `done:` withheld while its named head exists only in the worker copy, a pending one still delivered after teardown removes that copy, a line still being appended, later routine status prose not minting a fresh parent event because the inactive receipt identity binds structured fields only, the remote route, the yield of the inactive path to a terminal ledger, and the real watcher poll driving it.
 `tests/fm-captain-hold-lifecycle.test.sh` covers a mate home publishing a hold, its answer, and a distinct occurrence on re-hold, and a main home publishing nothing.
-`tests/fm-captain-hold-owner.test.sh` covers a mate home declaring each hold's owner, a parent-owned call publishing and closing on the parent's decision, and a captain-owned call staying closed to it.
+`tests/fm-captain-hold-owner.test.sh` covers a mate home declaring each hold's owner, refusing to hold a call the main firstmate owns, and a captain call released only by the captain's words or a recorded captain ruling.
 `tests/fm-pr-merge-forges.test.sh` covers the PR-ready line at registration and the merge outcome's upward report.
 `tests/fm-teardown-cleanup.test.sh` covers teardown delivering a child's final line and refusing when the channel cannot be written.
 `tests/fm-brief.test.sh` pins the charter's channel rule.

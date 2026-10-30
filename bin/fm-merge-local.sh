@@ -135,20 +135,6 @@ case "$hold_status" in
     exit 1
     ;;
 esac
-hold_status=0
-FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-  "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --distinguish-absent --parent-owned || hold_status=$?
-case "$hold_status" in
-  0)
-    echo "error: task $ID is still waiting on the parent firstmate's decision; record it with fm-captain-hold.sh decide before merging" >&2
-    exit 1
-    ;;
-  1|3) ;;
-  *)
-    echo "error: could not determine whether task $ID is still waiting on the parent firstmate; refusing to merge" >&2
-    exit 1
-    ;;
-esac
 merge_status=0
 git -C "$PROJ" merge --ff-only "$BRANCH" >/dev/null || merge_status=$?
 fm_lock_release "$MERGE_CONTROL_LOCK" || true

@@ -36,11 +36,10 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | --- | --- | --- |
 | `hold` | Creates or reuses a task and holds it for the captain. | [Creating a hold](#creating-a-hold-hold) |
 | `answer` | Records the captain's exact words and resolves the call. | [Answering a call](#answering-a-call-answer) |
-| `decide` | Records the parent firstmate's decision on a call it owns and releases that hold. | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | `withdraw` | Releases a captain-kind hold that a recorded captain ruling made moot, without writing captain words. | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
-| `open` | Read-only check of whether a row is still an open captain call, with `--parent-owned` an open parent decision, or with `--any-owner` either. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
+| `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | `freeze` | Declares the one project an open hold freezes. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `frozen` | Read-only check of whether an open hold in this home or a local home above it freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
@@ -147,13 +146,13 @@ The `--force` path remains the explicit captain-approved discard escape hatch.
 The policy prefers holding the very work item a question gates.
 So the backlog row a finished task's cleanup is about to close is routinely the captain's own call.
 
-An ordinary `bin/fm-teardown.sh` invocation therefore asks the read-only `open --any-owner` subcommand before its automatic backlog close:
+An ordinary `bin/fm-teardown.sh` invocation therefore asks the read-only `open` subcommand before its automatic backlog close:
 The finished-session sweep's stricter admission is owned by [`bin/fm-idle-session-reap.sh`](../bin/fm-idle-session-reap.sh)'s header, not this retention path.
 
 | `open` exit | Meaning | What ordinary teardown does |
 | --- | --- | --- |
-| 0 | The row is still an open captain call (not Done, `hold_kind: captain`) or an open [parent decision](#decision-owner-and-honest-release). | Retains the row, as described below. |
-| 1 | The row is neither. | Proceeds with its automatic close. |
+| 0 | The row is still an open captain call (not Done, `hold_kind: captain`). | Retains the row, as described below. |
+| 1 | The row is not an open captain call. | Proceeds with its automatic close. |
 | 2 | The answer could not be established. | Treats it as a refusal before any destructive step, never as permission to close. |
 
 ### Retaining the row on exit 0
@@ -312,7 +311,7 @@ The merge gate then refused the task with no honest path forward.
 That happened on 2026-10-10 twice and again on 2026-10-28 for a Mac mini mate's ship task.
 On the retry the captain's words were that it should not have been a decision point and should have just been done.
 So a call the main firstmate owns, such as an ask-user finding, a retry, or a hygiene call, is never held.
-The home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
+A decision Main owns goes to the parent as a keyed `needs-decision` status line, never as a captain hold; the home keeps working where it can, and Main's answer lets the work continue.
 `hold` is for captain calls only.
 
 ### Owner recorded at filing
@@ -325,45 +324,25 @@ Any other owner is refused, in either home, with a message that names the routin
 A hold filed before owners were recorded has no line.
 It reads as the captain's in a main home and as `unrecorded` in a secondmate home.
 
-A parent-owned hold is an `external` hold whose record carries `Decision owner: parent` from filing; `hold` never files one.
-It is never a captain call.
-The captain predicate `open`, the Bearings captain section, the divergence guard, and `answer` all ignore or refuse it.
-It still publishes a `needs-decision` line on the parent channel under the same `captain-hold-<task>-<n>` key family, with the label `parent decision`, so the parent is woken.
-The captain reverses it by re-holding with `--owner captain`.
-
-### Closing a parent-owned call
-
-`decide` records the parent's decision text as a `Parent decision:` block marked `Not a captain answer.`, and it publishes the matching `resolved` line.
-Like `answer` without `--release`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its `Deliverable of the finished work:` line.
-Otherwise it lifts the hold so the unfinished work item resumes without closing.
-An exact replay is accepted and publishes nothing twice.
-It refuses every hold whose recorded owner is not the parent, so it cannot release a captain call.
-
-The merge entry points (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh`) refuse while a captain call or a parent decision is open.
-They read the second through `open --parent-owned` and name whose decision is outstanding.
-Splitting the owner therefore never lets through a merge that the single captain kind would have stopped.
-Teardown, the idle reaper, and the session-end relauncher read `open --any-owner`, so cleanup never closes a row while either decision is open.
-The backlog row probe (`bin/fm-backlog-transition-lib.sh`) records the same fact, so an interrupted teardown's close replay keeps the row and `bin/fm-tasks-axi.sh done` refuses it while either decision is open.
-`decide` and `withdraw` read an open hold from its kind, never from tasks-axi's `held` bit, so a dated hold whose date has passed is still released by them.
-The investigation completion gate (`complete` and `verify`) accepts an open parent-owned hold, and a newest `decided` or `withdrawn` record, live or archived, as durable states, because each is attributed and marked `Not a captain answer.`.
-`complete` lists an archived one under its own label, never as an answered call.
-The idle reaper names an open parent decision as waiting on the parent firstmate, not on the captain.
-An archived parent decision or withdrawal is never a ruling for `withdraw`.
-A retried `decide` or `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
-
 ### Withdrawing a call that a captain ruling made moot
 
 `withdraw` is the honest release for a captain-kind hold on an open work item whose question a recorded captain ruling has already settled.
 It never writes the captain's words and never completes unfinished work.
 It lifts the hold so an unfinished ship or scout work item resumes queued and unheld.
-Like `decide`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its deliverable, so neither a moot question nor finished work returns as dispatchable work.
+Like `answer` without `--release`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its deliverable, so neither a moot question nor finished work returns as dispatchable work.
 It writes a `Resolution mode: withdrawn` record that names the ruling, the owner the hold was filed with, and the home role it ran from (derived, never typed).
 It also records the evidence file and the line `Not a captain answer.`, and it publishes a `resolved` line saying the call was withdrawn.
 The record carries a `Withdrawal evidence:` label instead of `Captain decision:`, so every reader that recognizes a captain answer skips it.
 Bearings and the divergence guard read only open captain-kind holds, so a withdrawn call leaves both.
 
+`withdraw` reads an open hold from its kind, never from tasks-axi's `held` bit, so a dated hold whose date has passed is still released by it.
+The investigation completion gate (`complete` and `verify`) accepts a newest `withdrawn` record, live or archived, as a durable state, because it is attributed and marked `Not a captain answer.`.
+`complete` lists an archived one under its own label, never as an answered call.
+An archived withdrawal is never a ruling for `withdraw`.
+A retried `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
+
 The one eligibility fact is `--ruling <id>`, a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
-An evidence-only close, a release, a parent decision, and another withdrawal are not rulings.
+An evidence-only close, a release, and another withdrawal are not rulings.
 The ruling must also name the withdrawn task id in its title, its hold reason (its question), or the text of its recorded captain answer.
 Origin, owner, and other metadata lines in its body never count, so a call filed with `--origin <task>` does not name that task by its origin alone.
 The answer text is the block under `Captain decision:` whose digest matches the record's own `Decision digest:`.
@@ -372,11 +351,12 @@ A name written only at withdraw time, such as in the evidence file, never counts
 The ruling's answer must also be recorded after this hold's current `Captain hold set:` stamp.
 That binds the ruling to one hold occurrence: a ruling made before the hold, including one an earlier withdrawal of the same task cited, is refused.
 A hold with no stamp cannot show that any ruling postdates it, so it is refused too.
+A legacy stamp that records only a date cannot order a ruling made the same day, so the ruling must be dated a later day.
 The basis works on any captain hold, including one recorded as the captain's or filed before owners were recorded, because the captain has already ruled on it.
 
 There is no weaker basis for `withdraw`.
 A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
-A captain-kind hold stays the captain's and is released only by his recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`); `decide` refuses it.
+A captain-kind hold stays the captain's and is released only by his recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`).
 That includes a legacy hold filed before owners were recorded, which has no `Decision owner:` line and so cannot prove the decision was the parent's.
 The legacy set is closed and cannot grow: a secondmate home refuses every new hold that names no owner, through `bin/fm-captain-hold.sh hold` and the `bin/fm-decision-hold.sh` shim alike.
 The real hold behind PR 290 was filed before owners were recorded, so it stays the captain's.
@@ -774,25 +754,22 @@ It uses a stubbed tasks-axi that fails any markdown file override, and proves th
 
 ### Decision owner coverage
 
-The owner, parent decision, and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.sh`, and the merge gate cases in `tests/fm-pr-merge-checks.test.sh`:
+The owner and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.sh`, and the merge gate cases in `tests/fm-pr-merge-checks.test.sh`:
 
 - A secondmate home refuses a hold with no owner, `--owner parent`, or an unknown owner, and a main home refuses `--owner parent`.
-- A parent-owned hold is an external hold with the owner recorded and reads as no captain call.
-- The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases a gated work item with the work left open, closes a question-shaped row, closes the channel key, and replays once.
-- After teardown retains a finished work item that has an open parent decision, `decide` closes it with its deliverable and `tasks-axi ready` does not list it, while unfinished work under the same decision is only released.
-- A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
+- An open captain call in a secondmate home is never re-filed as the parent's, and the merge gate refuses a captain-owned hold and names `answer` and `withdraw`.
 - `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
   A withdrawn question-shaped row is closed and is absent from `tasks-axi ready`, while a withdrawn work item stays queued and unheld.
-  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that does not name the hold, a ruling that names the task only by its origin, a ruling reused after the task was re-held, and a missing evidence file.
+  After teardown retains a finished work item, `withdraw` closes it with its deliverable and `tasks-axi ready` does not list it, while unfinished work is only released.
+  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that does not name the hold, a ruling that names the task only by its origin, a ruling reused after the task was re-held, a ruling recorded the same day as a date-only hold-set stamp, and a missing evidence file.
 - `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
-- A legacy secondmate hold with no owner on record, including a genuine captain call the parent relayed, stays held for the captain: `decide` refuses it and `open` still reads it as an open captain call.
+- A legacy secondmate hold with no owner on record, including a genuine captain call the parent relayed, stays held for the captain: `withdraw` without a ruling refuses it and `open` still reads it as an open captain call.
 - The retired `fm-decision-hold.sh` shim refuses a secondmate hold that names no owner or `--owner parent`, keeps `--owner captain`, and leaves a main home alone.
-- `open --any-owner` reads both kinds of open decision, the completion gate accepts a parent decision and a withdrawal as durable, and a withdrawal retires the call's board reconcile request.
-- A `decide` or `withdraw` retried after an injected failed release finishes it without a second record or channel key.
-- The completion gate accepts a parent decision whose row retention archived, and `complete` lists it apart from answered calls.
-- `decide` and `withdraw` release a dated hold whose date has passed, and a plain `done` refuses a row while the parent's decision is open.
-- The merge gate refuses an open parent decision with a message naming the parent, proceeds after `decide`, and refuses a captain-owned hold after a `decide` attempt.
+- The completion gate accepts a withdrawal as durable, and a withdrawal retires the call's board reconcile request.
+- A `withdraw` retried after an injected failed release finishes it without a second record or channel key.
+- The completion gate accepts a withdrawal whose row retention archived, and `complete` lists it apart from answered calls.
+- `withdraw` releases a dated hold whose date has passed.
 
 ### Reconcile coverage
 

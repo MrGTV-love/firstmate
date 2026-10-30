@@ -887,32 +887,14 @@ hold_fixture_task() {
     || fail "could not place the fixture task under a captain hold"
 }
 
-# The same fixture task held for a secondmate home. A captain-owned call is
-# filed with --owner captain. `hold` never files a parent-owned hold, so that one
-# is a record written directly: an external hold with `Decision owner: parent`
-# beneath its hold-set stamp. Args: case_dir owner(captain|parent)
+# The same fixture task held for a secondmate home, which must name the captain
+# as the owner of every hold it files. Args: case_dir
 hold_fixture_task_owned() {
-  local case_dir=$1 owner=$2 home=$1/home
-  if [ "$owner" = captain ]; then
-    FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
-      "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
-        --title 'Fixture call' --owner captain \
-        --reason 'the landing choice has not been made yet' >/dev/null \
-      || fail "could not place the fixture task under a captain-owned hold"
-    return 0
-  fi
-  mv "$home/.fm-secondmate-home" "$case_dir/premate-home"
-  mv "$home/.fm-secondmate-parent" "$case_dir/premate-parent"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+  FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/state" TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
-      --title 'Fixture call' --reason 'the landing choice is the main firstmate call' >/dev/null \
-    || fail "could not place the fixture task under a hold"
-  mv "$case_dir/premate-home" "$home/.fm-secondmate-home"
-  mv "$case_dir/premate-parent" "$home/.fm-secondmate-parent"
-  perl -0pi -e 's/^(- \[.\] task-x1 - [^\n]*)\(hold-kind: captain\)([^\n]*\n  Captain hold set: [^\n]*\n)/$1(hold-kind: external)$2  Decision owner: parent\n/m' \
-    "$home/data/backlog.md" || fail "could not record the parent as the fixture task's owner"
-  grep -q '^  Decision owner: parent$' "$home/data/backlog.md" \
-    || fail "the fixture task does not record the parent as its owner"
+      --title 'Fixture call' --owner captain \
+      --reason 'the landing choice has not been made yet' >/dev/null \
+    || fail "could not place the fixture task under a captain-owned hold"
 }
 
 # Count the guard events in <log> matching a guard and decision, so a test can
