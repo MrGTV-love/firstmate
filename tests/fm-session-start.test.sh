@@ -1189,7 +1189,14 @@ EOF
     make_fake_toolchain "$fakebin"
     make_fake_ps_claude "$fakebin"
     rm -f "$fakebin/tmux"
-    fm_fake_exit0 "$fakebin" herdr jq python3
+    fm_fake_exit0 "$fakebin" herdr jq
+    # Keep Python discoverable for Herdr diagnostics without claiming it can
+    # execute the progress runner; the real Perl fallback owns that work.
+    cat > "$fakebin/python3" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != -c ]
+SH
+    chmod +x "$fakebin/python3"
     printf '%s\n' manual > "$home/config/backlog-backend"
     mask="$home/mask-tmux.bash"
     cat > "$mask" <<'SH'

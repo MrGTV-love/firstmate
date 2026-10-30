@@ -125,6 +125,23 @@ case "$HOME_SUMMARY_IF_IDLE" in
   *) HOME_SUMMARY_IF_IDLE=0 ;;
 esac
 
+# Test fixtures export FM_TEST_PROCESS_REGISTRY (tests/lib.sh), whose cleanup
+# waits for every `wait` record before it removes a fixture home. A refresh
+# started outside a registered tree is that tree's root (see
+# bin/fm-timeout-lib.sh): --detach reserves a record before it starts its
+# refresh and fills it with that refresh's group before returning; any other
+# mode records its own pid before its first state write (fm-wake-lib.sh's
+# source-time mkdir) unless its launcher already reserved it (bin/fm-watch.sh).
+# Either root exports FM_TEST_PROCESS_RECORD, so every
+# worker, failure-logging, accounting and release child below it is recorded by
+# its launcher before it starts. One that cannot record starts no work. Unset,
+# nothing is recorded.
+if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && [ -z "${FM_TEST_PROCESS_RECORD:-}" ] && [ "$DETACH" -eq 0 ]; then
+  fm_process_reserve FM_TEST_PROCESS_RECORD fm-home-summary-refresh.sh || exit 1
+  fm_process_fill "$FM_TEST_PROCESS_RECORD" "$$"
+  export FM_TEST_PROCESS_RECORD
+fi
+
 if [ "$HOME_SUMMARY_MODE" != parent ]; then
   # shellcheck source=bin/fm-wake-lib.sh
   # shellcheck disable=SC1091
@@ -394,10 +411,16 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
     # stdio to /dev/null so no caller's pipe is held open, nohup so the refresh
     # outlives the shell that launched it, and its own process group so the
     # bounded child that runs session start cannot take it down with it.
+    detach_record=
+    if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ]; then
+      fm_process_reserve detach_record 'fm-home-summary-refresh.sh --detach' || exit 1
+      [ -n "${FM_TEST_PROCESS_RECORD:-}" ] || export FM_TEST_PROCESS_RECORD="$detach_record"
+    fi
     case $- in *m*) monitor_was_on=1 ;; *) monitor_was_on=0 ;; esac
     set -m 2>/dev/null || true
     FM_HOME_SUMMARY_IF_IDLE=1 nohup "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort \
       >/dev/null 2>&1 </dev/null &
+    fm_process_fill "$detach_record" "$!"
     [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
     exit 0
   fi

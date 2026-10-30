@@ -450,9 +450,12 @@ fm_test_reap_watchers() {
 # their PID and start time with fm_test_record_process before blocking.
 # Reaping requires that birth identity and the registered command needle to
 # match, so a reused PID cannot authorize killing an unrelated process.
+# A `wait` entry (third field) is an owned writer that cleanup waits for
+# instead; see fm_test_wait_processes.
 
 FM_TEST_PROCESS_REGISTRY="$FM_TEST_SHELL_DIR/process"
 : > "$FM_TEST_PROCESS_REGISTRY" || return 1
+export FM_TEST_PROCESS_REGISTRY
 
 fm_test_track_process() {  # <pidfile> <command-needle>
   [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
@@ -491,9 +494,10 @@ fm_test_process_alive() {  # <pidfile> <command-needle>
 }
 
 fm_test_reap_processes() {
-  local pidfile needle pid pgid
+  local pidfile needle mode pid pgid
   [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
-  while IFS=$'\t' read -r pidfile needle; do
+  while IFS=$'\t' read -r pidfile needle mode; do
+    [ -z "$mode" ] || continue
     fm_test_process_alive "$pidfile" "$needle" || continue
     pid=$FM_TEST_PROCESS_PID
     pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
@@ -504,7 +508,59 @@ fm_test_reap_processes() {
     fi
     kill -KILL "$pid" 2>/dev/null || true
   done < "$FM_TEST_PROCESS_REGISTRY"
-  rm -f "$FM_TEST_PROCESS_REGISTRY"
+}
+
+# --- owned writer waiting ---------------------------------------------------
+#
+# A detached product process can still write fixture state after its
+# foreground caller returned (bin/fm-home-summary-refresh.sh --detach and the
+# groups below it). Inside such a registered tree every launcher reserves a
+# fresh record file listed here as a `wait` entry BEFORE the launch, and fills
+# it with the leader pid of the group it created; bin/fm-timeout-lib.sh owns
+# that contract. Removing a root under such a writer lets it recreate the root
+# afterwards, so cleanup waits instead of signalling: it rereads the registry,
+# which covers records reserved by a writer still running at the previous pass,
+# until every filled record's pid is gone and the group it leads is empty. An
+# empty or partial record is a pending or failed handoff: it is never read as a
+# finished writer, so it is waited on to the bound. A finished record is
+# removed so it is not probed again. At the bound the pending records and live
+# pids are named, the registry and its remaining records are kept as evidence,
+# and the wait fails. Liveness is probed with signal 0 only; a reused pid or
+# group id can only lengthen the wait.
+FM_TEST_PROCESS_WAIT_SECONDS=${FM_TEST_PROCESS_WAIT_SECONDS:-150}
+
+fm_test_wait_processes() {  # [registry]
+  local registry=${1:-$FM_TEST_PROCESS_REGISTRY} record label mode pid live ticks=0
+  [ -f "$registry" ] || return 0
+  while :; do
+    live=
+    while IFS=$'\t' read -r record label mode; do
+      [ "$mode" = wait ] && [ -e "$record" ] || continue
+      if ! IFS= read -r pid < "$record" 2>/dev/null; then
+        live="$live pending:$record ($label)"
+        continue
+      fi
+      case "$pid" in
+        '' | 0* | *[!0-9]*) live="$live unreadable:$record ($label)" ;;
+        *)
+          if kill -0 "$pid" 2>/dev/null || kill -0 -- "-$pid" 2>/dev/null; then
+            live="$live $pid ($label)"
+          else
+            rm -f "$record"
+          fi
+          ;;
+      esac
+    done < "$registry"
+    [ -n "$live" ] || break
+    if [ "$ticks" -ge $((FM_TEST_PROCESS_WAIT_SECONDS * 10)) ]; then
+      printf 'fm_test_wait_processes: owned writers still running after %ss:%s; kept %s\n' \
+        "$FM_TEST_PROCESS_WAIT_SECONDS" "$live" "$registry" >&2
+      return 1
+    fi
+    ticks=$((ticks + 1))
+    sleep 0.1
+  done
+  rm -f "$registry"
 }
 
 # Default ceiling for blocking fixtures that use this exported setting.
@@ -565,6 +621,11 @@ fm_test_cleanup() {
   fm_test_reap_jobs
   fm_test_reap_processes
   fm_test_reap_procevent_homes
+  # A writer still running keeps every root, as evidence, and fails the run.
+  if [ "${FM_TEST_WAIT_FAILED:-0}" = 1 ] || ! fm_test_wait_processes; then
+    FM_TEST_WAIT_FAILED=1
+    exit 1
+  fi
   fm_test_reap_fixture_processes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"
@@ -1575,7 +1636,8 @@ fm_test_base_path_sans() {
 # FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
 # holds it; await-removal records the worker's pid in
 # FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
-# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# FM_TEST_FENCE_HOME is gone or FM_TEST_FENCE_HOME/state/.test-fence-release
+# exists, and refuses the mutex; hold starts a live process
 # that takes the mutex first, records its pid in
 # FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
 # FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
@@ -1597,7 +1659,9 @@ case "${*: -1}" in
       refuse) : > "$state/.test-fence-refused"; exit 1 ;;
       await-removal)
         printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
-        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ] && [ ! -e "$state/.test-fence-release" ]; do
+          sleep 0.1
+        done
         exit 1
         ;;
       hold)

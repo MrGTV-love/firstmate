@@ -3096,8 +3096,15 @@ fi
 # first. Publication is eventually consistent by design and every reader
 # re-derives current state from the owning home anyway, while beacon freshness
 # is what the whole supervision chain rests on.
+#
+# Under a test fixture's FM_TEST_PROCESS_REGISTRY (tests/lib.sh) the refresh's
+# record is reserved here, before it starts, and handed to it as its
+# FM_TEST_PROCESS_RECORD (bin/fm-timeout-lib.sh), so fixture cleanup waits on it
+# even when this watcher ends before the refresh reaches its own code. One that
+# cannot be recorded is not started. Unset, nothing is recorded.
 HOME_SUMMARY_PID=
 home_summary_refresh_detached() {
+  local record=
   if [ -n "$HOME_SUMMARY_PID" ]; then
     if kill -0 "$HOME_SUMMARY_PID" 2>/dev/null; then
       return 0
@@ -3105,9 +3112,14 @@ home_summary_refresh_detached() {
     wait "$HOME_SUMMARY_PID" 2>/dev/null || true
     HOME_SUMMARY_PID=
   fi
+  if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && [ -z "${FM_TEST_PROCESS_RECORD:-}" ]; then
+    fm_process_reserve record 'fm-watch.sh home summary' || return 0
+    local -x FM_TEST_PROCESS_RECORD=$record
+  fi
   FM_HOME_SUMMARY_IF_IDLE=1 \
     "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort </dev/null >/dev/null 2>&1 &
   HOME_SUMMARY_PID=$!
+  fm_process_fill "$record" "$HOME_SUMMARY_PID"
 }
 
 # Open-work ledger refresh, detached for the same reason as the home summary: the

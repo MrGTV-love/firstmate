@@ -10,6 +10,17 @@
 
 set -u
 
+# Temporary CI attribution: the observer re-enters this same suite once.
+if [ "${FM_TEARDOWN_CPU_CHILD:-0}" != 1 ]; then
+  exec python3 "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-cpu-probe.py" "$@"
+fi
+fm_teardown_cpu_mark() {
+  local _
+  printf '%s\n' "$1" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
+  IFS= read -r _ <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+}
+fm_teardown_cpu_mark suite.start
+
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-helpers.sh"
 
@@ -20,7 +31,10 @@ test_local_only_force_overrides_unpushed() {
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
   rc=0
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  # Temporary CI attribution: the hosted runner keeps guard phase walls with
+  # the shard timing artifact; without RUNNER_TEMP nothing is measured.
+  FM_GUARD_PHASE_DURATION_FILE=${RUNNER_TEMP:+$RUNNER_TEMP/fm-test/guard-phase-durations.jsonl} \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"
@@ -31,8 +45,8 @@ test_local_only_force_overrides_unpushed() {
 # and, once the fixture that owned the home is cleaned up, can never be stopped
 # by anything that looks at the fixture: its command line names only the shared
 # code. The child runs a real teardown case with its refresh worker held at the
-# fence until the home is gone, then exits so its own fixture cleanup removes the
-# home under the waiting worker; no worker may remain.
+# fence, then exits so its own fixture cleanup releases the waiting worker before
+# the normal writer drain and root removal; no worker may remain.
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
   local child out stub worker identity
   child="$TMP_ROOT/fixture-cleanup-child.sh"
@@ -45,6 +59,7 @@ set -u
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$1/tests/fm-teardown-helpers.sh"
 case_dir=$(make_case leak-child)
+trap ': > "$case_dir/state/.test-fence-release"; teardown_fixture_cleanup' EXIT
 write_meta "$case_dir" local-only ship
 wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
@@ -6580,10 +6595,26 @@ test_teardown_retires_the_dsh_launch_state
 # registered after it. test_local_only_force_overrides_unpushed
 # is the first such case here, so restore that errexit state once before it.
 errexit_restored=false
+# Temporary CI attribution: the shared runner calls this hook before every
+# registered case and runs that case next only when it is selected, so the hook
+# closes the case that just ran and opens the selected one.
+teardown_cpu_requested=("$@")
+teardown_cpu_case=
 fm_test_before_case() {
+  if [ -n "$teardown_cpu_case" ]; then
+    fm_teardown_cpu_mark "$teardown_cpu_case.end"
+    teardown_cpu_case=
+  fi
   if [ "$errexit_restored" = false ] && [ "$1" = test_local_only_force_overrides_unpushed ]; then
     set -e
     errexit_restored=true
   fi
+  if [ "${#teardown_cpu_requested[@]}" -eq 0 ] || fm_test_case_known "$1" "${teardown_cpu_requested[@]}"; then
+    teardown_cpu_case=$1
+    fm_teardown_cpu_mark "$teardown_cpu_case.start"
+  fi
 }
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
+if [ -n "$teardown_cpu_case" ]; then
+  fm_teardown_cpu_mark "$teardown_cpu_case.end"
+fi

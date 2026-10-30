@@ -9,13 +9,15 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
-       fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
+       fm-duration.py keep-going [--record PATH] INACTIVITY_SECONDS -- COMMAND [ARGS...]
        fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS [PATH...]
        fm-duration.py check-literals [--base REF | --report]
 
 keep-going is the record-free operational command runner: its only automatic
 stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
 It has no absolute wall-clock bound and writes no timing or backlog records.
+--record fills a test-fixture process record that bin/fm-timeout-lib.sh's
+fm_run_progress reserved, with the pid of the group the command leads.
 Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
@@ -1066,7 +1068,7 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None):
         release_slot(fd)
 
 
-def run(key, command, calibration_file, *, inactivity=None):
+def run(key, command, calibration_file, *, inactivity=None, launch_record=None):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
@@ -1087,6 +1089,9 @@ def run(key, command, calibration_file, *, inactivity=None):
     if calibration_file is not None:
         child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
     child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if launch_record:
+        with contextlib.suppress(OSError), open(launch_record, 'a', encoding='ascii') as fill:
+            fill.write(f'{child.pid}\n')
     streams = selectors.DefaultSelector()
     streams.register(child.stdout, selectors.EVENT_READ, sys.stdout.buffer)
     streams.register(child.stderr, selectors.EVENT_READ, sys.stderr.buffer)
@@ -1368,6 +1373,7 @@ def main():
     runner = commands.add_parser('run')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     progress = commands.add_parser('keep-going')
+    progress.add_argument('--record')
     progress.add_argument('inactivity', type=float)
     progress.add_argument('command', nargs=argparse.REMAINDER)
     observer = commands.add_parser('progress-check')
@@ -1412,7 +1418,7 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('keep-going requires -- COMMAND')
-        return run('operational-read', command, None, inactivity=args.inactivity)
+        return run('operational-read', command, None, inactivity=args.inactivity, launch_record=args.record)
     elif args.action == 'run':
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:

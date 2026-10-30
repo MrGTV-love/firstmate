@@ -90,6 +90,19 @@
 # with setpgrp plus a negative pid, and the bash fallback uses monitor mode.
 # A descendant that creates another group needs its own owner-death cleanup
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
+#
+# Test fixtures export FM_TEST_PROCESS_REGISTRY (tests/lib.sh), whose cleanup
+# waits for every `wait` record before it removes a fixture root. A registered
+# tree is one whose root exported FM_TEST_PROCESS_RECORD as well (only
+# bin/fm-home-summary-refresh.sh starts one; bin/fm-watch.sh reserves the root
+# record of each refresh it launches). Inside it, every group this file
+# creates - fm_run_progress and all four fm_run_timed mechanisms - is reserved
+# by its launcher BEFORE the launch as a fresh record file (one per launch,
+# never a reused name) and filled with the group's leader pid once the group
+# exists. An empty or partial record is a pending handoff that cleanup waits on
+# and never reads as a finished writer. A launcher that cannot reserve starts
+# nothing and returns 125. The watchdogs' own groups run no fixture work and
+# are not recorded. Outside a registered tree nothing is recorded.
 set -u
 
 # The sourced word names the file literally so fm-lint-cache.pl can resolve
@@ -101,6 +114,33 @@ _fm_timeout_dir=${_fm_timeout_dir:-/}
 [ ! -f "$_fm_timeout_dir/fm-scratch-lib.sh" ] || . "$_fm_timeout_dir/fm-scratch-lib.sh"
 unset _fm_timeout_dir
 
+fm_process_tree() {
+  [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && [ -n "${FM_TEST_PROCESS_RECORD:-}" ]
+}
+
+# fm_process_reserve <variable> <label>: set <variable> to a new pending record
+# listed in FM_TEST_PROCESS_REGISTRY; 1, with nothing launched, when it cannot.
+fm_process_reserve() {
+  local fm_record
+  if [ -f "${FM_TEST_PROCESS_REGISTRY:-}" ] \
+    && fm_record=$(mktemp "$FM_TEST_PROCESS_REGISTRY.XXXXXX" 2>/dev/null); then
+    if printf '%s\t%s\twait\n' "$fm_record" "$2" >> "$FM_TEST_PROCESS_REGISTRY" 2>/dev/null; then
+      printf -v "$1" '%s' "$fm_record"
+      return 0
+    fi
+    rm -f -- "$fm_record" 2>/dev/null || true
+  fi
+  printf '%s: could not register with the fixture process registry %s\n' \
+    "$2" "${FM_TEST_PROCESS_REGISTRY:-}" >&2
+  return 1
+}
+
+# fm_process_fill <record> <leader-pid>: one newline-terminated line, so a
+# reader never takes a partial pid for a finished one.
+fm_process_fill() {
+  [ -z "$1" ] || printf '%s\n' "$2" >> "$1" 2>/dev/null || true
+}
+
 # fm_run_progress <no-progress-seconds> <command...>: keep slow work running
 # while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
 # bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
@@ -109,11 +149,14 @@ unset _fm_timeout_dir
 # group and write no duration records. A nested call keeps its own bound, so a
 # hung inner read is stopped by its own owner and the outer work continues.
 fm_run_progress() {
-  local seconds=$1 helper
+  local seconds=$1 helper record=
   shift
   helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
   if fm_posix_python; then
-    python3 "$helper" keep-going "$seconds" -- "$@"
+    if fm_process_tree; then
+      fm_process_reserve record fm_run_progress || return 125
+    fi
+    python3 "$helper" keep-going ${record:+--record "$record"} "$seconds" -- "$@"
   elif command -v perl >/dev/null 2>&1; then
     fm_run_perl_progress "$seconds" "$@"
   else
@@ -173,11 +216,14 @@ fm_progress_check() {
 # TERM cleanup; while no sample is available one warning names the platform and
 # nothing is stopped for inactivity. Parent death and signals clean up the owned
 # command group.
-fm_run_perl_progress() {
-  local owner=${BASHPID:-$$}
+fm_run_perl_progress() {  # <seconds> <command...>
+  local owner=${BASHPID:-$$} record=
+  if fm_process_tree; then
+    fm_process_reserve record fm_run_perl_progress || return 125
+  fi
   # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
   perl -MPOSIX=WNOHANG -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -MIO::Select -MIO::Handle -e '
-    my ($owner, $idle) = (shift, shift);
+    my ($owner, $record, $idle) = (shift, shift, shift);
     die "inactivity must be positive\n" unless $idle =~ /^\d+(?:[.]\d+)?$/ && $idle > 0;
     my $parent = getppid();
     my ($pending, $stopping, $exit_code) = (0, 0, 0);
@@ -201,6 +247,7 @@ fm_run_perl_progress() {
       exit 127;
     }
     setpgrp($pid, $pid);
+    if (length $record && open my $fill, ">>", $record) { print $fill "$pid\n"; close $fill; }
     close $out_w; close $err_w;
     STDOUT->autoflush(1); STDERR->autoflush(1);
     my $streams = IO::Select->new($out_r, $err_r);
@@ -324,7 +371,7 @@ fm_run_perl_progress() {
         }
       }
     }
-  ' "$owner" "$@"
+  ' "$owner" "$record" "$@"
 }
 
 fm_timeout_mechanism() {
@@ -392,11 +439,15 @@ fm_timeout_open_status() {
 # The command's exit status and the watchdog's "expired" line share one
 # unlinked file (see fm_timeout_open_status).
 fm_run_bash_timeout() {
-  local seconds=$1 child_pid watchdog_pid command_rc recorded content wfd rfd monitor_was_on=0
+  local seconds=$1 child_pid watchdog_pid command_rc recorded content wfd rfd monitor_was_on=0 record=
   shift
   fm_timeout_open_status fm-bash-timeout-command || return 124
   wfd=$FM_TIMEOUT_WFD
   rfd=$FM_TIMEOUT_RFD
+  if fm_process_tree && ! fm_process_reserve record fm_run_timed; then
+    eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
+    return 125
+  fi
   case $- in *m*) monitor_was_on=1 ;; esac
   set -m
   (
@@ -408,6 +459,7 @@ fm_run_bash_timeout() {
     exit "$command_rc"
   ) &
   child_pid=$!
+  fm_process_fill "$record" "$child_pid"
   (
     set +m
     eval "exec $rfd<&-"
@@ -448,11 +500,15 @@ fm_run_bash_timeout() {
 # one entry per interrupted call (2394 fm-timeout-status.* found in a shared
 # temp dir).
 fm_run_external_timeout() {
-  local runner=$1 seconds=$2 runner_pid runner_rc command_rc wfd rfd
+  local runner=$1 seconds=$2 runner_pid runner_rc command_rc wfd rfd record=
   shift 2
   fm_timeout_open_status fm-timeout-status || return 124
   wfd=$FM_TIMEOUT_WFD
   rfd=$FM_TIMEOUT_RFD
+  if fm_process_tree && ! fm_process_reserve record fm_run_timed; then
+    eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
+    return 125
+  fi
   # Run timeout asynchronously so its pid - also the process-group id created
   # by GNU/BSD timeout without --foreground - remains available for cleanup.
   # A shell wrapper can exit promptly on TERM while one of its descendants
@@ -471,6 +527,7 @@ fm_run_external_timeout() {
     exit "$command_rc"
   ' _ "$wfd" "$rfd" "$@" &
   runner_pid=$!
+  fm_process_fill "$record" "$runner_pid"
   if wait "$runner_pid"; then
     runner_rc=0
   else
@@ -509,10 +566,13 @@ fm_run_external_timeout() {
 # Signal handlers record pending cleanup before the fork, so an interruption
 # during startup cannot bypass group creation and leave the child unowned.
 fm_timeout_perl_bound() {  # <seconds> <command...>
-  local owner=${BASHPID:-$$}
+  local owner=${BASHPID:-$$} record=
+  if fm_process_tree; then
+    fm_process_reserve record fm_timeout_perl_bound || return 125
+  fi
   # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
   perl -MPOSIX=WNOHANG -e '
-    my ($owner, $t) = (shift, shift);
+    my ($owner, $record, $t) = (shift, shift, shift);
     my $parent = getppid();
     my $pending = 0;
     $SIG{ALRM} = sub { $pending ||= 124 };
@@ -529,6 +589,7 @@ fm_timeout_perl_bound() {  # <seconds> <command...>
       exit 127;
     }
     setpgrp($pid, $pid);
+    if (length $record && open my $fill, ">>", $record) { print $fill "$pid\n"; close $fill; }
     my $stop = sub {
       my $code = shift;
       $SIG{ALRM} = $SIG{TERM} = $SIG{INT} = $SIG{HUP} = "IGNORE";
@@ -547,7 +608,7 @@ fm_timeout_perl_bound() {  # <seconds> <command...>
       $stop->(143) if getppid() != $parent || !kill(0, $owner);
       select undef, undef, undef, 0.05;
     }
-  ' "$owner" "$@"
+  ' "$owner" "$record" "$@"
   return $?
 }
 
