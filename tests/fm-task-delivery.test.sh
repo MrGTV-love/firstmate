@@ -2121,4 +2121,212 @@ test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_position
 test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check
 test_project_mode_resolves_branch_prefix
+# A scout on its own non-fm branch in a governed project whose provisioner
+# refuses, after running any extra fixture Python line.
+# Echoes "<home>|<project-dir>|<slot>".
+promotion_refusal_fixture() {  # <name> <id> [<provisioner-python-line>]
+  local name=$1 id=$2 extra=${3:-} rec home proj fakebin slot
+  rec=$(make_home "$name")
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/$name/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  {
+    printf 'import json\nimport subprocess\nimport sys\n%s\n' "$extra"
+    cat <<'PY'
+print(json.dumps({"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}))
+sys.exit(2)
+PY
+  } > "$proj/scripts/git-stability/provision_existing_slot.py"
+  git -C "$proj" add scripts
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
+  printf '%s\n' "$home|$proj|$slot"
+}
+
+run_promotion() {  # <home> <id>
+  FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" FM_DATA_OVERRIDE="$1/data" FM_CONFIG_OVERRIDE="$1/config" \
+    bash "$PROMOTE" "$2" --mode local-only --yolo off 2>&1
+}
+
+test_governed_promotion_preserves_scout_on_refusal() {
+  local rec home proj id=promote-slot-refused slot meta brief out status original_branch original_head advanced
+  rec=$(promotion_refusal_fixture promote-slot-refused "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  original_branch=$(git -C "$slot" branch --show-current)
+  original_head=$(git -C "$slot" rev-parse HEAD)
+  out=$(run_promotion "$home" "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion admitted a refused slot'
+  assert_contains "$out" 'manifest_live_owner' 'promotion lost the actual governed refusal'
+  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
+  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'refused promotion changed the scout checkout'
+  [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$original_head" ] || fail 'refused promotion moved the scout branch'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion left its own task branch behind'
+  assert_absent "$home/data/$id/ship-instructions.md" 'refused promotion published ship instructions'
+  assert_absent "$slot/.claude/worktrees" 'refused promotion created nested isolation'
+  printf 'scout work\n' > "$slot/scout-work.txt"
+  git -C "$slot" add scout-work.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'scout advances after refusal'
+  advanced=$(git -C "$slot" rev-parse HEAD)
+  out=$(run_promotion "$home" "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail 'retried promotion admitted a refused slot'
+  assert_not_contains "$out" "is not at the assigned copy's HEAD" 'retry was blocked by the earlier refused promotion'
+  assert_contains "$out" 'manifest_live_owner' 'retry did not reach the project owner'
+  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'retry changed the scout checkout'
+  [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$advanced" ] || fail 'retry lost the advanced scout work'
+  [ "$(cat "$slot/scout-work.txt")" = 'scout work' ] || fail 'retry lost the scout content'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused retry left its own task branch behind'
+  pass 'governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner'
+}
+
+# Only the alias this refused call created is removed: a task branch that
+# already existed, or that gained work while the project owner ran, survives.
+test_refused_promotion_preserves_other_task_branches() {
+  local rec home proj id=promote-slot-existing slot out head moved
+  rec=$(promotion_refusal_fixture promote-slot-existing "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  head=$(git -C "$slot" rev-parse HEAD)
+  git -C "$slot" branch "fm/$id"
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'pre-existing task branch case lost the refusal'
+  [ "$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id")" = "$head" ] || fail 'refused promotion deleted a pre-existing task branch'
+
+  id=promote-slot-moved
+  rec=$(promotion_refusal_fixture promote-slot-moved "$id" \
+    'subprocess.run(["git", "-C", sys.argv[sys.argv.index("--worktree-path") + 1], "-c", "user.name=Tests", "-c", "user.email=tests@example.invalid", "commit", "-q", "--allow-empty", "-m", "work on the task branch"], check=True)')
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  head=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: fm/$id moved from" 'moved task branch was not reported as preserved'
+  moved=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id") || fail 'refused promotion deleted a task branch that gained work'
+  [ "$moved" != "$head" ] && [ "$(git -C "$slot" rev-parse "$moved^")" = "$head" ] || fail 'moved task branch lost its work'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$head" ] || fail 'refused promotion did not restore the scout checkout'
+  pass 'refused promotion preserves a pre-existing task branch and one that gained work'
+}
+
+# A legacy scout works at a detached HEAD. Its refused promotion removes only
+# the alias it created, so the scout's later detached work never blocks a retry.
+test_refused_detached_promotion_retries_after_scout_advances() {
+  local rec home proj id=promote-slot-detached slot out original advanced
+  rec=$(promotion_refusal_fixture promote-slot-detached "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  git -C "$slot" checkout -q --detach
+  git -C "$slot" branch -D -q scout-retained
+  original=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused detached slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'detached promotion lost the actual governed refusal'
+  assert_not_contains "$out" 'preserving task branch' 'detached rollback did not prove its own alias unused'
+  ! git -C "$slot" symbolic-ref -q HEAD >/dev/null || fail 'refused promotion left the detached scout on a branch'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$original" ] || fail 'refused promotion moved the detached scout'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused detached promotion left its own task branch behind'
+  printf 'detached scout work\n' > "$slot/scout-work.txt"
+  git -C "$slot" add scout-work.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'detached scout advances after refusal'
+  advanced=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'retried detached promotion admitted a refused slot'; fi
+  assert_not_contains "$out" "is not at the assigned copy's HEAD" 'detached retry was blocked by the earlier refused promotion'
+  assert_contains "$out" 'manifest_live_owner' 'detached retry did not reach the project owner'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$advanced" ] || fail 'detached retry lost the advanced scout work'
+  [ "$(git -C "$slot" rev-parse "$advanced^")" = "$original" ] || fail 'detached retry lost the original scout commit'
+  [ "$(cat "$slot/scout-work.txt")" = 'detached scout work' ] || fail 'detached retry lost the scout content'
+  pass 'refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner'
+}
+
+# A project that declared the alias in a PASS manifest has used it, even when
+# Firstmate then rejects the returned identity: the alias and manifest stay.
+test_refused_promotion_preserves_project_declared_branch() {
+  local rec home proj id=promote-slot-declared slot out manifest
+  rec=$(promotion_refusal_fixture promote-slot-declared "$id" "$(cat <<'PY'
+import os
+arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+record = dict(worktree_path=os.path.realpath(arg("--worktree-path")), owner_id=arg("--owner-id"), branch=arg("--branch"),
+              base_sha=arg("--base-sha"), owned_paths=[value.rstrip("/") for flag, value in zip(sys.argv, sys.argv[1:]) if flag == "--owned-path"],
+              lifecycle_state="worktree_active")
+open(os.environ["FM_TEST_SLOT_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
+print(json.dumps(dict(state="PASS", manifest_path=os.environ["FM_TEST_SLOT_RECORD"], **record)))
+sys.exit(0)
+PY
+)")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  manifest="$TMP_ROOT/promote-slot-declared/manifest.json"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts/\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
+  if out=$(FM_TEST_SLOT_RECORD="$manifest" run_promotion "$home" "$id"); then fail 'promotion admitted a mismatched declaration'; fi
+  assert_contains "$out" 'provisioner identity mismatch: owned_paths' 'declared mismatch lost its attestation refusal'
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: the project report may declare it" \
+    'project-declared alias was not reported as preserved'
+  git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion deleted a project-declared task branch'
+  assert_grep "\"branch\": \"fm/$id\"" "$manifest" 'refused promotion changed the project manifest'
+  [ "$(git -C "$slot" branch --show-current)" = scout-retained ] || fail 'refused promotion did not restore the scout checkout'
+  pass 'refused promotion preserves a task branch the project declared before attestation refused it'
+}
+
+# Recorded scope is Firstmate's own frozen contract: a caller's --owned-path is
+# refused before the project owner runs or the record is rewritten.
+test_promotion_refuses_recorded_scope_override() {
+  local rec home proj fakebin id="promote-scope-override-$$" slot meta brief out status
+  rec=$(make_home promote-scope-override)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/promote-scope-override/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  cat > "$proj/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import os
+from pathlib import Path
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text("called", encoding="utf-8")
+raise SystemExit(2)
+PY
+  git -C "$proj" add scripts
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$meta"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  out=$(FM_TEST_PROVISION_CALLED="$TMP_ROOT/promote-scope-override/called" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" bash "$PROMOTE" "$id" --mode local-only --yolo off --owned-path README.md 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion replaced recorded scope'
+  assert_contains "$out" 'cannot override it' 'promotion scope override refusal reason missing'
+  assert_absent "$TMP_ROOT/promote-scope-override/called" 'scope override reached the project owner'
+  cmp -s "$meta" "$meta.before" || fail 'scope override changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'scope override changed the scout contract'
+  assert_absent "$home/data/$id/ship-instructions.md" 'scope override published ship instructions'
+  pass 'promotion refuses to override recorded slot scope before provisioning or rewriting the record'
+}
+
+test_governed_promotion_preserves_scout_on_refusal
+test_refused_promotion_preserves_other_task_branches
+test_refused_detached_promotion_retries_after_scout_advances
+test_refused_promotion_preserves_project_declared_branch
+test_promotion_refuses_recorded_scope_override
+
 echo "# all fm-task-delivery tests passed"
