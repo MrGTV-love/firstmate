@@ -1,0 +1,11 @@
+bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+== base 386a4fdf4 bin/fm-wake-lib.sh
+live pid 81202 with unreadable stat -> alive (caller kept running)
+exited pid 81202 -> dead (caller kept running)
+caller reached end
+exit=0
+== train head be87b3c96 bin/fm-wake-lib.sh
+live pid 81334 with unreadable stat -> alive (caller kept running)
+exited pid 81334 -> dead (caller kept running)
+caller reached end
+exit=0

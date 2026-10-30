@@ -1,0 +1,15 @@
+CI job: https://github.com/MrGTV-love/firstmate/actions/runs/41036503931/job/123998531787 (Behavior portable serial 3, head be87b3c96)
+FM_TEST_BEGIN 2026-10-30T10:08:12Z tests/fm-gate-refuse.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-gate-refuse-lib: refuses when NO_MISTAKES_GATE is set
+ok - fm-gate-refuse-lib: refuses when NO_MISTAKES_GATE is set empty
+ok - fm-gate-refuse-lib: refuses from a gate worktree via git-common-dir (marker unset)
+ok - fm-gate-refuse-lib: no-op for a normal session (neither signal, set -eu clean)
+ok - fm-gate-refuse-lib: production lab paths permitted; relocated paths and invalid identities refused
+ok - fm-lab-home: create mints marked stock homes only on fresh empty dirs; anything else is refused
+ok - fm-lab-home: env provisions the marked lab home the gate boundary admits, even under a symlinked TMPDIR
+ok - fm-lab-home: create refuses a directory inside a git work tree and still mints one outside
+fm-lab-home: refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=1)
+server exited unexpectedly
+not ok - lab tmux directory teardown failed
+FM_TEST_END 2026-10-30T10:08:14Z tests/fm-gate-refuse.test.sh exit=1 duration_ms=2405 gate_skip=false
+ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

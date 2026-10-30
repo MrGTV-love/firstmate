@@ -1,0 +1,23 @@
+# Train 2 structure proof  (HEAD=be87b3c96ba8314a350e429e1d00f132b0941ef1)
+## M1 ancestry
+ancestor OK  386a4fdf40ef952e5f3ce0cf46228caf05c49906
+ancestor OK  fc98d581c4ad6d14953b1d4fa5be771a979e2435
+ancestor OK  a1746d269926b5771302a0ac51b3577e3d451844
+ancestor OK  c7332e064eed5bbee73e7d6586a03f20b91e1af8
+ancestor OK  140f93d71c660d8ef134ecaf083f76cb14596f1e
+## Live GitHub PR heads (now)
+PR 315 head: fc98d581c4ad6d14953b1d4fa5be771a979e2435 state=open
+PR 319 head: a1746d269926b5771302a0ac51b3577e3d451844 state=open
+PR 266 head: c7332e064eed5bbee73e7d6586a03f20b91e1af8 state=open
+PR 318 head: 140f93d71c660d8ef134ecaf083f76cb14596f1e state=open
+## M3 each merge tree vs fresh automatic merge (git merge-tree --write-tree)
+05068b8de tree==fresh-merge (36c7aa11d60ad3a0d44f698222693f4952119d52) conflicts=none
+04af570bd tree==fresh-merge (13d69370e43d8dde1a3b30964064c79df2069700) conflicts=none
+9dc87e0c8 tree==fresh-merge (fd45ef89be09f591e116d6c21d0d9ea7c260be11) conflicts=none
+f05b585ac tree==fresh-merge (3b2dbd2bbf2913d1f88053c6d358a0f0700bd9b7) conflicts=none
+## Non-merge commits on train first-parent line
+be87b3c96 no-mistakes(document): Correct stalled-worker elapsed-token wording in ledger docs
+ docs/configuration.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+## GitHub main head now: 386a4fdf40ef952e5f3ce0cf46228caf05c49906
+## PR 324 head: be87b3c96ba8314a350e429e1d00f132b0941ef1 draft=false

@@ -1,0 +1,8 @@
+lab FM_HOME=<disposable lab home>
+$ bin/fm-open-loops.sh --digest
+exit=0
+$ bin/fm-open-loops.sh --report
+exit=0
+$ bin/fm-open-loops.sh --bogus
+error: "unrecognized arguments: --bogus"
+exit=2

@@ -1,0 +1,9 @@
+bash: GNU bash, version 5.2.0(1)-release (aarch64-apple-darwin27.0.0) (built from gnu.org source in a temp dir)
+== base 386a4fdf4 bin/fm-wake-lib.sh
+/tmp/fm-pidalive.4x3GHb/base/bin/fm-wake-lib.sh: line 104: state: unbound variable
+exit=1
+== train head be87b3c96 bin/fm-wake-lib.sh
+live pid 36950 with unreadable stat -> alive (caller kept running)
+exited pid 36950 -> dead (caller kept running)
+caller reached end
+exit=0
