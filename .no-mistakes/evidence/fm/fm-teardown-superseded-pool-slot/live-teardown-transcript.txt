@@ -1,0 +1,330 @@
+Live teardown transcript - real bin/fm-teardown.sh + real treehouse v3.1.7-fm.8759019, disposable TREEHOUSE_ROOT/HOME/repos, marked fm lab home.
+Pool move reproduced the backpass way: repoint the project's origin, so treehouse pool-dir moves to a new folder that reuses slot names 1..3.
+Base = 28bb500b2 (before the change); head = 9165e06f4.
+
+################ S1-fresh-BASE
+code root: /Users/charlesabrooker/tmp/fm-live.QvWtN6/base-code
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-96a905/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-6e0d25
+-- lease state BEFORE
+  backpass-96a905: ["1=free","2=free"]
+  backpass-6e0d25: ["1=leased:other-task","2=free","3=free"]
+  sha256 e0be2da718c23610f564e389d0277006bbe2460bead8430823d959b86c48329e  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-96a905/treehouse-state.json
+  sha256 09192e757fb8fbb52af4a36003c8406f37996b37921e4980f2fb0f82d9421a58  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-6e0d25/treehouse-state.json
+  sha256 record copy snapshot: 51c59d4c4c645ffbe5ef002fc6feb8d9bafe8b91f1c74a7a10c94756ceca23c5  -
+-- exit code: 1
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse lease 2 --lease-holder task-live
+-- lease state AFTER
+  backpass-96a905: ["1=free","2=free"]
+  backpass-6e0d25: ["1=leased:other-task","2=leased:task-live","3=free"]
+  sha256 e0be2da718c23610f564e389d0277006bbe2460bead8430823d959b86c48329e  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-96a905/treehouse-state.json
+  sha256 1f60552ad9f2ea70ee41d7becea9b8652f0af55536c3d87b5f4cbf2da0021224  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-6e0d25/treehouse-state.json
+  sha256 record copy snapshot: 51c59d4c4c645ffbe5ef002fc6feb8d9bafe8b91f1c74a7a10c94756ceca23c5  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: present
+-- record copy dir: present (0 dirty entries, HEAD e69dba6)
+-- teardown stderr (key lines):
+  REFUSED: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-base/thr/.treehouse/backpass-96a905/2/backpass was not proved durably leased after reservation; retaining its task record and contents
+
+################ S1-fresh-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-302e83/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-e9c0c4
+-- lease state BEFORE
+  backpass-302e83: ["1=free","2=free"]
+  backpass-e9c0c4: ["1=leased:other-task","2=free","3=free"]
+  sha256 54e84ea4ada08cbaa9ef49e9ff8f79da73b1d8b4ab5c1065473749c4f8183390  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-302e83/treehouse-state.json
+  sha256 c6e22e113e1986cc1bf5a8e6566433f3c8d3bba687e95fd4766c833c4572b60e  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-e9c0c4/treehouse-state.json
+  sha256 record copy snapshot: bf2492ff2648f1e886c13cbc1c54926e6be4df785fbe974507abf70dd070a23c  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse status --json
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-302e83/2/backpass
+-- lease state AFTER
+  backpass-302e83: ["1=free","2=free"]
+  backpass-e9c0c4: ["1=leased:other-task","2=free","3=free"]
+  sha256 54e84ea4ada08cbaa9ef49e9ff8f79da73b1d8b4ab5c1065473749c4f8183390  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-302e83/treehouse-state.json
+  sha256 c6e22e113e1986cc1bf5a8e6566433f3c8d3bba687e95fd4766c833c4572b60e  /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-e9c0c4/treehouse-state.json
+  sha256 record copy snapshot: 6379c31f09646b91f0330d4e099e9a630bf575b10a4b9dcd305d54bdb1d4c052  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD 178866f)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/fresh-head/thr/.treehouse/backpass-302e83/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+
+################ S2-stuck-BASE
+code root: /Users/charlesabrooker/tmp/fm-live.QvWtN6/base-code
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890
+-- lease state BEFORE
+  backpass-e226ed: ["1=free","2=free"]
+  backpass-e6f890: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 d138c7ff6d6911c9a6f143508b8d161ca5095498b7ca36881b823ec5872c43d9  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/treehouse-state.json
+  sha256 8971cb1a4f8631988c8db19137f71ee3a1bdaf9f29df97b55170df98458a3405  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890/treehouse-state.json
+  sha256 record copy snapshot: d24b446474f7c0c2d826c9f8afd101bf56d06fdacfe5eb8d1a04fe290cf04126  -
+-- exit code: 1
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse lease 2 --lease-holder task-live
+-- lease state AFTER
+  backpass-e226ed: ["1=free","2=free"]
+  backpass-e6f890: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 d138c7ff6d6911c9a6f143508b8d161ca5095498b7ca36881b823ec5872c43d9  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/treehouse-state.json
+  sha256 8971cb1a4f8631988c8db19137f71ee3a1bdaf9f29df97b55170df98458a3405  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890/treehouse-state.json
+  sha256 record copy snapshot: d24b446474f7c0c2d826c9f8afd101bf56d06fdacfe5eb8d1a04fe290cf04126  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: present
+-- record copy dir: present (0 dirty entries, HEAD 5e75a5f)
+-- teardown stderr (key lines):
+  worktree 2 is already leased (holder: "task-live")
+
+################ S2-stuck-BASE-rerun
+code root: /Users/charlesabrooker/tmp/fm-live.QvWtN6/base-code
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890
+-- lease state BEFORE
+  backpass-e226ed: ["1=free","2=free"]
+  backpass-e6f890: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 d138c7ff6d6911c9a6f143508b8d161ca5095498b7ca36881b823ec5872c43d9  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/treehouse-state.json
+  sha256 8971cb1a4f8631988c8db19137f71ee3a1bdaf9f29df97b55170df98458a3405  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890/treehouse-state.json
+  sha256 record copy snapshot: d24b446474f7c0c2d826c9f8afd101bf56d06fdacfe5eb8d1a04fe290cf04126  -
+-- exit code: 1
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse lease 2 --lease-holder task-live
+-- lease state AFTER
+  backpass-e226ed: ["1=free","2=free"]
+  backpass-e6f890: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 d138c7ff6d6911c9a6f143508b8d161ca5095498b7ca36881b823ec5872c43d9  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e226ed/treehouse-state.json
+  sha256 8971cb1a4f8631988c8db19137f71ee3a1bdaf9f29df97b55170df98458a3405  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-base/thr/.treehouse/backpass-e6f890/treehouse-state.json
+  sha256 record copy snapshot: d24b446474f7c0c2d826c9f8afd101bf56d06fdacfe5eb8d1a04fe290cf04126  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: present
+-- record copy dir: present (0 dirty entries, HEAD 5e75a5f)
+-- teardown stderr (key lines):
+  worktree 2 is already leased (holder: "task-live")
+
+################ S2-stuck-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-8b0a78/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-ea6fca
+-- lease state BEFORE
+  backpass-8b0a78: ["1=free","2=free"]
+  backpass-ea6fca: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 b9483b4e4ef02e5e3173cd360465075be3164f571009277ff6cadf031a0cdc9d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-8b0a78/treehouse-state.json
+  sha256 22c61bf24f1828697ea91a6b479db674259b9256dd670a1bb1421cf0f444eee5  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-ea6fca/treehouse-state.json
+  sha256 record copy snapshot: bde977272ca600afd3a35ab10b85fb05980419f1d50a968eaa6320936382b8ac  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse status --json
+  treehouse return /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-ea6fca/2/backpass --if-lease-holder task-live
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-8b0a78/2/backpass
+-- lease state AFTER
+  backpass-8b0a78: ["1=free","2=free"]
+  backpass-ea6fca: ["1=leased:other-task","2=free","3=leased:task-live"]
+  sha256 b9483b4e4ef02e5e3173cd360465075be3164f571009277ff6cadf031a0cdc9d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-8b0a78/treehouse-state.json
+  sha256 c485a950d90b4201502f151e3d1e16c9230608b6fa9b7c217cb55a424a13edc0  /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-ea6fca/treehouse-state.json
+  sha256 record copy snapshot: 0e0f2da254d443c4475610cceb3f10944d905596c1a8833f70293ca994ad5a9f  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD ef89e41)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-8b0a78/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+  teardown: released the lease on /Users/charlesabrooker/tmp/fm-live.QvWtN6/stuck-head/thr/.treehouse/backpass-ea6fca/2/backpass that an earlier teardown took by slot name in the project's current pool
+
+################ S3-same-name-held-by-other-task-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-591329/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-b75c89
+-- lease state BEFORE
+  backpass-591329: ["1=free","2=free"]
+  backpass-b75c89: ["1=leased:other-task","2=leased:other-task2","3=free"]
+  sha256 3cb2ec1f376988a2455e4b574ce49acbce21e50321df3b4b3015a740075d6013  /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-591329/treehouse-state.json
+  sha256 4f30284651a8a3838cd2de59245af5d1644a0a41cc1775bcc53929c2e6f5b85d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-b75c89/treehouse-state.json
+  sha256 record copy snapshot: 95ff6ba0dd245827730ce28555753f954bccd6303eeda5104063b98fbde2a653  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse status --json
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-591329/2/backpass
+-- lease state AFTER
+  backpass-591329: ["1=free","2=free"]
+  backpass-b75c89: ["1=leased:other-task","2=leased:other-task2","3=free"]
+  sha256 3cb2ec1f376988a2455e4b574ce49acbce21e50321df3b4b3015a740075d6013  /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-591329/treehouse-state.json
+  sha256 4f30284651a8a3838cd2de59245af5d1644a0a41cc1775bcc53929c2e6f5b85d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-b75c89/treehouse-state.json
+  sha256 record copy snapshot: 239e3852a07b0ad8d1b6e0735d1844e6770495f3be30facb96aa9f8c3b7fd791  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD ab492e8)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/foreign2-head/thr/.treehouse/backpass-591329/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+
+################ S4-unlanded-commit-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3
+-- lease state BEFORE
+  backpass-cee7cb: ["1=free","2=free"]
+  backpass-685dc3: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 56bf68a2c99bc725b1ca419627003c83243e0150e2fde44ef91c076da2d75c12  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/treehouse-state.json
+  sha256 b25c12b6eb3de0bca6c8e4631c83587d0729eee26fa66d5f7a77a553c0a8dd68  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/treehouse-state.json
+  sha256 record copy snapshot: 046a3da1f4e03ccf06e3fc7cf048e1ab01716d009c569779f292bbc43a5e14fa  -
+-- exit code: 1
+-- treehouse calls made by teardown:
+-- lease state AFTER
+  backpass-cee7cb: ["1=free","2=free"]
+  backpass-685dc3: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 56bf68a2c99bc725b1ca419627003c83243e0150e2fde44ef91c076da2d75c12  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/treehouse-state.json
+  sha256 b25c12b6eb3de0bca6c8e4631c83587d0729eee26fa66d5f7a77a553c0a8dd68  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/treehouse-state.json
+  sha256 record copy snapshot: 046a3da1f4e03ccf06e3fc7cf048e1ab01716d009c569779f292bbc43a5e14fa  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: present
+-- record copy dir: present (0 dirty entries, HEAD 3a377a2)
+-- teardown stderr (key lines):
+  REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+
+(landed fm/task-live on local main)
+################ S4-unlanded-then-landed-retry-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3
+-- lease state BEFORE
+  backpass-cee7cb: ["1=free","2=free"]
+  backpass-685dc3: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 56bf68a2c99bc725b1ca419627003c83243e0150e2fde44ef91c076da2d75c12  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/treehouse-state.json
+  sha256 b25c12b6eb3de0bca6c8e4631c83587d0729eee26fa66d5f7a77a553c0a8dd68  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/treehouse-state.json
+  sha256 record copy snapshot: 046a3da1f4e03ccf06e3fc7cf048e1ab01716d009c569779f292bbc43a5e14fa  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse status --json
+  treehouse return /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/2/backpass --if-lease-holder task-live
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/2/backpass
+-- lease state AFTER
+  backpass-cee7cb: ["1=free","2=free"]
+  backpass-685dc3: ["1=leased:other-task","2=free","3=leased:task-live"]
+  sha256 56bf68a2c99bc725b1ca419627003c83243e0150e2fde44ef91c076da2d75c12  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/treehouse-state.json
+  sha256 428d2bc91d03719cef7b9e685c2cee8563d4e0eb6f9f208035fb889f7f2c3ba8  /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/treehouse-state.json
+  sha256 record copy snapshot: fad59fd2f2fc7948869cb370b2bd726d0c565485ac911330a95cf3ceb614a735  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD 3a377a2)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-cee7cb/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+  teardown: released the lease on /Users/charlesabrooker/tmp/fm-live.QvWtN6/unlanded-head/thr/.treehouse/backpass-685dc3/2/backpass that an earlier teardown took by slot name in the project's current pool
+
+################ S5-dirty-copy-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-19b9d8/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-4811fc
+-- lease state BEFORE
+  backpass-19b9d8: ["1=free","2=free"]
+  backpass-4811fc: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 b4ef6a87a7d72b9e6e3dc8d441c67c192ba8717f2ff2b592510c9cae8df1fbc0  /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-19b9d8/treehouse-state.json
+  sha256 5a4bd155c63a684de6cd1c6a76d7a857199398bfdb7a005c547b79a7dfc0b907  /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-4811fc/treehouse-state.json
+  sha256 record copy snapshot: 0010596a2af2605b8bb5612030926a4d77d1a53037a087e3c042b4ef9bc20886  -
+-- exit code: 1
+-- treehouse calls made by teardown:
+-- lease state AFTER
+  backpass-19b9d8: ["1=free","2=free"]
+  backpass-4811fc: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 b4ef6a87a7d72b9e6e3dc8d441c67c192ba8717f2ff2b592510c9cae8df1fbc0  /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-19b9d8/treehouse-state.json
+  sha256 5a4bd155c63a684de6cd1c6a76d7a857199398bfdb7a005c547b79a7dfc0b907  /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-4811fc/treehouse-state.json
+  sha256 record copy snapshot: 0010596a2af2605b8bb5612030926a4d77d1a53037a087e3c042b4ef9bc20886  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: present
+-- record copy dir: present (1 dirty entries, HEAD 2ae06dc)
+-- teardown stderr (key lines):
+  REFUSED: worktree /Users/charlesabrooker/tmp/fm-live.QvWtN6/dirty-head/thr/.treehouse/backpass-19b9d8/2/backpass has uncommitted changes.
+
+################ S6-treehouse-without-pool-dir-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-a0b146/2/backpass
+treehouse pool-dir (current pool): 
+-- lease state BEFORE
+  backpass-a0b146: ["1=free","2=free"]
+  backpass-18ea7f: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 0f1bef059aa3e671dcca4a98e74d3542dec54e31a2e8f8169fb9598e7fbcd2fa  /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-a0b146/treehouse-state.json
+  sha256 81bf19f767482d86311e96011699ab201cf9f1921d5b717312926f12f2986e1f  /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-18ea7f/treehouse-state.json
+  sha256 record copy snapshot: a3d4e5b82602cfe573383cc391a90ec6158d744ee64f23e7e69f900821575a30  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse status --json
+  treehouse return /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-18ea7f/2/backpass --if-lease-holder task-live
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-a0b146/2/backpass
+-- lease state AFTER
+  backpass-a0b146: ["1=free","2=free"]
+  backpass-18ea7f: ["1=leased:other-task","2=free","3=leased:task-live"]
+  sha256 0f1bef059aa3e671dcca4a98e74d3542dec54e31a2e8f8169fb9598e7fbcd2fa  /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-a0b146/treehouse-state.json
+  sha256 ce4baae04404d7ce3f4e35718b8c8952b6eba8845f32eb6f90bdb3641d8c9ed1  /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-18ea7f/treehouse-state.json
+  sha256 record copy snapshot: 7a170c89cc8056a7fc120eb02d7673439a0205e987abdfb44d16c5a1a0dc9af4  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD ce3d858)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-a0b146/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+  teardown: released the lease on /Users/charlesabrooker/tmp/fm-live.QvWtN6/nopooldir-head/thr/.treehouse/backpass-18ea7f/2/backpass that an earlier teardown took by slot name in the project's current pool
+
+################ S7-copy-in-current-pool-BASE
+code root: /Users/charlesabrooker/tmp/fm-live.QvWtN6/base-code
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-1c9d28/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-1c9d28
+-- lease state BEFORE
+  backpass-13e36b: ["1=free","2=free"]
+  backpass-1c9d28: ["1=free","2=free","3=free"]
+  sha256 917415c6638421f396d977cf94d7890a511cc4f0f825b32ef2a9c334e9ab597d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-13e36b/treehouse-state.json
+  sha256 d7c7df66aa90df53a48827e3893db02fd43ffa44ff4e28d5cb07f4026684b6e6  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-1c9d28/treehouse-state.json
+  sha256 record copy snapshot: 463bb16ed5215a10091629c349a419221f88bdd738e72693ee1d364153499a65  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse lease 2 --lease-holder task-live
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-1c9d28/2/backpass
+-- lease state AFTER
+  backpass-13e36b: ["1=free","2=free"]
+  backpass-1c9d28: ["1=free","2=free","3=free"]
+  sha256 917415c6638421f396d977cf94d7890a511cc4f0f825b32ef2a9c334e9ab597d  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-13e36b/treehouse-state.json
+  sha256 d7c7df66aa90df53a48827e3893db02fd43ffa44ff4e28d5cb07f4026684b6e6  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-base/thr/.treehouse/backpass-1c9d28/treehouse-state.json
+  sha256 record copy snapshot: 1403d8e1d90993fa14f3316594752bdf215f94627ddcdb4da28da998835a8d89  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD 1a9273f)
+-- teardown stderr (key lines):
+
+################ S7-copy-in-current-pool-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-cee062/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-cee062
+-- lease state BEFORE
+  backpass-762c5f: ["1=free","2=free"]
+  backpass-cee062: ["1=free","2=free","3=free"]
+  sha256 93e66a32bcb83f470de660507f0c3924c1ce5caa45e7a44a39d168fc7ed1b54c  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-762c5f/treehouse-state.json
+  sha256 68164ad191e7db5612e22e74d29a45d5e583ae6b03da29d0ef3ad2ef3cce453f  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-cee062/treehouse-state.json
+  sha256 record copy snapshot: 8b42a34340b7e053998d7dc08c90513c351f381c81e6021e1cea2e4a3ea7a763  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse lease 2 --lease-holder task-live
+  treehouse return --force /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-cee062/2/backpass
+-- lease state AFTER
+  backpass-762c5f: ["1=free","2=free"]
+  backpass-cee062: ["1=free","2=free","3=free"]
+  sha256 93e66a32bcb83f470de660507f0c3924c1ce5caa45e7a44a39d168fc7ed1b54c  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-762c5f/treehouse-state.json
+  sha256 68164ad191e7db5612e22e74d29a45d5e583ae6b03da29d0ef3ad2ef3cce453f  /Users/charlesabrooker/tmp/fm-live.QvWtN6/current-head/thr/.treehouse/backpass-cee062/treehouse-state.json
+  sha256 record copy snapshot: b63dcc0243df192652f1bbb91faaa77c464ff16c1eb3070fa9ec9256dde14c9b  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD 68bd7d8)
+-- teardown stderr (key lines):
+

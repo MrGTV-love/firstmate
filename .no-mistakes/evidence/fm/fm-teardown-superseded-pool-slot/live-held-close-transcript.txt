@@ -1,0 +1,43 @@
+Live held-close scenario: recorded old-folder slot holds a foreign nested copy with unlanded work.
+################ S8-held-close-HEAD
+code root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CRDNWG84QKWF84BMPJ8KD
+record copy: /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass
+treehouse pool-dir (current pool): /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-a742bc
+-- lease state BEFORE
+  backpass-06dfb0: ["1=free","2=free"]
+  backpass-a742bc: ["1=leased:other-task","2=leased:task-live","3=leased:task-live"]
+  sha256 4af287be7e8cfa7cdcfb4038e0dbe4fb513ec95a42a71e240167da8d0dda67bf  /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/treehouse-state.json
+  sha256 208d567529caaeb10d2c1055ecb57870cd64f84b1fc324317d254112199c8cd3  /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-a742bc/treehouse-state.json
+  sha256 record copy snapshot: e1ddd33076ebbad703cf6bf9d85d2ffb89ba9f1c13be8fcd38d4e129d202d541  -
+-- exit code: 0
+-- treehouse calls made by teardown:
+  treehouse lease --help
+  treehouse pool-dir
+  treehouse lease --path /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass --lease-holder task-live
+  treehouse status --json
+  treehouse return /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-a742bc/2/backpass --if-lease-holder task-live
+-- lease state AFTER
+  backpass-06dfb0: ["1=free","2=leased:task-live"]
+  backpass-a742bc: ["1=leased:other-task","2=free","3=leased:task-live"]
+  sha256 53b54e89cf35cb2ade2bd1a69b7fbc1dac14e40b8cdd7fd0873fe12394bf4ecf  /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/treehouse-state.json
+  sha256 a99df28d7c33a9e7719a7f8771c33730f1b805230902ad6689e436e69a82f1e6  /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-a742bc/treehouse-state.json
+  sha256 record copy snapshot: e1ddd33076ebbad703cf6bf9d85d2ffb89ba9f1c13be8fcd38d4e129d202d541  -
+  current-pool slots 1 (other-task) and 3 (this task, other name): byte-identical
+-- task record: removed
+-- record copy dir: present (0 dirty entries, HEAD f318e2f)
+-- teardown stderr (key lines):
+  warning: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy
+  teardown: released the lease on /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-a742bc/2/backpass that an earlier teardown took by slot name in the project's current pool
+
+-- nested foreign copy fingerprint before: 46a3256d77f8ad0b28bec2a27d3fd95660accef5d55150a2dc8362aa6708b7e0  -
+-- nested foreign copy fingerprint after:  46a3256d77f8ad0b28bec2a27d3fd95660accef5d55150a2dc8362aa6708b7e0  -
+-- old-folder slot 2 lease after: {"leased":true,"lease_holder":"task-live"}
+-- slot claim file: task=task-live home=/Users/charlesabrooker/tmp/fm-lab.QKRd6F 
+-- teardown stdout:
+  notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+  notice: held foreign copy /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass: its HEAD ca1fbde10642 is not proved landed.
+  notice: next step for the owner of /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass/.claude/worktrees/fc-one: list the commits only it holds with git -C /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass/.claude/worktrees/fc-one log --oneline HEAD --not --remotes, land them, remove the copy with git -C /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass worktree remove /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass/.claude/worktrees/fc-one (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass/.claude/worktrees/fc-one --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/src/backpass && treehouse return /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass --if-lease-holder task-live </dev/null).
+  notice: pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files.
+  notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.QKRd6F/data/held-foreign-copies.log.
+  teardown task-live complete (window firstmate:fm-task-live; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-live.QvWtN6/held-head/thr/.treehouse/backpass-06dfb0/2/backpass is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+  Backlog: task-live just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/tmp/fm-lab.QKRd6F/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
