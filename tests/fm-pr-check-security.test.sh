@@ -1530,13 +1530,17 @@ test_bootstrap_leaves_unauthenticated_checks() {
   pass "bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics"
 }
 
-test_custom_snapshot_cleanup_on_signal() {
-  local dir state child_pid_file pid child_pid i rc
-  dir=$(make_case custom-snapshot-signal)
+custom_snapshot_signal_case() {  # <responsive|stopped>
+  local mode=$1 dir state child_pid_file launcher_pid_file pid child_pid launcher_pid check_pgid i rc
+  local active_check_grace=0 guardian_grace=1 stop_margin=3 stop_polls launcher_command group_states host
+  host=$(uname)
+  dir=$(make_case "custom-snapshot-signal-$mode")
   state="$dir/home/state"
   child_pid_file="$dir/custom-child.pid"
-  # shellcheck disable=SC2016  # The generated child expands $$ when it runs.
+  launcher_pid_file="$dir/custom-launcher.pid"
+  # shellcheck disable=SC2016  # The generated child expands its own process IDs.
   printf '%s\n' '#!/usr/bin/env bash' 'trap "" TERM' \
+    'printf "%s\n" "$PPID" > "$FM_TEST_CUSTOM_LAUNCHER_PID"' \
     'printf "%s\n" "$$" > "$FM_TEST_CUSTOM_CHILD_PID"' 'while :; do sleep 1; done' \
     > "$state/custom.check.sh"
   chmod 0700 "$state/custom.check.sh"
@@ -1554,6 +1558,7 @@ SH
 
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=0 FM_CHECK_INTERVAL=0 \
     FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
+    FM_TEST_CUSTOM_LAUNCHER_PID="$launcher_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
@@ -1569,29 +1574,70 @@ SH
   find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "watcher did not create the custom check snapshot"
   child_pid=$(cat "$child_pid_file")
+  launcher_pid=$(cat "$launcher_pid_file")
+  if [ "$host" = Darwin ]; then
+    launcher_command=$(python3 "$ROOT/bin/fm-proc-info.py" args "$launcher_pid")
+    check_pgid=$(python3 "$ROOT/bin/fm-proc-info.py" pgid "$child_pid")
+  else
+    launcher_command=$(ps -p "$launcher_pid" -o command=)
+    check_pgid=$(ps -p "$child_pid" -o pgid= | tr -d '[:space:]')
+  fi
+  case "$launcher_command" in
+    *fm-check-run.py*) ;;
+    *) fail "custom check parent is not its owned launcher" ;;
+  esac
+  if [ "$mode" = stopped ]; then
+    kill -STOP "$launcher_pid" || fail "could not stop owned launcher"
+  fi
   kill -TERM "$pid" 2>/dev/null || fail "could not signal watcher during custom check"
-  # The check ignores TERM, so its stop includes the guardian's TERM grace before
-  # KILL. Only a hang fails here; the bound is this file's 60 s watcher backstop.
+  # Custom captures use FM_ACTIVE_CHECK_GRACE=0; the guardian gives TERM-resistant
+  # work its own 1 s grace. The fixed 3 s margin covers the controller's 0.2 s
+  # escalation allowance, final 1 s group reap, and scheduling/pipe-close work.
+  # This is a bound on requested shutdown, never on normally progressing work.
+  stop_polls=$(((active_check_grace + guardian_grace + stop_margin) * 10))
   i=0
-  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 600 ]; do
+  while { process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+      || process_is_live_non_zombie "$child_pid"; } && [ "$i" -lt "$stop_polls" ]; do
     sleep 0.1
     i=$((i + 1))
   done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+  if process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+    || process_is_live_non_zombie "$child_pid"; then
+    # Fault-injection failure must not leave a stopped launcher or check behind.
+    kill -KILL "$launcher_pid" "$pid" 2>/dev/null || true
+    kill -KILL -- "-$check_pgid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    fail "signaled watcher did not exit"
+    fail "signaled watcher did not exit within cleanup grace plus margin ($mode launcher)"
   fi
   rc=0
   wait "$pid" || rc=$?
   [ "$rc" -ne 0 ] || fail "signaled watcher exited successfully"
-  ! kill -0 "$child_pid" 2>/dev/null || fail "signaled watcher left the custom check child running"
+  ! process_is_live_non_zombie "$launcher_pid" || fail "signaled watcher left its launcher running"
+  ! process_is_live_non_zombie "$child_pid" || fail "signaled watcher left the custom check child running"
+  # Orphan zombies are already dead; no live member of the check's group may
+  # remain, including its independent guardian and TERM-resistant descendants.
+  if [ "$host" = Darwin ]; then
+    group_states=$(python3 "$ROOT/bin/fm-proc-info.py" table pgid,stat) || fail "cannot read check-group state"
+  else
+    group_states=$(ps -ax -o pgid=,stat=) || fail "cannot read check-group state"
+  fi
+  ! printf '%s\n' "$group_states" | awk -v group="$check_pgid" \
+    '$1 == group && $2 !~ /^Z/ { live=1 } END { exit !live }' \
+    || fail "signaled watcher left a live check-group member"
   ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private custom check snapshot"
   ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private check output file"
   [ ! -e "$state/.watch.lock/pid" ] || fail "signaled watcher left its singleton lock"
-  pass "a signaled watcher stops its custom check and cleans private state"
+  pass "a signaled watcher stops its custom check and cleans private state ($mode launcher)"
+}
+
+test_custom_snapshot_cleanup_on_signal() {
+  custom_snapshot_signal_case responsive
+}
+
+test_custom_snapshot_cleanup_with_stopped_launcher() {
+  custom_snapshot_signal_case stopped
 }
 
 test_returned_custom_check_descendants_are_drained() {
@@ -3787,6 +3833,8 @@ SH
   pass "device re-record publication waits without rewriting its registration"
 }
 
+fm_test_only
+
 test_parser_matrix
 test_gitlab_merge_watch
 test_forgejo_merge_watch
@@ -3835,5 +3883,6 @@ test_device_rerecord_serializes_rerecord
 test_postrename_poll_validation_revokes_and_retries
 test_bootstrap_leaves_unauthenticated_checks
 test_custom_snapshot_cleanup_on_signal
+test_custom_snapshot_cleanup_with_stopped_launcher
 test_returned_custom_check_descendants_are_drained
 test_teardown_removes_poll_artifacts

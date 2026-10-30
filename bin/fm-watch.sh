@@ -2368,6 +2368,20 @@ fm_check_group_wait() {  # <pgid> <polls>
   fi
 }
 
+# A stop-requested launcher may itself be stopped or unable to service TERM.
+# Give its guardian-first cleanup the same grace as an unowned group, then let
+# the caller KILL the launcher; its independent guardian still owns the check.
+fm_check_pid_wait() {  # <pid> <polls>
+  local hundredths=$(($2 % 100))
+  kill -0 "$1" 2>/dev/null || return 0
+  if command -v perl >/dev/null 2>&1; then
+    perl -e 'my ($pid, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, $pid); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+  else
+    [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
+    sleep "$(($2 / 100)).$hundredths"
+  fi
+}
+
 fm_active_check_stop() {
   local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-}
   local stop_polls=$((FM_ACTIVE_CHECK_GRACE * 100 + 20))
@@ -2375,9 +2389,9 @@ fm_active_check_stop() {
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
   if [ -n "$FM_ACTIVE_CHECK_OWNED" ] && [ -n "$pid" ]; then
-    # The check launcher exits only after its guardian has cleaned the
-    # check's own group, so its actual exit is the end of that cleanup.
-    wait "$pid" 2>/dev/null || true
+    # A responsive launcher lets its guardian clean first. An unresponsive
+    # launcher must not prevent the independent KILL/owner-loss path below.
+    fm_check_pid_wait "$pid" "$stop_polls" || true
   else
     [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
   fi
