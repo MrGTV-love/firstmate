@@ -1,0 +1,19 @@
+ok - a secondmate home must declare each captain hold's owner, never holds the parent's call, and a main home cannot name a parent
+ok - an open captain call is never re-filed as the parent's
+ok - withdraw releases a moot call on a recorded captain ruling, keeps a work item open, and closes a question row
+ok - withdraw refuses a captain call with no captain ruling, whatever the channel carried, and a non-captain ruling
+ok - withdraw refuses an unrelated ruling and releases a legacy mate hold on a ruling that names it, keeping the work open
+ok - the divergence guard stops reporting a call once it is withdrawn
+ok - the decision-hold shim refuses an ownerless or parent-owned secondmate hold, keeps the captain owner, and leaves a main home alone
+ok - a legacy mate hold, including a genuine captain call the parent relayed, stays the captain's without a ruling
+ok - recording the owner keeps a freeze in force for frozen and the idle reaper, and keeps the owner beside the origin
+ok - the completion gate knows withdrawals, and a withdrawal retires its reconcile request
+ok - a withdraw retried after a failed release finishes it without a second record
+ok - a withdraw retried with edited evidence writes one record and resolves the key its hold opened
+ok - a withdraw retried with another ruling publishes the basis its record names
+ok - the completion gate accepts an archived withdrawal and never lists it as an answer
+ok - withdraw closes finished work teardown retained, with its deliverable, and only releases unfinished work
+ok - an expired dated hold is still withdrawn
+ok - withdraw needs a ruling dated a later day than a date-only hold-set stamp
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+rc=0

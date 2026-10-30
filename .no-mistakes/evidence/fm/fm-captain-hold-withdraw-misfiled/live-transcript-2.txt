@@ -1,0 +1,92 @@
+
+=== S7: the captain's own words still release a genuine mate captain call
+(runtime record: state/genuine-call.meta)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold genuine-call --owner captain --reason land or drop 18 unpublished commits
+genuine-call
+[exit 0]
+open genuine-call --distinguish-absent -> exit 0 (0 = held: fm-pr-merge refuses)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer genuine-call --decision-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/words.txt --release
+released: genuine-call
+[exit 0]
+  state: queued
+  held: no
+Captain decision:\nLand them.
+open genuine-call --distinguish-absent -> exit 1 (0 = held: fm-pr-merge refuses)
+needs-decision [key=captain-hold-genuine-call-1] [at=1793338122]: captain hold genuine-call: land or drop 18 unpublished commits
+resolved [key=captain-hold-genuine-call-1] [at=1793338124]: captain hold genuine-call: released
+
+=== S8: rows that are not captain rulings are refused as --ruling (released, withdrawn, reconciled)
+(runtime record: state/target.meta)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold target --owner captain --reason pick one
+target
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold q-withdrawn --owner captain --title Question about target --reason is target needed --repo sample
+q-withdrawn
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-q --owner captain --title Ruling Q --reason choose --repo sample
+ruling-q
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-q --decision-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/rq.txt
+answered: ruling-q
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw q-withdrawn --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev.txt --ruling ruling-q
+withdrawn: q-withdrawn
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold q-reconciled --owner captain --title Reconciled question about target --reason target choice --repo sample
+q-reconciled
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh reconcile close q-reconciled --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev.txt --verified-outcome moot
+reconciled: q-reconciled
+[exit 0]
+  state: done
+-- released row (genuine-call, released with --release), withdrawn row, reconciled row as --ruling for target:
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw target --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev2.txt --ruling genuine-call
+fm-captain-hold: genuine-call is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw target
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw target --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev2.txt --ruling q-withdrawn
+fm-captain-hold: q-withdrawn is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw target
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PH74Md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw target --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev2.txt --ruling q-reconciled
+fm-captain-hold: q-reconciled is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw target
+[exit 1]
+  held: yes
+open target --distinguish-absent -> exit 0 (0 = held: fm-pr-merge refuses)
+
+=== S9: a remote-route mate home (no local parent home): ownerless hold refused, captain hold published to state/parent-replies.status, withdraw on a ruling
+(runtime record: state/remote-work.meta)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold remote-work --reason retry or fix one red CI check; Main180/181 reserve ask-user decisions to Main
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold remote-work --reason retry one red check --owner parent
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+  held: no
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold remote-work --owner captain --reason land or drop
+remote-work
+[exit 0]
+Decision owner: captain
+open remote-work --distinguish-absent -> exit 0 (0 = held: fm-pr-merge refuses)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-remote --owner captain --title Ruling for remote-work --reason who decides --repo sample
+ruling-remote
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-remote --decision-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/rr.txt
+answered: ruling-remote
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.U7xmGv /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw remote-work --evidence-file /Users/charlesabrooker/tmp/fm-livetest.QoQuTn/ev.txt --ruling ruling-remote
+withdrawn: remote-work
+[exit 0]
+  state: queued
+  held: no
+open remote-work --distinguish-absent -> exit 1 (0 = held: fm-pr-merge refuses)
+remote parent channel (state/parent-replies.status):
+needs-decision [key=captain-hold-remote-work-1] [at=1793338154]: captain hold remote-work: land or drop
+needs-decision [key=captain-hold-ruling-remote-1] [at=1793338158]: captain hold ruling-remote: who decides
+resolved [key=captain-hold-ruling-remote-1] [at=1793338160]: captain hold ruling-remote: answered
+resolved [key=captain-hold-remote-work-1] [at=1793338163]: captain hold remote-work: withdrawn, not a captain answer: moot under the recorded captain ruling ruling-remote
+
+=== S10: a generated secondmate charter tells the mate a Main call is never held and hold needs --owner captain
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rMMTpk FM_SECONDMATE_CHARTER=firstmate self-development FM_SECONDMATE_SCOPE=firstmate repo work /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-brief.sh fdev --secondmate --no-projects
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rMMTpk/data/fdev/brief.md (secondmate charter)
+[exit 0]
+26:A call the main firstmate owns is never held: append it as a `needs-decision` line for the main firstmate and keep working where you can, and the work continues on its answer.
+27:`bin/fm-captain-hold.sh hold` is only for a call that needs the captain's own words, and here it must say so with `--owner captain`; only the captain's words release it.

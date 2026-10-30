@@ -1,0 +1,3 @@
+ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+ok - fm-pr-merge refuses a captain-owned mate hold and names the captain's answer and the ruling-based withdrawal
+rc=0

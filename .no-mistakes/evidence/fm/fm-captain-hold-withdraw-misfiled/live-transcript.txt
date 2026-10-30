@@ -1,140 +1,226 @@
-parent lab home: /Users/charlesabrooker/tmp/fm-lab.PLNnHr
-mate lab home:   /Users/charlesabrooker/tmp/fm-lab.eZsuU1
 
-=== S1 root cause: a mate home never holds Main's call; it must name the owner
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 hold pr290-ship --reason retry or fix one red CI check
-fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
-[exit 1]
-PASS: ownerless mate hold refused
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 hold pr290-ship --reason retry or fix one red CI check --owner parent
-fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
-[exit 1]
-PASS: parent-owned hold refused with routing
-  held: no
-PASS: task stayed unheld
-
-=== S2 PR 290 replay: legacy captain-kind hold on a ship task, Main relayed the question
-parent pending-reply record: /Users/charlesabrooker/tmp/fm-lab.PLNnHr/state/pending-replies/9fb98b7df5fc3461
+=== S1-before (base commit 28bb500b2): a mate home files the PR 290 shape as a captain hold, and no honest close exists
+(runtime record written: state/fm-host-hook-successor-watcher-race.meta - a worker owns fm-host-hook-successor-watcher-race)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jEtsfN /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/base/bin/fm-captain-hold.sh hold fm-host-hook-successor-watcher-race --reason retry or fix one red CI check on PR 290; Main180/181 reserve ask-user decisions to Main
+fm-host-hook-successor-watcher-race
+[exit 0]
   held: yes
   hold_kind: captain
-open (captain predicate) exit=0
-PASS: legacy hold reads as an open captain call (the stuck state)
-
-=== S2a captain answer path cannot be used for Main's call after classify; classify with provenance
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify pr290-ship --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason the retry call was Main's
-classified: pr290-ship as parent
-[exit 0]
-PASS: classify accepted the hold with matching parent provenance
-  held: yes
-  hold_kind: external
-  body: "Captain hold set: 2026-10-29T22:59:44Z\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry call was Main's\nClassification provenance: parent request corr=9fb98b7df5fc3461\nClassification evidence digest: fb6ee0e66ca0540adb7500ac7897f8e04594513f99934dd72f4e14fcbd07d07e\nOriginal hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461\n\nClassification evidence:\nMain decided one unchanged-head retry; this was Main's call."
-PASS: no longer a captain call
-PASS: open parent decision (merge gate still blocks)
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 answer pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/fake-captain.txt --release
-fm-captain-hold: task pr290-ship is not held for the captain; hold it first or name the right task
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jEtsfN /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/base/bin/fm-captain-hold.sh reconcile close fm-host-hook-successor-watcher-race --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-base.txt --verified-outcome moot
+fm-captain-hold: task fm-host-hook-successor-watcher-race still owns unfinished work; use answer --release with the captain's words rather than completing it
 [exit 1]
-PASS: answer (captain words) refused for Main's call
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jEtsfN /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/base/bin/fm-captain-hold.sh withdraw fm-host-hook-successor-watcher-race --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-base.txt --ruling none
+fm-captain-hold.sh - deterministic mechanics for tasks held for the captain.
+[exit 2]
+open fm-host-hook-successor-watcher-race --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
 
-=== S2b Main records its decision with decide
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 decide pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
-decided: pr290-ship
-[exit 0]
-task:
-  id: pr290-ship
-  title: Successor watcher race (PR 290 shape)
-  state: queued
-  blocked: no
-  blocked_by: none
+=== S1-after (head): the same mate-home filing is refused at the source
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold fm-host-hook-successor-watcher-race --reason retry or fix one red CI check on PR 290; Main180/181 reserve ask-user decisions to Main
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold fm-host-hook-successor-watcher-race --reason retry or fix one red CI check on PR 290; Main180/181 reserve ask-user decisions to Main --owner parent
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold fm-host-hook-successor-watcher-race --reason retry or fix one red CI check on PR 290; Main180/181 reserve ask-user decisions to Main --owner main
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: main); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
   held: no
-  hold_reason: "-"
   hold_kind: "-"
-  hold_until: "-"
-  kind: ship
-  repo: sample
-  priority: "-"
-  created: 2026-10-29
-  closed: "-"
-  deps: none
-  links: none
-  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 962a9397537cab753159507de042259a8db0a9bdb5c0e8f4521aa53f9a3c7d80\nResolution mode: decided\nResolves hold set: 2026-10-29T22:59:44Z\nResolved at: 2026-10-29T23:00:03Z\nDecided by: parent firstmate\nNot a captain answer.\n\nParent decision:\nRetry the failing check once on the unchanged head.\n\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry call was Main's\nClassification provenance: parent request corr=9fb98b7df5fc3461\nClassification evidence digest: fb6ee0e66ca0540adb7500ac7897f8e04594513f99934dd72f4e14fcbd07d07e\nOriginal hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461\n\nClassification evidence:\nMain decided one unchanged-head retry; this was Main's call."
-PASS: hold lifted
-PASS: work item left open
-PASS: record says not a captain answer
-PASS: no captain words written
-PASS: merge gate predicates both clear
---- parent channel /Users/charlesabrooker/tmp/fm-lab.PLNnHr/state/fm-lab-mate.status
-needs-decision [key=captain-hold-pr290-ship-1] [at=1793314796]: parent decision pr290-ship: Parent classification as the parent's call, not the captain's words: the retry call was Main's. Original hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461
-resolved [key=captain-hold-pr290-ship-1] [at=1793314804]: parent decision pr290-ship: decided by the parent firstmate
+open fm-host-hook-successor-watcher-race --distinguish-absent -> exit 1 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+parent channel after refusals:
+(empty: nothing filed as a captain call)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh decide fm-host-hook-successor-watcher-race
+fm-captain-hold.sh - deterministic mechanics for tasks held for the captain.
+[exit 2]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh classify fm-host-hook-successor-watcher-race --owner parent
+fm-captain-hold.sh - deterministic mechanics for tasks held for the captain.
+[exit 2]
 
-=== S3 adversarial: classify refuses a legacy hold without provenance; decide refuses a captain call
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify genuine-call --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason say it was Main's
-fm-captain-hold: task genuine-call carries no parent provenance: its hold reason names no corr=<id> token of a request the parent firstmate relayed to this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+=== S1b: the legacy fm-decision-hold.sh shim is refused the same way in a mate home
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-decision-hold.sh hold shim-origin k1 --title Shim call --reason retry the check --repo sample
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
 [exit 1]
-PASS: no-token refusal names the missing fact
-PASS: genuine call stays captain-kind
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify stray-corr --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason say it was Main's
-fm-captain-hold: task stray-corr carries no parent provenance: its hold reason names corr=aabbccddeeff0011, but the parent home holds no pending-reply record of that request for this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
-[exit 1]
-PASS: unmatched-corr refusal names the missing record
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 decide genuine-call --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
-fm-captain-hold: task genuine-call is not waiting on the parent firstmate (recorded owner: unrecorded); only the captain's own words release a captain call, so use answer for that
-[exit 1]
-PASS: decide cannot release the captain's call
-$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify owned-call --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason x
-fm-captain-hold: task owned-call records its owner (captain) from when it was filed or classified; a recorded owner is never reclassified
-[exit 1]
-PASS: recorded captain owner never reclassified
-
-=== S4 withdraw: moot-by-ruling (vernant-d5 shape) in a main home
-$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/ruling.txt
-answered: ruling-a
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-decision-hold.sh hold shim-origin k2 --title Shim call --reason needs the captain --repo sample --owner captain
+shim-origin-decision-k2
 [exit 0]
-$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt
-fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a legacy hold classified as the parent's is released with decide, and nothing else releases a captain call without the captain's words
+  held: yes
+  hold_kind: captain
+
+=== S2: a main home cannot name a parent owner, and its ordinary hold still works
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.tIgwce /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold main-work --reason no parent here --owner parent
+fm-captain-hold: this home has no parent firstmate and hold files captain calls only; omit --owner or pass --owner captain: parent
 [exit 1]
-PASS: withdraw with no ruling refused
-$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling unrelated-ruling
-fm-captain-hold: unrelated-ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw d5-mechanism
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.tIgwce /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold main-work --reason captain choice
+main-work
+[exit 0]
+open main-work --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+
+=== S3: a genuine captain call in a mate home: --owner captain is recorded and published
+(runtime record written: state/genuine-call.meta - a worker owns genuine-call)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold genuine-call --owner captain --reason land or drop 18 unpublished commits
+genuine-call
+[exit 0]
+  body: "Captain hold set: 2026-10-30T05:09:47Z\nDecision owner: captain\n\nGated work."
+parent channel:
+needs-decision [key=captain-hold-shim-origin-decision-k2-1] [at=1793336984]: captain hold shim-origin-decision-k2: needs the captain
+needs-decision [key=captain-hold-genuine-call-1] [at=1793336990]: captain hold genuine-call: land or drop 18 unpublished commits
+open genuine-call --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw genuine-call --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-main.txt
+fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; nothing else releases a captain call without the captain's words
 [exit 1]
-PASS: withdraw on an open non-ruling refused
-$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling ruling-a
-withdrawn: d5-mechanism
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh reconcile close genuine-call --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-main.txt --verified-outcome moot
+fm-captain-hold: task genuine-call still owns unfinished work; use answer --release with the captain's words rather than completing it
+[exit 1]
+open genuine-call --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+
+=== S4: the real PR 290 shape: a legacy captain hold (filed before owners were recorded) on a mate ship task
+(runtime record written: state/pr290-task.meta - a worker owns pr290-task)
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold pr290-task --reason retry or fix one red CI check on PR 290; Main180/181 reserve ask-user decisions to Main
+pr290-task
+[exit 0]
+  body: "Captain hold set: 2026-10-30T05:09:54Z\n\nShip PR 290."
+open pr290-task --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+-- adversarial: no ruling, absent ruling, open work as ruling, a ruling that does not name the task, a ruling made before the hold
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt
+fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; nothing else releases a captain call without the captain's words
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling no-such-ruling
+fm-captain-hold: no-such-ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw pr290-task
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling genuine-call
+fm-captain-hold: genuine-call is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw pr290-task
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling pr290-task
+fm-captain-hold: a hold cannot be moot by its own record
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold other-ruling --owner captain --title Unrelated ruling --reason pick a colour --repo sample
+other-ruling
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer other-ruling --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/blue.txt
+answered: other-ruling
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling other-ruling
+fm-captain-hold: ruling other-ruling does not name pr290-task in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw pr290-task
+[exit 1]
+-- the evidence file naming the task does not make an unrelated ruling count
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-names.txt --ruling other-ruling
+fm-captain-hold: ruling other-ruling does not name pr290-task in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw pr290-task
+[exit 1]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh reconcile close pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --verified-outcome moot
+fm-captain-hold: task pr290-task still owns unfinished work; use answer --release with the captain's words rather than completing it
+[exit 1]
+  state: queued
+  held: yes
+open pr290-task --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+-- a ruling recorded BEFORE a hold cannot release it
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold early-ruling --owner captain --title Early ruling on later-held --reason is later-held needed --repo sample
+early-ruling
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer early-ruling --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/early.txt
+answered: early-ruling
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold later-held --owner captain --reason pick an approach
+later-held
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw later-held --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-main.txt --ruling early-ruling
+fm-captain-hold: ruling early-ruling was recorded at 2026-10-30T05:10:13Z, not after this hold was set at 2026-10-30T05:10:17Z; a ruling made before this hold, including one an earlier withdrawal cited, does not make it moot; refusing to withdraw later-held
+[exit 1]
+open later-held --distinguish-absent -> exit 0 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+-- the captain rules (his own recorded words naming the task); withdraw then releases it honestly
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-290 --owner captain --title Retry rule for red checks --reason who decides CI retries --repo sample
+ruling-290
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-290 --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ruling290.txt
+answered: ruling-290
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling ruling-290
+withdrawn: pr290-task
 [exit 0]
   state: queued
   held: no
-  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 50393e21b16733e0f1bb8464d3232c6463bcc361bd151f4cfffd1af9b2555895\nResolution mode: withdrawn\nResolves hold set: 2026-10-29T23:00:28Z\nResolved at: 2026-10-29T23:00:54Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: captain\nRun from: main home\nNot a captain answer.\n\nWithdrawal evidence:\nMoot under ruling A."
-PASS: scout work item queued and unheld
-PASS: no captain answer label
-$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-error-bound --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling ruling-a
-withdrawn: d5-error-bound
-[exit 0]
-  state: done
-  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 50393e21b16733e0f1bb8464d3232c6463bcc361bd151f4cfffd1af9b2555895\nResolution mode: withdrawn\nResolves hold set: 2026-10-29T23:00:35Z\nResolved at: 2026-10-29T23:00:57Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: captain\nRun from: main home\nNot a captain answer.\n\nWithdrawal evidence:\nMoot under ruling A."
-PASS: moot question row closed
---- tasks-axi ready:
+  hold_kind: "-"
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: d6aabe30c21362c55def0341f4f581aaeb353263c64c28ffd4c0458c26fe1223\nResolution mode: withdrawn\nResolves hold set: 2026-10-30T05:09:54Z\nResolved at: 2026-10-30T05:10:34Z\nWithdrawn by: moot under the recorded captain ruling ruling-290\nFiled owner: unrecorded\nRun from: secondmate home\nNot a captain answer.\n\nWithdrawal evidence:\nMain decided one unchanged-head retry; CI 34 of 34 green; DeepSeek PASS at 17154e984b.\n\nShip PR 290."
+open pr290-task --distinguish-absent -> exit 1 (0 = still held: fm-pr-merge refuses; 1/3 = merge gate allows)
+tasks-axi ready:
 count: 2
 ready[2]{id,state,kind,repo,title}:
-  d5-mechanism,queued,scout,sample,Demand-map mechanism
-  unrelated-ruling,queued,captain,sample,Unrelated
+  fm-host-hook-successor-watcher-race,queued,ship,sample,Watcher race fix
+  pr290-task,queued,ship,sample,Watcher race (legacy hold)
 ready_public_followups: 0 delivery-ready obligations
 help[1]:
-  - Run `tasks-axi start <id> --file=data/backlog.md` to dispatch one of these
-PASS: moot question absent from ready
-PASS: work item is dispatchable again
+  - Run `tasks-axi start <id>` to dispatch one of these
+parent channel:
+needs-decision [key=captain-hold-shim-origin-decision-k2-1] [at=1793336984]: captain hold shim-origin-decision-k2: needs the captain
+needs-decision [key=captain-hold-genuine-call-1] [at=1793336990]: captain hold genuine-call: land or drop 18 unpublished commits
+needs-decision [key=captain-hold-other-ruling-1] [at=1793337003]: captain hold other-ruling: pick a colour
+resolved [key=captain-hold-other-ruling-1] [at=1793337005]: captain hold other-ruling: answered
+needs-decision [key=captain-hold-early-ruling-1] [at=1793337013]: captain hold early-ruling: is later-held needed
+resolved [key=captain-hold-early-ruling-1] [at=1793337015]: captain hold early-ruling: answered
+needs-decision [key=captain-hold-later-held-1] [at=1793337019]: captain hold later-held: pick an approach
+needs-decision [key=captain-hold-ruling-290-1] [at=1793337028]: captain hold ruling-290: who decides CI retries
+resolved [key=captain-hold-ruling-290-1] [at=1793337032]: captain hold ruling-290: answered
+resolved [key=captain-hold-pr290-task-1] [at=1793337034]: captain hold pr290-task: withdrawn, not a captain answer: moot under the recorded captain ruling ruling-290
+-- replay is idempotent
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw pr290-task --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev290.txt --ruling ruling-290
+withdrawn: pr290-task
+[exit 0]
+withdrawn records on pr290-task: 1
+-- divergence guard and open no longer see it
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh diverged
+[exit 0]
 
-=== S5 remote mate: provenance from the relayed request in the parent-route steering inbox
-$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC classify unrelayed --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason Main's
-fm-captain-hold: task unrelayed carries no parent provenance: its hold reason names corr=aabbccddeeff0011, but this home's parent-route steering inbox holds no relayed request with that correlation; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+=== S5: a moot question-shaped captain row is closed by withdraw, not left as dispatchable work
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold demand-map-bound --owner captain --title Which error bound for the demand map --reason pick the bound --repo sample
+demand-map-bound
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-a --owner captain --title Ruling A --reason choose the approach --repo sample
+ruling-a
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ra.txt
+answered: ruling-a
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw demand-map-bound --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-main.txt --ruling ruling-a
+withdrawn: demand-map-bound
+[exit 0]
+  state: done
+  held: no
+tasks-axi ready:
+count: 2
+ready[2]{id,state,kind,repo,title}:
+  fm-host-hook-successor-watcher-race,queued,ship,sample,Watcher race fix
+  pr290-task,queued,ship,sample,Watcher race (legacy hold)
+ready_public_followups: 0 delivery-ready obligations
+help[1]:
+  - Run `tasks-axi start <id>` to dispatch one of these
+
+=== S6: a withdraw whose release fails is retried with edited evidence and another ruling: one record, the original key, the recorded ruling
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold retry-work --owner captain --reason pick one
+retry-work
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-one --owner captain --title Ruling ruling-one --reason choose --repo sample
+ruling-one
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-one --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/r.txt
+answered: ruling-one
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh hold ruling-two --owner captain --title Ruling ruling-two --reason choose --repo sample
+ruling-two
+[exit 0]
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh answer ruling-two --decision-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/r.txt
+answered: ruling-two
+[exit 0]
+$ env PATH=/Users/charlesabrooker/tmp/fm-livetest.XmbNMa/fakebin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw retry-work --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-r.txt --ruling ruling-one
+injected unhold failure
+fm-captain-hold: could not release withdrawn task retry-work
 [exit 1]
-PASS: remote unmatched refusal accurate
-$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC classify relayed --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason Main's
-classified: relayed as parent
+  held: yes
+$ env PATH=/Users/charlesabrooker/tmp/fm-livetest.XmbNMa/fakebin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0yN9k9 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65BP54MPV7YNTK6DJQSMAVA/bin/fm-captain-hold.sh withdraw retry-work --evidence-file /Users/charlesabrooker/tmp/fm-livetest.XmbNMa/ev-r.txt --ruling ruling-two
+withdrawn: retry-work
 [exit 0]
-PASS: remote classify matched inbox record
-$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC decide relayed --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
-decided: relayed
-[exit 0]
-PASS: remote parent decision released the work
-
-=== SUMMARY
-failures: 0
+  state: queued
+  held: no
+withdrawn records on retry-work: 1
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: aef8af845f71025e212478cf87b34bc7fbe2c424bd955a2912a0ecde4b37a829\nResolution mode: withdrawn\nResolves hold set: 2026-10-30T05:10:47Z\nResolved at: 2026-10-30T05:11:00Z\nWithdrawn by: moot under the recorded captain ruling ruling-one\nFiled owner: captain\nRun from: secondmate home\nNot a captain answer.\n\nWithdrawal evidence:\nMoot under the ruling.\n\nDecision owner: captain"
+parent channel lines for retry-work:
+needs-decision [key=captain-hold-retry-work-1] [at=1793337049]: captain hold retry-work: pick one
+resolved [key=captain-hold-retry-work-1] [at=1793337062]: captain hold retry-work: withdrawn, not a captain answer: moot under the recorded captain ruling ruling-one
