@@ -2454,7 +2454,7 @@ assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prio
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
 
-# A steer must be a delivery sent after the row's overdue episode began; re-presenting the unchanged row accepts it again.
+# A steer must be a delivery sent after the row's overdue episode began; the unchanged steered row stays covered.
 home, ledger, row, call, ok, drain, ack = case('steer-fresh')
 _, boundary = drain()
 inbox(home, '003.msg', handled=True, offset=-3700)
@@ -2466,15 +2466,31 @@ assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
 assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prior steer'
+# A reviewed green PR is re-presented after a steer; re-presenting the unchanged row accepts the same delivery again.
+home, ledger, row, call, ok, drain, ack = case('steer-represent', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '004.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
 reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
 assert reused.returncode == 0, ('the same unchanged row needs no newer message', reused)
 assert ack(boundary).returncode == 0
-# A firstmate-owned steer stands for four hours from its delivery, and its message says how long remains.
-home, ledger, row, call, ok, drain, ack = case('steer-remaining', owner='firstmate')
+# A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
+home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
 _, boundary = drain()
 inbox(home, '005.msg', offset=-600)
-steered = ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
-assert 'standing: unchanged row; re-present after 13800 seconds' in steered.stdout, steered.stdout
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+clock['now'] = now + 13799
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'the steer stands until four hours'
+clock['now'] = now + 13800
+expired = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert expired.returncode == 1 and row['id'] in expired.stdout, ('four hours from the delivery have passed', expired)
+clock['now'] = now
 
 # PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
 for handled in (False, True):
@@ -2696,15 +2712,22 @@ fresh = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--
              '--recheck', recheck)
 assert fresh.returncode == 0, ('a changed row inherited the old deferral', fresh.stdout)
 assert ack(boundary).returncode == 0
-second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
+repeat = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
               '--recheck', recheck)
+assert repeat.returncode == 1 and 'already stands' in repeat.stdout, repeat
+clock['now'] = now + 700
+second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
+              '--recheck', dt.datetime.fromtimestamp(now + 1300, dt.timezone.utc).isoformat())
 assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+clock['now'] = now
 
 # A row once made captain-visible by a refused second deferral gets a working fresh deferral after it changes.
 home, ledger, row, call, ok, drain, ack = case('deferral-visible-change')
 _, boundary = drain()
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
-refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', recheck)
+clock['now'] = now + 700
+later = dt.datetime.fromtimestamp(now + 1300, dt.timezone.utc).isoformat()
+refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', later)
 assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
 assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
@@ -2713,11 +2736,12 @@ record = json.loads(ledger.read_text())
 record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
 ledger.write_text(json.dumps(record))
 _, boundary = drain()
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', recheck)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', later)
 stored = json.loads(ledger.read_text())
 assert stored['handling']['actions'][row['id']]['captain_visible'] is False, stored['handling']['actions'][row['id']]
 assert not stored['rows'][0].get('captain_visible'), stored['rows'][0]
 assert ack(boundary).returncode == 0, 'a fresh deferral on changed work did not cover the row'
+clock['now'] = now
 
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
@@ -4091,7 +4115,21 @@ assert ack(boundary).returncode == 0
 clock['now'] = now + 120
 wake('again')
 _, boundary = drain()
-assert ack(boundary).returncode == 1, 'a worker-owned steer answers only the turn it followed'
+assert ack(boundary).returncode == 0, 'an unchanged steered row needs no new action until it changes'
+clock['now'] = now
+# A reviewed green PR is re-presented after a steer, so the same delivery must keep counting there.
+PR = 'https://github.com/test/project/pull/9'
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
+    'represent-reviewed', category='review_pass_not_merged', subject=PR, owner='firstmate',
+    source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+wake('again')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
 again = act('steered', '001.msg')
 assert again.returncode == 0, ('re-presenting the same unchanged row must not demand a new message', again.stdout)
 assert ack(boundary).returncode == 0
