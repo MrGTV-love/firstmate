@@ -1,0 +1,206 @@
+== builder=28c985640 harness=claude alias=hardlink-worktree
+packed-refs links: 2
+fm/other before: 76dda4907083b90a1b7f5a1cd6a986e1b7d510ab (real=76dda4907083b90a1b7f5a1cd6a986e1b7d510ab)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: a6a24cf4e65f10052e5bd3b9822cbe5e5f9774b1 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.EegS6H/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.EegS6H/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=28c985640 harness=claude alias=hardlink-data
+packed-refs links: 2
+fm/other before: 62e2bcd3d91db90a9dda7510b8dee0146c5d8227 (real=62e2bcd3d91db90a9dda7510b8dee0146c5d8227)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: e6b1e84c46874c85cc4723f57d1b003771ff9219 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.ea4uam/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.ea4uam/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=28c985640 harness=claude alias=hardlink-hometmp
+packed-refs links: 2
+fm/other before: a6e6bb1328fea241c962e7e1c5f872ecace9c676 (real=a6e6bb1328fea241c962e7e1c5f872ecace9c676)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: 04dd5e4a89722e57a249362d4f91c62dc7e08ada -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.Rjh7kP/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.Rjh7kP/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=HEAD harness=claude alias=hardlink-worktree
+packed-refs links: 2
+fm/other before: 3e80970691b0fa3e1360d229f14ae2fc02dbcf79 (real=3e80970691b0fa3e1360d229f14ae2fc02dbcf79)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.ojRQ9o/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=claude alias=hardlink-data
+packed-refs links: 2
+fm/other before: 3e80970691b0fa3e1360d229f14ae2fc02dbcf79 (real=3e80970691b0fa3e1360d229f14ae2fc02dbcf79)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.LteQ3m/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=claude alias=hardlink-hometmp
+packed-refs links: 2
+fm/other before: 00685d1fa74804b0618aa9809fc947d033e7803e (real=00685d1fa74804b0618aa9809fc947d033e7803e)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.rVFLtg/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=078d60087 harness=claude alias=symlink-ref
+packed-refs links: 1
+fm/other before: a8aa92b5991ac7224ece2303afa1fe7f8ac5a5d0 (real=a8aa92b5991ac7224ece2303afa1fe7f8ac5a5d0)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: c275c91a64ad7da125f98e7db32b0659c0a804f9 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.IuAdNX/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.IuAdNX/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=078d60087 harness=claude alias=symlink-folder
+packed-refs links: 1
+fm/other before: be4ed2f520bb939acabf58dd83a3433339604fe0 (real=be4ed2f520bb939acabf58dd83a3433339604fe0)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary aliased/other after: 43dd87760b5edc2ce457be61cffeb5f51a41762d -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.OUzxl3/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.OUzxl3/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=HEAD harness=claude alias=symlink-ref
+packed-refs links: 1
+fm/other before: be4ed2f520bb939acabf58dd83a3433339604fe0 (real=be4ed2f520bb939acabf58dd83a3433339604fe0)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.RorMtd/home/projects/project/.git/refs/heads/fm/other (symbolic link to /Users/charlesabrooker/tmp/fm-e4.RorMtd/wt/ref-target); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=claude alias=symlink-folder
+packed-refs links: 1
+fm/other before: cdaeec76e1e5dde0b3842cf3882dcfcc600184e3 (real=cdaeec76e1e5dde0b3842cf3882dcfcc600184e3)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.nkwKv3/home/projects/project/.git/refs/heads/aliased (symbolic link to /Users/charlesabrooker/tmp/fm-e4.nkwKv3/user-home/tmp/fm-task-dir); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=28bb500b2 harness=claude alias=none
+packed-refs links: 1
+fm/other before: cdaeec76e1e5dde0b3842cf3882dcfcc600184e3 (real=cdaeec76e1e5dde0b3842cf3882dcfcc600184e3)
+build exit=0; profile published=yes
+primary fm/other after: cdaeec76e1e5dde0b3842cf3882dcfcc600184e3 -> real-or-unchanged
+confined direct write to packed-refs exit=0
+confined new hard link exit=0
+
+== builder=HEAD harness=claude alias=none
+packed-refs links: 1
+fm/other before: 37ba54c52bbe90143a67b351e78116d375cc5689 (real=37ba54c52bbe90143a67b351e78116d375cc5689)
+build exit=0; profile published=yes
+primary fm/other after: 37ba54c52bbe90143a67b351e78116d375cc5689 -> real-or-unchanged
+sh: /Users/charlesabrooker/tmp/fm-e4.a0XeGc/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.a0XeGc/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=28c985640 harness=omp alias=hardlink-worktree
+packed-refs links: 2
+fm/other before: 9431d86c351ec71f9fbac512a08a1445f5b4c225 (real=9431d86c351ec71f9fbac512a08a1445f5b4c225)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: 4c9946d3b3d8d69b02beaa77cb03159fae1f9a39 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.zJSJnv/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.zJSJnv/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=28c985640 harness=omp alias=hardlink-data
+packed-refs links: 2
+fm/other before: c552ae266942ec7c0a1a3f7d7ae90843954eb054 (real=c552ae266942ec7c0a1a3f7d7ae90843954eb054)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: f4ab4de0993b7155327f4d7ac2a1590921e45986 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.z6ZnRR/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.z6ZnRR/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=28c985640 harness=omp alias=hardlink-hometmp
+packed-refs links: 2
+fm/other before: c552ae266942ec7c0a1a3f7d7ae90843954eb054 (real=c552ae266942ec7c0a1a3f7d7ae90843954eb054)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: f4ab4de0993b7155327f4d7ac2a1590921e45986 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.2tki3z/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.2tki3z/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=HEAD harness=omp alias=hardlink-worktree
+packed-refs links: 2
+fm/other before: b89835afada7f64aa8cb10baceea3f9b32619256 (real=b89835afada7f64aa8cb10baceea3f9b32619256)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.a3tmT9/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=omp alias=hardlink-data
+packed-refs links: 2
+fm/other before: b89835afada7f64aa8cb10baceea3f9b32619256 (real=b89835afada7f64aa8cb10baceea3f9b32619256)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.dyUl7h/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=omp alias=hardlink-hometmp
+packed-refs links: 2
+fm/other before: c62084649d866e7e4c2f65e01c451dbe1834775a (real=c62084649d866e7e4c2f65e01c451dbe1834775a)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.lVrauw/home/projects/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=078d60087 harness=omp alias=symlink-ref
+packed-refs links: 1
+fm/other before: c62084649d866e7e4c2f65e01c451dbe1834775a (real=c62084649d866e7e4c2f65e01c451dbe1834775a)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm/other after: 03213f66c4c4f52cc9342dbea0a389bc3668510d -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.m0XM8f/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.m0XM8f/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=078d60087 harness=omp alias=symlink-folder
+packed-refs links: 1
+fm/other before: 5042cd1a653b8a643ed603a19503659795386ad2 (real=5042cd1a653b8a643ed603a19503659795386ad2)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary aliased/other after: 6aee09ac2646dda86e4dcd17fd502eeaa3d027c7 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.BuoD4w/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.BuoD4w/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=HEAD harness=omp alias=symlink-ref
+packed-refs links: 1
+fm/other before: 9c13fe9ad441ddf8cba04074e4134a46b195fe12 (real=9c13fe9ad441ddf8cba04074e4134a46b195fe12)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.yS9bwV/home/projects/project/.git/refs/heads/fm/other (symbolic link to /Users/charlesabrooker/tmp/fm-e4.yS9bwV/wt/ref-target); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=omp alias=symlink-folder
+packed-refs links: 1
+fm/other before: ea45c8760a478beefed57c401c4b5eb0f997076e (real=ea45c8760a478beefed57c401c4b5eb0f997076e)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.QTN4TK/home/projects/project/.git/refs/heads/aliased (symbolic link to /Users/charlesabrooker/tmp/fm-e4.QTN4TK/user-home/tmp/fm-task-dir); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=28bb500b2 harness=omp alias=none
+packed-refs links: 1
+fm/other before: ea45c8760a478beefed57c401c4b5eb0f997076e (real=ea45c8760a478beefed57c401c4b5eb0f997076e)
+build exit=0; profile published=yes
+primary fm/other after: ea45c8760a478beefed57c401c4b5eb0f997076e -> real-or-unchanged
+confined direct write to packed-refs exit=0
+confined new hard link exit=0
+
+== builder=HEAD harness=omp alias=none
+packed-refs links: 1
+fm/other before: 9068b8369c9bc2d4c50d343da07b990c889aa9dd (real=9068b8369c9bc2d4c50d343da07b990c889aa9dd)
+build exit=0; profile published=yes
+primary fm/other after: 9068b8369c9bc2d4c50d343da07b990c889aa9dd -> real-or-unchanged
+sh: /Users/charlesabrooker/tmp/fm-e4.WlEsiC/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.WlEsiC/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+

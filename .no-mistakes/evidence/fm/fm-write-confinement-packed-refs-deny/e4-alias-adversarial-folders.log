@@ -1,0 +1,33 @@
+== builder=078d60087 harness=claude alias=symlink-refs-root
+packed-refs links: 1
+fm/other before: a1cecaee83bcad2884d00a4997ad41dff6990f0b (real=a1cecaee83bcad2884d00a4997ad41dff6990f0b)
+build exit=0; profile published=yes
+confined write through alias exit=0
+primary fm-other-loose after: 0a7d667a32fa996968af6de5274665c6b19cb945 -> FORGED
+sh: /Users/charlesabrooker/tmp/fm-e4.qDICmp/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.qDICmp/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=078d60087 harness=claude alias=symlink-logs-heads
+packed-refs links: 1
+fm/other before: 9086e990be9ba40fec179570789c0be8c993db1c (real=9086e990be9ba40fec179570789c0be8c993db1c)
+build exit=0; profile published=yes
+primary fm/other after: 9086e990be9ba40fec179570789c0be8c993db1c -> real-or-unchanged
+sh: /Users/charlesabrooker/tmp/fm-e4.qPtcl0/home/projects/project/.git/packed-refs: Operation not permitted
+confined direct write to packed-refs exit=1
+ln: /Users/charlesabrooker/tmp/fm-e4.qPtcl0/wt/new-alias: Operation not permitted
+confined new hard link exit=1
+
+== builder=HEAD harness=claude alias=symlink-refs-root
+packed-refs links: 1
+fm/other before: 00a30166d7832a0c8c77c1fc5bd3960b247df21b (real=00a30166d7832a0c8c77c1fc5bd3960b247df21b)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.II5bOd/home/projects/project/.git/refs (symbolic link to /Users/charlesabrooker/tmp/fm-e4.II5bOd/user-home/tmp/fm-task-refs); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+
+== builder=HEAD harness=claude alias=symlink-logs-heads
+packed-refs links: 1
+fm/other before: 98d615ce701ceedf25365da9e6f2f9d674ef6f0f (real=98d615ce701ceedf25365da9e6f2f9d674ef6f0f)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-e4.UC9ew1/home/projects/project/.git/logs/refs/heads (symbolic link to /Users/charlesabrooker/tmp/fm-e4.UC9ew1/wt/fake-logs/heads); remove the extra link or symbolic link and launch again
+build exit=1; profile published=no
+

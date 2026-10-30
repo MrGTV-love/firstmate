@@ -1,0 +1,34 @@
+== omp: spawn with pre-existing hard link /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.GWSc8m/alias-omp/home/data/alias-omp-z9/packed-refs-alias (links=2)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: <tmp>/alias-omp/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+error: cannot derive the protected-asset write profile
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh alias-omp-z9 <project> --mode <mode> --yolo <on|off>
+spawn exit=1
+state/alias-omp-z9.meta present: no
+launch delivered to pane: no
+guard deny event: 1
+== omp: same id after removing the alias
+spawn exit=0
+write_confinement=seatbelt-v1
+-- confined harness probe:
+packed-refs=refused
+new-link=refused
+confinement=seatbelt-v1
+fetch-prune=false
+primary fm/other: real-sha; packed-refs links=1
+== claude: spawn with pre-existing hard link /Users/charlesabrooker/tmp/fm-spawn-worktree-settle.KQZGq0/alias-claude/home/data/alias-claude-z9/packed-refs-alias (links=2)
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: <tmp>/alias-claude/project/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+error: cannot derive the protected-asset write profile
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh alias-claude-z9 <project> --mode <mode> --yolo <on|off>
+spawn exit=1
+state/alias-claude-z9.meta present: no
+launch delivered to pane: no
+guard deny event: 1
+== claude: same id after removing the alias
+spawn exit=0
+write_confinement=seatbelt-v1
+-- confined harness probe:
+packed-refs=refused
+new-link=refused
+confinement=seatbelt-v1
+fetch-prune=false
+primary fm/other: real-sha; packed-refs links=1
