@@ -5,9 +5,12 @@
 # The sweep must (1) remove only directories that carry the .fm-test-fixture
 # marker and whose owner is provably dead, (2) keep a live owner's roots and
 # every unmarked entry, (3) leave exactly one marked entry behind when a shell is
-# KILLed, and (4) not slow down as unrelated fm-* entries pile up in the shared
-# temp dir (3.2 s with 50000 of them against 0.47 s with none before the record
-# existed; tests/fm-test-fixture-cleanup.test.sh pins the ownership rules).
+# KILLed, (4) still find and remove a dead owner's marked root of any fm-* name
+# that predates the records, and (5) not slow down per entry as unrelated fm-*
+# entries pile up in the shared temp dir (2.8 s with 50000 of them against 0.3 s
+# with none before the record existed; 0.3 s against 0.14 s now, or 0.7 s on the
+# once-per-age-floor sweep that looks at every fm-* entry).
+# tests/fm-test-fixture-cleanup.test.sh pins the ownership rules.
 # The bash -c scripts below expand their own variables in the child shell.
 # shellcheck disable=SC2016
 set -u

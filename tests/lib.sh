@@ -644,12 +644,14 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # The sweep reads only what a test run owns: the per-shell records under
 # fm-test-owners (each names its shell's fixture roots), marked fm-test-*
 # roots at the top of the temp dir, and the fmlab.* labs and fm-test-run.*
-# runner containers there (bin/fm-test-reap-orphans.sh --owners). Its cost
-# therefore does not grow with the other fm-* entries that tools leave in a
-# shared temp dir, which the shared per-prefix scratch containers
-# (bin/fm-scratch-lib.sh) keep out of the way as well. Once per age floor it
-# also looks at every top-level fm-* directory, for marked roots that predate
-# the records (a stamp in the owners dir says when it last did).
+# runner containers there (bin/fm-test-reap-orphans.sh --owners). The shared
+# per-prefix scratch containers (bin/fm-scratch-lib.sh) keep the other fm-*
+# entries that tools leave in a shared temp dir out of the way, and the sweep
+# makes no stat call and no process per such entry. It does still read the temp
+# dir's names a few times (about 0.06 s per read at 50000 entries). Once per age
+# floor it also looks at every top-level fm-* directory, for marked roots that
+# predate the records (a stamp in the owners dir says when it last did); that
+# look costs a stat per entry.
 # FM_TEST_SWEEP_ALL=1 always looks and also reaps dead shells' legacy
 # registries; bin/fm-test-run.sh does that once per run.
 FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
