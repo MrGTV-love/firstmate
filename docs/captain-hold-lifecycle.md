@@ -14,7 +14,7 @@ This document records the deterministic mechanism, structured surfaces, compatib
 | Why does cleanup of finished work leave a captain call open? | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | How does a keyed answer from chat or a board reach the call? | [Answer-time resolution](#answer-time-resolution) |
 | How is a call closed when it stopped being a question? | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
-| Who owns a call, and how is one a captain ruling made moot released? | [Decision owner and honest release](#decision-owner-and-honest-release) |
+| Who owns a call, and how is a call a captain ruling made moot released? | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | Why did a decision card disappear from the board? | [Card hygiene](#card-hygiene-a-landed-subject-is-not-a-live-call) |
 | Where does a hold appear in snapshots and Bearings? | [Structured read surfaces](#structured-read-surfaces) |
 | What does a `RECORD DIVERGENCE` section mean? | [Record divergence](#record-divergence) |
@@ -216,7 +216,7 @@ Rewriting the hold's origin keeps the line.
 An open hold is any captain-kind row that is not done, as `open` reads it.
 A freeze therefore outlives the hold's `--until` revisit date: a revisit date is not a release, `freeze` accepts that still-open call, and re-holding it keeps the line.
 The lapse of `--until` for ordinary holds is unchanged.
-An answer moves the old header under its resolution record, so re-holding released work starts a new lifecycle with no freeze.
+A resolution record (`answer`, `withdraw`, or `reconcile close`) moves the old header under it, so re-holding released work starts a new lifecycle with no freeze.
 
 The read-only `frozen <task-id>` subcommand is the one owner of the question "is this task frozen by an open captain hold".
 It compares the project named by the task's `project=` metadata with the declaration on every open captain hold in this home's own backlog and, in a local secondmate home, in the backlog of every local home above it.
@@ -340,6 +340,7 @@ The investigation completion gate (`complete` and `verify`) accepts a newest `wi
 `complete` lists an archived one under its own label, never as an answered call.
 An archived withdrawal is never a ruling for `withdraw`.
 A retried `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
+The retry keeps that record's evidence and ruling, even when it passes edited evidence or another ruling, and its `resolved` line closes the key the hold opened and names the recorded ruling.
 
 The one eligibility fact is `--ruling <id>`, a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
 An evidence-only close, a release, and another withdrawal are not rulings.
@@ -768,6 +769,8 @@ The owner and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.s
 - The retired `fm-decision-hold.sh` shim refuses a secondmate hold that names no owner or `--owner parent`, keeps `--owner captain`, and leaves a main home alone.
 - The completion gate accepts a withdrawal as durable, and a withdrawal retires the call's board reconcile request.
 - A `withdraw` retried after an injected failed release finishes it without a second record or channel key.
+  Retried with edited evidence, it resolves the key the hold opened; retried with another ruling, its `resolved` line and record both name the first ruling.
+- Recording the owner keeps a freeze in force for `frozen` and the idle reaper, and keeps the owner beside the origin.
 - The completion gate accepts a withdrawal whose row retention archived, and `complete` lists it apart from answered calls.
 - `withdraw` releases a dated hold whose date has passed.
 
