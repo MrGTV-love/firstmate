@@ -149,17 +149,14 @@ fm_process_fill() {
 # group and write no duration records. A nested call keeps its own bound, so a
 # hung inner read is stopped by its own owner and the outer work continues.
 fm_run_progress() {
-  local seconds=$1 helper fm_diag='' record=
+  local seconds=$1 helper record=
   shift
   helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
   if fm_posix_python; then
     if fm_process_tree; then
       fm_process_reserve record fm_run_progress || return 125
-      fm_run_progress_diag "$record"
     fi
-    # The assignment is always made, so an empty value clears a selection
-    # inherited from an outer launch.
-    FM_PENDING_DIAG_SIDECAR=$fm_diag python3 "$helper" keep-going ${record:+--record "$record"} "$seconds" -- "$@"
+    python3 "$helper" keep-going ${record:+--record "$record"} "$seconds" -- "$@"
   elif command -v perl >/dev/null 2>&1; then
     fm_run_perl_progress "$seconds" "$@"
   else
@@ -177,28 +174,6 @@ fm_progress_quiet_secs() {
   local secs=${FM_DURATION_NO_PROGRESS_SECS:-}
   case "$secs" in ''|*[!0-9]*|0*) secs=900 ;; esac
   printf '%s\n' "$secs"
-}
-
-# TEMPORARY pending-registration diagnostic for portable serial shard 8; remove
-# before acceptance. fm_run_progress_diag <record>: only inside the registry that
-# tests/fm-fleet-ledger.test.sh activated, select <record> when its exact row is
-# the only match within the registry's first 128 rows, write one `reserved`
-# receipt to <record>.diag, and set fm_diag to it for the next Python launch.
-# Anything else, including a failed write, leaves fm_diag empty and unobserved.
-fm_run_progress_diag() {
-  local row=0 found='' fixture=${FM_PENDING_DIAG_FIXTURE:-} r l m
-  fm_diag=
-  [ -n "${FM_PENDING_DIAG_REGISTRY:-}" ] && [ "$FM_PENDING_DIAG_REGISTRY" = "$FM_TEST_PROCESS_REGISTRY" ] || return 0
-  while [ "$row" -lt 128 ] && IFS=$'\t' read -r r l m; do
-    row=$((row + 1))
-    [ "$r" = "$1" ] || continue
-    [ -z "$found" ] && [ "$l" = fm_run_progress ] && [ "$m" = wait ] || return 0
-    found=$row
-  done 2>/dev/null < "$FM_TEST_PROCESS_REGISTRY"
-  [ -n "$found" ] && [ ! -e "$1.diag" ] || return 0
-  case "$fixture" in '' | *[!0-9]*) fixture=unknown ;; esac
-  printf '1\treserved\t%s\t%s\t%s\n' "${BASHPID:-unknown}" "$found" "$fixture" 2>/dev/null > "$1.diag" || return 0
-  fm_diag=$1.diag
 }
 
 # fm_posix_python: 0 when python3 is a POSIX interpreter able to run
