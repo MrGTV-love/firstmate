@@ -54,8 +54,14 @@
 # runs under a silence backstop of twice the gate-read interval: it stops a
 # scan that makes no output or process-tree CPU progress for that long, never
 # one that is slow but working, and the gate read's own interval fires first,
-# so the stall is judged, and remembered, inside the live scan. A wait for a
-# lock whose holder is alive is work, not silence, so the scan waits for it.
+# so the stall is judged, and remembered, inside the live scan. A lock wait
+# looks like work to that backstop, so no lock wait in a scan is unbounded: a
+# scan that finds the scan lock held does nothing this poll, a due child whose
+# metadata lock is held (its teardown, which reports the outcome itself) is
+# skipped until the next scan, and the first wake-queue lock wait that outlasts
+# the scan budget gives up every later wake append of that scan, whose durable
+# records are retried by the next one. `report`, `acknowledge`, and teardown
+# keep their waits.
 #
 # It considers only a direct ordinary crewmate whose newest meta, status, or
 # turn-ended mtime is older than that interval and whose last status is not
@@ -139,6 +145,9 @@ if [ "$FM_INACTIVE_RECONCILE_BUDGET_SECS" -gt 30 ]; then
   printf 'fm-inactive-reconcile: FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
   exit 2
 fi
+# Seconds a wake-queue lock wait may take; empty (unbounded) outside a scan.
+WAKE_LOCK_BOUND=
+WAKE_LOCK_GAVE_UP=0
 
 if [ "$(uname)" = Darwin ]; then
   file_mtime() { /usr/bin/stat -f %m "$1" 2>/dev/null; }
@@ -246,16 +255,20 @@ mark_reported() { # <record>
   mv -f "$record" "$reported"
 }
 
-queue_key_exists() { # <key>
-  local key=$1 queued
-  queued=$(fm_wake_queued_keys check 2>/dev/null || true)
-  printf '%s\n' "$queued" | grep -Fx -- "$key" >/dev/null 2>&1
-}
-
 publish_actionable() { # <key> <payload>
-  local key=$1 payload=$2
-  queue_key_exists "$key" && return 1
-  fm_wake_append check "$key" "$payload" || return 2
+  local key=$1 payload=$2 rc=0
+  [ "$WAKE_LOCK_GAVE_UP" = 0 ] || return 2
+  if ! fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" ${WAKE_LOCK_BOUND:+"$WAKE_LOCK_BOUND"}; then
+    [ -z "$WAKE_LOCK_BOUND" ] || WAKE_LOCK_GAVE_UP=1
+    return 2
+  fi
+  if fm_wake_queued_keys_locked check | grep -Fx -- "$key" >/dev/null 2>&1; then
+    rc=1
+  elif ! fm_wake_append_locked check "$key" "$payload"; then
+    rc=2
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ "$rc" -eq 0 ] || return "$rc"
   printf 'actionable: %s\n' "$payload"
 }
 
@@ -577,7 +590,7 @@ reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeou
 reconcile_direct_child() { # <id> <meta> <secondmate-id-or-empty> <timeout>
   local id=$1 meta=$2 self=${3:-} timeout=$4 lock rc=0
   lock=$(fm_meta_lock_path "$meta") || return 1
-  fm_lock_acquire_wait "$lock" || return 1
+  fm_lock_try_acquire "$lock" || return 0
   reconcile_direct_child_locked "$id" "$meta" "$self" "$timeout" || rc=$?
   fm_lock_release "$lock"
   return "$rc"
@@ -622,6 +635,7 @@ scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
 
 scan() {
   local startup=${1:-0} self='' cursor deadline rc=0 marker_rc=0
+  WAKE_LOCK_BOUND=$FM_INACTIVE_RECONCILE_BUDGET_SECS
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   if self=$(home_secondmate_id); then
@@ -686,8 +700,9 @@ case "$mode" in
       *) printf 'usage: fm-inactive-reconcile.sh scan [--startup]\n' >&2; exit 2 ;;
     esac
     # The scan's own whole-second deadline enforces the budget between
-    # children; this outer stop is only for a scan that goes silent, and it
-    # waits twice the gate-read interval so that read's own stall fires first.
+    # children, and its lock waits are bounded or skipped; this outer stop is
+    # only for a scan that goes silent, and it waits twice the gate-read
+    # interval so that read's own stall fires first.
     : "${FM_DOD_NM_STALL_SECS:=120}"
     case "$FM_DOD_NM_STALL_SECS" in ''|*[!0-9]*|0*) FM_DOD_NM_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
     export FM_DOD_NM_STALL_SECS
@@ -699,7 +714,10 @@ case "$mode" in
     ;;
   _scan-locked)
     [ "$#" -eq 2 ] || exit 2
-    fm_lock_acquire_wait "$SCAN_LOCK" || exit 1
+    if ! fm_lock_try_acquire "$SCAN_LOCK"; then
+      [ "$FM_LOCK_BUSY" = 1 ] && exit 0
+      exit 1
+    fi
     trap 'fm_lock_release "$SCAN_LOCK"' EXIT
     scan "$2"
     ;;

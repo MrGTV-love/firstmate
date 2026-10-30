@@ -174,6 +174,29 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   pass "a secondmate home's teardown delivers the child's final line or refuses until it can"
 }
 
+# The report step runs under teardown's progress line but keeps its own
+# diagnostics: a misconfigured reconciler names its own cause.
+test_secondmate_home_teardown_shows_report_diagnostics() {
+  local case_dir rc wt_head
+
+  case_dir=$(make_case mate-teardown-report-stderr)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_INACTIVE_RECONCILE_BUDGET_SECS=40 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "mate-teardown-report-stderr: teardown went on past a report that could not run"
+  grep -q 'FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30' "$case_dir/stderr" \
+    || fail "mate-teardown-report-stderr: the report's own diagnostic was hidden: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-report-stderr: teardown did not keep the task record"
+  pass "a secondmate home's teardown shows the report step's own diagnostics"
+}
+
 # A secondmate-home ship teardown whose completion-gate read at the report step
 # goes silent does not know whether the child's done: is accepted. That is a
 # retry (exit 75, the status the sweeps retry without a refusal memo), never the
@@ -6237,6 +6260,7 @@ test_local_only_force_overrides_unpushed
 test_secondmate_pr_registration_publishes_ready_line
 test_secondmate_home_teardown_delivers_final_line_or_refuses
 test_secondmate_home_teardown_unknown_acceptance_is_a_retry
+test_secondmate_home_teardown_shows_report_diagnostics
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes

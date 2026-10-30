@@ -3142,8 +3142,19 @@ TASK_NM_READ_UNKNOWN=0
 # repo-wide quiet interval, so a sweep that stops a silent teardown never stops
 # one that is only waiting on a live read.
 teardown_nm_read() {  # <variable> <command> [args...]
-  local _var=$1 _out _rc=0 _beat _every
+  local _var=$1 _out _rc=0
   shift
+  teardown_nm_beat_start
+  _out=$(FM_NM_READ_PROGRESS=1 "$@" 2>/dev/null) || _rc=$?
+  teardown_nm_beat_stop
+  printf -v "$_var" '%s' "$_out"
+  return "$_rc"
+}
+
+# The progress line above, around a call that keeps its own output.
+TEARDOWN_NM_BEAT=
+teardown_nm_beat_start() {
+  local _every
   _every=$(( $(fm_progress_quiet_secs) / 10 ))
   [ "$_every" -gt 0 ] || _every=1
   (
@@ -3155,12 +3166,13 @@ teardown_nm_read() {  # <variable> <command> [args...]
       echo "teardown: $ID is still waiting on a no-mistakes read" >&2
     done
   ) >/dev/null &
-  _beat=$!
-  _out=$(FM_NM_READ_PROGRESS=1 "$@" 2>/dev/null) || _rc=$?
-  kill "$_beat" 2>/dev/null || true
-  wait "$_beat" 2>/dev/null || true
-  printf -v "$_var" '%s' "$_out"
-  return "$_rc"
+  TEARDOWN_NM_BEAT=$!
+}
+
+teardown_nm_beat_stop() {
+  kill "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  wait "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  TEARDOWN_NM_BEAT=
 }
 
 # The status of one run with its error text, which names a run that is gone.
@@ -6225,8 +6237,10 @@ if [ "$BACKEND" = herdr ]; then
 fi
 if [ "$KIND" != secondmate ]; then
   REPORT_RC=0
-  teardown_nm_read REPORT_OUT env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+  teardown_nm_beat_start
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
     "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID" ${FORCE:+"$FORCE"} || REPORT_RC=$?
+  teardown_nm_beat_stop
   if [ "$REPORT_RC" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
     echo "UNKNOWN: the no-mistakes daemon went silent, so whether $ID's final outcome is accepted is unknown; every durable task record is kept, retry teardown." >&2
     exit "$FM_PROJECT_LOCK_BUSY_EXIT"
