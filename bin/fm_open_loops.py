@@ -1546,8 +1546,8 @@ class WaitVerifier:
         reader fm_pr_poll_merge_marker_matches, and a PR identity or marker area it cannot read fails closed:
         it raises, so the wait is never admitted, kept or renewed on a PR whose landing cannot be checked.
         A marker file that fails the canonical private-file validation (fm_pr_private_file_valid: regular,
-        not a symlink, mode 600, same device, one link) or is unreadable is such a case; only a validated
-        marker naming another PR continues the scan, and no marker at all means open.
+        not a symlink, mode 600, same device, one link) or is unreadable is such a case; a validated, readable
+        marker that does not name this PR continues the scan, and no marker at all means open.
         """
         if GITHUB_PR.fullmatch(pr):
             return merge_marker(self.collector.state, pr)
