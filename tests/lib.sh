@@ -1553,9 +1553,10 @@ fm_test_export_sleep_counter() {
 # cycles than it had when the wait began, so a live poller that keeps polling
 # without producing the outcome cannot hang the suite. A live poller must pass
 # it, with N stated by the caller and small. --while-alive fails once that PID
-# is dead, a zombie or reused (also for a disappearance predicate); never pass
-# the waiting test's own PID. Silence means no change in any --progress-file or
-# COUNT_FILE, outcome-specific observables only, for the inactivity interval:
+# is dead, a zombie or reused and no descendant it was last observed with remains
+# (also for a disappearance predicate); never pass the waiting test's own PID.
+# Silence means no change in any --progress-file or COUNT_FILE, outcome-specific
+# observables only, for the inactivity interval:
 # by default the operational 15-quiet-minute no-progress policy owned by
 # bin/fm-duration.py (NO_PROGRESS_LIMIT, via progress-check's "default"), with
 # --inactivity a failure-fixture override. An unreadable count or sample is
