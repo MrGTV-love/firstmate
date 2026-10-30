@@ -457,13 +457,14 @@ class Watch:
     def retarget(self):
         """Re-point the plane at a changed owner DM; only an explicit retarget may do this."""
         if not self.state.get('user') or self.state['user'] == self.dm_user():
-            return
+            return False
         if self.state['pending']:
             # Pending rows belong to threads in the old DM; they must finish there first.
             raise SlackError('dm_user_changed_with_pending_work')
         # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
         self.commit()
+        return True
 
     def prepare(self):
         if not self.bound():
@@ -944,8 +945,10 @@ def main(argv):
 def check(watch, action):
     state_dir = state_home()
     if action == 'retarget':
-        watch.retarget()
-        print('retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER')
+        if watch.retarget():
+            print('retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER')
+        else:
+            print('unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget')
         return 0
     if action == 'arm':
         try:

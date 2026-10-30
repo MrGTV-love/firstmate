@@ -1218,6 +1218,14 @@ assert_eq "$(grep chat.postMessage "$FM_STATE_OVERRIDE/slack-watch/outbound.json
 new_home mirror
 bind
 mirror mirror >/dev/null
+before=$(cat "$(state_file)")
+set +e
+out=$("$ROOT/bin/fm-slack-check.sh" retarget --replay "$FIX/mirror/transcript.json" 2>&1); rc=$?
+set -e
+assert_eq "$rc" 0 "X26 retarget of an unchanged owner failed"
+assert_contains "$out" 'unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget' "X26 unchanged retarget did not say nothing changed"
+assert_not_contains "$out" 'retargeted:' "X26 unchanged retarget claimed a change"
+assert_eq "$(cat "$(state_file)")" "$before" "X26 unchanged retarget touched the state"
 python3 "$HELPER" stage-notice "$(state_file)" 900.000001 open-a 10
 set +e
 out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$TMP/moved.json" 2>&1); rc=$?
