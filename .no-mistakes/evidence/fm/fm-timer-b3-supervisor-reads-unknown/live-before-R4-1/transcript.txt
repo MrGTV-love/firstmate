@@ -1,0 +1,36 @@
+### L1a run-record DB held locked by a writer (real 30 s SQLite busy wait, default 900 s stall)
+$ fm-teardown.sh task-x1 
+exit=1  wall=38s
+--- stderr ---
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ac8359c Merge remote-tracking branch 'origin/main' into fm/task-x1
+4c31f11 add b
+1f4a48d add a
+commits whose change is not proven present in the merged PR head:
+1f4a48d add a
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+the no-mistakes run record for https://github.com/example/repo/pull/7 could not be read from /Users/charlesabrooker/tmp/fm-teardown-tests.prsiK2/live-locked/nm/state.sqlite
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- guard events (teardown-unlanded?) ---
+"guard":"teardown-unlanded" "decision":"deny"
+--- task copy kept: yes; task record kept: yes
+
+### L1b same task after the lock is released: the record answers 'not this copy'
+$ fm-teardown.sh task-x1 
+exit=1  wall=4s
+--- stderr ---
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ac8359c Merge remote-tracking branch 'origin/main' into fm/task-x1
+4c31f11 add b
+1f4a48d add a
+commits whose change is not proven present in the merged PR head:
+1f4a48d add a
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+run 01RUNLOCKED started from 13a2e88f1489; this copy's HEAD ac8359c19245 is not that head, so this copy is not the input the run started from
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- guard events (teardown-unlanded?) ---
+"guard":"teardown-unlanded" "decision":"deny" "guard":"teardown-unlanded" "decision":"deny"
+--- task copy kept: yes; task record kept: yes
+

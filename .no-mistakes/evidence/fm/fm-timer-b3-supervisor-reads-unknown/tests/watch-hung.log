@@ -1,0 +1,2 @@
+ok - a hung worktree walk defers the wedge escalation and re-surfaces as unknown, while a prompt empty walk still escalates
+exit=0 secs=51

@@ -1,0 +1,15 @@
+$ FM_CREW_STATE_NM_TIMEOUT=3 fm-crew-state.sh ship1   (bin: /tmp/fm-prefix-bin.cDKc; FM_DOD_NM_STALL_SECS unset; outer kill at 120 s)
+exit=142  wall=316s
+--- output ---
+
+--- axi status calls (epoch seconds) ---
+1793315866 axi status answered: no active run
+1793315866 axi status start, silent (pid 43261)
+1793316179 axi status stopped
+--- note ---
+bin is commit 0414e3c1b^ (before the R4-3 fix). The completion gate's silent
+axi status read was NOT stopped by FM_CREW_STATE_NM_TIMEOUT=3: the outer 120 s
+alarm killed crew-state (exit 142 = SIGALRM) with no answer printed, and the
+silent read itself was still waiting at 313 s, when the tester stopped it by hand.
+After the fix (after.txt) the same read stops at about 4 s and crew-state prints
+"state: unknown ... did not answer ... read it again".

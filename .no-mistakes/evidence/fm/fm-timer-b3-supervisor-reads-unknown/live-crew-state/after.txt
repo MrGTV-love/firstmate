@@ -1,0 +1,8 @@
+$ FM_CREW_STATE_NM_TIMEOUT=3 fm-crew-state.sh ship1   (bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8PMZ9QZQBA0YTM9PH4PC; FM_DOD_NM_STALL_SECS unset; outer kill at 120 s)
+exit=0  wall=6s
+--- output ---
+state: unknown · source: status-log · the no-mistakes run for this copy did not answer (no output or CPU progress), so whether its fixes are recovered is unknown, not a verdict; read it again
+--- axi status calls (epoch seconds) ---
+1793315866 axi status answered: no active run
+1793315866 axi status start, silent (pid 43254)
+1793315870 axi status stopped

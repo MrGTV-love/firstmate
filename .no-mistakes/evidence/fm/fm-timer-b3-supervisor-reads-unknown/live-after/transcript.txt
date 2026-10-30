@@ -1,0 +1,59 @@
+### L1a run-record DB held locked by a writer (real 30 s SQLite busy wait, default 900 s stall)
+$ fm-teardown.sh task-x1 
+exit=75  wall=38s
+--- stderr ---
+unknown: the no-mistakes run record did not answer; retry teardown
+--- guard events (teardown-unlanded?) ---
+(none)
+--- task copy kept: yes; task record kept: yes
+
+### L1b same task after the lock is released: the record answers 'not this copy'
+$ fm-teardown.sh task-x1 
+exit=1  wall=4s
+--- stderr ---
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ac8359c Merge remote-tracking branch 'origin/main' into fm/task-x1
+4c31f11 add b
+1f4a48d add a
+commits whose change is not proven present in the merged PR head:
+1f4a48d add a
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+run 01RUNLOCKED started from c5e3d6217cac; this copy's HEAD ac8359c19245 is not that head, so this copy is not the input the run started from
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- guard events (teardown-unlanded?) ---
+"guard":"teardown-unlanded" "decision":"deny"
+--- task copy kept: yes; task record kept: yes
+
+### L2a silent daemon, no --force (stall 5 s)
+$ fm-teardown.sh task-x1 
+exit=75  wall=10s
+--- stderr ---
+UNKNOWN: the no-mistakes daemon went silent (no output or CPU progress for 5s), so whether a run for task-x1 is parked at a gate is unknown; nothing more was closed, retry teardown.
+--- guard events (teardown-unlanded?) ---
+(none)
+--- task copy kept: yes; task record kept: yes
+
+### L2b silent daemon, captain's --force
+$ fm-teardown.sh task-x1 --force --drop-file /Users/charlesabrooker/tmp/fm-drop-words.QEKy6z/captain-words.txt
+exit=0  wall=13s
+--- stderr ---
+warning: the no-mistakes daemon went silent (no output or CPU progress for 5s), so whether a run for task-x1 is parked at a gate is unknown; --force goes on with the no-mistakes run state unknown.
+teardown: recorded the unknown no-mistakes run state in /Users/charlesabrooker/tmp/fm-teardown-tests.l90k3P/live-silent/data/task-x1/no-mistakes-unknown.log
+--- guard events (teardown-unlanded?) ---
+(none)
+--- task copy kept: yes; task record kept: no
+--- data/task-x1/no-mistakes-unknown.log ---
+2026-10-29T23:12:53Z forced teardown went on with the no-mistakes run state unknown: the no-mistakes daemon went silent (no output or CPU progress for 5s), so whether a run for task-x1 is parked at a gate is unknown
+
+silent status reads made by L2a+L2b: 2; abort log: none
+### L3 slow, CPU-busy daemon answers after 20 s (stall 5 s)
+$ fm-teardown.sh task-x1 
+exit=0  wall=28s
+--- stderr ---
+teardown: no-mistakes run for task-x1 is parked at a gate; aborting before the worker is removed
+--- guard events (teardown-unlanded?) ---
+(none)
+--- task copy kept: yes; task record kept: no
+
+abort log after L3: abort --run 01RUN

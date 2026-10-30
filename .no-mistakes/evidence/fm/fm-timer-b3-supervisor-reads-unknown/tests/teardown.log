@@ -1,0 +1,5 @@
+ok - a slow but working run-record read still proves the copy was the pipeline's input
+ok - a silent run-record read is unknown and retried, while an answered one still refuses
+ok - a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused
+ok - merged PR still refuses a copy that is behind the recorded run's input head
+exit=0 secs=76

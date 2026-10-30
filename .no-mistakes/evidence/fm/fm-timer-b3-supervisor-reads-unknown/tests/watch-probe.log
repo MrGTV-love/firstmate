@@ -1,0 +1,2 @@
+ok - the worktree write probe stops a silent walk as unknown and lets a slow, working one finish
+exit=0 secs=27

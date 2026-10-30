@@ -1,0 +1,15 @@
+### scan (before any teardown)
+reap	task-x1	ship	7203	finished and idle
+
+### reap pass 1: run-record DB held locked by a real SQLite writer
+lock-skipped	task-x1	-	-	teardown asked to be retried: another operation holds or is queued for the task's project lock, or a no-mistakes read it needs went silent
+wall=40s
+refusal memo state/.idle-reap/task-x1.refused: absent
+task record kept: yes
+teardown-unlanded guard events: 0
+published report row: lock-skipped	task-x1	-	-	teardown asked to be retried: another operation holds or is queued for the task's project lock, or a no-mistakes read it needs went silent
+
+### reap pass 2: lock released, record answers 'not this copy'
+teardown-refused	task-x1	-	-	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+refusal memo: PRESENT
+teardown-unlanded guard events: 1
