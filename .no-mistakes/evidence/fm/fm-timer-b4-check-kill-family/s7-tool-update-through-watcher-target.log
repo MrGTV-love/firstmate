@@ -1,0 +1,8 @@
+armed: state/tool-updates.check.sh
+== target: watcher sweep (default FM_CHECK_TIMEOUT, default probe settings) started 05:38:08
+sweep 51s
+sweep took 51s
+-- wake queue:
+check: $FM_HOME/state/tool-updates.check.sh: tool updates: mutetool check unknown: $FM_HOME/fixbin/mutetool-fixture stopped making progress; retry at the next tool-update interval; slowtool update available: A new version of slowtool is available: v1.0.0 -> v2.0.0
+-- triage:
+-- leftover fixture processes: 0

@@ -1,0 +1,15 @@
+armed: state/mail.check.sh
+== base pass A started 05:38:09 (default watcher settings)
+sweep took 18s
+-- wake queue:
+$FM_HOME/state/mail.check.sh	check: $FM_HOME/state/mail.check.sh: mail: poll did not finish within the 15s budget
+-- triage:
+-- .mail-check record: fm-mail-check-v1|epoch=1793356706|
+armed: state/mail.check.sh
+== base pass B started 05:38:27 (default watcher settings)
+sweep took 17s
+-- wake queue:
+$FM_HOME/state/mail.check.sh	check: $FM_HOME/state/mail.check.sh: mail: poll did not finish within the 15s budget
+-- triage:
+-- hung poll pid alive: no
+-- .mail-check record: fm-mail-check-v1|epoch=1793356724|

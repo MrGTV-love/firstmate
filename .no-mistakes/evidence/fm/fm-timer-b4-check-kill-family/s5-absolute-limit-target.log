@@ -1,0 +1,12 @@
+== spin check (FM_CHECK_TIMEOUT=30, absolute 10 s): sweep 15s; endless pid 48917 alive: no
+-- wake queue:
+check: $FM_HOME/state/a-spin.check.sh: check a-spin stopped after 12s (absolute limit); result unknown, retry next pass
+check: $FM_HOME/state/b-after.check.sh: after-ran
+-- triage:
+[2026-10-30T05:38:22-0500] check a-spin stopped after 12s (absolute limit); result unknown, retry next pass
+== spam check (FM_CHECK_TIMEOUT=30, absolute 10 s): sweep 14s; endless pid 87078 alive: no
+-- wake queue:
+check: $FM_HOME/state/a-spam.check.sh: check a-spam stopped after 11s (absolute limit); result unknown, retry next pass
+check: $FM_HOME/state/b-after.check.sh: after-ran
+-- triage:
+[2026-10-30T05:38:36-0500] check a-spam stopped after 11s (absolute limit); result unknown, retry next pass

@@ -1,0 +1,2 @@
+base 1x: sweep 13s -> SUCCEEDED (work-done reported)
+base 5x: sweep 32s -> FAILED (no work-done; check was killed)

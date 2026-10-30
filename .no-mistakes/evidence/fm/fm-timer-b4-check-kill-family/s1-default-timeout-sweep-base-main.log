@@ -1,0 +1,11 @@
+registered: state/a-slow-stderr.check.sh
+registered: state/b-cpu-silent.check.sh
+registered: state/c-hung.check.sh
+registered: state/d-after.check.sh
+== base: watcher sweep, FM_CHECK_TIMEOUT unset (default 30), started 05:38:09
+sweep finished: rc=0 after 93s
+-- wake queue (check column 5):
+check: $FM_HOME/state/d-after.check.sh: after-ran
+-- triage log:
+hung check pid 95225 gone
+-- stray processes from lab: 0

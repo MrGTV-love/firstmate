@@ -1,0 +1,15 @@
+/Users/charlesabrooker/tmp/fm-b4-driver.Gtchh8/s6.sh: line 17: /Users/charlesabrooker/tmp/fm-lab.Ny3RQa/state/.watch-triage.log: No such file or directory
+pass 1-hang: sweep done=yes; stops logged this pass=1; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|
+pass 2-hang-again: sweep done=no; stops logged this pass=0; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|
+pass 3-hang-third: sweep done=yes; stops logged this pass=1; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|
+pass 4-healthy: sweep done=yes; stops logged this pass=0; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|check: $FM_HOME/state/flaky.check.sh: healthy-run|
+pass 5-hang-new-episode: sweep done=yes; stops logged this pass=1; unknown wakes queued=2
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|check: $FM_HOME/state/flaky.check.sh: healthy-run|check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|
+-- triage log (every stop is logged):
+[2026-10-30T05:38:14-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-30T05:38:23-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-30T05:38:33-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass

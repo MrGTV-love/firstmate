@@ -1,0 +1,93 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture
+ok - a watcher past the alarm limit stays silent about its own and the daemon's singleton locks
+ok - a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock
+ok - an alarm exit spills a consumed source's pending wake and the next watcher queues it first
+ok - a queue lock freed during the alarm check lands the pending append before after-output work
+ok - spilled rows wait for a held queue lock, then replay in order ahead of newer rows
+ok - the drain presents a pending append ahead of the alarm that interrupted its wait
+ok - a failed lock observation inside a queue wait keeps waiting and lands the pending append
+ok - every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row
+ok - exit cleanup's bounded recovery-marker wait never delivers a second wake
+ok - an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter
+ok - a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict
+ok - multiline /proc comm uses the state after the last closing parenthesis and keeps unreadable state alive
+ok - dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms
+ok - a dead owner alarms only after two consecutive blocked checks, revalidated before publication
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue
+ok - local observation covers foreign-indexed state locks and never-owned external locks without touching the foreign index
+ok - a timed-out waiter is pruned without alarming on or changing the fresh live owner
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent
+ok - failed and empty ps results retain live lock ownership
+ok - waiter warns after 60s once per owner and continues to acquire
+ok - wait deadline diagnoses and reaps a stopped test child without hanging
+ok - simultaneous watcher starts leave exactly one live process
+ok - fm_pid_identity real ps fallback is locale-invariant
+ok - fm_pid_identity is locale-invariant across LC_ALL/LC_TIME
+ok - fm_pid_identity ps fallback is terminal-width-invariant
+ok - /proc process identity ignores simulated btime changes
+ok - /proc process identity detects pid reuse
+ok - MSYS /proc process identity regression skipped on non-Windows host
+ok - killed watcher stale lock is reclaimed
+tests/fm-watcher-lock.test.sh: line 2087: 54499 Killed: 9               FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_remove_path() {
+      if [ "$1" = "$STATE/.watch.lock" ]; then
+        kill -KILL "${BASHPID:-$$}"
+      fi
+      return 1
+    }
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" > /dev/null 2>&1
+ok - stale watcher reclaim publishes durable recovery evidence before clear
+ok - live watcher lock with stale heartbeat is actionable
+ok - bounded check returns output and failure status without launching per-tick sleep processes
+ok - group cleanup without perl stops a TERM-ignoring descendant with one sleep per bounded wait
+ok - slow bounded check stays fresh; stopped live poll goes stale and resumes
+ok - decimal inactivity intervals preserve launch allowance and stop a silent check
+ok - authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound
+ok - SIGKILL owner loss independently cleans a progressing TERM-resistant check tree
+ok - a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues
+ok - a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one
+ok - without a POSIX python3 a check still runs and returns its result
+Terminated: 15
+ok - owner loss sends a check's detached child TERM before any KILL
+ok - a stopped check returns only after its TERM-ignoring tree, detached child included, is gone
+ok - private check stderr is capped and keeps its newest tail
+ok - live watcher lock proven stalled for the hard bound is replaced; an unproven old beacon is kept
+ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+ok - concurrent fm_lock_try_acquire yields exactly one winner
+ok - dead-pid stale lock is reclaimed by a single acquirer
+ok - concurrent stale-lock steal yields exactly one winner
+ok - dead steal owner is reclaimed once without a nested steal marker
+ok - dead nested steal chain from an interrupted reclaim is recovered
+ok - a competing reaper cannot remove the successor's steal mutex
+ok - a steal mutex abandoned by this process does not block its own reclaim
+ok - a steal reap interrupted in this process is resumed from its own tombstone
+ok - live steal mutex is not reclaimed
+ok - live-held lock is not stolen
+ok - empty mid-acquire lock keeps a minimum grace
+ok - late original claimant cannot claim a recreated lock
+ok - paused mid-acquire claimant backs off to active stealer
+ok - watch restart preserves recovery without signaling a reused pid
+ok - watch restart attaches to a verified healthy peer and later surfaces a successor gap
+ok - watcher self-evicts when the lock pid no longer names it
+ok - arm turns clean self-eviction without a successor into a typed failure
+ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+ok - attached arm signals record a classified lifecycle entry
+ok - arm starts cleanly and resurfaces recovery after a dead-pid lock
+ok - arm cleans child watcher and temp output on HUP
+ok - arm defers TERM until startup watcher can run its lock cleanup
+ok - arm TERM stops a startup watcher that never becomes cleanup-ready
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 15200.1793355657.nAxNle
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - arm propagates an immediate watcher wake before confirmation
+ok - arm attaches to a peer watcher after child stands down and surfaces a missing successor
+watcher: lock held by live pid 64007 but heartbeat is stale for 846649270s (>300s); inspect or stop that watcher before re-arming.
+ok - arm reports FAILED and exits non-zero when no fresh watcher can be confirmed
+ok - cycle-exit ledger links a verified successor and remains size-capped
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+rc=0 elapsed=306s

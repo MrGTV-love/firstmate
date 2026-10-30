@@ -1,0 +1,10 @@
+target SIGKILL: check=99861 child=99892 detached=99981 all live: yes
+  watcher exited after .25s (alive now: no)
+  LEAK: still alive: 99981
+  .watch.lock present: lrwxr-xr-x
+  stray processes naming the lab: 1
+target SIGTERM: check=33267 child=33317 detached=33445 all live: yes
+  watcher exited after 1.50s (alive now: no)
+  LEAK: still alive: 33445
+  .watch.lock released
+  stray processes naming the lab: 0

@@ -1,0 +1,10 @@
+target SIGKILL: check=49127 child=49173 detached=49382 all live: yes
+  watcher exited after .24s (alive now: no)
+  check tree gone 1.06s after signal (check, child, detached child)
+  .watch.lock present: lrwxr-xr-x
+  stray processes naming the lab: 0
+target SIGTERM: check=57852 child=57869 detached=57944 all live: yes
+  watcher exited after 1.47s (alive now: no)
+  check tree gone 1.48s after signal (check, child, detached child)
+  .watch.lock released
+  stray processes naming the lab: 0
