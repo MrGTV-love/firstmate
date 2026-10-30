@@ -220,6 +220,9 @@ open_prs = cat('open_pr')
 assert set(open_prs) == {PR_URL + '8', PR_URL + '9'}, open_prs
 assert open_prs[PR_URL + '8']['owner'] == 'reviewer' and open_prs[PR_URL + '9']['owner'] == 'firstmate', open_prs
 assert open_prs[PR_URL + '9']['age_seconds'] == 3600 and open_prs[PR_URL + '9']['overdue'], open_prs
+# Merge authority for a green PR is AGENTS.md section 7's standing rule: the row points at it and never asks for approval.
+assert 'AGENTS.md section 7' in open_prs[PR_URL + '9']['next_action'], open_prs
+assert 'approv' not in open_prs[PR_URL + '9']['next_action'].lower(), open_prs
 # Every row names an owner, a next action and an age (or an unknown age that stays overdue).
 for row in report['rows']:
     assert row['owner'] and row['next_action'] and 'age_seconds' in row and row['id'], row
@@ -293,6 +296,8 @@ set_review_age(601)
 assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'a recorded independent PASS did not qualify'
 assert 'openai reviewing anthropic' in rows(ledger(), 'review_pass_not_merged')[review_url]['evidence'], \
     'the review evidence did not name both model families'
+reviewed_action = rows(ledger(), 'review_pass_not_merged')[review_url]['next_action']
+assert 'AGENTS.md section 7' in reviewed_action and 'approv' not in reviewed_action.lower(), reviewed_action
 assert review_url not in rows(ledger(), 'open_pr'), 'one actionable obligation per reviewed PR'
 
 # review_lanes is a discovery hint only: dropping it stops the check even though
@@ -2253,6 +2258,41 @@ restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
 assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
 clock['now'] = now
+# A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
+# the episode follows the row's obligation clock as well as its digest.
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 8000
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: after the restart"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+old = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert old.returncode == 1 and 'new delivery' in old.stdout + old.stderr, (
+    'a delivery from before the restarted obligation clock must be refused', old.stdout, old.stderr)
+assert ack(boundary).returncode == 1, 'the refused delivery must leave the restarted row gated'
+inbox(home, '002.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '002.msg')
+assert ack(boundary).returncode == 0, 'a delivery sent after the restarted overdue boundary answers it'
+clock['now'] = now
+# Control: re-presenting an unchanged row, with no restart, still reuses its valid delivery.
+home, ledger, row, call, ok, drain, ack = case('clock-steady-steer', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+clock['now'] = now
 # The unpause case: a new head is pushed after the presented ledger was generated (G) but before the action (T).
 home, ledger, row, call, ok, drain, ack = case('restart-before-record', owner='captain')
 _, boundary = drain()
@@ -2439,10 +2479,10 @@ assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prio
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
 
-# A steer must be a new delivery sent after the row's presentation, and each record is cited once.
+# A steer must be a delivery sent after the row's overdue episode began; the unchanged steered row stays covered.
 home, ledger, row, call, ok, drain, ack = case('steer-fresh')
 _, boundary = drain()
-inbox(home, '003.msg', handled=True, offset=-60)
+inbox(home, '003.msg', handled=True, offset=-3700)
 stale = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '003.msg')
 assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
 inbox(home, '004.msg')
@@ -2451,11 +2491,31 @@ assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
 assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prior steer'
-reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
-assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
-inbox(home, '005.msg')
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+# A reviewed green PR is re-presented after a steer; re-presenting the unchanged row accepts the same delivery again.
+home, ledger, row, call, ok, drain, ack = case('steer-represent', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '004.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
 assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
+reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
+assert reused.returncode == 0, ('the same unchanged row needs no newer message', reused)
+assert ack(boundary).returncode == 0
+# A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
+home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '005.msg', offset=-600)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+clock['now'] = now + 13799
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'the steer stands until four hours'
+clock['now'] = now + 13800
+expired = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert expired.returncode == 1 and row['id'] in expired.stdout, ('four hours from the delivery have passed', expired)
+clock['now'] = now
 
 # PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
 for handled in (False, True):
@@ -2470,7 +2530,7 @@ for handled in (False, True):
     (home / 'state/worker.inbox/001.msg').unlink()
     refused = call(*args, '001.msg')
     assert refused.returncode == 1 and 'task inbox' in refused.stdout, refused
-    inbox(home, '002.msg', handled=handled, offset=-60)
+    inbox(home, '002.msg', handled=handled, offset=-3700)
     refused = call(*args, '002.msg')
     assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
     inbox(home, '003.msg', handled=handled, offset=1)
@@ -2479,8 +2539,8 @@ for handled in (False, True):
     assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
     assert ack(boundary).returncode == 0
     reused = call(*args, '003.msg')
-    assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
-print('PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement', flush=True)
+    assert reused.returncode == 0, ('the same unchanged row accepts its earlier delivery', reused)
+print('PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement', flush=True)
 
 # A damaged ledger row whose source is not an object still steers through its owner.
 for index, damaged in enumerate(('a string', None, ['worker'], 7)):
@@ -2543,6 +2603,35 @@ ok('bash', '-c', '. "$1"; fm_wake_append check report "check: deferred approval 
 result, boundary = drain()
 assert row['id'] in result.stdout and 'STANDING' not in result.stdout, result
 assert ack(boundary).returncode == 1, 'a deferral cannot hold a mergeable reviewed PR across turns'
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral that never stands leaves the printed row captain-visible', shown)
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is True, record['handling']['actions']
+assert record['handling']['actions'][row['id']]['requires_followup'] is True, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
+# An action marked for follow-up never lets its deferral stand, whatever its stored visibility mark says.
+home, ledger, row, call, ok, drain, ack = case('followup-deferred')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']].update(requires_followup=True, captain_visible=False)
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: followup deferral"', '_', code / 'bin/fm-wake-lib.sh')
+result, boundary = drain()
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral marked for follow-up does not stand, so the row prints captain-visible', shown)
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']]['captain_visible'] = False
+record['rows'][0].pop('captain_visible', None)
+ledger.write_text(json.dumps(record))
+ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json')
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is False, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
 
 # An unproved escalation of a captain-owned row needs no new action until its evidence changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
@@ -2686,17 +2775,42 @@ assert ack(boundary).returncode == 0, 'a fresh deferral on changed work did not 
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
 _, boundary = drain()
+assert row['id'] in json.loads(ledger.read_text())['handling']['episodes'], 'presentation opens the overdue episode'
 inbox(home, '030.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '030.msg')
 clock['now'] = now + 3600
 first = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 kept = next(r for r in first['rows'] if r['id'] == row['id'])
 assert kept['stale'] and kept['last_seen'] == now and row['id'] in first['handling']['actions'], first
+assert row['id'] in first['handling']['episodes'], 'a row an incomplete pass keeps stale keeps its episode'
 clock['now'] = now + 86400
 second = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 assert row['id'] not in {r['id'] for r in second['rows']}, second
 assert row['id'] not in second['handling']['actions'], 'a returning stall starts a fresh row history'
 assert row['id'] not in second['handling']['presentations']['main'], second
+clock['now'] = now
+
+# A stale-retained row is unconfirmed, not no longer overdue: its episode survives the incomplete pass, so a steer
+# sent before a deferral does not count again once a complete pass presents the same row.
+home, ledger, row, call, ok, drain, ack = case('stale-episode')
+_, boundary = drain()
+inbox(home, '040.msg', offset=-60)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck',
+   dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat())
+assert ack(boundary).returncode == 0
+assert json.loads(ledger.read_text())['handling']['episodes'][row['id']]['start'] == now, 'a deferral restarts the episode'
+clock['now'] = now + 60
+incomplete = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert not incomplete['complete'] and next(r for r in incomplete['rows'] if r['id'] == row['id'])['stale'], incomplete
+assert incomplete['handling']['episodes'][row['id']]['start'] == now, 'a stale-retained row keeps its episode'
+clock['now'] = now + 700
+record = json.loads(ledger.read_text())
+record.update(complete=True, generated_epoch=clock['now'], rows=[dict(row, age_seconds=row['age_seconds'] + 700)])
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: complete pass"', '_', code / 'bin/fm-wake-lib.sh')
+drain()
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '040.msg')
+assert again.returncode == 1 and 'became overdue' in again.stdout, ('a steer older than the deferral stays refused', again)
 clock['now'] = now
 
 home, ledger, row, call, ok, drain, ack = case('recheck')
@@ -3963,5 +4077,682 @@ try:
     print('PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated', flush=True)
 finally:
     shutil.rmtree(world)
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+# Ledger actions that tell the truth about common real states: a steer that predates a re-presentation, a remote
+# secondmate's delivery id, one visibility value, and a wait on a named live task.
+import datetime as dt, json, os, re, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code = world / 'evidence-code'
+shutil.copytree(root / 'bin', code / 'bin')
+now = int(time.time())
+clock = dict(now=now)
+iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+WAKE = '. "$1"; fm_wake_append check report "check: %s"'
+
+def inbox(home, record, offset=0, task='worker', handled=False):
+    path = home / 'state' / (task + '.inbox') / ('handled' if handled else '') / record
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'schema=fm-task-inbox.v1\nat={iso(clock["now"] + offset)}\n--\nfollow up\n')
+    return path
+
+def case(name, actor='main', **fields):
+    home = world / ('evidence-' + name)
+    for directory in ('state', 'config', 'data'):
+        (home / directory).mkdir(parents=True)
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now),
+               FM_SUPERVISION_ACTOR=actor, FM_TEST_SEAM='1', FM_TEST_HARNESS='codex')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        env.pop(key, None)
+    row = dict(id='row-' + name, category='stalled_worker', subject='worker', owner='worker:worker',
+               next_action='follow up on lint.full.whole', age_seconds=7200, limit_seconds=3600,
+               overdue=True, evidence='waiting for lint.full.whole; declaration age 7200s')
+    row.update(fields)
+    ledger = home / 'state/open-loops.json'
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now, complete=True, rows=[row])))
+    def call(*args):
+        return subprocess.run([str(a) for a in args], env=dict(env, FM_OPEN_LOOPS_NOW=str(clock['now'])),
+                              text=True, capture_output=True)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    def wake(label='board report'):
+        ok('bash', '-c', WAKE % label, '_', code / 'bin/fm-wake-lib.sh')
+    def drain():
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, (result.stdout, result.stderr)
+        return result, match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0],
+                    '--recovery-generation', boundary[1])
+    def act(kind, evidence, *extra):
+        return call(code / 'bin/fm-open-loops.sh', 'action', row['id'], kind, '--evidence', evidence, *extra)
+    def stored():
+        return json.loads(ledger.read_text())
+    wake()
+    return home, ledger, row, call, ok, wake, drain, ack, act, stored
+
+# 1. A delivery sent after the row's overdue episode began keeps counting when the unchanged row is presented again.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('represent')
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+wake('again')
+_, boundary = drain()
+assert ack(boundary).returncode == 0, 'an unchanged steered row needs no new action until it changes'
+clock['now'] = now
+# A reviewed green PR is re-presented after a steer, so the same delivery must keep counting there.
+PR = 'https://github.com/test/project/pull/9'
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
+    'represent-reviewed', category='review_pass_not_merged', subject=PR, owner='firstmate',
+    source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+wake('again')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
+again = act('steered', '001.msg')
+assert again.returncode == 0, ('re-presenting the same unchanged row must not demand a new message', again.stdout)
+assert ack(boundary).returncode == 0
+clock['now'] = now + 300
+wake('third')
+_, boundary = drain()
+inbox(home, '002.msg', offset=-30)
+minutes_before = act('steered', '002.msg')
+assert minutes_before.returncode == 0, ('a steer sent minutes before the re-presentation still counts', minutes_before.stdout)
+assert ack(boundary).returncode == 0
+clock['now'] = now
+print('PASS: a steer delivered after the overdue episode began counts on every re-presentation of the unchanged row', flush=True)
+
+# A delivery older than the receipt window, and one sent before the episode, never counts.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('old-steer', age_seconds=100000)
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+inbox(home, '002.msg', offset=-96500)
+before = act('steered', '002.msg')
+assert before.returncode == 1 and 'new delivery' in before.stdout, before
+clock['now'] = now + 5 * 3600
+old = act('steered', '001.msg')
+assert old.returncode == 1 and 'four hours' in old.stdout, old
+clock['now'] = now
+# Materially changed evidence opens a new episode: the earlier delivery no longer answers it.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('changed-evidence')
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0 and ack(boundary).returncode == 0
+record = stored()
+record['rows'][0]['evidence'] = 'waiting for lint.full.whole and a new failing step; declaration age 7200s'
+ledger.write_text(json.dumps(record))
+clock['now'] = now + 60
+wake('changed')
+_, boundary = drain()
+stale = act('steered', '001.msg')
+assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
+inbox(home, '002.msg', offset=1)
+assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
+clock['now'] = now
+print('PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused', flush=True)
+
+# The episode opens when the row became overdue, not when a drain first presents it.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('overdue-before-presentation')
+inbox(home, '001.msg', offset=-3700)
+inbox(home, '002.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now - 3600, stored()['handling']['episodes']
+before = act('steered', '001.msg')
+assert before.returncode == 1 and 'became overdue' in before.stdout, ('a delivery before the row went overdue', before.stdout)
+after = act('steered', '002.msg')
+assert after.returncode == 0, ('a delivery after the row went overdue but before its first presentation', after.stdout)
+assert ack(boundary).returncode == 0
+# A record that cannot say when it became overdue falls back to its first presentation, never earlier.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('uncomputable-overdue', age_seconds=None)
+inbox(home, '001.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now, stored()['handling']['episodes']
+early = act('steered', '001.msg')
+assert early.returncode == 1 and 'became overdue' in early.stdout, early
+inbox(home, '002.msg', offset=1)
+assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
+print('PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say',
+      flush=True)
+
+# 2. A remote secondmate keeps its inbox record on its own host; the parent's pending-reply record is the delivery id.
+def reply_record(home, corr, task='mini', delivered=''):
+    directory = home / 'state/pending-replies'
+    directory.mkdir(exist_ok=True)
+    (directory / corr).write_text(f'schema=fm-pending-reply.v1\ncorr_id={corr}\ntask_id={task}\n'
+                                  f'created_epoch={clock["now"]}\ndelivered_epoch={delivered}\nphase=awaiting_report\n')
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
+    'remote', category='silent_report', subject='mini', owner='firstmate',
+    next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
+_, boundary = drain()
+reply_record(home, '0123456789abcdef', delivered='')
+undelivered = act('steered', '0123456789abcdef')
+assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undelivered
+reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
+foreign = act('steered', 'fedcba9876543210')
+assert foreign.returncode == 1, foreign
+reply_record(home, '0011223344556677', delivered=str(now - 3700))
+early = act('steered', '0011223344556677')
+assert early.returncode == 1 and 'new delivery' in early.stdout, early
+reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
+accepted = act('steered', 'aabbccddeeff0011')
+assert accepted.returncode == 0, ('a delivered pending-reply id is a remote secondmate delivery record', accepted.stdout)
+assert stored()['handling']['actions'][row['id']]['evidence'] == 'aabbccddeeff0011'
+assert ack(boundary).returncode == 0
+link = home / 'state/pending-replies/1100110011001100'
+link.symlink_to(home / 'state/pending-replies/aabbccddeeff0011')
+home2, ledger2, row2, call2, ok2, wake2, drain2, ack2, act2, stored2 = case(
+    'remote-link', category='silent_report', subject='mini', owner='firstmate',
+    next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
+_, boundary2 = drain2()
+reply_record(home2, 'aabbccddeeff0011', delivered=str(now + 5))
+(home2 / 'state/pending-replies/2211221122112211').symlink_to(home2 / 'state/pending-replies/aabbccddeeff0011')
+linked = act2('steered', '2211221122112211')
+assert linked.returncode == 1, linked
+print('PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused', flush=True)
+
+# 3. One owner decides captain visibility: the printed row and the deferral check agree.
+def printed_visibility(result, ident):
+    line = next(l for l in result.stdout.splitlines() if ident in l and l.startswith('  '))
+    return line.rsplit(',', 1)[1]
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('visibility')
+_, boundary = drain()
+assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 700
+wake('lapsed')
+result, boundary = drain()
+shown = printed_visibility(result, row['id'])
+second = act('deferred', 'still running', '--recheck', iso(now + 1300))
+assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+assert 'wait on' not in second.stdout, ('a row that cannot take a wait is not told to wait', second.stdout)
+assert shown == 'true', ('a row whose deferral check refuses must print captain_visible true', shown)
+assert stored()['handling']['actions'][row['id']]['captain_visible'] is True
+assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
+clock['now'] = now
+# A second deferral is refused even while the first still stands; the refusal marks the row and it prints captain-visible.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('standing-deferral')
+_, boundary = drain()
+assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+assert ack(boundary).returncode == 0
+repeat = act('deferred', 'lint still running', '--recheck', iso(now + 900))
+assert repeat.returncode == 1 and 'second deferral refused' in repeat.stdout, repeat
+action = stored()['handling']['actions'][row['id']]
+assert action['captain_visible'] is True and action['requires_followup'] is True, action
+assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'the refusal voids the standing deferral'
+wake('refused')
+result, boundary = drain()
+assert printed_visibility(result, row['id']) == 'true', ('the refused row must print captain_visible true', result.stdout)
+# The refusal names a wait only for a row that can take one.
+for category, named in (('red_check', 'wait on a named live task'),
+                        ('unanswered_question', 'wait on a task through a delivery naming the row')):
+    home, ledger, row, call, ok, wake, drain, ack, act, stored = case('visibility-' + category, category=category)
+    clock['now'] = now
+    _, boundary = drain()
+    assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+    assert ack(boundary).returncode == 0
+    clock['now'] = now + 700
+    wake('lapsed')
+    drain()
+    second = act('deferred', 'still running', '--recheck', iso(now + 1300))
+    assert second.returncode == 1 and 'second deferral refused' in second.stdout and named in second.stdout, second
+clock['now'] = now
+print('PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check', flush=True)
+
+# 4. A dependency wait on a named live task, for a red PR row whose worker is parked on purpose.
+fake = world / 'evidence-fakebin'
+fake.mkdir()
+def executable(path, text):
+    path.write_text(text); path.chmod(0o755)
+executable(fake / 'tmux', '''#!/usr/bin/env bash
+if [ -e "$FM_HOME/session-gone" ]; then
+  [ "$1" = list-windows ] && exit 0
+  exit 1
+fi
+case "$1" in
+  list-windows) printf 'fm-repair-owner\\n' ;;
+  display-message) printf '%%1\\n' ;;
+  capture-pane) printf 'all quiet\\n' ;;
+  *) exit 1 ;;
+esac
+''')
+# The crew-state read (FM_CREW_STATE_NO_FORGE=1) sees no run, so the verdict comes from the status log; the
+# ledger's own run read sees the run and its pr field once run-pr exists.
+executable(fake / 'no-mistakes', '''#!/usr/bin/env python3
+import os, sys
+args = sys.argv[1:]
+run_pr = os.path.join(os.environ.get('FM_HOME', ''), 'run-pr')
+run_stall = os.path.join(os.environ.get('FM_HOME', ''), 'run-stall')
+ledger_read = args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1'
+if ledger_read and os.path.exists(run_stall):
+    left = open(run_stall).read().strip()
+    if left == '1':
+        os.unlink(run_stall)
+    elif left:
+        open(run_stall, 'w').write(str(int(left) - 1))
+    sys.exit(1)  # a read that gives no answer; a count limits it to that many reads
+if ledger_read and os.path.exists(os.path.join(os.environ.get('FM_HOME', ''), 'run-uninit')):
+    print("error: repo not initialized (run 'no-mistakes init' first)")
+    print('help[1]: Run `no-mistakes init` to set up the gate in this repository')
+    sys.exit(1)
+if ledger_read and os.path.exists(run_pr):
+    print('run:\\n  id: run-1\\n  branch: fm/repair-owner\\n  pr: ' + open(run_pr).read().strip())
+elif args in (['axi'], ['axi', 'status']) or args[:2] == ['daemon', 'status'] or args[:1] == ['runs']:
+    pass
+else:
+    raise AssertionError(args)
+''')
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+executable(code / 'bin/fm-fleet-snapshot.sh', '''#!/usr/bin/env python3
+import json, os, subprocess, sys
+from pathlib import Path
+p = Path(__file__).parent
+if sys.argv[1] == '--contribution-input':
+    os.execv(str(p / 'real-fleet-snapshot.sh'), [str(p / 'real-fleet-snapshot.sh'), *sys.argv[1:]])
+assert sys.argv[1] == '--home-input'
+snap = json.loads(subprocess.check_output([str(p / 'real-fleet-snapshot.sh'), '--contribution-input']))
+for task in snap['tasks']:
+    task.update(current_state={'state': 'working', 'source': 'status-log'},
+                endpoint={'exists': True, 'agent_alive': 'alive'}, paths={'worktree': {'path': None}}, hints={})
+snap['schema'] = 'fm-fleet-home-input.v1'
+print(json.dumps(snap))
+''')
+executable(code / 'bin/fm-gh-rest.sh', '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+p = json.loads((Path(os.environ['FM_HOME']) / 'forge.json').read_text())
+url = sys.argv[2]
+if '/pulls?' in url: value = [p]
+elif '/check-runs' in url and (Path(os.environ['FM_HOME']) / 'checks-pending').exists():
+    value = {'check_runs': [{'name': 'ci', 'status': 'in_progress', 'conclusion': None, 'id': 1, 'app': {'id': 1}}]}
+elif '/check-runs' in url:
+    value = {'check_runs': [{'name': 'Behavior portable serial 17', 'status': 'completed', 'conclusion': 'failure',
+                             'completed_at': '2026-10-28T00:00:00Z', 'id': 1, 'app': {'id': 1}}]}
+elif '/statuses?' in url: value = []
+else: raise AssertionError(url)
+print(json.dumps([value]))
+''')
+pr = 'https://github.com/test/project/pull/283'
+task_env = dict(os.environ, FM_ROOT_OVERRIDE='', FM_TEST_SEAM='1', FM_TEST_HARNESS='codex', FM_SUPERVISION_ACTOR='main',
+                NM_HOME=str(world / 'evidence-nm'), PATH=str(fake) + os.pathsep + os.environ['PATH'])
+for key in ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+    task_env.pop(key, None)
+
+def wait_fixture(name):
+    home = world / ('evidence-wait-' + name)
+    for directory in ('state', 'data', 'config', 'projects'):
+        (home / directory).mkdir(parents=True)
+    env = dict(task_env, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now))
+    def call(*args):
+        return subprocess.run([str(x) for x in args], env=env, text=True, capture_output=True, timeout=120)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    (home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+    (home / 'forge.json').write_text(json.dumps(dict(html_url=pr, number=283, state='open', draft=False,
+                                                     head={'sha': 'a' * 40}, updated_at=iso(now - 7200))))
+    (home / 'state/parked-job.meta').write_text(f'kind=ship\nspawn_gen=s-parked\npr={pr}\n')
+    (home / 'state/parked-job.status').write_text(f'working [at={now}]: parked on purpose until repair-owner merges\n')
+    tree = world / ('evidence-tree-' + name)
+    ok('git', 'init', '-q', '-b', 'fm/repair-owner', tree)
+    ok('git', '-C', tree, 'commit', '-q', '--allow-empty', '-m', 'fixture')
+    meta = f'kind=ship\nspawn_gen=s-repair\nworktree={tree}\nharness=claude\nwindow=fm:fm-repair-owner\n'
+    (home / 'state/repair-owner.meta').write_text(meta)
+    working = f'working [at={now}]: fixing the red main\n'
+    (home / 'state/repair-owner.status').write_text(working)
+    ok(code / 'bin/fm-busy-event.sh', 'arm', home / 'state', 'repair-owner')
+    def activity(state):
+        ok(code / 'bin/fm-busy-event.sh', 'apply', home / 'state', 'repair-owner', state,
+           '--current-gen', '--source', 'claude-hook', '--event', 'fixture')
+    activity('busy')
+    loops = code / 'bin/fm-open-loops.sh'
+    ledger = home / 'state/open-loops.json'
+    def publish():
+        stamp = int(env['FM_OPEN_LOOPS_NOW'])
+        for path in (home / 'state').glob('*.status'):
+            os.utime(path, (stamp, stamp))
+        return json.loads(ok(loops, '--heartbeat', '--json').stdout)
+    def drain():
+        ok('bash', '-c', WAKE % 'dependency followup', '_', code / 'bin/fm-wake-lib.sh')
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, (result.stdout, result.stderr)
+        return match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0], '--recovery-generation', boundary[1])
+    report = publish()
+    assert report['complete'], report
+    red = next(r for r in report['rows'] if r['subject'] == pr)
+    assert red['category'] == 'red_check' and red['owner'] == 'worker:parked-job', red
+    return dict(home=home, env=env, call=call, ok=ok, loops=loops, ledger=ledger, publish=publish, drain=drain,
+                ack=ack, red=red, activity=activity, working=working, meta=meta)
+
+reason = 'PR is red because main is red; parked until repair-owner merges'
+fx = wait_fixture('live')
+boundary = fx['drain']()
+waited = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert waited.returncode == 0, ('a red PR row can wait on a named live task', waited.stdout)
+assert fx['ack'](boundary).returncode == 0
+boundary = fx['drain']()
+assert fx['ack'](boundary).returncode == 0, 'an unchanged live wait stands across presentations'
+assert fx['red']['id'] in fx['ok'](fx['loops'], '--report').stdout, 'a standing wait stays visible'
+# It never stands past its recheck, and a renewal needs the prerequisite to still be live.
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 3600)
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a due recheck restores the action requirement'
+fx['publish']()
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('a live prerequisite can carry a renewed wait', renewed.stdout)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+
+# It resurfaces when the prerequisite merges, fails or stalls, and refuses a prerequisite that is not live.
+def waiting_fixture(name):
+    fx = wait_fixture(name)
+    boundary = fx['drain']()
+    ok = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    assert ok.returncode == 0, ok.stdout
+    assert fx['ack'](boundary).returncode == 0
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 0
+    return fx
+fx = waiting_fixture('merged')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite merged'
+fx = waiting_fixture('failed')
+(fx['home'] / 'state/repair-owner.status').write_text(f'failed [at={now}]: tests still red\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite failed'
+fx = waiting_fixture('stalled')
+stalled = json.loads(fx['ledger'].read_text())
+stalled['rows'].append(dict(id='stalled-repair', category='stalled_worker', subject='repair-owner',
+                            owner='worker:repair-owner', next_action='follow up', age_seconds=7200,
+                            limit_seconds=3600, overdue=True, evidence='no progress'))
+fx['ledger'].write_text(json.dumps(stalled))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite stalled'
+fx = waiting_fixture('replaced')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('s-repair', 's-replacement'))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a replacement worker cannot inherit the wait'
+fx = waiting_fixture('session-missing')
+fx['activity']('idle')
+(fx['home'] / 'session-gone').write_text('')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite session is missing'
+fx = waiting_fixture('absent-record')
+(fx['home'] / 'state/repair-owner.status').unlink()
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an absent task record is not live'
+# A live prerequisite need not be busy right now: idle between turns, or parked with its PR awaiting review.
+fx = waiting_fixture('idle-turn')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an idle prerequisite between turns still carries the wait'
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'needs-decision [at={now}] [key=review]: PR 290 parked awaiting review\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a parked prerequisite still carries the wait'
+# A done prerequisite with an unmerged recorded PR stays live until its merge is recorded.
+fx = waiting_fixture('done-pr')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR 290 opened; awaiting other-family review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done prerequisite with an unmerged PR carries the wait'
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite whose PR merged has landed'
+# A trouble row that crosses its limit between collections ends the wait at its current age, with no recollection.
+fx = waiting_fixture('trouble-ages')
+aged = json.loads(fx['ledger'].read_text())
+aged['rows'].append(dict(id='stalled-repair', category='stalled_worker', subject='repair-owner',
+                         owner='worker:repair-owner', next_action='follow up', age_seconds=3590,
+                         limit_seconds=3600, overdue=False, evidence='no progress'))
+fx['ledger'].write_text(json.dumps(aged))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a trouble row still under its limit keeps the wait'
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 20)
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the trouble row crossed its limit without a recollection'
+crossed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3620))
+assert crossed.returncode == 1 and 'stalled, missing or failed' in crossed.stdout, ('no new wait on a stalled task', crossed)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A prerequisite's PR on any provider the PR parser accepts ends the wait when its canonical merge record exists.
+def gitlab_done(fx, url):
+    (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=' + url + '\n')
+    (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: MR opened; awaiting review\n')
+    fx['activity']('idle')
+fx = waiting_fixture('merged-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('an unmerged GitLab MR accepts a renewed wait', renewed.stdout)
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the GitLab MR merged'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert landed.returncode == 1 and 'merged' in landed.stdout, ('no renewal after the MR merged', landed)
+# A merge record for another MR of the same project does not end it.
+fx = waiting_fixture('merged-other-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 291',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a merge record for another MR leaves the wait'
+# A merge record the canonical reader cannot validate is unreadable, never "open": the wait is not kept or renewed.
+fx = waiting_fixture('unreadable-marker-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a valid merge record ends the wait'
+marker = fx['home'] / 'state/repair-owner.pr-poll-merge-notified'
+marker.chmod(0)
+try:
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable merge record does not keep the wait'
+    unreadable_marker = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+    assert unreadable_marker.returncode == 1 and 'unreadable' in unreadable_marker.stdout, \
+        ('no wait on an unreadable merge record', unreadable_marker)
+finally:
+    marker.chmod(0o600)
+# A prerequisite whose PR identity the landing check cannot read never keeps or admits a wait.
+fx = waiting_fixture('unreadable-pr-identity')
+gitlab_done(fx, 'https://gitlab.com/test/project/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable PR identity does not keep the wait'
+unreadable = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                        '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert unreadable.returncode == 1 and 'identity' in unreadable.stdout, ('no wait on an unreadable PR identity', unreadable)
+# A done note naming an open PR keeps the prerequisite live before pr= is registered, until that PR's merge is recorded.
+fx = waiting_fixture('done-note')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290 opened; awaiting review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done note naming an open PR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('a done note naming an open PR accepts a new wait', renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the PR its done note named merged'
+# A done note whose PR URL does not parse names no PR, so the task has landed.
+fx = waiting_fixture('done-note-malformed')
+fx['ok']('git', '-C', world / 'evidence-tree-done-note-malformed', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290, checks green\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a malformed done-note PR URL is no PR'
+malformed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                       '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert malformed.returncode == 1 and 'done with no PR' in malformed.stdout, malformed
+# A ship's no-mistakes run records its PR even when the done note names none and pr= is not registered yet.
+fx = waiting_fixture('run-pr')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, "the run's PR carries the wait"
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ("the run's open PR accepts a new wait", renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, "the run's PR merged"
+# A run read that gives no answer is unknown, never a verdict: the wait stands and the next pass reads again.
+fx = waiting_fixture('run-pr-stall')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr-stall', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, "the run's PR carries the wait"
+(fx['home'] / 'run-pr').unlink()
+(fx['home'] / 'run-stall').write_text('')
+stalled_read = fx['call'](fx['loops'], '--check-actions')
+assert stalled_read.returncode == 0, ('a stalled run read leaves the wait standing', stalled_read.stdout)
+unread = fx['call'](fx['loops'], '--present-overdue')
+assert 'PR source unreadable this pass for repair-owner' in unread.stderr, unread
+refused = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert refused.returncode == 1 and 'could not be read' in refused.stdout, ('no new wait on an unread done task', refused)
+(fx['home'] / 'run-stall').unlink()
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an answering read finding no PR ends the wait'
+# A stalled read refuses its own batch line only; a later line whose read answers clears the mark and records.
+fx = waiting_fixture('run-pr-stall-batch')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr-stall-batch', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+(fx['home'] / 'run-stall').write_text('1')
+line = json.dumps(dict(row_id=fx['red']['id'], kind='waiting', evidence=reason, prerequisite_task='repair-owner',
+                       recheck=iso(now + 7200)))
+batch = subprocess.run([str(fx['loops']), 'action', '--batch', '-'], env=fx['env'], text=True, capture_output=True,
+                       timeout=120, input=line + '\n' + line + '\n')
+assert batch.returncode == 1, ('the stalled line is refused', batch.stdout, batch.stderr)
+assert re.search(r'^  1,.*"refused",.*could not be read', batch.stdout, re.M), batch.stdout
+assert re.search(r'^  2,.*"recorded"', batch.stdout, re.M), ('an answering read clears the unread mark', batch.stdout)
+# A repo with no no-mistakes setup answers that there is no run: a done ship with no PR has landed, never unread.
+fx = waiting_fixture('run-uninit')
+fx['ok']('git', '-C', world / 'evidence-tree-run-uninit', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-uninit').write_text('')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: no change needed\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an uninitialized repo answers: the task has landed'
+uninit = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert uninit.returncode == 1 and 'done with no PR' in uninit.stdout, ('an uninitialized repo is an answer', uninit)
+assert 'could not be read' not in uninit.stdout and 'unreadable' not in uninit.stderr, uninit
+# A done scout whose done note names another task's PR has landed: only a ship's done note names its own PR.
+fx = waiting_fixture('done-scout-note')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('kind=ship', 'kind=scout'))
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/293 reviewed: FAIL, 3 findings\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, "a done scout naming another task's PR has landed"
+scouted = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert scouted.returncode == 1 and 'done with no PR' in scouted.stdout, scouted
+# A done prerequisite with no PR from any source has landed: its report is its delivery.
+fx = waiting_fixture('done-no-pr')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: findings reported\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite with no PR has landed'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert landed.returncode == 1 and 'done with no PR' in landed.stdout, landed
+fx = wait_fixture('idle')
+boundary = fx['drain']()
+fx['activity']('idle')
+idle = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert idle.returncode == 0, ('a wait on an idle live prerequisite is recorded', idle.stdout)
+(fx['home'] / 'session-gone').write_text('')
+gone = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert gone.returncode == 1 and 'not live' in gone.stdout, gone
+missing = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'no-such-task', '--recheck', iso(now + 3600))
+assert missing.returncode == 1, missing
+own = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                 '--prerequisite-task', 'parked-job', '--recheck', iso(now + 3600))
+assert own.returncode == 1 and 'distinct' in own.stdout, own
+assert json.loads(fx['ledger'].read_text())['handling']['actions'][fx['red']['id']]['evidence'] == reason
+print('PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, '
+      'loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live '
+      'is refused', flush=True)
+
+# The delivery form of a task wait shares the steer's boundary: the start of the row's current overdue episode.
+def delivery(fx, record, sent):
+    path = fx['home'] / 'state/repair-owner.inbox' / record
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'schema=fm-task-inbox.v1\nat={iso(sent)}\n--\nopen-loop-row: {fx["red"]["id"]}\nland the red-main fix\n')
+fx = wait_fixture('delivery-episode')
+boundary = fx['drain']()
+published = json.loads(fx['ledger'].read_text())
+episode = published['handling']['episodes'][fx['red']['id']]['start']
+red = next(r for r in published['rows'] if r['id'] == fx['red']['id'])
+assert episode == published['generated_epoch'] - red['age_seconds'] + red['limit_seconds'], (episode, red)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 60)
+delivery(fx, '001.msg', now + 60)
+delivery(fx, '002.msg', episode - 60)
+assert fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 200)).returncode == 0
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 300)
+boundary = fx['drain']()
+stored = json.loads(fx['ledger'].read_text())['handling']
+assert stored['presented_at']['main'][fx['red']['id']] == now + 300, 'the due recheck re-presented the unchanged row'
+assert stored['episodes'][fx['red']['id']]['start'] == episode, 're-presenting an unchanged row keeps its episode'
+older = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '002.msg',
+                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert older.returncode == 1 and 'became overdue' in older.stdout, ('a delivery older than the episode is refused', older.stdout)
+inside = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '001.msg',
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert inside.returncode == 0, ('a delivery inside the episode counts after a re-presentation', inside.stdout)
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A complete pass whose row is no longer overdue closes its episode: a PR update resets the open PR's age.
+fx = wait_fixture('episode-closes')
+(fx['home'] / 'checks-pending').write_text('')
+pending = next(r for r in fx['publish']()['rows'] if r['subject'] == pr)
+assert pending['category'] == 'open_pr' and pending['overdue'], pending
+fx['drain']()
+assert pending['id'] in json.loads(fx['ledger'].read_text())['handling']['episodes'], 'presentation opens the episode'
+forge = json.loads((fx['home'] / 'forge.json').read_text())
+(fx['home'] / 'forge.json').write_text(json.dumps(dict(forge, updated_at=iso(now))))
+closed = fx['publish']()
+row = next(r for r in closed['rows'] if r['id'] == pending['id'])
+assert closed['complete'] and not row['overdue'] and not row.get('stale'), row
+assert pending['id'] not in closed['handling']['episodes'], 'a published row that is no longer overdue closes its episode'
+print('PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; '
+      'one older than the episode is refused; a row no longer overdue closes its episode', flush=True)
+
+# Only a PR row waits on a task by reason alone; a question or unlanded-commit row cites a delivery naming it.
+fx = wait_fixture('reason-scope')
+boundary = fx['drain']()
+for number, category in enumerate(('open_pr', 'red_check', 'unanswered_question', 'unlanded_commit'), 1):
+    published = json.loads(fx['ledger'].read_text())
+    next(r for r in published['rows'] if r['id'] == fx['red']['id'])['category'] = category
+    fx['ledger'].write_text(json.dumps(published))
+    by_reason = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                           '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    if category in ('open_pr', 'red_check'):
+        assert by_reason.returncode == 0, (category, 'a PR row waits on a live task by reason', by_reason.stdout)
+        continue
+    assert by_reason.returncode == 1 and 'NNN.msg' in by_reason.stdout, (category, by_reason.stdout)
+    record = f'{number:03d}.msg'
+    delivery(fx, record, now)
+    by_delivery = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', record,
+                             '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    assert by_delivery.returncode == 0, (category, 'the delivery form still binds this row', by_delivery.stdout)
+print('PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows '
+      'are refused that form and still wait through a delivery naming them', flush=True)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

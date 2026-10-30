@@ -19,7 +19,8 @@
     "status-log-size-cap",
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
-    "slack-dm-retarget-pending-work"
+    "slack-dm-retarget-pending-work",
+    "open-loops-one-deferral"
   ],
   "guards": [
     {
@@ -1122,6 +1123,33 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by PR #188 after a status-append loop filled the disk; deny without a guard event: an append past the cap exits 75 and a refused read returns status 2, each naming the file on stderr, and nothing is written or read; the symbolic-link refusal keeps the capped append on the status log itself; bin/fm-status-cap-guard.sh raises the over-cap wake for a raw writer; docs/configuration.md \"Status log size bounds\" describes the bounds for operators; the test proves the cap and both read refusals, and the symbolic-link refusal has no fixture"
+    },
+    {
+      "id": "open-loops-one-deferral",
+      "version": "1",
+      "owner": "bin/fm_open_loops.py",
+      "sites": [
+        {"file": "bin/fm_open_loops.py", "match": "second deferral refused; row is captain-visible"}
+      ],
+      "invariant": "an overdue open-work ledger row takes at most one deferral before it needs a real action",
+      "layer": "runtime-block",
+      "source": "the row's recorded action in state/open-loops.json handling.actions (deferral count, row digest and recorded clock start), read by record_action in bin/fm_open_loops.py",
+      "trigger": "bin/fm-open-loops.sh action <row-id> deferred on an unchanged row whose one deferral was already used, whether or not that deferral still stands",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "record a real action: bin/fm-open-loops.sh action <row-id> steered --evidence <NNN.msg>, merged --evidence <PR-URL>, for an open_pr or red_check row waiting --prerequisite-task <task-id> --evidence <reason> --recheck <UTC-time>, or escalated --evidence <escalation>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-open-loops.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "deny without a guard event: the refusal marks the row captain-visible and its receipt requires_followup, reopens its action requirement, and exits 1 naming the real actions; docs/configuration.md \"Open-work ledger\" describes the one-deferral rule; the test proves the refusal, the marks and the printed captain_visible value"
     },
     {
       "decision": "deny",
