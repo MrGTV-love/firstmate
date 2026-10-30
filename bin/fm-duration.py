@@ -10,7 +10,7 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
        fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
-       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS [PATH...]
+       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS|default [PATH...] [--while-alive]
        fm-duration.py check-literals [--base REF | --report]
 
 keep-going is the record-free operational command runner: its only automatic
@@ -37,6 +37,14 @@ identity-bound observation record for an existing PID plus optional file
 signatures; it returns 124 only after consecutive valid observations show no
 progress for the inactivity interval. First, failed, corrupt or reused-PID
 observations never authorize a stop. Missing telemetry does not prove a stall.
+PID 0 selects file-only observation and requires at least one watched path; the
+observer's own CPU never becomes publisher progress. --while-alive on a positive
+PID additionally returns 3 for a dead/zombie peer or an observed PID reuse once
+no descendant it was last observed with remains; it never signals anything. In that mode the PID is a liveness fence only: activity
+(CPU, runnable work, forks) is not progress toward an outcome, so only watched
+files reset inactivity. Tests use it to distinguish a missing outcome after
+peer exit from a productive publisher that is merely slow. An inactivity of
+"default" selects the operational no-progress policy below.
 These inactivity bounds exist to recover genuinely hung work, not to cap the
 duration of productive work. The default operational policy is 15 quiet minutes;
 callers' historical timeout overrides now select inactivity intervals instead.
@@ -737,21 +745,88 @@ def communicate_progress(child, inactivity):
                 raise
 
 
-def progress_check(path, pid, inactivity, paths):
+def descendants_alive(pid, old):
+    """Whether a process recorded beside PID, other than PID, still runs."""
+    members = [(child, start) for child, start in old if child != pid]
+    if not members:
+        return False
+    table = proc_table(os.getpid())
+    if table is None:
+        table = ps_table()
+    if table is None:
+        return True  # An unreadable table is unknown, not a death verdict.
+    return any(child in table and table[child][2] == start for child, start in members)
+
+
+def observer_clock():
+    # Records cross interpreter processes. On macOS Python < 3.10 monotonic()
+    # has a process-local epoch; CLOCK_UPTIME_RAW shares the kernel's clock and,
+    # like monotonic() elsewhere, does not count system sleep as inactivity.
+    if sys.platform == 'darwin':
+        return 'uptime_raw', time.clock_gettime(time.CLOCK_UPTIME_RAW)
+    return 'monotonic', time.monotonic()
+
+
+def progress_check(path, pid, inactivity, paths, while_alive=False):
     """124 only after repeated valid samples prove no CPU or file progress.
 
     The saved process start identity fences PID reuse. A first/failed sample,
     corrupt record, missing process, or clock reset never authorizes a signal.
     Callers own their lock and must recheck its identity before acting.
+    Persisted times use a cross-process kernel clock that excludes system
+    sleep; records from another clock domain start a fresh window.
+    PID 0 observes files only. The opt-in while_alive mode returns 3 for a
+    proven dead/zombie/reused peer once the descendants recorded with it are
+    gone too, independently of the inactivity verdict, and counts only
+    watched-file changes as progress.
     """
     observed = {}
-    cpu, runnable = tree_cpu(pid, observed)
-    if cpu is None:
-        warn_blind_telemetry()
-        return 0
-    if not any(child == pid for child, _ in observed):
-        return 0
-    identity = next(identity for (child, identity) in observed if child == pid)
+    identity = ()
+    runnable = False
+    previous, old = None, {}
+    with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+        candidate = json.loads(path.read_text())
+        if (candidate['pid'] == pid and 0 <= candidate['since'] <= candidate['sampled']
+                and isinstance(candidate['identity'], list) and isinstance(candidate['files'], list)):
+            old = {(child, tuple(start)): value for child, start, value in candidate['cpu']}
+            previous = candidate
+    gone = False
+    if while_alive:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            gone = True
+        except PermissionError:
+            pass  # An unreadable peer is unknown, not dead.
+    if while_alive and not gone:
+        # kill(0) alone accepts zombies. Prefer the native stat where available;
+        # confined Darwin workers use the existing process-info fallback.
+        try:
+            stat_line = (Path(os.environ.get('FM_PROC_ROOT_OVERRIDE') or '/proc') / str(pid) / 'stat').read_text()
+            state = stat_line[stat_line.rindex(')') + 1:].split()[0]
+        except (OSError, ValueError, IndexError):
+            try:
+                result, native = proc_read(['ps', '-o', 'stat=', '-p', str(pid)], ['table', 'pid,stat'])
+                state = result.stdout.strip() if native else next(
+                    (line.split()[1] for line in result.stdout.splitlines()
+                     if len(line.split()) == 2 and line.split()[0] == str(pid)), '')
+            except OSError:
+                state = ''  # Unavailable state is unknown, not a death verdict.
+        gone = state.startswith(('Z', 'X'))
+    if pid and not gone:
+        cpu, runnable = tree_cpu(pid, observed)
+        if cpu is None:
+            warn_blind_telemetry()
+            return 0
+        if not any(child == pid for child, _ in observed):
+            return 0
+        identity = next(identity for (child, identity) in observed if child == pid)
+        gone = (while_alive and previous is not None and previous['identity'] != list(identity)
+                and (pid, tuple(previous['identity'])) in old)  # A reused PID is not the peer's successor.
+    if gone:
+        if previous is None or not descendants_alive(pid, old):
+            return 3
+        identity, observed = tuple(previous['identity']), dict(old)
     files = []
     for name in paths:
         try:
@@ -761,20 +836,16 @@ def progress_check(path, pid, inactivity, paths):
             files.append([name, None])
         except OSError:
             return 0
-    now = time.monotonic()
+    clock, now = observer_clock()
     record = dict(pid=pid, identity=list(identity), files=files,
                   cpu=[[child, list(start), value] for (child, start), value in observed.items()],
-                  since=now, sampled=now)
-    try:
-        previous = json.loads(path.read_text())
-        if (previous['pid'] == pid and previous['identity'] == list(identity)
-                and 0 <= previous['since'] <= previous['sampled'] <= now):
-            old = {(child, tuple(start)): value for child, start, value in previous['cpu']}
-            advancing = runnable or files != previous['files'] or any(value > old.get(key, -1) for key, value in observed.items())
-            if not advancing:
-                record['since'] = previous['since']
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
+                  clock=clock, since=now, sampled=now)
+    if (previous is not None and previous.get('clock') == clock
+            and previous['sampled'] <= now and previous['identity'] == list(identity)):
+        advancing = files != previous['files'] or not while_alive and (
+            runnable or any(value > old.get(key, -1) for key, value in observed.items()))
+        if not advancing:
+            record['since'] = previous['since']
     temporary = path.with_name(path.name + '.' + str(os.getpid()))
     try:
         temporary.write_text(json.dumps(record))
@@ -1373,8 +1444,10 @@ def main():
     observer = commands.add_parser('progress-check')
     observer.add_argument('record', type=Path)
     observer.add_argument('pid', type=int)
-    observer.add_argument('inactivity', type=float)
+    observer.add_argument('inactivity', type=lambda value: float(
+        positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT) if value == 'default' else value))
     observer.add_argument('paths', nargs='*')
+    observer.add_argument('--while-alive', action='store_true')
     gater = commands.add_parser('gate')
     gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
@@ -1408,7 +1481,9 @@ def main():
         if not math.isfinite(args.inactivity) or args.inactivity <= 0:
             parser.error('inactivity must be finite and positive')
         if args.action == 'progress-check':
-            return progress_check(args.record, args.pid, args.inactivity, args.paths)
+            if args.pid < 0 or (args.pid == 0 and (args.while_alive or not args.paths)):
+                parser.error('progress-check needs a positive PID, or PID 0 with watched files only')
+            return progress_check(args.record, args.pid, args.inactivity, args.paths, args.while_alive)
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('keep-going requires -- COMMAND')

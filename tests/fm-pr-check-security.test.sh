@@ -1530,13 +1530,32 @@ test_bootstrap_leaves_unauthenticated_checks() {
   pass "bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics"
 }
 
-test_custom_snapshot_cleanup_on_signal() {
-  local dir state child_pid_file pid child_pid i rc
-  dir=$(make_case custom-snapshot-signal)
+custom_snapshot_signal_case() {  # <responsive|stopped>
+  local mode=$1 dir state child_pid_file launcher_pid_file pid child_pid launcher_pid check_pgid i rc
+  local active_check_grace=0 watcher_margin=10 test_margin=20 allowances launcher_cleanup guardian_grace
+  local stop_polls launcher_command group_states host
+  host=$(uname)
+  # In tenths of a second, from their one definitions. Custom captures use
+  # FM_ACTIVE_CHECK_GRACE=0. The watcher waits that grace, the launcher's own
+  # cleanup (TERM_SECONDS + LEFTOVER_GRACE) and its 1 s margin before it KILLs
+  # a stopped launcher; the guardian then gives TERM-resistant work
+  # TERM_SECONDS. The 2 s test margin covers interpreter starts and scheduling.
+  # This is a bound on requested shutdown, never on normally progressing work.
+  # Each tenth is ten 0.01 s polls, the unit the watcher's launcher wait
+  # counts, so host load stretches this wait as much as the watcher's.
+  allowances=$(python3 -c 'import math, runpy, sys
+proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
+print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 10), math.ceil(proc["TERM_SECONDS"] * 10))' \
+    "$ROOT/bin/fm-proc-info.py" "$ROOT/bin/fm-proc-budget-tree.py") || fail "cannot read cleanup allowances"
+  read -r launcher_cleanup guardian_grace <<< "$allowances"
+  stop_polls=$((active_check_grace * 10 + launcher_cleanup + watcher_margin + guardian_grace + test_margin))
+  dir=$(make_case "custom-snapshot-signal-$mode")
   state="$dir/home/state"
   child_pid_file="$dir/custom-child.pid"
-  # shellcheck disable=SC2016  # The generated child expands $$ when it runs.
+  launcher_pid_file="$dir/custom-launcher.pid"
+  # shellcheck disable=SC2016  # The generated child expands its own process IDs.
   printf '%s\n' '#!/usr/bin/env bash' 'trap "" TERM' \
+    'printf "%s\n" "$PPID" > "$FM_TEST_CUSTOM_LAUNCHER_PID"' \
     'printf "%s\n" "$$" > "$FM_TEST_CUSTOM_CHILD_PID"' 'while :; do sleep 1; done' \
     > "$state/custom.check.sh"
   chmod 0700 "$state/custom.check.sh"
@@ -1554,6 +1573,7 @@ SH
 
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=0 FM_CHECK_INTERVAL=0 \
     FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
+    FM_TEST_CUSTOM_LAUNCHER_PID="$launcher_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
@@ -1569,98 +1589,121 @@ SH
   find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "watcher did not create the custom check snapshot"
   child_pid=$(cat "$child_pid_file")
+  launcher_pid=$(cat "$launcher_pid_file")
+  if [ "$host" = Darwin ]; then
+    launcher_command=$(python3 "$ROOT/bin/fm-proc-info.py" args "$launcher_pid")
+    check_pgid=$(python3 "$ROOT/bin/fm-proc-info.py" pgid "$child_pid")
+  else
+    launcher_command=$(ps -p "$launcher_pid" -o command=)
+    check_pgid=$(ps -p "$child_pid" -o pgid= | tr -d '[:space:]')
+  fi
+  case "$launcher_command" in
+    *fm-check-run.py*) ;;
+    *) fail "custom check parent is not its owned launcher" ;;
+  esac
+  if [ "$mode" = stopped ]; then
+    kill -STOP "$launcher_pid" || fail "could not stop owned launcher"
+  fi
   kill -TERM "$pid" 2>/dev/null || fail "could not signal watcher during custom check"
   i=0
-  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 100 ]; do
-    sleep 0.02
+  while { process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+      || process_is_live_non_zombie "$child_pid"; } && [ "$i" -lt "$stop_polls" ]; do
+    perl -e 'select undef, undef, undef, 0.01 for 1 .. 10'
     i=$((i + 1))
   done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+  if process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+    || process_is_live_non_zombie "$child_pid"; then
+    # Fault-injection failure must not leave a stopped launcher or check behind.
+    kill -KILL "$launcher_pid" "$pid" 2>/dev/null || true
+    kill -KILL -- "-$check_pgid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    fail "signaled watcher did not exit promptly"
+    fail "signaled watcher did not exit within cleanup grace plus margin ($mode launcher)"
   fi
   rc=0
   wait "$pid" || rc=$?
   [ "$rc" -ne 0 ] || fail "signaled watcher exited successfully"
-  ! kill -0 "$child_pid" 2>/dev/null || fail "signaled watcher left the custom check child running"
+  ! process_is_live_non_zombie "$launcher_pid" || fail "signaled watcher left its launcher running"
+  ! process_is_live_non_zombie "$child_pid" || fail "signaled watcher left the custom check child running"
+  # Orphan zombies are already dead; no live member of the check's group may
+  # remain, including its independent guardian and TERM-resistant descendants.
+  if [ "$host" = Darwin ]; then
+    group_states=$(python3 "$ROOT/bin/fm-proc-info.py" table pgid,stat) || fail "cannot read check-group state"
+  else
+    group_states=$(ps -ax -o pgid=,stat=) || fail "cannot read check-group state"
+  fi
+  ! printf '%s\n' "$group_states" | awk -v group="$check_pgid" \
+    '$1 == group && $2 !~ /^Z/ { live=1 } END { exit !live }' \
+    || fail "signaled watcher left a live check-group member"
   ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private custom check snapshot"
   ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private check output file"
   [ ! -e "$state/.watch.lock/pid" ] || fail "signaled watcher left its singleton lock"
-  pass "watcher signals promptly stop custom checks and clean private state"
+  pass "a signaled watcher stops its custom check and cleans private state ($mode launcher)"
+}
+
+test_custom_snapshot_cleanup_on_signal() {
+  custom_snapshot_signal_case responsive
+}
+
+test_custom_snapshot_cleanup_with_stopped_launcher() {
+  custom_snapshot_signal_case stopped
 }
 
 test_returned_custom_check_descendants_are_drained() {
-  local backend dir state fakebin ready direct_done child_pid_file child_pid check rc force_fallback
-  for backend in installed-timeout fallback-timeout; do
-    dir=$(make_case "returned-custom-descendant-$backend")
-    state="$dir/home/state"
-    fakebin="$dir/fakebin"
-    ready="$dir/descendant-ready"
-    direct_done="$dir/direct-check-done"
-    child_pid_file="$dir/descendant.pid"
-    # The descendant ignores TERM and never exits on its own while this case's
-    # directory exists, so its absence can only mean the watcher drained it.
-    cat > "$state/custom.check.sh" <<'SH'
+  local dir state fakebin ready direct_done child_pid_file child_pid check rc
+  dir=$(make_case returned-custom-descendant)
+  state="$dir/home/state"
+  fakebin="$dir/fakebin"
+  ready="$dir/descendant-ready"
+  direct_done="$dir/direct-check-done"
+  child_pid_file="$dir/descendant.pid"
+  # The descendant ignores TERM and never exits on its own while this case's
+  # directory exists, so its absence can only mean the watcher drained it.
+  cat > "$state/custom.check.sh" <<'SH'
 #!/usr/bin/env bash
 perl -e '$SIG{TERM}="IGNORE"; open my $ready, ">", $ENV{FM_TEST_DESCENDANT_READY} or die $!; print {$ready} "ready\n"; close $ready; select undef, undef, undef, 0.2 while -d $ENV{FM_TEST_DESCENDANT_HOLD}' &
 printf '%s\n' "$!" > "$FM_TEST_DESCENDANT_PID"
 while [ ! -s "$FM_TEST_DESCENDANT_READY" ]; do sleep 0.01; done
 : > "$FM_TEST_DIRECT_DONE"
 SH
-    # The watcher runs this check next in the same cycle, only after it has
-    # finished with the returned one, so its wake both records whether the
-    # descendant outlived that drain and stops the watcher.
-    cat > "$state/z-drain-witness.check.sh" <<'SH'
+  # The watcher runs this check next in the same cycle, only after it has
+  # finished with the returned one, so its wake both records whether the
+  # descendant outlived that drain and stops the watcher.
+  cat > "$state/z-drain-witness.check.sh" <<'SH'
 #!/usr/bin/env bash
 case "$(ps -o stat= -p "$(cat "$FM_TEST_DESCENDANT_PID")" 2>/dev/null)" in
   ''|Z*) printf 'descendant drained\n' ;;
   *) printf 'descendant alive\n' ;;
 esac
 SH
-    for check in custom z-drain-witness; do
-      chmod 0700 "$state/$check.check.sh"
-      FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
-        || fail "could not register $backend returned-descendant $check check"
-    done
-    if [ "$backend" = installed-timeout ]; then
-      cat > "$fakebin/timeout" <<'SH'
-#!/usr/bin/env bash
-shift
-exec "$@"
-SH
-      chmod 0700 "$fakebin/timeout"
-      force_fallback=0
-    else
-      rm -f "$fakebin/timeout" "$fakebin/gtimeout"
-      force_fallback=1
-    fi
-
-    rc=0
-    FM_TEST_CHECK_TIMEOUT=10 FM_CHECK_FORCE_FALLBACK="$force_fallback" \
-      FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
-      FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
-      run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
-    child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
-    if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
-      kill -KILL "$child_pid" 2>/dev/null || true
-      fail "$backend watcher left a returned check descendant alive"
-    fi
-    [ "$rc" -eq 0 ] \
-      || fail "$backend watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
-    [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
-      || fail "$backend watcher did not complete the direct custom check"
-    grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
-      || fail "$backend watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
-    ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private custom check snapshot"
-    ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private check output file"
-    [ ! -e "$state/.watch.lock/pid" ] || fail "$backend watcher left its singleton lock"
+  for check in custom z-drain-witness; do
+    chmod 0700 "$state/$check.check.sh"
+    FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
+      || fail "could not register returned-descendant $check check"
   done
-  pass "returned custom check descendants are drained on installed and fallback timeout paths"
+  rc=0
+  FM_TEST_CHECK_TIMEOUT=10 \
+    FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
+    FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
+    run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
+  child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
+  if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
+    kill -KILL "$child_pid" 2>/dev/null || true
+    fail "watcher left a returned check descendant alive"
+  fi
+  [ "$rc" -eq 0 ] \
+    || fail "watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
+  [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
+    || fail "watcher did not complete the direct custom check"
+  grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
+    || fail "watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
+  ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
+    || fail "watcher left a private custom check snapshot"
+  ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
+    || fail "watcher left a private check output file"
+  [ ! -e "$state/.watch.lock/pid" ] || fail "watcher left its singleton lock"
+  pass "returned custom check descendants are drained before the next check runs"
 }
 
 test_teardown_removes_poll_artifacts() {
@@ -3800,6 +3843,8 @@ SH
   pass "device re-record publication waits without rewriting its registration"
 }
 
+fm_test_only
+
 test_parser_matrix
 test_gitlab_merge_watch
 test_forgejo_merge_watch
@@ -3848,5 +3893,6 @@ test_device_rerecord_serializes_rerecord
 test_postrename_poll_validation_revokes_and_retries
 test_bootstrap_leaves_unauthenticated_checks
 test_custom_snapshot_cleanup_on_signal
+test_custom_snapshot_cleanup_with_stopped_launcher
 test_returned_custom_check_descendants_are_drained
 test_teardown_removes_poll_artifacts

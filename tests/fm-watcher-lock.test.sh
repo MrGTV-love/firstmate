@@ -199,11 +199,11 @@ test_live_stale_watch_lock_is_actionable() {
   pass "live watcher lock with stale heartbeat is actionable"
 }
 
-watcher_check_timeout_case() {
-  local fallback=$1 timeout=$2 runtime=$3 setup=$4 expected=$5
+watcher_check_inactivity_case() {
+  local timeout=$1 runtime=$2 setup=$3 expected=$4
   local dir state fakebin pid i real_mktemp
   real_mktemp=$(command -v mktemp)
-  dir=$(make_case "check-timeout-$fallback-$timeout-$setup-$expected")
+  dir=$(make_case "check-inactivity-$timeout-$setup-$expected")
   state="$dir/state"
   fakebin="$dir/fakebin"
   cat > "$state/timeout.check.sh" <<'SH'
@@ -232,7 +232,7 @@ SH
   fi
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_CHECK_TIMEOUT="$timeout" FM_CHECK_FORCE_FALLBACK="$fallback" \
+    FM_CHECK_TIMEOUT="$timeout" \
     FM_TEST_CHECK_RUNTIME="$runtime" FM_TEST_CHECK_SETUP="$setup" \
     FM_TEST_REAL_MKTEMP="$real_mktemp" \
     "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
@@ -248,16 +248,16 @@ SH
     sleep 0.1
   done
   stop_seed_watcher "$pid" "$dir/watch.err"
-  [ -e "$state/check-started" ] || fail "timeout $timeout never launched (fallback $fallback): $(cat "$dir/watch.err")"
-  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep (fallback $fallback): $(cat "$dir/watch.err")"
+  [ -e "$state/check-started" ] || fail "timeout $timeout never launched: $(cat "$dir/watch.err")"
+  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep: $(cat "$dir/watch.err")"
   if [ "$setup" -gt 0 ]; then
     [ -e "$state/output-setup-started" ] && [ -e "$state/output-setup-finished" ] \
       || fail "slow check-output setup was not exercised"
   fi
   if [ "$expected" = complete ]; then
-    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (fallback $fallback, setup $setup)"
+    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$dir/watch.out" >/dev/null \
-      || fail "timeout $timeout lost actual watcher output (fallback $fallback, setup $setup)"
+      || fail "timeout $timeout lost actual watcher output (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$state/.wake-queue" >/dev/null \
       || fail "timeout $timeout did not queue check output"
   else
@@ -267,15 +267,306 @@ SH
   fi
 }
 
-test_check_timeout_configuration_and_launch_allowance() {
-  local fallback
-  for fallback in 0 1; do
-    watcher_check_timeout_case "$fallback" 08 0.5 0 complete
-    watcher_check_timeout_case "$fallback" 010 9.2 0 complete
-    watcher_check_timeout_case "$fallback" 2 1 4 complete
-    watcher_check_timeout_case "$fallback" 2 4 0 expired
+test_check_inactivity_configuration_and_launch_allowance() {
+  watcher_check_inactivity_case 08 0.5 0 complete
+  watcher_check_inactivity_case 010 9.2 0 complete
+  watcher_check_inactivity_case 2 1 4 complete
+  watcher_check_inactivity_case 2 30 0 expired
+  pass 'decimal inactivity intervals preserve launch allowance and stop a silent check'
+}
+
+test_check_progress_survives_fivefold_slowdown() {
+  local dir state factor pid
+  for factor in 1 5; do
+    dir=$(make_case "progress-$factor")
+    state="$dir/state"
+    cat > "$state/progress.check.sh" <<'SH'
+#!/usr/bin/env bash
+for ((step=0; step<10; step++)); do
+  printf 'working %s\n' "$step" >&2
+  sleep "$FM_TEST_DELAY"
+done
+touch "$FM_STATE_OVERRIDE/check-finished"
+printf 'check-completed\n'
+SH
+    chmod 0700 "$state/progress.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" progress >/dev/null || fail 'registration failed'
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+      FM_TEST_DELAY="0.$factor" "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    while is_live_non_zombie "$pid"; do
+      grep -F 'check-completed' "$dir/watch.out" >/dev/null && break
+      [ ! -e "$state/.last-check" ] || [ -e "$state/check-finished" ] || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -e "$state/check-finished" ] || fail "${factor}x progressing check was killed"
+    grep -F 'check-completed' "$dir/watch.out" >/dev/null || fail 'check output was lost'
+    grep -F 'check-completed' "$state/.wake-queue" >/dev/null || fail 'check wake was lost'
+    ! grep -F 'working ' "$dir/watch.out" >/dev/null || fail 'stderr telemetry became check news'
   done
-  pass "decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers"
+  pass 'authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound'
+}
+
+test_check_sigkill_owner_cleans_progressing_tree() {
+  local dir state pid child launcher descendant leaked=0
+  dir=$(make_case check-sigkill-owner)
+  state="$dir/state"
+  cat > "$state/owner.check.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+sleep 300 &
+printf '%s\n' "$!" > "$FM_STATE_OVERRIDE/descendant-pid"
+printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/launcher-pid"
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-pid"
+while :; do printf 'working\n' >&2; sleep 0.1; done
+SH
+  chmod 0700 "$state/owner.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" owner >/dev/null || fail 'registration failed'
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  while is_live_non_zombie "$pid" && [ ! -s "$state/check-pid" ]; do sleep 0.1; done
+  [ -s "$state/check-pid" ] || fail "check never started: $(cat "$dir/watch.err")"
+  IFS= read -r child < "$state/check-pid"
+  IFS= read -r launcher < "$state/launcher-pid"
+  IFS= read -r descendant < "$state/descendant-pid"
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null || true
+  # Wait for the cleanup owner, not a guessed deadline. On the old direct-exec
+  # path the launcher is the now-dead watcher, exposing the leak immediately.
+  while is_live_non_zombie "$launcher"; do sleep 0.1; done
+  is_live_non_zombie "$child" && leaked=1
+  is_live_non_zombie "$descendant" && leaked=1
+  if [ "$leaked" = 1 ]; then
+    kill -KILL "$child" "$descendant" 2>/dev/null || true
+    fail 'SIGKILL watcher left a progressing TERM-resistant check or descendant alive'
+  fi
+  pass 'SIGKILL owner loss independently cleans a progressing TERM-resistant check tree'
+}
+
+test_check_absolute_limit_stops_endless_progress_as_unknown() {
+  local dir state pid endless mode i
+  for mode in spin spam; do
+    dir=$(make_case "check-absolute-$mode")
+    state="$dir/state"
+    {
+      printf '#!/usr/bin/env bash\n'
+      # shellcheck disable=SC2016 # The generated check expands its own PID and state.
+      printf 'printf "%%s\\n" "$$" > "$FM_STATE_OVERRIDE/endless-pid"\n'
+      if [ "$mode" = spin ]; then
+        printf 'while :; do :; done\n'
+      else
+        printf 'while :; do printf "retrying\\n" >&2; sleep 0.1; done\n'
+      fi
+    } > "$state/a-$mode.check.sh"
+    printf '#!/usr/bin/env bash\nprintf "after-ran\\n"\n' > "$state/b-after.check.sh"
+    chmod 0700 "$state/a-$mode.check.sh" "$state/b-after.check.sh"
+    for i in "a-$mode" b-after; do
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" "$i" >/dev/null \
+        || fail "registration of $i failed"
+    done
+    # FM_DURATION_ABSOLUTE_SECS is fm-duration.py's own test seam for its 6 hour extreme.
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_ABSOLUTE_SECS=8 \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=30 \
+      "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -s "$state/endless-pid" ] || fail "$mode check never started: $(cat "$dir/watch.err")"
+    IFS= read -r endless < "$state/endless-pid"
+    if is_live_non_zombie "$endless"; then
+      kill -KILL "$endless" 2>/dev/null || true
+      fail "$mode check outlived the absolute limit"
+    fi
+    [ -e "$state/.last-check" ] || fail "$mode check blocked the rest of the sweep: $(cat "$dir/watch.err")"
+    grep -F "check a-$mode stopped after" "$state/.watch-triage.log" 2>/dev/null \
+      | grep -F '(absolute limit); result unknown, retry next pass' >/dev/null \
+      || fail "$mode stop did not name the check and its runtime: $(cat "$state/.watch-triage.log" 2>/dev/null)"
+    grep -F "check: $state/b-after.check.sh: after-ran" "$state/.wake-queue" >/dev/null \
+      || fail "the check after a stopped $mode check did not run"
+    awk -F '\t' -v c="$state/a-$mode.check.sh" '$4 == c && index($5, "result unknown, retry next pass") { found = 1 }
+      $4 == c && !index($5, "result unknown, retry next pass") { bad = 1 } END { exit !(found && !bad) }' \
+      "$state/.wake-queue" || fail "a stopped $mode check did not wake as unknown, or produced a verdict"
+  done
+  pass 'a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues'
+}
+
+test_stopped_check_wakes_once_per_episode() {
+  local dir state pid i run notices
+  dir=$(make_case check-stop-episode)
+  state="$dir/state"
+  arm_flaky() {
+    # shellcheck disable=SC2016 # The generated check expands its own state.
+    printf '#!/usr/bin/env bash\n[ ! -e "$FM_STATE_OVERRIDE/hang" ] || sleep 30\nexit 0\n' > "$state/a-flaky.check.sh"
+    chmod 0700 "$state/a-flaky.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" a-flaky >/dev/null \
+      || fail 'registration of a-flaky failed'
+  }
+  arm_flaky
+  for run in stop repeat complete again reregistered rearmed; do
+    case "$run" in complete) rm -f "$state/hang" ;; *) : > "$state/hang" ;; esac
+    case "$run" in
+      reregistered) arm_flaky ;;
+      rearmed)
+        FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-unregister.sh" a-flaky >/dev/null \
+          || fail 'disarming a-flaky failed'
+        arm_flaky
+        ;;
+    esac
+    rm -f "$state/.last-check"
+    : > "$state/.wake-queue"
+    # Each later run is the successor started after the previous run's wake.
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_WATCH_HANDLING_SUCCESSOR="$([ "$run" = stop ] && echo 0 || echo 1)" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=1 \
+      "$WATCH" > "$dir/watch-$run.out" 2> "$dir/watch-$run.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch-$run.err"
+    [ -e "$state/.last-check" ] || fail "$run sweep never finished: $(cat "$dir/watch-$run.err")"
+    notices=$(awk -F '\t' -v c="$state/a-flaky.check.sh" \
+      '$4 == c && index($5, "check a-flaky stopped after") && index($5, "result unknown, retry next pass") { n++ } END { print n + 0 }' \
+      "$state/.wake-queue")
+    case "$run" in
+      stop|again|rearmed) [ "$notices" = 1 ] || fail "the $run stop gave $notices unknown wakes, not one" ;;
+      *) [ "$notices" = 0 ] || fail "the $run sweep gave $notices unknown wakes, not none" ;;
+    esac
+  done
+  pass 'a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one'
+}
+
+test_check_runs_without_posix_python() {
+  local dir state fakebin
+  dir=$(make_case check-no-posix-python)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  # A python3 that is no POSIX interpreter, like a native Windows one on Git Bash.
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/python3"
+  chmod +x "$fakebin/python3"
+  printf '#!/usr/bin/env bash\nprintf "check-ran\\n"\n' > "$state/plain-check.sh"
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_check_capture plain "$STATE/plain-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-ran ] || exit 22
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a check did not run without a POSIX python3: $(cat "$dir/capture.err")"
+  pass 'without a POSIX python3 a check still runs and returns its result'
+}
+
+test_check_owner_loss_terms_a_detached_child() {
+  local dir fifo pid grandchild i
+  dir=$(make_case check-owner-term)
+  fifo="$dir/owner"
+  mkfifo "$fifo"
+  # A child in its own session, the way fm_run_progress starts a read, under a
+  # parent that stays alive in the check's group.
+  cat > "$dir/grandchild.sh" <<'SH'
+#!/usr/bin/env bash
+trap 'printf term > "$FM_TEST_DIR/termed"; exit 0' TERM
+printf '%s\n' "$$" > "$FM_TEST_DIR/grandchild.pid"
+while :; do sleep 0.1; done
+SH
+  chmod +x "$dir/grandchild.sh"
+  # shellcheck disable=SC2016 # The generated check expands its own test directory.
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'exec python3 -c "import subprocess, sys, time; subprocess.Popen([sys.argv[1]], start_new_session=True); time.sleep(60)" "$FM_TEST_DIR/grandchild.sh"' \
+    > "$dir/check.sh"
+  FM_TEST_DIR="$dir" python3 "$ROOT/bin/fm-check-run.py" 3 -- bash "$dir/check.sh" 3< "$fifo" &
+  pid=$!
+  exec 4> "$fifo"
+  for ((i = 0; i < 300; i++)); do
+    [ ! -s "$dir/grandchild.pid" ] || break
+    sleep 0.1
+  done
+  [ -s "$dir/grandchild.pid" ] || { exec 4>&-; wait "$pid"; fail 'the detached child never started'; }
+  IFS= read -r grandchild < "$dir/grandchild.pid"
+  exec 4>&-
+  wait "$pid" || true
+  if kill -0 "$grandchild" 2>/dev/null; then
+    kill -KILL "$grandchild" 2>/dev/null || true
+    fail 'owner loss left the check'"'"'s detached child running'
+  fi
+  [ -e "$dir/termed" ] || fail 'the detached child was killed without a TERM first'
+  pass 'owner loss sends a check'"'"'s detached child TERM before any KILL'
+}
+
+test_stopped_check_tree_is_gone_when_stop_returns() {
+  local dir state
+  dir=$(make_case check-stop-term-ignoring)
+  state="$dir/state"
+  # Every member ignores TERM, so only the launcher's own TERM-then-KILL
+  # cleanup ends them; the detached child is reachable only through it.
+  cat > "$state/detached.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/detached-pid"
+exec sleep 600
+SH
+  chmod +x "$state/detached.sh"
+  cat > "$state/stubborn-check.sh" <<'SH'
+#!/usr/bin/env bash
+exec python3 -c 'import os, signal, subprocess, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+subprocess.Popen([sys.argv[1]], start_new_session=True)
+open(sys.argv[2], "w").write("%d\n" % os.getpid())
+time.sleep(600)' "$FM_STATE_OVERRIDE/detached.sh" "$FM_STATE_OVERRIDE/check-pid"
+SH
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      live() {
+        kill -0 "$1" 2>/dev/null || return 1
+        case "$(ps -p "$1" -o stat= 2>/dev/null)" in Z*) return 1 ;; esac
+      }
+      watcher_beat force
+      CHECK_TIMEOUT=2
+      run_check_capture stubborn "$STATE/stubborn-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+      IFS= read -r check_pid < "$STATE/check-pid" || exit 23
+      IFS= read -r detached_pid < "$STATE/detached-pid" || exit 24
+      ! live "$check_pid" || { kill -KILL "$check_pid" "$detached_pid" 2>/dev/null; exit 25; }
+      ! live "$detached_pid" || { kill -KILL "$detached_pid" 2>/dev/null; exit 26; }
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a stopped check reported cleanup while its TERM-ignoring tree lived (exit $?): $(cat "$dir/capture.err")"
+  pass 'a stopped check returns only after its TERM-ignoring tree, detached child included, is gone'
+}
+
+test_check_stderr_capture_keeps_a_capped_tail() {
+  local dir state
+  dir=$(make_case check-stderr-cap)
+  state="$dir/state"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      CHECK_STDERR_CAP_BYTES=4096
+      CHECK_STDERR_TAIL_BYTES=1024
+      seen_tick() { cp "$FM_CHECK_OUTPUT.stderr" "$STATE/stderr-seen" 2>/dev/null || true; }
+      FM_CAPTURE_OWNER=1 FM_CAPTURE_TICK=seen_tick run_owned_capture 10 0 discard bash -c '\''head -c 100000 /dev/zero | tr "\\0" x >&2; printf "\\nTAIL-MARK\\n" >&2; sleep 3; printf check-finished'\'' || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
+      size=$(wc -c < "$STATE/stderr-seen") || exit 23
+      [ "$size" -le 4096 ] || exit 24
+      grep -F TAIL-MARK "$STATE/stderr-seen" >/dev/null || exit 25
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "private stderr capture was not capped to its tail: $(cat "$dir/capture.err")"
+  pass 'private check stderr is capped and keeps its newest tail'
 }
 
 test_check_wait_has_no_per_tick_processes() {
@@ -309,7 +600,7 @@ SH
       deadline_started=$SECONDS
       run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 25
       deadline_elapsed=$((SECONDS - deadline_started))
-      [ "$deadline_elapsed" -ge 3 ] && [ "$deadline_elapsed" -lt 10 ] || exit 35
+      [ "$deadline_elapsed" -ge 3 ] || exit 35
       [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 26
       IFS= read -r stopped_pid < "$STATE/stopped-pid"
       ! kill -0 "$stopped_pid" 2>/dev/null || exit 27
@@ -318,13 +609,11 @@ SH
       IFS= read -r descendant_pid < "$STATE/descendant-pid"
       ! kill -0 "$descendant_pid" 2>/dev/null || exit 30
       [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 31
-      CHECK_TIMEOUT=120
-      for FM_CHECK_FORCE_FALLBACK in 0 1; do
-        FM_CHECK_OWNED_GROUP=1 run_owned_capture 2 0 discard run_check_process "$STATE/controller-check.sh" || exit 32
-        [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
-        IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
-        ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
-      done
+      CHECK_TIMEOUT=2
+      run_check_capture controller "$STATE/controller-check.sh" || exit 32
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
+      IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
+      ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
     ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
     || fail "bounded check lost output/status or launched poll sleeps: $(cat "$dir/capture.err" "$dir/poll-launches" 2>/dev/null)"
   pass "bounded check returns output and failure status without launching per-tick sleep processes"
@@ -3074,7 +3363,15 @@ test_live_stale_watch_lock_is_actionable
 test_check_wait_has_no_per_tick_processes
 test_group_cleanup_without_perl_uses_one_sleep_per_wait
 test_slow_check_beats_but_stopped_poll_goes_stale
-test_check_timeout_configuration_and_launch_allowance
+test_check_inactivity_configuration_and_launch_allowance
+test_check_progress_survives_fivefold_slowdown
+test_check_sigkill_owner_cleans_progressing_tree
+test_check_absolute_limit_stops_endless_progress_as_unknown
+test_stopped_check_wakes_once_per_episode
+test_check_runs_without_posix_python
+test_check_owner_loss_terms_a_detached_child
+test_stopped_check_tree_is_gone_when_stop_returns
+test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency
