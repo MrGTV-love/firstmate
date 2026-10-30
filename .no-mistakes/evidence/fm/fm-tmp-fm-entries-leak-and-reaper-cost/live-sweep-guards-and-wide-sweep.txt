@@ -1,0 +1,21 @@
+1) a LIVE shell makes a marked root, then waits
+2) a shell makes a marked root, starts a stray process with its cwd in that root, and is KILLed
+/private/tmp/nmlive.4HMKpj/guard.sh: line 8: 90147 Killed: 9               TMPDIR=$T bash -c '. "$1/tests/lib.sh"; r=$(fm_test_tmproot fm-test-deadroot); echo "$r" > "$2/dead.root"; mkdir -p "$r/work"; (cd "$r/work" && exec sleep 300) & echo $! > "$2/stray.pid"; kill -KILL $$' _ "$R" "$W"
+  stray pid 90932 alive: yes, cwd: /private/tmp/nmlive.4HMKpj/guard.dl7SuL/fm-test-deadroot.T8jSNq/work
+3) age every marker and record by 2 hours (past the 1-hour floor)
+  TMPDIR top level: fm-test-deadroot.T8jSNq fm-test-liveroot.hy0bDQ fm-test-owners fm-unmarked.CCCCCC 
+  records: .legacy-discovery 90144.I8J1GG 90147.XoAuNb 
+4) a new ordinary test shell sources tests/lib.sh (narrow sweep)
+  TMPDIR top level: fm-test-liveroot.hy0bDQ fm-test-owners fm-unmarked.CCCCCC 
+  records: .legacy-discovery 90144.I8J1GG 
+  stray alive: no
+5) the runner's wide sweep (FM_TEST_SWEEP_ALL=1)
+  TMPDIR top level: fm-test-liveroot.hy0bDQ fm-test-owners fm-unmarked.CCCCCC 
+  records: .legacy-discovery 90144.I8J1GG 
+  stray pid 90932 alive after wide sweep: no
+  live root /private/tmp/nmlive.4HMKpj/guard.dl7SuL/fm-test-liveroot.hy0bDQ: KEPT
+  dead root /private/tmp/nmlive.4HMKpj/guard.dl7SuL/fm-test-deadroot.T8jSNq: REMOVED
+  unmarked fm-unmarked.CCCCCC: KEPT
+6) the live shell ended by TERM; its trap cleaned up:
+  TMPDIR top level: fm-test-owners fm-unmarked.CCCCCC 
+  records: .legacy-discovery 

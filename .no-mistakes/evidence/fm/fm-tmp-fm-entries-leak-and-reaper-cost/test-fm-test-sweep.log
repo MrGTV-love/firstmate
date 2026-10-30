@@ -1,4 +1,8 @@
 ok - a KILLed shell leaves one marked record and the next sweep removes the record and its roots
+ok - the wide sweep stops a process inside a dead shell's record before it removes the record
 ok - tests/lib.sh refuses an owners directory it does not own and touches nothing behind it
 ok - the sweep keeps a live owner's roots and registries and every unmarked entry, narrow or wide
-ok - the sweep takes 0.129s with no unrelated entries and 0.215s with 12000
+ok - ordinary sourcing removes a dead owner's marked root of any fm-* name and keeps live, young and unmarked ones
+ok - the sweep that looks at every fm-* entry takes 0.089s with no unrelated entries and 0.221s with 12000
+ok - the stamped sweep takes 0.106s with no unrelated entries and 0.225s with 12000
+bin/fm-proc-budget.sh --own-procs 256 -- bash tests/$t.test.sh  11.00s user 29.56s system 58% cpu 1:09.47 total

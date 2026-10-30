@@ -1,0 +1,6 @@
+22:41  up 1 day, 12:42, 4 users, load averages: 36.92 48.50 49.10
+head  unrelated=0      source-with-sweep median=.954s  source-without-sweep median=.751s  sweep-only=.203s
+head  unrelated=50000  source-with-sweep median=1.029s  source-without-sweep median=.715s  sweep-only=.314s
+base  unrelated=0      source-with-sweep median=1.063s  source-without-sweep median=.832s  sweep-only=.231s
+base  unrelated=50000  source-with-sweep median=2.655s  source-without-sweep median=.807s  sweep-only=1.848s
+22:43  up 1 day, 12:43, 4 users, load averages: 34.42 43.28 46.93

@@ -1,0 +1,12 @@
+== head TMPDIR=/private/tmp/nmlive.4HMKpj/tmp-timed-head.TMhWNf
+parallel workers: 12 x 80 calls, total failed calls = 0
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63890 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63897 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63909 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63922 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63932 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63937 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+/private/tmp/nmlive.4HMKpj/timed-stress.sh: line 10: 63945 Killed: 9               TMPDIR=$T bash -c '. "$1/bin/fm-timeout-lib.sh"; while :; do fm_run_timed 20 true; done' _ "$R"
+after KILLing 8 looping callers, entries: 0 : 
+one more call exit=0
+after one more call, entries: 0

@@ -1,0 +1,6 @@
+=== base + new tests/fm-scratch-leaks.test.sh
+not ok - fm-gh-rest did not remove the entry a killed owner left
+exit=
+=== base + new tests/fm-test-sweep.test.sh
+not ok - a killed shell must leave exactly one record (registries and helper roots live inside it) (expected '1', got '0')
+exit=

@@ -1,0 +1,5 @@
+Time for one shell that sources tests/lib.sh (runs fm_test_reap_orphans). run1 = first shell in that TMPDIR (once-per-age-floor discovery look); run2/run3 = later shells.
+head  unrelated=0       run1=1.880s run2=1.084s run3=.787s | dead marked fm-test root: removed | dead marked legacy fm-drop-words root: removed | unmarked old fm-* entry: kept
+head  unrelated=50000   run1=2.753s run2=1.395s run3=1.418s | dead marked fm-test root: removed | dead marked legacy fm-drop-words root: removed | unmarked old fm-* entry: kept
+base  unrelated=0       run1=2.209s run2=1.020s run3=.960s | dead marked fm-test root: removed | dead marked legacy fm-drop-words root: removed | unmarked old fm-* entry: kept
+base  unrelated=50000   run1=4.467s run2=3.158s run3=3.421s | dead marked fm-test root: removed | dead marked legacy fm-drop-words root: removed | unmarked old fm-* entry: kept

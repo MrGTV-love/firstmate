@@ -1,23 +1,26 @@
 ok - fm-gh-rest removes what a killed owner left and keeps a live owner's entry
 ok - fm-gh-rest leaves no entry after a normal run, an error exit, TERM, INT or HUP
-tests/fm-scratch-leaks.test.sh: line 142: 85904 Killed: 9               sleep 300
+tests/fm-scratch-leaks.test.sh: line 162: 13074 Killed: 9               sleep 300
 ok - fm_run_timed removes what a killed owner left and keeps a live owner's entry
-tests/fm-scratch-leaks.test.sh: line 171: 88262 Killed: 9               sleep 300
+tests/fm-scratch-leaks.test.sh: line 193: 15422 Killed: 9               sleep 300
 ok - fm-contributions removes what a killed owner left and keeps a live owner's entry
 ok - fm-contributions leaves no entry after a normal run, an error exit, TERM, INT or HUP
-tests/fm-scratch-leaks.test.sh: line 210: 93680 Killed: 9               sleep 300
+tests/fm-scratch-leaks.test.sh: line 580: 25444 Killed: 9               sleep 300
 ok - fm-procevent-remote-reply ingest removes what a killed owner left and keeps a live owner's entry
 ok - remote reply ingest leaves no entry after a normal run, an error exit, TERM, INT or HUP
+tests/fm-scratch-leaks.test.sh: line 581: 45305 Killed: 9               sleep 300
 ok - fm-session-start removes what a killed owner left and keeps a live owner's entry
 ok - fm-session-start leaves no stage file after a normal run, a fired bound, TERM, INT or HUP
+tests/fm-scratch-leaks.test.sh: line 582:  5215 Killed: 9               sleep 300
 ok - fm-procevent-lavish poll removes what a killed owner left and keeps a live owner's entry
 ok - a lavish poll leaves no response file after a normal run, an error exit, TERM, INT or HUP
-tests/fm-scratch-leaks.test.sh: line 350: 88981 Killed: 9               sleep 300
+tests/fm-scratch-leaks.test.sh: line 382: 29189 Killed: 9               sleep 300
 ok - fm-test-reap-orphans removes what a killed owner left and keeps a live owner's entry
 ok - the reaper leaves no working directory after a normal run, an error exit, TERM, INT or HUP
-tests/fm-scratch-leaks.test.sh: line 386: 13473 Killed: 9               sleep 300
+tests/fm-scratch-leaks.test.sh: line 584: 39155 Killed: 9               sleep 300
 ok - fm_scratch_new never enters a symlinked container and survives a container removed under it
 ok - fm_scratch_new survives a container removed and remade by peers under it
 ok - fm_scratch_new never returns an entry made through a container swapped under it
 ok - fm_scratch_new checks the container it made, not only the path before mkdir
 ok - lone copies of fm-timeout-lib.sh and fm-gh-rest.sh keep working without fm-scratch-lib.sh
+bin/fm-proc-budget.sh --own-procs 256 -- bash tests/$t.test.sh  7.28s user 16.61s system 29% cpu 1:20.34 total

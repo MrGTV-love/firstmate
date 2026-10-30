@@ -1,0 +1,12 @@
+== base: repo=/private/tmp/nmlive.4HMKpj/base TMPDIR=/private/tmp/nmlive.4HMKpj/tmp-base.SEfVM3
+after KILL #1, TMPDIR holds: ./fm-gh-rest.FbAkRb ./fm-gh-rest.FbAkRb/raw.74824685 ./fm-gh-rest.FbAkRb/raw.74824685.cache ./fm-gh-rest.FbAkRb/raw.74824685.err 
+after KILL #2, TMPDIR holds: ./fm-gh-rest.FbAkRb ./fm-gh-rest.FbAkRb/raw.74824685 ./fm-gh-rest.FbAkRb/raw.74824685.cache ./fm-gh-rest.FbAkRb/raw.74824685.err ./fm-gh-rest.YKPC1q ./fm-gh-rest.YKPC1q/raw.2805220362 ./fm-gh-rest.YKPC1q/raw.2805220362.cache ./fm-gh-rest.YKPC1q/raw.2805220362.err 
+after KILL #3, TMPDIR holds: ./fm-gh-rest.FbAkRb ./fm-gh-rest.FbAkRb/raw.74824685 ./fm-gh-rest.FbAkRb/raw.74824685.cache ./fm-gh-rest.FbAkRb/raw.74824685.err ./fm-gh-rest.YKPC1q ./fm-gh-rest.YKPC1q/raw.2805220362 ./fm-gh-rest.YKPC1q/raw.2805220362.cache ./fm-gh-rest.YKPC1q/raw.2805220362.err ./fm-gh-rest.li4OWG ./fm-gh-rest.li4OWG/raw.192952413 ./fm-gh-rest.li4OWG/raw.192952413.cache ./fm-gh-rest.li4OWG/raw.192952413.err 
+normal run exit=0
+after next normal run, TMPDIR holds: [./fm-gh-rest.FbAkRb ./fm-gh-rest.FbAkRb/raw.74824685 ./fm-gh-rest.FbAkRb/raw.74824685.cache ./fm-gh-rest.FbAkRb/raw.74824685.err ./fm-gh-rest.YKPC1q ./fm-gh-rest.YKPC1q/raw.2805220362 ./fm-gh-rest.YKPC1q/raw.2805220362.cache ./fm-gh-rest.YKPC1q/raw.2805220362.err ./fm-gh-rest.li4OWG ./fm-gh-rest.li4OWG/raw.192952413 ./fm-gh-rest.li4OWG/raw.192952413.cache ./fm-gh-rest.li4OWG/raw.192952413.err ]
+== head: repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65CG05R9P5H396137DNR7P9 TMPDIR=/private/tmp/nmlive.4HMKpj/tmp-head.UrqxxR
+after KILL #1, TMPDIR holds: ./fm-gh-rest.scratch ./fm-gh-rest.scratch/4746.JGg1gy ./fm-gh-rest.scratch/4746.JGg1gy/raw.3136023360 ./fm-gh-rest.scratch/4746.JGg1gy/raw.3136023360.cache ./fm-gh-rest.scratch/4746.JGg1gy/raw.3136023360.err 
+after KILL #2, TMPDIR holds: ./fm-gh-rest.scratch ./fm-gh-rest.scratch/5249.tVXluo ./fm-gh-rest.scratch/5249.tVXluo/raw.1411618621 ./fm-gh-rest.scratch/5249.tVXluo/raw.1411618621.cache ./fm-gh-rest.scratch/5249.tVXluo/raw.1411618621.err 
+after KILL #3, TMPDIR holds: ./fm-gh-rest.scratch ./fm-gh-rest.scratch/5646.7clBD1 ./fm-gh-rest.scratch/5646.7clBD1/raw.3109024969 ./fm-gh-rest.scratch/5646.7clBD1/raw.3109024969.cache ./fm-gh-rest.scratch/5646.7clBD1/raw.3109024969.err 
+normal run exit=0
+after next normal run, TMPDIR holds: []

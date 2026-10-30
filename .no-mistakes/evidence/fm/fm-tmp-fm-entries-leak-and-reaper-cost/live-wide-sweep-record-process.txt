@@ -1,0 +1,6 @@
+1) a test shell starts a stray process with cwd inside its own record (FM_TEST_SHELL_DIR/slots), then is KILLed
+/private/tmp/nmlive.4HMKpj/wide.sh: line 5: 98822 Killed: 9               TMPDIR=$T bash -c '. "$1/tests/lib.sh"; echo "$FM_TEST_SHELL_DIR" > "$2/rec"; (cd "$FM_TEST_SLOT_DIR" && exec sleep 300) & echo $! > "$2/stray.pid"; kill -KILL $$' _ "$R" "$W" 2> /dev/null
+  record /private/tmp/nmlive.4HMKpj/wide.q1GXDP/fm-test-owners/98822.weJaY3 ; stray 299 cwd: /private/tmp/nmlive.4HMKpj/wide.q1GXDP/fm-test-owners/98822.weJaY3/slots
+2) only the runner's wide sweep runs (FM_TEST_SWEEP_ALL=1)
+  stray 299 alive: no, stopped
+  dead record: removed
