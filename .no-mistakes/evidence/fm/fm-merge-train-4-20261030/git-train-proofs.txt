@@ -1,0 +1,47 @@
+== M1 ancestor proofs at HEAD 98bd3e78f3b823ea953a2baea1d980f87a6f596c
+ancestor OK a7f3e14a3
+ancestor OK aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc
+ancestor OK 64f01052ec4dcbfff0d70e2fdb191e05f5129e39
+ancestor OK f967cf0bef13e51d25e5de89e76a6adc579ee885
+== M3 merge-tree equality
+783149171 parents=5df96973e02763e67d41c610c80ce874bbbd4656 aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc fresh=9133397d46e3e958c6afed7be51c5641ccce7e72 actual=9133397d46e3e958c6afed7be51c5641ccce7e72 EQUAL
+3d0b26141 parents=783149171a9ed997bc75711d56dad505dbf3106e 64f01052ec4dcbfff0d70e2fdb191e05f5129e39 fresh=0a5655ea60d304d4cc397d0a7419ca7070970796 actual=0a5655ea60d304d4cc397d0a7419ca7070970796 EQUAL
+b8172d292 parents=f61daf406da018347bbfae0e9b51311e49eebd4a a7f3e14a3faa47b740b5213d4562c2025126e591 fresh=193c02a635458311bbc0fb7b8b6cd7487a82603f actual=193c02a635458311bbc0fb7b8b6cd7487a82603f EQUAL
+98bd3e78f parents=b8172d292715b21e7f9db3f2b0b2ce828fbfab62 f967cf0bef13e51d25e5de89e76a6adc579ee885 fresh=819bed119d106375928334dca2a7803ea4155698 actual=819bed119d106375928334dca2a7803ea4155698 EQUAL
+== fix commit f61daf406 diff
+f61daf406da018347bbfae0e9b51311e49eebd4a no-mistakes(review): Migrate two old-form fm_test_wait_until callers to PR 316 contract
+
+ tests/fm-session-start.test.sh | 2 +-
+ tests/fm-teardown.test.sh      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+diff --git a/tests/fm-session-start.test.sh b/tests/fm-session-start.test.sh
+index dbf5a263d..49b3655fe 100755
+--- a/tests/fm-session-start.test.sh
++++ b/tests/fm-session-start.test.sh
+@@ -1683,7 +1683,7 @@ EOF
+     "a read that never answered was not stopped and reported unknown"
+   assert_not_contains "$out" "STARTUP TRUNCATED - SESSION START" \
+     "a measured endpoint bound raised the whole-digest truncation banner"
+-  fm_test_wait_until 60 no_stray_herdr "$fakebin" \
++  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.log" -- no_stray_herdr "$fakebin" \
+     || fail "the measured read bound left hung herdr process(es) behind"
+ 
+   pass "an endpoint read gets its host's measured bound: slow is alive, silent is unknown"
+diff --git a/tests/fm-teardown.test.sh b/tests/fm-teardown.test.sh
+index e2c8bcb61..28131429b 100755
+--- a/tests/fm-teardown.test.sh
++++ b/tests/fm-teardown.test.sh
+@@ -1230,7 +1230,7 @@ db.execute("BEGIN EXCLUSIVE")
+ open(sys.argv[2], "w").close()
+ time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+   holder=$!
+-  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
++  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+ 
+   rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=60 run_teardown_status "$case_dir")
+   kill "$holder" 2>/dev/null || true
+== base check: 5df96973e
+5df96973e02763e67d41c610c80ce874bbbd4656 Merge pull request #325 from MrGTV-love/fm/fm-merge-train-3-20261030
+316 OPEN draft=false head=aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc
+321 OPEN draft=false head=64f01052ec4dcbfff0d70e2fdb191e05f5129e39
+322 OPEN draft=false head=f967cf0bef13e51d25e5de89e76a6adc579ee885

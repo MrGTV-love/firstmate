@@ -1,0 +1,2 @@
+ok - a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused
+rc=0

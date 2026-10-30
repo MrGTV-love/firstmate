@@ -1,0 +1,13 @@
+=== run 1: $ FM_CHECK_TIMEOUT=5 FM_CHECK_INTERVAL=0 bin/fm-watch.sh (lab FM_HOME; check: silent = sleep 300, no output) started 2026-10-30T18:10:27Z
+finished rc=0 wall=9s
+--- watcher stdout:
+check: /Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check.sh: check silent stopped after 7s (no progress); result unknown, retry next pass
+--- stderr tail:
+no_progress: "pid=74698 no CPU or watched-file progress for 5.8s"
+--- check child (sleep 300) pid=74745 still alive?
+no (process gone)
+--- stop-episode marker:
+-rw-r--r--  1 charlesabrooker  staff  0 Oct 30 13:10 /Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check-stopped
+--- leftover private files:
+none
+--- triage lines:

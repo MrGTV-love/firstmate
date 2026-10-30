@@ -1,0 +1,7 @@
+$ FM_CHECK_TIMEOUT=5 FM_CHECK_INTERVAL=0 bin/fm-watch.sh   (lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.uL7FOq; check: slowprog = 20 x (stderr tick + sleep 2))
+started 2026-10-30T18:08:56Z
+finished 2026-10-30T18:09:39Z rc=0 wall=43s
+--- watcher stdout:
+check: /Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/slowprog.check.sh: slow check finished after 41s
+--- watcher stderr (tail):
+--- triage log lines about slowprog:

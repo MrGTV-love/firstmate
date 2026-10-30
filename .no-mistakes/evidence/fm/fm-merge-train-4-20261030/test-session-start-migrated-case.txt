@@ -1,0 +1,3 @@
+ok - an endpoint read gets its host's measured bound: slow is alive, silent is unknown
+# one case passed
+rc=0

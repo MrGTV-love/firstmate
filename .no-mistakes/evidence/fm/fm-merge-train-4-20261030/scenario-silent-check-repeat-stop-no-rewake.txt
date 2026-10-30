@@ -1,0 +1,27 @@
+=== adversarial repeat: same silent check, stop episode already open; watcher bounded at 30s by perl alarm. started 2026-10-30T18:10:52Z
+finished rc=0 (142 = perl alarm SIGALRM: watcher kept blocking) wall=1s
+--- watcher stdout (expected empty: no second wake for the same stop episode):
+check: rearm-resurface
+--- stderr no_progress lines:
+0
+--- triage log lines naming check silent:
+[2026-10-30T13:10:36-0500] check silent stopped after 7s (no progress); result unknown, retry next pass
+71770	Fri Oct 30 13:10:27 2026     bash bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check.sh: check silent stopped after 7s (no progress); result unknown, retry next pass
+1793383836	3	check	/Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check.sh: check silent stopped after 7s (no progress); result unknown, retry next pass
+--- leftover sleep children:
+none
+=== run 2 (run 1 above exited at once on the watcher's own 'check: rearm-resurface' restart wake, unrelated to checks). started 2026-10-30T18:11:06Z
+finished rc=0 (142 = perl alarm SIGALRM: watcher kept blocking) wall=10s
+--- watcher stdout (expected empty: no second wake for the same stop episode):
+check: rearm-resurface
+--- stderr no_progress lines (one per stopped run):
+no_progress: "pid=54732 no CPU or watched-file progress for 5.8s"
+--- triage log lines naming check silent:
+--- leftover sleep 300 children:
+none
+--- episode marker:
+/Users/charlesabrooker/tmp/fm-lab.uL7FOq/state/silent.check-stopped
+--- triage log (state/.*log) lines naming check silent across both runs:
+[2026-10-30T13:10:36-0500] check silent stopped after 7s (no progress); result unknown, retry next pass
+[2026-10-30T13:11:15-0500] check silent stopped after 7s (no progress); result unknown, retry next pass
+Reading: run 2 stopped the check again (second triage line, no_progress on stderr) but raised no second 'check silent stopped' wake; the open episode marker suppresses it.
