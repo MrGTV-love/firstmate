@@ -20,7 +20,7 @@ on Darwin; neither needs ps, which a confined worker's sandbox may refuse.
 The dead-man link is fm-proc-budget-memory.py's: its gate holds the command
 until a Reader has joined the command's group, and that Reader reads a pipe
 only this supervisor writes. It is never sampled here and is neither counted
-nor signalled by this supervisor. If this supervisor dies, the Reader sees the
+nor ended by this supervisor; a stop of the whole group resumes it at once. If this supervisor dies, the Reader sees the
 end of its stdin and ends the group: on Darwin it sends TERM, then KILL after
 at most one second, to the group and its descendants; on Linux, where its
 libproc read cannot run, it KILLs the group at once.
@@ -187,10 +187,23 @@ def run(limit, command):
         """Freeze, then KILL until no live member is left.
 
         Freezing parents first keeps a forking runaway from outrunning the
-        sweep. The sweep ends when the tree is empty; a member the kernel is
-        slow to reap is waited for, because hang protection belongs to the
-        caller's progress runner and a still-living member is not a verdict.
+        sweep. While the command is unreaped its PID, and so its group, cannot
+        be reused, so the whole group is stopped in one signal first: a
+        member-by-member freeze from a table read lags a fork chain that is
+        faster than the read and stops each leaf only after it has forked.
+        The Reader shares that group and is resumed at once. The sweep ends
+        when the tree is empty; a member the kernel is slow to reap is waited
+        for, because hang protection belongs to the caller's progress runner
+        and a still-living member is not a verdict.
         """
+        if child.returncode is None:
+            try:
+                os.killpg(root, signal.SIGSTOP)
+            except ProcessLookupError:
+                pass
+            except OSError as error:
+                errors.append(error)
+            os.kill(guardian.process.pid, signal.SIGCONT)
         frozen = set()
         while True:
             fresh = {pid: identity for pid, identity in live(root).items() if pid not in frozen}
