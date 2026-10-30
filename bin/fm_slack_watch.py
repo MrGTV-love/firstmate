@@ -802,13 +802,17 @@ class Watch:
             chosen = taps[0]
         answer, label, author = chosen['answer'], chosen['label'], chosen['user']
         self.consume([c['event'] for c in new_replies + taps if c is not chosen], key)
-        pending = self.stage({'event': chosen['event'], 'occurrence': occurrence,
-                              'identity': record['identity'], 'thread': record['ts'],
-                              'key': key, 'mode': record.get('mode', 'done'),
-                              'answer': answer, 'label': label, 'author': author,
-                              'kind': 'answer', 'stage': 'intake'})
+        row = {'event': chosen['event'], 'occurrence': occurrence,
+               'identity': record['identity'], 'thread': record['ts'],
+               'key': key, 'mode': record.get('mode', 'done'),
+               'answer': answer, 'label': label, 'author': author,
+               'kind': 'answer', 'stage': 'intake'}
+        advanced = self.advanced
+        pending = self.stage(row)
         self.publish(pending)
-        return remaining - 1
+        if pending is row or self.advanced > advanced:
+            remaining -= 1
+        return remaining
 
     def event(self, record, *parts):
         return '/'.join([self.state.get('team', ''), self.state.get('channel', ''), record['ts'], *parts])

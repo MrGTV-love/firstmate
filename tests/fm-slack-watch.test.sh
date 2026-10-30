@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X38.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X39.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1446,5 +1446,28 @@ set -e
 assert_contains "$out" 'closed: dup-b' "X38 a row stuck before its acknowledgement used up the answer cap"
 assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X38 the row for the gone thread left the journal"
 printf 'ok - X38\n'
+
+# X39: an older journaled answer acknowledged on a re-read never uses up the answer cap
+new_home duplicate
+bind
+python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); next(m for m in d["messages"] if m["ts"] == "900.000002")["text"] = "reconcile"; json.dump(d, open(sys.argv[2], "w"))' \
+  "$FIX/duplicate/transcript.json" "$TMP/reread-cap.json"
+python3 "$HELPER" add-failure "$TMP/reread-cap.json" "$TMP/reread-cap.json" chat.postMessage 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/reread-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X39 the failed acknowledgement reported success"
+assert_contains "$out" 'refused: dup-a' "X39 the reserved answer was not refused"
+assert_open dup-a 0 "X39 a refused answer closed the call"
+assert_open dup-b 0 "X39 one poll delivered more answers than the cap"
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage 400 1
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/reread-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X39 the transient acknowledgement failure was not reported"
+assert_contains "$out" 'closed: dup-b' "X39 an older answer acknowledged on a re-read used up the answer cap"
+assert_not_contains "$out" 'refused: dup-a' "X39 the older answer was delivered twice"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X39 the acknowledged answers stayed journaled"
+printf 'ok - X39\n'
 
 printf 'ok - all Slack watch checks\n'
