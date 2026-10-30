@@ -3067,8 +3067,10 @@ test_lock_wait_diagnostics_never_recreate_a_vanished_parent() {
     kill "$other"
     fail "could not seed the held lock"
   fi
+  # Harm: a runaway tree. Observable: the tree's own member count. Expiry: the
+  # tree is stopped and the wrapper exits 98. The ceiling of 64 is unchanged.
   # shellcheck disable=SC2016 # Expanded by the child shell, not this one.
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-proc-budget.sh" 64 -- bash -c '
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-proc-budget.sh" --own-procs 64 -- bash -c '
     . "$1"
     state_dir=$2
     eval "$(declare -f _fm_lock_monitor_state_to | sed "1s/_fm_lock_monitor_state_to/observed_state_to/")"

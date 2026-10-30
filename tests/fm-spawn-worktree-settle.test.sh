@@ -414,6 +414,7 @@ case "\${1:-}" in --version) printf '%s\\n' '$version'; exit 0 ;; esac
   if { printf 'probe-status-append\\n' >> '$HOME_DIR/state/$id.status'; } 2>/dev/null; then echo status=appended; else echo status=refused; fi
   echo "tmpdir=\$TMPDIR"
   echo "confinement=\$FM_WRITE_CONFINEMENT"
+  echo "fetch-prune=\$(git config --get fetch.prune)"
 } > '$probe'
 SH
     session_probe="$HOME_DIR/data/$id/claude-session-probe"
@@ -448,8 +449,8 @@ SH
     source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
     PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
     assert_present "$probe" "delivered $harness launch did not reach the harness"
-    assert_equals $'foreign=refused\nstatus=appended\ntmpdir=/tmp/fm-'"$id"$'\nconfinement=seatbelt-v1' "$(cat "$probe")" \
-      "delivered $harness launch ran outside its write profile"
+    assert_equals $'foreign=refused\nstatus=appended\ntmpdir=/tmp/fm-'"$id"$'\nconfinement=seatbelt-v1\nfetch-prune=false' "$(cat "$probe")" \
+      "delivered $harness launch ran outside its write profile or without fetch.prune=false"
     assert_equals "$before" "$(cat "$PROJ_DIR/README.md")" "confined $harness changed the primary checkout"
     assert_grep 'probe-status-append' "$HOME_DIR/state/$id.status" "confined $harness could not append its own status"
     if [ "$harness" = claude ]; then

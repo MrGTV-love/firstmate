@@ -15,6 +15,7 @@
     "spawn-confinement-coverage",
     "spawn-write-confinement",
     "status-log-size-cap",
+    "teardown-superseded-slot-lease",
     "open-loops-one-deferral"
   ],
   "guards": [
@@ -534,6 +535,34 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "teardown-superseded-slot-lease",
+      "owner": "bin/fm-teardown.sh",
+      "sites": [
+        {"file": "bin/fm-teardown.sh", "match": "is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path", "count": 2}
+      ],
+      "invariant": "a teardown never leases a slot in a superseded Treehouse pool folder by its slot name",
+      "layer": "runtime-block",
+      "source": "treehouse pool-dir from the project, or, when it is missing or its output is not one absolute path, treehouse status --json from the project, which lists only the current pool folder; and treehouse lease --help for --path",
+      "trigger": "a slot that must stay held is not in the project's current Treehouse pool, and the installed treehouse has no lease --path or its lease by path cannot be proved",
+      "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, or, when its lease by path cannot be proved, run the printed treehouse lease --path <slot> --lease-holder <task> from the project, and rerun bin/fm-teardown.sh <task>",
+      "budget": 1,
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "remedy_verified": "fixture",
+      "layer_note": "deny without a guard event: the refusal prints the REFUSED: line, exits 1, and changes no lease; a lease by slot name would hold a same-named copy of the current pool instead"
     },
     {
       "decision": "deny",
