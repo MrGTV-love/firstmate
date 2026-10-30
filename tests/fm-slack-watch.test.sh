@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X39.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X40.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1469,5 +1469,26 @@ assert_contains "$out" 'closed: dup-b' "X39 an older answer acknowledged on a re
 assert_not_contains "$out" 'refused: dup-a' "X39 the older answer was delivered twice"
 assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X39 the acknowledged answers stayed journaled"
 printf 'ok - X39\n'
+
+# X40: an older journaled answer acknowledged on a closed call's re-read never uses up the answer cap
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/closed-reread-cap.json" chat.postMessage 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/closed-reread-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X40 the failed acknowledgement reported success"
+assert_contains "$out" 'closed: dup-a' "X40 the first thread was not answered"
+assert_closed dup-a 1 "X40 the accepted answer left the call open"
+assert_open dup-b 0 "X40 one poll delivered more answers than the cap"
+python3 "$HELPER" fail-call "$(replay_file)" chat.postMessage 400 1
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/closed-reread-cap.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X40 the transient acknowledgement failure was not reported"
+assert_contains "$out" 'closed: dup-b' "X40 an older answer acknowledged on a closed call's re-read used up the answer cap"
+assert_not_contains "$out" 'unmatched reply' "X40 the acknowledged answer was surfaced as unmatched"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X40 the acknowledged answers stayed journaled"
+printf 'ok - X40\n'
 
 printf 'ok - all Slack watch checks\n'

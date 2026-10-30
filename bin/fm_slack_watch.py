@@ -702,11 +702,15 @@ class Watch:
             self.mark_seen(event, key)
 
     def notice(self, event, key, thread, text, line, contributing=()):
+        """Stage and publish one notice; returns whether this call made progress for the per-poll cap."""
         self.noticed_threads.add(thread)
-        pending = self.stage({'event': event, 'key': key, 'thread': thread, 'text': text,
-                              'line': line, 'kind': 'notice', 'stage': 'notice',
-                              'contributing': list(contributing)})
+        row = {'event': event, 'key': key, 'thread': thread, 'text': text,
+               'line': line, 'kind': 'notice', 'stage': 'notice',
+               'contributing': list(contributing)}
+        advanced = self.advanced
+        pending = self.stage(row)
         self.publish(pending)
+        return pending is row or self.advanced > advanced
 
     def poll(self):
         if not self.bound():
@@ -768,10 +772,10 @@ class Watch:
             for reply in new_replies:
                 if remaining <= 0:
                     break
-                self.notice(reply['event'], key, record['ts'],
-                            'No open decision matches this reply. Firstmate has been notified.',
-                            'check: slack %s - unmatched reply %s' % (record['ts'], reply['ts']))
-                remaining -= 1
+                if self.notice(reply['event'], key, record['ts'],
+                               'No open decision matches this reply. Firstmate has been notified.',
+                               'check: slack %s - unmatched reply %s' % (record['ts'], reply['ts'])):
+                    remaining -= 1
             return remaining
         typed = {r['answer']: r['label'] for r in new_replies}
         tapped = {tap['answer']: tap['label'] for tap in taps}
@@ -791,11 +795,12 @@ class Watch:
                     taps[0]['name'], REACTIONS.index(taps[0]['name']) + 1)
             else:
                 remedy = 'Please reply once.'
-            self.notice(event, key, record['ts'],
-                        'Conflicting signals: ' + slack_escape(labels) + '. No answer was recorded. ' + remedy,
-                        'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
-                        [r['event'] for r in new_replies])
-            return remaining - 1
+            if self.notice(event, key, record['ts'],
+                           'Conflicting signals: ' + slack_escape(labels) + '. No answer was recorded. ' + remedy,
+                           'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
+                           [r['event'] for r in new_replies]):
+                remaining -= 1
+            return remaining
         if new_replies:
             chosen = new_replies[0]
         else:
