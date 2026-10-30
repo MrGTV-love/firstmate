@@ -1369,6 +1369,9 @@ class WaitVerifier:
             raise ValueError("waiting requires a current ledger collected for the effective home and state directory")
         self.stale = bool(report.get("stale"))
         self.rows = {row["id"]: row for row in report["rows"]}
+        # The public gate's decision at this time: published ages advance to now, so a row that crossed its
+        # limit since the last collection is overdue here too.
+        self.overdue = {row["id"] for row in overdue_rows(report, now)}
         self.actions = report.get("handling", {}).get("actions", {})
         self.backlog = None
         self.backlog_error = None
@@ -1529,7 +1532,7 @@ class WaitVerifier:
             if merge_marker(c.state, pr):
                 raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
-               and row.get("overdue") and not row.get("informational") and not row.get("stale")
+               and row["id"] in self.overdue and not row.get("informational") and not row.get("stale")
                for row in self.rows.values()):
             raise ValueError("prerequisite task is stalled, missing or failed; follow up on it")
         stat = path.stat()

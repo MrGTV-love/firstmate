@@ -4094,6 +4094,20 @@ assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done prere
 (fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
     'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
 assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite whose PR merged has landed'
+# A trouble row that crosses its limit between collections ends the wait at its current age, with no recollection.
+fx = waiting_fixture('trouble-ages')
+aged = json.loads(fx['ledger'].read_text())
+aged['rows'].append(dict(id='stalled-repair', category='stalled_worker', subject='repair-owner',
+                         owner='worker:repair-owner', next_action='follow up', age_seconds=3590,
+                         limit_seconds=3600, overdue=False, evidence='no progress'))
+fx['ledger'].write_text(json.dumps(aged))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a trouble row still under its limit keeps the wait'
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 20)
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the trouble row crossed its limit without a recollection'
+crossed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3620))
+assert crossed.returncode == 1 and 'stalled, missing or failed' in crossed.stdout, ('no new wait on a stalled task', crossed)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
 # A done note naming an open PR keeps the prerequisite live before pr= is registered, until that PR's merge is recorded.
 fx = waiting_fixture('done-note')
 (fx['home'] / 'state/repair-owner.status').write_text(
