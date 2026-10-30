@@ -51,7 +51,8 @@
 #
 # Options:
 #   --tmpdir DIR    directory holding lab/test containers to scan (repeatable).
-#                   Defaults to $TMPDIR (when set) and /tmp. Scans discover
+#                   Defaults to $TMPDIR (when set) and /tmp when neither
+#                   --tmpdir nor --owners is given. Scans discover
 #                   .fm-test-fixture and .fm-lab-home directly inside every
 #                   immediate fm-* and fmlab.* directory, and at any depth inside
 #                   an fm-test-run.* or fmlab.* directory or a directory that

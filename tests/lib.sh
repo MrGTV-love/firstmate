@@ -632,10 +632,10 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # fm_test_reap_orphans: best-effort sweep for fixture roots left behind by a
 # prior run that was killed hard enough to skip the traps above (e.g. a
 # SIGKILL timeout). Only removes directories carrying the .fm-test-fixture
-# marker fm_test_tmproot writes, so it never touches unrelated fm-* tmp dirs
-# from real (non-test) firstmate commands. The marker identifies the owning
-# shell across PID reuse, so the same live owner always wins over the age
-# fallback for dead or unowned roots.
+# marker fm_test_tmproot and each per-shell record carry, so it never touches
+# unrelated fm-* tmp dirs from real (non-test) firstmate commands. The marker
+# identifies the owning shell across PID reuse, so the same live owner always
+# wins over the age fallback for dead or unowned roots.
 #
 # The sweep reads only what a test run owns: the per-shell records under
 # fm-test-owners (each names its shell's fixture roots), marked fm-test-*
@@ -778,7 +778,7 @@ fm_test_reap_orphans() {
 
 # A parent coordinator can reap once before it starts isolated child sections.
 # Those children use their own EXIT cleanup and must not spend their bounded
-# execution window repeating the same global stale-fixture scan.
+# execution window repeating the same stale-fixture sweep.
 if [ "${FM_TEST_SKIP_ORPHAN_REAP:-0}" != 1 ]; then
   fm_test_reap_orphans
 fi

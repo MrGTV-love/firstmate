@@ -3035,9 +3035,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 # One wide sweep per run: it also removes roots and registries an older layout
-# left behind. Each script's own sweep afterwards reads only the per-shell owner
-# records (tests/lib.sh) and the labs and runner containers beside them, so the
-# cost of a script does not track the temp dir.
+# left behind. Each script's own sweep afterwards is the narrow one; the comment
+# above fm_test_reap_orphans in tests/lib.sh owns what it reads and what it costs.
 FM_TEST_SWEEP_ALL=1 bash -c '. "$1/tests/lib.sh"' _ "$ROOT" >/dev/null 2>&1 || true
 
 RUN_ID="fm-test-run-${RUN_STARTED_MS}-$$"

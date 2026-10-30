@@ -9,7 +9,7 @@
 #       directory, so no scan of the shared temp dir ever has to read them.
 #   fm_scratch_release <path>
 #       Removes the entry and then its container when no other entry is left.
-#       A command calls it from its EXIT, INT, TERM and HUP traps.
+#       A command calls it from its EXIT trap and any signal traps it sets.
 #   fm_scratch_reap <prefix>
 #       Removes the entries of <prefix> whose owner pid names no process this
 #       user can signal. KILL cannot run any trap, so the next fm_scratch_new
