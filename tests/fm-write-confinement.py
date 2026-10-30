@@ -840,6 +840,8 @@ def hardlink_alias(repo, manifest, base, harness, env):
                "task-data": (common / "packed-refs", Path(manifest["home"]) / "data/task/packed-refs-alias"),
                "loose-ref": (common / "refs/heads/fm/other", Path(manifest["worktree"]) / "loose-ref-alias"),
                "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias")}
+    aliases.update({f"other-worktree-{name}": (common / "worktrees/fm-other" / name, Path(manifest["worktree"]) / f"other-worktree-{name}-alias")
+                    for name in ("HEAD", "index", "commondir")})
     for name, (target, alias) in aliases.items():
         profile = base / f"alias-{name}-{harness}.sb"
         alias.parent.mkdir(parents=True, exist_ok=True)
@@ -854,10 +856,45 @@ def hardlink_alias(repo, manifest, base, harness, env):
             raise AssertionError(f"{harness}: a profile was built while {target} had a second link at {alias}")
         finally:
             alias.unlink()
+    # A symbolic link at a protected path, or at a folder above one, sends a
+    # confined write and Git's read of the ref to wherever it points.
+    ref, forged_ref = common / "refs/heads/fm/other", Path(manifest["worktree"]) / "forged-ref"
+    folder, forged_folder = common / "refs/heads/aliased", Path(manifest["user_tmp"]) / "fm-task-ref-folder"
+    real_ref = ref.read_bytes()
+    forged_ref.write_text(manifest["forged_sha"] + "\n")
+    forged_folder.mkdir(parents=True)
+    (forged_folder / "other").write_text(manifest["forged_sha"] + "\n")
+    symlinks = {"symlinked-ref": (ref, forged_ref), "symlinked-folder": (folder, forged_folder)}
+    for name, (path, target) in symlinks.items():
+        profile = base / f"alias-{name}-{harness}.sb"
+        path.unlink(missing_ok=True)
+        path.symlink_to(target)
+        try:
+            build_profile(repo, manifest, harness, profile, env)
+        except subprocess.CalledProcessError as error:
+            assert error.returncode == 1 and f"{path} (symbolic link to {target})" in error.stderr, (name, error.stderr)
+            assert not profile.exists(), f"{name}: a refused build published a profile"
+        else:
+            raise AssertionError(f"{harness}: a profile was built while {path} was a symbolic link to {target}")
+        finally:
+            path.unlink()
+    ref.write_bytes(real_ref)
+    forged_ref.unlink()
+    shutil.rmtree(forged_folder)
+    # Git's core.preferSymlinkRefs HEAD names a branch and is never followed.
+    real_head = (common / "HEAD").read_bytes()
+    (common / "HEAD").unlink()
+    (common / "HEAD").symlink_to("refs/heads/main")
+    try:
+        build_profile(repo, manifest, harness, base / f"alias-symlink-head-{harness}.sb", env)
+    finally:
+        (common / "HEAD").unlink()
+        (common / "HEAD").write_bytes(real_head)
     clean = base / f"alias-clean-{harness}.sb"
     build_profile(repo, manifest, harness, clean, env)
     assert clean.exists(), "the build still refuses after every alias was removed"
-    print(f"{harness} hard-link aliases: " + ", ".join(aliases) + " refused naming file and link count; clean build still works")
+    print(f"{harness} aliases: " + ", ".join([*aliases, *symlinks]) + " refused naming path and link count or target;"
+          " symbolic-link HEAD and clean builds still work")
 
 
 def reftable_source(repo, manifest, base, env):
