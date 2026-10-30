@@ -316,7 +316,7 @@ A decision Main owns goes to the parent as a keyed `needs-decision` status line,
 
 ### Owner recorded at filing
 
-`hold` writes the owner on a `Decision owner:` line directly beneath the hold-set stamp.
+`hold` writes the owner on a `Decision owner:` line directly beneath the hold-set stamp, inside the hold's header block (the lines under the stamp, up to the first blank line), and every later header write keeps it there beside the origin and freeze lines.
 The owner is a fact written at filing and is never inferred from the reason text.
 A main home needs no `--owner`, because no parent exists and the owner is the captain.
 A secondmate home must pass `--owner captain`, so a mate cannot file a call without saying it needs the captain's own words.

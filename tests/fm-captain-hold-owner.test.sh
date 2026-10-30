@@ -436,6 +436,46 @@ test_a_legacy_mate_hold_is_marked_the_captains_by_re_holding() {
   pass "a legacy mate hold is marked the captain's by re-holding it with that owner"
 }
 
+# Recording the owner keeps the hold's header block whole: a legacy hold that
+# freezes a project and is re-held as the captain's, with an origin as the shim
+# always passes, still freezes it for `frozen` and the idle reaper, and its owner
+# still reads as the captain.
+test_recording_the_owner_keeps_a_freeze_in_force() {
+  local mate out show
+  mate=$(make_mate_home owner-freeze)
+  printf 'window=w:in-scope\nkind=ship\nproject=%s/projects/vernant\n' "$mate" > "$mate/state/in-scope.meta"
+  tasks_in "$mate" add scout-o "Scout O" --kind scout --repo sample --start >/dev/null
+  make_legacy_mate_hold "$mate" frozen-work "freeze vernant until the captain decides"
+  run_captain "$mate" freeze frozen-work --project vernant >/dev/null || fail "freeze failed"
+  out=$(run_captain "$mate" frozen in-scope) || fail "the legacy hold did not freeze its project"
+  assert_equals frozen-work "$out" "frozen did not name the legacy hold"
+
+  run_captain "$mate" hold frozen-work --owner captain --origin scout-o --reason "the captain's own call" >/dev/null \
+    || fail "re-holding the legacy hold as the captain's failed"
+  show=$(tasks_in "$mate" show frozen-work --full)
+  assert_contains "$show" "Decision owner: captain" "the re-hold did not record the captain as owner"
+  out=$(run_captain "$mate" frozen in-scope) || fail "recording the owner lifted the freeze"
+  assert_equals frozen-work "$out" "frozen stopped naming the hold after its owner was recorded"
+  out=$(
+    PATH="$mate/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_CONFIG_OVERRIDE="$mate/config"
+    export PATH REAL_TASKS_AXI FM_CONFIG_OVERRIDE
+    . "$ROOT/bin/fm-idle-reap-lib.sh"
+    fm_idle_reap_frozen "$mate" "$mate/state" "$mate/data" in-scope || exit 1
+    printf '%s %s' "$IDLE_REAP_CLASS" "$IDLE_REAP_DETAIL"
+  ) || fail "the idle reaper no longer sees the freeze after the owner was recorded"
+  assert_contains "$out" "parked frozen by captain hold frozen-work" "the idle reaper did not name the freezing hold"
+
+  printf 'frozen-work is moot.\n' > "$mate/ruling.txt"
+  printf 'Moot under the ruling.\n' > "$mate/evidence.txt"
+  run_captain "$mate" hold ruling-f --title "Ruling F" --reason "choose" --repo sample >/dev/null
+  run_captain "$mate" answer ruling-f --decision-file "$mate/ruling.txt" >/dev/null || fail "could not record the ruling"
+  run_captain "$mate" withdraw frozen-work --evidence-file "$mate/evidence.txt" --ruling ruling-f >/dev/null \
+    || fail "withdraw refused the re-held hold"
+  assert_contains "$(tasks_in "$mate" show frozen-work --full)" "Filed owner: captain" \
+    "the origin write moved the owner out of the header, so the withdrawal lost it"
+  pass "recording the owner keeps a freeze in force for frozen and the idle reaper, and keeps the owner beside the origin"
+}
+
 # The lifecycle readers and the completion gate know the withdrawal: a scout's
 # inventory accepts the record as durable, and a withdrawal retires the board's
 # reconcile request for the call it released.
@@ -649,6 +689,7 @@ test_the_divergence_guard_stops_reporting_a_withdrawn_call
 test_the_decision_hold_shim_refuses_a_secondmate_hold_with_no_owner
 test_a_legacy_mate_hold_stays_the_captains_without_a_ruling
 test_a_legacy_mate_hold_is_marked_the_captains_by_re_holding
+test_recording_the_owner_keeps_a_freeze_in_force
 test_lifecycle_readers_and_the_gate_know_withdrawn_records
 test_a_retried_withdraw_finishes_without_a_second_record
 test_the_gate_accepts_an_archived_withdrawal

@@ -1421,15 +1421,20 @@ body_hold_origin() {  # <decoded-task-body>
   printf '%s\n' "$1" | sed -n 's/^Captain hold origin: \(.*\)$/\1/p' | head -1
 }
 
-# WHO OWNS A HOLD. A hold records, on a line of its own beneath the hold-set
-# stamp, the owner of the decision it waits on: `captain`, because only calls
+# WHO OWNS A HOLD. A hold records, on a line of its own in its header block
+# (the lines under the hold-set stamp, up to the first blank line, as the freeze
+# reads it), the owner of the decision it waits on: `captain`, because only calls
 # that need the captain's own words are held. The owner is a fact written at
 # filing, never inferred from the reason text. A hold filed before owners were
 # recorded has no line: in a main home that is the captain, because no parent
 # exists, and in a secondmate home it is `unrecorded`, because the home's
 # parent channel was its only addressee and the record cannot say more.
 body_decision_owner() {  # <decoded-task-body>
-  printf '%s\n' "$1" | sed -n 's/^Decision owner: \(.*\)$/\1/p' | head -1
+  printf '%s\n' "$1" | awk '
+    NR == 1 { if ($0 !~ /^Captain hold set: /) exit; next }
+    NF == 0 { exit }
+    /^Decision owner: / { sub(/^Decision owner: /, ""); print; exit }
+  '
 }
 
 # main when this home has no parent firstmate, mate otherwise. An unusable
@@ -1452,18 +1457,23 @@ effective_decision_owner() {  # <decoded-task-body>
   fi
 }
 
-# Writes the owner line directly beneath the stamp.
+# Writes the owner line directly beneath the stamp, keeping every other line of
+# the header block in it.
 write_decision_owner() {  # <task-id> <shown-body> <owner>
-  local id=$1 body=$2 owner=$3 stamp rest new_body tmp
+  local id=$1 body=$2 owner=$3 stamp after header rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its owner was recorded"
-  rest=$(printf '%s\n' "$body" | sed 1d \
-    | awk '!seen && index($0, "Decision owner: ") == 1 { seen = 1; next } { print }' \
+  after=$(printf '%s\n' "$body" | sed 1d)
+  header=$(printf '%s\n' "$after" | awk 'NF == 0 { exit } !/^Decision owner: / { print }')
+  rest=$(printf '%s\n' "$after" | awk 'found { print; next } NF == 0 { found = 1 }' \
     | awk 'NF || started { started = 1; print }')
   new_body=$(printf '%s\nDecision owner: %s' "$stamp" "$owner")
+  if [ -n "$header" ]; then
+    new_body=$(printf '%s\n%s' "$new_body" "$header")
+  fi
   if [ -n "$rest" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
   fi
@@ -1492,23 +1502,28 @@ task_identity() {
 }
 
 write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
-  local id=$1 body=$2 origin=$3 stamp freeze rest new_body tmp
+  local id=$1 body=$2 origin=$3 stamp owner freeze rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its origin was recorded"
+  owner=$(body_decision_owner "$body")
   freeze=$(body_hold_freeze_project "$body")
   rest=$(printf '%s\n' "$body" | sed 1d | awk '
       BEGIN { header = 1 }
       header && NF == 0 { header = 0 }
       /^Captain hold origin: / { next }
       header && /^Captain hold freezes project: / { next }
+      header && /^Decision owner: / { next }
       { print }
     ' | awk 'NF || started { started = 1; print }')
   new_body=$stamp
+  if [ -n "$owner" ]; then
+    new_body=$(printf '%s\nDecision owner: %s' "$new_body" "$owner")
+  fi
   if [ -n "$origin" ]; then
-    new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
+    new_body=$(printf '%s\nCaptain hold origin: %s' "$new_body" "$origin")
   fi
   if [ -n "$freeze" ]; then
     new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$freeze")
