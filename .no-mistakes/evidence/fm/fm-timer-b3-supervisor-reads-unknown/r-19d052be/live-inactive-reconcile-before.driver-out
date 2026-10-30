@@ -1,0 +1,20 @@
+tree: /Users/charlesabrooker/tmp/fm-before-02b.jNe5 (02b291521)
+### IR2 session-start 'scan --startup' behind a REAL watcher scan holding the scan lock
+    (secondmate home; the watcher scan waits on a silent no-mistakes gate read, FM_DOD_NM_STALL_SECS=30;
+     startup budget FM_INACTIVE_RECONCILE_BUDGET_SECS=3)
+watcher scan pid 96501 is waiting on the silent gate read: yes
+$ fm-inactive-reconcile.sh scan --startup -> exit=0 wall=63845ms
+watcher scan still running when startup returned: no
+z's failed outcome delivered by the startup pass: yes
+watcher scan finished: exit=0, after a further 133ms; z delivered by it: yes; silent gate reads: 2
+
+### IR3 child a's metadata lock held (a long teardown); b is slow (crew-state read sleeps 30 s); c is due
+    up to 5 scan --startup passes at FM_INACTIVE_RECONCILE_BUDGET_SECS=1
+scan 1: exit=0 wall=3185ms cursor= queued: 
+scan 2: exit=0 wall=2092ms cursor= queued: 
+scan 3: exit=0 wall=1920ms cursor= queued: 
+scan 4: exit=0 wall=1940ms cursor= queued: 
+scan 5: exit=0 wall=1907ms cursor= queued: 
+a still held during all scans: yes
+RESULT: c reached while a held: NO after 5 scan(s); a handled while held: no
+

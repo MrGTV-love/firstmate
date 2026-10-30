@@ -1,0 +1,7 @@
+tree: /Users/charlesabrooker/tmp/fm-before-c4b.GGKp (c4b00ad04)
+perl on the no-perl PATH: none
+$ fm-crew-state.sh feat-dnoperl   (normal PATH)
+state: done · source: run-step · run passed: PR open
+$ PATH=<every tool but perl> fm-crew-state.sh feat-dnoperl
+state: done · source: run-step · run passed: PR state unknown (unreadable)
+

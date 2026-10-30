@@ -1,0 +1,34 @@
+L6 reruns (same driver, SCENARIOS=L6), after the first L6 run in live-teardown/transcript.txt took 68 s per teardown:
+--- rerun 1
+### L6a secondmate home, report-step gate read silent, no --force (gate stall 3 s)
+exit=75  wall=7s
+UNKNOWN: the no-mistakes daemon went silent, so whether task-x1's final outcome is accepted is unknown; every durable task record is kept, retry teardown.
+### L6b same, captain's --force
+exit=0  wall=7s
+done [key=child-outcome-task-x1-done-a1b4451a] [at=1793341312]: child task-x1 done (acceptance unknown: no-mistakes read stalled): PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=no-mistakes
+--- rerun 2
+### L6a secondmate home, report-step gate read silent, no --force (gate stall 3 s)
+exit=75  wall=7s
+UNKNOWN: the no-mistakes daemon went silent, so whether task-x1's final outcome is accepted is unknown; every durable task record is kept, retry teardown.
+### L6b same, captain's --force
+exit=0  wall=8s
+done [key=child-outcome-task-x1-done-a1b4451a] [at=1793341334]: child task-x1 done (acceptance unknown: no-mistakes read stalled): PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=no-mistakes
+--- rerun 3
+### L6a secondmate home, report-step gate read silent, no --force (gate stall 3 s)
+exit=75  wall=7s
+UNKNOWN: the no-mistakes daemon went silent, so whether task-x1's final outcome is accepted is unknown; every durable task record is kept, retry teardown.
+### L6b same, captain's --force
+exit=0  wall=8s
+done [key=child-outcome-task-x1-done-a1b4451a] [at=1793341354]: child task-x1 done (acceptance unknown: no-mistakes read stalled): PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=no-mistakes
+--- rerun 4
+### L6a secondmate home, report-step gate read silent, no --force (gate stall 3 s)
+exit=75  wall=8s
+UNKNOWN: the no-mistakes daemon went silent, so whether task-x1's final outcome is accepted is unknown; every durable task record is kept, retry teardown.
+### L6b same, captain's --force
+exit=0  wall=8s
+done [key=child-outcome-task-x1-done-a1b4451a] [at=1793341377]: child task-x1 done (acceptance unknown: no-mistakes read stalled): PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=no-mistakes
+--- rerun 0
+### L6a secondmate home, report-step gate read silent, no --force (gate stall 3 s)
+exit=75  wall=7s
+### L6b same, captain's --force
+exit=0  wall=7s

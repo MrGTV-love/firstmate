@@ -1,0 +1,24 @@
+tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8PMZ9QZQBA0YTM9PH4PC (19d052be0)
+### IR1 report on a ship done: whose gate read goes silent (secondmate home, FM_DOD_NM_STALL_SECS=3)
+$ fm-inactive-reconcile.sh report child        -> exit=75 wall=4501ms
+parent channel (main/state/mate.status) child-outcome lines: 0
+$ fm-inactive-reconcile.sh report child --force -> exit=0 wall=4643ms
+parent channel now has:
+done [key=child-outcome-child-done-1ba0492c] [at=1793340794]: child child done (acceptance unknown: no-mistakes read stalled): PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off
+
+### IR2 session-start 'scan --startup' behind a REAL watcher scan holding the scan lock
+    (secondmate home; the watcher scan waits on a silent no-mistakes gate read, FM_DOD_NM_STALL_SECS=30;
+     startup budget FM_INACTIVE_RECONCILE_BUDGET_SECS=3)
+watcher scan pid 73671 is waiting on the silent gate read: yes
+$ fm-inactive-reconcile.sh scan --startup -> exit=0 wall=2572ms
+watcher scan still running when startup returned: yes
+z's failed outcome delivered by the startup pass: no
+watcher scan finished: exit=0, after a further 29785ms; z delivered by it: yes; silent gate reads: 1
+
+### IR3 child a's metadata lock held (a long teardown); b is slow (crew-state read sleeps 30 s); c is due
+    up to 5 scan --startup passes at FM_INACTIVE_RECONCILE_BUDGET_SECS=1
+scan 1: exit=0 wall=1880ms cursor=b queued: 
+scan 2: exit=0 wall=2245ms cursor=b queued: child=c state=done
+a still held during all scans: yes
+RESULT: c reached while a held: yes after 2 scan(s); a handled while held: no
+

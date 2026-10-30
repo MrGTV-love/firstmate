@@ -1,0 +1,40 @@
+### MP1 silent daemon (prune stall 6 s < teardown read stall 15 s, beat every 2 s)
+fm-merge-prune.sh run t1 --now: exit=0 wall=20s
+--- prune record (state/t1.merge-prune) ---
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793340726
+state=pending
+reason=UNKNOWN: the no-mistakes daemon went silent (no output or CPU progress for 15s), so whether a run for t1 is parked at a gate is unknown; nothing more was closed, retry teardown.
+wake_sent=0
+copy=
+armed_at=1793340665
+project=/Users/charlesabrooker/tmp/fm-merge-prune.hnGAlq/w1/project
+returned=0
+--- data/t1/merge-prune.log ---
+2026-10-30T06:11:05Z armed for https://github.com/acme/widget/pull/7
+2026-10-30T06:11:25Z retry in 60s (attempt 1): UNKNOWN: the no-mistakes daemon went silent (no output or CPU progress for 15s), so whether a run for t1 is parked at a gate is unknown; nothing more was closed, retry teardown.
+--- task record kept: yes; copy kept: yes; wakes: 0
+
+### MP1b same task, daemon answers again: the retry reaps
+fm-merge-prune.sh run t1 --now: exit=0 wall=5s
+--- prune record (state/t1.merge-prune) ---
+(gone: pruned)
+--- data/t1/merge-prune.log ---
+2026-10-30T06:11:05Z armed for https://github.com/acme/widget/pull/7
+2026-10-30T06:11:25Z retry in 60s (attempt 1): UNKNOWN: the no-mistakes daemon went silent (no output or CPU progress for 15s), so whether a run for t1 is parked at a gate is unknown; nothing more was closed, retry teardown.
+2026-10-30T06:11:30Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.hnGAlq/w1/th/pool1/1/repo (head 38b5dea); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.hnGAlq/w1/home/data/t1/merge-prune-preserved/1793340685
+2026-10-30T06:11:30Z reaped: teardown completed; removed the returned copy
+--- task record kept: no; copy kept: no; wakes: 0
+
+### MP2 slow daemon answers after 25 s quiet (prune stall 6 s)
+fm-merge-prune.sh run t1 --now: exit=0 wall=30s
+--- prune record (state/t1.merge-prune) ---
+(gone: pruned)
+--- data/t1/merge-prune.log ---
+2026-10-30T06:11:31Z armed for https://github.com/acme/widget/pull/7
+2026-10-30T06:12:01Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.hnGAlq/w2/th/pool1/1/repo (head 710d2a7); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.hnGAlq/w2/home/data/t1/merge-prune-preserved/1793340691
+2026-10-30T06:12:01Z reaped: teardown completed; removed the returned copy
+--- task record kept: no; copy kept: no; wakes: 0
+
