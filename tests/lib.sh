@@ -651,7 +651,8 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # dir's names a few times (about 0.06 s per read at 50000 entries). Once per age
 # floor it also looks at every top-level fm-* directory, for marked roots that
 # predate the records (a stamp in the owners dir says when it last did); that
-# look costs a stat per entry.
+# look costs a stat per entry. Roots the look kept (owner alive, or too young)
+# are listed beside the stamp, and every sweep checks that short list.
 # FM_TEST_SWEEP_ALL=1 always looks and also reaps dead shells' legacy
 # registries; bin/fm-test-run.sh does that once per run.
 FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
@@ -659,6 +660,7 @@ FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity shell root entry
   local pattern='fm-test-*' stamp="$FM_TEST_OWNERS_DIR/.legacy-discovery" stamp_mtime
+  local kept_list="$FM_TEST_OWNERS_DIR/.legacy-kept" kept_root kept_tmp discovered=0
   local seen=$'\n'
   local -a markers=() fm_test_sweep_candidates=() reaper_args=()
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
@@ -672,6 +674,7 @@ fm_test_reap_orphans() {
     stamp_mtime=$(stat -c %Y "$stamp" 2>/dev/null || stat -f %m "$stamp" 2>/dev/null) || stamp_mtime=
     if [ -L "$stamp" ] || [ -z "$stamp_mtime" ] || [ $(( $(date +%s) - stamp_mtime )) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ]; then
       pattern='fm-*'
+      discovered=1
       rm -f "$stamp" 2>/dev/null
       : > "$stamp" 2>/dev/null || true
     fi
@@ -694,6 +697,22 @@ fm_test_reap_orphans() {
     markers+=("$marker")
     fm_test_sweep_candidates+=("${marker%/.fm-test-fixture}")
   done
+  # A sweep that does not look at every fm-* entry still checks the legacy roots
+  # an earlier look kept (owner alive or root too young), so one that has since
+  # become eligible goes at the next sweep. The cost follows that short list.
+  # Only a direct fm-* child of the temp dir that this user owns is trusted from it.
+  if [ "$discovered" = 0 ] && [ -f "$kept_list" ] && [ ! -L "$kept_list" ] && [ -O "$kept_list" ]; then
+    while IFS= read -r kept_root; do
+      case "$kept_root" in "$FM_TEST_TMPDIR"/fm-*) ;; *) continue ;; esac
+      [ "${kept_root%/*}" = "${FM_TEST_TMPDIR%/}" ] && [ -d "$kept_root" ] && [ ! -L "$kept_root" ] && [ -O "$kept_root" ] || continue
+      marker="$kept_root/.fm-test-fixture"
+      [ -f "$marker" ] || continue
+      case "$seen" in *$'\n'"$marker"$'\n'*) continue ;; esac
+      seen+="$marker"$'\n'
+      markers+=("$marker")
+      fm_test_sweep_candidates+=("$kept_root")
+    done < "$kept_list"
+  fi
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
     # Registries from before the per-shell records lived beside the fixture roots.
     # They record no owner identity, so any live process with the owner's PID
@@ -750,6 +769,14 @@ fm_test_reap_orphans() {
     esac
     fm_test_remove_tree "$dir"
   done
+  # Roots outside the records that are still here are the ones the look kept.
+  [ "$discovered" = 1 ] || [ -f "$kept_list" ] || return 0
+  kept_tmp="$kept_list.$$"
+  : > "$kept_tmp" 2>/dev/null || return 0
+  for kept_root in ${fm_test_sweep_candidates[@]+"${fm_test_sweep_candidates[@]}"}; do
+    [ -f "$kept_root/.fm-test-fixture" ] && printf '%s\n' "$kept_root" >> "$kept_tmp"
+  done
+  if [ -s "$kept_tmp" ]; then mv -f "$kept_tmp" "$kept_list" 2>/dev/null || rm -f "$kept_tmp"; else rm -f "$kept_tmp" "$kept_list"; fi
 }
 
 # A parent coordinator can reap once before it starts isolated child sections.

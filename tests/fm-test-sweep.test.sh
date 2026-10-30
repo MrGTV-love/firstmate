@@ -153,6 +153,66 @@ test_sweep_finds_legacy_marked_roots() {
   pass "ordinary sourcing removes a dead owner's marked root of any fm-* name and keeps live, young and unmarked ones"
 }
 
+# The reviewer's sequence, with the discovery stamp left alone: a look at every
+# fm-* entry keeps a legacy root whose owner is alive; the owner dies; the next
+# ordinary sourcing, still inside the stamp's interval, removes the root.
+test_sweep_removes_kept_legacy_root_once_owner_dies() {
+  local tmp="$TMP_ROOT/legacy-kept" pid root
+  mkdir -p "$tmp"
+  sleep 300 &
+  pid=$!
+  root=$(make_legacy_root "$tmp/fm-drop-words.DDDDDD" "$pid")
+  sourcing_shell "$tmp"   # the look at every fm-* entry: no stamp yet
+  assert_present "$root" "the look removed a legacy root whose owner is still running"
+  assert_present "$tmp/fm-test-owners/.legacy-discovery" "the look left no stamp"
+  kill -TERM "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  sourcing_shell "$tmp"   # still inside the stamp's interval; the owner is dead now
+  assert_absent "$root" "the next ordinary sourcing left a legacy root whose owner has died"
+  pass "a legacy root kept while its owner lived goes at the next ordinary sourcing after the owner dies, stamp untouched"
+}
+
+# The list the look leaves behind holds only roots that are still there and are
+# direct fm-* children of the temp dir; anything else in it is dropped unread.
+test_kept_legacy_list_holds_only_live_roots_of_the_temp_dir() {
+  local tmp="$TMP_ROOT/legacy-list" pid root gone outside list
+  mkdir -p "$tmp" "$TMP_ROOT/legacy-list-outside/victim"
+  list="$tmp/fm-test-owners/.legacy-kept"
+  sleep 300 &
+  pid=$!
+  root=$(make_legacy_root "$tmp/fm-drop-words.DDDDDD" "$pid")
+  gone=$(make_legacy_root "$tmp/fm-drop-words.EEEEEE" "$pid")
+  # An old, ownerless marker outside the temp dir, planted into the list.
+  outside="$TMP_ROOT/legacy-list-outside/victim"
+  printf '%s\n' "$(bash -c 'printf "%s" "$$"')" > "$outside/.fm-test-fixture"
+  touch -t 202001010000 "$outside/.fm-test-fixture" "$outside"
+  sourcing_shell "$tmp"
+  grep -qxF "$root" "$list" 2>/dev/null || fail "the look did not list the legacy root it kept: $(cat "$list" 2>/dev/null)"
+  printf '%s\n' "$outside" >> "$list"
+  rm -rf "$gone"
+  sourcing_shell "$tmp"
+  assert_present "$root" "the list check removed a legacy root whose owner is still running"
+  assert_present "$outside" "the list check removed a root outside the temp dir"
+  if grep -qxF "$gone" "$list" || grep -qxF "$outside" "$list"; then
+    fail "the list kept a path that is gone or outside the temp dir: $(cat "$list")"
+  fi
+  kill -TERM "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  sourcing_shell "$tmp"
+  assert_absent "$root" "the list check left a legacy root whose owner has died"
+  [ ! -e "$list" ] || fail "the list outlived its last root: $(cat "$list")"
+  pass "the kept-roots list drops paths that are gone or outside the temp dir and ends with its last root"
+}
+
+# make_legacy_root <path> <owner-pid>: a marked root from before the records,
+# owned by a running process, with a marker old enough to be eligible.
+make_legacy_root() {
+  mkdir -p "$1"
+  printf '%s\n%s\n' "$2" "$(fm_test_pid_identity "$2")" > "$1/.fm-test-fixture"
+  touch -t 202001010000 "$1/.fm-test-fixture" "$1"
+  printf '%s\n' "$1"
+}
+
 test_sweep_cost_does_not_follow_unrelated_entries() {
   local tmp_few="$TMP_ROOT/cost-few" tmp_many="$TMP_ROOT/cost-many" i dir few many
   mkdir -p "$tmp_few" "$tmp_many"
@@ -248,4 +308,6 @@ test_wide_sweep_stops_a_dead_records_process_first
 test_owners_dir_must_be_ours
 test_sweep_keeps_live_owner_and_unmarked_entries
 test_sweep_finds_legacy_marked_roots
+test_sweep_removes_kept_legacy_root_once_owner_dies
+test_kept_legacy_list_holds_only_live_roots_of_the_temp_dir
 test_sweep_cost_does_not_follow_unrelated_entries
