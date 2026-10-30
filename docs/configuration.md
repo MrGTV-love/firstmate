@@ -3460,11 +3460,8 @@ Arming refuses an unbound source, establishes the DM and proves it readable, the
 The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
 Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
 `bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
-`arm` itself still refuses a changed owner, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, so run `bin/fm-slack-poll.sh` until it prints nothing first.
-The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
-Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
-Re-running `bin/fm-slack-check.sh arm` is the one step that takes the change: it stops tracking the old DM's threads, posts nothing more there, opens and proves the new DM, and lets the mirror post the open calls again.
-It refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, so finish that poll first.
+`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM.
+The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until it prints nothing, set the new value, then run `disarm`, `retarget`, and `arm`.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 

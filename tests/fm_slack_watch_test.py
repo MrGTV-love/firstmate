@@ -24,6 +24,7 @@ Usage:
   fm_slack_watch_test.py react <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py unreact <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py set-state <state.json> <field> <value>
+  fm_slack_watch_test.py journal-line <state.json> <line>
   fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status>
   fm_slack_watch_test.py move-transcript <transcript.json> <out.json> <channel>
   fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
@@ -160,6 +161,8 @@ def main(argv):
             if command == 'unreact':
                 entry['users'] = [u for u in entry['users'] if u != argv[4]]
         edit(argv[1], toggle)
+    elif command == 'journal-line':
+        edit(argv[1], lambda data: data.setdefault('outbox', []).append(argv[2]))
     elif command == 'set-state':
         edit(argv[1], lambda data: data.__setitem__(argv[2], argv[3]))
     elif command == 'fail-call':

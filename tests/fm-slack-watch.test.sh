@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X23.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X32.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1310,5 +1310,23 @@ bind
 out=$(poll typed-reply)
 assert_contains "$out" 'closed: typed-call' "X31 the staged answer is delivered once the source is bound again"
 printf 'ok - X31\n'
+
+# X32: a journaled wake line that does not fit is held, never cut, and prints in full on the next run
+new_home unmatched
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/unmatched/transcript.json" >/dev/null
+held_a="check: slack held-a $(python3 -I -c 'print("a" * 280)')"
+held_b="check: slack held-b $(python3 -I -c 'print("b" * 280)')"
+python3 "$HELPER" journal-line "$(state_file)" "$held_a"
+python3 "$HELPER" journal-line "$(state_file)" "$held_b"
+wake() { "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/unmatched/transcript.json"; }
+out=$(wake)
+[ "${#out}" -le 480 ] || fail "X32 the wake line is unbounded"
+assert_eq "$out" "$held_a; +2 queued" "X32 the first journaled line with the queue marker"
+out=$(wake)
+assert_contains "$out" "^$held_b; " "X32 the held line was lost or cut"
+assert_contains "$out" 'unmatched reply 900.000002' "X32 the queued notice was lost"
+assert_not_contains "$out" 'queued' "X32 an empty queue left a marker"
+assert_eq "$(wake)" "" "X32 a printed line repeated"
+printf 'ok - X32\n'
 
 printf 'ok - all Slack watch checks\n'

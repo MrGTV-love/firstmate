@@ -123,9 +123,13 @@ def fresh(generated, identity):
     return bool(board and hold and board > hold)
 
 
+def queue_tail(queued):
+    return '; +%d queued' % queued if queued else ''
+
+
 def wake_line(lines, queued=0):
     line = '; '.join(lines)
-    tail = '; +%d queued' % queued if queued else ''
+    tail = queue_tail(queued)
     room = WAKE_LIMIT - len(tail)
     return (line if len(line) <= room else line[:room - 3] + '...') + tail
 
@@ -851,14 +855,14 @@ def emit(watch, command):
         # Only the lines the wake line holds are printed (and cleared from the journal);
         # the rest wait for the next run behind the queue marker.
         shown = len(lines)
-        while shown > 1 and len(wake_line(lines[:shown], queued + len(lines) - shown)) > WAKE_LIMIT:
+        while shown > 1 and len('; '.join(lines[:shown]) + queue_tail(queued + len(lines) - shown)) > WAKE_LIMIT:
             shown -= 1
         if lines:
             print(wake_line(lines[:shown], queued + len(lines) - shown), flush=True)
             watch.printed(shown)
         return
-    if lines and queued:
-        lines[-1] += '; +%d queued' % queued
+    if lines:
+        lines[-1] += queue_tail(queued)
     for line in lines:
         print(line, flush=True)
     watch.printed(len(watch.output))
