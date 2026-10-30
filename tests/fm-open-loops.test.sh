@@ -2258,6 +2258,41 @@ restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
 assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
 clock['now'] = now
+# A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
+# the episode follows the row's obligation clock as well as its digest.
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 8000
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: after the restart"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+old = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert old.returncode == 1 and 'new delivery' in old.stdout + old.stderr, (
+    'a delivery from before the restarted obligation clock must be refused', old.stdout, old.stderr)
+assert ack(boundary).returncode == 1, 'the refused delivery must leave the restarted row gated'
+inbox(home, '002.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '002.msg')
+assert ack(boundary).returncode == 0, 'a delivery sent after the restarted overdue boundary answers it'
+clock['now'] = now
+# Control: re-presenting an unchanged row, with no restart, still reuses its valid delivery.
+home, ledger, row, call, ok, drain, ack = case('clock-steady-steer', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+clock['now'] = now
 # The unpause case: a new head is pushed after the presented ledger was generated (G) but before the action (T).
 home, ledger, row, call, ok, drain, ack = case('restart-before-record', owner='captain')
 _, boundary = drain()

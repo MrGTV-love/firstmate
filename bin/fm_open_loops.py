@@ -1329,13 +1329,37 @@ def overdue_since(row, now):
     return now - age + limit
 
 
+def obligation_clock(row, now):
+    """When this row's obligation clock started: its age aged to now, taken from now; None when the record has no age."""
+    age = row.get("age_seconds")
+    return now - age if type(age) is int else None
+
+
+def clock_restarted(episode, row, now):
+    """The row's age clock restarted after the episode was stored, whatever its evidence text now says."""
+    clock = obligation_clock(row, now)
+    return clock is not None and type(episode.get("clock")) is int and clock > episode["clock"]
+
+
+def episode_record(row, now, start):
+    clock = obligation_clock(row, now)
+    return dict(digest=row_digest(row), start=start, **({} if clock is None else {"clock": clock}))
+
+
 def note_episode(controls, row, now):
-    """Open a row's overdue episode at the moment it became overdue, or now when its evidence materially changed."""
+    """Open a row's overdue episode at the moment it became overdue, or now when its evidence materially changed.
+
+    The episode follows the row's obligation clock as well as its digest: when the clock restarted on unchanged
+    text, a new episode opens at the current overdue boundary, so a delivery from the earlier episode is refused.
+    """
     episodes = controls.setdefault("episodes", {})
-    digest = row_digest(row)
     current = episodes.get(row["id"])
-    if not isinstance(current, dict) or current.get("digest") != digest:
-        episodes[row["id"]] = dict(digest=digest, start=now if isinstance(current, dict) else overdue_since(row, now))
+    if not isinstance(current, dict) or current.get("digest") != row_digest(row):
+        episodes[row["id"]] = episode_record(row, now, now if isinstance(current, dict) else overdue_since(row, now))
+    elif clock_restarted(current, row, now):
+        episodes[row["id"]] = episode_record(row, now, overdue_since(row, now))
+    elif "clock" not in current and obligation_clock(row, now) is not None:
+        current["clock"] = obligation_clock(row, now)  # an episode stored before clocks were kept adopts its row's
 
 
 def episode_boundary(controls, row, actor, now):
@@ -1346,7 +1370,7 @@ def episode_boundary(controls, row, actor, now):
     """
     episode = controls.get("episodes", {}).get(row["id"])
     if isinstance(episode, dict) and episode.get("digest") == row_digest(row) and type(episode.get("start")) is int:
-        return episode["start"]
+        return overdue_since(row, now) if clock_restarted(episode, row, now) else episode["start"]
     stamps = controls["presented_at"]
     boundary = stamps.get(actor, {}).get(row["id"])
     if boundary is None:
@@ -2064,7 +2088,7 @@ def record_action(args, state, now, report, waits, waits_error):
         for marked in stamps.values():
             if ident in marked:
                 marked[ident] = now
-        controls.setdefault("episodes", {})[ident] = dict(digest=row_digest(by_id[ident]), start=now)
+        controls.setdefault("episodes", {})[ident] = episode_record(by_id[ident], now, now)
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=prior_deferrals
