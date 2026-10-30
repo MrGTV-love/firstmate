@@ -3916,10 +3916,20 @@ executable(fake / 'no-mistakes', '''#!/usr/bin/env python3
 import os, sys
 args = sys.argv[1:]
 run_pr = os.path.join(os.environ.get('FM_HOME', ''), 'run-pr')
-if args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1' \
-        and os.path.exists(os.path.join(os.environ.get('FM_HOME', ''), 'run-stall')):
-    sys.exit(1)  # a read that gives no answer
-if args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1' and os.path.exists(run_pr):
+run_stall = os.path.join(os.environ.get('FM_HOME', ''), 'run-stall')
+ledger_read = args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1'
+if ledger_read and os.path.exists(run_stall):
+    left = open(run_stall).read().strip()
+    if left == '1':
+        os.unlink(run_stall)
+    elif left:
+        open(run_stall, 'w').write(str(int(left) - 1))
+    sys.exit(1)  # a read that gives no answer; a count limits it to that many reads
+if ledger_read and os.path.exists(os.path.join(os.environ.get('FM_HOME', ''), 'run-uninit')):
+    print("error: repo not initialized (run 'no-mistakes init' first)")
+    print('help[1]: Run `no-mistakes init` to set up the gate in this repository')
+    sys.exit(1)
+if ledger_read and os.path.exists(run_pr):
     print('run:\\n  id: run-1\\n  branch: fm/repair-owner\\n  pr: ' + open(run_pr).read().strip())
 elif args in (['axi'], ['axi', 'status']) or args[:2] == ['daemon', 'status'] or args[:1] == ['runs']:
     pass
@@ -4137,6 +4147,31 @@ refused = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evide
 assert refused.returncode == 1 and 'could not be read' in refused.stdout, ('no new wait on an unread done task', refused)
 (fx['home'] / 'run-stall').unlink()
 assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an answering read finding no PR ends the wait'
+# A stalled read refuses its own batch line only; a later line whose read answers clears the mark and records.
+fx = waiting_fixture('run-pr-stall-batch')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr-stall-batch', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+(fx['home'] / 'run-stall').write_text('1')
+line = json.dumps(dict(row_id=fx['red']['id'], kind='waiting', evidence=reason, prerequisite_task='repair-owner',
+                       recheck=iso(now + 7200)))
+batch = subprocess.run([str(fx['loops']), 'action', '--batch', '-'], env=fx['env'], text=True, capture_output=True,
+                       timeout=120, input=line + '\n' + line + '\n')
+assert batch.returncode == 1, ('the stalled line is refused', batch.stdout, batch.stderr)
+assert re.search(r'^  1,.*"refused",.*could not be read', batch.stdout, re.M), batch.stdout
+assert re.search(r'^  2,.*"recorded"', batch.stdout, re.M), ('an answering read clears the unread mark', batch.stdout)
+# A repo with no no-mistakes setup answers that there is no run: a done ship with no PR has landed, never unread.
+fx = waiting_fixture('run-uninit')
+fx['ok']('git', '-C', world / 'evidence-tree-run-uninit', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-uninit').write_text('')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: no change needed\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an uninitialized repo answers: the task has landed'
+uninit = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert uninit.returncode == 1 and 'done with no PR' in uninit.stdout, ('an uninitialized repo is an answer', uninit)
+assert 'could not be read' not in uninit.stdout and 'unreadable' not in uninit.stderr, uninit
 # A done scout whose done note names another task's PR has landed: only a ship's done note names its own PR.
 fx = waiting_fixture('done-scout-note')
 (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('kind=ship', 'kind=scout'))

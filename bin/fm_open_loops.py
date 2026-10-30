@@ -1521,10 +1521,13 @@ class WaitVerifier:
         pr = self.task_pr(path, fields)
         if pr is None:
             self.unread[task] = state  # unknown, not a verdict: the wait stands and the read repeats next pass
-        elif state == "done" and not pr:
-            raise ValueError("prerequisite task is done with no PR; its report is its delivery; follow up on its result")
-        elif merge_marker(c.state, pr):
-            raise ValueError("prerequisite task's PR has merged; follow up on its result")
+        else:
+            self.unread.pop(task, None)
+            if state == "done" and not pr:
+                raise ValueError("prerequisite task is done with no PR; its report is its delivery;"
+                                 " follow up on its result")
+            if merge_marker(c.state, pr):
+                raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
                and row.get("overdue") and not row.get("informational") and not row.get("stale")
                for row in self.rows.values()):
@@ -1551,7 +1554,9 @@ class WaitVerifier:
             'pr "$(fm_dod_pr_url_from_done_note "$note")" && exit 0; fi; '
             '[ -n "$3" ] && [ -d "$3" ] && command -v no-mistakes >/dev/null 2>&1 || exit 0; '
             'branch=$(git -C "$3" symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0; '
-            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || { echo "?"; exit 0; }; '
+            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || '
+            "{ [ \"$(fm_nm_strip_quotes \"$(fm_nm_field \"$out\" error)\")\" = \"repo not initialized (run 'no-mistakes init' first)\" ] "
+            '|| echo "?"; exit 0; }; '
             '[ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" branch)")" = "$branch" ] || exit 0; '
             'pr "$(fm_nm_strip_quotes "$(fm_nm_field "$out" pr)")" || :',
             BIN, path, fields.get("worktree", ""), str(self.collector.timeout)).strip()
