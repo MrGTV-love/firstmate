@@ -1230,7 +1230,7 @@ db.execute("BEGIN EXCLUSIVE")
 open(sys.argv[2], "w").close()
 time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
   holder=$!
-  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
 
   rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=60 run_teardown_status "$case_dir")
   kill "$holder" 2>/dev/null || true

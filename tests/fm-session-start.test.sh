@@ -1683,7 +1683,7 @@ EOF
     "a read that never answered was not stopped and reported unknown"
   assert_not_contains "$out" "STARTUP TRUNCATED - SESSION START" \
     "a measured endpoint bound raised the whole-digest truncation banner"
-  fm_test_wait_until 60 no_stray_herdr "$fakebin" \
+  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.log" -- no_stray_herdr "$fakebin" \
     || fail "the measured read bound left hung herdr process(es) behind"
 
   pass "an endpoint read gets its host's measured bound: slow is alive, silent is unknown"
