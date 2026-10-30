@@ -6,6 +6,10 @@
 # fm_duration_limit <key> <existing-fallback-seconds> [95|99]
 #   a fallback of 0 means the caller had no deadline: record only, never a measured kill
 # fm_duration_timed <key> <existing-fallback-seconds> <command...>
+# fm_duration_progress <key> <inactivity-seconds> <samples-file> <command...>
+#   fm_run_progress under the caller's bound (usually fm_duration_limit, read
+#   once); appends the run as one fm_duration_record_batch row to samples-file;
+#   124 means it was stopped for inactivity, never a wall-clock cut
 # Only the owner of a limit says a timeout happened (timed-out 1); an exit of
 # 124 or 137 is never inferred to be one here.
 # Recording errors are visible on stderr and never replace a command's exit.
@@ -89,5 +93,21 @@ fm_duration_timed() {
     timed_out=1
   fi
   fm_duration_record "$key" "$((finished - started))" "$result" '' 1 "$load_start" "$timed_out"
+  return "$result"
+}
+
+fm_duration_progress() {
+  local key=$1 bound=$2 samples=$3 started finished load_start result=0
+  shift 3
+  if ! declare -F fm_run_progress >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-timeout-lib.sh
+    . "${FM_DURATION_HELPER%/*}/fm-timeout-lib.sh"
+  fi
+  load_start=$(fm_duration_load)
+  started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000' 2>/dev/null) || started=
+  fm_run_progress "$bound" "$@" || result=$?
+  if [ -n "$started" ] && finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000' 2>/dev/null); then
+    printf '%s\t%s\t%s\t1\t%s\t%s\t0\n' "$key" "$((finished - started))" "$result" "$load_start" "$(fm_duration_load)" >> "$samples"
+  fi
   return "$result"
 }
