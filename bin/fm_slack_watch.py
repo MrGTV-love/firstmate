@@ -244,6 +244,8 @@ class Watch:
         self.read_threads = set()
         self.advanced = 0
         self.notices_held = False
+        self.staging_only = False
+        self.dm_proven = False
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -437,6 +439,13 @@ class Watch:
             raise SlackError('dm_not_prepared')
         if not DM_CHANNEL.fullmatch(channel) or self.state.get('user') != self.dm_user():
             raise SlackError('target_is_not_a_DM')
+        if not self.dm_proven:
+            # The stored id must be the DM Slack itself opens for the configured owner;
+            # a different DM-shaped id, or an answer that cannot be read, writes nothing.
+            opened = self.api.call('conversations.open', users=self.dm_user(), return_im=True).get('channel', {})
+            if opened.get('id') != channel:
+                raise SlackError('stored_channel_not_owner_dm')
+            self.dm_proven = True
         return channel
 
     def post(self, event, text, thread=None):
@@ -462,6 +471,17 @@ class Watch:
         if self.state['pending']:
             # Pending rows belong to threads in the old DM; they must finish there first.
             raise SlackError('dm_user_changed_with_pending_work')
+        # An empty journal does not prove the old threads were read: read each tracked one
+        # now and stage what it holds by the normal rules, without publishing into the old DM.
+        # A failed or cut-off read propagates, so nothing is cleared on an incomplete read.
+        self.staging_only = True
+        try:
+            for occurrence, record in self.tracked():
+                self.read_thread(occurrence, record, 10 ** 6)
+        finally:
+            self.staging_only = False
+        if self.state['pending']:
+            raise SlackError('dm_user_changed_with_pending_work')
         # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
         self.commit()
@@ -478,6 +498,7 @@ class Watch:
         self.state.update(team=result.get('team_id'), user=self.dm_user(),
                           channel=channel['id'], scopes=sorted(getattr(self.api, 'scopes', set())))
         self.commit()
+        self.dm_proven = True
 
     def allowed(self, message):
         return (message.get('user') in self.authors
@@ -495,6 +516,8 @@ class Watch:
         self.state['seen'][event] = {'key': key}
 
     def publish(self, pending):
+        if self.staging_only:
+            return
         if pending.get('kind') == 'answer' and pending.get('author') not in self.authors:
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()

@@ -28,6 +28,7 @@ Usage:
   fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status> [times]
   fm_slack_watch_test.py clear-fail <replay-state.json> <method[:ts]>
   fm_slack_watch_test.py move-transcript <transcript.json> <out.json> <channel>
+  fm_slack_watch_test.py split-transcript <transcript.json> <out.json> <post-channel> <owner-dm>
   fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
   fm_slack_watch_test.py outbound-targets <outbound.jsonl> <method>
 """
@@ -179,6 +180,10 @@ def main(argv):
             data['messages'] = []
         data = json.load(open(argv[1]))
         move(data)
+        json.dump(data, open(argv[2], 'w'))
+    elif command == 'split-transcript':
+        data = json.load(open(argv[1]))
+        data['channel'], data['owner_dm'], data['messages'] = argv[3], argv[4], []
         json.dump(data, open(argv[2], 'w'))
     elif command == 'add-failure':
         data = json.load(open(argv[1]))

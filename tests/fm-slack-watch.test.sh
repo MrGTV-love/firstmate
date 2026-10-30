@@ -1205,7 +1205,7 @@ out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP
 set -e
 assert_contains "$out" 'dm_user_changed' "X26 a poll followed a changed owner without a retarget"
 set +e
-out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$TMP/moved.json" 2>&1); rc=$?
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$FIX/mirror/transcript.json" 2>&1); rc=$?
 set -e
 assert_eq "$rc" 0 "X26 retarget refused the changed owner"
 assert_contains "$out" 'retargeted:' "X26 retarget did not say what it did"
@@ -1490,5 +1490,80 @@ assert_contains "$out" 'closed: dup-b' "X40 an older answer acknowledged on a cl
 assert_not_contains "$out" 'unmatched reply' "X40 the acknowledged answer was surfaced as unmatched"
 assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X40 the acknowledged answers stayed journaled"
 printf 'ok - X40\n'
+
+# X41: retarget reads every tracked old-DM thread first, so no unread owner reply is stranded
+new_home mirror
+bind
+mirror mirror >/dev/null
+ts=$(thread_field open-a ts)
+reply_to "$ts" 900.999999 'ship from old DM'
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X41 the unread reply is not journaled yet"
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/mirror/transcript.json" >/dev/null
+"$ROOT/bin/fm-slack-check.sh" disarm >/dev/null
+before_user=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["user"])' "$(state_file)")
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$FIX/mirror/transcript.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X41 retarget cleared the old DM while an unread owner reply was waiting in it"
+assert_contains "$out" 'dm_user_changed_with_pending_work' "X41 retarget named its refusal"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X41 the unread reply was not staged by the retarget"
+assert_eq "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["user"])' "$(state_file)")" "$before_user" "X41 a refused retarget changed the owner"
+assert_eq "$(thread_count)" 4 "X41 a refused retarget stopped tracking old threads"
+assert_open open-a 0 "X41 retarget closed the call itself"
+out=$(poll mirror)
+assert_contains "$out" 'closed: open-a' "X41 the staged reply was not delivered by the old owner's poll"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X41 the journal did not drain"
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$FIX/mirror/transcript.json" 2>&1); rc=$?
+set -e
+assert_eq "$rc" 0 "X41 a fully drained old DM could not be retargeted"
+assert_contains "$out" 'retargeted:' "X41 drained retarget did not say what it did"
+new_home mirror
+bind
+mirror mirror >/dev/null
+python3 "$HELPER" add-failure "$FIX/mirror/transcript.json" "$TMP/unreadable-old.json" "conversations.replies:$(thread_field open-b ts)" 400
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$TMP/unreadable-old.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X41 retarget cleared the old DM although one thread could not be read"
+assert_contains "$out" 'slack: refused:' "X41 an unreadable old thread was not named"
+assert_eq "$(thread_count)" 4 "X41 an unreadable old thread was dropped"
+printf 'ok - X41\n'
+
+# X42: a DM-shaped channel that is not the configured owner's DM never receives a write
+new_home mirror
+bind
+mirror mirror >/dev/null
+python3 "$HELPER" split-transcript "$FIX/mirror/transcript.json" "$TMP/other-dm.json" D0OTHERDM01 D0123456789
+python3 "$HELPER" set-state "$(state_file)" channel D0OTHERDM01
+(cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+set +e
+out=$("$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/other-dm.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X42 the mirror posted to a DM that is not the configured owner's"
+assert_contains "$out" 'stored_channel_not_owner_dm' "X42 named refusal"
+assert_eq "$(grep -c D0OTHERDM01 "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" || true)" 0 "X42 something was written to the other DM"
+new_home mirror
+bind
+mirror mirror >/dev/null
+(cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+mirror mirror >/dev/null
+assert_eq "$(thread_count late-call)" 1 "X42 the legitimate owner DM stopped receiving cards"
+assert_contains "$(python3 "$HELPER" outbound-targets "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" chat.postMessage)" 'U0TESTOWNER@D0123456789' "X42 no card reached the owner DM"
+new_home mirror
+bind
+mirror mirror >/dev/null
+(cd "$FM_HOME" && tasks-axi add late-call "Late call" --kind captain --repo sample >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold late-call --reason "Late" >/dev/null
+python3 "$HELPER" add-failure "$FIX/mirror/transcript.json" "$TMP/open-fails.json" conversations.open 503
+sent=$(outbound_count chat.postMessage)
+set +e
+out=$("$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/open-fails.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X42 the mirror wrote although the owner DM could not be confirmed"
+assert_eq "$(outbound_count chat.postMessage)" "$sent" "X42 a write happened without confirming the owner DM"
+printf 'ok - X42\n'
 
 printf 'ok - all Slack watch checks\n'

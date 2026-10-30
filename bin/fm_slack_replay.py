@@ -80,7 +80,8 @@ class Replay:
             target = fields.get('users')
             if target != os.environ.get('FM_SLACK_DM_USER'):
                 raise SlackError('target_mismatch')
-            channel = self.transcript.get('channel', 'D0123456789')
+            # owner_dm names the DM that really belongs to the opened user when it is not the channel that accepts posts.
+            channel = self.transcript.get('owner_dm', self.transcript.get('channel', 'D0123456789'))
             self.log({'method': method, 'recipient': target, 'channel': channel})
             data = {'ok': True, 'channel': {'id': channel, 'is_im': True} if fields.get('return_im') else {'id': channel}}
         elif method in ('conversations.history', 'conversations.replies'):
