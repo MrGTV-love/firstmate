@@ -16,7 +16,8 @@
     "spawn-write-confinement",
     "status-log-size-cap",
     "teardown-superseded-slot-lease",
-    "open-loops-one-deferral"
+    "open-loops-one-deferral",
+    "captain-hold-withdraw-ruling"
   ],
   "guards": [
     {
@@ -1083,6 +1084,34 @@
       "instrumented": false,
       "status": "active",
       "layer_note": "deny without a guard event: the refusal marks the row captain-visible and its receipt requires_followup, reopens its action requirement, and exits 1 naming the real actions; docs/configuration.md \"Open-work ledger\" describes the one-deferral rule; the test proves the refusal, the marks and the printed captain_visible value"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "captain-hold-withdraw-ruling",
+      "owner": "bin/fm-captain-hold.sh",
+      "sites": [
+        {"file": "bin/fm-captain-hold.sh", "match": "refusing to withdraw $id", "count": 4}
+      ],
+      "invariant": "a captain hold is withdrawn as moot only under a recorded captain ruling that names it and was recorded after the hold was set",
+      "layer": "runtime-block",
+      "source": "the ruling task's closed captain answer record, its title, hold reason and answer text, its Resolved at stamp, and the withdrawn task's Captain hold set stamp",
+      "trigger": "bin/fm-captain-hold.sh withdraw names a ruling that is not a closed captain call carrying the captain's words, does not name the task, or was recorded before the hold was set, or the task carries no hold-set stamp",
+      "remedy": "bin/fm-captain-hold.sh withdraw <task> --evidence-file <file> --ruling <captain-ruling-task> naming a captain ruling that names the task and postdates the hold, or bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release with the captain's own words",
+      "budget": 1,
+      "test": "tests/fm-captain-hold-owner.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "layer_note": "deny without a guard event: each refusal exits 1 with the reason on stderr and writes no record, so the hold stays open and the merge gate keeps refusing"
     }
   ],
   "excluded": [

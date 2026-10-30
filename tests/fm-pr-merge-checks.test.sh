@@ -1588,6 +1588,34 @@ test_held_task_refusal_prints_the_exact_release_command() {
   pass "fm-pr-merge prints the exact captain-hold release command with the real task id"
 }
 
+# A secondmate home holds only calls that need the captain's own words. Recorded
+# 2026-10-28: a Mac mini mate's ship task was held as a captain call although the
+# question was the main firstmate's, and no honest release existed. The merge
+# gate still refuses a captain-owned hold and names both honest releases.
+test_merge_gate_refuses_a_captain_owned_mate_hold() {
+  local case_dir rc head url
+  head=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+  url=https://github.com/example/repo/pull/198
+  case_dir=$(make_home_case merge-gate-captain-owned local)
+  mkdir -p "$case_dir/parent/state"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$case_dir/parent" \
+    > "$case_dir/home/.fm-secondmate-parent"
+  add_gh_mocks "$case_dir" "$head"
+  hold_fixture_task_owned "$case_dir"
+
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "merge-gate-captain-owned: a captain-owned hold must still refuse the merge"
+  assert_grep 'task task-x1 is still held for the captain; nothing was merged' "$case_dir/stderr" \
+    "merge-gate-captain-owned: the refusal did not name the captain"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh answer task-x1 --decision-file" "$case_dir/stderr" \
+    "merge-gate-captain-owned: the captain's release command was not printed"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh withdraw task-x1 --evidence-file" "$case_dir/stderr" \
+    "merge-gate-captain-owned: the ruling-based withdrawal was not printed"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "merge-gate-captain-owned: gh pr merge ran on a captain-owned hold"
+  pass "fm-pr-merge refuses a captain-owned mate hold and names the captain's answer and the ruling-based withdrawal"
+}
+
 # One event per guard decision. A refused merge appends a single green-head
 # deny, a green merge appends allows, and an unwritable log cannot change the
 # merge's own exit status because the writer is never in a deciding condition.
@@ -2310,6 +2338,7 @@ test_allow_missing_refused_on_forgejo
 test_green_head_refusal_names_each_check_and_its_repair
 test_away_waiver_refusal_names_the_posture_and_the_attended_path
 test_held_task_refusal_prints_the_exact_release_command
+test_merge_gate_refuses_a_captain_owned_mate_hold
 test_guard_events_record_the_merge_decisions_without_changing_them
 test_github_review_required_refuses
 test_a_head_that_lacks_the_live_base_tip_refuses_naming_both_bases

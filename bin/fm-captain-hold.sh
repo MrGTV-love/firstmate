@@ -21,7 +21,9 @@
 #
 # Usage:
 #   fm-captain-hold.sh hold <task-id> --reason <reason> \
-#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD]
+#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
+#     [--owner captain]
+#   fm-captain-hold.sh withdraw <task-id> --evidence-file <path> --ruling <ruling-task-id>
 #   fm-captain-hold.sh freeze <task-id> --project <project>
 #   fm-captain-hold.sh frozen <task-id>
 #   fm-captain-hold.sh answer <task-id> --decision-file <path> [--release]
@@ -63,6 +65,40 @@
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
 #
+# WHO OWNS THE CALL. `hold` is for captain calls only. A call the main firstmate
+# owns is never held: a secondmate home routes it to Main as a needs-decision
+# status line on its parent channel and keeps working where it can, and Main's
+# answer lets the work continue. Every hold records its owner as a fact written
+# at filing. In a main home the owner is the captain and no `--owner` is needed.
+# In a secondmate home `--owner captain` is required, because the home's parent
+# channel is its only addressee, so each hold must say it waits on the captain's
+# own words; any other owner is refused with the routing above.
+#
+# `withdraw` is the honest release of a captain-kind hold that a recorded
+# captain ruling made moot. It never writes the captain's words and never
+# completes unfinished work: it lifts the hold, or, like `answer` without
+# `--release`, closes a row no worker owns that is question-shaped (a `captain`-kind row) or finished work
+# teardown retained with its deliverable, so neither a moot question nor
+# finished work returns as dispatchable work. It records the basis, the owner
+# the hold was filed with, the home role it ran from, and the evidence file, and
+# marks the record `Not a captain answer.`. The one eligibility fact is
+# `--ruling <id>`: a closed captain call in this home (live or archived) that
+# carries the captain's recorded words, whose title, hold reason (its question),
+# or recorded captain answer text names the withdrawn task id, and whose answer
+# was recorded after this hold was set. Origin, owner, and other metadata lines
+# never count, and neither does a name written only at withdraw time, such as in
+# the evidence file. Because the ruling must postdate the current hold-set
+# stamp, a ruling made before this hold, including one an earlier withdrawal of
+# this task cited, cannot release it. A hold-set stamp that records only a date
+# needs a ruling dated a later day, because the same day cannot show the order.
+# It works on any captain hold whatever its
+# recorded owner, because the captain has already ruled on it, and nothing else
+# releases a captain call without his words. A mate home reaches the captain
+# only through its parent channel, so a call's delivery to that channel proves
+# nothing about whose it is, and no weaker basis exists. Every other captain
+# hold, including a legacy hold filed before owners were recorded, stays the
+# captain's and is released only by his recorded words or a recorded ruling.
+#
 # `freeze` declares the one project an open captain hold freezes: a
 # `Captain hold freezes project: <project>` line in the hold's header block (the
 # lines under the hold-set stamp, up to the first blank line), recorded by the
@@ -70,12 +106,13 @@
 # A second `freeze` replaces the project. An open hold is any captain-kind row
 # that is not done, as `open` reads it, so a freeze outlives the hold's
 # `--until` revisit date: re-holding that still-open call keeps the line, and
-# only `answer` or `reconcile close` ends it. Re-holding released work starts a
-# new lifecycle with no freeze: the line lives only in the header block, which
-# an answer moves under the resolution record. `frozen` is the read-only owner
-# predicate behind "is this task frozen by an open captain hold": exit 0 prints
-# the freezing hold's id when an open captain hold declares the project named by
-# the task's `project=` metadata, 1 means no open hold declares it, and 2 means
+# only a release (`answer`, `withdraw`, or `reconcile close`) ends
+# it. Re-holding released work starts a new lifecycle with no freeze: the line
+# lives only in the header block, which every resolution record moves under it.
+# `frozen` is the read-only owner predicate behind "is this task frozen by an
+# open captain hold": exit 0 prints the freezing hold's id when an open captain
+# hold declares the project named by the task's `project=` metadata, 1 means no
+# open hold declares it, and 2 means
 # the answer could not be established, which a mechanical closer must treat as
 # frozen. It reads this home's backlog and, in a local secondmate home, the
 # backlog of every local home above it, walking the parent bindings its parent
@@ -758,17 +795,28 @@ ledger_hold_filed() {  # <task-id> <repo>
 # bin/fm-answered-by-lib.sh; reconciliation is evidence, not an answer.
 resolution_block() {
   local label='Captain decision:'
-  [ "$1" != reconciled ] || label='Reconciliation evidence:'
+  case "$1" in
+    reconciled) label='Reconciliation evidence:' ;;
+    withdrawn) label='Withdrawal evidence:' ;;
+  esac
   printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
     "$DECISION_DIGEST" "$1"
   [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
   printf 'Resolved at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  [ "$1" = reconciled ] || printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")"
+  case "$1" in
+    reconciled) : ;;
+    withdrawn)
+      printf 'Withdrawn by: %s\nFiled owner: %s\nRun from: %s home\nNot a captain answer.\n' \
+        "$WITHDRAW_BASIS" "$WITHDRAW_OWNER" "$WITHDRAW_RUN_ROLE"
+      ;;
+    *) printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")" ;;
+  esac
   printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
 # Durable state of one captain call: an active captain hold (annotations
-# surviving even when a date gate has expired) or a recorded captain answer.
+# surviving even when a date gate has expired), a recorded captain answer, or a
+# newest record that is a withdrawal (attributed and marked not a captain answer).
 verify_hold_durable() {  # <task-id>
   local id=$1 show state hold_kind body
   task_show "$id" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
@@ -779,6 +827,9 @@ verify_hold_durable() {  # <task-id>
   if body_has_resolution_record "$body"; then
     return 0
   fi
+  case "$(recorded_resolution_mode "$body" || true)" in
+    withdrawn) return 0 ;;
+  esac
   if [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
     return 0
   fi
@@ -989,6 +1040,7 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # path set only in ~/.tasks-axi/config.toml is not read: the lookup refuses.
 
 ARCHIVE_ROW_BODY=
+ARCHIVE_ROW_HEADER=
 
 # [markdown] archive value from a .tasks.toml or ~/.tasks-axi/config.toml. The
 # gate trusts only the one plain form tasks-axi reads literally, a header line
@@ -1049,12 +1101,14 @@ archive_setting_unreadable() {  # <toml-file> <reader-status>
 }
 
 # Look <id> up in the configured archive. Returns 0 and sets ARCHIVE_ROW_BODY to
-# the row's dedented body lines when an archived row carries that id, 1 when the
+# the row's dedented body lines and ARCHIVE_ROW_HEADER to its `- [x] <id> ...`
+# line when an archived row carries that id, 1 when the
 # archive does not (or does not exist), and 2 with the reason on stderr when the
 # archive cannot be read. The newest row wins when an id was archived twice.
 archive_row_lookup() {  # <resolved-data-dir> <id>
   local data=$1 id=$2 root archive outside found
   ARCHIVE_ROW_BODY=
+  ARCHIVE_ROW_HEADER=
   root=$(fm_backlog_root "$data") || {
     printf 'fm-captain-hold: the configured data directory cannot be resolved for an archive lookup: %s\n' \
       "$FM_BACKLOG_TRANSITION_ERROR" >&2
@@ -1090,21 +1144,27 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
     return 2
   fi
   found=$(LC_ALL=C awk -v id="$id" '
-    function flush() { if (inrow) { last = body; seen = 1 } }
+    function flush() { if (inrow) { last = body; lasthead = head; seen = 1 } }
     /^- \[.\] / {
       flush()
       rowid = substr($0, 7)
       sub(/ .*/, "", rowid)
       inrow = (rowid == id)
+      head = $0
       body = ""
       next
     }
     /^## / { flush(); inrow = 0; next }
     inrow { line = $0; sub(/^  /, "", line); body = body line "\n" }
-    END { flush(); if (seen) { printf "%s", last } else exit 3 }
+    END { flush(); if (seen) { printf "%s\n%s", lasthead, last } else exit 3 }
   ' "$archive" 2>/dev/null)
   case $? in
-    0) ARCHIVE_ROW_BODY=$found; return 0 ;;
+    0)
+      ARCHIVE_ROW_HEADER=${found%%$'\n'*}
+      ARCHIVE_ROW_BODY=${found#"$ARCHIVE_ROW_HEADER"}
+      ARCHIVE_ROW_BODY=${ARCHIVE_ROW_BODY#$'\n'}
+      return 0
+      ;;
     3) return 1 ;;
   esac
   printf 'fm-captain-hold: the done archive at %s could not be parsed\n' "$archive" >&2
@@ -1118,8 +1178,12 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
 # `Captain decision:`. The
 # retired fm-decision-hold leader counts only with its own full shape. A record
 # of mode `reconciled` is evidence, never an answer, and prose that merely
-# quotes the marker strings is no record. Returns 0 for an answer, 4 for an
-# evidence-only record, 1 for anything else. Only archived rows use this check;
+# quotes the marker strings is no record. A `withdrawn` record is a durable
+# resolution that is not a captain answer: its mode line, its key-value lines
+# through `Not a captain answer.`, a blank line, its `Withdrawal evidence:`
+# label, and non-empty text. Returns 0 for an answer, 4 for an evidence-only
+# record, 5 for a withdrawal,
+# 1 for anything else. Only archived rows use this check;
 # body_has_resolution_record keeps its broader meaning for live rows.
 archived_answer_state() {  # <dedented-archived-body>
   local state
@@ -1149,6 +1213,7 @@ archived_answer_state() {  # <dedented-archived-body>
       if ($0 == "Resolution mode: answered" || $0 == "Resolution mode: repaired" \
           || $0 == "Resolution mode: routed") { st = 4; next }
       if (!retired && $0 == "Resolution mode: released") { st = 4; next }
+      if (!retired && $0 == "Resolution mode: withdrawn") { st = 7; next }
       if (retired && $0 == "Resolution mode: declined") { st = 4; next }
       if (retired && $0 == "") { st = 5; next }
       verdict("none")
@@ -1173,18 +1238,35 @@ archived_answer_state() {  # <dedented-archived-body>
       if (is_leader($0) || (retired && $0 == "Routed work:")) verdict("none")
       verdict("answer")
     }
+    st == 7 {
+      if ($0 == "Not a captain answer.") { st = 8; next }
+      if ($0 ~ /^[A-Z][A-Za-z ]*: [^[:space:]]/) next
+      verdict("none")
+    }
+    st == 8 { if ($0 == "") { st = 9; next } verdict("none") }
+    st == 9 {
+      if ($0 == "Withdrawal evidence:") { st = 10; next }
+      verdict("none")
+    }
+    st == 10 {
+      if ($0 !~ /[^[:space:]]/) next
+      if (is_leader($0)) verdict("none")
+      verdict("resolved")
+    }
     END { if (!decided) print "none" }
   ') || return 1
   case "$state" in
     answer) return 0 ;;
     evidence) return 4 ;;
+    resolved) return 5 ;;
   esac
   return 1
 }
 
 # Resolve an entry that no live row carries to the closed call backlog retention
 # archived. Prints "<id> archive" and returns 0 when an archived row carries a
-# recorded captain answer, returns 1 when the archive holds no such row (or the
+# recorded captain answer, prints "<id> archive-resolved" and returns 0 when its
+# newest record is a withdrawal (never a captain answer, so no ruling), returns 1 when the archive holds no such row (or the
 # backend keeps no markdown archive), returns 2 with the reason on stderr when
 # the archive cannot be read, and returns 3 after naming an archived row that
 # carries no recorded answer, which no archive entry may stand in for.
@@ -1208,6 +1290,10 @@ resolve_archived_entry() {  # <origin-or-empty> <entry>
         case "$rc" in
           0)
             printf '%s archive' "$candidate"
+            return 0
+            ;;
+          5)
+            printf '%s archive-resolved' "$candidate"
             return 0
             ;;
           4)
@@ -1335,6 +1421,75 @@ body_hold_origin() {  # <decoded-task-body>
   printf '%s\n' "$1" | sed -n 's/^Captain hold origin: \(.*\)$/\1/p' | head -1
 }
 
+# WHO OWNS A HOLD. A hold records, on a line of its own in its header block
+# (the lines under the hold-set stamp, up to the first blank line, as the freeze
+# reads it), the owner of the decision it waits on: `captain`, because only calls
+# that need the captain's own words are held. The owner is a fact written at
+# filing, never inferred from the reason text. A hold filed before owners were
+# recorded has no line: in a main home that is the captain, because no parent
+# exists, and in a secondmate home it is `unrecorded`, because the home's
+# parent channel was its only addressee and the record cannot say more.
+body_decision_owner() {  # <decoded-task-body>
+  printf '%s\n' "$1" | awk '
+    NR == 1 { if ($0 !~ /^Captain hold set: /) exit; next }
+    NF == 0 { exit }
+    /^Decision owner: / { sub(/^Decision owner: /, ""); print; exit }
+  '
+}
+
+# main when this home has no parent firstmate, mate otherwise. An unusable
+# identity marker is a mate shape: it must never be read as a main home.
+home_decision_scope() {
+  local rc=0
+  fm_parent_channel_home_id "$FM_HOME" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 1 ]; then printf 'main'; else printf 'mate'; fi
+}
+
+effective_decision_owner() {  # <decoded-task-body>
+  local owner
+  owner=$(body_decision_owner "$1")
+  if [ -n "$owner" ]; then
+    printf '%s' "$owner"
+  elif [ "$(home_decision_scope)" = main ]; then
+    printf 'captain'
+  else
+    printf 'unrecorded'
+  fi
+}
+
+# Writes the owner line directly beneath the stamp, keeping every other line of
+# the header block in it.
+write_decision_owner() {  # <task-id> <shown-body> <owner>
+  local id=$1 body=$2 owner=$3 stamp after header rest new_body tmp
+  body=$(decode_shown_value "$body") \
+    || fail "could not decode the existing body for $id"
+  stamp=$(printf '%s\n' "$body" | sed -n 1p)
+  [ -n "$(body_hold_set_timestamp "$body")" ] \
+    || fail "task $id lost its hold-set stamp before its owner was recorded"
+  after=$(printf '%s\n' "$body" | sed 1d)
+  header=$(printf '%s\n' "$after" | awk 'NF == 0 { exit } !/^Decision owner: / { print }')
+  rest=$(printf '%s\n' "$after" | awk 'found { print; next } NF == 0 { found = 1 }' \
+    | awk 'NF || started { started = 1; print }')
+  new_body=$(printf '%s\nDecision owner: %s' "$stamp" "$owner")
+  if [ -n "$header" ]; then
+    new_body=$(printf '%s\n%s' "$new_body" "$header")
+  fi
+  if [ -n "$rest" ]; then
+    new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
+  fi
+  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-owner.XXXXXX") \
+    || fail "cannot stage the hold owner"
+  if ! printf '%s\n' "$new_body" > "$tmp"; then
+    rm -f -- "$tmp"
+    fail "cannot stage the hold owner for $id"
+  fi
+  if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    fail "could not record the hold owner on $id"
+  fi
+  rm -f -- "$tmp"
+}
+
 task_identity() {
   local id=$1
   if task_show "$id"; then
@@ -1347,23 +1502,28 @@ task_identity() {
 }
 
 write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
-  local id=$1 body=$2 origin=$3 stamp freeze rest new_body tmp
+  local id=$1 body=$2 origin=$3 stamp owner freeze rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its origin was recorded"
+  owner=$(body_decision_owner "$body")
   freeze=$(body_hold_freeze_project "$body")
   rest=$(printf '%s\n' "$body" | sed 1d | awk '
       BEGIN { header = 1 }
       header && NF == 0 { header = 0 }
       /^Captain hold origin: / { next }
       header && /^Captain hold freezes project: / { next }
+      header && /^Decision owner: / { next }
       { print }
     ' | awk 'NF || started { started = 1; print }')
   new_body=$stamp
+  if [ -n "$owner" ]; then
+    new_body=$(printf '%s\nDecision owner: %s' "$new_body" "$owner")
+  fi
   if [ -n "$origin" ]; then
-    new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
+    new_body=$(printf '%s\nCaptain hold origin: %s' "$new_body" "$origin")
   fi
   if [ -n "$freeze" ]; then
     new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$freeze")
@@ -1448,6 +1608,7 @@ refuse_self_inventory() {
 # origin was recorded, so completion can disclose the legacy fallback.
 verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origin-state>"
   local origin=$1 entry=$2 resolved resolve_status=0 id how stored origin_state=unrecorded origin_id stored_id
+  local archived_rc
   # The origin task is never its own captain-call inventory: it is the work the
   # calls were found in, so accepting it would let a refused hold look recorded.
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$entry" = "$origin" ]; then
@@ -1461,12 +1622,14 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   fi
   id=${resolved%% *}
   how=${resolved##* }
-  if [ "$how" = archive ]; then
+  if [ "$how" = archive ] || [ "$how" = archive-resolved ]; then
     # The archived row holds the same body a live closed row would show, so the
     # origin it was held for is read from it; its identity is the archived id.
     archive_row_lookup "$(fm_backlog_data_absolute "$DATA")" "$id" \
       || fail "archived task $id could not be read again after it resolved"
-    archived_answer_state "$ARCHIVE_ROW_BODY" \
+    archived_rc=0
+    archived_answer_state "$ARCHIVE_ROW_BODY" || archived_rc=$?
+    [ "$archived_rc" = 0 ] || [ "$archived_rc" = 5 ] \
       || fail "captain-held task $id is archived without a recorded captain answer"
     validate_slug backend-task-id "$id"
     stored=$(body_hold_origin "$ARCHIVE_ROW_BODY")
@@ -1496,6 +1659,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
   local existing_hold_kind='' existing_held='' preserve_hold_set=0 existing_freeze='' stored_reason previous_origin='' hold_status=0 resolved_hold_set
+  local owner='' scope
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1505,11 +1669,22 @@ command_hold() {
       --repo) shift; repo=${1:-} ;;
       --origin) shift; origin=${1:-} ;;
       --until) shift; until=${1:-} ;;
+      --owner) shift; owner=${1:-} ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
   done
   validate_slug task-id "$id"
+  scope=$(home_decision_scope)
+  case "$scope:$owner" in
+    main:|main:captain|mate:captain) : ;;
+    main:*)
+      fail "this home has no parent firstmate and hold files captain calls only; omit --owner or pass --owner captain: $owner"
+      ;;
+    *)
+      fail "--owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: ${owner:-<none>}); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can"
+      ;;
+  esac
   [ -n "$reason" ] || fail "reason must not be empty"
   # bin/fm-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(fm_hold_reason_encode "$reason") || fail "could not encode the hold reason"
@@ -1586,6 +1761,11 @@ command_hold() {
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id did not retain its hold-set stamp"
+  if [ -n "$owner" ] \
+    && [ "$(body_decision_owner "$(decode_shown_value "$(show_field "$show" body)")")" != "$owner" ]; then
+    write_decision_owner "$id" "$(show_field "$show" body)" "$owner"
+    task_show_or_fail "$id" "task $id disappeared while recording its owner"
+  fi
   if [ -n "$origin" ]; then
     origin=$(task_identity "$origin") || exit $?
     previous_origin=$(body_hold_origin "$(show_field_value "$show" body)")
@@ -1685,6 +1865,17 @@ apply_pending_retained_artifact() {  # <task-id>
 # landing that has not happened, so a keyed answer only ever releases it.
 live_work_item() {  # <task-id> <backlog-state>
   [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
+}
+
+# True when a withdrawal closes the row rather than
+# lifting its hold: no worker owns it, and it is either a question-shaped row or
+# finished work teardown retained with its deliverable. Lifting the hold on
+# either would return a row with nothing left to do to the dispatchable queue.
+closes_on_decision() {  # <task-id> <backlog-state> <kind> <shown-body>
+  live_work_item "$1" "$2" && return 1
+  [ "$3" = captain ] && return 0
+  fm_backlog_retained_close_args "$(decode_shown_value "$4")"
+  [ "${#FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}" -gt 0 ]
 }
 
 close_answered() {  # <task-id> <release-0-or-1> [<answer-source>]
@@ -1853,6 +2044,167 @@ command_answer() {
     return 0
   fi
   fail "task $id is not held for the captain; hold it first or name the right task"
+}
+
+# --- decisions the captain does not own ---------------------------------------
+
+WITHDRAW_BASIS=''
+WITHDRAW_OWNER=''
+WITHDRAW_RUN_ROLE=''
+
+# The text of a stored hold reason (bin/fm-hold-reason-lib.sh owns the encoding).
+stored_hold_reason_text() {  # <stored-reason>
+  case "$1" in
+    fm-hold-v1:*) printf '%s' "${1#fm-hold-v1:}" | perl -MMIME::Base64=decode_base64 -0777 -ne 'print decode_base64($_)' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# Sets RULING_RECORDS to a ruling's title, its question (hold reason), and the
+# text of its newest captain answer, found in the body as the block under
+# `Captain decision:` whose digest matches the record's own, so the origin and
+# owner lines after it never count; and RULING_RESOLVED_AT to when that answer
+# was recorded.
+set_ruling_records() {  # <title> <stored-hold-reason> <decoded-body>
+  local answer
+  answer=$(printf '%s' "$3" | perl -MDigest::SHA=sha256_hex -e '
+    local $/;
+    my $t = <STDIN> // "";
+    my ($digest) = $t =~ /^Decision digest: ([0-9a-f]{64})$/m or exit 0;
+    my ($rest) = $t =~ /^Captain decision:\n(.*)\z/ms or exit 0;
+    $rest =~ s/\n+\z//;
+    my $pos = 0;
+    while (1) {
+      my $cut = index($rest, "\n\n", $pos);
+      my $text = $cut < 0 ? $rest : substr($rest, 0, $cut);
+      if (sha256_hex($text) eq $digest) { print $text; exit 0 }
+      last if $cut < 0;
+      $pos = $cut + 1;
+    }
+  ')
+  RULING_RECORDS=$(printf '%s\n%s\n%s' "$1" "$(stored_hold_reason_text "$2")" "$answer")
+  RULING_RESOLVED_AT=$(printf '%s\n' "$3" | sed -n 's/^Resolved at: //p' | head -1)
+}
+
+# True when <ruling-id> is a closed captain call carrying the captain's recorded
+# words, found in the live backlog or, failing that, the done archive. Sets the
+# ruling's records through set_ruling_records.
+ruling_is_recorded_captain_answer() {  # <ruling-id>
+  local rid=$1 rbody mode resolved rc=0 header
+  RULING_RECORDS=
+  RULING_RESOLVED_AT=
+  if task_show "$rid"; then
+    [ "$(show_field "$TASK_SHOW_OUTPUT" state)" = "done" ] || return 1
+    rbody=$(show_field "$TASK_SHOW_OUTPUT" body)
+    mode=$(recorded_resolution_mode "$rbody" || true)
+    case "$mode" in answered|routed|repaired) : ;; *) return 1 ;; esac
+    case "$rbody" in *"Captain decision:"*) : ;; *) return 1 ;; esac
+    set_ruling_records "$(show_field_value "$TASK_SHOW_OUTPUT" title)" \
+      "$(show_field_value "$TASK_SHOW_OUTPUT" hold_reason)" "$(decode_shown_value "$rbody")"
+    return 0
+  fi
+  resolved=$(resolve_entry "" "$rid" archive 2>/dev/null) || rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  case "$resolved" in *' archive') : ;; *) return 1 ;; esac
+  archive_row_lookup "$(fm_backlog_data_absolute "$DATA")" "$rid" || return 1
+  case "$(recorded_resolution_mode "$ARCHIVE_ROW_BODY" || true)" in answered|routed|repaired) : ;; *) return 1 ;; esac
+  header=${ARCHIVE_ROW_HEADER#"- ["?"] $rid - "}
+  set_ruling_records "${header%% (*}" \
+    "$(printf '%s\n' "$ARCHIVE_ROW_HEADER" | sed -n 's/.* (hold: \([^)]*\)).*/\1/p')" "$ARCHIVE_ROW_BODY"
+  return 0
+}
+
+# True when <text> names <task-id> as a whole id, not as part of a longer one.
+text_names_task() {  # <text> <task-id>
+  printf '%s' "$1" | FM_NAMED_ID=$2 perl -e \
+    'local $/; my $t = <STDIN> // ""; exit($t =~ /(?<![A-Za-z0-9._-])\Q$ENV{FM_NAMED_ID}\E(?![A-Za-z0-9_-]|\.[A-Za-z0-9_-])/ ? 0 : 1)'
+}
+
+# An honest release of a hold that was never the captain's. It never writes the
+# captain's words and never completes unfinished work; it lifts the hold
+# (closing a question-shaped row or retained finished work, as answer does),
+# records who decided and why, and marks
+# the record as not a captain answer.
+command_withdraw() {
+  local id=${1:-} evidence_file='' ruling='' show state hold_kind body owner occurrence hold_set replay=0 ruling_at
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --evidence-file) shift; evidence_file=${1:-} ;;
+      --ruling) shift; ruling=${1:-} ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+  validate_slug task-id "$id"
+  [ -n "$ruling" ] \
+    || fail "a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; nothing else releases a captain call without the captain's words"
+  validate_slug ruling-id "$ruling"
+  [ -n "$evidence_file" ] || fail "--evidence-file is required; a withdrawal records who decided and why, never an assertion"
+  load_decision "$evidence_file"
+  acquire_task_control_lock "$id"
+  require_tasks_axi
+  task_show "$id" || fail "task $id is absent from this home's configured backlog (data directory $DATA)"
+  show=$TASK_SHOW_OUTPUT
+  state=$(show_field "$show" state)
+  hold_kind=$(show_field_value "$show" hold_kind)
+  body=$(show_field "$show" body)
+  owner=$(effective_decision_owner "$(decode_shown_value "$body")")
+  hold_set=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
+  if [ "$(recorded_resolution_mode "$body" || true)" = withdrawn ]; then
+    if [ -z "$hold_kind" ] || [ "$state" = "done" ]; then
+      if [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+        occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$(recorded_resolved_hold_set "$body")") || exit 1
+        remove_interrupted_answer_stamp "$id"
+        reconcile_request_retire "$id"
+        publish_parent_hold "$id" "$occurrence" resolved \
+          "withdrawn, not a captain answer: $(decode_shown_value "$body" | sed -n 's/^Withdrawn by: //p' | head -1)"
+        printf 'withdrawn: %s\n' "$id"
+        return 0
+      fi
+    elif [ -n "$hold_set" ] && [ "$(recorded_resolved_hold_set "$body")" = "$hold_set" ]; then
+      replay=1
+    fi
+  fi
+  [ "$state" != "done" ] || fail "task $id is already closed; a withdrawal releases an open hold"
+  if [ "$hold_kind" != captain ]; then
+    fail "task $id is not held for the captain; nothing to withdraw"
+  fi
+  [ "$ruling" != "$id" ] || fail "a hold cannot be moot by its own record"
+  ruling_is_recorded_captain_answer "$ruling" \
+    || fail "$ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw $id"
+  text_names_task "$RULING_RECORDS" "$id" \
+    || fail "ruling $ruling does not name $id in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw $id"
+  [ -n "$hold_set" ] \
+    || fail "task $id carries no hold-set stamp, so no ruling can be shown to postdate this hold; refusing to withdraw $id"
+  occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$hold_set") || exit 1
+  case "$hold_set" in
+    *T*) ruling_at=$RULING_RESOLVED_AT ;;
+    *) ruling_at=${RULING_RESOLVED_AT%%T*} ;;
+  esac
+  [ -n "$RULING_RESOLVED_AT" ] && [[ "$ruling_at" > "$hold_set" ]] \
+    || fail "ruling $ruling was recorded at ${RULING_RESOLVED_AT:-an unrecorded time}, not after this hold was set at $hold_set; a ruling made before this hold, including one an earlier withdrawal cited, does not make it moot; refusing to withdraw $id"
+  WITHDRAW_BASIS="moot under the recorded captain ruling $ruling"
+  WITHDRAW_OWNER=$owner
+  WITHDRAW_RUN_ROLE=$(fm_answered_by_home_role "$FM_HOME" "$STATE")
+  if [ "$replay" = 1 ]; then
+    WITHDRAW_BASIS=$(decode_shown_value "$body" | sed -n 's/^Withdrawn by: //p' | head -1)
+  else
+    write_resolution_record "$id" withdrawn "$body"
+  fi
+  if closes_on_decision "$id" "$state" "$(show_field_value "$show" kind)" "$body"; then
+    apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for withdrawn task $id"
+    tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \
+      || fail "could not close withdrawn task $id"
+    ledger_hold_closed "$id" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
+  else
+    tasks_axi unhold "$id" >/dev/null || fail "could not release withdrawn task $id"
+  fi
+  remove_interrupted_answer_stamp "$id"
+  reconcile_request_retire "$id"
+  publish_parent_hold "$id" "$occurrence" resolved "withdrawn, not a captain answer: $WITHDRAW_BASIS"
+  printf 'withdrawn: %s\n' "$id"
 }
 
 # --- the one keyed-answer intake, and the source bindings that feed it --------
@@ -2591,7 +2943,7 @@ reconcile_note() {
 
 command_complete() {
   local origin=${1:-} meta previous='' supplied='' keys='' entry key status_file open has_meta=0 transfer_rc transfers=() resolved
-  local resolved_how attested_by_prefix='' attested_by_archive='' origin_state unrecorded_origin=''
+  local resolved_how attested_by_prefix='' attested_by_archive='' attested_by_archive_resolved='' origin_state unrecorded_origin=''
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   validate_slug origin-id "$origin"
   shift
@@ -2636,6 +2988,9 @@ command_complete() {
       if [ "$resolved_how" = archive ]; then
         attested_by_archive="${attested_by_archive}${attested_by_archive:+ }$resolved"
       fi
+      if [ "$resolved_how" = archive-resolved ]; then
+        attested_by_archive_resolved="${attested_by_archive_resolved}${attested_by_archive_resolved:+ }$resolved"
+      fi
     done <<EOF
 $(printf '%s\n' "$keys" | tr ',' '\n')
 EOF
@@ -2675,9 +3030,10 @@ EOF
       fi
     fi
   fi
-  printf 'complete: %s captain-call inventory reviewed%s%s%s%s\n' "$origin" "${keys:+ ($keys)}" \
+  printf 'complete: %s captain-call inventory reviewed%s%s%s%s%s\n' "$origin" "${keys:+ ($keys)}" \
     "${attested_by_prefix:+ [attested through the configured prefix: $attested_by_prefix]}" \
     "${attested_by_archive:+ [answered and archived: $attested_by_archive]}" \
+    "${attested_by_archive_resolved:+ [withdrawn, not a captain answer, and archived: $attested_by_archive_resolved]}" \
     "${unrecorded_origin:+ [no recorded origin on: $unrecorded_origin; not checked against $origin]}"
 }
 
@@ -3087,6 +3443,7 @@ command_open_bound() {
 
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
+  withdraw) shift; command_withdraw "$@" ;;
   answer) shift; command_answer "$@" ;;
   answers) shift; command_answers "$@" ;;
   reconcile-requests) shift; command_reconcile_requests "$@" ;;

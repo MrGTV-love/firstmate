@@ -1128,6 +1128,123 @@ test_pipeline_input_rewritten_by_pipeline_allows() {
   pass "merged PR accepts the local input that the recorded run rewrote and extended"
 }
 
+# The run-record read is a query against a database a busy daemon may hold. It is
+# stopped by silence, never by how long it takes: a read that burns CPU for longer
+# than the ten seconds it used to be allowed is slow, not hung, and must prove the
+# copy landed. A read that really is silent has proved nothing either way, so
+# teardown neither refuses nor fires the unlanded-work guard: it says the answer is
+# unknown and exits 75, the retry status the sweeps take without a refusal memo.
+install_quiet_record_reader() {  # <case-dir> <burn|hang>
+  local case_dir=$1 mode=$2 real_python
+  # The interpreter itself, not a version-manager shim: a shim puts its own bin
+  # first on PATH, so the reader that teardown starts would bypass this stand-in.
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  printf '%s\n' "$mode" > "$case_dir/record-reader-mode"
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ] && [ -f "$case_dir/record-reader-mode" ]; then
+  case "\$(cat "$case_dir/record-reader-mode")" in
+    hang) exec sleep 60 ;;
+    burn)
+      rm -f "$case_dir/record-reader-mode"
+      end=\$((SECONDS + 13))
+      while [ "\$SECONDS" -lt "\$end" ]; do :; done ;;
+  esac
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+}
+
+test_pipeline_input_slow_record_read_still_proves_the_copy() {
+  local case_dir pr_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-slow-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-slow-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNSLOW "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" burn
+
+  rc=$(FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-slow-read: a slow, working record read should still prove the copy"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-slow-read: teardown printed a REFUSED line"
+  pass "a slow but working run-record read still proves the copy was the pipeline's input"
+}
+
+test_pipeline_input_silent_record_read_is_unknown() {
+  local case_dir pr_head local_head rc events
+  pr_head=$(pipeline_input_case pipeline-input-silent-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-silent-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  events="$case_dir/guard-events.jsonl"
+  # The record answers "not landed" once it is read: its run started from the merged
+  # head, not from this copy.
+  write_nm_run_record "$case_dir" 01RUNSILENT "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" hang
+
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 75 "$rc" "pipeline-input-silent-read: a silent record read should exit for a retry"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "unknown: the no-mistakes run record did not answer; retry teardown" "$case_dir/stderr" \
+    "pipeline-input-silent-read: teardown did not say the record did not answer"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-silent-read: a silent read was reported as a refusal"
+  ! grep -q teardown-unlanded "$events" 2>/dev/null \
+    || fail "pipeline-input-silent-read: a silent read fired the unlanded-work guard: $(cat "$events")"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-silent-read "$local_head"
+
+  rm -f "$case_dir/record-reader-mode"
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 1 "$rc" "pipeline-input-silent-read: a record that answers 'not this copy' should still refuse"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-silent-read: the answered read did not refuse"
+  grep -q '"teardown-unlanded"' "$events" 2>/dev/null \
+    || fail "pipeline-input-silent-read: the answered refusal did not fire the unlanded-work guard"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-silent-read-answered "$local_head"
+  pass "a silent run-record read is unknown and retried, while an answered one still refuses"
+}
+
+# SQLite's own busy wait is the one wait the record reader cannot watch: a writer
+# that holds the database lock past it makes the read give up with "database is
+# locked". That is a read that ran out of time, not an answer, so it is unknown
+# and retried exactly like a silent read, never a refusal. The stand-in shortens
+# only that busy wait so the case does not sit out the real 30 s.
+test_pipeline_input_locked_record_read_is_unknown() {
+  local case_dir pr_head local_head rc events real_python holder
+  pr_head=$(pipeline_input_case pipeline-input-locked-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-locked-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  events="$case_dir/guard-events.jsonl"
+  write_nm_run_record "$case_dir" 01RUNLOCKED "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ]; then
+  exec "$real_python" -I -c 'import sqlite3, sys
+connect = sqlite3.connect
+sqlite3.connect = lambda *args, **kwargs: connect(*args, **dict(kwargs, timeout=0.2))
+exec(compile(sys.stdin.read(), "<stdin>", "exec"), {"__name__": "__main__"})' "\${@:3}"
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+  "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+  holder=$!
+  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=60 run_teardown_status "$case_dir")
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  expect_code 75 "$rc" "pipeline-input-locked-read: a lock-blocked record read should exit for a retry"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "unknown: the no-mistakes run record did not answer; retry teardown" "$case_dir/stderr" \
+    "pipeline-input-locked-read: teardown did not say the record did not answer"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-locked-read: a locked read was reported as a refusal"
+  ! grep -q teardown-unlanded "$events" 2>/dev/null \
+    || fail "pipeline-input-locked-read: a locked read fired the unlanded-work guard: $(cat "$events")"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-locked-read "$local_head"
+  pass "a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused"
+}
+
 # A copy that lags the run's input head is not the input the run started from.
 test_pipeline_input_refuses_copy_behind_the_input_head() {
   local case_dir pr_head input_head local_head
@@ -2566,6 +2683,9 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_squash_merged_prerebase_copy_with_a_later_main_merge_allows
 test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
+test_pipeline_input_slow_record_read_still_proves_the_copy
+test_pipeline_input_silent_record_read_is_unknown
+test_pipeline_input_locked_record_read_is_unknown
 test_pipeline_input_refuses_copy_behind_the_input_head
 test_pipeline_input_ties_the_run_by_pushed_head_allows
 test_pipeline_input_refuses_commit_made_after_the_run_started
