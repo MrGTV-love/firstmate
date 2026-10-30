@@ -36,11 +36,13 @@ SH
 cat > "$LAB/burst.sh" <<'SH'
 #!/bin/sh
 # Starts $1 sleepers and exits; they outlive it until the suite kills them.
+# An optional $2 records the last sleeper's PID.
 i=0
 while [ "$i" -lt "$1" ]; do
   "$BURSTSLEEP" 60 &
   i=$((i + 1))
 done
+[ -z "${2:-}" ] || echo "$!" > "$2"
 SH
 
 stop_lab_processes() { pkill -f "$LAB/(bash|nestsleep|burstsleep)" >/dev/null 2>&1; return 0; }
@@ -245,9 +247,8 @@ if [ "$room" = 1 ]; then
   # burst, and dropping the burst returns well below it, however busy the host is.
   limit=$(python3 -I -c 'import sys; print(int((int(sys.argv[1]) + int(sys.argv[2]) // 2) / 0.6) + 1)' "$base" "$burst")
   D="$STATE/dip"
-  "$LAB/bash" "$LAB/burst.sh" "$burst" &
-  burst_pid=$!
-  fm_test_wait_until --while-alive "$burst_pid" -- burst_ready || fail "the first burst never started"
+  "$LAB/bash" "$LAB/burst.sh" "$burst" "$LAB/burst.last"
+  fm_test_wait_until --while-alive "$(cat "$LAB/burst.last")" -- burst_ready || fail "the first burst never started"
   first=$(now)
   "$GUARD" watch --state-dir "$D" --limit "$limit" --hold 4 --interval 0.2 --source-id t-dip > "$LAB/dip.out" &
   WATCH_PID=$!

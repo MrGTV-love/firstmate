@@ -7,7 +7,9 @@ TMP_ROOT=$(fm_test_tmproot fm-test-wait-until)
 
 # Each helper observation starts a new interpreter. Their saved timestamps must
 # include quiet time between processes, including on macOS system Python 3.9.
-python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+for interpreter in "$(command -v python3)" /usr/bin/python3; do
+[ -x "$interpreter" ] || continue
+"$interpreter" - "$ROOT" "$TMP_ROOT" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +17,7 @@ import time
 
 root, tmp = map(Path, sys.argv[1:])
 record = tmp / 'cross-process-clock.json'
+record.unlink(missing_ok=True)
 command = [sys.executable, str(root / 'bin/fm-duration.py'), 'progress-check',
            str(record), '0', '0.1', str(tmp / 'absent-publication')]
 for expected in (0, 124):
@@ -25,6 +28,7 @@ for expected in (0, 124):
     time.sleep(0.3)
 print('ok - separate observer processes detect an unchanged absent publication')
 PY
+done
 
 # The same publisher takes five times longer in the second run, without losing
 # progress. Its final output is the condition; its journal proves intermediate

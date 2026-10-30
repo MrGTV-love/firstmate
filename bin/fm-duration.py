@@ -764,8 +764,8 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     The saved process start identity fences PID reuse. A first/failed sample,
     corrupt record, missing process, or clock reset never authorizes a signal.
     Callers own their lock and must recheck its identity before acting.
-    Persisted times use a cross-process kernel monotonic clock, or wall time on
-    hosts without it; records from another clock domain start a fresh window.
+    Persisted times use a cross-process kernel clock that excludes system
+    sleep; records from another clock domain start a fresh window.
     PID 0 observes files only. The opt-in while_alive mode returns 3 for a
     proven dead/zombie/reused peer once the descendants recorded with it are
     gone too, independently of the inactivity verdict, and counts only
@@ -828,10 +828,12 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
         except OSError:
             return 0
     # Records cross interpreter processes. On macOS Python < 3.10 monotonic()
-    # has a process-local epoch; CLOCK_MONOTONIC shares the kernel's clock.
-    # Fall back to wall time only on hosts without that shared monotonic clock.
-    clock = 'clock_monotonic' if hasattr(time, 'CLOCK_MONOTONIC') else 'wall'
-    now = time.clock_gettime(time.CLOCK_MONOTONIC) if clock == 'clock_monotonic' else time.time()
+    # has a process-local epoch; CLOCK_UPTIME_RAW shares the kernel's clock and,
+    # like monotonic() elsewhere, does not count system sleep as inactivity.
+    if sys.platform == 'darwin':
+        clock, now = 'uptime_raw', time.clock_gettime(time.CLOCK_UPTIME_RAW)
+    else:
+        clock, now = 'monotonic', time.monotonic()
     record = dict(pid=pid, identity=list(identity), files=files,
                   cpu=[[child, list(start), value] for (child, start), value in observed.items()],
                   clock=clock, since=now, sampled=now)
