@@ -5,6 +5,19 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # A manual run runs the full suite on any ref. Giving a base replays the test
+  # selection for the diff from that revision instead, which previews what a pull
+  # request of that diff would run.
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Replay the selection for the diff from this revision (empty runs the full suite)
+        required: false
+        default: ''
+      head:
+        description: The end of the replayed diff (default is the commit being run)
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -30,6 +43,106 @@ concurrency:
 # Each job comment identifies the tier implemented by its executable value.
 
 jobs:
+  # Decides which behavior-test jobs a pull request needs. A push to main, a
+  # manual run, a pull request labeled ci-full and any selector trouble run the
+  # full suite; otherwise only the tests the diff can affect run, packed into as
+  # few shards as their work needs. A job the plan leaves out is skipped, which
+  # GitHub reports as a skipped (not a pending) check. bin/fm-test-select.py
+  # owns how the selection is made, bin/fm-test-run.sh --plan-ci owns the job
+  # plan, and docs/fm-test-portable-shards.md "Change-based test selection"
+  # owns the rules and how to force a full run.
+  plan:
+    name: Test selection plan
+    runs-on: ubuntu-latest
+    # Fast tier: the selector reads the tree once, seconds of work.
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      selection: ${{ steps.plan.outputs.selection }}
+      parallel_1: ${{ steps.plan.outputs.parallel_1 }}
+      parallel_2: ${{ steps.plan.outputs.parallel_2 }}
+      herdr: ${{ steps.plan.outputs.herdr }}
+      serial_count: ${{ steps.plan.outputs.serial_count }}
+      any_lane: ${{ steps.plan.outputs.any_lane }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Select the tests this change can affect
+        id: plan
+        env:
+          FM_EVENT_NAME: ${{ github.event_name }}
+          FM_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+          FM_REPLAY_BASE: ${{ inputs.base }}
+          FM_REPLAY_HEAD: ${{ inputs.head }}
+        run: |
+          set -eu
+          dir="$RUNNER_TEMP/fm-plan"
+          mkdir -p "$dir"
+          force=
+          base=
+          head=HEAD
+          if [ "$FM_EVENT_NAME" = workflow_dispatch ] && [ -n "$FM_REPLAY_BASE" ]; then
+            # A manual replay of the selection for a chosen diff.
+            base=$FM_REPLAY_BASE
+            head=${FM_REPLAY_HEAD:-HEAD}
+          elif [ "$FM_EVENT_NAME" != pull_request ]; then
+            force="a $FM_EVENT_NAME run always runs the full suite"
+          elif [ "$FM_FULL_LABEL" = true ]; then
+            force="the ci-full label asks for the full suite"
+          elif git rev-parse --verify --quiet 'HEAD^2' >/dev/null; then
+            # A pull request checks out the merge of its head into the base, so
+            # the first parent is the base the diff is taken against.
+            base=$(git rev-parse HEAD^1)
+          else
+            force="the checkout is not a pull request merge commit"
+          fi
+          if [ -n "$force" ]; then
+            python3 bin/fm-test-select.py --full "$force" >"$dir/decision" || true
+          else
+            python3 bin/fm-test-select.py --base "$base" --head "$head" >"$dir/decision" || true
+          fi
+          mode=$(sed -n 's/^mode=//p' "$dir/decision" | head -n 1)
+          reason=$(sed -n 's/^reason=//p' "$dir/decision" | head -n 1)
+          case "$mode" in
+            selected) ;;
+            *)
+              mode=full
+              reason="${reason:-the selector printed no decision}"
+              ;;
+          esac
+          : >"$dir/selection"
+          if [ "$mode" = selected ]; then
+            sed -n 's/^test=//p' "$dir/decision" >"$dir/selection"
+            bin/fm-test-run.sh --plan-ci --select-file "$dir/selection" >"$dir/plan"
+            if [ "$(sed -n 's/^mode=//p' "$dir/plan" | head -n 1)" != selected ]; then
+              # The plan refused the selection (a selected test no lane owns).
+              mode=full
+              reason="$(sed -n 's/^reason=//p' "$dir/plan" | head -n 1)"
+              : >"$dir/selection"
+            fi
+          else
+            bin/fm-test-run.sh --plan-ci >"$dir/plan"
+          fi
+          {
+            printf 'mode=%s\n' "$mode"
+            grep -E '^(parallel_1|parallel_2|herdr|serial_count|any_lane)=' "$dir/plan"
+            printf 'selection<<FM_SELECTION_END\n'
+            cat "$dir/selection"
+            printf 'FM_SELECTION_END\n'
+          } >>"$GITHUB_OUTPUT"
+          {
+            printf '### Test selection\n\n'
+            printf -- '- mode: %s\n' "$mode"
+            printf -- '- reason: %s\n' "$reason"
+            if [ "$mode" = selected ]; then
+              printf -- '- selected tests: %s\n' "$(grep -c . "$dir/selection" || true)"
+            else
+              printf -- '- selected tests: all\n'
+            fi
+            grep -E '^(parallel_1|parallel_2|herdr|serial_count)=' "$dir/plan" | sed 's/^/- /; s/=/: /'
+          } >>"$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint ${{ matrix.partition }}
     runs-on: ubuntu-latest
@@ -110,6 +223,8 @@ jobs:
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
   tests-portable-parallel-1:
     name: Behavior portable parallel 1
+    needs: plan
+    if: needs.plan.outputs.parallel_1 == 'true'
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
     timeout-minutes: 60
@@ -127,21 +242,36 @@ jobs:
           set -eu
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Install tasks-axi
+      - name: Install tasks-axi, Pi and TypeScript for the Pi extension tests
+        uses: ./.github/actions/npm-tools
+        with:
+          packages: tasks-axi @earendil-works/pi-coding-agent typescript
+      - name: Check the installed tools
         run: |
           set -eu
-          npm install -g tasks-axi
           tasks-axi --version
-      - name: Install Pi and TypeScript for the Pi extension tests
+          tsc --version
+      - name: Write the test selection
+        env:
+          FM_PLAN_MODE: ${{ needs.plan.outputs.mode }}
+          FM_PLAN_SELECTION: ${{ needs.plan.outputs.selection }}
         run: |
           set -eu
-          npm install -g @earendil-works/pi-coding-agent typescript
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
-          tsc --version
+          if [ "$FM_PLAN_MODE" = selected ]; then
+            mkdir -p "$RUNNER_TEMP/fm-plan"
+            printf '%s\n' "$FM_PLAN_SELECTION" >"$RUNNER_TEMP/fm-plan/selection"
+            echo "FM_CI_SELECTION_FILE=$RUNNER_TEMP/fm-plan/selection" >>"$GITHUB_ENV"
+          fi
       - name: Run portable parallel shard 1
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
+          # A pull request that selected tests narrows the lane to them; the
+          # full suite (push, manual, ci-full, any doubt) passes no selection.
+          select_args=()
+          if [ -n "${FM_CI_SELECTION_FILE:-}" ]; then
+            select_args=(--select-file "$FM_CI_SELECTION_FILE")
+          fi
           # Three scripts at a time: the lane is exactly the proven-isolated
           # set, whose recorded four-way proof ran on macOS with two members
           # not passing (docs/fm-test-isolation-proof.md). The first three-wide
@@ -151,7 +281,8 @@ jobs:
           # bins and tests/fm-ci-workflow.test.sh enforces.
           bin/fm-test-run.sh --lane portable-parallel-1 --jobs 3 \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json"
+            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json" \
+            ${select_args[@]+"${select_args[@]}"}
       - name: Upload shard 1 timing artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -162,6 +293,8 @@ jobs:
 
   tests-portable-parallel-2:
     name: Behavior portable parallel 2
+    needs: plan
+    if: needs.plan.outputs.parallel_2 == 'true'
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
     timeout-minutes: 60
@@ -180,16 +313,35 @@ jobs:
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi
+        uses: ./.github/actions/npm-tools
+        with:
+          packages: tasks-axi
+      - name: Check tasks-axi
+        run: tasks-axi --version
+      - name: Write the test selection
+        env:
+          FM_PLAN_MODE: ${{ needs.plan.outputs.mode }}
+          FM_PLAN_SELECTION: ${{ needs.plan.outputs.selection }}
         run: |
           set -eu
-          npm install -g tasks-axi
-          tasks-axi --version
+          if [ "$FM_PLAN_MODE" = selected ]; then
+            mkdir -p "$RUNNER_TEMP/fm-plan"
+            printf '%s\n' "$FM_PLAN_SELECTION" >"$RUNNER_TEMP/fm-plan/selection"
+            echo "FM_CI_SELECTION_FILE=$RUNNER_TEMP/fm-plan/selection" >>"$GITHUB_ENV"
+          fi
       - name: Run portable parallel shard 2
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
+          # A pull request that selected tests narrows the lane to them; the
+          # full suite (push, manual, ci-full, any doubt) passes no selection.
+          select_args=()
+          if [ -n "${FM_CI_SELECTION_FILE:-}" ]; then
+            select_args=(--select-file "$FM_CI_SELECTION_FILE")
+          fi
           bin/fm-test-run.sh --lane portable-parallel-2 --jobs 3 \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-2.json"
+            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-2.json" \
+            ${select_args[@]+"${select_args[@]}"}
       - name: Upload shard 2 timing artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -204,75 +356,462 @@ jobs:
   # a machine: each shard is still strictly serial in itself. Shard membership
   # and the shard count both belong to bin/fm-test-run.sh, which refuses a lane
   # whose "ofN" disagrees with it (docs/fm-test-portable-shards.md).
-  tests-portable-serial:
-    name: Behavior portable serial ${{ matrix.shard }}
+  #
+  # One job per shard rather than a matrix, so that a shard the plan does not
+  # need is a skipped job under its own name and still reports (a skipped job
+  # satisfies a required check, whereas a skipped matrix job reports once under
+  # its unexpanded name). A full-suite run plans all 25 shards; a selection
+  # plans the first N. tests/fm-ci-workflow.test.sh holds the 25 jobs identical
+  # but for their number, and equal to the lanes bin/fm-test-run.sh defines.
+  tests-portable-serial-1:
+    name: Behavior portable serial 1
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 1
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
     timeout-minutes: 60
-    strategy:
-      # Every shard reports so one failure never hides another shard's result.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Install pinned ShellCheck
-        run: |
-          set -eu
-          bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Install pinned actionlint
-        run: |
-          set -eu
-          bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Require tmux for e2e tests
-        run: |
-          set -eu
-          command -v tmux >/dev/null || {
-            echo "::error::tmux is required for real afk injection e2e coverage"
-            exit 1
-          }
-          tmux -V
-      - name: Install tasks-axi for backlog-handoff delegation
-        run: |
-          set -eu
-          npm install -g tasks-axi
-          tasks-axi --version
-      # The Pi extension tests read the installed Pi package's own types and
-      # runtime, so without it they gate-skip and pass silently. It is a public
-      # npm package and needs no credential, so CI can hold the real thing.
-      - name: Install Pi for the Pi extension tests
-        run: |
-          set -eu
-          npm install -g @earendil-works/pi-coding-agent
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent
-      - name: Run portable serial shard ${{ matrix.shard }}
-        env:
-          # job-total rather than a literal, so shrinking or growing the matrix
-          # without matching bin/fm-test-run.sh is refused instead of quietly
-          # leaving a shard of the required lane unrun.
-          FM_SERIAL_LANE: portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
-          FM_SERIAL_SHARD: ${{ matrix.shard }}
-        run: |
-          set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
-          # Only Pi is installed above; the TypeScript compiler is installed on
-          # parallel 1, which runs the typecheck suite. The gate-skip flag guards
-          # against a typecheck member moving into this lane, where its missing
-          # prerequisite would otherwise skip and pass silently.
-          bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
-            --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"
-      - name: Upload portable serial shard ${{ matrix.shard }} timing artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - uses: ./.github/actions/portable-serial-shard
         with:
-          name: fm-test-timing-portable-serial-${{ matrix.shard }}
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
-          if-no-files-found: warn
+          shard: 1
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-2:
+    name: Behavior portable serial 2
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 2
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 2
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-3:
+    name: Behavior portable serial 3
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 3
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 3
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-4:
+    name: Behavior portable serial 4
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 4
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 4
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-5:
+    name: Behavior portable serial 5
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 5
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 5
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-6:
+    name: Behavior portable serial 6
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 6
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 6
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-7:
+    name: Behavior portable serial 7
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 7
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 7
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-8:
+    name: Behavior portable serial 8
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 8
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 8
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-9:
+    name: Behavior portable serial 9
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 9
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 9
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-10:
+    name: Behavior portable serial 10
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 10
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 10
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-11:
+    name: Behavior portable serial 11
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 11
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 11
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-12:
+    name: Behavior portable serial 12
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 12
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 12
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-13:
+    name: Behavior portable serial 13
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 13
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 13
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-14:
+    name: Behavior portable serial 14
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 14
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 14
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-15:
+    name: Behavior portable serial 15
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 15
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 15
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-16:
+    name: Behavior portable serial 16
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 16
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 16
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-17:
+    name: Behavior portable serial 17
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 17
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 17
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-18:
+    name: Behavior portable serial 18
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 18
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 18
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-19:
+    name: Behavior portable serial 19
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 19
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 19
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-20:
+    name: Behavior portable serial 20
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 20
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 20
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-21:
+    name: Behavior portable serial 21
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 21
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 21
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-22:
+    name: Behavior portable serial 22
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 22
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 22
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-23:
+    name: Behavior portable serial 23
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 23
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 23
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-24:
+    name: Behavior portable serial 24
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 24
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 24
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
+
+  tests-portable-serial-25:
+    name: Behavior portable serial 25
+    needs: plan
+    if: fromJSON(needs.plan.outputs.serial_count) >= 25
+    runs-on: ubuntu-latest
+    # Normal tier (see the timeout policy above).
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/portable-serial-shard
+        with:
+          shard: 25
+          total: ${{ needs.plan.outputs.serial_count }}
+          mode: ${{ needs.plan.outputs.mode }}
+          selection: ${{ needs.plan.outputs.selection }}
 
   # Required real-Herdr lane: pinned install, serial real-herdr-gated family,
   # hard-fail on missing Herdr or tasks-axi. Starts on Linux x86_64; if a genuine
@@ -280,6 +819,8 @@ jobs:
   # the failure evidence and move the job to macOS rather than skip assertions.
   tests-herdr:
     name: Behavior tests (Herdr)
+    needs: plan
+    if: needs.plan.outputs.herdr == 'true'
     runs-on: ubuntu-latest
     # Heavy tier (see the timeout policy above): the last-resort job backstop.
     # The family-run step below owns the hang tripwire, so a wedged suite fails
@@ -311,10 +852,11 @@ jobs:
           bin/fm-install-treehouse.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi for recovery regression
-        run: |
-          set -eu
-          npm install -g tasks-axi
-          tasks-axi --version
+        uses: ./.github/actions/npm-tools
+        with:
+          packages: tasks-axi
+      - name: Check tasks-axi
+        run: tasks-axi --version
       - name: Assert Herdr pin and protocol floor
         run: |
           set -eu
@@ -368,6 +910,17 @@ jobs:
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-herdr"
           bin/fm-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/fm-herdr/sessions-before.json"
+      - name: Write the test selection
+        env:
+          FM_PLAN_MODE: ${{ needs.plan.outputs.mode }}
+          FM_PLAN_SELECTION: ${{ needs.plan.outputs.selection }}
+        run: |
+          set -eu
+          if [ "$FM_PLAN_MODE" = selected ]; then
+            mkdir -p "$RUNNER_TEMP/fm-plan"
+            printf '%s\n' "$FM_PLAN_SELECTION" >"$RUNNER_TEMP/fm-plan/selection"
+            echo "FM_CI_SELECTION_FILE=$RUNNER_TEMP/fm-plan/selection" >>"$GITHUB_ENV"
+          fi
       - name: Run real-Herdr family (serial, required)
         id: run-real-herdr-family
         # Heavy tier step tripwire: three times the longest healthy run in the
@@ -379,10 +932,17 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fm-test"
           # Serial only. Missing Herdr or recovery prerequisites must fail.
           # Live harness credential tests stay outside this family (opt-in env only).
+          # A pull request that selected tests narrows the lane to them; the
+          # full suite (push, manual, ci-full, any doubt) passes no selection.
+          select_args=()
+          if [ -n "${FM_CI_SELECTION_FILE:-}" ]; then
+            select_args=(--select-file "$FM_CI_SELECTION_FILE")
+          fi
           bin/fm-test-run.sh --family real-herdr-gated \
             --fail-on-gate-skip 'herdr not found' \
             --fail-on-gate-skip 'tasks-axi not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-herdr.json"
+            --json "$RUNNER_TEMP/fm-test/fm-test-timing-herdr.json" \
+            ${select_args[@]+"${select_args[@]}"}
       - name: Cleanup job-owned Herdr lab sessions
         id: cleanup-herdr-lab-sessions
         if: always()
@@ -412,11 +972,37 @@ jobs:
     # Fast tier: aggregation is seconds of work over lane artifacts.
     timeout-minutes: 5
     needs:
+      - plan
       - tests-portable-parallel-1
       - tests-portable-parallel-2
-      - tests-portable-serial
+      - tests-portable-serial-1
+      - tests-portable-serial-2
+      - tests-portable-serial-3
+      - tests-portable-serial-4
+      - tests-portable-serial-5
+      - tests-portable-serial-6
+      - tests-portable-serial-7
+      - tests-portable-serial-8
+      - tests-portable-serial-9
+      - tests-portable-serial-10
+      - tests-portable-serial-11
+      - tests-portable-serial-12
+      - tests-portable-serial-13
+      - tests-portable-serial-14
+      - tests-portable-serial-15
+      - tests-portable-serial-16
+      - tests-portable-serial-17
+      - tests-portable-serial-18
+      - tests-portable-serial-19
+      - tests-portable-serial-20
+      - tests-portable-serial-21
+      - tests-portable-serial-22
+      - tests-portable-serial-23
+      - tests-portable-serial-24
+      - tests-portable-serial-25
       - tests-herdr
-    if: always()
+    # Nothing to aggregate when a selection ran no test job at all.
+    if: always() && needs.plan.outputs.any_lane == 'true'
     steps:
       - uses: actions/checkout@v6
       - name: Download lane timing artifacts

@@ -13,6 +13,11 @@
 #   fm-test-run.sh --proven-isolated
 #   fm-test-run.sh tests/<name>.test.sh [more scripts...]
 #
+# Narrowing (any selection mode that names a whole lane, family or the suite):
+#   fm-test-run.sh --lane portable-parallel-1 --select-file <file>
+#   fm-test-run.sh --lane portable-serial-<k>of<n> --select-file <file>
+#   fm-test-run.sh --plan-ci [--select-file <file>]
+#
 # Inspection (no execution):
 #   fm-test-run.sh --list --all
 #   fm-test-run.sh --list --family <name>
@@ -99,6 +104,29 @@
 #                   bounded by --per-script-timeout-secs, or by the progress
 #                   guard on plain --changed. Pathological output
 #                   sinks that block finalization are explicitly out of scope.
+#   --select-file <file>
+#                   keep only the scripts a change-based selection named, one
+#                   tests/<name>.test.sh per line (bin/fm-test-select.py prints
+#                   them as test=<path> lines). It narrows --all, --family and
+#                   --lane; a script the file does not name is dropped and an
+#                   empty result is a clean run of nothing. A line that is not an
+#                   existing tests/*.test.sh is refused. For a serial shard
+#                   lane, portable-serial-<k>of<n> then packs only the selected
+#                   serial scripts into <n> bins, 1 <= n <= the full shard
+#                   count, instead of the fixed full-suite partition, which
+#                   still demands exactly the full count. Only the option
+#                   selects, never the environment, so a suite that runs this
+#                   runner inside a test cannot inherit a selection.
+#                   docs/fm-test-portable-shards.md "Change-based test
+#                   selection" owns how the selection is made and trusted.
+#   --plan-ci       print, as key=value lines for $GITHUB_OUTPUT, which CI test
+#                   jobs a selection needs: mode (full or selected),
+#                   parallel_1, parallel_2 and herdr (true or false),
+#                   serial_count (how many serial shards, 1..n, run),
+#                   any_lane and selected. Without
+#                   --select-file the plan is the full suite. A selected test
+#                   that no lane owns turns the whole plan into mode=full, so a
+#                   test can never be selected and then run nowhere.
 #   -h, --help      print this header
 #
 # Per-script machine-parseable markers (stdout):
@@ -251,6 +279,10 @@ AGGREGATE_OUT=
 FAMILY=
 LANE=
 BASE_REF=origin/main
+SELECT_FILE=
+SELECT_PATHS=
+SELECT_TMP=
+PLAN_CI=0
 JSON_PATH=
 SCRIPTS=()
 EXCLUDE_FAMILIES=()
@@ -986,7 +1018,7 @@ tests/fm-home-summary-refresh.test.sh 217901
 tests/fm-home-writes.test.sh 37642
 tests/fm-host-mirror-live-e2e.test.sh 923
 tests/fm-host-mirror.test.sh 16179
-tests/fm-idle-session-reap.test.sh 39711
+tests/fm-idle-session-reap.test.sh 90959
 tests/fm-inactive-reconcile.test.sh 78920
 tests/fm-inbox.test.sh 9762
 tests/fm-jev-guard-audit.test.sh 9806
@@ -1027,7 +1059,7 @@ tests/fm-omp-task-session-live-e2e.test.sh 1042
 tests/fm-omp-wake-restore-live-e2e.test.sh 1141
 tests/fm-omp-wake-turns.test.sh 325
 tests/fm-on.test.sh 31676
-tests/fm-open-loops.test.sh 700272
+tests/fm-open-loops.test.sh 996615
 tests/fm-opencode-primary-live-e2e.test.sh 781
 tests/fm-operational-input.test.sh 2999
 tests/fm-orphan-safety.test.sh 6837
@@ -1169,6 +1201,7 @@ tests/fm-test-fixture-cleanup.test.sh 4736
 tests/fm-test-fixtures.test.sh 18329
 tests/fm-test-isolation-proof.test.sh 4963
 tests/fm-test-reap-orphans.test.sh 38552
+tests/fm-test-select.test.sh 17300
 tests/fm-timeout-lib.test.sh 35202
 tests/fm-tmux-agent-liveness.test.sh 4922
 tests/fm-tool-update-check.test.sh 20060
@@ -1190,7 +1223,7 @@ tests/fm-wake-queue.test.sh 309414
 tests/fm-watch-arm.test.sh 178107
 tests/fm-watch-checkpoint.test.sh 44982
 tests/fm-watch-idle-reap.test.sh 148077
-tests/fm-watch-open-loops.test.sh 340590
+tests/fm-watch-open-loops.test.sh 394550
 tests/fm-watch-recovery-loop.test.sh 59522
 tests/fm-watch-triage-waits-away.test.sh 77766
 tests/fm-watch-triage-waits-declared.test.sh 829105
@@ -1308,14 +1341,18 @@ portable_serial_assignments() (
   # Bash 3.2 builtin writes to an asynchronous pipe can fail with EINTR; let awk
   # own assignment output and require the complete producer to succeed.
   set -o pipefail
-  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; list_portable_serial; } \
+  # An optional first argument packs into that many bins and an optional second
+  # packs only the scripts it lists (one path per line), for a change-based run.
+  shards=${1:-$PORTABLE_SERIAL_SHARDS}
+  only=${2:-}
+  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; portable_serial_candidates "$only"; } \
     | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
         $0 == "--" { scripts = 1; next }
         !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
         NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
       ' \
     | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
-    | awk -F '\t' -v shards="$PORTABLE_SERIAL_SHARDS" '
+    | awk -F '\t' -v shards="$shards" '
         BEGIN { for (i = 1; i <= shards; i++) loads[i] = 0 }
         {
           best = 1
@@ -1327,11 +1364,20 @@ portable_serial_assignments() (
       '
 )
 
+# The serial remainder, or only the part of it a selection file names.
+portable_serial_candidates() {  # [<select-file>]
+  if [ -z "${1:-}" ]; then
+    list_portable_serial
+    return $?
+  fi
+  list_portable_serial | { grep -Fxf "$1" || [ "$?" -eq 1 ]; }
+}
+
 # Parse "<k>of<n>" from a portable-serial shard lane and echo <k>, refusing when
 # <n> disagrees with this script's configured count so a CI matrix built for a
 # different shard count fails loudly instead of dropping tests.
 portable_serial_shard_index() {
-  local lane=$1 spec index count
+  local lane=$1 spec index count limit
   spec=${lane#portable-serial-}
   index=${spec%%of*}
   count=${spec#*of}
@@ -1345,13 +1391,139 @@ portable_serial_shard_index() {
   case "$count" in
     ''|*[!0-9]*) die "unknown lane '$lane' (see --list-lanes)" ;;
   esac
-  if [ "$count" -ne "$PORTABLE_SERIAL_SHARDS" ]; then
-    die "lane '$lane' asks for $count portable serial shards but this runner is configured for $PORTABLE_SERIAL_SHARDS (see --list-lanes)"
+  if [ -z "$SELECT_FILE" ]; then
+    # The full-suite partition has exactly one shard count, so a CI matrix built
+    # for a different one fails loudly instead of dropping tests.
+    if [ "$count" -ne "$PORTABLE_SERIAL_SHARDS" ]; then
+      die "lane '$lane' asks for $count portable serial shards but this runner is configured for $PORTABLE_SERIAL_SHARDS (see --list-lanes)"
+    fi
+  elif [ "$count" -lt 1 ] || [ "$count" -gt "$PORTABLE_SERIAL_SHARDS" ]; then
+    # A selection packs into as many shards as its own work needs.
+    die "lane '$lane' asks for $count portable serial shards but a selection packs into 1..$PORTABLE_SERIAL_SHARDS (see --plan-ci)"
   fi
-  if [ "$index" -lt 1 ] || [ "$index" -gt "$PORTABLE_SERIAL_SHARDS" ]; then
-    die "lane '$lane' shard index is outside 1..$PORTABLE_SERIAL_SHARDS (see --list-lanes)"
+  limit=$count
+  if [ "$index" -lt 1 ] || [ "$index" -gt "$limit" ]; then
+    die "lane '$lane' shard index is outside 1..$limit (see --list-lanes)"
   fi
   printf '%s\n' "$index"
+}
+
+# Clean, validate and sort the --select-file list into $SELECT_PATHS: one
+# existing tests/*.test.sh per line, blank and # lines dropped.
+prepare_select_file() {
+  local line
+  [ -n "$SELECT_FILE" ] || return 0
+  [ -f "$SELECT_FILE" ] || die "--select-file not found: $SELECT_FILE"
+  SELECT_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-select.XXXXXX") \
+    || die "could not create a scratch directory for --select-file"
+  trap 'rm -rf "$SELECT_TMP"' EXIT
+  SELECT_PATHS="$SELECT_TMP/paths"
+  awk '{ sub(/\r$/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); if ($0 != "" && $0 !~ /^#/) print }' "$SELECT_FILE" \
+    | LC_ALL=C sort -u >"$SELECT_PATHS" || die "could not read --select-file: $SELECT_FILE"
+  while IFS= read -r line; do
+    case "$line" in
+      */*/*) die "--select-file line is not a tests/<name>.test.sh script: $line" ;;
+      tests/*.test.sh) ;;
+      *) die "--select-file line is not a tests/<name>.test.sh script: $line" ;;
+    esac
+    [ -f "$line" ] || die "--select-file names a script that does not exist: $line"
+  done <"$SELECT_PATHS"
+}
+
+# Drop the scripts a --select-file selection does not name.
+apply_select_file() {
+  local s
+  local -a kept=()
+  [ -n "$SELECT_FILE" ] || return 0
+  case "$MODE" in
+    all|family|lane) ;;
+    *) die "--select-file narrows --all, --family or --lane, not ${MODE:+--}${MODE:-a selection}" ;;
+  esac
+  for s in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
+    if grep -Fxq -- "$s" "$SELECT_PATHS"; then
+      kept+=("$s")
+    fi
+  done
+  SCRIPTS=("${kept[@]+"${kept[@]}"}")
+  SELECTION_DESC="${SELECTION_DESC};select-file=$(wc -l <"$SELECT_PATHS" | tr -d ' ')"
+}
+
+# How many of the lines on stdin a selection names.
+count_selected() {
+  local n
+  n=$(grep -cFxf "$SELECT_PATHS" || [ "$?" -eq 1 ]) || return 1
+  printf '%s\n' "${n:-0}"
+}
+
+# Print the CI test jobs a selection needs, as key=value lines. See --plan-ci in
+# the header. Every number comes from the same lane lists --lane runs, so a plan
+# cannot disagree with the jobs it plans.
+plan_ci() {
+  local selected=0 p1 p2 herdr=false serial_count shards serial_ms owned s
+  local mode=selected parallel_1=false parallel_2=false
+  if [ -z "$SELECT_FILE" ]; then
+    mode=full
+    parallel_1=true
+    parallel_2=true
+    herdr=true
+    shards=$PORTABLE_SERIAL_SHARDS
+    serial_count=$shards
+  else
+    selected=$(wc -l <"$SELECT_PATHS" | tr -d ' ')
+    # A selected script that no lane owns would be selected and then run
+    # nowhere, so the plan falls back to the full suite instead.
+    owned=$(
+      { list_portable_parallel_1; list_portable_parallel_2; list_portable_serial; \
+        all_repo_tests | while IFS= read -r s; do
+          [ "$(family_for_basename "${s##*/}")" = real-herdr-gated ] && printf '%s\n' "$s"
+        done
+        true; } | LC_ALL=C sort -u
+    ) || die "could not list the CI lanes"
+    while IFS= read -r s; do
+      [ -n "$s" ] || continue
+      if ! printf '%s\n' "$owned" | grep -Fxq -- "$s"; then
+        printf 'mode=full\nreason=selected script is in no CI lane: %s\n' "$s"
+        plan_ci_full
+        return 0
+      fi
+      if [ "$(family_for_basename "${s##*/}")" = real-herdr-gated ]; then
+        herdr=true
+      fi
+    done <"$SELECT_PATHS"
+    p1=$(list_portable_parallel_1 | count_selected) || die "could not plan parallel lane 1"
+    p2=$(list_portable_parallel_2 | count_selected) || die "could not plan parallel lane 2"
+    [ "$p1" -eq 0 ] || parallel_1=true
+    [ "$p2" -eq 0 ] || parallel_2=true
+    serial_count=$(portable_serial_candidates "$SELECT_PATHS" | grep -c . || [ "$?" -eq 1 ]) || die "could not plan the serial lane"
+    shards=0
+    if [ "$serial_count" -gt 0 ]; then
+      read -r serial_ms _ <<<"$(portable_serial_candidates "$SELECT_PATHS" | portable_serial_lane_weight)"
+      # The fewest shards that keep each near the packing target, never more
+      # than the scripts or the full-suite shard count.
+      shards=$(((serial_ms + PORTABLE_SERIAL_MAX_WEIGHT_MS - 1) / PORTABLE_SERIAL_MAX_WEIGHT_MS))
+      [ "$shards" -ge 1 ] || shards=1
+      [ "$shards" -le "$serial_count" ] || shards=$serial_count
+      [ "$shards" -le "$PORTABLE_SERIAL_SHARDS" ] || shards=$PORTABLE_SERIAL_SHARDS
+    fi
+    serial_count=$shards
+  fi
+  printf 'mode=%s\n' "$mode"
+  printf 'selected=%s\n' "$selected"
+  printf 'parallel_1=%s\n' "$parallel_1"
+  printf 'parallel_2=%s\n' "$parallel_2"
+  printf 'herdr=%s\n' "$herdr"
+  printf 'serial_count=%s\n' "$serial_count"
+  if [ "$parallel_1" = true ] || [ "$parallel_2" = true ] || [ "$herdr" = true ] || [ "$serial_count" -gt 0 ]; then
+    printf 'any_lane=true\n'
+  else
+    printf 'any_lane=false\n'
+  fi
+}
+
+# The full-suite plan, after a selection that cannot be honored.
+plan_ci_full() {
+  printf 'selected=0\nparallel_1=true\nparallel_2=true\nherdr=true\n'
+  printf 'serial_count=%s\nany_lane=true\n' "$PORTABLE_SERIAL_SHARDS"
 }
 
 select_proven_isolated() {
@@ -1389,8 +1561,13 @@ select_lane() {
     portable-serial-*)
       # One separate-runner shard of the same remainder, still serial in itself.
       shard=$(portable_serial_shard_index "$want")
-      assignments=$(portable_serial_assignments) \
-        || die "could not generate complete portable serial shard assignments"
+      if [ -n "$SELECT_FILE" ]; then
+        assignments=$(portable_serial_assignments "${want##*of}" "$SELECT_PATHS") \
+          || die "could not generate selected portable serial shard assignments"
+      else
+        assignments=$(portable_serial_assignments) \
+          || die "could not generate complete portable serial shard assignments"
+      fi
       while IFS=$'\t' read -r idx s; do
         [ -n "$s" ] || continue
         if [ "$idx" = "$shard" ]; then
@@ -1407,7 +1584,9 @@ select_lane() {
       die "unknown lane '$want' (see --list-lanes)"
       ;;
   esac
-  [ "$found" -eq 1 ] || die "lane '$want' selected no tests"
+  # A selection may leave a shard or a lane with nothing to run; the empty
+  # result is handled after selection as a clean run of nothing.
+  [ "$found" -eq 1 ] || [ -n "$SELECT_FILE" ] || die "lane '$want' selected no tests"
 }
 
 run_coverage_guard() {
@@ -2674,6 +2853,19 @@ while [ "$#" -gt 0 ]; do
       # For aggregation we accept only input JSON paths as free args after this.
       MODE=aggregate
       ;;
+    --select-file)
+      [ "$#" -gt 1 ] || die "--select-file requires a path"
+      SELECT_FILE=$2
+      shift 2
+      ;;
+    --select-file=*)
+      SELECT_FILE=${1#--select-file=}
+      shift
+      ;;
+    --plan-ci)
+      PLAN_CI=1
+      shift
+      ;;
     --exclude-family)
       [ "$#" -gt 1 ] || die "--exclude-family requires a name"
       EXCLUDE_FAMILIES+=("$2")
@@ -2750,6 +2942,13 @@ if [ "${MODE:-}" = "aggregate" ]; then
   exit 0
 fi
 
+prepare_select_file
+if [ "$PLAN_CI" -eq 1 ]; then
+  [ -z "${MODE:-}" ] || die "--plan-ci takes no selection mode"
+  plan_ci
+  exit 0
+fi
+
 case "$JOBS" in
   ''|*[!0-9]*) die "--jobs must be a positive integer" ;;
 esac
@@ -2812,6 +3011,7 @@ case "${MODE:-}" in
     ;;
 esac
 
+apply_select_file
 apply_exclude_families
 if [ "${#EXCLUDE_FAMILIES[@]}" -gt 0 ]; then
   SELECTION_DESC="${SELECTION_DESC};exclude-family=$(IFS=,; printf '%s' "${EXCLUDE_FAMILIES[*]}")"
@@ -3026,7 +3226,7 @@ declare -a WORKER_SCRIPTS=()
 # Invoked indirectly by the EXIT trap below.
 # shellcheck disable=SC2329
 cleanup_run() {
-  rm -rf "$RUN_TMP"
+  rm -rf "$RUN_TMP" ${SELECT_TMP:+"$SELECT_TMP"}
 }
 
 trap cleanup_run EXIT

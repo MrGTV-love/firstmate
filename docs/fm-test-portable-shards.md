@@ -337,6 +337,46 @@ Replaying each of the three main runs' own per-script durations through the earl
 The same replay through the newer pull-request runs gives a slowest shard of 1209920, 1316807, and 1834041 ms, where run 40691163806 shows a shard far above the others whose cause this refresh did not investigate; the target bounds the model, not every real shard, as the 2026-10-26 note above already states.
 The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`; the twenty-four-shard assignment has not been replayed.
 
+## Change-based test selection
+
+A pull request runs only the behavior tests its diff can affect; a push to `main` runs all of them.
+`bin/fm-test-select.py` makes the decision and its header owns the output format, and `bin/fm-test-run.sh --plan-ci` turns the selected tests into the CI jobs that have work.
+The `plan` job in `.github/workflows/ci.yml` runs both and hands every behavior job its mode, its selection and its plan.
+
+**What a test depends on.**
+Every tracked file is a node, and one file depends on another when its code runs, sources, copies, reads or lists it.
+In shell code that means the command word, the file given to `source` or `.`, the script given to an interpreter, any other whole word that names a file, a glob over a repository directory, and a repository directory that `cp -R`, `rsync`, `tar`, `find`, `ls`, `git ls-files` or a `for` loop walks.
+A name with a variable inside it (`backends/$name.sh`) counts as the files it could mean, up to sixteen.
+A root-level file such as `AGENTS.md`, or a whole directory, counts only when it is named through a repository-root variable (`$ROOT`, `$FM_ROOT`) or a command substitution, because the same name under `$home` or `$repo` belongs to a fixture.
+A `bash -c` argument counts only where the inline code runs it.
+A message that merely mentions a script, a comment, a document that mentions a script, and a production script's reference to a test file name nothing.
+Tests also depend on everything their text mentions, because a test may assert on a file it never runs, and Python, JavaScript and TypeScript depend on every whole string literal that names a file.
+A test is selected when a changed file is reachable from it through code files; documents and data are leaves.
+A `tests/` helper that at least half of the tests load (today `tests/lib.sh` and the helpers it sources) is infrastructure: the scripts it starts for its own setup and teardown are included with the libraries they load, but the scripts those start are not followed.
+
+**What forces the full suite.**
+A push to `main`, a manual run that names no `base`, a pull request labeled `ci-full`, a checkout that is not a pull request merge commit, a change to `tests/lib.sh`, `bin/fm-test-run.sh`, `bin/fm-test-select.py` or anything under `.github/`, a change that reaches nine tenths of the tests (a library sourced almost everywhere), a changed path in neither the base nor the head tree, any error reading the tree or the diff, and a selected test that no lane owns.
+The selector prints its reason on every decision and never exits nonzero for a bad guess; the `plan` job also falls back to the full suite when the selector prints nothing.
+To force a full run on a pull request, add the `ci-full` label and push, or run the workflow by hand on the branch.
+A manual run that gives `base` (and optionally `head`) replays the selection for that diff on the checked-out tree instead of running everything.
+
+**How the plan maps to jobs.**
+`Behavior portable parallel 1`, `Behavior portable parallel 2` and `Behavior tests (Herdr)` run when a selected test belongs to their lane and are skipped otherwise, and each narrows its lane with `--select-file`.
+The selected serial scripts are packed into the fewest shards whose hint sum stays within `PORTABLE_SERIAL_MAX_WEIGHT_MS`, never more than the scripts or the full shard count, by the same longest-processing-time rule that packs the full partition.
+Shard jobs `Behavior portable serial 1` through `N` run and the rest are skipped; the full suite plans all 25.
+A skipped job is reported by the forge as skipped under its own name, which satisfies a required check, so no required context is removed or renamed; `Test selection plan` is a new required context because a failed plan skips everything else (see `CONTRIBUTING.md` "Maintaining required checks").
+`Behavior timing aggregate` is skipped when no behavior job ran.
+Lint, the coverage guard, the invariants and the stock macOS Bash job do not depend on the plan and always run.
+
+**What it cannot see.**
+A path built at run time from pieces the code does not spell out, a file named only inside a longer string that a program later parses, a file reached through a program's own search path or an environment variable, a directory listed from a bare name with no path around it, a call whose script is passed to a shell function that runs it, and behavior that depends on a file's content but not on its name.
+It also follows only source and library edges past a shared test helper, so a test that reaches a script only through that helper's teardown is not selected for a change to that script.
+The full run on every push to `main` is the backstop for all of these: a regression the selection missed is caught there, not shipped silently.
+
+**Verification.**
+`tests/fm-test-select.test.sh` builds fixture repositories and checks the selected set for a changed sourced library, a regression planted in a file no test names, a message and a comment, a `bash -c` argument, a deleted file, a walked and a globbed directory, a document, a variable name, the shared-helper boundary, every full-suite trigger and the fail-closed paths; `tests/fm-test-run.test.sh` checks `--select-file` and `--plan-ci`; `tests/fm-ci-workflow.test.sh` checks the jobs, the plan step for each event and the shard-to-lane match.
+Preview a selection with `bin/fm-test-select.py --base origin/main --explain` and the plan it implies with `bin/fm-test-run.sh --plan-ci --select-file <file>`.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
@@ -351,7 +391,8 @@ On [PR 1495](https://github.com/kunchenguid/firstmate/pull/1495), its main step 
 Each shard is still strictly serial in itself, and separate runners mean no two of these stateful scripts ever share a machine, so the split needs no concurrency isolation proof.
 
 `bin/fm-test-run.sh` owns `n` and refuses any lane whose `of<n>` disagrees with it.
-`.github/workflows/ci.yml` derives the same `n` from `strategy.job-total` rather than a literal, so changing the shard count in either file without the other fails the lane loudly instead of leaving part of the required suite unrun.
+`.github/workflows/ci.yml` has one job per shard and passes the lane the shard count the plan reports (`bin/fm-test-run.sh --plan-ci` prints `serial_count`) rather than a literal, so changing the shard count in either file without the other fails the lane loudly instead of leaving part of the required suite unrun.
+`tests/fm-ci-workflow.test.sh` holds the shard jobs identical but for their number and equal to the lanes the runner defines.
 
 Assignment is longest-processing-time bin packing over per-script duration hints embedded in `bin/fm-test-run.sh`.
 [Verification inputs](#verification-inputs) owns the measurement provenance and exceptions.
@@ -408,6 +449,13 @@ The estimates use per-file maxima from different runs, not measured rebalanced j
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
+
+On 2026-10-30 three hints that sat more than fifteen percent and more than thirty seconds below the slowest successful sample across the behavior timing aggregates of three green pull-request runs ([40982150141](https://github.com/MrGTV-love/firstmate/actions/runs/40982150141), [40976642993](https://github.com/MrGTV-love/firstmate/actions/runs/40976642993), and [40974708385](https://github.com/MrGTV-love/firstmate/actions/runs/40974708385)) were raised to that sample, and no hint was lowered: `tests/fm-open-loops.test.sh` from 700272 to 996615 ms, `tests/fm-watch-open-loops.test.sh` from 340590 to 394550 ms, and `tests/fm-idle-session-reap.test.sh` from 39711 to 90959 ms.
+`tests/fm-open-loops.test.sh` had left serial shard 6 at 1443 s in run 40982150141 against a 1200 s target.
+The serial hints then sum to 28754200 ms plus the 17300 ms first hint of `tests/fm-test-select.test.sh` (a local macOS arm64 run, 16.4 and 17.2 s, until CI measures it), so twenty-five shards leave 1228500 ms of lane slack, still one target, and pass `--check-coverage`.
+Raising every hint that three runs showed above its value would have taken the sum to 28830860 ms and the slack to 1169140 ms, below one target, so only the three that moved a shard were raised.
+Replaying each run's recorded per-script durations through the previous hints reproduces that shard (1437 s replayed against 1443 s recorded), and through the refreshed hints puts the slowest of the twenty-five shards at 1196, 1183 and 1226 s, against 1437, 1208 and 1224 s; the spread between the fastest and slowest shard falls from 602 s to 367 s in the first run.
+This is a replay of recorded durations, not a measured CI run.
 
 Refresh the CI-derived hints by downloading the per-shard timing artifacts from several green CI runs and replacing the `portable_serial_weight_hints` table in `bin/fm-test-run.sh` with the slowest measured `duration_ms` per `path`:
 

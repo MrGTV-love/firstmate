@@ -3492,3 +3492,171 @@ test_fm_lint_groups_partition_one_inventory() {
 }
 
 test_fm_lint_groups_partition_one_inventory
+
+# --- Change-based selection: --select-file and --plan-ci -----------------------
+#
+# A selection file (bin/fm-test-select.py prints one) narrows a lane, a family or
+# the suite to the tests a change can affect. These cases hold what the runner
+# does with it: it never runs a script the file does not name, never drops one it
+# does, packs the selected serial scripts into as few shards as their work needs
+# with each script in exactly one, plans only the CI jobs that have work, and
+# turns any doubt into the full suite.
+
+sel_tmp=$(fm_test_tmproot fm-test-run-select)
+
+# nth_of <n> <listing>: the nth line of a listing, 1-based, clamped to the last.
+nth_of() {
+  local n=$1 listing=$2 total
+  total=$(printf '%s\n' "$listing" | wc -l | tr -d ' ')
+  [ "$n" -le "$total" ] || n=$total
+  printf '%s\n' "$listing" | sed -n "${n}p"
+}
+
+test_select_file_narrows_lanes_and_families() {
+  local p1 serial herdr file listed a b
+  p1=$("$RUNNER" --list --lane portable-parallel-1)
+  serial=$("$RUNNER" --list --lane portable-serial)
+  herdr=$("$RUNNER" --list --family real-herdr-gated)
+  a=$(nth_of 2 "$p1")
+  b=$(nth_of 3 "$serial")
+  file="$sel_tmp/narrow"
+  printf '%s\n' "$a" "$b" "$(nth_of 1 "$herdr")" >"$file"
+  listed=$("$RUNNER" --list --lane portable-parallel-1 --select-file "$file")
+  assert_equals "$a" "$listed" "parallel lane 1 keeps only the selected script it owns"
+  listed=$("$RUNNER" --list --lane portable-parallel-2 --select-file "$file")
+  assert_equals "" "$listed" "parallel lane 2 owns none of them"
+  listed=$("$RUNNER" --list --family real-herdr-gated --select-file "$file")
+  assert_equals "$(nth_of 1 "$herdr")" "$listed" "the Herdr family keeps only the selected Herdr script"
+  listed=$("$RUNNER" --list --lane portable-serial --select-file "$file")
+  assert_equals "$b" "$listed" "the serial lane keeps only the selected serial script"
+  pass "--select-file narrows a lane or a family to the scripts it names and no others"
+}
+
+test_select_file_leaving_nothing_runs_nothing_and_still_writes_the_artifact() {
+  local file out rc json
+  file="$sel_tmp/other-lane"
+  printf '%s\n' "$(nth_of 1 "$("$RUNNER" --list --lane portable-parallel-1)")" >"$file"
+  json="$sel_tmp/empty.json"
+  out=$("$RUNNER" --lane portable-parallel-2 --jobs 3 --select-file "$file" --json "$json" 2>&1)
+  rc=$?
+  assert_equals 0 "$rc" "a lane left with nothing to run is a clean result"
+  assert_contains "$out" 'FM_TEST_SUMMARY total=0 failed=0' "the run reports total=0"
+  python3 -I -c "
+import json, sys
+doc = json.load(open(sys.argv[1]))
+assert doc['summary']['total'] == 0, doc['summary']
+assert 'select-file=1' in doc['selection'], doc['selection']
+" "$json" || fail "the timing artifact must record the selection that left nothing"
+  : >"$sel_tmp/none"
+  out=$("$RUNNER" --list --lane portable-serial --select-file "$sel_tmp/none")
+  assert_equals "" "$out" "an empty selection file keeps nothing from any lane"
+  pass "a selection that leaves a lane empty exits 0, reports total=0 and still writes its timing artifact"
+}
+
+test_select_file_refuses_what_is_not_a_selection() {
+  local file out rc
+  file="$sel_tmp/bad-line"
+  printf '%s\n' 'bin/fm-test-run.sh' >"$file"
+  out=$("$RUNNER" --list --all --select-file "$file" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "a line that is not a tests/<name>.test.sh must be refused"
+  assert_contains "$out" 'not a tests/<name>.test.sh' "the refusal names the rule"
+  printf '%s\n' 'tests/no-such-script.test.sh' >"$file"
+  out=$("$RUNNER" --list --all --select-file "$file" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "a selected script that does not exist must be refused"
+  out=$("$RUNNER" --list --all --select-file "$sel_tmp/missing-file" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "a selection file that does not exist must be refused"
+  printf '%s\n' "$(nth_of 1 "$("$RUNNER" --list --all)")" >"$file"
+  out=$("$RUNNER" --list --changed --select-file "$file" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "--select-file narrows --all, --family or --lane, not --changed"
+  out=$("$RUNNER" --list --select-file "$file" tests/fm-brief.test.sh 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "--select-file does not combine with named script paths"
+  pass "--select-file refuses a non-test line, a missing script, a missing file and a mode it cannot narrow"
+}
+
+test_selected_serial_scripts_are_packed_once_into_the_planned_shards() {
+  local serial file plan count shard union dup listed total
+  serial=$("$RUNNER" --list --lane portable-serial)
+  file="$sel_tmp/serial"
+  printf '%s\n' "$(nth_of 1 "$serial")" "$(nth_of 20 "$serial")" "$(nth_of 60 "$serial")" \
+    "$(nth_of 100 "$serial")" "$(nth_of 140 "$serial")" "$(nth_of 180 "$serial")" \
+    "$(nth_of 9999 "$serial")" >"$file"
+  plan=$("$RUNNER" --plan-ci --select-file "$file")
+  count=$(printf '%s\n' "$plan" | sed -n 's/^serial_count=//p')
+  [ "$count" -ge 1 ] && [ "$count" -le 7 ] || fail "seven serial scripts plan 1..7 shards, got $count"
+  union=
+  shard=1
+  while [ "$shard" -le "$count" ]; do
+    listed=$("$RUNNER" --list --lane "portable-serial-${shard}of${count}" --select-file "$file")
+    [ -n "$listed" ] || fail "shard $shard of $count must have work: the plan promised $count shards"
+    union="${union}${listed}"$'\n'
+    shard=$((shard + 1))
+  done
+  total=$(printf '%s' "$union" | grep -c .)
+  dup=$(printf '%s' "$union" | LC_ALL=C sort | uniq -d)
+  assert_equals "" "$dup" "no selected script may run in two shards"
+  assert_equals "$(LC_ALL=C sort -u "$file")" "$(printf '%s' "$union" | LC_ALL=C sort -u)" "the shards together run exactly the selected serial scripts"
+  assert_equals 7 "$total" "each of the seven scripts runs once"
+  pass "the selected serial scripts are packed into the planned shards, each script in exactly one"
+}
+
+test_the_full_serial_lanes_still_demand_the_full_shard_count() {
+  local out rc
+  out=$("$RUNNER" --list --lane portable-serial-1of3 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "without a selection only the full shard count is a lane"
+  assert_contains "$out" 'configured for' "the refusal names the configured count"
+  printf '%s\n' "$(nth_of 1 "$("$RUNNER" --list --lane portable-serial)")" >"$sel_tmp/one"
+  out=$("$RUNNER" --list --lane portable-serial-1of99 --select-file "$sel_tmp/one" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "a selection packs into at most the full shard count"
+  out=$("$RUNNER" --list --lane portable-serial-2of1 --select-file "$sel_tmp/one" 2>&1)
+  rc=$?
+  assert_equals 2 "$rc" "a shard index past the planned count is refused"
+  pass "the fixed full-suite partition still demands its shard count, and a selection stays within bounds"
+}
+
+test_plan_ci_without_a_selection_is_the_full_suite() {
+  local plan lanes lane
+  plan=$("$RUNNER" --plan-ci)
+  assert_contains "$plan" 'mode=full' "no selection is the full suite"
+  for lane in parallel_1 parallel_2 herdr any_lane; do
+    assert_contains "$plan" "$lane=true" "the full plan runs $lane"
+  done
+  lanes=$("$RUNNER" --list-lanes | grep -c '^portable-serial-[0-9]*of[0-9]*$')
+  assert_contains "$plan" "serial_count=$lanes" "the full plan runs every serial shard"
+  pass "--plan-ci with no selection plans every lane and every serial shard"
+}
+
+test_plan_ci_plans_only_the_lanes_that_have_selected_work() {
+  local plan file p1 herdr
+  p1=$(nth_of 1 "$("$RUNNER" --list --lane portable-parallel-1)")
+  herdr=$(nth_of 1 "$("$RUNNER" --list --family real-herdr-gated)")
+  file="$sel_tmp/plan"
+  printf '%s\n' "$p1" >"$file"
+  plan=$("$RUNNER" --plan-ci --select-file "$file")
+  assert_contains "$plan" 'mode=selected' "a selection is a selected plan"
+  assert_contains "$plan" 'parallel_1=true' "parallel lane 1 has the selected script"
+  assert_contains "$plan" 'parallel_2=false' "parallel lane 2 has none"
+  assert_contains "$plan" 'herdr=false' "the Herdr lane has none"
+  assert_contains "$plan" 'serial_count=0' "the serial lane has none"
+  printf '%s\n' "$herdr" >"$file"
+  plan=$("$RUNNER" --plan-ci --select-file "$file")
+  assert_contains "$plan" 'herdr=true' "a selected Herdr script plans the Herdr job"
+  : >"$file"
+  plan=$("$RUNNER" --plan-ci --select-file "$file")
+  assert_contains "$plan" 'any_lane=false' "an empty selection plans no test job"
+  pass "--plan-ci plans only the lanes that have selected work"
+}
+
+test_select_file_narrows_lanes_and_families
+test_select_file_leaving_nothing_runs_nothing_and_still_writes_the_artifact
+test_select_file_refuses_what_is_not_a_selection
+test_selected_serial_scripts_are_packed_once_into_the_planned_shards
+test_the_full_serial_lanes_still_demand_the_full_shard_count
+test_plan_ci_without_a_selection_is_the_full_suite
+test_plan_ci_plans_only_the_lanes_that_have_selected_work
