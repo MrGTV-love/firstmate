@@ -178,10 +178,19 @@ def parse_options(lines):
     return options
 
 
+def evidence_pointer(value):
+    return isinstance(value, str) and bool(value.startswith('/') or re.match(r'^https?://[^\s]+$', value))
+
+
 def parse_fields(lines, remainder=None, multiline=False, loose=None):
     fields, current = {}, None
     for line in lines:
         match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
+        if match and match.group(1) == 'Evidence':
+            value = match.group(2).strip()
+            if value and value.lower() != 'none recorded' and not evidence_pointer(value):
+                match = None
+                current = None
         if match:
             current = match.group(1)
             if current == 'Brief description of issue':
@@ -357,8 +366,7 @@ class Watch:
                                        if isinstance(card, dict) and card.get('key')}
 
     def scope_state(self):
-        scopes = set(getattr(self.api, 'scopes', set()))
-        missing = {'reactions:read', 'users:read'} - scopes
+        missing = {'reactions:read', 'users:read'} - set(self.state.get('scopes') or [])
         return not missing, missing
 
     def scope_notice(self):
@@ -383,8 +391,7 @@ class Watch:
         parts.update(reason)
         evidence = next((value for value in (reason.get('Evidence'), card.get('pr_url'),
                                             card.get('report_path'), body.get('Evidence'))
-                         if isinstance(value, str) and
-                         (value.startswith('/') or re.match(r'^https?://[^\s]+$', value))), '')
+                         if evidence_pointer(value)), '')
         usable, missing = self.scope_state()
         usable = usable and reactions
         fields = [('Task: ', row['id'])]

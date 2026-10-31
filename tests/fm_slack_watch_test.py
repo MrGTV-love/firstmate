@@ -46,7 +46,6 @@ import unittest
 import tempfile
 from unittest.mock import patch
 from pathlib import Path
-from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
 from fm_slack_watch import CARD_LIMIT, SlackError, Watch
@@ -56,7 +55,7 @@ from fm_slack_replay import Replay
 class CardRenderingTest(unittest.TestCase):
     def render(self, reason, body=(), scopes=True, card=None):
         watch = Watch.__new__(Watch)
-        watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'} if scopes else set())
+        watch.state = {'scopes': ['reactions:read', 'users:read'] if scopes else []}
         row = {'id': 'release-call', 'title': 'Release choice',
                'hold_reason': reason, 'body_lines': list(body)}
         return watch.card_payload(row, card or {})[0]
@@ -117,11 +116,27 @@ class CardRenderingTest(unittest.TestCase):
                         body = ['Evidence: ' + values[3]] if isinstance(values[3], str) else []
                         text = self.render(reason, body, card={
                             'pr_url': values[1], 'report_path': values[2]})
+                        shown = first_valid > 0 and isinstance(values[0], str)
+                        if shown:
+                            self.assertIn('Evidence: ' + values[0] + '\n', text)
                         if first_valid < len(candidates):
                             self.assertIn('Evidence: ' + candidates[first_valid] + '\n', text)
-                            self.assertEqual(text.count('Evidence: '), 1)
-                        else:
-                            self.assertNotIn('Evidence:', text)
+                        self.assertEqual(text.count('Evidence: '), shown + (first_valid < len(candidates)))
+
+    def test_four_part_invalid_reason_evidence_is_plain_text(self):
+        text = self.render('Decision sought: Merge?\nBrief: Review passed.\nEvidence: see CI run 1234',
+                           ['Option 1: Merge (merge)'], card={'pr_url': 'https://example.com/pull/1'})
+        self.assertIn('Brief description of issue: Review passed.\n'
+                      'Evidence: https://example.com/pull/1\nOptions:\n1. Merge (merge)\n'
+                      'Evidence: see CI run 1234\n', text)
+        self.assertEqual(text.count('see CI run 1234'), 1)
+
+    def test_legacy_invalid_reason_evidence_stays_in_question(self):
+        text = self.render('Should we merge?\nEvidence: see CI run 1234',
+                           card={'pr_url': 'https://example.com/pull/1'})
+        self.assertIn('Question: Should we merge?\nEvidence: see CI run 1234\n'
+                      'Evidence: https://example.com/pull/1\n', text)
+        self.assertEqual(text.count('see CI run 1234'), 1)
 
     def test_body_fields_do_not_include_unlabeled_prose(self):
         for structured in (False, True):
@@ -163,7 +178,7 @@ class CardRenderingTest(unittest.TestCase):
         for body in ([], ['Option 1: Review (review)']):
             with self.subTest(body=body):
                 watch = Watch.__new__(Watch)
-                watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+                watch.state = {'scopes': ['reactions:read', 'users:read']}
                 text, options, _ = watch.card_payload({
                     'id': 'release-call', 'title': 'Release choice',
                     'hold_reason': 'Should we ship?\n' + reason_options,
@@ -183,7 +198,7 @@ class CardRenderingTest(unittest.TestCase):
         for card in ({}, {'options': [{'value': 'review', 'label': 'Review'}]}):
             with self.subTest(card=card):
                 watch = Watch.__new__(Watch)
-                watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+                watch.state = {'scopes': ['reactions:read', 'users:read']}
                 text, options, _ = watch.card_payload({
                     'id': 'release-call', 'title': 'Release choice',
                     'hold_reason': reason, 'body_lines': []}, card)
@@ -208,7 +223,7 @@ class CardRenderingTest(unittest.TestCase):
 
     def test_body_selected_four_part_shows_whole_unlabeled_reason(self):
         watch = Watch.__new__(Watch)
-        watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+        watch.state = {'scopes': ['reactions:read', 'users:read']}
         text, options, _ = watch.card_payload({
             'id': 'release-call', 'title': 'Release choice',
             'hold_reason': 'Should we merge PR #328?\nCI is green.',
@@ -246,7 +261,7 @@ class CardRenderingTest(unittest.TestCase):
 
 class CardRefreshTest(unittest.TestCase):
     @contextmanager
-    def fixture(self):
+    def fixture(self, scopes=('reactions:read', 'users:read')):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
             home = Path(directory)
             transcript = home / 'transcript.json'
@@ -259,7 +274,7 @@ class CardRefreshTest(unittest.TestCase):
                                          'FM_SLACK_POLL_MAX_ANSWERS': '1'}):
                 replay = Replay(transcript, home / 'slack-watch')
                 watch = Watch(replay=replay)
-                watch.state.update(channel='D0123456789', user='U0TESTOWNER')
+                watch.state.update(channel='D0123456789', user='U0TESTOWNER', scopes=sorted(scopes))
                 rows = [{'id': key, 'title': key, 'hold_kind': 'captain',
                          'hold_reason': 'Original question'} for key in ('first', 'second')]
                 with patch.object(watch, 'bound', return_value=True), \
@@ -270,6 +285,26 @@ class CardRefreshTest(unittest.TestCase):
                         yield watch, replay, rows
                     finally:
                         watch.lock.close()
+
+    def test_live_scopes_that_differ_from_armed_scopes_do_not_change_cards(self):
+        full = ['reactions:read', 'users:read']
+        for armed, live in ((full, set()), ((), set(full))):
+            with self.subTest(armed=armed), self.fixture(scopes=armed) as (watch, replay, rows):
+                replay.scopes = set(armed)
+                watch.mirror()
+                digests = {key: record['text_digest'] for key, record in watch.state['threads'].items()}
+                texts = [message['text'] for message in replay.state['messages']]
+                watch.output, watch.state['outbox'] = [], []
+                replay.scopes = live
+                for _ in range(2):
+                    watch.state = watch.load_state()
+                    watch.mirror()
+                    watch.scope_notice()
+                    self.assertEqual({key: record['text_digest'] for key, record
+                                      in watch.state['threads'].items()}, digests)
+                self.assertEqual([message['text'] for message in replay.state['messages']], texts)
+                self.assertNotIn('chat.update', [entry['method'] for entry in replay.state['log']])
+                self.assertFalse([line for line in watch.output if 'reaction scope' in line])
 
     def test_answer_cap_does_not_limit_posts_or_edits(self):
         with self.fixture() as (watch, replay, rows):
