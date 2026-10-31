@@ -631,6 +631,46 @@ JS
   pass "path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments"
 }
 
+test_omp_conflict_remedy() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const handlers = {};
+const home = process.env.HOME_DIR;
+installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'conflicts', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', host: 'omp', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+const ctx = { cwd: process.env.WT };
+const conflict = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> topic\n';
+const file = `${process.env.WT}/conflicted.txt`;
+writeFileSync(file, conflict);
+const before = readFileSync(process.env.REQUESTS, 'utf8');
+for (const path of ['conflict://1', 'conflict://999999', 'conflict://*', 'CONFLICT://1', '[conflict://1]', '[conflict://1#ABCD]  ', 'conflict://1 ']) {
+  for (const input of [{ toolName: 'write', input: { path, content: 'resolved\n' } }, { toolName: 'edit', input: { path, old_string: conflict, new_string: 'resolved\n' } }]) {
+    const refused = await handlers.tool_call(input, ctx);
+    assert.equal(refused?.block, true, 'conflict identifiers never prove a filesystem target');
+    assert.match(refused.reason, /cannot prove.*(?:file|path)/i);
+    assert.match(refused.reason, /edit.*conflicted file.*real path.*own.*copy.*normal edit tool/i);
+    assert.match(refused.reason, /Apart from the alternative this refusal names/,
+      'the retry prohibition must explicitly exempt the completing step');
+    assert.equal(readFileSync(file, 'utf8'), conflict, 'refused conflict writes leave the file unchanged');
+  }
+}
+for (const path of [file, 'conflicted.txt']) {
+  assert.equal(await handlers.tool_call({ toolName: 'edit', input: { path, old_string: conflict, new_string: 'resolved\n' } }, ctx), undefined,
+    'the named real-path edit must pass the ordinary write policy');
+}
+const outside = await handlers.tool_call({ toolName: 'edit', input: { path: '/etc/conflicted.txt', old_string: conflict, new_string: 'resolved\n' } }, ctx);
+assert.equal(outside?.block, true, 'the completing step must not widen the permitted roots');
+assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before, 'conflict path policy stays deterministic and sends no content');
+console.log('conflict-remedy-ok');
+JS
+) || fail "OMP conflict remedy: $out"
+  [ "$out" = conflict-remedy-ok ] || fail "unexpected conflict remedy output: $out"
+  pass "conflict URI refusal names an exempt real-path edit while outside edits stay refused"
+}
+
 test_omp_device_effects() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
@@ -961,6 +1001,7 @@ test_service_contract
 test_pretool_audit_policy
 test_claude_node_pretool
 test_omp_permissions
+test_omp_conflict_remedy
 test_omp_device_effects
 test_deadlines
 test_oversize_writes
