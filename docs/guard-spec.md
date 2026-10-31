@@ -16,6 +16,10 @@ The retirement changelog is `docs/guards/retired.json`, owned by the same lint.
 The ratchet allowlist is `docs/guards/lint-allowlist.json`; it may only shrink.
 `bin/fm-guard-sites.py` is the discovery helper the lint calls for every refusal site in the runtime code; "Refusal sites" below owns what it finds.
 Guards registered after the audit are named in the registry's `beyond_audit_active` list, so `--counts` keeps the audited population arithmetic exact.
+An inventory family already represented by a registry id adds site mappings to that id rather than a duplicate registration.
+A separately named subpredicate can retain its own registry invariant even when its refusal already enforces a broader registered guard.
+Registration describes existing enforcement; it grants no runtime permission, adds no retry loop and does not imply new telemetry.
+Entries for uninstrumented families explicitly distinguish their existing caller diagnostics and per-invocation refusal from an implemented event emitter or cross-invocation counter.
 
 `bin/fm-guard-refcheck.sh` owns the wiring proof: every hook registration
 resolves to a file that exists, every retired guard has zero live references,
