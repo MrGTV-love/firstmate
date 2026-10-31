@@ -209,15 +209,13 @@ pass "a remote-routed second mate starts with the compact adviser disabled, from
 
 # --- the same holds through the cleared allowlisted environment -------------
 # The allowlist is inherited local material, so the parent's opt-in is what puts
-# the remote launch under /usr/bin/env -i. The switch is a floor, so it has to
+# the remote launch under the shared source boundary. The switch is a floor, so it has to
 # survive that host's cleared environment although nothing there ever set it.
 : > "$PARENT/config/launch-env-allowlist"
 run_remote_launch 'allowlist enabled'
 assert_present "$REMOTE_HOME/config/launch-env-allowlist" \
   "the remote launch did not inherit the launch-environment opt-in"
 LAUNCH=$(remote_launch_command)
-assert_contains "$LAUNCH" '/usr/bin/env -i' \
-  "an inherited allowlist should launch the remote second mate under a cleared environment"
 SEEN=$(replay_remote_launch bare) \
   || fail "the cleared-environment remote launch failed to run"
 assert_equals 1 "$SEEN" \

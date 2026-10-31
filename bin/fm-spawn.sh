@@ -617,8 +617,8 @@
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,
-#   raw command, and relaunch) into /usr/bin/env -i followed by /bin/sh -c of the
-#   existing launch command.
+#   raw command, and relaunch) into bin/fm-worker-env.py's names-only generated
+#   clean-environment prefix followed by /bin/sh -c of the existing command.
 #   Each line is one POSIX environment name, never a value or shell expression;
 #   blank lines and lines beginning with # are ignored. Invalid input refuses
 #   before launch, as do path inspection errors such as inaccessible config
@@ -626,17 +626,10 @@
 #   Names are read once per spawn; values are expanded in the destination pane,
 #   not copied from the invoking process or written into the launch text.
 #   Unset names stay unset and empty values stay empty.
-#   The fixed operational floor is HOME PATH USER LOGNAME SHELL TERM COLORTERM
-#   LANG LC_ALL LC_CTYPE TMPDIR TMP TEMP GOTMPDIR, plus backend identity/routing:
-#   TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH HERDR_PANE_ID
-#   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID CMUX_SOCKET_PATH
-#   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION, plus the task
-#   marker FM_TASK_ID that ship and scout panes receive above, plus the
-#   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor pins
-#   to the resolved per-home policy even when no pane export arrived, plus
-#   FM_COMPACT_ADVISER_HOOKS, which travels with a retained function-hooks flag
-#   so an adviser-only flag cannot pass as the captain's own opt-in, plus the
-#   Lavish server address LAVISH_AXI_HOST.
+#   bin/fm-worker-env.py owns the fixed operational floor: home/search/terminal,
+#   locale, temp and backend routing, task/inbox/duration identity, compact
+#   adviser and Lavish selectors. Explicit launch assignments below pin the
+#   resolved adviser policy even when no pane export arrived.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
@@ -6661,6 +6654,12 @@ confinement_refuse() {
   echo "repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh $ID <project> --mode <mode> --yolo <on|off>" >&2
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
     --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
+  "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement deny --source-ok "$source_ok" \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
+  if [ "$HARNESS" = claude ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-claude-dotenv-confinement deny --source-ok "$source_ok" \
+      --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
+  fi
 }
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
@@ -6741,6 +6740,12 @@ if [ "$KIND" != secondmate ]; then
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
+        --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
+      if [ "$HARNESS" = claude ]; then
+        "$SCRIPT_DIR/fm-guard-event.sh" spawn-claude-dotenv-confinement allow --source-ok true \
+          --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
+      fi
       ;;
     Darwin:*) WRITE_CONFINEMENT="unconfined-macos-$HARNESS" ;;
     Linux:*) WRITE_CONFINEMENT=unconfined-linux ;;
@@ -7946,7 +7951,7 @@ fi
 # the doorbell line (bin/fm-task-inbox-lib.sh) can name
 # "$FM_TASK_INBOX" instead of a path that grows with the home's depth. Like the
 # kill switch below it is an export statement, so it survives a compound raw
-# launch and the launch-env-allowlist `env -i` wrapper.
+# launch and the shared launch-env-allowlist boundary.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 # Ship and scout workers run their worktree's own bin/, so name the owning home
 # for command durations and repeated-timeout work (bin/fm-duration.py header);
@@ -8064,27 +8069,17 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH_ENV_PREFIX='/usr/bin/env -i'
-  # The resolved literal below wins over any retained ambient switch.
-  for env_name in HOME PATH USER LOGNAME SHELL TERM COLORTERM LANG LC_ALL LC_CTYPE \
-    TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
-    HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
-    CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
-    FM_TASK_ID COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS LAVISH_AXI_HOST \
-    $LAUNCH_ENV_NAMES; do
-    # Only validated names enter shell syntax. Values expand once, quoted, in
-    # the pane shell and never become source text or spawn-process snapshots.
-    # shellcheck disable=SC2016
-    printf -v env_arg '${%s+"%s=$%s"}' "$env_name" "$env_name" "$env_name"
-    LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX $env_arg"
+  # Shared with Main-run readers: generate names-only references here and let
+  # the destination shell expand values once, including non-exported names.
+  launch_env_args=(--shell-prefix)
+  for env_name in $LAUNCH_ENV_NAMES; do
+    launch_env_args+=(--keep "$env_name")
   done
-  # Establish the policy before the wrapper shell starts, even if a pane export
-  # was lost.
-  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
   if [ -n "$SPAWN_TRACEPARENT" ]; then
-    # shellcheck disable=SC2016
-    LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
+    launch_env_args+=(--keep TRACEPARENT)
   fi
+  LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" "${launch_env_args[@]}") || exit 1
+  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then

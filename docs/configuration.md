@@ -1975,7 +1975,9 @@ SSH_AUTH_SOCK
 ### Variables retained and where values come from
 
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the retained environment floor and destination-side execution; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns allowlist selection and parsing.
+Main-run readers can invoke the same helper directly without fm-spawn, using its default clean environment and its `--startup` option on Darwin.
+An explicit `--keep` retains a named existing authentication route; it does not isolate that credential from the harness's tools.
 
 Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
@@ -2003,7 +2005,9 @@ Verify the selected provider login and Git transport after opting in; Firstmate 
 Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when this option is enabled, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
-This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
+The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
+The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks and dotenv-read rules for Darwin Claude tasks; unfiltered authentication, other harnesses, OMP dotenv imports, renamed secret files and unconfined platforms remain outside that boundary.
+A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
 
@@ -2796,6 +2800,14 @@ Dispatch is separate from this tool-call guard: its [typed resolution contract](
 On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
 The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
 It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+Both profiles include read-denial rules for standard user/system Bash and Zsh startup files, their canonical symlink targets and the resolved `ZDOTDIR`, `BASH_ENV` and `ENV` selectors, intended to stop child login and interactive shells from re-running those credential loaders.
+A selector present only in a stale destination pane, an arbitrary alternate loader and a selector changed after launch are outside this named-path boundary.
+The launch already supplies PATH; if additional operational initialization is needed, ask Main to separate it from credential-loading startup rather than sourcing a different secret-bearing file.
+The Claude profile also includes a `file-read-data` denial for `.env` and `.env.*` final path components, including nested project and foreign-home files.
+The executable acceptance test must run from an unconfined Darwin process; `sandbox_apply: Operation not permitted` from an already-confined worker does not prove the new rules enforce or that native authentication remains compatible.
+OMP keeps its private TypeSafe dotenv lookup and has no corresponding dotenv read-denial claim.
+These narrow read rules do not protect renamed copies, hard-link aliases, dotenv symlinks resolving to a non-dotenv target name, arbitrary alternate loaders or same-user process inspection.
+Guard events record one launch admission, not each kernel read denial; [`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) exercises the actual profiles with fake-only files.
 Writes are allowed by default; the profile denies writes to these named protected assets:
 
 - the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;

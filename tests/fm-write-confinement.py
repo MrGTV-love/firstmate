@@ -145,12 +145,22 @@ def git(*args, **kwargs):
 
 def refused(path):
     path = Path(path)
-    before = path.read_bytes() if path.exists() else None
+    def snapshot():
+        if not path.exists():
+            return None
+        try:
+            return path.read_bytes()
+        except PermissionError:
+            # Dotenv contents are now unreadable in Claude; a refused write
+            # must still preserve inode, size and modification metadata.
+            info = path.stat()
+            return info.st_ino, info.st_size, info.st_mtime_ns
+    before = snapshot()
     try:
         with path.open("a") as stream:
             stream.write("replaced")
     except PermissionError:
-        return (path.read_bytes() if path.exists() else None) == before
+        return snapshot() == before
     return False
 
 
@@ -193,6 +203,25 @@ def child(manifest):
     own_gate, other_gate = Path(manifest["own_gate"]), Path(manifest["other_gate"])
     other = manifest["other"]
     results = {}
+    # These files contain fake sentinels only. Read through both a direct path
+    # and a symlink using the actual production-built profile, not its text.
+    for index, path in enumerate(manifest["dotenv"]):
+        try:
+            readable = "sentinel-not-a-secret" in Path(path).read_text()
+        except PermissionError:
+            readable = False
+        if manifest["harness"] == "claude":
+            results[f"refused-dotenv-{index}"] = not readable
+        else:
+            results[f"omp-private-dotenv-kept-{index}"] = readable
+    results["ordinary-source-readable"] = (worktree / "README").read_text() == "original"
+    for shell, flags in (("/bin/bash", ["--login", "-i"]), ("/bin/zsh", ["-l", "-i"])):
+        if Path(shell).exists():
+            shell_probe = 'exec "$1" -c \'import os; print("FM_TEST_FAKE_API_KEY" in os.environ)\''
+            shell_result = subprocess.run([shell, *flags, "-c", shell_probe, "probe", sys.executable],
+                                          env={"HOME": os.environ["HOME"], "PATH": os.environ["PATH"], "TERM": "xterm"},
+                                          capture_output=True, text=True)
+            results["refused-startup-" + Path(shell).name] = shell_result.returncode == 0 and shell_result.stdout.strip() == "False"
     # B3 and B15 in the shared temp roots, narrowed to this run's other task so
     # the unconfined control can never touch a real session's directory.
     claude_tmp, user_tmp = Path(manifest["claude_tmp"]), Path(manifest["user_tmp"])
@@ -836,7 +865,16 @@ def fixture(repo, base, harness, user_home, other):
                                "omp-models-db-shm": user_home / ".omp/agent/models.db-shm",
                                "omp-session": user_home / ".omp/agent/sessions/session.jsonl",
                                "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
-    return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
+    dotenv = [worktree / ".env", worktree / "nested/.env.local", base / "other-home/.env", home / ".env"]
+    for path in dotenv:
+        write(path, "TYPESAFE_API_KEY=sentinel-not-a-secret\n")
+    alias = worktree / "dotenv-alias"
+    alias.symlink_to(dotenv[2])
+    dotenv.append(alias)
+    for name in (".bash_profile", ".bashrc", ".zshenv", ".zprofile", ".zshrc", ".zlogin"):
+        write(user_home / name, "export FM_TEST_FAKE_API_KEY=sentinel-not-a-secret\n")
+    return {"harness": harness, "dotenv": [str(path) for path in dotenv],
+            "repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
             "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha, "stash_sha": stash_sha,
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
@@ -1069,12 +1107,38 @@ def archive_branch_file(repo, manifest, base, harness, mode, env):
     return {"archive-branch-kept": kept, "own-archive-created": created.returncode == 0 and exists}
 
 
+def reader_startup(repo, root):
+    """The Main-run reader uses the same owner without a task Git profile."""
+    home = root / "reader-home"
+    home.mkdir()
+    for name in (".bash_profile", ".bashrc", ".zshenv", ".zprofile", ".zshrc", ".zlogin"):
+        write(home / name, "export FM_TEST_FAKE_API_KEY=sentinel-not-a-secret\n")
+    environment = {"HOME": str(home), "PATH": os.defpath, "TERM": "xterm",
+                   "FM_GUARD_EVENT_LOG": str(home / "state/guard-events.jsonl")}
+    probe = "import os,json; print(json.dumps(dict(os.environ)))"
+    for shell, flags in (("/bin/bash", ["--login", "-i"]), ("/bin/zsh", ["-l", "-i"])):
+        if not Path(shell).exists():
+            continue
+        command = [shell, *flags, "-c", 'exec "$1" -c "$2"', "probe", sys.executable, probe]
+        baseline = subprocess.run(command, env=environment, capture_output=True, text=True)
+        assert baseline.returncode == 0 and json.loads(baseline.stdout)["FM_TEST_FAKE_API_KEY"] == "sentinel-not-a-secret"
+        confined = subprocess.run([sys.executable, str(repo / "bin/fm-worker-env.py"), "--startup", "--", *command],
+                                  env=environment, capture_output=True, text=True)
+        assert confined.returncode == 0, confined.stderr
+        actual = json.loads(confined.stdout)
+        assert "FM_TEST_FAKE_API_KEY" not in actual and actual["TERM"] == "xterm" and actual["PATH"] == os.defpath
+    events = [json.loads(line) for line in (home / "state/guard-events.jsonl").read_text().splitlines()]
+    assert any(event.get("guard") == "spawn-shell-startup-confinement" and event.get("decision") == "allow" for event in events)
+    print("reader startup: Bash/Zsh login-interactive children cannot restore fake credential; PATH/TERM retained; admission event recorded")
+
+
 if sys.argv[1] == "--child":
     results = child(json.loads(sys.argv[2]))
     sys.exit(0 if all(results.values()) else 1)
 
 repo = Path(sys.argv[1])
 root = Path(sys.argv[2]).resolve()
+reader_startup(repo, root)
 for harness in ("claude", "omp"):
     for mode in ("baseline", "confined"):
         base = root / f"{harness}-{mode}"
