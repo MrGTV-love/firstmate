@@ -466,9 +466,10 @@ await test('M4: each coverage and egress decision emits one content-free central
     const before = events().length;
     await handlers.tool_call(event, { cwd: state });
     const added = events().slice(before);
-    assert.deepEqual(added.map(e => [e.guard, e.decision, e.session, e.source_ok]), expected, event.toolName);
+    assert.deepEqual(added.map(e => [e.guard, e.decision, `${e.task}:${e.rule}`, e.source_ok]), expected, event.toolName);
     for (const e of added) {
-      assert.deepEqual(Object.keys(e).sort(), ['cleared_by', 'decision', 'elapsed_ms', 'guard', 'override', 'repeat', 'session', 'source_ok', 'system', 'ts', 'version']);
+      assert.equal(e.session, 'audit');
+      assert.deepEqual(Object.keys(e).sort(), ['base', 'cleared_by', 'decision', 'elapsed_ms', 'guard', 'head', 'override', 'repeat', 'rule', 'session', 'source_ok', 'system', 'task', 'ts', 'version']);
       assert.equal(e.system, 'firstmate');
       assert.ok(Number.isInteger(e.elapsed_ms));
       assert.ok(!JSON.stringify(e).includes('private-event-canary'), 'events carry no call content');

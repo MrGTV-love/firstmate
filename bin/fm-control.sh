@@ -294,6 +294,7 @@ esac
 . "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never
 # drive a crewmate's lifecycle (see bin/fm-gate-refuse-lib.sh).
+FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then

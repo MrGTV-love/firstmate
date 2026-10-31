@@ -121,5 +121,8 @@ fm_session_launch_policy_converge_child() (
       propagate_inheritable_config "$config" "$home/config" ||
       printf 'warning: secondmate %s session-launch-policy inheritance failed for %s\n' "$id" "$home" >&2
   fi
+  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" = 1 ]; then
+    "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" secondmate-inherit bypass --rule FM_SKIP_SECONDMATE_INHERIT --task "$id" --override 2>/dev/null || true
+  fi
   fm_session_launch_policy_admit_child "$config" "$home" "$harness" "$raw"
 )

@@ -801,7 +801,21 @@ SH
 
   [ "$(head_of "$w/sm")" = "$c2" ] \
     || fail "spawn did not fast-forward the secondmate worktree to the primary's HEAD"
-  pass "T10 spawn fast-forwards a secondmate worktree to the primary's local HEAD before launch"
+  # The host-local launch leg already converged by its parent deliberately
+  # suppresses a second sync/inheritance pass. Record that existing behavior.
+  bump_primary "$w" instr
+  PATH="$fakebin:$BASE_PATH" TMUX='' \
+    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
+    FM_GUARD_EVENT_LOG="$w/skip-events.jsonl" FM_SKIP_SECONDMATE_SYNC=1 \
+    FM_SKIP_SECONDMATE_INHERIT=1 FM_SPAWN_NO_GUARD=1 \
+    "$ROOT/bin/fm-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>&1 || true
+  [ "$(head_of "$w/sm")" = "$c2" ] || fail "an explicitly skipped secondmate sync changed HEAD"
+  jq -se '[.[] | select(.decision == "bypass" and (.rule == "FM_SKIP_SECONDMATE_SYNC" or .rule == "FM_SKIP_SECONDMATE_INHERIT" or .rule == "FM_SPAWN_NO_GUARD"))] |
+    length == 3 and all(.[]; .task == "sm" and .override == true)' "$w/skip-events.jsonl" >/dev/null \
+    || fail "host-local secondmate skips were not attributed to the launched mate"
+  pass "T10 spawn fast-forwards normally and records the host-local sync/inheritance/watcher bypasses"
 }
 
 # --- T11: spawn warns when pre-launch sync is skipped ------------------------
@@ -1355,6 +1369,8 @@ test_remote_launch_does_not_retarget_host_copy() {
 
   pass "R9 a remote launch leaves the home on the parent's commit while an ordinary spawn follows its own checkout"
 }
+
+fm_test_only
 
 test_ff_updated
 test_ff_current

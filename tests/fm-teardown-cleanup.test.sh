@@ -20,8 +20,9 @@ test_local_only_force_overrides_unpushed() {
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
   rc=0
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
+  jq -se 'any(.[]; .guard == "teardown-unlanded" and .task == "task-x1" and .rule == "landed-work" and .decision == "bypass" and .override == true and .cleared_by == "force")' "$case_dir/guard-events.jsonl" >/dev/null || fail "forced teardown was not attributed"
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"

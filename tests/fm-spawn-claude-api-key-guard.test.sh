@@ -17,6 +17,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-claude-api-key-guard)
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 
 # make_case <name> <harness> <id>...
 # Echoes "<case-dir>|<home>|<project>|<worktree>|<fakebin>|<launch-log>|<pane-log>".

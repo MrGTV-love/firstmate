@@ -4571,6 +4571,15 @@ while :; do
   [ "$hb" -gt "$HEARTBEAT_MAX" ] && hb=$HEARTBEAT_MAX
   if [ "$(age_of "$STATE/.last-heartbeat")" -ge "$hb" ]; then
     review_agent_select_detached
+    # Detection is read-only; the watcher owns presentation deduplication.
+    guard_workaround_report=$(python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" 2>/dev/null) || guard_workaround_report=
+    if [ -n "$guard_workaround_report" ] \
+      && [ "$guard_workaround_report" != "$(cat "$STATE/.guard-workarounds-presented" 2>/dev/null || true)" ]; then
+      fm_wake_append heartbeat heartbeat "$guard_workaround_report" || exit 1
+      printf '%s\n' "$guard_workaround_report" > "$STATE/.guard-workarounds-presented"
+      touch "$STATE/.last-heartbeat"
+      wake "heartbeat"
+    fi
     # Triage: in always-on mode a heartbeat is benign unless the cheap fleet-scan
     # turns up a captain-relevant status the per-wake path missed. Absorb the
     # no-change case (advance the schedule and back off exactly as wake() would,
