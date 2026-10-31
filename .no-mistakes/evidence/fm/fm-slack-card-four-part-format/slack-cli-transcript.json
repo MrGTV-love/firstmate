@@ -1,0 +1,215 @@
+[
+  {
+    "command": [
+      "bash",
+      "tests/fixtures/slack/make-home.sh",
+      "card-payload",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/.slack-phase-xeyhyge5"
+    ],
+    "exit": 0,
+    "stdout": "home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/.slack-phase-xeyhyge5\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "bind",
+      "slack-dm"
+    ],
+    "exit": 0,
+    "stdout": "bound: slack-dm -> (any)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Approve waiting?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Approve waiting until tomorrow?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "tests/fm_slack_watch_test.py",
+      "fail-call",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/.slack-phase-xeyhyge5/state/slack-watch/replay-state-1f2dbc2ec1f82e07.json",
+      "chat.update:900.000001",
+      "400",
+      "1"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Rejected A?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "check: slack 900.000001 - card update failed: api_error\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Approve waiting until tomorrow?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Successful B?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-captain-hold.sh",
+      "hold",
+      "with-options",
+      "--reason",
+      "Alternatives: Ship now skips approval.\nBrief: CI is green.\nRollout approval is pending.\nRecommendation: Wait for approval.\nIt avoids an unapproved rollout.\nDecision sought: Rejected A?"
+    ],
+    "exit": 0,
+    "stdout": "with-options\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-slack-mirror.sh",
+      "--replay",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M68J557V5QMJ9YWY0TREKDFV/tests/fixtures/slack/card-payload/transcript.json"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

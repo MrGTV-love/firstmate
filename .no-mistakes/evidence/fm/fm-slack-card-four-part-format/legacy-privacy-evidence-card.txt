@@ -1,0 +1,12 @@
+Task: with-options
+Decision: Choose a deployment
+Question: Should we ship?
+Brief: CI flaky on arm
+Alternatives: Wait a week
+Recommendation: Wait for approval
+Evidence: /disposable/review.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.

@@ -1,0 +1,47 @@
+[
+  {
+    "method": "chat.postMessage",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "thread_ts": null,
+    "ts": "900.000001",
+    "text": "Task: with-options\nDecision sought: Approve waiting?\nBrief description of issue: CI is green.\nRollout approval is pending.\nRecommendation and key reasons: Wait for approval.\nIt avoids an unapproved rollout.\nAlternatives considered: Ship now skips approval.\nEvidence: /tmp/evidence-with-options.md\nOptions:\n1. Ship it (ship) - Deploy now\n2. Wait (wait) - Hold current\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer."
+  },
+  {
+    "method": "chat.postMessage",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "thread_ts": null,
+    "ts": "901.000001",
+    "text": "Task: no-options\nDecision: Open-ended decision\nQuestion: Select the release approach\nRecommendation: proceed with the default\nEvidence: /tmp/evidence-no-options.md\nType your answer in this thread."
+  },
+  {
+    "method": "chat.postMessage",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "thread_ts": null,
+    "ts": "902.000001",
+    "text": "Task: no-recommendation\nDecision: Choose without a recommendation\nQuestion: Select the release approach\nOptions:\n1. Alpha (alpha) - First path\n2. Beta (beta) - Second path\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer."
+  },
+  {
+    "method": "chat.update",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "ts": "900.000001",
+    "text": "Task: with-options\nDecision sought: Approve waiting until tomorrow?\nBrief description of issue: CI is green.\nRollout approval is pending.\nRecommendation and key reasons: Wait for approval.\nIt avoids an unapproved rollout.\nAlternatives considered: Ship now skips approval.\nEvidence: /tmp/evidence-with-options.md\nOptions:\n1. Ship it (ship) - Deploy now\n2. Wait (wait) - Hold current\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer."
+  },
+  {
+    "method": "chat.update",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "ts": "900.000001",
+    "text": "Task: with-options\nDecision sought: Successful B?\nBrief description of issue: CI is green.\nRollout approval is pending.\nRecommendation and key reasons: Wait for approval.\nIt avoids an unapproved rollout.\nAlternatives considered: Ship now skips approval.\nEvidence: /tmp/evidence-with-options.md\nOptions:\n1. Ship it (ship) - Deploy now\n2. Wait (wait) - Hold current\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer."
+  },
+  {
+    "method": "chat.update",
+    "recipient": "U0TESTOWNER",
+    "channel": "D0123456789",
+    "ts": "900.000001",
+    "text": "Task: with-options\nDecision sought: Rejected A?\nBrief description of issue: CI is green.\nRollout approval is pending.\nRecommendation and key reasons: Wait for approval.\nIt avoids an unapproved rollout.\nAlternatives considered: Ship now skips approval.\nEvidence: /tmp/evidence-with-options.md\nOptions:\n1. Ship it (ship) - Deploy now\n2. Wait (wait) - Hold current\nTap a number reaction or type the option number in this thread.\nIf you both tap and type: disagreement records neither answer."
+  }
+]

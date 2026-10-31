@@ -1,0 +1,13 @@
+Task: with-options
+Decision sought: Approve waiting?
+Brief description of issue: CI is green.
+Rollout approval is pending.
+Recommendation and key reasons: Wait for approval.
+It avoids an unapproved rollout.
+Alternatives considered: Ship now skips approval.
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
