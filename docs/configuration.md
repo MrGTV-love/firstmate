@@ -1088,7 +1088,7 @@ Explicit reopening or successful new-work start or dispatch retires the previous
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
 A ship whose commits only a recorded verified bundle holds is removed only while its row is held for the captain's land-or-drop call, and teardown keeps that row open and held, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes.
 A home with a manual backlog, or an Orca cleanup recovery, has no row that can hold that call, so the bundle route refuses there.
-A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project>`.
+A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason>`.
 The captain's answer closes the row with no note, and its captain hold kind keeps it out of Recently Landed.
 A row closed on that bundle instead, by a replay that finds the hold released or by hand, carries the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
 The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.
