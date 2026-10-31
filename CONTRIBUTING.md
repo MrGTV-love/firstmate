@@ -142,11 +142,11 @@ Family selection is the ordinary local path; `--all` is deliberate full regressi
 CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 A pull request runs only the behavior tests its diff can affect: the `Test selection plan` job asks `bin/fm-test-select.py` which `tests/*.test.sh` can reach a changed file through the scripts they source, run, copy or read, and `bin/fm-test-run.sh --plan-ci` turns that into the behavior jobs that have work.
 A job with no selected test is skipped, and the serial lane packs the selected scripts into the fewest shards its work needs.
-These always run the full suite: every push to `main`, a manual run (`workflow_dispatch`) that names no `base`, a pull request labeled `ci-full`, a pull request that changes `tests/lib.sh`, `bin/fm-test-run.sh`, `bin/fm-test-select.py` or anything under `.github/`, a change that reaches nine tenths of the tests, and any selector error or unrecognized path.
+Every push to `main` runs the full suite.
 To force a full run on one pull request, add the `ci-full` label and push, or start the workflow by hand on the branch.
 A manual run that gives `base` replays the selection for the diff from `base` to the commit being run instead, which previews what a pull request of that diff would run.
 Preview a selection locally with `bin/fm-test-select.py --base origin/main --explain`, which prints each selected test with the chain that reaches it.
-`docs/fm-test-portable-shards.md` "Change-based test selection" owns the rules and what the selector cannot see.
+`docs/fm-test-portable-shards.md` "Change-based test selection" owns the rules, every case that forces the full suite, and what the selector cannot see.
 Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` coalesce so a newer push replaces a still-pending main run but never cancels the running one, and the workflow owns that contract and its rationale.
 Use `bin/fm-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
