@@ -491,9 +491,9 @@
       ],
       "invariant": "every unwaived reported check at the exact head is green",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
       "trigger": "any unwaived reported check at the current head is pending or failed",
-      "remedy": "wait for pending checks or repair the failed check, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>",
+      "remedy": "wait for pending checks or repair the failed check, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> waives one named non-green check",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
@@ -521,9 +521,9 @@
       ],
       "invariant": "every unwaived check required by the base branch has reported at the exact head",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, check-run producers at the exact head",
       "trigger": "a required check has not reported at the current head",
-      "remedy": "wait for the named required check to report, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>",
+      "remedy": "wait for the named required check to report, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-missing <check-name> waives one named required check that never reported",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
@@ -547,7 +547,7 @@
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "merge-landing-tree-tested deny",
-          "count": 4
+          "count": 5
         },
         {
           "file": "bin/fm-pr-merge.sh",
@@ -557,13 +557,17 @@
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "that head %s was verified to contain"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "is not proven to be tested tree"
         }
       ],
-      "invariant": "the landing tree is covered by verified CI tree records, or the existing ancestry or proven merge-queue safety rule",
+      "invariant": "a GitHub merge lands only a tree that verified CI tree records prove tested, or one the ancestry or proven merge-queue rule covers; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
       "layer": "runtime-block",
       "source": "live compare API, Actions check runs and attempt-scoped artifacts, git merge-tree and queue rules",
       "trigger": "github_landing_tree_safe or the live base or queue read cannot prove the landing tree safe",
-      "remedy": "update the branch and push so CI tests the combined tree, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; no waiver applies",
+      "remedy": "push a new head commit, first updating the branch to contain the base tip when it lacks it, so CI tests the tree the merge would land, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; no waiver applies",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
@@ -595,7 +599,7 @@
       ],
       "invariant": "off-queue auto-merge cannot remain armed to land later on an unverified tip",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
+      "source": "base branch merge_queue rule, live mergeStateStatus read immediately before the merge",
       "trigger": "an off-queue --auto merge would arm auto-merge instead of merging immediately",
       "remedy": "clear the condition holding the PR, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>",
       "budget": 1,

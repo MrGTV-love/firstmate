@@ -23,6 +23,9 @@ jobs:
   check:
     name: PR must be raised via no-mistakes
     runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.user.login != 'github-actions[bot]' &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,9 +44,6 @@ jobs:
           path: ${{ runner.temp }}/fm-tested-tree
           if-no-files-found: error
       - name: Verify no-mistakes signature and pipeline attestation
-        if: >-
-          github.event.pull_request.user.login != 'github-actions[bot]' &&
-          github.event.pull_request.user.login != 'dependabot[bot]'
         uses: kunchenguid/no-mistakes/.github/actions/require-no-mistakes@f6441c96c352a18b9cadcaef6b6c7017e9ac3970 # v1.80.1
         with:
           exempt-authors: kunchenguid,stonemonk2

@@ -24,6 +24,7 @@ Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm
 For the tested-tree landing rule and its conservative ancestry fallback, see `github_landing_tree_safe` in [`fm-pr-merge.sh`](../../../bin/fm-pr-merge.sh).
 Build train N+1 on train N's head so its CI already tests the predecessor's files; after train N lands, the guard can prove the successor's landing tree is unchanged without another head push.
 Rebuild successors above any failed or changed train rather than landing their stale combination.
+The rule cannot prove two cases, and both stay on the ancestry fallback: CI writes the record only in Lint partition 1 of the attempt that ran it, so a partial re-run ("Re-run failed jobs") that does not re-run that job has no record for its attempt; and bot-authored PRs skip the compliance job, so that check run has no record.
 
 Tear down a ship task only after landing is confirmed.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.

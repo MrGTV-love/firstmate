@@ -489,8 +489,10 @@ MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
 MERGE_VERIFY_LOG=
+FM_PR_TREE_SCRATCH=
 merge_control_cleanup() {
   [ -z "$MERGE_VERIFY_LOG" ] || rm -f "$MERGE_VERIFY_LOG"
+  [ -z "$FM_PR_TREE_SCRATCH" ] || rm -rf "$FM_PR_TREE_SCRATCH"
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
@@ -573,6 +575,7 @@ require_recorded_review() {
 FM_PR_MERGE_HEAD=
 FM_PR_MERGE_BASE=
 FM_PR_MERGE_BASE_TIP=
+FM_PR_MERGE_TESTED_TREE=
 FM_PR_GITLAB_ASYNC_CONFIGURED=false
 gitlab_verify_mergeable() {
   local json fields line
@@ -1093,16 +1096,26 @@ FIELDS
 # the live merge-tree equals every run's checked-out tree. A valid record that
 # proves a different tree refuses even if ancestry holds (including reverts).
 # Missing/unreadable/unverifiable evidence and rebase retain ancestry, never
-# infer safety from disjoint paths or run timing. Recompute at both live reads.
+# infer safety from disjoint paths or run timing. Verify reads and checks the
+# records once per head; the final read passes offline, so between its tip read
+# and the merge it only recomputes merge-tree locally against those records.
 # The remaining seconds between the final read and GitHub's merge are not atomic.
 FM_PR_TESTED_TREE=
 FM_PR_TREE_RECORDS_ELIGIBLE=false
+github_tree_records_apply() {
+  [ "$FM_PR_TREE_RECORDS_ELIGIBLE" = true ] || return 1
+  case "$FM_PR_GITHUB_CALLER_METHOD" in
+    merge|squash|'') return 0 ;;
+  esac
+  return 1
+}
 github_landing_tree_safe() {
-  local head=$1 tip=$2 status=0 worktree
+  local head=$1 tip=$2 mode=${3:-} status=0 worktree
   FM_PR_TESTED_TREE=
-  if { [ "$FM_PR_GITHUB_CALLER_METHOD" = merge ] || [ "$FM_PR_GITHUB_CALLER_METHOD" = squash ] || [ -z "$FM_PR_GITHUB_CALLER_METHOD" ]; } && [ "$FM_PR_TREE_RECORDS_ELIGIBLE" = true ]; then
+  if github_tree_records_apply; then
     worktree=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
-    FM_PR_TESTED_TREE=$(python3 "$SCRIPT_DIR/fm-tested-tree.py" "$PR_OWNER/$PR_REPO" "$head" "$tip" "$worktree") || status=$?
+    FM_PR_TESTED_TREE=$(python3 "$SCRIPT_DIR/fm-tested-tree.py" "$PR_OWNER/$PR_REPO" "$head" "$tip" \
+      "$FM_PR_TREE_SCRATCH" "$worktree" ${mode:+"$mode"}) || status=$?
     [ "$status" -ne 0 ] || return 0
     [ "$status" -ne 2 ] || return 1
   fi
@@ -1314,6 +1327,10 @@ EOF
     source_unreadable=true
     refusals="$refusals  - whether head $live_head contains the current tip of base branch $base could not be read
 "
+  elif [ -n "$other_refusals" ] && [ "$source_unreadable" = false ] && github_tree_records_apply; then
+    [ "$FM_PR_BASE_BEHIND" -eq 0 ] \
+      || refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind); whether its tested-tree records cover the tree this merge would land is checked once the refusals above clear
+"
   elif ! github_landing_tree_safe "$live_head" "$FM_PR_BASE_TIP"; then
     lacks_tip=$FM_PR_BASE_TIP
     if [ "$FM_PR_BASE_BEHIND" -eq 0 ]; then
@@ -1343,7 +1360,10 @@ EOF
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
-    if [ -n "$lacks_tip" ]; then
+    if [ -n "$lacks_tip" ] && [ "$FM_PR_BASE_BEHIND" -eq 0 ]; then
+      printf 'Push a new head commit to the branch, so CI tests the tree this merge would land on %s at %s. Re-running the jobs or reopening the pull request does not change the tested tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
+        "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
+    elif [ -n "$lacks_tip" ]; then
       printf 'Update the branch so its head contains %s at %s (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
         "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
     fi
@@ -1381,14 +1401,17 @@ EOF
     printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which enters the merge queue of base branch %s\n' \
       "$URL" "$live_head" "$base" >&2
     FM_PR_MERGE_BASE_TIP=
+    FM_PR_MERGE_TESTED_TREE=
   elif [ -n "$FM_PR_TESTED_TREE" ]; then
     printf 'verified: %s at head %s lands tested tree %s on current %s tip %s\n' \
       "$URL" "$live_head" "$FM_PR_TESTED_TREE" "$base" "$FM_PR_BASE_TIP" >&2
     FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
+    FM_PR_MERGE_TESTED_TREE=$FM_PR_TESTED_TREE
   else
     printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which contains the current %s tip %s\n' \
       "$URL" "$live_head" "$base" "$FM_PR_BASE_TIP" >&2
     FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
+    FM_PR_MERGE_TESTED_TREE=
   fi
   FM_PR_MERGE_HEAD=$live_head
   FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || FM_PR_MERGE_BASE=
@@ -1975,6 +1998,10 @@ case "$PROVIDER" in
       echo "error: could not prepare GitHub pre-merge verification diagnostics" >&2
       exit 1
     }
+    FM_PR_TREE_SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/fm-tested-tree.XXXXXX") || {
+      echo "error: could not prepare GitHub tested-tree verification" >&2
+      exit 1
+    }
     mergeable_retry_delay=${FM_PR_GITHUB_MERGEABLE_RETRY_DELAY:-3}
     case "$mergeable_retry_delay" in
       [0-9] | 10) ;;
@@ -2046,8 +2073,15 @@ case "$PROVIDER" in
           "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
         exit 1
       fi
-      if ! github_landing_tree_safe "$FM_PR_MERGE_HEAD" "$FM_PR_BASE_TIP" \
-        || { [ -z "$FM_PR_TESTED_TREE" ] && [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; }; then
+      if [ -n "$FM_PR_MERGE_TESTED_TREE" ]; then
+        if ! github_landing_tree_safe "$FM_PR_MERGE_HEAD" "$FM_PR_BASE_TIP" --offline \
+          || [ -z "$FM_PR_TESTED_TREE" ]; then
+          "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok true --elapsed-ms 0 2>/dev/null
+          printf 'error: refusing to merge %s: base branch %s is at %s, and the tree head %s would land there is not proven to be tested tree %s, verified on tip %s, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
+            "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "$FM_PR_MERGE_HEAD" "$FM_PR_MERGE_TESTED_TREE" "$FM_PR_MERGE_BASE_TIP" "$0" "$ID" "$URL" >&2
+          exit 1
+        fi
+      elif [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
         "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok true --elapsed-ms 0 2>/dev/null
         printf 'error: refusing to merge %s: base branch %s is at %s, not the tip %s that head %s was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
           "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2

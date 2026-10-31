@@ -1258,6 +1258,8 @@ test_partial_producer_read_retries_before_merging() {
   assert_logged_gh_merge "$case_dir" 112 example/repo --squash
   assert_no_grep 'these required checks have not reported' "$case_dir/stderr" \
     "a partial producer read was presented as a missing check"
+  [ "$(cat "$case_dir/github-runs-calls")" -eq 4 ] \
+    || fail "partial producer read was not retried exactly once (two producer and two tested-tree record reads)"
   pass "fm-pr-merge retries an incomplete producer list before merging the verified head"
 }
 
@@ -2326,6 +2328,19 @@ write_tested_artifact() {
     "$2" "$3" "$(cat "$1/github-head")" > "$1/artifacts.json"
 }
 
+# The record reads finish before the final tip read: after the last compare
+# read nothing reads Actions or check runs, and one invocation reads the
+# records once. Args: case_dir label
+assert_final_read_is_offline() {
+  local last
+  last=$(grep -n '/compare/' "$1/gh.log" | tail -1 | cut -d: -f1)
+  [ -n "$last" ] || fail "$2: the final tip read never happened"
+  if tail -n +"$((last + 1))" "$1/gh.log" | grep -qE 'actions/|check-runs'; then
+    fail "$2: Actions evidence was read after the final tip read"
+  fi
+  assert_equals 1 "$(grep -c '/artifacts' "$1/gh.log")" "$2: verified records were not reused within one invocation"
+}
+
 test_stacked_train_lands_without_new_head() {
   local case_dir head method
   for method in --squash --merge; do
@@ -2336,6 +2351,7 @@ test_stacked_train_lands_without_new_head() {
     expect_code 0 "$RC" "stacked train should land its already tested tree: $(cat "$case_dir/stderr")"
     assert_logged_gh_merge "$case_dir" 188 example/repo "$method"
     assert_equals "$head" "$(git -C "$case_dir/wt" rev-parse HEAD)" 'stacked train must not rebuild its head'
+    assert_final_read_is_offline "$case_dir" "stacked train $method"
     pass "stacked train $method accepts identical tested landing tree without a new head"
   done
 }
@@ -2357,7 +2373,69 @@ test_equivalent_tree_after_last_tip_move_still_lands() {
   run_required_case "$case_dir" 188
   expect_code 0 "$RC" "last-read equivalent tree should merge: $(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+  assert_final_read_is_offline "$case_dir" 'equivalent tip move'
   pass 'last tip read recomputes and accepts a still-identical tested tree'
+}
+
+# A check run that appears while verify retries must be proven too, so a
+# verdict kept for the head is reused only for the same check runs.
+test_tested_tree_rechecks_a_check_run_added_during_retry() {
+  local case_dir head tip
+  case_dir=$(make_case tested-tree-run-added-on-retry)
+  make_tested_train "$case_dir"
+  head=$(cat "$case_dir/github-head")
+  tip=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+  cp "$case_dir/github-runs.json" "$case_dir/github-runs-first.json"
+  jq '.total_count = 2 | .check_runs += [(.check_runs[0] | .id = 8 | .name = "other" | .details_url = "https://github.com/example/repo/actions/runs/13/job/8")]' \
+    "$case_dir/github-runs-first.json" > "$case_dir/github-runs.json"
+  printf '{"id":8,"run_id":13,"run_attempt":1,"name":"other","check_run_url":"https://api.github.com/repos/example/repo/check-runs/8"}\n' > "$case_dir/job-8.json"
+  printf '{"id":13,"run_attempt":1,"event":"pull_request","head_sha":"%s"}\n' "$head" > "$case_dir/run-13.json"
+  printf '{"total_count":0,"artifacts":[]}\n' > "$case_dir/artifacts-13.json"
+  printf 'UNKNOWN\nMERGEABLE\n' > "$case_dir/mergeable-sequence"
+  FM_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" run_required_case "$case_dir" 188
+  expect_code 1 "$RC" "a check run added during the retry must not reuse the earlier verdict: $(cat "$case_dir/stderr")"
+  assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" 'the added check run must fall back to the ancestry rule'
+  assert_grep 'actions/runs/13/artifacts' "$case_dir/gh.log" 'the added check run was never checked for a record'
+  assert_no_grep 'pr merge' "$case_dir/gh.log" 'a merge landed on a verdict that missed a check run'
+  pass 'a kept tested-tree verdict is reused only for the same check runs'
+}
+
+# GitHub links a check run with the repository's canonical case, which can
+# differ from the case in the task's pull request URL.
+test_tested_tree_repo_case_differs_from_url() {
+  local case_dir
+  case_dir=$(make_case tested-tree-repo-case)
+  make_tested_train "$case_dir"
+  jq '.check_runs[0].details_url = "https://github.com/Example/Repo/actions/runs/12/job/7"' \
+    "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+  mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+  jq '.check_run_url = "https://api.github.com/repos/Example/Repo/check-runs/7"' \
+    "$case_dir/job.json" > "$case_dir/job.tmp"
+  mv "$case_dir/job.tmp" "$case_dir/job.json"
+  run_required_case "$case_dir" 188
+  expect_code 0 "$RC" "a canonical-case check link should still prove the tested tree: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+  pass 'tested-tree records match the repository case-insensitively'
+}
+
+# A definite refusal already fails the attempt, so the record reads wait for a
+# later run instead of costing forge calls now, and no tree verdict is claimed.
+test_tested_tree_waits_for_a_definite_refusal() {
+  local case_dir head tip
+  case_dir=$(make_case tested-tree-red-check)
+  make_tested_train "$case_dir"
+  head=$(cat "$case_dir/github-head")
+  tip=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+  write_github_red_json "$case_dir" "$head" lint
+  run_required_case "$case_dir" 188
+  expect_code 1 "$RC" 'a red check must refuse'
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" 'the red check was not named'
+  assert_grep "head $head lacks the current tip $tip of base branch main (1 commits behind); whether its tested-tree records cover the tree this merge would land is checked once the refusals above clear" \
+    "$case_dir/stderr" 'the unchecked tree was not reported'
+  assert_no_grep 'Update the branch so its head contains' "$case_dir/stderr" 'an unchecked tree was given a tree remedy'
+  assert_no_grep '/artifacts' "$case_dir/gh.log" 'records were read for an attempt that already failed'
+  assert_no_grep 'pr merge' "$case_dir/gh.log" 'a red check reached the forge merge'
+  pass 'tested-tree records are not read when a definite refusal already fails the attempt'
 }
 
 test_tested_tree_refusals_and_fallbacks() {
@@ -2391,6 +2469,9 @@ test_tested_tree_refusals_and_fallbacks() {
         jq '.total_count = 2 | .check_runs += [(.check_runs[0] | .id = 8 | .name = "other" | .details_url = "https://github.com/example/repo/actions/runs/13/job/8")]' \
           "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
         mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+        printf '{"id":8,"run_id":13,"run_attempt":1,"name":"other","check_run_url":"https://api.github.com/repos/example/repo/check-runs/8"}\n' > "$case_dir/job-8.json"
+        printf '{"id":13,"run_attempt":1,"event":"pull_request","head_sha":"%s"}\n' "$head" > "$case_dir/run-13.json"
+        printf '{"total_count":0,"artifacts":[]}\n' > "$case_dir/artifacts-13.json"
         ;;
       *)
         case "$scenario" in
@@ -2405,10 +2486,24 @@ test_tested_tree_refusals_and_fallbacks() {
     esac
     run_required_case "$case_dir" 188 "$method"
     expect_code 1 "$RC" "$scenario must not land an untested tree"
-    if [ "$scenario" != moving-tip ]; then
-      assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" "$scenario must retain ancestry refusal"
-      assert_grep 'Update the branch so its head contains' "$case_dir/stderr" "$scenario must retain remedy"
-    fi
+    case "$scenario" in
+      moving-tip)
+        assert_grep "base branch main is at $tip, and the tree head $head would land there is not proven to be tested tree" \
+          "$case_dir/stderr" 'moving-tip must refuse by the tested tree, not by containment'
+        assert_no_grep 'was verified to contain' "$case_dir/stderr" 'moving-tip must not claim the head contained the tip'
+        assert_final_read_is_offline "$case_dir" moving-tip
+        ;;
+      *)
+        assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" "$scenario must retain ancestry refusal"
+        assert_grep 'Update the branch so its head contains' "$case_dir/stderr" "$scenario must retain remedy"
+        ;;
+    esac
+    case "$scenario" in
+      disjoint|moving-tip|rebase) ;;
+      *) assert_grep 'note: tested-tree records unavailable (' "$case_dir/stderr" "$scenario must say why the ancestry rule applies" ;;
+    esac
+    [ "$scenario" != unrecorded-check ] \
+      || assert_grep 'actions/runs/13/artifacts' "$case_dir/gh.log" 'unrecorded-check must reach the run with no record'
     assert_no_grep 'pr merge' "$case_dir/gh.log" "$scenario must not call forge merge"
     pass "tested-tree $scenario refuses without weakening ancestry fallback"
   done
@@ -2438,6 +2533,8 @@ test_reverted_ancestor_compares_trees_not_ancestry() {
   run_required_case "$case_dir" 188
   expect_code 1 "$RC" 'reverted ancestor must refuse mismatched tested tree even though ancestry holds'
   assert_grep 'landing tree differs from its verified tested-tree records' "$case_dir/stderr" 'revert refusal must explain actual tree difference'
+  assert_grep 'Push a new head commit to the branch' "$case_dir/stderr" 'revert refusal must name a new push as the remedy'
+  assert_no_grep 'Update the branch so its head contains' "$case_dir/stderr" 'revert refusal told a head that contains the tip to contain it'
   assert_no_grep 'pr merge' "$case_dir/gh.log" 'revert must not merge'
   pass 'reverted ancestor refuses by tree comparison even when head contains live tip'
 }
@@ -2447,6 +2544,9 @@ test_equivalent_tree_after_last_tip_move_still_lands
 test_tested_tree_refusals_and_fallbacks
 test_reverted_ancestor_compares_trees_not_ancestry
 test_stacked_train_lands_without_new_head
+test_tested_tree_repo_case_differs_from_url
+test_tested_tree_rechecks_a_check_run_added_during_retry
+test_tested_tree_waits_for_a_definite_refusal
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
 test_single_pr_task_with_a_local_only_head_is_still_refused
 test_multi_pr_task_without_a_reported_forge_head_is_still_refused
