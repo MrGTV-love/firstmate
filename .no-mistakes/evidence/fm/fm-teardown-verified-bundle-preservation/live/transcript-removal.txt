@@ -1,0 +1,56 @@
+
+===== nested copy, one unpushed tip(s), bundle --all, captain call held =====
+$ bin/fm-teardown.sh task-x1 (one)
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-one/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-one/bundles/work.bundle sha256=045e97e9b16cf2c2853877fd98e98d867894a67f1da08139c8d1991eaa179e55 tips=3a4f9a8032d9d09b03d8bae344358a3a6aac78f9 e8c01098a8ffbbcf0e4fe8883d51569eae3b2e79
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-one/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-one/bundles/work.bundle sha256=045e97e9b16cf2c2853877fd98e98d867894a67f1da08139c8d1991eaa179e55 tips=3a4f9a8032d9d09b03d8bae344358a3a6aac78f9 e8c01098a8ffbbcf0e4fe8883d51569eae3b2e79
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-one/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-one/bundles/work.bundle sha256=045e97e9b16cf2c2853877fd98e98d867894a67f1da08139c8d1991eaa179e55 tips=3a4f9a8032d9d09b03d8bae344358a3a6aac78f9 e8c01098a8ffbbcf0e4fe8883d51569eae3b2e79
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-one/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-one/bundles/work.bundle sha256=045e97e9b16cf2c2853877fd98e98d867894a67f1da08139c8d1991eaa179e55 tips=3a4f9a8032d9d09b03d8bae344358a3a6aac78f9 e8c01098a8ffbbcf0e4fe8883d51569eae3b2e79
+<tmp>/rm-one/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree <tmp>/rm-one/pool/1/project/.claude/worktrees/bundled removed and its pool slot <tmp>/rm-one/pool/1/project returned)
+Backlog: task-x1 stays open in <tmp>/rm-one/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+copy dir: REMOVED
+git worktree list:
+<tmp>/rm-one/project        e8c0109 [main]
+<tmp>/rm-one/pool/1/project e8c0109 (detached HEAD)
+RESULT REMOVE-one: pass (exit 0, copy directory removed, path+sha+all tips printed, every tip restored from bundle)
+
+===== nested copy, two unpushed tip(s), bundle --all, captain call held =====
+$ bin/fm-teardown.sh task-x1 (two)
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-two/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-two/bundles/work.bundle sha256=f19e73f33aff2873ea33472c016a51e274d61cba8b8f4fc586b49c2068d5b66c tips=09af5546219669b79f34fd857e3cbcfd3b6e9bc0 1fc0b2059db3ff495f61fac8c7304b4a58375a23 236cb29aefb010c752e1f076bb6dcffae815c81d
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-two/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-two/bundles/work.bundle sha256=f19e73f33aff2873ea33472c016a51e274d61cba8b8f4fc586b49c2068d5b66c tips=09af5546219669b79f34fd857e3cbcfd3b6e9bc0 1fc0b2059db3ff495f61fac8c7304b4a58375a23 236cb29aefb010c752e1f076bb6dcffae815c81d
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-two/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-two/bundles/work.bundle sha256=f19e73f33aff2873ea33472c016a51e274d61cba8b8f4fc586b49c2068d5b66c tips=09af5546219669b79f34fd857e3cbcfd3b6e9bc0 1fc0b2059db3ff495f61fac8c7304b4a58375a23 236cb29aefb010c752e1f076bb6dcffae815c81d
+teardown: the captain's land-or-drop call for bundle <tmp>/rm-two/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/rm-two/bundles/work.bundle sha256=f19e73f33aff2873ea33472c016a51e274d61cba8b8f4fc586b49c2068d5b66c tips=09af5546219669b79f34fd857e3cbcfd3b6e9bc0 1fc0b2059db3ff495f61fac8c7304b4a58375a23 236cb29aefb010c752e1f076bb6dcffae815c81d
+<tmp>/rm-two/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree <tmp>/rm-two/pool/1/project/.claude/worktrees/bundled removed and its pool slot <tmp>/rm-two/pool/1/project returned)
+Backlog: task-x1 stays open in <tmp>/rm-two/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+copy dir: REMOVED
+git worktree list:
+<tmp>/rm-two/project        236cb29 [main]
+<tmp>/rm-two/pool/1/project 236cb29 (detached HEAD)
+RESULT REMOVE-two: pass (exit 0, copy directory removed, path+sha+all tips printed, every tip restored from bundle)
+
+===== nested copy, two unpushed tips, bundle lists only one =====
+$ bin/fm-teardown.sh task-x1 (partial)
+teardown: bundle preservation unavailable: <tmp>/rm-partial/bundles/work.bundle: bundle does not list unlanded tip 9a2d2bcd20dad13ff3b363f6406400cb9ab05cca.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/rm-partial/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c4e4d1a unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+copy dir: PRESENT
+git worktree list:
+<tmp>/rm-partial/project                                  b079055 [main]
+<tmp>/rm-partial/pool/1/project                           b079055 [fm/task-x1]
+<tmp>/rm-partial/pool/1/project/.claude/worktrees/bundled c4e4d1a [fm/task-x1-v2]
+RESULT REMOVE-partial: pass (refused, copy kept)

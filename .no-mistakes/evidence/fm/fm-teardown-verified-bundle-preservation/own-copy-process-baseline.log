@@ -1,0 +1,1 @@
+ok - a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving

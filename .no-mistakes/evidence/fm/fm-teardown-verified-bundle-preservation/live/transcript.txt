@@ -1,0 +1,230 @@
+
+===== S1 BEFORE (base 3c750632e): unpushed commit, no bundle =====
+$ bin/fm-teardown.sh task-x1  (base)
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+fd75f3d unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+
+===== S1 AFTER (HEAD): same copy, no bundle =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <tmp>/s1-after/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/s1-after/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ef7ea65 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT S1: pass (same exit 1, copy kept, predicate + recipe printed)
+
+===== S2 bundle recorded, backlog has no task-x1 row, no captain call =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/s2/bundles/work.bundle: task task-x1 has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+File the land-or-drop call as its row, then retry ordinary teardown: bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ task-x1\,\ tips\ 4e7406cb8871955654aff6386fac51ff0b65be36:\ they\ are\ preserved\ in\ bundle\ <tmp>/s2/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 4e7406cb8871955654aff6386fac51ff0b65be36\ 55601157c9a37a18db5500c1b3a16bb3d9a9620b\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+4e7406c unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+printed command: bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ task-x1\,\ tips\ 4e7406cb8871955654aff6386fac51ff0b65be36:\ they\ are\ preserved\ in\ bundle\ <tmp>/s2/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 4e7406cb8871955654aff6386fac51ff0b65be36\ 55601157c9a37a18db5500c1b3a16bb3d9a9620b\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+RESULT S2a: pass (refused, single hold-with-title command carries --repo project)
+backlog row after printed command:
+task:
+  id: task-x1
+  title: Land or drop the bundle-preserved commits of task-x1
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDEsIHRpcHMgNGU3NDA2Y2I4ODcxOTU1NjU0YWZmNjM4NmZhYzUxZmYwYjY1YmUzNjogdGhleSBhcmUgcHJlc2VydmVkIGluIGJ1bmRsZSAvVXNlcnMvY2hhcmxlc2Ficm9va2VyL3RtcC9mbS10ZWFyZG93bi10ZXN0cy5YMDRyNmUvczIvYnVuZGxlcy93b3JrLmJ1bmRsZSwgd2hvc2UgcmVjb3JkIGxpc3RzIGFkdmVydGlzZWQgdGlwcyA0ZTc0MDZjYjg4NzE5NTU2NTRhZmY2Mzg2ZmFjNTFmZjBiNjViZTM2IDU1NjAxMTU3YzlhMzdhMThkYjU1MDBjMWIzYTE2YmIzZDlhOTYyMGI7IGFuIGFkdmVydGlzZWQgdGlwIG1heSBhbHJlYWR5IGJlIGxhbmRlZC4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: project
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-31T08:30:46Z\nDecision owner: captain"
+RESULT S2b: pass (captain-held row under repo project)
+
+===== S2 retry ordinary teardown, no --force =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: the captain's land-or-drop call for bundle <tmp>/s2/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/s2/bundles/work.bundle sha256=f73f579bef7107cc46c367e932f0183bae5f436ce512774be4829456dbdefeb2 tips=4e7406cb8871955654aff6386fac51ff0b65be36 55601157c9a37a18db5500c1b3a16bb3d9a9620b
+<tmp>/s2/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <tmp>/s2/wt)
+Backlog: task-x1 stays open in <tmp>/s2/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+RESULT S2c: FAIL
+restored work.txt from bundle: recoverable work
+RESULT S2d: pass (commit recovered from bundle)
+backlog row after teardown:
+task:
+  id: task-x1
+  title: Land or drop the bundle-preserved commits of task-x1
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDEsIHRpcHMgNGU3NDA2Y2I4ODcxOTU1NjU0YWZmNjM4NmZhYzUxZmYwYjY1YmUzNjogdGhleSBhcmUgcHJlc2VydmVkIGluIGJ1bmRsZSAvVXNlcnMvY2hhcmxlc2Ficm9va2VyL3RtcC9mbS10ZWFyZG93bi10ZXN0cy5YMDRyNmUvczIvYnVuZGxlcy93b3JrLmJ1bmRsZSwgd2hvc2UgcmVjb3JkIGxpc3RzIGFkdmVydGlzZWQgdGlwcyA0ZTc0MDZjYjg4NzE5NTU2NTRhZmY2Mzg2ZmFjNTFmZjBiNjViZTM2IDU1NjAxMTU3YzlhMzdhMThkYjU1MDBjMWIzYTE2YmIzZDlhOTYyMGI7IGFuIGFkdmVydGlzZWQgdGlwIG1heSBhbHJlYWR5IGJlIGxhbmRlZC4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: project
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-31T08:30:46Z\nDecision owner: captain\n\nDeliverable of the finished work: preserved in bundle <tmp>/s2/bundles/work.bundle, not landed"
+RESULT S2e: pass (row stays open and captain-held after removal)
+
+===== S3 BEFORE (base) with valid bundle + captain call =====
+$ bin/fm-teardown.sh task-x1  (base)
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+9b88e6f unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT S3: pass (base refuses: before text)
+
+===== ADV two-tips-bundle-lists-one =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/adv-two-tips-bundle-lists-one/bundles/work.bundle: bundle does not list unlanded tip 0d0294c2a57e2c5f9dee09b43f27ae5aece7e25a.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-two-tips-bundle-lists-one/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+3dc721b unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-two-tips-bundle-lists-one: pass (refused exit 1, copy kept, names: bundle does not list unlanded tip)
+
+===== ADV sha-changed =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/adv-sha-changed/bundles/work.bundle: bundle sha256 does not match record.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-sha-changed/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+652d327 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-sha-changed: pass (refused exit 1, copy kept, names: sha256 does not match record)
+
+===== ADV bundle-inside-copy =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/adv-bundle-inside-copy/wt/.claude/work.bundle: bundle is inside copy <tmp>/adv-bundle-inside-copy/wt.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-bundle-inside-copy/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+b87566b unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-bundle-inside-copy: pass (refused exit 1, copy kept, names: bundle is inside)
+
+===== ADV no-record =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <tmp>/adv-no-record/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-no-record/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+d656634 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-no-record: pass (refused exit 1, copy kept, names: missing preservation record)
+
+===== ADV verify-fails =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/adv-verify-fails/bundles/work.bundle: git bundle verify failed.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-verify-fails/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+6865799 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-verify-fails: pass (refused exit 1, copy kept, names: git bundle verify failed)
+
+===== ADV malformed-record =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: malformed preservation record in <tmp>/adv-malformed-record/data/task-x1/preservation-bundles.tsv (exactly one line required).
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in <tmp>/adv-malformed-record/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+a7bdee1 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-malformed-record: pass (refused exit 1, copy kept, names: exactly one line required)
+
+===== ADV dirty-copy-valid-bundle =====
+$ bin/fm-teardown.sh task-x1  (head)
+REFUSED: worktree <tmp>/adv-dirty-copy-valid-bundle/wt has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+RESULT ADV-dirty-copy-valid-bundle: pass (refused exit 1, copy kept, names: uncommitted)
+
+===== ADV supervision-branch-valid-bundle =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+dbfc13a unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-supervision-branch-valid-bundle: pass (refused exit 1, copy kept, names: REFUSED: the ship deliverable is not landed)
+
+===== ADV away-valid-bundle =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+f6ccb27 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-away-valid-bundle: pass (refused exit 1, copy kept, names: REFUSED: the ship deliverable is not landed)
+
+===== ADV no-captain-call =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: bundle preservation unavailable: <tmp>/adv-no-captain-call/bundles/work.bundle: task task-x1 is not held for the captain's land-or-drop call naming the bundle and every recorded tip.
+Hold it for the captain, then retry ordinary teardown: bin/fm-captain-hold.sh hold task-x1 --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ task-x1\,\ tips\ 94a86d6a2e233cdfb053521719c31e784c057da0:\ they\ are\ preserved\ in\ bundle\ <tmp>/adv-no-captain-call/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 0e6a8758b07c702dfc96f738b41fa86385d4300b\ 94a86d6a2e233cdfb053521719c31e784c057da0\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+94a86d6 unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+RESULT ADV-no-captain-call: pass (refused exit 1, copy kept, names: Hold it for the captain, then retry ordinary teardown: bin/fm-captain-hold.sh hold task-x1)
+
+===== ADV extra: two tips, bundle lists both -> removed =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: the captain's land-or-drop call for bundle <tmp>/two-tips-both/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/two-tips-both/bundles/work.bundle sha256=05a86e035445808a5c9395be38a9a8b687846c74a15850c1958f1c3df5e45953 tips=45f74edc17d30d3836103e71f53572bee964ab00 9ca81835091b7c344d24b29e47a48577c6c9154a cee2dfb42057887d27836529789eda7905a7bc9c
+<tmp>/two-tips-both/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <tmp>/two-tips-both/wt)
+Backlog: task-x1 stays open in <tmp>/two-tips-both/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+RESULT TWO-TIPS-BOTH: FAIL
+
+===== ADV own-copy live process with valid bundle + call =====
+$ bin/fm-teardown.sh task-x1  (head)
+teardown: the captain's land-or-drop call for bundle <tmp>/adv-process/bundles/work.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle <tmp>/adv-process/bundles/work.bundle sha256=ac83784fb9e8fa82d36f0aa1587e820163c800c80c6a7d778c8fd95ab0732cb0 tips=ae6d4cc17de00abfdf12fb21f7601fb9f31808ef ec36fe1c2b24c4900f01b4b287c7bc07ce6ba385
+teardown: reaping leaked worktree process(es) for task-x1: 29653
+<tmp>/adv-process/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <tmp>/adv-process/wt)
+Backlog: task-x1 stays open in <tmp>/adv-process/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+RESULT ADV-own-process: FAIL (rc=0 alive=no)
+
+===== FORCE unchanged: unbundled unpushed copy with --force, base vs head =====
+$ bin/fm-teardown.sh task-x1 --force (base)
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+$ bin/fm-teardown.sh task-x1 --force (head)
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+base: exit=1 copy=kept ; head: exit=1 copy=kept
+RESULT FORCE: pass (same exit and copy outcome)
