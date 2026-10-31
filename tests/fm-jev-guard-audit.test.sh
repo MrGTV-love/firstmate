@@ -566,7 +566,7 @@ pass 'offline guard settlement, cost completeness and S2 egress acceptance'
 # installed omp below consumes these actual generated overlays, not a copied policy.
 export AUDIT_DISPATCH_CASES="$TMP_ROOT/dispatch-cases"
 : > "$AUDIT_DISPATCH_CASES"
-for posture in absent granted other-class no-helpers other-project invalid; do
+for posture in directive-only absent granted other-class no-helpers other-project invalid; do
   world="$TMP_ROOT/dispatch-$posture"
   home="$world/home"
   project="$world/firstmate"
@@ -586,6 +586,17 @@ for posture in absent granted other-class no-helpers other-project invalid; do
     invalid) grant='["semantic-search","unknown"]' ;;
   esac
   [ "$posture" = absent ] || printf '\nEgress needs: %s\n' "$grant" >> "$home/data/$id/brief.md"
+  if [ "$posture" = directive-only ]; then
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+## Firstmate spec
+Egress needs: []
+### Out of scope
+None.
+EOF
+  fi
   # The fixture endpoint observes the record at the actual launch send, not
   # merely after fm-spawn returns. No real agent or terminal is started.
   mv "$fakebin/tmux" "$fakebin/tmux-base"
@@ -603,9 +614,9 @@ SH
   out=$(FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
   status=$?
-  if [ "$posture" = invalid ]; then
-    [ "$status" -ne 0 ] || fail "invalid consent was accepted: $out"
-    [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid consent provisioned a worker'
+  if [ "$posture" = invalid ] || [ "$posture" = directive-only ]; then
+    [ "$status" -ne 0 ] || fail "$posture dispatch input was accepted: $out"
+    [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid dispatch input provisioned a worker'
     continue
   fi
   expect_code 0 "$status" "$posture dispatch must succeed: $out"
@@ -619,6 +630,24 @@ SH
     expect_code 0 $? "relaunch must not authorize the edited brief: $out"
     assert_equals '[]' "$(sed -n 's/^egress=//p' "$home/state/$id.meta")" 'relaunch preserves recorded consent'
     assert_equals off "$(jq -r .find.enabled "$home/state/$id.omp-fallback.yml")" 'relaunch keeps ungranted find absent'
+    cp "$home/data/$id/brief.md" "$world/filled-brief.md"
+    cp "$home/state/$id.meta" "$world/before-empty-promotion.meta"
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+## Firstmate spec
+Egress needs: []
+### Out of scope
+None.
+EOF
+    out=$(HOME="$home/user-home" PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+      "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "directive-only Firstmate spec permitted promotion: $out"
+    cmp -s "$world/before-empty-promotion.meta" "$home/state/$id.meta" || fail 'refused promotion changed task authorization or kind'
+    mv "$world/filled-brief.md" "$home/data/$id/brief.md"
     out=$(HOME="$home/user-home" PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
       FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
       "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)

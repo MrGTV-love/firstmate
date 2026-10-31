@@ -2960,6 +2960,7 @@ A refusal names the destination class whose authorization Firstmate must supply;
 Before ship/scout dispatch, Firstmate records the task's authorized needs in one unfenced `Egress needs: ["semantic-search","web"]` directive inside `## Firstmate spec` under `# Task`.
 Only the existing classes `semantic-search`, `web`, `browser`, `provider` and `remote-storage` are recognized; no keyword inference, wildcard, project-wide permission or trust exemption exists.
 The scaffold starts with `Egress needs: []`, and an absent directive in a legacy brief also means no authorization.
+The directive is authorization metadata, not build instructions: spawn and promotion still refuse a Firstmate spec containing only that directive and its exclusion list.
 Duplicate directives, malformed JSON, non-string or unknown members, NUL bytes, unreadable input or a symlinked brief refuse fresh dispatch before worker provisioning; fenced examples do not authorize anything.
 The spawn atomically publishes exactly one canonical `egress=` JSON-array line in `state/<task>.meta` before launch, including an empty grant, and declares the resolved classes in the generated launch brief.
 Native omp semantic `find` is constructed only when that grant includes `semantic-search` and the existing Firstmate-project and helper eligibility also permits it; otherwise the final task overlay sets `find.enabled: off`, removing it from the native registry, model tools and ordinary Eval tool bridge rather than offering a tool that must refuse.

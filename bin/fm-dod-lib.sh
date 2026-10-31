@@ -936,9 +936,9 @@ fm_brief_text_has_content() {  # <text>
   printf '%s\n' "$1" | grep -Evq '^ {0,3}#{1,6}([[:space:]]|$)|^[[:space:]]*$'
 }
 
-# The `## Firstmate spec` body without its nested `### Out of scope` subsection.
-# The exclusion list is specification, but it is never the build instructions,
-# so a stated `None.` must not satisfy a spec that holds nothing else.
+# The `## Firstmate spec` build instructions, excluding unfenced Egress needs
+# metadata and its nested `### Out of scope` subsection. Neither authorization
+# nor a stated `None.` substitutes for missing build instructions.
 fm_brief_spec_instructions() {  # <file>
   fm_brief_task_heading_body "$1" "## Firstmate spec" | awk '
     {
@@ -958,6 +958,7 @@ fm_brief_spec_instructions() {  # <file>
           fenced = 0
         }
       }
+      if (!was_fenced && !fenced && scan ~ /^Egress needs:/) next
       if (!was_fenced && !fenced && scan ~ /^#+([[:space:]]|$)/) {
         if ($0 == "### Out of scope") { skip = 1; next }
         if (match(scan, /^#+/) && RLENGTH <= 3) skip = 0

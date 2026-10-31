@@ -1229,18 +1229,36 @@ EOF
   if fm_brief_task_content_valid "$brief"; then
     fail "an empty Firstmate spec passed because the exclusion list held None."
   fi
+  local needs
+  for needs in '[]' '["semantic-search"]'; do
+    cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Egress needs: $needs
+
+### Out of scope
+None.
+EOF
+    if fm_brief_task_content_valid "$brief"; then
+      fail "egress authorization metadata satisfied an otherwise empty Firstmate spec"
+    fi
+  done
   cat > "$brief" <<'EOF'
 # Task
 ## Captain's intent
 Fix the dispatch refusal.
 
 ## Firstmate spec
+Egress needs: []
 Print one complete list and the repair.
 
 ### Out of scope
 None.
 EOF
-  fm_brief_task_content_valid "$brief" || fail "a filled Firstmate spec with a stated exclusion list was refused"
+  fm_brief_task_content_valid "$brief" || fail "a filled Firstmate spec with egress metadata and a stated exclusion list was refused"
   pass "the exclusion list does not satisfy an empty Firstmate spec"
 }
 
@@ -1269,13 +1287,19 @@ EOF
 Fix the dispatch refusal.
 
 ## Firstmate spec
+Egress needs: []
 ```
 ### Out of scope
+Egress needs: ["semantic-search"]
 ```
 Print one complete list and the repair.
 EOF
   fm_brief_task_content_valid "$brief" \
     || fail "a fenced exclusion heading hid the Firstmate spec after it"
+  local instructions
+  instructions=$(fm_brief_spec_instructions "$brief")
+  assert_contains "$instructions" 'Egress needs: ["semantic-search"]' 'a fenced metadata example was removed from build instructions'
+  assert_not_contains "$instructions" 'Egress needs: []' 'unfenced authorization metadata remained build instructions'
   pass "spec content survives the exclusion list"
 }
 
