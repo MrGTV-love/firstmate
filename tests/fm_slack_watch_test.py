@@ -161,6 +161,15 @@ class CardRenderingTest(unittest.TestCase):
                 for value in ('see CI run 1234', '/tmp/a.md', '/tmp/b.md'):
                     self.assertEqual(text.count(value), 1)
 
+    def test_legacy_board_decide_keeps_removed_reason_and_board_lines_visible(self):
+        text = self.render('Should we merge?\nEvidence: /tmp/a.md\nEvidence: /tmp/b.md',
+                           card={'decide': 'Board question\nEvidence: /tmp/c.md\nRecommendation: Board rec.'})
+        self.assertIn('Question: Board question\nEvidence: /tmp/a.md\n'
+                      'Evidence: /tmp/c.md\nRecommendation: Board rec.\nEvidence: /tmp/b.md\n'
+                      'Type your answer in this thread.', text)
+        for value in ('/tmp/a.md', '/tmp/b.md', '/tmp/c.md', 'Board rec.'):
+            self.assertEqual(text.count(value), 1)
+
     def test_body_fields_do_not_include_unlabeled_prose(self):
         for structured in (False, True):
             for label in ('Decision sought', 'Brief', 'Recommendation', 'Alternatives', 'Evidence'):

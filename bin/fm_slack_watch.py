@@ -36,6 +36,7 @@ DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
+FIELD_LINE = re.compile(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
 LABEL_LIMIT = 168  # Leave room for two candidates, a long thread ts, the longest remedy, and the queue marker.
@@ -182,10 +183,10 @@ def evidence_pointer(value):
     return isinstance(value, str) and bool(value.startswith('/') or re.match(r'^https?://[^\s]+$', value))
 
 
-def parse_fields(lines, remainder=None, multiline=False, loose=None):
+def parse_fields(lines, remainder=None, multiline=False, loose=None, removed=None):
     fields, current = {}, None
     for line in lines:
-        match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
+        match = FIELD_LINE.match(line)
         if match and match.group(1) == 'Evidence':
             value = match.group(2).strip()
             if (value and value.lower() != 'none recorded'
@@ -203,12 +204,16 @@ def parse_fields(lines, remainder=None, multiline=False, loose=None):
             fields[current] = value
             if remainder is not None and current not in ('Recommendation', 'Evidence'):
                 remainder.append(line)
+            elif removed is not None and current in ('Recommendation', 'Evidence'):
+                removed.append((current, line))
             if current == 'Evidence':
                 current = None
         elif current and multiline and not OPTION_LINE.match(line):
             fields[current] += '\n' + line.strip()
             if remainder is not None and current not in ('Recommendation', 'Evidence'):
                 remainder.append(line)
+            elif removed is not None and current in ('Recommendation', 'Evidence'):
+                removed.append((current, line))
         else:
             current = None
             for kept in (remainder, loose):
@@ -401,6 +406,7 @@ class Watch:
         usable = usable and reactions
         fields = [('Task: ', row['id'])]
         structured = bool(parts.get('Decision sought'))
+        plain = loose if structured else []
         if structured:
             for key, label in (('Decision sought', 'Decision sought: '),
                                ('Brief', 'Brief description of issue: '),
@@ -413,9 +419,13 @@ class Watch:
             if card.get('about'):
                 fields.append(('About: ', card['about']))
             question = card.get('decide') or row.get('hold_reason') or ''
-            remainder = []
-            parse_fields(question.splitlines(), remainder, multiline=True)
+            remainder, removed = [], []
+            asked = parse_fields(question.splitlines(), remainder, multiline=True, removed=removed)
             question = '\n'.join(remainder).strip()
+            shown = {'Recommendation': parts.get('Recommendation'), 'Evidence': evidence}
+            plain = [line for label, line in removed if asked.get(label) and asked[label] != shown[label]]
+            if card.get('decide'):
+                plain += [line for line in loose if FIELD_LINE.match(line)]
             if question:
                 fields.append(('Question: ', question))
             if parts.get('Recommendation'):
@@ -427,8 +437,7 @@ class Watch:
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
-        if structured:
-            fields.extend(('', line) for line in loose if line.strip())
+        fields.extend(('', line) for line in plain if line.strip())
         fields = [(prefix, slack_escape(value)) for prefix, value in fields
                   if str(value).strip().lower() != 'none recorded']
         if usable and options:
