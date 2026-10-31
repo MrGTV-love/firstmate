@@ -4,7 +4,7 @@ This doc explains the check that stops a primary Firstmate session from ending a
 It is for operators working out why a turn end was blocked or followed up, and for anyone changing a harness turn-end hook.
 
 This is the authoritative current contract for the "no turn ends blind" primary backstop referenced from AGENTS.md section 8.
-The predicate lives in `bin/fm-turnend-guard.sh`.
+The liveness predicate lives in `bin/fm-supervision-liveness-lib.sh`; `bin/fm-turnend-guard.sh` owns the turn-end decision.
 Primary scope lives in `bin/fm-primary-scope-lib.sh`, shared with the native session-start adapters in [`sessionstart-nudge.md`](sessionstart-nudge.md).
 Harness hook files adapt each enabled primary harness integration's turn-end mechanism to that shared predicate.
 
@@ -43,7 +43,7 @@ When the guard acts, the harness integration must do one of two things:
 - Block the turn end.
 - Force one bounded follow-up that uses the recovery instruction from the emitted session-start protocol.
 
-The mid-turn pull warning uses the model-aware supervision verdict described below, while the turn-end guard keeps the PID-strict watcher predicate.
+The mid-turn pull warning and turn-end guard share the [same liveness predicate](#pull-warning-verdict-by-supervision-model).
 
 Away and quiet mode are the one place the turn-end guard accepts a different supervisor.
 While `state/.afk` exists, in either mode (`bin/fm-wake-lib.sh`'s `fm_afk_mode`), the daemon owns supervision.
@@ -55,7 +55,7 @@ The guard remains a backstop.
 ## Guard predicates
 
 The turn-end guard checks primary scope first, then supervision need, then watcher health.
-The mid-turn pull warning in `bin/fm-guard.sh` judges watcher health differently, as described under [pull-warning verdict by supervision model](#pull-warning-verdict-by-supervision-model).
+The mid-turn pull warning in `bin/fm-guard.sh` shares that health check, as described under [pull-warning verdict by supervision model](#pull-warning-verdict-by-supervision-model).
 
 ### Primary scope
 
@@ -119,58 +119,23 @@ The exception has these limits:
 
 ### Pull-warning verdict by supervision model
 
-`bin/fm-guard.sh`, the pull warning, instead uses the model-aware `fm_watcher_supervision_verdict` from `bin/fm-wake-lib.sh`.
-It needs a different verdict because it fires mid-turn, when an auto-arm watcher may be absent.
-The verdict depends on the supervision model.
-
-#### Claude Stop auto-arm model
-
-Under the Claude Stop auto-arm model a beacon fresh within grace is healthy even with no live watcher process.
-A stale beacon is still healthy while `fm_autoarm_midturn_healthy` in `bin/fm-wake-lib.sh` proves a Claude rewake explains the mid-turn gap.
-That proof requires both of these:
-
-- The rewake is bound to the current recovery generation and live session-lock owner.
-- No later watcher beacon or exhausted-failure marker supersedes it.
-
-The tolerance holds because that session's turn-end will re-arm.
-Without that proof a stale or absent beacon is a genuine lapse and alarms.
+`bin/fm-guard.sh` uses the same `fm_supervision_liveness` verdict as the turn-end guard, owned by `bin/fm-supervision-liveness-lib.sh`.
+A fresh leftover beacon, a rewake ledger, or loaded extension markers alone never substitutes for the [live-owner proof](#strict-watcher-check-at-the-turn-boundary).
+This applies to persistent, Claude auto-arm, Pi, pi-signed, and omp primaries alike, including hand-offs without a watcher lock.
+The [away/quiet daemon proof](#away-and-quiet-mode-daemon-ownership) is shared as well.
+The warning remains advisory, while the turn-end guard retains its harness-specific continuation and budget decisions.
+The banner keys its once-per-episode dedup on the failing condition rather than the beacon mtime; branch actors still leave the primary's warning episode alone.
 
 #### Extension model
 
-Under the extension model (Pi, pi-signed, and omp) a live identity-matched watcher is the ordinary healthy state.
-A genuinely unheld lock with a beacon fresh within grace is also healthy while a live Pi or omp session provably owns continuity.
-That hand-off is benign because `.pi/extensions/fm-primary-pi-watch.ts` and `.omp/extensions/fm-primary-omp-watch.ts` tear the watcher down on every actionable wake and spawn the replacement themselves.
-
-A lock is genuinely unheld only in one of these cases:
-
-- The lock directory or its symlinked owner directory is absent.
-- The existing lock records no pid at all.
-
-Any lock with a recorded pid remains down when its pid, home, watcher path, or process identity fails the strict watcher health check.
-
-That ownership proof is `fm_extension_owns_supervision` in `bin/fm-wake-lib.sh`.
-It accepts either the Pi pair (`fm_pi_extension_owns_supervision`) or the omp pair (`fm_omp_extension_owns_supervision`).
-The proof requires all of these:
-
-- Both primary extensions of one family must be recorded in their state markers at their current on-disk builds by the process named in `state/.lock`.
-  On omp, a live lock holder permits only that exact process to record itself or arm a watcher; descendant sessions cannot borrow ancestry.
-  A marker may also be written before a live session claims the lock, but arming still requires exact ownership.
-  The turn-end guard re-asserts its marker at turn boundaries after the session-start hook claims the lock.
-- That process must still be alive.
-- Pi's watcher marker must additionally name an active generation rather than a retiring handoff.
-
-omp never inherits the Pi tolerance because its proof is keyed on its own two files and markers.
-Requiring the turn-end guard extension as well as the watch extension is deliberate, because a home without that structural backstop has no benign hand-off to tolerate.
-
-Without that proof an unheld lock alarms exactly as it did before.
-An unloaded, version-drifted, or exited Pi or omp session is therefore loud immediately.
-A cycle the extension never restores is loud once the beacon passes grace.
-
-#### Persistent-watcher harnesses
-
-Under every persistent-watcher harness a live identity-matched watcher with a fresh beacon is still required, so the pull guard keeps the same strict semantics there.
-Its banner names the true failing condition, either a missing live watcher process or a genuinely stale beacon with its real age.
-It keys the once-per-episode dedup on that condition rather than the beacon mtime.
+The separate model-aware `fm_watcher_supervision_verdict` in `bin/fm-wake-lib.sh` remains available to inbox consumer readiness and the watchdog, not to either guard above.
+Its extension hand-off proof is `fm_extension_owns_supervision`, accepting the Pi or omp extension pair that the session recorded.
+Both primary extensions must be recorded at their current on-disk builds by the live process named in `state/.lock`, and Pi's watcher marker must name an active generation rather than a retiring hand-off.
+On omp, a live lock holder permits only that exact process to record itself or arm a watcher; descendant sessions cannot borrow ancestry.
+A marker may be written before a live session claims the lock, but arming still requires exact ownership, and the turn-end extension reasserts its marker at turn boundaries after session start claims the lock.
+omp never inherits Pi's proof because its two source files and markers are distinct.
+For these model-aware consumers, a fresh beacon and genuinely unheld watcher lock may prove a hand-off only with that extension ownership; any recorded watcher pid still requires the strict identity and home/path match.
+The warning and turn-end guard do not use this hand-off tolerance.
 
 ### Away and quiet mode daemon ownership
 
@@ -359,10 +324,14 @@ A wait of 12 seconds nominal stays inside it with a wide margin even at the 9 ti
 The cost lands whenever no claim is open at the end of the wait, not only when the auto-arm is absent.
 Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and it adds up over the Stops of one failure episode:
 
-- With a failure notice on disk, the budget of three re-blocks runs out on the fourth Stop, which also waits the full 12 seconds before the verified fail-open, so the episode costs about 48 seconds of wait.
-- With no failure notice on disk, the verified fail-open never fires: nine measured consecutive guard invocations all blocked, costing 108 nominal seconds of wait and 233.560 measured elapsed seconds under load.
-  The ninth invocation still blocked, so this is neither an eight-block/96-second guard bound nor evidence of when Claude Code itself overrides the hook.
-  The same holds in away mode with no live daemon, and for a Stop that pi-code delivers, because the auto-arm stands down there by design.
+- Every Claude exit-2 decision must charge the same persisted budget, capped at three blocks per session failure episode by default.
+- The fourth unsupervised Stop allows with an attended failure diagnostic, even without an auto-arm failure notice, in away mode, or after the episode alarm was already recorded.
+- If the budget cannot be locked or written, the guard cannot safely charge another bounded block and instead allows with the same loud diagnostic naming the unavailable budget.
+- A proven live supervisor always allows; failed episode-reset bookkeeping remains for a later retry and never changes that verdict.
+
+Budget exhaustion never reports supervision as restored.
+The diagnostic requires attended diagnosis of the automatic mechanism and episode bookkeeping before unattended supervision is trusted again.
+The alarm marker still suppresses further automatic failure continuations, but later unsupervised Stops remain loud without restarting the exhausted budget.
 
 These are nominal floors; wall time can stretch about 9 times under load.
 The wait ends before the full 12 seconds only when the watcher is healthy, the auto-arm's generation claim is open, a legacy build's lock-holding claim is live, or a fresh actionable rewake is recorded.

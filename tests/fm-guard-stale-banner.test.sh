@@ -63,8 +63,7 @@ run_guard_case_read_only() {
     "$ROOT/bin/fm-guard.sh" 2>&1
 }
 
-# The Claude Stop auto-arm model: the watcher runs only between turns, so a fresh
-# beacon with no live watcher process is the healthy mid-turn state.
+# Pin the Claude auto-arm model to prove it cannot change guard liveness.
 run_guard_case_autoarm() {
   local dir=$1
   FM_ROOT_OVERRIDE="$(case_root "$dir")" \
@@ -91,9 +90,7 @@ record_session_lock_pid() {
   printf '%s\n' "$pid" > "$home/state/.lock"
 }
 
-# The Pi extension model: .pi/extensions/fm-primary-pi-watch.ts tears the watcher
-# down on every actionable wake and spawns the replacement itself, so the lock is
-# legitimately unheld during a hand-off.
+# Pin the extension model to prove hand-offs still use strict guard liveness.
 run_guard_case_extension() {
   local dir=$1
   FM_ROOT_OVERRIDE="$(case_root "$dir")" \
@@ -426,16 +423,14 @@ test_read_only_never_mutates_stale_banner_state_files() {
   pass "fm-guard stale banner: read-only never mutates stale-banner state files"
 }
 
-test_autoarm_fresh_beacon_without_watcher_is_healthy() {
+test_autoarm_fresh_beacon_without_watcher_warns() {
   local dir out
   dir=$(make_guard_case autoarm-fresh)
-  # A fresh beacon and NO live watcher: the healthy mid-turn state under the
-  # Claude Stop auto-arm model, where the watcher only runs between turns.
+  # A fresh beacon without a live watcher cannot satisfy the shared predicate.
   touch "$(case_home "$dir")/state/.last-watcher-beat"
   out=$(run_guard_case_autoarm "$dir")
-  [ -z "$out" ] \
-    || fail "auto-arm model with a fresh beacon and no live watcher must stay silent, got: $out"
-  pass "fm-guard stale banner: auto-arm fresh beacon without a live watcher is healthy"
+  assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "a leftover auto-arm beacon must not prove liveness"
+  pass "fm-guard stale banner: auto-arm leftover beacons do not prove liveness"
 }
 
 test_autoarm_stale_beacon_alarms_with_correct_reason() {
@@ -464,11 +459,9 @@ test_autoarm_stale_episode_is_stable() {
   pass "fm-guard stale banner: auto-arm stale episode stays one episode across calls"
 }
 
-# The send-time false alarm on a long Claude handling turn: the between-turns
-# watcher has already exited, the beacon is older than grace, and the auto-arm
-# ledger still shows a healthy rewake with no failure markers while the session
-# lock names a live pid. Turn-end will re-arm, so the pull guard must stay silent.
-test_autoarm_long_handling_turn_stays_silent() {
+# A long Claude handling turn still needs a live supervisor: a rewake ledger
+# and live session lock alone cannot silence the shared guard predicate.
+test_autoarm_rewake_without_watcher_warns() {
   local dir home out pid
   dir=$(make_guard_case autoarm-long-turn)
   home=$(case_home "$dir")
@@ -479,17 +472,14 @@ test_autoarm_long_handling_turn_stays_silent() {
   out=$(run_guard_case_autoarm "$dir")
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
-  [ -z "$out" ] \
-    || fail "a long auto-arm handling turn past grace must stay silent, got: $out"
-  assert_absent "$home/state/.guard-watcher-stale-banner" \
-    "a healthy long handling turn must not open a down-episode"
-  pass "fm-guard stale banner: auto-arm long handling turn with a healthy rewake stays silent"
+  assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "a rewake ledger must not replace a live supervisor"
+  assert_present "$home/state/.guard-watcher-stale-banner" "a stale unsupervised turn must open a down-episode"
+  pass "fm-guard stale banner: a rewake ledger without a live watcher still warns"
 }
 
-# Drive the long-turn signals apart on the same stale beacon. Losing any one
-# healthy-generation signal must restore the banner; the stale beacon alone
-# is not enough to stay quiet, and adding a failure marker is not either.
-test_autoarm_long_turn_requires_every_healthy_signal() {
+# Legacy generation metadata, complete or incomplete, cannot replace a live
+# watcher under the shared strict predicate.
+test_autoarm_legacy_signals_never_replace_a_live_watcher() {
   local dir home out pid replacement_pid='' case_name
   for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon; do
     dir=$(make_guard_case "autoarm-long-turn-$case_name")
@@ -543,7 +533,7 @@ test_autoarm_long_turn_requires_every_healthy_signal() {
     assert_contains "$out" "no watcher has a fresh beacon" \
       "a genuine auto-arm lapse with $case_name must still name the stale beacon"
   done
-  pass "fm-guard stale banner: every auto-arm long-turn healthy signal is load-bearing"
+  pass "fm-guard stale banner: legacy auto-arm signals never replace a live watcher"
 }
 
 # An open arming claim is between-turn startup, not evidence that the current
@@ -627,11 +617,9 @@ test_persistent_no_watcher_episode_survives_beacon_touch() {
   pass "fm-guard stale banner: a no-watcher episode survives a beacon mtime change"
 }
 
-# The send-time false alarm this suite exists to pin: on a Pi primary the watcher
-# process is torn down and respawned by the extension on every actionable wake, so
-# a guarded command that lands in a hand-off sees a fresh beacon and an unheld lock
-# - state the persistent model cannot tell apart from supervision being off.
-test_extension_handoff_with_live_session_is_healthy() {
+# A Pi extension hand-off with no watcher has the same liveness verdict as
+# the turn-end guard, regardless of loaded extension ownership markers.
+test_extension_handoff_without_watcher_warns() {
   local dir home out pid
   dir=$(make_guard_case extension-handoff)
   home=$(case_home "$dir")
@@ -642,16 +630,13 @@ test_extension_handoff_with_live_session_is_healthy() {
   out=$(run_guard_case_extension "$dir")
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
-  [ -z "$out" ] \
-    || fail "an extension-owned hand-off with a live Pi session must stay silent, got: $out"
-  assert_absent "$home/state/.guard-watcher-stale-banner" \
-    "a healthy extension-owned hand-off must not open a down-episode"
-  pass "fm-guard stale banner: extension-owned hand-off with a live session is healthy"
+  assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "extension markers must not replace a live supervisor"
+  assert_present "$home/state/.guard-watcher-stale-banner" "an unheld extension handoff must open a down-episode"
+  pass "fm-guard stale banner: extension ownership does not replace a live supervisor"
 }
 
-# A released owner may leave the lock directory briefly before cleanup. It is
-# still genuinely unheld when it records no pid, so the hand-off stays benign.
-test_extension_handoff_with_empty_lock_is_healthy() {
+# An empty watcher lock proves no owner even with loaded extension markers.
+test_extension_handoff_with_empty_lock_warns() {
   local dir home out pid
   dir=$(make_guard_case extension-empty-lock)
   home=$(case_home "$dir")
@@ -663,11 +648,9 @@ test_extension_handoff_with_empty_lock_is_healthy() {
   out=$(run_guard_case_extension "$dir")
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
-  [ -z "$out" ] \
-    || fail "an extension-owned hand-off with an empty lock must stay silent, got: $out"
-  assert_absent "$home/state/.guard-watcher-stale-banner" \
-    "an empty lock during a healthy hand-off must not open a down-episode"
-  pass "fm-guard stale banner: extension-owned empty lock is genuinely unheld"
+  assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "an empty watcher lock must not prove liveness"
+  assert_present "$home/state/.guard-watcher-stale-banner" "an empty lock must open a down-episode"
+  pass "fm-guard stale banner: an empty extension handoff lock still warns"
 }
 
 # Extension ownership tolerates only a released lock. Every non-empty recorded
@@ -739,10 +722,8 @@ test_extension_without_ownership_evidence_stays_alarm() {
   pass "fm-guard stale banner: extension model without ownership evidence stays loud"
 }
 
-# Drive the ownership signals apart one at a time. Each part is load-bearing on its
-# own, so losing any single one restores the alarm rather than leaving the tolerance
-# resting on whichever signal happens to survive.
-test_extension_ownership_needs_every_signal() {
+# Complete or incomplete extension markers do not establish a live watcher.
+test_extension_legacy_signals_never_replace_a_live_watcher() {
   local dir home out pid case_name spec
   for spec in \
     "dead-session:dead::" \
@@ -786,7 +767,7 @@ test_extension_ownership_needs_every_signal() {
     [ "$(count_text "$out" "WATCHER DOWN - SUPERVISION IS OFF")" -eq 1 ] \
       || fail "extension ownership must not survive $case_name; guard output: $out"
   done
-  pass "fm-guard stale banner: every extension-ownership signal is load-bearing"
+  pass "fm-guard stale banner: legacy extension signals never replace a live watcher"
 }
 
 # Ownership tolerates the hand-off, never a supervision lapse: once the beacon
@@ -829,9 +810,8 @@ test_extension_handoff_keeps_queued_wake_warning() {
   wait "$pid" 2>/dev/null || true
   assert_contains "$out" "queued wakes pending" \
     "the queued-wake warning must still fire during an extension-owned hand-off"
-  assert_not_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" \
-    "a queued wake must not resurrect the watcher-down banner for a healthy hand-off"
-  pass "fm-guard stale banner: queued-wake warning survives the extension hand-off tolerance"
+  assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "handoff must retain the same missing-supervisor warning"
+  pass "fm-guard stale banner: queued-wake warning remains independent during handoff"
 }
 
 # The tolerance is scoped to the extension model alone. Every persistent-watcher
@@ -913,7 +893,7 @@ test_extension_live_watcher_is_healthy_without_ownership_evidence() {
 # are cleared because the host running this suite may carry one, and the ancestry
 # walk is blinded because a structural ancestor of a different harness outranks the
 # Pi marker, so the harness this suite was launched from would otherwise answer.
-test_pi_harness_routes_itself_to_the_extension_model() {
+test_pi_harness_uses_shared_strict_liveness() {
   local dir home out pid harness blind
   local -a pi_env
   blind=$(fm_fakebin "$TMP_ROOT/pi-routing-blind")
@@ -936,32 +916,78 @@ test_pi_harness_routes_itself_to_the_extension_model() {
       "$ROOT/bin/fm-guard.sh" 2>&1)
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    [ -z "$out" ] \
-      || fail "a $harness primary must route itself to the extension model, got: $out"
+    assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "a $harness primary must use strict liveness despite extension markers"
   done
-  pass "fm-guard stale banner: Pi and pi-signed primaries route themselves to the extension model"
+  pass "fm-guard stale banner: Pi and pi-signed primaries use the same strict liveness"
 }
 
+test_warning_and_turnend_share_liveness() {
+  local dir home root model scenario pid out status expected identity
+  sleep 60 &
+  pid=$!
+  for model in persistent autoarm extension; do
+    for scenario in healthy handoff missing-lock stale-beacon wrong-identity away-daemon; do
+      dir=$(make_guard_case "shared-$model-$scenario")
+      home=$(case_home "$dir")
+      root=$(case_root "$dir")
+      git init -q "$root"
+      : > "$root/AGENTS.md"
+      mkdir -p "$root/bin"
+      touch "$home/state/.last-watcher-beat"
+      expected=2
+      case "$scenario" in
+        healthy|stale-beacon|wrong-identity)
+          record_live_watcher "$dir" "$pid" || fail "could not record shared watcher"
+          case "$scenario" in
+            healthy) expected=0 ;;
+            stale-beacon) touch -t 202001010000 "$home/state/.last-watcher-beat" ;;
+            wrong-identity) printf 'wrong\n' > "$home/state/.watch.lock/pid-identity" ;;
+          esac ;;
+        handoff) record_pi_extension_session "$dir" "$pid" || fail "could not record extension handoff" ;;
+        away-daemon)
+          : > "$home/state/.afk"
+          mkdir "$home/state/.supervise-daemon.lock"
+          identity=$(fm_test_pid_identity "$pid") || fail "could not identify away owner"
+          printf '%s\n' "$pid" > "$home/state/.supervise-daemon.lock/pid"
+          printf '%s\n' "$identity" > "$home/state/.supervise-daemon.lock/pid-identity"
+          expected=0 ;;
+      esac
+      out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_SUPERVISION_MODEL="$model" bash "$ROOT/bin/fm-guard.sh" 2>&1)
+      if [ "$expected" -eq 0 ]; then
+        [ -z "$out" ] || fail "$model/$scenario warning rejected live supervision: $out"
+      else
+        assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "$model/$scenario warning accepted missing supervision"
+      fi
+      out=$(printf '{"stop_hook_active":false}' | FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_SUPERVISION_MODEL="$model" bash "$ROOT/bin/fm-turnend-guard.sh" 2>&1); status=$?
+      expect_code "$expected" "$status" "$model/$scenario turn-end and warning must agree"
+    done
+  done
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  pass "fm-guard and turn-end: identical liveness for watcher, handoff, missing lock, stale beacon, identity mismatch and away owner"
+}
+
+test_warning_and_turnend_share_liveness
 test_first_stale_call_prints_full_banner
 test_full_banner_names_quiet_mode_when_active
 test_repeated_same_episode_prints_reminder_only
-test_pi_harness_routes_itself_to_the_extension_model
-test_extension_handoff_with_live_session_is_healthy
-test_extension_handoff_with_empty_lock_is_healthy
+test_pi_harness_uses_shared_strict_liveness
+test_extension_handoff_without_watcher_warns
+test_extension_handoff_with_empty_lock_warns
 test_extension_held_unhealthy_locks_stay_alarm
 test_extension_without_ownership_evidence_stays_alarm
-test_extension_ownership_needs_every_signal
+test_extension_legacy_signals_never_replace_a_live_watcher
 test_extension_stale_beacon_alarms_despite_live_session
 test_extension_handoff_keeps_queued_wake_warning
 test_branch_actor_is_not_told_to_drain_queued_wakes
 test_branch_actor_is_never_told_to_repair_the_watcher
 test_persistent_model_ignores_pi_extension_evidence
 test_extension_live_watcher_is_healthy_without_ownership_evidence
-test_autoarm_fresh_beacon_without_watcher_is_healthy
+test_autoarm_fresh_beacon_without_watcher_warns
 test_autoarm_stale_beacon_alarms_with_correct_reason
 test_autoarm_stale_episode_is_stable
-test_autoarm_long_handling_turn_stays_silent
-test_autoarm_long_turn_requires_every_healthy_signal
+test_autoarm_rewake_without_watcher_warns
+test_autoarm_legacy_signals_never_replace_a_live_watcher
 test_autoarm_open_claim_does_not_explain_stale_beacon
 test_autoarm_long_turn_does_not_silence_other_models
 test_persistent_no_watcher_banner_names_missing_process

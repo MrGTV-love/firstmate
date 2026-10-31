@@ -207,7 +207,7 @@ The beacon is `state/.last-watcher-beat`, which only the watcher process touches
 - A refused notice commit stays silent for a later retry.
 - After a successful notice, later Stop cycles exit 2 without repeating it until the turn-end guard consumes the attended fail-open.
 
-The Claude turn-end guard owns that notice commit contract, the monotonic failure progression, one-time attended fail-open, post-alarm continuation suppression, and positive recovery reset described in [`turnend-guard.md`](turnend-guard.md#harness-integrations).
+The Claude turn-end guard owns that notice commit contract, the monotonic bounded failure progression, attended fail-open, post-alarm continuation suppression, and positive recovery reset described in [`turnend-guard.md`](turnend-guard.md#harness-integrations).
 
 ### Supervision host
 

@@ -518,8 +518,8 @@ fm_afk_mode() {
 }
 
 # fm_watcher_supervision_verdict <state> <watch-path> [grace] [home] [root]
-# Model-aware "is supervision healthy right now" verdict for the pull warning
-# guard (bin/fm-guard.sh), NOT the arm layer or the turn-end guard. Sets:
+# Model-aware health verdict for inbox consumer readiness and the watchdog,
+# NOT the warning, arm layer or turn-end guard. Sets:
 #   FM_WATCHER_VERDICT_OK      true when supervision is healthy for this model
 #   FM_WATCHER_VERDICT_REASON  when not ok, the true failing condition:
 #                              no-watcher   - a live watcher process is the real
@@ -527,8 +527,8 @@ fm_afk_mode() {
 #                                             the lock (the beacon is still fresh)
 #                              stale-beacon - the beacon is stale beyond grace or
 #                                             absent (a genuine supervision lapse)
-# autoarm: docs/turnend-guard.md "Pull-warning verdict by supervision model"
-# owns fresh-beacon tolerance and the proof required for a stale mid-turn gap.
+# autoarm: accept a fresh beacon or the generation-bound mid-turn proof in
+# fm_autoarm_midturn_healthy; the warning and turn-end guards stay PID-strict.
 # extension: a live identity-matched watcher is the ordinary healthy state, but a
 # genuinely unheld lock is also healthy while the beacon is fresh AND a live Pi
 # session provably owns continuity (fm_extension_owns_supervision: the Pi or the

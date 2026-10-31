@@ -474,7 +474,7 @@ ok - cursor primary: an away-mode escalation is delivered, confirmed, and proces
 ```
 
 The live run proved that session start acquires the fleet lock through Cursor's structural process identity in `bin/fm-cursor-lib.sh`; `tests/fm-session-lock-ancestry.test.sh` pins the same ancestry path portably.
-It also proved that Cursor's `autoarm` supervision model lets the mid-turn pull guard accept a fresh beacon after the between-turn watcher closes; `tests/fm-guard-stale-banner.test.sh` pins that model-aware verdict.
+That run predates the unified strict liveness predicate; current mid-turn warning semantics are owned by [the turn-end guard contract](../turnend-guard.md#pull-warning-verdict-by-supervision-model) and exercised by `tests/fm-guard-stale-banner.test.sh`.
 The baton is claimed only by the next `stop`, so an actionable close before that claim can still produce one real follow-up from the sole existing park; durable wake handling is idempotent, and any older park still running after the claim stands down.
 The step is now registered for the dialog mirror, but still does not invalidate the park baton; [turnend-guard.md](../turnend-guard.md) owns the remaining pre-claim window and deferred fix.
 
