@@ -2845,7 +2845,9 @@ Writes are allowed by default; the profile denies writes to these named protecte
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
 In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
-Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
+Both archive names are anchored at both ends on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
+That holds for a task created after the profile was built, because the profile names only these two exact shapes and never a prefix.
+Any other archive name, such as `archive/<task>-submitted` without the hex suffix, stays refused.
 The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
 When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
 The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write by their own path, a rename onto `packed-refs` is refused, and creating a new hard link to `packed-refs` is refused, so another task's packed branch under `refs/heads` stays protected against those routes.
