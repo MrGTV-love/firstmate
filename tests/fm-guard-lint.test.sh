@@ -405,6 +405,48 @@ SIG=$(fixture sig_oneline_event)
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"
 assert_site "S1 finds a guard event deny inside a one-line function definition" "$SIG" 'E'
 
+SIG=$(fixture sig_python_event)
+cat >"$SIG/bin/a.py" <<'PY'
+import os
+import subprocess
+EVENT_WRITER = os.path.join('/synthetic', 'fm-guard-event.sh')
+
+def record(guard, decision):
+    subprocess.run([EVENT_WRITER, guard, decision])
+
+record('credential-fixture', 'deny' if blocked else 'allow')
+record('allowed-fixture', 'allow')
+record('allowed-branches', 'allow' if blocked else 'allow')
+record(guard='keyword-fixture', decision='deny')
+subprocess.run([
+    EVENT_WRITER, 'direct-fixture', 'deny',
+])
+subprocess.run([EVENT_WRITER, 'allowed-direct', 'allow'])
+subprocess.run(['other-command', 'not-an-event', 'deny'])
+# record('comment', 'deny')
+example = "record('string', 'deny')"
+PY
+assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 3 ] \
+  || fail "only conditional, keyword and direct deny calls may be sites: $(site_ids "$SIG")"
+mutate "$SIG" '.guards[0].sites = [
+  {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
+  {"file":"bin/a.py","match":"record(guard="},
+  {"file":"bin/a.py","match":"subprocess.run(["}]'
+assert_mapped "Python event sites can be mapped without counting forwarding or allow calls" "$SIG" 3
+
+SIG=$(fixture sig_python_unbound_record)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['unrelated-program', guard, decision])
+
+record('ordinary-data', 'deny')
+PY
+[ -z "$(site_ids "$SIG")" ] || fail "an unrelated record function must not become a guard event"
+pass "an arbitrary Python record function is not a guard event"
+
 SIG=$(fixture sig_python_helper)
 printf 'def refuse(reason):\n    raise SystemExit(reason)\n\nrefuse("no task named")\n' >"$SIG/bin/a.py"
 assert_site "S1 finds a call to a Python refuse helper" "$SIG" 'C'

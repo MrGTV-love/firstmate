@@ -17,6 +17,7 @@ Output is one JSON object on stdout:
 
 Exit: 0 on success; 2 on a usage or environment error.
 """
+import ast
 import hashlib
 import json
 import os
@@ -283,6 +284,69 @@ def event_denies(body):
     return decision != 'allow'
 
 
+def python_event_lines(lines):
+    """Find Python subprocess writer calls and their module-local forwarding wrappers.
+
+    Resolve only literal writer paths and os.path.join bindings, not arbitrary
+    functions named record. Never execute the scanned module.
+    """
+    try:
+        tree = ast.parse('\n'.join(lines))
+    except SyntaxError:
+        return set()  # Other signatures still scan incomplete or older Python syntax.
+    bindings = {node.targets[0].id: node.value for node in tree.body
+                if isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)}
+
+    def writer(node, seen=frozenset()):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return os.path.basename(node.value) == 'fm-guard-event.sh'
+        if isinstance(node, ast.Name) and node.id in bindings and node.id not in seen:
+            return writer(bindings[node.id], seen | {node.id})
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'join' and isinstance(node.func.value, ast.Attribute)
+                and isinstance(node.func.value.value, ast.Name)
+                and node.func.value.value.id == 'os' and node.func.value.attr == 'path'
+                and bool(node.args) and writer(node.args[-1], seen))
+
+    def event_decision(node):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess'
+                and node.func.attr == 'run' and node.args
+                and isinstance(node.args[0], (ast.List, ast.Tuple))):
+            args = node.args[0].elts
+            if len(args) >= 3 and writer(args[0]):
+                return args[2]
+        return None
+
+    def allows(node):
+        if isinstance(node, ast.IfExp):
+            return allows(node.body) and allows(node.orelse)
+        return isinstance(node, ast.Constant) and node.value == 'allow'
+
+    wrappers = {}
+    forwarded = set()
+    for function in tree.body:
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        parameters = [arg.arg for arg in function.args.posonlyargs + function.args.args]
+        for node in ast.walk(function):
+            decision = event_decision(node)
+            if isinstance(decision, ast.Name) and decision.id in parameters:
+                wrappers[function.name] = (parameters.index(decision.id), decision.id)
+                forwarded.add(node.lineno)
+    sites = set()
+    for node in ast.walk(tree):
+        decision = event_decision(node)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in wrappers:
+            index, name = wrappers[node.func.id]
+            decision = (node.args[index] if len(node.args) > index else
+                        next((kw.value for kw in node.keywords if kw.arg == name), None))
+        if decision is not None and node.lineno not in forwarded and not allows(decision):
+            sites.add(node.lineno)
+    return sites
+
+
 def embedded_kind(opener_line, tag):
     """The language of a heredoc body when the opener feeds an interpreter, else None (text)."""
     if re.search(r'\b(?:python3?|py)\b', opener_line):
@@ -300,6 +364,7 @@ def scan_file(root, rel, helpers, hook_names):
     if kind == 'other':
         kind = shebang_kind(path) or 'other'
     lines = read_lines(path)
+    python_events = python_event_lines(lines) if kind == 'py' else set()
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
     heredoc = None
@@ -385,7 +450,7 @@ def scan_file(root, rel, helpers, hook_names):
                     and '$#' not in (lines[number - 2] if stripped == 'exit 2' and number > 1 else stripped)) \
                 or (opencode and re.search(r'\bthrow new Error\(', line)):
             sig.append('D')
-        if event_denies(body):
+        if event_denies(body) or number in python_events:
             sig.append('E')
         if sig:
             sites.append((number, ','.join(sig), stripped))
