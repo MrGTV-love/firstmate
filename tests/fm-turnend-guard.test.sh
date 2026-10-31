@@ -32,25 +32,7 @@ AWAY_REQUIRED_REASON='Away mode owns watcher supervision'
 # comm/args/ppid queries are answered here; watcher liveness still reaches the
 # real ps.
 BLIND_BIN=$(fm_fakebin "$TMP_ROOT/blind-ancestry")
-REAL_PID_BIN=$(fm_fakebin "$TMP_ROOT/real-process-queries")
-# A shell shim's failed exec of setuid ps returns 1 under confinement, not the
-# direct exec's 126 that selects the production sysctl fallback. Preserve real
-# process queries through that same fallback; do not fake watcher identities or
-# the Pi marker test's ancestry.
-if [ "$(uname)" = Darwin ]; then
-  cat > "$REAL_PID_BIN/ps" <<SH
-#!/usr/bin/env bash
-if [ "\${1:-}" = -p ] && [ "\${3:-}" = -o ] && [ "\${4:-}" = lstart= ] \\
-  && [ "\${5:-}" = -o ] && [ "\${6:-}" = command= ]; then
-  exec python3 "$ROOT/bin/fm-proc-info.py" identity "\$2"
-elif [ "\${1:-}" = -o ] && [ "\${2:-}" = ppid= ] && [ "\${3:-}" = -p ]; then
-  exec python3 "$ROOT/bin/fm-proc-info.py" ppid "\$4"
-fi
-exec /bin/ps "\$@"
-SH
-  chmod +x "$REAL_PID_BIN/ps"
-fi
-PATH="$REAL_PID_BIN:$PATH" fm_fake_blind_ancestry "$BLIND_BIN"
+fm_fake_blind_ancestry "$BLIND_BIN"
 
 # --- PREDICATE: bin/fm-supervision-lib.sh -----------------------------------
 
@@ -422,7 +404,6 @@ install_guard_scripts() {
   cp "$ROOT/bin/fm-supervision-liveness-lib.sh" "$dir/bin/fm-supervision-liveness-lib.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
-  cp "$ROOT/bin/fm-proc-info.py" "$dir/bin/fm-proc-info.py"
   cp "$ROOT/bin/fm-guard-event.sh" "$dir/bin/fm-guard-event.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
@@ -1741,7 +1722,7 @@ test_pi_extension_keeps_marker_of_live_ancestor_session() {
   cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/fm-operational-input.sh"
   for marker_case in nested dead foreign fresh; do
     rm -f "$home/state/.pi-turnend-extension-loaded"
-    out=$(PATH="$REAL_PID_BIN:$PATH" PLUGIN="$ext" FM_HOME="$home" MARKER_CASE="$marker_case" node --input-type=module 2>&1 <<'EOF'
+    out=$(PLUGIN="$ext" FM_HOME="$home" MARKER_CASE="$marker_case" node --input-type=module 2>&1 <<'EOF'
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -1865,7 +1846,6 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-supervision-liveness-lib.sh" "$dir/bin/fm-supervision-liveness-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
-  cp "$ROOT/bin/fm-proc-info.py" "$dir/bin/fm-proc-info.py"
   cp "$ROOT/bin/fm-guard-event.sh" "$dir/bin/fm-guard-event.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
@@ -2992,8 +2972,6 @@ test_hook_no_afk_ignores_poll_derived_grace() {
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
   pass "fm-turnend-guard: with away mode off, the poll-derived grace never applies"
 }
-
-fm_test_only
 
 test_predicate_healthy_no_inflight
 test_predicate_unhealthy_no_beacon
