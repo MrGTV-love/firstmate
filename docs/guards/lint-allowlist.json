@@ -13,11 +13,6 @@
       "text": "if (value?.version !== 1 || typeof value.spawn_gen !== \"string\" || !Number.isSafeInteger(value.pid) "
     },
     {
-      "id": "site:.pi/extensions/fm-branch-supervision.ts:5275227479",
-      "rule": "S1",
-      "text": "reason: `native main requires an independent Pi supervision model and ${resolved.reason}; the branch"
-    },
-    {
       "id": "site:.pi/extensions/fm-branch-supervision.ts:f8fe3baab0",
       "rule": "S1",
       "text": "content: [{ type: \"text\", text: \"acknowledgement refused: through must be a positive outcome sequenc"
@@ -88,46 +83,6 @@
       "text": "1) printf 'refused to start the herdr server for session %s to protect a live or unknown server' \"$2"
     },
     {
-      "id": "site:bin/backends/herdr.sh:2437ef335e",
-      "rule": "S1",
-      "text": "echo \"error: exact herdr presentation pane for $id is $state; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:2e52874eba",
-      "rule": "S1",
-      "text": "echo \"error: herdr presentation pane for $id became $state during reclaim; refusing duplicate launch"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:fb21bdf156",
-      "rule": "S1",
-      "text": "echo \"error: herdr presentation pane for $id became $state at the close boundary; refusing duplicate"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:545643d28a",
-      "rule": "S1",
-      "text": "echo \"error: malformed herdr presentation journal for $id; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:f28f43ee56",
-      "rule": "S1",
-      "text": "echo \"error: could not inspect the quarantined herdr presentation for $id; refusing duplicate launch"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:dc6e9bd848",
-      "rule": "S1",
-      "text": "echo \"error: could not inspect herdr presentation workspace $wsid for $id; refusing duplicate launch"
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:30f7c0af7e",
-      "rule": "S1",
-      "text": "echo \"error: could not parse herdr presentation workspace $wsid for $id; refusing duplicate launch\" "
-    },
-    {
-      "id": "site:bin/backends/herdr.sh:94090b258a",
-      "rule": "S1",
-      "text": "echo \"error: quarantined herdr presentation for $id has a $state pane; refusing duplicate launch\" >&"
-    },
-    {
       "id": "site:bin/backends/zellij.sh:f28b432744",
       "rule": "S1",
       "text": "echo \"error: could not parse a zellij version from '$raw'; refusing to use an unverified zellij buil"
@@ -141,11 +96,6 @@
       "id": "site:bin/fm-afk-contract.sh:37a2123d26",
       "rule": "S1",
       "text": "fm_afk_contract_log \"away-posture record at $record is invalid; refusing to archive\""
-    },
-    {
-      "id": "site:bin/fm-afk-launch.sh:586c9ee9a7",
-      "rule": "S1",
-      "text": "fm_afk_launch_log \"quiet mode refuses while this home's away record (state/.afk-contract) is live; r"
     },
     {
       "id": "site:bin/fm-afk-launch.sh:336095bade",
@@ -188,51 +138,6 @@
       "text": "[ -n \"$HOME_REAL\" ] || refuse \"HOME '$HOME' is not an accessible directory\""
     },
     {
-      "id": "site:bin/fm-agy-trust.sh:f9c068970f",
-      "rule": "S1",
-      "text": "[ \"$WT_REAL\" != \"$HOME_REAL\" ] || refuse \"'$WT_REAL' is the home directory, not a task worktree\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:8b432f1933",
-      "rule": "S1",
-      "text": "[ -n \"$WT_TOP\" ] || refuse \"'$WT_REAL' is not inside a git repository\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:5e08becb11",
-      "rule": "S1",
-      "text": "[ \"$WT_TOP_REAL\" = \"$WT_REAL\" ] || refuse \"'$WT_REAL' is not a worktree root (its root is '${WT_TOP_"
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:8752bf5339",
-      "rule": "S1",
-      "text": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$WT_REAL' has no resolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:2fa6d387a0",
-      "rule": "S1",
-      "text": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$WT_REAL' has an unresolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:9bd5fc5273",
-      "rule": "S1",
-      "text": "[ -n \"$WT_COMMON\" ] || refuse \"'$WT_REAL' has no resolvable git common directory\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:d3711b32a9",
-      "rule": "S1",
-      "text": "[ \"$WT_GIT_DIR\" != \"$WT_COMMON\" ] || refuse \"'$WT_REAL' is a primary checkout, not an isolated workt"
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:25c0c8c606",
-      "rule": "S1",
-      "text": "[ -n \"$PROJ_COMMON\" ] || refuse \"project '$PROJ_REAL' is not inside a git repository\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:6477f8b942",
-      "rule": "S1",
-      "text": "[ \"$WT_COMMON\" = \"$PROJ_COMMON\" ] || refuse \"'$WT_REAL' is not a worktree of project '$PROJ_REAL'\""
-    },
-    {
       "id": "site:bin/fm-agy-trust.sh:e3e5ad871e",
       "rule": "S1",
       "text": "command -v node >/dev/null 2>&1 || refuse \"node is required to record workspace trust and was not fo"
@@ -243,29 +148,9 @@
       "text": "[ -n \"$STORE_DIR_REAL\" ] || refuse \"agy settings directory '$STORE_DIR' does not exist and could not"
     },
     {
-      "id": "site:bin/fm-agy-trust.sh:affabf1e4c",
-      "rule": "S1",
-      "text": "[ -n \"$STORE_REAL\" ] || refuse \"'$STORE' is a symlink whose target cannot be resolved\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:9bda99eabc",
-      "rule": "S1",
-      "text": "[ -f \"$STORE\" ] || refuse \"'$STORE' is not a regular file\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:908aa9ee10",
-      "rule": "S1",
-      "text": "[ -O \"$STORE\" ] || refuse \"'$STORE' is not owned by this user\""
-    },
-    {
       "id": "site:bin/fm-agy-trust.sh:499f20dd35",
       "rule": "S1",
       "text": "[ -w \"$STORE\" ] || refuse \"'$STORE' is not writable\""
-    },
-    {
-      "id": "site:bin/fm-agy-trust.sh:3363d2bee5",
-      "rule": "S1",
-      "text": "console.error(`error: ${store} was modified while trust was being recorded; refusing to overwrite it"
     },
     {
       "id": "site:bin/fm-agy-trust.sh:f85d43fd0d",
@@ -431,41 +316,6 @@
       "id": "site:bin/fm-bearings-board.sh:2f42c73344",
       "rule": "S1",
       "text": "fail \"the board Lavish session is not listed open immediately before arming (lavish-axi ${version:-v"
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:d6872d792b",
-      "rule": "S1",
-      "text": "echo \"error: backlog reconciliation refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:ea1f1cd07e",
-      "rule": "S1",
-      "text": "echo \"BACKLOG_RECONCILE: unsafe pending close refused: $FM_BACKLOG_TRANSITION_ERROR\""
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:7790ebdb39",
-      "rule": "S1",
-      "text": "echo \"BACKLOG_RECONCILE: unsafe worker record refused: $FM_BACKLOG_TRANSITION_ERROR\""
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:7790ebdb39~2",
-      "rule": "S1",
-      "text": "echo \"BACKLOG_RECONCILE: unsafe worker record refused: $FM_BACKLOG_TRANSITION_ERROR\""
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:7172fe80b2",
-      "rule": "S1",
-      "text": "echo \"BACKLOG_RECONCILE: $id: post-lock worker record check refused: $FM_BACKLOG_TRANSITION_ERROR\""
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:cf40160f0f",
-      "rule": "S1",
-      "text": "echo \"error: bootstrap refused unsafe pending close ($FM_BACKLOG_TRANSITION_ERROR)\" >&2"
-    },
-    {
-      "id": "site:bin/fm-bootstrap.sh:6a55b14f13",
-      "rule": "S1",
-      "text": "echo \"error: bootstrap refused unsafe worker record ($FM_BACKLOG_TRANSITION_ERROR)\" >&2"
     },
     {
       "id": "site:bin/fm-branch-outcome.sh:113dcedccd",
@@ -648,11 +498,6 @@
       "text": "printf 'refused: %s (cannot record the reconcile request)\\n' \"$id\""
     },
     {
-      "id": "site:bin/fm-claude-launcher-lib.sh:9553e25e3f",
-      "rule": "S1",
-      "text": "echo \"error: config/claude-launcher=teamclaude needs the executable launcher $launch_bin; refusing t"
-    },
-    {
       "id": "site:bin/fm-claude-stop-autoarm.sh:9016cec07f",
       "rule": "S1",
       "text": "autoarm_commit failed \"$FAILURE_NOTICE\" && exit 2"
@@ -718,209 +563,14 @@
       "text": "[ -n \"$CONFIG_DIR_REAL\" ] || refuse \"Claude config directory '$CONFIG_DIR' does not exist and could "
     },
     {
-      "id": "site:bin/fm-claude-trust.sh:92126f473b",
-      "rule": "S1",
-      "text": "[ \"$TARGET_REAL\" != / ] || refuse \"'/' is the filesystem root, not a $SCOPE_NOUN\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:49ec57829d",
-      "rule": "S1",
-      "text": "[ \"$TARGET_REAL\" != \"$CONFIG_DIR_REAL\" ] || refuse \"'$TARGET_REAL' is the Claude config directory, n"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:1f9de9ee40",
-      "rule": "S1",
-      "text": "[ \"$TARGET_REAL\" != \"${HOME_REAL:-}\" ] || refuse \"'$TARGET_REAL' is the home directory, not a $SCOPE"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:64a40d1b51",
-      "rule": "S1",
-      "text": "[ -n \"$WT_TOP\" ] || refuse \"'$TARGET_REAL' is not inside a git repository\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:ccf8f7aa1c",
-      "rule": "S1",
-      "text": "[ \"$WT_TOP_REAL\" = \"$TARGET_REAL\" ] || refuse \"'$TARGET_REAL' is not a worktree root (its root is '$"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:2a0e9b78a6",
-      "rule": "S1",
-      "text": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$TARGET_REAL' has no resolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:d7d60fc84b",
-      "rule": "S1",
-      "text": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$TARGET_REAL' has an unresolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:7a5b10824e",
-      "rule": "S1",
-      "text": "[ -n \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' has no resolvable git common directory\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:682a817d5d",
-      "rule": "S1",
-      "text": "[ \"$WT_GIT_DIR\" != \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' is a primary checkout, not an isolated w"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:25c0c8c606",
-      "rule": "S1",
-      "text": "[ -n \"$PROJ_COMMON\" ] || refuse \"project '$PROJ_REAL' is not inside a git repository\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:6d8669d053",
-      "rule": "S1",
-      "text": "[ -n \"$SIBLING_CANON\" ] || refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:fb4fc49d67",
-      "rule": "S1",
-      "text": "[ \"$SIBLING_GIT_DIR\" = \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:82780870a7",
-      "rule": "S1",
-      "text": "|| refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:67928c2d3d",
-      "rule": "S1",
-      "text": "[ -n \"$PROJ_GIT_DIR\" ] || refuse \"project '$PROJ_REAL' has no resolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:0c5bd6ee0f",
-      "rule": "S1",
-      "text": "[ -n \"$PROJ_GIT_DIR\" ] || refuse \"project '$PROJ_REAL' has an unresolvable git directory\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:be04d7d4d6",
-      "rule": "S1",
-      "text": "|| refuse \"project '$PROJ_REAL' is a linked worktree whose primary checkout could not be resolved\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:be04d7d4d6~2",
-      "rule": "S1",
-      "text": "|| refuse \"project '$PROJ_REAL' is a linked worktree whose primary checkout could not be resolved\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:261ba124d8",
-      "rule": "S1",
-      "text": "[ ! -L \"$LAB_MARKER\" ] || refuse \"'$LAB_MARKER' is a symlink; a lab home carries the marker as a reg"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:da812d9c34",
-      "rule": "S1",
-      "text": "refuse \"'$TARGET_REAL' carries no lab-home marker owned by this user, so it is not a disposable lab "
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:8ac90a52d0",
-      "rule": "S1",
-      "text": "[ -f \"$TARGET_REAL/AGENTS.md\" ] || refuse \"'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:ffbdff56b0",
-      "rule": "S1",
-      "text": "[ -d \"$TARGET_REAL/bin\" ] || refuse \"'$TARGET_REAL' has no bin/, so it is not a firstmate home\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:35a0dd1701",
-      "rule": "S1",
-      "text": "|| refuse \"'$TARGET_REAL' is not the top level of a git checkout\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:42887267a9",
-      "rule": "S1",
-      "text": "|| refuse \"'$TARGET_REAL' is a linked worktree, not the primary checkout a lab primary launches in\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:ea5c1fb3a3",
-      "rule": "S1",
-      "text": "[ -n \"$SUB_ID\" ] || refuse \"no secondmate id was supplied, so '$TARGET_REAL' cannot be matched again"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:31dcfc2704",
-      "rule": "S1",
-      "text": "[ ! -L \"$SUB_MARKER\" ] || refuse \"'$SUB_MARKER' is a symlink; a seeded secondmate home carries the m"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:6a7c53b031",
-      "rule": "S1",
-      "text": "[ -f \"$SUB_MARKER\" ] || refuse \"'$TARGET_REAL' carries no .fm-secondmate-home marker, so it is not a"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:21e9e85fdf",
-      "rule": "S1",
-      "text": "[ -O \"$SUB_MARKER\" ] || refuse \"'$SUB_MARKER' is not owned by this user\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:55ecfbafdd",
-      "rule": "S1",
-      "text": "[ \"$SUB_MARKER_ID\" = \"$SUB_ID\" ] || refuse \"'$TARGET_REAL' is marked for secondmate '${SUB_MARKER_ID"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:8ac90a52d0~2",
-      "rule": "S1",
-      "text": "[ -f \"$TARGET_REAL/AGENTS.md\" ] || refuse \"'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:ffbdff56b0~2",
-      "rule": "S1",
-      "text": "[ -d \"$TARGET_REAL/bin\" ] || refuse \"'$TARGET_REAL' has no bin/, so it is not a firstmate home\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:006aee00a2",
-      "rule": "S1",
-      "text": "refuse \"'$sub_dir' is a broken symlink, so this home's $sub_dir_name directory cannot be shown to st"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:03f1846bdf",
-      "rule": "S1",
-      "text": "[ -d \"$sub_dir\" ] || refuse \"'$sub_dir' is not a directory, so '$TARGET_REAL' is not a seeded second"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:d3d0599c68",
-      "rule": "S1",
-      "text": "[ -n \"$sub_dir_real\" ] || refuse \"'$sub_dir' cannot be resolved\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:9c89794d11",
-      "rule": "S1",
-      "text": "*) refuse \"'$sub_dir' resolves to '$sub_dir_real', outside the home, so '$TARGET_REAL' is not a safe"
-    },
-    {
       "id": "site:bin/fm-claude-trust.sh:e3e5ad871e",
       "rule": "S1",
       "text": "command -v node >/dev/null 2>&1 || refuse \"node is required to record workspace trust and was not fo"
     },
     {
-      "id": "site:bin/fm-claude-trust.sh:affabf1e4c",
-      "rule": "S1",
-      "text": "[ -n \"$STORE_REAL\" ] || refuse \"'$STORE' is a symlink whose target cannot be resolved\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:9bda99eabc",
-      "rule": "S1",
-      "text": "[ -f \"$STORE\" ] || refuse \"'$STORE' is not a regular file\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:908aa9ee10",
-      "rule": "S1",
-      "text": "[ -O \"$STORE\" ] || refuse \"'$STORE' is not owned by this user\""
-    },
-    {
       "id": "site:bin/fm-claude-trust.sh:499f20dd35",
       "rule": "S1",
       "text": "[ -w \"$STORE\" ] || refuse \"'$STORE' is not writable\""
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:661b00ddc5",
-      "rule": "S1",
-      "text": "`project entry for ${project} in ${store} already declined external CLAUDE.md imports; refusing to o"
-    },
-    {
-      "id": "site:bin/fm-claude-trust.sh:3363d2bee5",
-      "rule": "S1",
-      "text": "console.error(`error: ${store} was modified while trust was being recorded; refusing to overwrite it"
     },
     {
       "id": "site:bin/fm-claude-trust.sh:cd9ce572ac",
@@ -938,74 +588,14 @@
       "text": "echo 'error: dsh-tui screen: could not parse the composer frame or its input content; refusing launc"
     },
     {
-      "id": "site:bin/fm-control.sh:1620adace5",
-      "rule": "S1",
-      "text": "|| die \"another task copy allocation, return, or reassociation is in progress for ${RA_PREPROJECT[0]"
-    },
-    {
-      "id": "site:bin/fm-control.sh:0dfe8ac0db",
-      "rule": "S1",
-      "text": "|| die \"adopt refused: record proof needs a recorded PID other than the live foreground PID; the rec"
-    },
-    {
-      "id": "site:bin/fm-control.sh:96d702a8dc",
-      "rule": "S1",
-      "text": "echo \"adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $ad"
-    },
-    {
-      "id": "site:bin/fm-control.sh:7d699c8466",
-      "rule": "S1",
-      "text": "|| die \"adopt refused: launch-pin proof needs a positively readable environment without a usable lau"
-    },
-    {
-      "id": "site:bin/fm-control.sh:41d8e1f4d2",
-      "rule": "S1",
-      "text": "die \"task $ID runs on the $BACKEND backend, which has no recovery-grade agent-state classifier, so '"
-    },
-    {
       "id": "site:bin/fm-control.sh:8e803b584b",
       "rule": "S1",
       "text": "echo \"error: relaunch of $ID was refused before its agent was touched; nothing changed\" >&2"
     },
     {
-      "id": "site:bin/fm-control.sh:46074a8394",
-      "rule": "S1",
-      "text": "die \"refusing to relaunch $ID onto a stale model - $stale; the running agent was not stopped (relaun"
-    },
-    {
       "id": "site:bin/fm-control.sh:40e1be5da9",
       "rule": "S1",
       "text": "|| die \"task $ID has no instructions at $RELAUNCH_BRIEF; refusing to relaunch a worker with nothing "
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:6f5e8f66dc",
-      "rule": "S1",
-      "text": "echo \"REFUSED: $2 is no longer proven after its plan: $CLASS, $REASON\" >&2"
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:e99ad78db6",
-      "rule": "S1",
-      "text": "echo \"REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released.\" >&2"
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:e958600206",
-      "rule": "S1",
-      "text": "echo \"REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preser"
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:0e3919cc91",
-      "rule": "S1",
-      "text": "echo \"REFUSED: the preservable ignored content of $shown changed after it was preserved, or could no"
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:45d4351a99",
-      "rule": "S1",
-      "text": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names"
-    },
-    {
-      "id": "site:bin/fm-copy-sweep.sh:f7e10cba1a",
-      "rule": "S1",
-      "text": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words\" >&2"
     },
     {
       "id": "site:bin/fm-copy-sweep.sh:f9f22a7d61",
@@ -1033,19 +623,9 @@
       "text": "return refuse(str(error))"
     },
     {
-      "id": "site:bin/fm-duration.py:3702c3b723",
-      "rule": "S1",
-      "text": "return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')"
-    },
-    {
       "id": "site:bin/fm-ensure-agents-md.sh:855723e5f8",
       "rule": "S1",
       "text": "echo \"error: internal: refuse to overwrite existing CLAUDE.md\" >&2"
-    },
-    {
-      "id": "site:bin/fm-extension.mjs:f0bf59bae8",
-      "rule": "S1",
-      "text": "fail(\"binding-in-use\", diagnostic || \"binding retirement process-event preflight refused\");"
     },
     {
       "id": "site:bin/fm-harness.sh:e5a5b8a959",
@@ -1071,76 +651,6 @@
       "id": "site:bin/fm-herdr-lab.sh:fb5aecd570",
       "rule": "S1",
       "text": "'') fm_herdr_lab_error \"refusing an empty session name\" ;;"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:e464d318a5",
-      "rule": "S1",
-      "text": "refuse_active_home_path \"$home\" || return 1"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:e464d318a5~2",
-      "rule": "S1",
-      "text": "refuse_active_home_path \"$home\" || return 1"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:991bf97527",
-      "rule": "S1",
-      "text": "[ \"$target\" != \"/\" ] || { echo \"REFUSED: unsafe $label rollback target $target\" >&2; return 1; }"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:fbd56b0cbc",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:dec8ab3b1b",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:a3934b0de5",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is an ancestor of the active firstmate home\" >&"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:66a85da803",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is an ancestor of the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:33d167af16",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is inside the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:835773bebd",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label rollback target $target is inside the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:e93fb076c6",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe created project rollback target $target has projects directory outside the sec"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:9e3219eb92",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe created project rollback target $target is outside the secondmate projects dir"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:72744d0db5",
-      "rule": "S1",
-      "text": "echo \"error: seeded project $project at $dst is not initialized for no-mistakes; refusing to mutate "
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:eb681d77c0",
-      "rule": "S1",
-      "text": "refuse_active_home_path \"$requested_abs\" || return 1"
-    },
-    {
-      "id": "site:bin/fm-home-seed.sh:a2449afede",
-      "rule": "S1",
-      "text": "refuse_populated_projectless_home \"$home\" || return 1"
     },
     {
       "id": "site:bin/fm-home-seed.sh:1de9e6270f",
@@ -1188,64 +698,9 @@
       "text": "fm_lab_home_error \"refusing '$dir': exists and is not a directory\""
     },
     {
-      "id": "site:bin/fm-launch-proof-lib.sh:5fb0fdfa1e",
-      "rule": "S1",
-      "text": "echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:ce22ee5c76",
-      "rule": "S1",
-      "text": "echo 'adopt refused: endpoint proof needs the recorded pane to exist and be readable' >&2; return 1"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:5338e447c2",
-      "rule": "S1",
-      "text": "echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane'"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:d457d36dad",
-      "rule": "S1",
-      "text": "echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp proces"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:36133a6da7",
-      "rule": "S1",
-      "text": "echo 'adopt refused: generation proof needs the live process not to be pinned to another launch gene"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:31cf08ae11",
-      "rule": "S1",
-      "text": "echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pa"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:99f6304eee",
-      "rule": "S1",
-      "text": "*) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1"
-    },
-    {
-      "id": "site:bin/fm-launch-proof-lib.sh:9a4fb2c8b9",
-      "rule": "S1",
-      "text": "print(f\"adopt refused: {message}\", file=sys.stderr)"
-    },
-    {
       "id": "site:bin/fm-live-lab.sh:9fac1ea9c4",
       "rule": "S1",
       "text": "echo \"fail probe: no LABREADY-$NONCE reply in window main (model refused, turn still running, or a d"
-    },
-    {
-      "id": "site:bin/fm-live-lab.sh:2049c0ef0d",
-      "rule": "S1",
-      "text": "die \"refusing to remove the lab: its processes did not exit (pid ppid pgid state command): $details\""
-    },
-    {
-      "id": "site:bin/fm-lock.sh:5ca693258f",
-      "rule": "S1",
-      "text": "refuse_live_owner \"$old\""
-    },
-    {
-      "id": "site:bin/fm-lock.sh:5ca693258f~2",
-      "rule": "S1",
-      "text": "refuse_live_owner \"$old\""
     },
     {
       "id": "site:bin/fm-merge-local.sh:9c04c45fba",
@@ -1258,24 +713,9 @@
       "text": "echo \"error: local merge refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
     },
     {
-      "id": "site:bin/fm-merge-local.sh:525740e11f",
-      "rule": "S1",
-      "text": "echo \"error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-merge-local.sh:e768db489d",
-      "rule": "S1",
-      "text": "echo \"error: task $ID changed incarnation while waiting to merge; refusing\" >&2"
-    },
-    {
       "id": "site:bin/fm-merge-local.sh:58ca1af84d",
       "rule": "S1",
       "text": "echo \"error: $PROJ has a dirty working tree; refusing to merge into it\" >&2"
-    },
-    {
-      "id": "site:bin/fm-merge-local.sh:3b81dbeacf",
-      "rule": "S1",
-      "text": "echo \"REFUSED: $BRANCH is not a fast-forward of $DEFAULT (it has diverged).\" >&2"
     },
     {
       "id": "site:bin/fm-merge-prune.sh:ce0d41c495",
@@ -1318,16 +758,6 @@
       "text": "refuse_retired \"$harness\" \"$model\" \"in role '$role'\""
     },
     {
-      "id": "site:bin/fm-model-picker-jev.sh:1d2cd8cd00",
-      "rule": "S1",
-      "text": "printf '%s\\n' \"${FM_TYPESAFE_WITHHELD_REASON:-never-send policy refused the request}\" >&2"
-    },
-    {
-      "id": "site:bin/fm-pr-check.sh:c68a4f32f6",
-      "rule": "S1",
-      "text": "echo \"error: task worktree or branch changed while preparing PR registration; refusing\" >&2"
-    },
-    {
       "id": "site:bin/fm-pr-merge.sh:8e3a5c1ed9",
       "rule": "S1",
       "text": "echo \"error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
@@ -1338,29 +768,9 @@
       "text": "echo \"error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
     },
     {
-      "id": "site:bin/fm-pr-merge.sh:525740e11f",
-      "rule": "S1",
-      "text": "echo \"error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-pr-merge.sh:e768db489d",
-      "rule": "S1",
-      "text": "echo \"error: task $ID changed incarnation while waiting to merge; refusing\" >&2"
-    },
-    {
       "id": "site:bin/fm-pr-merge.sh:e132310448",
       "rule": "S1",
       "text": "echo \"error: refusing to merge $URL: the repository's default merge style could not be read; name on"
-    },
-    {
-      "id": "site:bin/fm-pr-merge.sh:70ce75fab4",
-      "rule": "S1",
-      "text": "printf 'error: this run refuses even though the request for %s was accepted with the exact flags bas"
-    },
-    {
-      "id": "site:bin/fm-pr-merge.sh:e696a72cea",
-      "rule": "S1",
-      "text": "printf 'error: auto-merge was requested and armed for %s, but nothing is merged or in the merge queu"
     },
     {
       "id": "site:bin/fm-pr-ready-reconcile.sh:2d08588ebc",
@@ -1408,16 +818,6 @@
       "text": "emit_doc \"$sid\" rejected \"refused without executing anything: $SPEC_ERROR\" \"$polls\" '' ''"
     },
     {
-      "id": "site:bin/fm-procevent-when.sh:f3c7161e38",
-      "rule": "S1",
-      "text": "\"refused without executing the action: its bytes do not match the registered trust binding\" \"$polls\""
-    },
-    {
-      "id": "site:bin/fm-procevent.sh:768595adef",
-      "rule": "S1",
-      "text": "printf '%s' \"its claim names a dead runner whose process group still has members, so reconcile prese"
-    },
-    {
       "id": "site:bin/fm-project-mode.sh:d25f70d7b3",
       "rule": "S1",
       "text": "echo \"refused: empty forge binding \\\"forge=\\\" registered for $NAME in $REG; the accepted values are "
@@ -1426,11 +826,6 @@
       "id": "site:bin/fm-project-mode.sh:15ed9d8248",
       "rule": "S1",
       "text": "echo \"refused: unknown forge \\\"${forge#forge=}\\\" registered for $NAME in $REG; the accepted values a"
-    },
-    {
-      "id": "site:bin/fm-project-mode.sh:44951e68e0",
-      "rule": "S1",
-      "text": "echo \"refused: $NAME is registered local-only with forge=$forge in $REG; local-only publishes nothin"
     },
     {
       "id": "site:bin/fm-public-followup.sh:07a03dd01e",
@@ -1478,11 +873,6 @@
       "text": "fix_report \"$report\" failed \"launchctl kickstart gui/$UID_NUM/$LAUNCH_AGENT_LABEL refused: ${out:-no"
     },
     {
-      "id": "site:bin/fm-remote-herdr-guard.sh:8db26bc4bf",
-      "rule": "S1",
-      "text": "fm_remote_herdr_owner_reader_available || { printf 'fm-remote-herdr-guard: python3 prerequisite does"
-    },
-    {
       "id": "site:bin/fm-remote-herdr-guard.sh:d1189be321",
       "rule": "S1",
       "text": "*) log \"the start lock refused to start session $SESSION; re-checking\" ;;"
@@ -1518,11 +908,6 @@
       "text": "REMOTE_ENDPOINT_ERROR=\"remote secondmate $id endpoint target '$REMOTE_ENDPOINT_TARGET' is outside He"
     },
     {
-      "id": "site:bin/fm-remote-secondmate-control.sh:80c2bb9c8d",
-      "rule": "S1",
-      "text": "*) die \"remote endpoint state is $current; refusing duplicate launch\" ;;"
-    },
-    {
       "id": "site:bin/fm-remote-secondmate-relaunch.sh:012694b791",
       "rule": "S1",
       "text": "printf 'error: remote inheritance refused; the running secondmate was not relaunched\\n' >&2"
@@ -1538,21 +923,6 @@
       "text": "printf 'model index refuses %s %s: %s\\n' \"$h\" \"$m\" \"${out:-no detail}\""
     },
     {
-      "id": "site:bin/fm-secondmate-liveness-lib.sh:ef65cd4144",
-      "rule": "S1",
-      "text": "reason=\"check: secondmate $id auto-relaunch refused: $FM_SM_LIVE_REASON\""
-    },
-    {
-      "id": "site:bin/fm-send.sh:b6f734ba04",
-      "rule": "S1",
-      "text": "echo \"error: --resolve-key '$k' cannot take effect: this key is reserved for its owning library, and"
-    },
-    {
-      "id": "site:bin/fm-send.sh:12c3788998",
-      "rule": "S1",
-      "text": "echo \"error: --resolve-key cannot close a decision key of length ${#k}: its ${#probe_line}-character"
-    },
-    {
       "id": "site:bin/fm-send.sh:37fb341054",
       "rule": "S1",
       "text": "echo \"error: explicitly requested pending-reply correlation '${existing_corr:-empty}' is not reusabl"
@@ -1563,16 +933,6 @@
       "text": "echo \"error: pending-reply delivery for $TARGET_TASK_ID is unresolved; refusing to resend correlatio"
     },
     {
-      "id": "site:bin/fm-session-end-relaunch-lib.sh:bf88888fda",
-      "rule": "S1",
-      "text": "reason=\"check: $id auto-relaunch refused after session-end: $(fm_session_end_first_line \"$policy_err"
-    },
-    {
-      "id": "site:bin/fm-session-launch-policy-lib.sh:2a9ea3535d",
-      "rule": "S1",
-      "text": "printf \"error: config/session-launch-policy=omp-or-tc refuses launch '%s'; only the canonical omp ad"
-    },
-    {
       "id": "site:bin/fm-spawn.sh:ce9df83989",
       "rule": "S1",
       "text": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
@@ -1581,11 +941,6 @@
       "id": "site:bin/fm-spawn.sh:ce9df83989~2",
       "rule": "S1",
       "text": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:72505e7e0e",
-      "rule": "S1",
-      "text": "echo \"error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
     },
     {
       "id": "site:bin/fm-spawn.sh:fb8517a25f",
@@ -1603,11 +958,6 @@
       "text": "echo \"error: remote secondmate $id inheritance failed; launch refused\" >&2"
     },
     {
-      "id": "site:bin/fm-spawn.sh:3304861cdb",
-      "rule": "S1",
-      "text": "echo \"warning: herdr presentation focus lock unavailable; retaining the projection journal and refus"
-    },
-    {
       "id": "site:bin/fm-spawn.sh:ce9df83989~3",
       "rule": "S1",
       "text": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
@@ -1618,44 +968,9 @@
       "text": "echo \"error: spawn refused: state directory does not exist at $STATE\" >&2"
     },
     {
-      "id": "site:bin/fm-spawn.sh:ee41751d06",
-      "rule": "S1",
-      "text": "echo \"error: this home's task set is locked by another spawn; refusing to create task $ID rather tha"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:974cf61c12",
-      "rule": "S1",
-      "text": "echo \"error: this home's task set is locked by a forced teardown; refusing to create task $ID rather"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:a21a96a813",
-      "rule": "S1",
-      "text": "echo \"error: this home's task set is locked by another operation; refusing to create task $ID rather"
-    },
-    {
       "id": "site:bin/fm-spawn.sh:ce9df83989~4",
       "rule": "S1",
       "text": "echo \"error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:72505e7e0e~2",
-      "rule": "S1",
-      "text": "echo \"error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:b91faf534d",
-      "rule": "S1",
-      "text": "echo \"error: --relaunch refused after locking: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:0317c67e61",
-      "rule": "S1",
-      "text": "echo \"error: backend '$BACKEND' has no recovery-grade agent-state classifier, so a relaunch cannot p"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:b9420e347b",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's recorded endpoint $RELAUNCH_TARGET reads 'missing', but ${RELAUNCH_ABSENCE#*"
     },
     {
       "id": "site:bin/fm-spawn.sh:ffee538574",
@@ -1673,11 +988,6 @@
       "text": "echo \"error: task $ID has no recorded project; refusing to relaunch\" >&2"
     },
     {
-      "id": "site:bin/fm-spawn.sh:51ed3a0ea1",
-      "rule": "S1",
-      "text": "echo \"error: refusing to launch a stale model - $MODEL_STALE\" >&2"
-    },
-    {
       "id": "site:bin/fm-spawn.sh:9e1ac44574",
       "rule": "S1",
       "text": "echo \"error: refusing Kimi spawn because backend '$BACKEND' has no verified viewport-bounded capture"
@@ -1686,171 +996,6 @@
       "id": "site:bin/fm-spawn.sh:5f8772984f",
       "rule": "S1",
       "text": "echo \"error: refusing Kimi spawn because the global turn-end hook could not be installed safely\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:b754a1376c",
-      "rule": "S1",
-      "text": "echo \"error: spawn refused: the project capacity declaration is unreadable ($FM_PROJECT_CAPACITY_ERR"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:c04b3f041c",
-      "rule": "S1",
-      "text": "echo \"error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race "
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:406212444f",
-      "rule": "S1",
-      "text": "echo \"error: another Treehouse slot allocation or return is in progress for $PROJ_ABS; refusing to r"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:e97be4d9af",
-      "rule": "S1",
-      "text": "echo \"error: spawn refused: project $(basename \"$PROJ_ABS\") declares a capacity of $SPAWN_PROJECT_CA"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:a9c6297e92",
-      "rule": "S1",
-      "text": "echo \"error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race "
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:3c8791687a",
-      "rule": "S1",
-      "text": "echo \"error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate ont"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:df4fa8d439",
-      "rule": "S1",
-      "text": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refus"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:6eceab4636",
-      "rule": "S1",
-      "text": "echo \"error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while re"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:ebbba8c71b",
-      "rule": "S1",
-      "text": "echo \"error: $SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentiall"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:7e39eaec88",
-      "rule": "S1",
-      "text": "echo \"error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a poten"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:aa36ff86ec",
-      "rule": "S1",
-      "text": "echo \"error: could not resolve origin's current default branch for pooled worktree '$worktree'; refu"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:3e869d776f",
-      "rule": "S1",
-      "text": "echo \"error: could not determine origin's default branch for pooled worktree '$worktree'; refusing t"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:659ad14dc2",
-      "rule": "S1",
-      "text": "echo \"error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a po"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:8d1b3230bc",
-      "rule": "S1",
-      "text": "echo \"error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a po"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:4b26ffb917",
-      "rule": "S1",
-      "text": "echo \"error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a pot"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:596118b4b3",
-      "rule": "S1",
-      "text": "echo \"error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expect"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:f3ec81d9b4",
-      "rule": "S1",
-      "text": "echo \"error: existing metadata for $ID has no endpoint; refusing duplicate launch while its herdr pr"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:9b2f5c0fd1",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr endpoint for $ID is malformed; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:04987f3470",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr metadata for $ID has an ambiguous session; refusing duplicate launch\" >&"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:de4befbbdd",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr metadata for $ID has an ambiguous workspace; refusing duplicate launch\" "
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:43f9474936",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr metadata for $ID has an ambiguous tab; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:a71e54b7c3",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr metadata for $ID has an ambiguous pane; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:970b25a919",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr metadata for $ID has inconsistent endpoint identities; refusing duplicat"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:691207f279",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr endpoint for $ID could not be inspected; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:e30356ed0f",
-      "rule": "S1",
-      "text": "echo \"error: existing herdr endpoint for $ID is $old_state; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:0ad2ed663d",
-      "rule": "S1",
-      "text": "echo \"error: existing $old_backend endpoint for $ID is $old_state; refusing duplicate launch\" >&2"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:6b0ad4dcdc",
-      "rule": "S1",
-      "text": "echo \"error: herdr presentation recovery could not acquire its session lock; refusing a concurrent r"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:72b1933ad0",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's endpoint could not be moved into its recorded worktree '$WT'; refusing to la"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:8ba0d5538a",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's worker started in '${seen:-unknown}', not its recorded worktree '$WT'; refus"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:1ae5219822",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT';"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:06e96eb060",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and could not be told to return t"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:876e6bd710",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and did not return to its recorde"
-    },
-    {
-      "id": "site:bin/fm-spawn.sh:b25f6812ae",
-      "rule": "S1",
-      "text": "echo \"error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose"
     },
     {
       "id": "site:bin/fm-spawn.sh:6cef05ee5c",
@@ -1871,21 +1016,6 @@
       "id": "site:bin/fm-task-copy-lib.sh:5d02771829",
       "rule": "S1",
       "text": "echo \"REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed\" >&2"
-    },
-    {
-      "id": "site:bin/fm-task-copy-lib.sh:cff030a213",
-      "rule": "S1",
-      "text": "remedy=\"treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && tr"
-    },
-    {
-      "id": "site:bin/fm-task-copy-lib.sh:6df0fed844",
-      "rule": "S1",
-      "text": "echo \"error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT"
-    },
-    {
-      "id": "site:bin/fm-teamclaude-launch.sh:44ffecd422",
-      "rule": "S1",
-      "text": "printf 'error: TeamClaude %s; refusing to launch Claude without it\\n' \"$1\" >&2"
     },
     {
       "id": "site:bin/fm-teardown-nested-lib.sh:1e2a47c1d3",
@@ -1913,26 +1043,6 @@
       "text": "teardown_refuse_copy inspection-unavailable \"task $ID's nested copy $own could not be scanned for ot"
     },
     {
-      "id": "site:bin/fm-teardown-nested-lib.sh:32113e701f",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot durably record process $pid identity for $ID; preserving the worktree without "
-    },
-    {
-      "id": "site:bin/fm-teardown-nested-lib.sh:c919036e6e",
-      "rule": "S1",
-      "text": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\\n\" "
-    },
-    {
-      "id": "site:bin/fm-teardown-nested-lib.sh:af58ba465b",
-      "rule": "S1",
-      "text": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output could n"
-    },
-    {
-      "id": "site:bin/fm-teardown-nested-lib.sh:bde0cf8dd6",
-      "rule": "S1",
-      "text": "teardown_refuse_copy ignored-bytes-preserved \"the ignored files of foreign copy $copy could not be p"
-    },
-    {
       "id": "site:bin/fm-teardown-nested-lib.sh:3cb7f37ffb",
       "rule": "S1",
       "text": "teardown_refuse_copy creation-lock-owner \"foreign copy $copy is locked by something other than Verna"
@@ -1953,11 +1063,6 @@
       "text": "echo \"REFUSED: the lock state of foreign copy $(fm_refuse_text \"$copy\") cannot be read; it was not r"
     },
     {
-      "id": "site:bin/fm-teardown-nested-lib.sh:0537a2a132",
-      "rule": "S1",
-      "text": "teardown_refuse_copy \"$TEARDOWN_FOREIGN_RULE\" \"foreign copy $copy in pool slot $slot is no longer pr"
-    },
-    {
       "id": "site:bin/fm-teardown-nested-lib.sh:6c57de2c09",
       "rule": "S1",
       "text": "teardown_refuse_copy \"${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}\" \"own nested copy $copy stays in"
@@ -1966,16 +1071,6 @@
       "id": "site:bin/fm-teardown-nested-lib.sh:b25316f0e7",
       "rule": "S1",
       "text": "echo \"REFUSED: own nested copy $(fm_refuse_text \"$copy\") is not locked by Vernant's creation lock an"
-    },
-    {
-      "id": "site:bin/fm-teardown-nested-lib.sh:17810f39fe",
-      "rule": "S1",
-      "text": "teardown_refuse_copy ignored-bytes-preserved \"the ignored files of own nested copy $copy could not b"
-    },
-    {
-      "id": "site:bin/fm-teardown-nested-lib.sh:63e3439ca8",
-      "rule": "S1",
-      "text": "echo \"REFUSED: an own nested copy in pool slot $slot is no longer provable; nothing was removed.\" >&"
     },
     {
       "id": "site:bin/fm-teardown.sh:5fc370d2c3",
@@ -1993,16 +1088,6 @@
       "text": "echo \"error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
     },
     {
-      "id": "site:bin/fm-teardown.sh:1742691fb0",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missin"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:c2ec3e45b9",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; the task"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:fc52576664",
       "rule": "S1",
       "text": "echo \"REFUSED: pool slot $slot was not proved durably leased after reservation; retaining its task r"
@@ -2016,21 +1101,6 @@
       "id": "site:bin/fm-teardown.sh:a8bd44545f",
       "rule": "S1",
       "text": "echo \"error: teardown refused after locking: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:6a12508863",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's record has no spawn_gen that identifies one exact incarnation ($FM_BACKLOG_T"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:9d3ec07434",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's record has an unreadable spawn_gen that identifies one exact incarnation ($F"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:a2d94717b9",
-      "rule": "S1",
-      "text": "echo \"error: task $ID's record carries the legacy incarnation stamp $FM_BACKLOG_META_SPAWN_GEN left "
     },
     {
       "id": "site:bin/fm-teardown.sh:1a8c738378",
@@ -2153,71 +1223,6 @@
       "text": "echo \"REFUSED: remote backlog outbox changed during retirement\" >&2"
     },
     {
-      "id": "site:bin/fm-teardown.sh:77aa67b72f",
-      "rule": "S1",
-      "text": "echo \"REFUSED: secondmate $ID still has an unresolved routed reply\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:f216eeed7e",
-      "rule": "S1",
-      "text": "[ \"$kind\" = secondmate ] || { echo \"REFUSED: remote placement metadata is valid only for a secondmat"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:35961c75de",
-      "rule": "S1",
-      "text": "[ -n \"$remote_root\" ] && [ -n \"$remote_home\" ] || { echo \"REFUSED: remote secondmate metadata is inc"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:9cc9a32e95",
-      "rule": "S1",
-      "text": "secondmate_registry_line_for_id \"$SECONDMATE_REG\" \"$ID\" || { echo \"REFUSED: remote secondmate route "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:9f6d6df9d8",
-      "rule": "S1",
-      "text": "[ \"$SECONDMATE_REGISTRY_REMOTE\" -eq 1 ] || { echo \"REFUSED: secondmate registry route is not remote\""
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:75d1416fc8",
-      "rule": "S1",
-      "text": "|| { echo \"REFUSED: remote secondmate metadata does not match its registry route\" >&2; return 1; }"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5d77e5289a",
-      "rule": "S1",
-      "text": "echo \"REFUSED: remote secondmate $ID still has a pending backlog outbox; deliver it or explicitly di"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:399f4d3553",
-      "rule": "S1",
-      "text": "secondmate_unresolved_pending_replies_refuse || return 1"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:526b3e50ee",
-      "rule": "S1",
-      "text": "echo \"REFUSED: remote secondmate $ID still has an unhandled captured reply\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:1134923238",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:1aec97b857",
-      "rule": "S1",
-      "text": "echo \"REFUSED: task $ID's Treehouse project identity changed while teardown acquired its locks; noth"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:f854098b5e",
-      "rule": "S1",
-      "text": "echo \"REFUSED: task $ID stopped naming a live Treehouse slot while teardown acquired its locks; noth"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:f5bd7d3997",
-      "rule": "S1",
-      "text": "echo \"REFUSED: task $ID's record predates spawn_gen and its recorded endpoint reads '$TEARDOWN_LEGAC"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:f19784236d",
       "rule": "S1",
       "text": "echo \"REFUSED: unsafe task PR-check artifact; preserving task state.\" >&2"
@@ -2228,99 +1233,9 @@
       "text": "echo \"REFUSED: invalid PR-poll retirement receipt; preserving task state.\" >&2"
     },
     {
-      "id": "site:bin/fm-teardown.sh:5c92eb1fd3",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot canonicalize pool slot $slot; retain its records and lease and inspect the slo"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:7df6cf3215",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot inspect registered copies in pool slot $slot; retain its records and lease and"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:8a21dbc957",
-      "rule": "S1",
-      "text": "echo \"REFUSED: pool slot $slot contains registered copy $(fm_refuse_text \"$copy\") that is not one of"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:7e5b5a8225",
-      "rule": "S1",
-      "text": "teardown_refuse_copy registered-copy-proven \"pool slot $slot contains registered copy $copy that is "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:f3a7fccfa5",
-      "rule": "S1",
-      "text": "echo \"Keep each listed copy and its records. For each one, run the completing-command or answer the "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:579fbf1045",
-      "rule": "S1",
-      "text": "echo \"REFUSED: no-mistakes run for $ID is still parked after axi abort; confirm it stopped (no-mista"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:5d02771829",
       "rule": "S1",
       "text": "echo \"REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:3b8c73e3b6",
-      "rule": "S1",
-      "text": "echo \"REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $l"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:4a256d37d8",
-      "rule": "S1",
-      "text": "echo \"REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership b"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170~2",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:1d812506b5",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp f"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170~3",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:1304b8f282",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/t"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170~4",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170~5",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:8288e7ffd9",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/t"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5c3ea2f170~6",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:56129f82a0",
-      "rule": "S1",
-      "text": "echo \"REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving th"
     },
     {
       "id": "site:bin/fm-teardown.sh:5d02771829~2",
@@ -2328,44 +1243,9 @@
       "text": "echo \"REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed\" >&2"
     },
     {
-      "id": "site:bin/fm-teardown.sh:811302f52a",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot establish nested worktree ownership under $canon_wt; preserving the launch age"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:022b5e54c7",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot classify the worktree holding no-mistakes launch agent $label's root $canon_ro"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5eff67acac",
-      "rule": "S1",
-      "text": "echo \"REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable,"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:ca11fbfa08",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:0840316db7",
-      "rule": "S1",
-      "text": "echo \"REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchct"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:18a5330eb3",
-      "rule": "S1",
-      "text": "echo \"REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the work"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:f1e2f3d9b7",
       "rule": "S1",
       "text": "echo \"REFUSED: $skipped; nothing was changed\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:8555b4b623",
-      "rule": "S1",
-      "text": "echo \"REFUSED: task $record_id's recorded worktree $worktree carries a slot-owner claim that cannot "
     },
     {
       "id": "site:bin/fm-teardown.sh:5d02771829~3",
@@ -2383,61 +1263,6 @@
       "text": "echo \"Treehouse 2.3.1-fm has no supported non-forcing route to replace this recovered-state lease: t"
     },
     {
-      "id": "site:bin/fm-teardown.sh:cf9181c4c5",
-      "rule": "S1",
-      "text": "echo \"REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was chan"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:feccb8ae4f",
-      "rule": "S1",
-      "text": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:7163d8356d",
-      "rule": "S1",
-      "text": "echo \"REFUSED: a foreign copy in pool slot $TEARDOWN_HELD_SLOT changed since the slot was proved, so"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:e5f07c4a7d",
-      "rule": "S1",
-      "text": "echo \"REFUSED: no other live task works in pool slot $TEARDOWN_PEER_SLOT any more, so task $ID's cle"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:bd3bc48410",
-      "rule": "S1",
-      "text": "''|/) echo \"REFUSED: unsafe $label removal target $target\" >&2; return 1 ;;"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:486651be15",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:03084d6c64",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:ad6a5801e1",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is an ancestor of the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:8497738510",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is an ancestor of the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:d430091fb5",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is inside the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:8608c529bc",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $target is inside the firstmate repo\" >&2"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:2a76b8cb2e",
       "rule": "S1",
       "text": "echo \"REFUSED: $SECONDMATE_REGISTRY_ERROR\" >&2"
@@ -2448,59 +1273,9 @@
       "text": "echo \"REFUSED: malformed secondmate registry entry: $line\" >&2"
     },
     {
-      "id": "site:bin/fm-teardown.sh:170d281a98",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label $name directory $dir resolves outside the secondmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:33685336fc",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label $name path $dir is not a directory\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:170d281a98~2",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label $name directory $dir resolves outside the secondmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:6265394994",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe child worktree removal target $target is inside the active firstmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:2f4b226ad4",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe child worktree removal target $target is inside the firstmate repo\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:73d3e1260f",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe child worktree removal target $target is not a git worktree for ${project:-the"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:a4277c1227",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $home is not a seeded secondmate home\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:14b484e45b",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $home is marked for secondmate ${marker_id:-unknown}, ex"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:b0b991e95e",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $home contains registered secondmate home; $SECONDMATE_R"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:f64aef1143",
       "rule": "S1",
       "text": "*) echo \"REFUSED: $SECONDMATE_REGISTRY_ERROR\" >&2 ;;"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:282062931e",
-      "rule": "S1",
-      "text": "echo \"REFUSED: unsafe $label removal target $home contains registered secondmate home $child_home fo"
     },
     {
       "id": "site:bin/fm-teardown.sh:8269c9aca7",
@@ -2533,31 +1308,6 @@
       "text": "echo \"REFUSED: descendant task $task_id has an invalid metadata lock path; forced teardown changed n"
     },
     {
-      "id": "site:bin/fm-teardown.sh:f00fba39fc",
-      "rule": "S1",
-      "text": "echo \"REFUSED: descendant task $task_id changed while forced teardown acquired its locks; forced tea"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:5e19b0ebff",
-      "rule": "S1",
-      "text": "echo \"REFUSED: descendant task $task_id changed kind while forced teardown acquired its locks; force"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:c2d4008744",
-      "rule": "S1",
-      "text": "echo \"REFUSED: descendant task $task_id changed home while forced teardown acquired its locks; force"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:962c158899",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for child $task_id; forced teardown "
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:30d0ebba46",
-      "rule": "S1",
-      "text": "echo \"REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:1c2bf84104",
       "rule": "S1",
       "text": "echo \"REFUSED: child $child_id pool slot is no longer durably reserved; retaining its task record an"
@@ -2573,49 +1323,9 @@
       "text": "echo \"REFUSED: child $child_id pool slot is durably leased and treehouse is not installed to return "
     },
     {
-      "id": "site:bin/fm-teardown.sh:33a405d5ab",
-      "rule": "S1",
-      "text": "echo \"REFUSED: cannot resolve the primary home for marked secondmate $SECOND_MATE_ID; refusing clean"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:802fc73c12",
-      "rule": "S1",
-      "text": "echo \"REFUSED: secondmate $ID still has in-flight work in $SUB_STATE.\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:e9a644179c",
-      "rule": "S1",
-      "text": "secondmate_unresolved_pending_replies_refuse || exit 1"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:59aa1c1992",
-      "rule": "S1",
-      "text": "echo \"REFUSED: scout task $ID has no report at $REPORT.\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:d5e9c5a27b",
-      "rule": "S1",
-      "text": "echo \"REFUSED: scout task $ID has not passed the captain-call completion gate.\" >&2"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:abceac1a3d",
-      "rule": "S1",
-      "text": "echo \"REFUSED: task $ID still owes a public reply through the myfirstmate relay.\" >&2"
-    },
-    {
       "id": "site:bin/fm-teardown.sh:8cfc248b34",
       "rule": "S1",
       "text": "[ -z \"$TEARDOWN_HELD_SLOT\" ] || echo \"REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durabl"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:d6b7a520a9",
-      "rule": "S1",
-      "text": "echo \"error: the stamped legacy incarnation does not validate for $ID ($FM_BACKLOG_TRANSITION_ERROR)"
-    },
-    {
-      "id": "site:bin/fm-teardown.sh:f877c09024",
-      "rule": "S1",
-      "text": "echo \"error: could not stamp the accepted legacy incarnation into task $ID's record; refusing destru"
     },
     {
       "id": "site:bin/fm-teardown.sh:88fbf36b30",
@@ -2626,31 +1336,6 @@
       "id": "site:bin/fm-test-isolation-proof.sh:bcbb439d55",
       "rule": "S1",
       "text": "[ \"${#CANDIDATES[@]}\" -gt 0 ] || die \"candidate set is empty; refusing isolation proof\""
-    },
-    {
-      "id": "site:bin/fm-test-run.sh:c83a110e0b",
-      "rule": "S1",
-      "text": "die \"refusing to run in the repository primary checkout $top while FM_TASK_ID=$task_id is set; run f"
-    },
-    {
-      "id": "site:bin/fm-test-run.sh:2aa4f7d9bf",
-      "rule": "S1",
-      "text": "refuse_primary_checkout_for_task"
-    },
-    {
-      "id": "site:bin/fm-test-run.sh:75d704ca1d",
-      "rule": "S1",
-      "text": "portable-serial|portable-serial-*) die \"--jobs $JOBS refused: portable serial lanes stay serial; use"
-    },
-    {
-      "id": "site:bin/fm-test-run.sh:1e9aece117",
-      "rule": "S1",
-      "text": "die \"--jobs $JOBS refused: $s is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh "
-    },
-    {
-      "id": "site:bin/fm-test-run.sh:4296e9c739",
-      "rule": "S1",
-      "text": "|| die \"--jobs $JOBS refused: family $family is proven only up to $family_jobs_max concurrent worker"
     },
     {
       "id": "site:bin/fm-turnend-guard.sh:0f9ac132f3",
@@ -2668,11 +1353,6 @@
       "text": "log(verbose, \"the profile refused, so falling back to the credentials \""
     },
     {
-      "id": "site:bin/fm-wake-drain.sh:ee616918f5",
-      "rule": "S1",
-      "text": "echo \"wake drain: no branch-eligible row snapshot at $ELIGIBLE_ROWS_FILE; refusing to guess what thi"
-    },
-    {
       "id": "site:bin/fm-wake-drain.sh:d79d498e28",
       "rule": "S1",
       "text": "printf 'BRANCH OUTCOMES: the store could not record this presentation, so these outcomes are present"
@@ -2681,11 +1361,6 @@
       "id": "site:bin/fm-watch.sh:a96c5b803c",
       "rule": "S1",
       "text": "triage_log \"refused a malformed wait record for $label: $win\""
-    },
-    {
-      "id": "site:bin/fm-x-reply.sh:c7b051bf5b",
-      "rule": "S1",
-      "text": "printf 'fm-x-reply: refusing follow-up for %s: could not authoritatively determine both the reply pl"
     },
     {
       "id": "site:bin/fm_model_picker/shadow.py:780e21e5cd",
@@ -2756,21 +1431,6 @@
       "id": "site:bin/fm_slack_watch.py:b87590d7e0",
       "rule": "S1",
       "text": "print('slack: refused: ' + str(error), file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:48851dec81",
-      "rule": "S1",
-      "text": "print('slack: refused: unsafe_state_path', file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:48851dec81~2",
-      "rule": "S1",
-      "text": "print('slack: refused: unsafe_state_path', file=sys.stderr)"
-    },
-    {
-      "id": "site:bin/fm_slack_watch.py:8c3491cc35",
-      "rule": "S1",
-      "text": "print('slack: refused: unsafe_check_shim', file=sys.stderr)"
     },
     {
       "id": "site:bin/fm_slack_watch.py:d8412fdb5f",

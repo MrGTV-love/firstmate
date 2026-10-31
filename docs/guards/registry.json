@@ -4,6 +4,65 @@
   "spec": "docs/guard-spec.md",
   "audited": 30,
   "beyond_audit_active": [
+    "live-lab-processes-stopped-before-remove",
+    "merge-local-ff-only",
+    "merge-unproved-outcome",
+    "nested-copy-ignored-bytes-preserved",
+    "nested-copy-reproof",
+    "nested-copy-vernant-closeout",
+    "nm-launch-agent-unloaded-first",
+    "nm-run-stopped-first",
+    "no-duplicate-launch",
+    "no-write-into-project-tree",
+    "omp-adopt-launch-proof",
+    "pi-branch-independent-model",
+    "pool-slot-allocation-live-copy",
+    "pooled-copy-no-discard",
+    "procevent-binding-in-use",
+    "procevent-stranded-claim-preserve",
+    "procevent-when-trust-binding",
+    "project-capacity-admission",
+    "project-local-only-no-forge",
+    "public-reply-owed",
+    "quiet-blocked-by-live-away",
+    "relaunch-proven-agent-free",
+    "remote-herdr-owner-proof",
+    "remote-secondmate-route-binding",
+    "resolve-key-effective-close",
+    "safe-rm-rf-target",
+    "scout-captain-call-gate",
+    "scout-report-required",
+    "secondmate-home-not-active-home",
+    "secondmate-in-flight-work",
+    "secondmate-undelivered-replies",
+    "seed-no-mutate-preexisting-clone",
+    "seed-no-projects-on-populated-home",
+    "session-launch-policy",
+    "session-lock-single-owner",
+    "signal-only-recorded-process",
+    "slot-owner-claim",
+    "slot-registered-copies-proven",
+    "spawn-fresh-base",
+    "spawn-lock-no-race",
+    "spawn-stale-model",
+    "state-record-home-containment",
+    "task-record-changed-under-lock",
+    "teamclaude-launcher-required",
+    "teardown-exact-incarnation",
+    "teardown-process-reap-custody",
+    "teardown-slot-route-reproof",
+    "test-run-primary-checkout",
+    "test-run-unproven-concurrency",
+    "treehouse-slot-lock-serialization",
+    "trust-import-consent",
+    "trust-scope-isolated-worktree",
+    "trust-scope-lab-home",
+    "trust-scope-secondmate-home",
+    "trust-store-integrity",
+    "typesafe-never-send",
+    "wake-branch-grant-snapshot",
+    "worker-in-recorded-worktree",
+    "x-reply-followup-context",
     "away-branch-queued-only",
     "away-spend-cap",
     "backlog-close-recorded-first",
@@ -84,6 +143,2582 @@
     "open-loops-one-deferral"
   ],
   "guards": [
+    {
+      "id": "live-lab-processes-stopped-before-remove",
+      "version": "1",
+      "owner": "bin/fm-live-lab.sh",
+      "invariant": "Live lab removal waits until its owned processes have stopped.",
+      "layer": "runtime-block",
+      "source": "the root's existence, owner-written lab record and exact surviving owned process identities; existing decision points: bin/fm-live-lab.sh:807",
+      "trigger": "removing the lab directory while lab processes survive kill -9",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Use a fresh root for bash bin/fm-live-lab.sh up; preserve an existing lab until its owner resolves surviving processes, then retry bash bin/fm-live-lab.sh down <lab-root>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-live-lab.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-live-lab.sh",
+          "match": "die \"refusing to remove the lab: its processes did not exit (pid ppid pgid state command): $details\""
+        }
+      ]
+    },
+    {
+      "id": "merge-local-ff-only",
+      "version": "1",
+      "owner": "bin/fm-merge-local.sh",
+      "invariant": "Local landing never introduces an untested non-fast-forward merge tree.",
+      "layer": "runtime-block",
+      "source": "git merge-base --is-ancestor for the recorded default and deliverable branch; existing decision points: bin/fm-merge-local.sh:118",
+      "trigger": "REFUSED marker: refuses a local landing whose branch is not a fast-forward of the default branch",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Have the implementation owner rebase the deliverable onto the current default and revalidate, then retry the separately authorized bash bin/fm-merge-local.sh <task>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-project-mode.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-merge-local.sh",
+          "match": "echo \"REFUSED: $BRANCH is not a fast-forward of $DEFAULT (it has diverged).\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "merge-unproved-outcome",
+      "version": "1",
+      "owner": "bin/fm-pr-merge.sh",
+      "invariant": "A merge request is not reported landed or queued without the forge proving that outcome.",
+      "layer": "runtime-block",
+      "source": "the forge's live merged and queued state following the recorded merge request; existing decision points: bin/fm-pr-merge.sh:1846",
+      "trigger": "refuses to report success when an --auto/queue merge request was accepted but the PR is neither merged nor in the merge queue",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Inspect the named change with the configured forge tool; rerun bash bin/fm-pr-merge.sh <task> only under existing merge authority once the outcome can be proved.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-pr-merge.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "printf 'error: auto-merge was requested and armed for %s, but nothing is merged or in the merge queue yet, so this run refuses instead of reporting an unproved merge\\n' \\"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "printf 'error: this run refuses even though the request for %s was accepted with the exact flags base branch %s requires (--auto --%s): the pull request has still not entered the merge queue, so no landed or queued outcome is proven; re-check the pull request'\"'\"'s merge queue state before retrying\\n' \\"
+        }
+      ]
+    },
+    {
+      "id": "nested-copy-ignored-bytes-preserved",
+      "version": "1",
+      "owner": "bin/fm-teardown-nested-lib.sh",
+      "invariant": "Nested-copy removal preserves unique ignored content with verified hashes first.",
+      "layer": "runtime-block",
+      "source": "the registered nested-copy inventory and verified preservation or post-release absence proof; existing decision points: bin/fm-copy-sweep.sh:1502, bin/fm-teardown-nested-lib.sh:868",
+      "trigger": "refuses to remove a nested (foreign or own) copy whose unique ignored files could not be copied with SHA-256 into data/<id>/nested-copy-preserved",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Keep the copy and slot; restore owner-approved preservation storage or reconcile the unsuccessful release, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preserved; it was not removed. human-only-exit: Which owner-approved storage or disposition preserves them? The next sweep run tries again; no removal or forced cleanup is authorized.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy ignored-bytes-preserved \"the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy ignored-bytes-preserved \"the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed.\" \"$copy\""
+        }
+      ]
+    },
+    {
+      "id": "nested-copy-reproof",
+      "version": "1",
+      "owner": "bin/fm-copy-sweep.sh",
+      "invariant": "Nested-copy release remains bound to the ownership and content proof taken immediately before execution.",
+      "layer": "runtime-block",
+      "source": "the current copy classification, Git HEAD, creation-lock hash, preserved ignored content and closeout-driver result; existing decision points: bin/fm-copy-sweep.sh:1363, bin/fm-teardown-nested-lib.sh:924",
+      "trigger": "re-proves a nested copy (class, HEAD, Vernant lock bytes, preserved ignored content) right before release and refuses if anything changed since the plan or proof",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Keep the copy and its proof records; have its owner repair the named storage, custody or closeout prerequisite, then rerun bash bin/fm-copy-sweep.sh using the original scope.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-copy-sweep.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released.\" >&2"
+        },
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: $2 is no longer proven after its plan: $CLASS, $REASON\" >&2"
+        },
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: the preservable ignored content of $shown changed after it was preserved, or could not be compared with its preserve; it was not released. $RETRY_PRESERVE; the next sweep run plans it again.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: an own nested copy in pool slot $slot is no longer provable; nothing was removed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy \"$TEARDOWN_FOREIGN_RULE\" \"foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed.\" \"$copy\""
+        }
+      ]
+    },
+    {
+      "id": "nested-copy-vernant-closeout",
+      "version": "1",
+      "owner": "bin/fm-copy-sweep.sh",
+      "invariant": "A creation-locked copy is retained when its owning closeout driver declines release.",
+      "layer": "runtime-block",
+      "source": "the current copy classification, Git HEAD, creation-lock hash, preserved ignored content and closeout-driver result; existing decision points: bin/fm-copy-sweep.sh:1542, bin/fm-teardown-nested-lib.sh:821",
+      "trigger": "reports and stops when Vernant's closeout driver declines to release a creation-locked copy; the copy is kept and never force-removed",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Keep the copy and its proof records; have its owner repair the named storage, custody or closeout prerequisite, then rerun bash bin/fm-copy-sweep.sh using the original scope.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-copy-sweep.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words\" >&2"
+        },
+        {
+          "file": "bin/fm-copy-sweep.sh",
+          "match": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output could not be saved under %s\\n\" \\"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\\n\" \\"
+        }
+      ]
+    },
+    {
+      "id": "nm-launch-agent-unloaded-first",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Task-copy removal leaves no task-private loaded no-mistakes launch agent pointing into it.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:3965",
+      "trigger": "refuses removing a copy while a no-mistakes launchd agent rooted in it cannot be classified, unloaded (launchctl missing/unknown/still loaded) or its plist archived",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the copy and launch-agent plist; have the owner confirm its task-private root and unload only that agent, then retry bash bin/fm-teardown.sh <task> without force; never stop the shared daemon.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot classify the worktree holding no-mistakes launch agent $label's root $canon_root; preserving the launch agent and task $ID.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot establish nested worktree ownership under $canon_wt; preserving the launch agents and task $ID.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded (launchctl print exited $rc); preserving the worktree and $plist.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the worktree.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchctl bootout; preserving the worktree and $plist.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "nm-run-stopped-first",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Task teardown preserves a copy while its no-mistakes run is still proven parked.",
+      "layer": "runtime-block",
+      "source": "the task run status after the authorized abort attempt; a proven still-parked run refuses cleanup; existing decision points: bin/fm-teardown.sh:3481",
+      "trigger": "refuses teardown while the task's no-mistakes run is still parked after axi abort",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Inspect no-mistakes axi status and have the owning supervisor reconcile or stop that exact run under existing authority; only after it is stopped retry bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no-mistakes run for $ID is still parked after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "no-duplicate-launch",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "One task copy never receives a second agent while an existing endpoint may still own it.",
+      "layer": "runtime-block",
+      "source": "the recorded task endpoint binding, backend agent classification and Herdr projection quarantine state; existing decision points: bin/backends/herdr.sh:2858, bin/fm-remote-secondmate-control.sh:233, bin/fm-spawn.sh:5110",
+      "trigger": "refuses a relaunch/reclaim when the task's exact or quarantined presentation pane is live, stale-agent or unknown, or when the journal/workspace cannot be inspected / refuses launch when the remote endpoint state is neither running, dead nor missing / fresh launch for a task id whose existing metadata endpoint is missing, malformed, ambiguous (session/workspace/tab/pane), inconsistent, uninspectable, or live/stale-agent/unknown (herdr projection quarantine path)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-retained-copy.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: could not inspect herdr presentation workspace $wsid for $id; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: could not inspect the quarantined herdr presentation for $id; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: could not parse herdr presentation workspace $wsid for $id; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: exact herdr presentation pane for $id is $state; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: herdr presentation pane for $id became $state at the close boundary; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: herdr presentation pane for $id became $state during reclaim; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: malformed herdr presentation journal for $id; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/backends/herdr.sh",
+          "match": "echo \"error: quarantined herdr presentation for $id has a $state pane; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "*) die \"remote endpoint state is $current; refusing duplicate launch\" ;;"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing $old_backend endpoint for $ID is $old_state; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr endpoint for $ID could not be inspected; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr endpoint for $ID is $old_state; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr endpoint for $ID is malformed; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr metadata for $ID has an ambiguous pane; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr metadata for $ID has an ambiguous session; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr metadata for $ID has an ambiguous tab; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr metadata for $ID has an ambiguous workspace; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing herdr metadata for $ID has inconsistent endpoint identities; refusing duplicate launch\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: existing metadata for $ID has no endpoint; refusing duplicate launch while its herdr presentation journal is quarantined\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "no-write-into-project-tree",
+      "version": "1",
+      "owner": "bin/fm-duration.py",
+      "invariant": "Duration accounting never writes operational state into a foreign project checkout.",
+      "layer": "runtime-block",
+      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: bin/fm-duration.py:303",
+      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Select the owning Firstmate data directory with FM_DURATION_HOME=<firstmate-home>/data before retrying python3 bin/fm-duration.py run <key> -- <command>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-duration.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-duration.py",
+          "match": "return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')"
+        }
+      ]
+    },
+    {
+      "id": "omp-adopt-launch-proof",
+      "version": "1",
+      "owner": "bin/fm-launch-proof-lib.sh",
+      "invariant": "Omp adoption changes a session binding only after proving the exact unpinned replacement process.",
+      "layer": "runtime-block",
+      "source": "the recorded task endpoint, unique foreground PID, process identity, launch generation and absolute session-file registration; existing decision points: bin/fm-control.sh:1459, bin/fm-launch-proof-lib.sh:141",
+      "trigger": "adopt (rewrite an omp session record) unless the recorded PID is not the live one, not a live omp, and the live process is provably unpinned / fm-control adopt of a live omp process as a task's agent unless all proofs hold: one recorded window, readable pane, one unique foreground pid, pid is omp, not pinned to another spawn_gen, readable absolute session-file registration matching the task session",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve both session records; establish the exact unpinned live omp process before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-control-relaunch-recovery.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "echo \"adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed\" >&2"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "|| die \"adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates\""
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "|| die \"adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed\""
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "*) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: endpoint proof needs the recorded pane to exist and be readable' >&2; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;"
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "print(f\"adopt refused: {message}\", file=sys.stderr)"
+        }
+      ]
+    },
+    {
+      "id": "pi-branch-independent-model",
+      "version": "1",
+      "owner": ".pi/extensions/fm-branch-supervision.ts",
+      "invariant": "A native-main Pi supervision branch builds only with an explicitly pinned independent model.",
+      "layer": "runtime-block",
+      "source": "the native-main identity and current explicit Pi supervision-model pin and independence verdict; existing decision points: .pi/extensions/fm-branch-supervision.ts:843",
+      "trigger": "Pi supervision branch refuses to build under native main until an independent supervision model is pinned",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Run `/supervision-model` in the Pi primary and pin a verified independent supervision model, then retry the branch build.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-pi-branch-extension.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": ".pi/extensions/fm-branch-supervision.ts",
+          "match": "reason: `native main requires an independent Pi supervision model and ${resolved.reason}; the branch refuses to build until one is pinned with /supervision-model`,"
+        }
+      ]
+    },
+    {
+      "id": "pool-slot-allocation-live-copy",
+      "version": "1",
+      "owner": "bin/fm-task-copy-lib.sh",
+      "invariant": "Pool allocation never resets an unheld slot containing a live task's current copy.",
+      "layer": "runtime-block",
+      "source": "the current pool-slot inventory, live task-copy records and durable hold/lease proof; existing decision points: bin/fm-task-copy-lib.sh:762",
+      "trigger": "refuses treehouse get allocation while a pool slot holds a live task record's current copy and the slot is not durably held (750 is the remedy string for the recovered-lease case)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the copy; have its owner establish the slot's durable custody through the guarded pool workflow before retrying bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-task-copy-lib.sh",
+          "match": "echo \"error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get\" >&2"
+        },
+        {
+          "file": "bin/fm-task-copy-lib.sh",
+          "match": "remedy=\"treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)\""
+        }
+      ]
+    },
+    {
+      "id": "pooled-copy-no-discard",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "Refreshing a pooled launch base never discards dirty or stale-submodule content.",
+      "layer": "runtime-block",
+      "source": "git status --porcelain and the checked-out submodule pins of the pooled copy; existing decision points: bin/fm-spawn.sh:4963",
+      "trigger": "refreshing a pooled worktree's base when it is dirty (4963) or has a stale submodule checkout (4961); leaves it untouched",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "procevent-binding-in-use",
+      "version": "1",
+      "owner": "bin/fm-extension.mjs",
+      "invariant": "Extension binding retirement preserves registrations and unhandled results still owned by that binding.",
+      "layer": "runtime-block",
+      "source": "the binding's process-event retirement preflight and unhandled registration/results inventory; existing decision points: bin/fm-extension.mjs:2426",
+      "trigger": "extension binding retirement refused when fm-procevent.sh preflight finds the binding still owns a registration or unhandled results",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Handle the binding's pending process-event results before retrying its existing retirement command; inspect registrations with bash bin/fm-procevent.sh list.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-extension-binding.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-extension.mjs",
+          "match": "fail(\"binding-in-use\", diagnostic || \"binding retirement process-event preflight refused\");"
+        }
+      ]
+    },
+    {
+      "id": "procevent-stranded-claim-preserve",
+      "version": "1",
+      "owner": "bin/fm-procevent.sh",
+      "invariant": "Reconciliation starts no replacement while a stranded runner claim may still own live group members.",
+      "layer": "runtime-block",
+      "source": "the recorded runner PID identity, process group and reservation records; existing decision points: bin/fm-procevent.sh:1837",
+      "trigger": "reconcile preserves a stranded claim (dead runner, live process group) and starts no replacement",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Confirm no old group member is still polling, then use bash bin/fm-procevent.sh start <source> only through the owner-controlled reclaim path.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-procevent-runner-custody.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-procevent.sh",
+          "match": "printf '%s' \"its claim names a dead runner whose process group still has members, so reconcile preserves that claim and starts no replacement. Check that nothing is still polling the source, then reclaim it with: bin/fm-procevent.sh start $1 - that reclaims it provided the dead generation's reservation records can still be tidied, and otherwise refuses with: cannot claim source\""
+        }
+      ]
+    },
+    {
+      "id": "procevent-when-trust-binding",
+      "version": "1",
+      "owner": "bin/fm-procevent-when.sh",
+      "invariant": "A condition-triggered action executes only the bytes authorized by its recorded trust binding.",
+      "layer": "runtime-block",
+      "source": "the current action script hash compared with its registered SPEC_ACTION_SHA256 trust binding; existing decision points: bin/fm-procevent-when.sh:464",
+      "trigger": "condition->action watch refuses to run an action whose bytes no longer match the registered trust binding hash",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Do not execute changed action bytes; have the owner review and rebind the action through bash bin/fm-procevent-when.sh, then retry the watch.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-procevent-when.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-procevent-when.sh",
+          "match": "\"refused without executing the action: its bytes do not match the registered trust binding\" \"$polls\" '' ''"
+        }
+      ]
+    },
+    {
+      "id": "project-capacity-admission",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "Worker admission requires a readable project-capacity declaration and occupant inventory.",
+      "layer": "runtime-block",
+      "source": "config/project-capacity and every task record used to count current project occupants; existing decision points: bin/fm-spawn.sh:4392",
+      "trigger": "fresh spawn when config/project-capacity is unreadable (4392) or task records cannot all be read to count occupants (4556); fail-closed for the capacity limit (the at-capacity deferral itself prints 'deferred:' and is not a site)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-project-capacity.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: project $(basename \"$PROJ_ABS\") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($FM_PROJECT_CAPACITY_ERROR)\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: the project capacity declaration is unreadable ($FM_PROJECT_CAPACITY_ERROR); fix it so the captain's worker limits are known (docs/configuration.md \\\"Project capacity\\\")\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "project-local-only-no-forge",
+      "version": "1",
+      "owner": "bin/fm-project-mode.sh",
+      "invariant": "A local-only project never claims a forge-reviewed delivery path.",
+      "layer": "runtime-block",
+      "source": "the project's delivery-mode and forge tokens in data/projects.md; existing decision points: bin/fm-project-mode.sh:233",
+      "trigger": "refuses a local-only registration that also names a forge",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Correct the project entry to a publishing mode or retain local-only without a forge, then re-read it with bash bin/fm-project-mode.sh <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-project-mode.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-project-mode.sh",
+          "match": "echo \"refused: $NAME is registered local-only with forge=$forge in $REG; local-only publishes nothing, so a forge has no meaning there, and its landing would fast-forward local main with content the review server has never seen; register no-mistakes or direct-PR to publish through the forge, or drop the forge token to keep the project local\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "public-reply-owed",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Task cleanup preserves the records needed to deliver outstanding public replies.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:5949",
+      "trigger": "non-forced teardown refuses while the task still owes a public reply through the myfirstmate relay, or the marked secondmate's primary home (durable parent binding) cannot be resolved",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-x-mode.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot resolve the primary home for marked secondmate $SECOND_MATE_ID; refusing cleanup without its durable parent binding.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID still owes a public reply through the myfirstmate relay.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "quiet-blocked-by-live-away",
+      "version": "1",
+      "owner": "bin/fm-afk-launch.sh",
+      "invariant": "Entering quiet posture never skips the catch-up gate of a live away posture.",
+      "layer": "runtime-block",
+      "source": "the current home's state/.afk-contract posture; existing decision points: bin/fm-afk-launch.sh:378",
+      "trigger": "quiet mode refused while the away record state/.afk-contract is live, until /afk return passes its catch-up gate",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Complete bash bin/fm-afk-return.sh and its catch-up gate, then run bash bin/fm-afk-launch.sh quiet-check.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-afk-launch.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-afk-launch.sh",
+          "match": "fm_afk_launch_log \"quiet mode refuses while this home's away record (state/.afk-contract) is live; run the /afk return (bin/fm-afk-return.sh) and pass its catch-up gate, then run bin/fm-afk-launch.sh quiet-check\""
+        }
+      ]
+    },
+    {
+      "id": "relaunch-proven-agent-free",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "Agent replacement or reported stop requires a recovery-grade proof of the old endpoint's state.",
+      "layer": "runtime-block",
+      "source": "the recorded task endpoint, task-set/project locks, backlog state, launch directory, selected base and observed worktree cwd; existing decision points: bin/fm-control.sh:1538, bin/fm-spawn.sh:2579",
+      "trigger": "exit, relaunch and stay on a backend without a recovery-grade agent-state classifier (only tmux and herdr pass; called at fm-control.sh:1965,2645,2876) / relaunch on a backend with no recovery-grade agent-state classifier (2564), or into an endpoint reading 'missing' whose absence cannot be proven (2579)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-control.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"task $ID runs on the $BACKEND backend, which has no recovery-grade agent-state classifier, so '$1' cannot prove the agent actually stopped; refusing rather than reporting an unproven transition as done\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: backend '$BACKEND' has no recovery-grade agent-state classifier, so a relaunch cannot prove the previous agent exited; refusing rather than risking two agents in one endpoint\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's recorded endpoint $RELAUNCH_TARGET reads 'missing', but ${RELAUNCH_ABSENCE#*$'\\t'}. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "remote-herdr-owner-proof",
+      "version": "1",
+      "owner": "bin/fm-remote-herdr-guard.sh",
+      "invariant": "Remote Herdr server startup requires an executable ownership-proof reader on the launch environment's PATH.",
+      "layer": "runtime-block",
+      "source": "whether the python3 ownership reader runs successfully on the launch agent PATH; existing decision points: bin/fm-remote-herdr-guard.sh:76",
+      "trigger": "refuses fm-remote herdr server start or takeover when the python3 ownership reader cannot run on the launch agent PATH",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Restore python3 on the remote launch agent PATH and retry bash bin/fm-remote-herdr-guard.sh <herdr-executable> <session> through the authorized remote owner; do not bypass the proof.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-remote-herdr-guard.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-remote-herdr-guard.sh",
+          "match": "fm_remote_herdr_owner_reader_available || { printf 'fm-remote-herdr-guard: python3 prerequisite does not run on the launch agent PATH; refusing server start or takeover\\n' >&2; exit 1; }"
+        }
+      ]
+    },
+    {
+      "id": "remote-secondmate-route-binding",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Remote secondmate retirement uses only a complete route agreeing with the registered secondmate binding.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:1718",
+      "trigger": "remote retirement refuses when remote placement metadata is incomplete, not a secondmate, missing/ambiguous in the registry, not remote, or disagrees with the registry route",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-remote-secondmate-parent-binding.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$SECONDMATE_REGISTRY_REMOTE\" -eq 1 ] || { echo \"REFUSED: secondmate registry route is not remote\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$kind\" = secondmate ] || { echo \"REFUSED: remote placement metadata is valid only for a secondmate\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ -n \"$remote_root\" ] && [ -n \"$remote_home\" ] || { echo \"REFUSED: remote secondmate metadata is incomplete\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "secondmate_registry_line_for_id \"$SECONDMATE_REG\" \"$ID\" || { echo \"REFUSED: remote secondmate route is missing or ambiguous\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "|| { echo \"REFUSED: remote secondmate metadata does not match its registry route\" >&2; return 1; }"
+        }
+      ]
+    },
+    {
+      "id": "resolve-key-effective-close",
+      "version": "1",
+      "owner": "bin/fm-send.sh",
+      "invariant": "A resolution send records only a close note the owning decision fold will accept.",
+      "layer": "runtime-block",
+      "source": "the exact requested decision key, owning fold's transition rule and capped close-note bytes; existing decision points: bin/fm-send.sh:682",
+      "trigger": "--resolve-key refused when the close note would be a silent no-op (reserved key or truncation past line cap)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Use a nonreserved key and a shorter truthful close note through FM_HOME=<home> bash bin/fm-send.sh <task> --resolve-key <key> <message>; reserved keys remain with their owning library.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-send-resolve-key.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: --resolve-key '$k' cannot take effect: this key is reserved for its owning library, and this send cannot produce a close note that library's fold will accept. Refusing rather than writing a silent no-op; nothing was sent.\" >&2"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: --resolve-key cannot close a decision key of length ${#k}: its ${#probe_line}-character close record exceeds the $FM_LINE_CAP_DEFAULT-character status-line cap, and truncation would remove the structural key delimiter. Refusing rather than writing an ineffective close; nothing was sent.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "safe-rm-rf-target",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Recursive home cleanup never removes a protected or unproved target.",
+      "layer": "runtime-block",
+      "source": "canonical target, active-home/repository ancestry, seed marker/id, child-home bindings and contained operational directories; existing decision points: bin/fm-home-seed.sh:596, bin/fm-teardown.sh:4826",
+      "trigger": "seed rollback (rm -rf / treehouse return --force) of a target that is /, the active home, the repo, an ancestor or descendant of either (591-616), or a created project outside the secondmate projects dir (647, 651) / rm -rf refuses a target that is empty, /, the active home, the firstmate repo, an ancestor or descendant of either, a non-seeded or wrong-id secondmate home, a home containing a registered child home, a home whose data/state/config/projects resolve outside it, or a child worktree not registered for its project",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-secondmate-safety.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "[ \"$target\" != \"/\" ] || { echo \"REFUSED: unsafe $label rollback target $target\" >&2; return 1; }"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is an ancestor of the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is an ancestor of the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is inside the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is inside the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe $label rollback target $target is the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe created project rollback target $target has projects directory outside the secondmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"REFUSED: unsafe created project rollback target $target is outside the secondmate projects directory\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "''|/) echo \"REFUSED: unsafe $label removal target $target\" >&2; return 1 ;;"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label $name directory $dir resolves outside the secondmate home\" >&2",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label $name path $dir is not a directory\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $home contains registered secondmate home $child_home for $child_id\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $home contains registered secondmate home; $SECONDMATE_REGISTRY_ERROR\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $home is marked for secondmate ${marker_id:-unknown}, expected $expected_id\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $home is not a seeded secondmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is an ancestor of the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is an ancestor of the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is inside the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is inside the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe $label removal target $target is the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe child worktree removal target $target is inside the active firstmate home\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe child worktree removal target $target is inside the firstmate repo\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: unsafe child worktree removal target $target is not a git worktree for ${project:-the recorded project}\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "scout-captain-call-gate",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "An investigation remains open until its captain-call completion gate passes.",
+      "layer": "runtime-block",
+      "source": "the exit status of fm-captain-hold.sh verify for this investigation origin; existing decision points: bin/fm-teardown.sh:6040",
+      "trigger": "non-forced scout teardown refuses when fm-captain-hold.sh verify fails (unresolved captain calls in the report or visual review)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Inventory and resolve the investigation captain calls through bash bin/fm-captain-hold.sh verify <task>, then retry bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-captain-hold-lifecycle.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: scout task $ID has not passed the captain-call completion gate.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "scout-report-required",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "A scout's durable report exists before non-forced teardown removes its task records.",
+      "layer": "runtime-block",
+      "source": "the scout data/<task>/report.md file type, symlink status and nonempty content; existing decision points: bin/fm-teardown.sh:6034",
+      "trigger": "non-forced scout teardown refuses when data/<id>/report.md is missing, a symlink or empty",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: scout task $ID has no report at $REPORT.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "secondmate-home-not-active-home",
+      "version": "1",
+      "owner": "bin/fm-home-seed.sh",
+      "invariant": "Secondmate seeding never overwrites the active home or repository tree.",
+      "layer": "runtime-block",
+      "source": "canonical active-home/repository/target paths, existing project inventory and whether this seed created each project clone; existing decision points: bin/fm-home-seed.sh:419",
+      "trigger": "seeding/verifying a secondmate home that is /, the active firstmate home, the firstmate repo, or inside either (refuse_active_home_path)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Choose a distinct unpopulated home consistent with the charter, preserve existing clones, then retry FM_HOME=<parent-home> bash bin/fm-home-seed.sh <secondmate> <new-home> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-secondmate-safety.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "refuse_active_home_path \"$home\" || return 1",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "refuse_active_home_path \"$requested_abs\" || return 1"
+        }
+      ]
+    },
+    {
+      "id": "secondmate-in-flight-work",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Non-forced secondmate retirement retains a home that still owns task records.",
+      "layer": "runtime-block",
+      "source": "the retiring secondmate home state directory task .meta inventory; existing decision points: bin/fm-teardown.sh:6013",
+      "trigger": "non-forced secondmate retirement refuses while its home state has any task .meta",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-secondmate-safety.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: secondmate $ID still has in-flight work in $SUB_STATE.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "secondmate-undelivered-replies",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Non-forced secondmate retirement preserves unresolved routed replies and captured results.",
+      "layer": "runtime-block",
+      "source": "the secondmate pending reply phases, remote backlog outbox and unhandled captured reply inventory; existing decision points: bin/fm-teardown.sh:1696",
+      "trigger": "non-forced secondmate retirement refuses while a routed reply for it is unresolved, a remote backlog outbox is pending, or a captured reply is unhandled",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-remote-reply.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: remote secondmate $ID still has a pending backlog outbox; deliver it or explicitly discard with --force\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: remote secondmate $ID still has an unhandled captured reply\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: secondmate $ID still has an unresolved routed reply\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "secondmate_unresolved_pending_replies_refuse || exit 1"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "secondmate_unresolved_pending_replies_refuse || return 1"
+        }
+      ]
+    },
+    {
+      "id": "seed-no-mutate-preexisting-clone",
+      "version": "1",
+      "owner": "bin/fm-home-seed.sh",
+      "invariant": "Home seeding initializes no-mistakes only on project clones that seeding created.",
+      "layer": "runtime-block",
+      "source": "canonical active-home/repository/target paths, existing project inventory and whether this seed created each project clone; existing decision points: bin/fm-home-seed.sh:777",
+      "trigger": "initializing no-mistakes on a project clone the seed did not create",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Choose a distinct unpopulated home consistent with the charter, preserve existing clones, then retry FM_HOME=<parent-home> bash bin/fm-home-seed.sh <secondmate> <new-home> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-secondmate-safety.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "echo \"error: seeded project $project at $dst is not initialized for no-mistakes; refusing to mutate preexisting clone\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "seed-no-projects-on-populated-home",
+      "version": "1",
+      "owner": "bin/fm-home-seed.sh",
+      "invariant": "Projectless seeding never orphans existing project data.",
+      "layer": "runtime-block",
+      "source": "canonical active-home/repository/target paths, existing project inventory and whether this seed created each project clone; existing decision points: bin/fm-home-seed.sh:948",
+      "trigger": "--no-projects seed of a home whose projects/ or data/projects.md already holds projects (or cannot be inspected)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Choose a distinct unpopulated home consistent with the charter, preserve existing clones, then retry FM_HOME=<parent-home> bash bin/fm-home-seed.sh <secondmate> <new-home> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-secondmate-safety.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-home-seed.sh",
+          "match": "refuse_populated_projectless_home \"$home\" || return 1"
+        }
+      ]
+    },
+    {
+      "id": "session-launch-policy",
+      "version": "1",
+      "owner": "bin/fm-session-launch-policy-lib.sh",
+      "invariant": "Automatic and explicit launches retain the configured canonical-adapter policy.",
+      "layer": "runtime-block",
+      "source": "config/session-launch-policy, the selected harness and the raw-launch flag; existing decision points: bin/fm-secondmate-liveness-lib.sh:320, bin/fm-session-end-relaunch-lib.sh:285, bin/fm-session-launch-policy-lib.sh:22",
+      "trigger": "secondmate auto-relaunch refused by config/session-launch-policy=omp-or-tc (notifies) / task auto-relaunch after session-end refused by session-launch-policy (notifies) / omp-or-tc policy refuses any launch other than omp or dsh-tui (and raw launches)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Select an explicitly authorized canonical profile; for recovery use bash bin/fm-control.sh <task> relaunch --harness omp --model <omp-model> --effort <level> --note <progress>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-session-launch-policy.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-secondmate-liveness-lib.sh",
+          "match": "reason=\"check: secondmate $id auto-relaunch refused: $FM_SM_LIVE_REASON\""
+        },
+        {
+          "file": "bin/fm-session-end-relaunch-lib.sh",
+          "match": "reason=\"check: $id auto-relaunch refused after session-end: $(fm_session_end_first_line \"$policy_error\")\""
+        },
+        {
+          "file": "bin/fm-session-launch-policy-lib.sh",
+          "match": "printf \"error: config/session-launch-policy=omp-or-tc refuses launch '%s'; only the canonical omp adapter and the dsh-tui DeepSeek adapter are currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\\n\" \"$harness\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "session-lock-single-owner",
+      "version": "1",
+      "owner": "bin/fm-lock.sh",
+      "invariant": "Only one verified live primary session mutates a home's fleet.",
+      "layer": "runtime-block",
+      "source": "the current session identity and verified liveness/ancestry of the recorded session-lock owner; existing decision points: bin/fm-lock.sh:199",
+      "trigger": "refuses the session lock while another live firstmate session holds it",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Remain read-only until the recorded owner exits or releases its lock, then retry FM_HOME=<home> bash bin/fm-lock.sh; never delete a live owner's lock.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-session-lock-ancestry.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-lock.sh",
+          "match": "refuse_live_owner \"$old\"",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "signal-only-recorded-process",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Cleanup signals only a process whose exact identity was durably recorded first.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown-nested-lib.sh:753, bin/fm-teardown.sh:3807",
+      "trigger": "refuses to TERM/KILL a leaked or foreign process when its identity cannot first be durably recorded; preserves the worktree",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: cannot durably record process $pid identity for $ID; preserving the worktree without signalling it.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without force-killing it.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "slot-owner-claim",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "Pool-slot mutation remains bound to a readable claim for the exact task and home.",
+      "layer": "runtime-block",
+      "source": "the Treehouse pool slot owner marker task= and home= binding written and read under the shared project lock; existing decision points: bin/fm-spawn.sh:6203, bin/fm-teardown.sh:4218",
+      "trigger": "launching or relocating onto a Treehouse pool slot whose owner claim for this task/home cannot be written / refuses (even --force) when the slot-owner claim file beside the worktree/shared slot cannot be read, so ownership cannot be proved",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate onto a slot that cannot later be proved to be its own\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $record_id's recorded worktree $worktree carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed - not even with --force.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "slot-registered-copies-proven",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "A slot return preserves every registered copy not proven to belong to this task's cleanup.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:2960",
+      "trigger": "refuses (even with --force) when a pool slot holds a registered worktree that is not one of this task's proven copies, or the slot cannot be canonicalized/inspected; 2968 is the remedy paragraph",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot canonicalize pool slot $slot; retain its records and lease and inspect the slot path before retrying.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot inspect registered copies in pool slot $slot; retain its records and lease and report the Git inspection failure.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: pool slot $slot contains registered copy $(fm_refuse_text \"$copy\") that is not one of task $task's proven copies; its record and lease must stay in place, even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown_refuse_copy registered-copy-proven \"pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force.\" \"$copy\""
+        }
+      ]
+    },
+    {
+      "id": "spawn-fresh-base",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "A pooled worker starts only from the proven current selected base.",
+      "layer": "runtime-block",
+      "source": "the fetched origin default or named base ref, resolved SHA and final pooled-copy HEAD; existing decision points: bin/fm-spawn.sh:5000",
+      "trigger": "launching from a pooled worktree whose base cannot be fetched/resolved/reset to origin's current default (or named) branch, or ends at a different commit",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: $SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not determine origin's default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: could not resolve origin's current default branch for pooled worktree '$worktree'; refusing to launch from a potentially stale base\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "spawn-lock-no-race",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "Task creation or relocation never races a task-set mutation or presentation-lock owner.",
+      "layer": "runtime-block",
+      "source": "the home task-set lock holder role and the named Herdr presentation/recovery lock; existing decision points: bin/fm-spawn.sh:2409",
+      "trigger": "creating/relocating a task while another spawn, forced teardown or other op holds the task-set lock (2409-2415) or the herdr presentation lock (5317; 1991 is a warning that skips abort cleanup)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-project-capacity.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: herdr presentation recovery could not acquire its session lock; refusing a concurrent resume\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: this home's task set is locked by a forced teardown; refusing to create task $ID rather than racing it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: this home's task set is locked by another operation; refusing to create task $ID rather than racing it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: this home's task set is locked by another spawn; refusing to create task $ID rather than racing it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"warning: herdr presentation focus lock unavailable; retaining the projection journal and refusing concurrent abort cleanup\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "spawn-stale-model",
+      "version": "1",
+      "owner": "bin/fm-control.sh",
+      "invariant": "Worker admission honors the freshness verdict except for an already admitted or explicitly pinned model.",
+      "layer": "runtime-block",
+      "source": "the selected harness/model, fm-model-freshness verdict, exact captain-model-pin and prior relaunch admission; existing decision points: bin/fm-control.sh:2511, bin/fm-spawn.sh:3766",
+      "trigger": "relaunch onto a model a newer same-family same-tier model has superseded, unless --captain-model-pin names it / launching a model the freshness check marks stale, unless captain-pinned (--captain-model-pin exact match) or a relaunch of the model already admitted",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Choose the newer same-tier model named by the freshness verdict and retry bash bin/fm-spawn.sh <task> <project> --model <new-model> --mode <mode> --yolo <on-or-off>; an older model requires the existing exact captain-model-pin authority.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-model-pin.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"refusing to relaunch $ID onto a stale model - $stale; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin $TARGET_MODEL only when the captain explicitly asked for $TARGET_MODEL)\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: refusing to launch a stale model - $MODEL_STALE\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "state-record-home-containment",
+      "version": "1",
+      "owner": "bin/fm-bootstrap.sh",
+      "invariant": "Operational record mutation never follows a redirected record outside its owning home.",
+      "layer": "runtime-block",
+      "source": "the canonical state directory and real task, pending-close and Slack check/trust file paths; existing decision points: bin/fm-bootstrap.sh:1369, bin/fm-spawn.sh:1491, bin/fm_slack_watch.py:1035",
+      "trigger": "backlog reconcile refuses state dir / task records / pending-close records that are not real files or resolve outside this home (symlink containment) / --relaunch whose task .meta is not a regular file or resolves outside this home's state dir (fm_backlog_record_present -> record_parent_authorized \"resolves outside this home\"); rechecked after the meta lock / Slack arm refuses a symlinked state dir, check shim or trust file, or a non-file shim",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Restore the owning home's regular contained records without deleting their contents, then rerun FM_HOME=<home> bash bin/fm-bootstrap.sh.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-backlog-atomicity.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"BACKLOG_RECONCILE: $id: post-lock worker record check refused: $FM_BACKLOG_TRANSITION_ERROR\""
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"BACKLOG_RECONCILE: unsafe pending close refused: $FM_BACKLOG_TRANSITION_ERROR\""
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"BACKLOG_RECONCILE: unsafe worker record refused: $FM_BACKLOG_TRANSITION_ERROR\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"error: backlog reconciliation refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"error: bootstrap refused unsafe pending close ($FM_BACKLOG_TRANSITION_ERROR)\" >&2"
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"error: bootstrap refused unsafe worker record ($FM_BACKLOG_TRANSITION_ERROR)\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: --relaunch refused after locking: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2",
+          "key": "site:bin/fm-spawn.sh:72505e7e0e"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR\" >&2",
+          "key": "site:bin/fm-spawn.sh:72505e7e0e~2"
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "print('slack: refused: unsafe_check_shim', file=sys.stderr)"
+        },
+        {
+          "file": "bin/fm_slack_watch.py",
+          "match": "print('slack: refused: unsafe_state_path', file=sys.stderr)",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "task-record-changed-under-lock",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "A locked lifecycle operation retains the task identity and incarnation proved before lock acquisition.",
+      "layer": "runtime-block",
+      "source": "the current spawn_gen, project, worktree, kind and home compared with the identity captured before lock acquisition; existing decision points: bin/fm-merge-local.sh:73, bin/fm-pr-check.sh:239, bin/fm-pr-merge.sh:508, bin/fm-teardown.sh:1869",
+      "trigger": "refuses a local landing when the task meta changed incarnation (spawn_gen) while waiting for the per-task control lock / refuses PR registration when the recorded worktree or branch changed while preparing it under the meta lock / refuses a PR merge when the task meta changed or changed incarnation while waiting for the per-task control lock / refuses when the task (or a forced-teardown descendant) changed project identity, slot, existence, kind or home while its locks were being taken",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-merge-local.sh",
+          "match": "echo \"error: task $ID changed incarnation while waiting to merge; refusing\" >&2"
+        },
+        {
+          "file": "bin/fm-merge-local.sh",
+          "match": "echo \"error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-check.sh",
+          "match": "echo \"error: task worktree or branch changed while preparing PR registration; refusing\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "echo \"error: task $ID changed incarnation while waiting to merge; refusing\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "echo \"error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: descendant task $task_id changed home while forced teardown acquired its locks; forced teardown changed nothing\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: descendant task $task_id changed kind while forced teardown acquired its locks; forced teardown changed nothing\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: descendant task $task_id changed while forced teardown acquired its locks; forced teardown changed nothing\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID stopped naming a live Treehouse slot while teardown acquired its locks; nothing was changed\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's Treehouse project identity changed while teardown acquired its locks; nothing was changed\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "teamclaude-launcher-required",
+      "version": "1",
+      "owner": "bin/fm-claude-launcher-lib.sh",
+      "invariant": "A TeamClaude-configured launch never starts Claude without its verified proxy prerequisites.",
+      "layer": "runtime-block",
+      "source": "config/claude-launcher, absolute Claude roots, the executable launcher and its prerequisite check; existing decision points: bin/fm-claude-launcher-lib.sh:48, bin/fm-teamclaude-launch.sh:48",
+      "trigger": "refuses to launch Claude without the TeamClaude proxy when config/claude-launcher=teamclaude / fail() helper: refuses to launch Claude when a TeamClaude prerequisite fails",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Restore the configured TeamClaude launcher and its proxy prerequisites, verify with bash bin/fm-teamclaude-launch.sh --check, then retry the same configured launch.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teamclaude-launch.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-claude-launcher-lib.sh",
+          "match": "echo \"error: config/claude-launcher=teamclaude needs the executable launcher $launch_bin; refusing to launch Claude without the proxy\" >&2"
+        },
+        {
+          "file": "bin/fm-teamclaude-launch.sh",
+          "match": "printf 'error: TeamClaude %s; refusing to launch Claude without it\\n' \"$1\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "teardown-exact-incarnation",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Automatic teardown names one exact task incarnation before performing cleanup.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:1306",
+      "trigger": "refuses automatic teardown when the record has no/unreadable spawn_gen, carries an abandoned legacy stamp, a --legacy-record endpoint is not confirmed dead/agent-less, or the legacy stamp fails to validate",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the record; use bash bin/fm-control.sh <task> relaunch --note <progress> to publish an unambiguous incarnation, or use the existing legacy-record route only after its recorded endpoint is proved dead or agent-less.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's record predates spawn_gen and its recorded endpoint reads '$TEARDOWN_LEGACY_ENDPOINT', not confidently dead or agent-less; --legacy-record teardown is refused while an agent may still be bound to it. Nothing was changed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: could not stamp the accepted legacy incarnation into task $ID's record; refusing destructive teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: task $ID's record carries the legacy incarnation stamp $FM_BACKLOG_META_SPAWN_GEN left by an abandoned --legacy-record teardown, not an incarnation published by a spawn; refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: task $ID's record has an unreadable spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - fix the record, then retry teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: task $ID's record has no spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"error: the stamped legacy incarnation does not validate for $ID ($FM_BACKLOG_TRANSITION_ERROR); refusing destructive teardown\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "teardown-process-reap-custody",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Process reaping preserves any process whose task-copy custody cannot be proved.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:3705",
+      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry.\" >&2",
+          "count": 6
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot verify leaked process $pid identity for $ID; preserving the worktree/tasktmp for manual inspection or retry.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "teardown-slot-route-reproof",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "A proved held-close or slot-return route cannot silently change before removal.",
+      "layer": "runtime-block",
+      "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: bin/fm-teardown.sh:4449",
+      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: a foreign copy in pool slot $TEARDOWN_HELD_SLOT changed since the slot was proved, so the slot is not returned. $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no other live task works in pool slot $TEARDOWN_PEER_SLOT any more, so task $ID's cleanup is no longer the peer route; re-run bin/fm-teardown.sh $ID. $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "test-run-primary-checkout",
+      "version": "1",
+      "owner": "bin/fm-test-run.sh",
+      "invariant": "A task's behavior suite never runs in the repository's primary checkout.",
+      "layer": "runtime-block",
+      "source": "FM_TASK_ID and Git common-dir identity, or the selected suites' recorded isolation and family concurrency proofs; existing decision points: bin/fm-test-run.sh:397",
+      "trigger": "running a test selection from the repository primary checkout while FM_TASK_ID is set",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Run bash bin/fm-test-run.sh <suite> --jobs 1 from the assigned isolated task worktree; higher concurrency requires its existing proof owner.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-test-run.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-test-run.sh",
+          "match": "die \"refusing to run in the repository primary checkout $top while FM_TASK_ID=$task_id is set; run from the assigned task worktree instead\""
+        },
+        {
+          "file": "bin/fm-test-run.sh",
+          "match": "refuse_primary_checkout_for_task"
+        }
+      ]
+    },
+    {
+      "id": "test-run-unproven-concurrency",
+      "version": "1",
+      "owner": "bin/fm-test-run.sh",
+      "invariant": "Concurrent test execution uses only individually or family-proven isolated selections within their proven limits.",
+      "layer": "runtime-block",
+      "source": "FM_TASK_ID and Git common-dir identity, or the selected suites' recorded isolation and family concurrency proofs; existing decision points: bin/fm-test-run.sh:2916",
+      "trigger": "an explicit --jobs N>1 over a portable-serial lane, a script with no isolation/concurrency proof, or above its family proven max",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Run bash bin/fm-test-run.sh <suite> --jobs 1 from the assigned isolated task worktree; higher concurrency requires its existing proof owner.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-test-run.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-test-run.sh",
+          "match": "die \"--jobs $JOBS refused: $s is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial.\""
+        },
+        {
+          "file": "bin/fm-test-run.sh",
+          "match": "portable-serial|portable-serial-*) die \"--jobs $JOBS refused: portable serial lanes stay serial; use --jobs 1\" ;;"
+        },
+        {
+          "file": "bin/fm-test-run.sh",
+          "match": "|| die \"--jobs $JOBS refused: family $family is proven only up to $family_jobs_max concurrent workers\""
+        }
+      ]
+    },
+    {
+      "id": "treehouse-slot-lock-serialization",
+      "version": "1",
+      "owner": "bin/fm-teardown.sh",
+      "invariant": "Copy allocation, return and reassociation share the same project serialization lock.",
+      "layer": "runtime-block",
+      "source": "the project identity and its shared Treehouse lock path before copy allocation, return or reassociation; existing decision points: bin/fm-control.sh:1276, bin/fm-spawn.sh:4542, bin/fm-teardown.sh:854",
+      "trigger": "reassociate while another copy allocation/return/reassociation holds the shared Treehouse project lock / creating/relocating a task copy while the shared Treehouse project lock is held or cannot be taken (split from spawn-lock-no-race) / refuses teardown (or forced child teardown) when the shared Treehouse project lock cannot be resolved or acquired, or another slot allocation/return is in progress",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown-pool.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "|| die \"another task copy allocation, return, or reassociation is in progress for ${RA_PREPROJECT[0]}; refusing to race it, nothing was changed\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: another Treehouse slot allocation or return is in progress for $PROJ_ABS; refusing to race it\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race its capacity admission\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; the task record and slot are retained\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot resolve the shared Treehouse project lock for child $task_id; forced teardown changed nothing\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "trust-import-consent",
+      "version": "1",
+      "owner": "bin/fm-claude-trust.sh",
+      "invariant": "Trust registration never reverses a recorded refusal of external imports.",
+      "layer": "runtime-block",
+      "source": "the project settings flags hasClaudeMdExternalIncludesApproved and hasClaudeMdExternalIncludesWarningShown; existing decision points: bin/fm-claude-trust.sh:600",
+      "trigger": "overriding a project entry that already declined external CLAUDE.md imports",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Have the operator preserve the settings file, remove only the two recorded external-import consent flags from the named project entry and approve the imports dialog interactively once; then retry bash bin/fm-claude-trust.sh <worktree> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-claude-trust.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "`project entry for ${project} in ${store} already declined external CLAUDE.md imports; refusing to override that consent. To recover, remove hasClaudeMdExternalIncludesApproved and hasClaudeMdExternalIncludesWarningShown from that project entry and approve the imports dialog interactively once`,"
+        }
+      ]
+    },
+    {
+      "id": "trust-scope-isolated-worktree",
+      "version": "1",
+      "owner": "bin/fm-claude-trust.sh",
+      "invariant": "Task-worktree trust is limited to a proven isolated root of the named project.",
+      "layer": "runtime-block",
+      "source": "the canonical target/project Git roots, user-owned home markers, operational-directory containment and resolved settings-store bytes; existing decision points: bin/fm-agy-trust.sh:70, bin/fm-claude-trust.sh:309",
+      "trigger": "registering trust for anything but the root of a linked git worktree of the named project (refuses /, $HOME, config dir, primary checkout, subdir, unrelated repo, unresolvable git dirs; claude accepts a sibling clone only on an exact origin URL string match, agy accepts no sibling clone)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the existing settings and consent; correct the named target or restore the user-owned readable store, then retry bash bin/fm-claude-trust.sh <worktree> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-claude-trust.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ \"$WT_COMMON\" = \"$PROJ_COMMON\" ] || refuse \"'$WT_REAL' is not a worktree of project '$PROJ_REAL'\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ \"$WT_GIT_DIR\" != \"$WT_COMMON\" ] || refuse \"'$WT_REAL' is a primary checkout, not an isolated worktree\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ \"$WT_REAL\" != \"$HOME_REAL\" ] || refuse \"'$WT_REAL' is the home directory, not a task worktree\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ \"$WT_TOP_REAL\" = \"$WT_REAL\" ] || refuse \"'$WT_REAL' is not a worktree root (its root is '${WT_TOP_REAL:-unresolvable}')\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$PROJ_COMMON\" ] || refuse \"project '$PROJ_REAL' is not inside a git repository\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$WT_COMMON\" ] || refuse \"'$WT_REAL' has no resolvable git common directory\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$WT_REAL' has an unresolvable git directory\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$WT_REAL' has no resolvable git directory\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$WT_TOP\" ] || refuse \"'$WT_REAL' is not inside a git repository\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$SIBLING_GIT_DIR\" = \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$TARGET_REAL\" != \"$CONFIG_DIR_REAL\" ] || refuse \"'$TARGET_REAL' is the Claude config directory, not a $SCOPE_NOUN\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$TARGET_REAL\" != \"${HOME_REAL:-}\" ] || refuse \"'$TARGET_REAL' is the home directory, not a $SCOPE_NOUN\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$TARGET_REAL\" != / ] || refuse \"'/' is the filesystem root, not a $SCOPE_NOUN\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$WT_GIT_DIR\" != \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' is a primary checkout, not an isolated worktree\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$WT_TOP_REAL\" = \"$TARGET_REAL\" ] || refuse \"'$TARGET_REAL' is not a worktree root (its root is '${WT_TOP_REAL:-unresolvable}')\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$PROJ_COMMON\" ] || refuse \"project '$PROJ_REAL' is not inside a git repository\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$PROJ_GIT_DIR\" ] || refuse \"project '$PROJ_REAL' has an unresolvable git directory\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$PROJ_GIT_DIR\" ] || refuse \"project '$PROJ_REAL' has no resolvable git directory\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$SIBLING_CANON\" ] || refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$WT_COMMON\" ] || refuse \"'$TARGET_REAL' has no resolvable git common directory\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$TARGET_REAL' has an unresolvable git directory\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$WT_GIT_DIR\" ] || refuse \"'$TARGET_REAL' has no resolvable git directory\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$WT_TOP\" ] || refuse \"'$TARGET_REAL' is not inside a git repository\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "|| refuse \"'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'\"",
+          "key": "site:bin/fm-claude-trust.sh:82780870a7"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "|| refuse \"project '$PROJ_REAL' is a linked worktree whose primary checkout could not be resolved\"",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "trust-scope-lab-home",
+      "version": "1",
+      "owner": "bin/fm-claude-trust.sh",
+      "invariant": "Lab-home trust is limited to a user-owned disposable home with the required checkout shape.",
+      "layer": "runtime-block",
+      "source": "the canonical target/project Git roots, user-owned home markers, operational-directory containment and resolved settings-store bytes; existing decision points: bin/fm-claude-trust.sh:404",
+      "trigger": "--lab-home trust unless the target has a regular, user-owned lab-home marker, AGENTS.md, bin/, and is a primary checkout top level",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Use a genuine user-owned disposable lab home created by the lab owner, then retry bash bin/fm-claude-trust.sh --lab-home <lab-home>; never stamp a live home as disposable.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-claude-trust.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ ! -L \"$LAB_MARKER\" ] || refuse \"'$LAB_MARKER' is a symlink; a lab home carries the marker as a regular file\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -d \"$TARGET_REAL/bin\" ] || refuse \"'$TARGET_REAL' has no bin/, so it is not a firstmate home\"",
+          "key": "site:bin/fm-claude-trust.sh:ffbdff56b0"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -f \"$TARGET_REAL/AGENTS.md\" ] || refuse \"'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate home\"",
+          "key": "site:bin/fm-claude-trust.sh:8ac90a52d0"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "refuse \"'$TARGET_REAL' carries no lab-home marker owned by this user, so it is not a disposable lab home\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "|| refuse \"'$TARGET_REAL' is a linked worktree, not the primary checkout a lab primary launches in\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "|| refuse \"'$TARGET_REAL' is not the top level of a git checkout\""
+        }
+      ]
+    },
+    {
+      "id": "trust-scope-secondmate-home",
+      "version": "1",
+      "owner": "bin/fm-claude-trust.sh",
+      "invariant": "Secondmate-home trust is limited to a user-owned seed matching the named id and contained operational directories.",
+      "layer": "runtime-block",
+      "source": "the canonical target/project Git roots, user-owned home markers, operational-directory containment and resolved settings-store bytes; existing decision points: bin/fm-claude-trust.sh:427",
+      "trigger": "--secondmate-home trust unless the .fm-secondmate-home marker is a user-owned regular file naming this id, AGENTS.md and bin/ exist, and data/state/config/projects resolve inside the home",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Have the seed owner restore the matching user-owned marker and contained home layout, then retry bash bin/fm-claude-trust.sh --secondmate-home <home> <secondmate-id>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-claude-trust.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "*) refuse \"'$sub_dir' resolves to '$sub_dir_real', outside the home, so '$TARGET_REAL' is not a safe secondmate home\" ;;"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ ! -L \"$SUB_MARKER\" ] || refuse \"'$SUB_MARKER' is a symlink; a seeded secondmate home carries the marker as a regular file\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ \"$SUB_MARKER_ID\" = \"$SUB_ID\" ] || refuse \"'$TARGET_REAL' is marked for secondmate '${SUB_MARKER_ID:-unknown}', not '$SUB_ID'\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -O \"$SUB_MARKER\" ] || refuse \"'$SUB_MARKER' is not owned by this user\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -d \"$TARGET_REAL/bin\" ] || refuse \"'$TARGET_REAL' has no bin/, so it is not a firstmate home\"",
+          "key": "site:bin/fm-claude-trust.sh:ffbdff56b0~2"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -d \"$sub_dir\" ] || refuse \"'$sub_dir' is not a directory, so '$TARGET_REAL' is not a seeded secondmate home\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -f \"$SUB_MARKER\" ] || refuse \"'$TARGET_REAL' carries no .fm-secondmate-home marker, so it is not a seeded secondmate home\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -f \"$TARGET_REAL/AGENTS.md\" ] || refuse \"'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate home\"",
+          "key": "site:bin/fm-claude-trust.sh:8ac90a52d0~2"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$SUB_ID\" ] || refuse \"no secondmate id was supplied, so '$TARGET_REAL' cannot be matched against its seed marker\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$sub_dir_real\" ] || refuse \"'$sub_dir' cannot be resolved\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "refuse \"'$sub_dir' is a broken symlink, so this home's $sub_dir_name directory cannot be shown to stay inside it\""
+        }
+      ]
+    },
+    {
+      "id": "trust-store-integrity",
+      "version": "1",
+      "owner": "bin/fm-claude-trust.sh",
+      "invariant": "Trust-store updates preserve ownership and concurrent edits of the resolved settings file.",
+      "layer": "runtime-block",
+      "source": "the resolved settings file regularity, user ownership and unchanged bytes across the read-modify-write retry; existing decision points: bin/fm-agy-trust.sh:98, bin/fm-claude-trust.sh:470",
+      "trigger": "writing the agent settings store when it is an unresolvable symlink, not a regular file, owned by another user, or changed twice during the read-modify-write",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the existing settings and consent; correct the named target or restore the user-owned readable store, then retry bash bin/fm-claude-trust.sh <worktree> <project>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-claude-trust.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -O \"$STORE\" ] || refuse \"'$STORE' is not owned by this user\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -f \"$STORE\" ] || refuse \"'$STORE' is not a regular file\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "[ -n \"$STORE_REAL\" ] || refuse \"'$STORE' is a symlink whose target cannot be resolved\""
+        },
+        {
+          "file": "bin/fm-agy-trust.sh",
+          "match": "console.error(`error: ${store} was modified while trust was being recorded; refusing to overwrite it`);"
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -O \"$STORE\" ] || refuse \"'$STORE' is not owned by this user\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -f \"$STORE\" ] || refuse \"'$STORE' is not a regular file\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "[ -n \"$STORE_REAL\" ] || refuse \"'$STORE' is a symlink whose target cannot be resolved\""
+        },
+        {
+          "file": "bin/fm-claude-trust.sh",
+          "match": "console.error(`error: ${store} was modified while trust was being recorded; refusing to overwrite it`);"
+        }
+      ]
+    },
+    {
+      "id": "typesafe-never-send",
+      "version": "1",
+      "owner": "bin/fm-model-picker-jev.sh",
+      "invariant": "TypeSafe requests are withheld when the never-send policy rejects them or cannot be checked.",
+      "layer": "runtime-block",
+      "source": "the request bytes and configured never-send policy through fm_typesafe_permitted; existing decision points: bin/fm-model-picker-jev.sh:29",
+      "trigger": "withholds a Jev/TypeSafe request when the never-send policy matches or cannot be checked",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Keep the request local; have the owner remove prohibited content without weakening the never-send policy, then retry the model selection through bash bin/fm-model-picker.sh.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-model-picker.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-model-picker-jev.sh",
+          "match": "printf '%s\\n' \"${FM_TYPESAFE_WITHHELD_REASON:-never-send policy refused the request}\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "wake-branch-grant-snapshot",
+      "version": "1",
+      "owner": "bin/fm-wake-drain.sh",
+      "invariant": "A branch consumes only wake rows in its nonempty granted snapshot.",
+      "layer": "runtime-block",
+      "source": "the branch actor's nonempty eligible-row snapshot; existing decision points: bin/fm-wake-drain.sh:218",
+      "trigger": "refuses a branch-actor drain/ack with no non-empty branch-eligible row snapshot",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Return to the branch wake dispatched with its granted snapshot; use FM_HOME=<home> bash bin/fm-wake-drain.sh only inside that original handoff, never guess or consume other rows.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-branch-supervision.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-wake-drain.sh",
+          "match": "echo \"wake drain: no branch-eligible row snapshot at $ELIGIBLE_ROWS_FILE; refusing to guess what this actor may consume\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "worker-in-recorded-worktree",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "A worker starts only after its endpoint is proven to be in the recorded task copy.",
+      "layer": "runtime-block",
+      "source": "the backend endpoint cwd compared with the canonical recorded worktree after the launch cd; existing decision points: bin/fm-spawn.sh:5638",
+      "trigger": "launching/relaunching when the endpoint cannot be cd'd into, or its cwd is not, the task's recorded worktree (5618, 5638, 6066, 6071, 6080)",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Preserve the task's current copy and endpoint; repair the named prerequisite with its owner, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-worktree-settle.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's endpoint could not be moved into its recorded worktree '$WT'; refusing to launch outside the copy holding its work\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and could not be told to return to its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and did not return to its recorded worktree '$WT' when told to; refusing to relaunch an agent outside the copy holding its work\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work\" >&2"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: task $ID's worker started in '${seen:-unknown}', not its recorded worktree '$WT'; refusing to continue outside the copy holding its work\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "x-reply-followup-context",
+      "version": "1",
+      "owner": "bin/fm-x-reply.sh",
+      "invariant": "A public follow-up uses an authoritatively recovered platform and explicit budget.",
+      "layer": "runtime-block",
+      "source": "the per-request local or relay context naming both platform and explicit reply budget; existing decision points: bin/fm-x-reply.sh:299",
+      "trigger": "public follow-up refused when the reply platform and explicit budget cannot be determined",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Hold the follow-up until both original values are recovered, then retry bash bin/fm-x-reply.sh <request> --followup <text> under the existing reply authority.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-x-mode.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-x-reply.sh",
+          "match": "printf 'fm-x-reply: refusing follow-up for %s: could not authoritatively determine both the reply platform and explicit budget (local per-request context was incomplete%s). Hold and retry once both values are recoverable.\\n' \\"
+        }
+      ]
+    },
     {
       "id": "away-branch-queued-only",
       "version": "1",
