@@ -1,0 +1,63 @@
+### plan for change to tests/fm-inbox.test.sh (14 tests)
+mode=selected
+selected=14
+parallel_1=true
+parallel_2=false
+herdr=false
+serial_count=1
+any_lane=true
+
+### plan for change to bin/fm-inbox.sh (65 tests)
+mode=selected
+selected=65
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=8
+any_lane=true
+
+### plan for change to docs/watchdog.md (61 tests)
+mode=selected
+selected=61
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=8
+any_lane=true
+
+### full plan (no select file)
+mode=full
+selected=0
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+
+### empty selection
+mode=selected
+selected=0
+parallel_1=false
+parallel_2=false
+herdr=false
+serial_count=0
+any_lane=false
+
+### bad select line
+fm-test-run: --select-file line is not a tests/<name>.test.sh script: bin/fm-inbox.sh
+exit=2
+### nonexistent test
+fm-test-run: --select-file names a script that does not exist: tests/nope.test.sh
+exit=2
+### full partition count mismatch without select
+fm-test-run: lane 'portable-serial-1of3' asks for 3 portable serial shards but this runner is configured for 25 (see --list-lanes)
+exit=2
+### selection serial count above 25
+fm-test-run: lane 'portable-serial-1of26' asks for 26 portable serial shards but a selection packs into 1..25 (see --plan-ci)
+exit=2
+### selection index above count
+fm-test-run: lane 'portable-serial-2of1' shard index is outside 1..1 (see --list-lanes)
+exit=2
+### --select-file with explicit script list refused
+fm-test-run: --select-file narrows --all, --family or --lane, not --scripts
+exit=2

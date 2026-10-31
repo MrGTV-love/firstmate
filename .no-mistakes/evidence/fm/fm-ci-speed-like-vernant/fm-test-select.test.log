@@ -1,0 +1,22 @@
+ok - a change to a sourced library selects the test that never names it
+ok - a regression planted in a file no test names fails 1 selected test(s) and no unselected one
+ok - a message that names a script does not make its test depend on it
+ok - a comment that names a file is not a dependency
+ok - a bash -c argument counts as a dependency only where the inline code sources or runs it
+ok - tests/lib.sh, the runner, the selector and the workflows select the full suite
+ok - a path the selector does not know selects the full suite
+ok - any selector error selects the full suite and exits zero
+ok - --full selects the full suite whatever the diff
+ok - a widely sourced library selects the full suite
+ok - a deleted file selects the tests that still name it
+ok - a globbed or copied directory selects its readers, and an unread file selects nothing
+ok - a document that names a script does not make its readers depend on the script
+ok - a name with a variable in it selects the tests that could load any file it might mean
+ok - the shared library's own teardown chain is followed one script deep, no further
+ok - a script first reached through the shared library is still followed in full from the test's own chain
+ok - the default word of ${NAME:-word} and ${NAME:=word} names a file in tests and in production scripts
+ok - a path under a linked fixture directory names the tracked file it ends with
+ok - an interpreter's here-document is read as its language, git ls-files pathspecs match as git matches them, and a glob git never receives names nothing
+ok - a root-level file is named through the repository root, and the same file under a fixture variable is not
+ok - --explain prints how a change reaches each selected test
+ok - the real tree builds a graph, selects an edited test for itself, and treats tests/lib.sh as infrastructure

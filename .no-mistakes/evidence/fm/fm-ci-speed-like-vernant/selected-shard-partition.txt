@@ -1,0 +1,13 @@
+selected:       65  serial-shard members:       58  parallel members:        6  herdr members:        1
+duplicates across all lanes:        0
+selected-but-unplanned:        0
+planned-but-unselected:        0
+per-shard counts:
+   5 1
+   7 2
+   6 3
+   9 4
+   9 5
+   7 6
+   8 7
+   7 8

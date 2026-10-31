@@ -1,0 +1,76 @@
+### paths: tests/fm-inbox.test.sh
+mode=selected
+reason=14 of 381 tests are affected by 1 changed paths
+changed=1
+total=381
+selected=14
+(first tests:) test=tests/fm-ci-workflow.test.sh test=tests/fm-gitignore-config.test.sh test=tests/fm-inbox.test.sh test=tests/fm-lint.test.sh test=tests/fm-omp-primary-live-e2e.test.sh 
+
+### paths: bin/fm-inbox.sh
+mode=selected
+reason=65 of 381 tests are affected by 1 changed paths
+changed=1
+total=381
+selected=65
+(first tests:) test=tests/fm-afk-return.test.sh test=tests/fm-arm-pretool-check.test.sh test=tests/fm-backend-herdr-presentation-e2e.test.sh test=tests/fm-bootstrap-network-parallel.test.sh test=tests/fm-bootstrap.test.sh 
+
+### paths: docs/watchdog.md
+mode=selected
+reason=61 of 381 tests are affected by 1 changed paths
+changed=1
+total=381
+selected=61
+(first tests:) test=tests/fm-afk-return.test.sh test=tests/fm-arm-pretool-check.test.sh test=tests/fm-backend-herdr-presentation-e2e.test.sh test=tests/fm-bootstrap-network-parallel.test.sh test=tests/fm-bootstrap.test.sh 
+
+### paths: bin/fm-timeout-lib.sh
+mode=full
+reason=widely shared: 377 of 381 tests are affected
+changed=1
+total=381
+(first tests:) 
+
+### paths: tests/lib.sh
+mode=full
+reason=infrastructure changed: tests/lib.sh
+changed=1
+(first tests:) 
+
+### paths: bin/fm-test-run.sh
+mode=full
+reason=infrastructure changed: bin/fm-test-run.sh
+changed=1
+(first tests:) 
+
+### paths: .github/workflows/ci.yml
+mode=full
+reason=infrastructure changed: .github/workflows/ci.yml
+changed=1
+(first tests:) 
+
+### paths: bin/fm-test-select.py
+mode=full
+reason=infrastructure changed: bin/fm-test-select.py
+changed=1
+(first tests:) 
+
+### paths: bin/does-not-exist.sh
+mode=full
+reason=unknown path (in neither tree): bin/does-not-exist.sh
+changed=1
+(first tests:) 
+
+### --full
+mode=full
+reason=manual force
+changed=0
+
+### --base nosuchrev
+mode=full
+reason=selector error: git rev-parse failed: 1
+changed=0
+exit=0
+### bad usage
+usage: fm-test-select.py [-h] [--repo REPO] [--base BASE]
+                         [--paths-from PATHS_FROM] [--explain] [--full REASON]
+fm-test-select.py: error: unrecognized arguments: --bogus
+exit=2

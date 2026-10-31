@@ -1,0 +1,13 @@
+ok - CI serial shard jobs match the executable lanes one to one and canonical lint roots are covered exactly once
+ok - every behavior-test job runs exactly when the plan asks for it, shards 1..k run with total k for every planned count, and the always-on jobs do not wait for the plan
+ok - pushes, manual runs, the ci-full label and an unmergeable checkout plan the full suite, and a manual replay plans the diff it is given
+ok - a manual replay diffs, graphs and plans the checked-out HEAD
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - main pushes share one group per branch and never cancel the running run
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+ok - both portable parallel jobs pass the concurrency the model starts from

@@ -1,0 +1,13 @@
+### merge-role: bin/fm-test-run.sh --lane portable-serial-1of1 --select-file <2 selected tests>   (fm-role-lib.sh line 2: exit 3  # planted regression for selecto)
+FM_TEST_SUMMARY total=2 failed=2 skipped_gate=0 duration_ms=4550
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1242 failed=1
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=2207 failed=1
+runner exit=1
+
+### main: bin/fm-test-run.sh --lane portable-serial-1of1 --select-file <2 selected tests>   (fm-role-lib.sh line 2: # fm-role-lib.sh - the Firstmate home ro)
+# all fm-spawn-orca-worktree tests passed
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=8384
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1290 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=5972 failed=0
+runner exit=0
+

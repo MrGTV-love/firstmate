@@ -1,0 +1,176 @@
+### PR touching bin/fm-inbox.sh (event=pull_request label=false base=none checkout=merge-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=selected
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=8
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 65)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: selected
+- reason: 65 of 381 tests are affected by 1 changed paths
+- selected tests: 65
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 8
+
+### PR touching only tests/fm-inbox.test.sh (event=pull_request label=false base=none checkout=merge-testonly) exit=0
+-- GITHUB_OUTPUT:
+mode=selected
+parallel_1=true
+parallel_2=false
+herdr=false
+serial_count=1
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 14)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: selected
+- reason: 14 of 381 tests are affected by 1 changed paths
+- selected tests: 14
+- parallel_1: true
+- parallel_2: false
+- herdr: false
+- serial_count: 1
+
+### PR touching .github/workflows/ci.yml (event=pull_request label=false base=none checkout=merge-gh) exit=0
+-- GITHUB_OUTPUT:
+mode=full
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 0)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: full
+- reason: infrastructure changed: .github/workflows/ci.yml
+- selected tests: all
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 25
+
+### PR with ci-full label (event=pull_request label=true base=none checkout=merge-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=full
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 0)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: full
+- reason: the ci-full label asks for the full suite
+- selected tests: all
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 25
+
+### push to main (event=push label=false base=none checkout=merge-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=full
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 0)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: full
+- reason: a push run always runs the full suite
+- selected tests: all
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 25
+
+### manual run, no base (event=workflow_dispatch label=false base=none checkout=merge-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=full
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 0)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: full
+- reason: a workflow_dispatch run always runs the full suite
+- selected tests: all
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 25
+
+### manual replay with base (event=workflow_dispatch label=false base=main checkout=pr-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=selected
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=8
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 65)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: selected
+- reason: 65 of 381 tests are affected by 1 changed paths
+- selected tests: 65
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 8
+
+### pull_request event on a non-merge checkout (event=pull_request label=false base=none checkout=pr-inbox) exit=0
+-- GITHUB_OUTPUT:
+mode=full
+parallel_1=true
+parallel_2=true
+herdr=true
+serial_count=25
+any_lane=true
+selection<<FM_SELECTION_END
+FM_SELECTION_END
+   (selection lines: 0)
+-- STEP SUMMARY:
+### Test selection
+
+- mode: full
+- reason: the checkout is not a pull request merge commit
+- selected tests: all
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 25
+

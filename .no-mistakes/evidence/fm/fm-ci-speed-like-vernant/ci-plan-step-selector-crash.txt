@@ -1,0 +1,21 @@
+### selector replaced by: import sys; sys.exit(1)  -> step exit=0
+mode=full
+parallel_1=true
+herdr=true
+serial_count=25
+- reason: the selector printed no decision
+
+### selector replaced by: print("garbage")  -> step exit=0
+mode=full
+parallel_1=true
+herdr=true
+serial_count=25
+- reason: the selector printed no decision
+
+### selector replaced by: raise SystemExit(0)  -> step exit=0
+mode=full
+parallel_1=true
+herdr=true
+serial_count=25
+- reason: the selector printed no decision
+

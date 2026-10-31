@@ -1,0 +1,10 @@
+### merge-role: action step, mode=selected, lane portable-serial-1of1, selection=2 tests -> exit=1
+FM_TEST_SUMMARY total=2 failed=2 skipped_gate=0 duration_ms=3071
+timing json keys: ['families', 'finished_at', 'run_id', 'scripts', 'selection', 'started_at', 'summary']
+[('tests/fm-spawn-orca-worktree.test.sh', None), ('tests/fm-ask-user-authority.test.sh', None)]
+
+### main: action step, mode=selected, lane portable-serial-1of1, selection=2 tests -> exit=0
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=6997
+timing json keys: ['families', 'finished_at', 'run_id', 'scripts', 'selection', 'started_at', 'summary']
+[('tests/fm-spawn-orca-worktree.test.sh', None), ('tests/fm-ask-user-authority.test.sh', None)]
+

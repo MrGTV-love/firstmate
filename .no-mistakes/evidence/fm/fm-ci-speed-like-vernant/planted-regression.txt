@@ -1,0 +1,20 @@
+### CI plan step on PR merge that changes only bin/fm-role-lib.sh (planted 'exit 3')
+ bin/fm-role-lib.sh | 1 +
+ 1 file changed, 1 insertion(+)
+### Test selection
+
+- mode: selected
+- reason: 322 of 381 tests are affected by 1 changed paths
+- selected tests: 322
+- parallel_1: true
+- parallel_2: true
+- herdr: true
+- serial_count: 24
+
+tests/fm-ask-user-authority.test.sh in selection: 1
+tests/fm-ask-user-authority.test.sh names fm-role-lib.sh: 0
+tests/fm-spawn-orca-worktree.test.sh in selection: 1
+tests/fm-spawn-orca-worktree.test.sh names fm-role-lib.sh: 0
+### --explain chains
+why=bin/fm-role-lib.sh <- bin/fm-brief.sh <- tests/fm-ask-user-authority.test.sh
+why=bin/fm-role-lib.sh <- bin/fm-spawn.sh <- tests/fm-spawn-orca-worktree.test.sh
