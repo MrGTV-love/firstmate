@@ -613,8 +613,6 @@
     {"id": "site:bin/fm-spawn.sh:d31255e452", "rule": "S1", "text": "echo \"error: task launch directory $LAUNCH_DIR already exists and is not a private directory owned b"},
     {"id": "site:bin/fm-spawn.sh:67cdf0824b", "rule": "S1", "text": "echo \"error: task launch file $LAUNCH_FILE already exists; refusing to replace it\" >&2"},
     {"id": "site:bin/fm-task-copy-lib.sh:5d02771829", "rule": "S1", "text": "echo \"REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed\" >&2"},
-    {"id": "site:bin/fm-task-copy-lib.sh:cff030a213", "rule": "S1", "text": "remedy=\"treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && tr"},
-    {"id": "site:bin/fm-task-copy-lib.sh:6df0fed844", "rule": "S1", "text": "echo \"error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT"},
     {"id": "site:bin/fm-teamclaude-launch.sh:44ffecd422", "rule": "S1", "text": "printf 'error: TeamClaude %s; refusing to launch Claude without it\\n' \"$1\" >&2"},
     {"id": "site:bin/fm-teardown-nested-lib.sh:1e2a47c1d3", "rule": "S1", "text": "fm_refuse \"$TEARDOWN_FRICTION_GUARD\" \"$1\" \"$missing\" \"$kind\" \"$exit_text\" nested-copy \"$3\" \"$ID\""},
     {"id": "site:bin/fm-teardown-nested-lib.sh:5074906223", "rule": "S1", "text": "teardown_refuse_copy \"$TEARDOWN_FOREIGN_RULE\" \"foreign copy ${TEARDOWN_DEF_COPY[$i]} stays in pool s"},

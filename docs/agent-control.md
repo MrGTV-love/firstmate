@@ -454,9 +454,11 @@ Before a fresh spawn sends `treehouse get`, and before secondmate home seeding s
 `treehouse get` resets and hands out only a slot its pool state file records as not leased, so such a slot (the nested replacement-copy case) refuses the allocation unless Treehouse's state durably holds it.
 A slot is held only when every state entry naming the same directory by device and inode identity is leased.
 An unleased entry spelled with trailing slashes, `/.` components, or repeated slashes still makes the slot unsafe even beside a leased entry.
-The same holds for an entry spelled that way that carries Treehouse's recovered-state holder on a slot that is not a local Firstmate home.
 The raw path-suffix prefilter skips only entries with an ordinary lease, so it cannot hide a conflicting unleased or recovered-lease alias; skipping an ordinary leased alias can still leave the slot unproved and refuse allocation.
-A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
+A lease carrying Treehouse's recovered-state holder is not durable custody unless the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
+For allocation, that recovered-state verdict is deferred until the actual selected slot is known: a recovered lease on a different slot does not block a free-slot start.
+Both allocation callers check the returned slot again before claiming it, seeding a home or launching a worker, and reject a selected recovered slot that still contains another task's current nested copy, including directory aliases.
+The check never returns, reaps, re-leases or edits the held slot; Treehouse remains responsible for lease release and selection.
 A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
 The check refuses to prove any slot held when any entry path is relative or escaped by the TSV transport, including paths containing backslashes, tabs, carriage returns, or newlines.
 It cannot safely exclude such an entry as unrelated without proving its directory identity, since even a different spelling can alias the requested slot.
@@ -467,7 +469,8 @@ For a singly recorded unleased slot with a unique state name, the refusal names 
 When an unleased entry's state name is duplicated or another entry names the same directory, the refusal instead requires `treehouse status` inspection and a repair report.
 Treehouse leases only the first entry with the requested name, so a lease cannot reliably clear a duplicate-entry refusal in either entry order, and the refusal does not describe a partly leased slot as unleased.
 No other refusal names a lease as its remedy.
-A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
+A refusal for a selected recovered-state slot names the existing task's completing step: land and finish that task, then run `FM_HOME=<owning-home> bin/fm-teardown.sh <existing-task>` before retrying.
+Inspecting status alone does not complete that task, and `treehouse lease` cannot replace a lease that already exists.
 An unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, does not stop a start, because `treehouse get` allocates from the current pool only; this is judged again at each start, so a folder that becomes current again is protected again.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.

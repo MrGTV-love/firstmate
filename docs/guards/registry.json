@@ -4,6 +4,7 @@
   "spec": "docs/guard-spec.md",
   "audited": 30,
   "beyond_audit_active": [
+    "spawn-retained-current-copy",
     "slot-provision-attestation",
     "spawn-local-source-selection",
     "jev-tool-coverage",
@@ -23,6 +24,34 @@
     "open-loops-one-deferral"
   ],
   "guards": [
+    {
+      "id": "spawn-retained-current-copy",
+      "version": "1",
+      "owner": "bin/fm-task-copy-lib.sh",
+      "invariant": "a fresh task is never assigned a recovered-lease slot containing another task's current nested copy",
+      "layer": "runtime-block",
+      "source": "local Firstmate state/<task>.meta worktree paths, Treehouse treehouse-state.json lease entries, the current project pool, and the actual allocated slot returned to fm-spawn.sh or fm-home-seed.sh",
+      "trigger": "before get, a current nested copy is in a slot whose lease is unproved for a reason other than recovered state; after get, the allocated slot contains a current nested copy whose lease is unproved, including recovered state",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "For a selected recovered slot, land and finish the existing task, then FM_HOME=<owning-home> bin/fm-teardown.sh <existing-task> before retrying; never return, reap or re-lease a held slot to unblock a new spawn. Other pre-allocation refusals retain their state-specific lease, inspection or repair commands.",
+      "budget": 1,
+      "budget_reason": "one refusal per invocation without internal retries; Main owns completion of the existing task before another attempt",
+      "telemetry": "state/guard-events.jsonl; one allow or deny per pre-allocation or selected-slot decision with guard_id, source_ok, elapsed_ms and cleared_by",
+      "test": "tests/fm-spawn-retained-copy.test.sh",
+      "sites": [
+        {"file": "bin/fm-task-copy-lib.sh", "match": "refusing allocation $boundary"},
+        {"file": "bin/fm-task-copy-lib.sh", "match": "spawn-retained-current-copy deny"}
+      ],
+      "status": "active",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "the allocated slot is unknown before treehouse get; recovered-state rejection runs before any owner claim, home seeding or worker launch while Treehouse owns lease release and selection",
+      "exemptions": [],
+      "instrumented": true
+    },
     {
       "decision": "deny",
       "fail_direction": "closed",

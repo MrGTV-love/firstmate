@@ -395,6 +395,32 @@ test_home_seed_refuses_slot_holding_live_nested_copy_before_lease() {
   pass "home seed refuses a slot holding a live record's nested copy before lease acquisition"
 }
 
+test_home_seed_refuses_selected_recovered_slot() {
+  local nested out rc=0
+  make_home_seed_retained_case recovered-selected
+  nested="$SEED_CASE_SLOT/.claude/worktrees/recovered-holder"
+  git -C "$SEED_CASE_HOME" worktree add --quiet -b recovered-holder "$nested"
+  fm_write_meta "$SEED_CASE_HOME/state/holder.meta" \
+    "project=$SEED_CASE_HOME" "worktree=$nested" "kind=ship"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}]}\n' \
+    "$SEED_CASE_SLOT" > "$SEED_CASE_DIR/pool/treehouse-state.json"
+  home_seed_retained_fingerprint "$SEED_CASE_SLOT" > "$SEED_CASE_DIR/before-copy"
+  cp "$SEED_CASE_HOME/state/holder.meta" "$SEED_CASE_DIR/before-holder-meta"
+  cp "$SEED_CASE_HOME/data/secondmates.md" "$SEED_CASE_DIR/before-registry"
+  out=$(run_home_seed_retained_case 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "home seed accepted a recovered slot holding another task"
+  assert_contains "$out" 'before assigning the allocated slot' "home seed lost selected-slot denial"
+  assert_contains "$out" "bin/fm-teardown.sh 'holder'" "home seed lost the completing step"
+  grep -F 'treehouse get --lease' "$SEED_CASE_LOG" >/dev/null || fail "home seed did not reach allocation"
+  ! grep -E 'treehouse return|reset' "$SEED_CASE_LOG" >/dev/null || fail "home seed returned or reset the held recovered slot"
+  home_seed_retained_fingerprint "$SEED_CASE_SLOT" | cmp -s - "$SEED_CASE_DIR/before-copy" \
+    || fail "home seed changed the recovered slot"
+  cmp -s "$SEED_CASE_DIR/before-holder-meta" "$SEED_CASE_HOME/state/holder.meta" || fail "home seed changed the holder"
+  cmp -s "$SEED_CASE_DIR/before-registry" "$SEED_CASE_HOME/data/secondmates.md" || fail "home seed changed the registry"
+  [ ! -e "$SEED_CASE_SLOT/.fm-secondmate-home" ] || fail "home seed marked the held recovered slot"
+  pass "home seed rejects a selected recovered slot without returning or seeding it"
+}
+
 test_home_seed_left_slot_allows_lease_and_propagates_get_failure() {
   local err out
   make_home_seed_retained_case left
@@ -3419,6 +3445,8 @@ EOF
   pass "fm-backlog-handoff refuses Done items under whitespace section headings and unsafe homes"
 }
 
+fm_test_only
+
 test_fm_home_parameterization
 test_lock_status_is_per_home
 test_seed_allows_overlapping_clones_and_drops_owner
@@ -3429,6 +3457,7 @@ test_home_seed_validate_rejects_duplicate_homes
 test_home_seed_validate_rejects_duplicate_ids
 test_home_seed_validate_rejects_nested_homes
 test_home_seed_uses_treehouse_acquired_home
+test_home_seed_refuses_selected_recovered_slot
 test_home_seed_refuses_slot_holding_live_nested_copy_before_lease
 test_home_seed_left_slot_allows_lease_and_propagates_get_failure
 test_home_seed_returns_treehouse_acquired_home_on_assignment_failure

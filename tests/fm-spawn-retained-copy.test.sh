@@ -12,8 +12,9 @@
 #      as the remedy: a live owner process only, no state entry, an unreadable
 #      state file, missing jq, conflicting records (including an unleased or
 #      recovered-lease alias of the slot's directory), a relative or
-#      TSV-escaped entry path, or Treehouse's recovered-state lease on a slot
-#      that is not a Firstmate home.
+#      TSV-escaped entry path. A recovered-state lease on a different slot
+#      permits a free-slot allocation; selecting that recovered slot itself
+#      still refuses before any claim or worker launch, with a completing step.
 #   3. A slot Treehouse's state durably leases does not block allocation even
 #      with a live record's nested copy inside it: treehouse get never hands it
 #      out, so the spawn proceeds into another slot and leaves it untouched.
@@ -105,6 +106,27 @@ assert_retained_refusal() {
   retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "refused allocation changed the slot"
   [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "refused allocation claimed the slot"
   [ ! -e "$HOME_DIR/state/new-$name.meta" ] || fail "refused allocation published metadata"
+}
+
+assert_recovered_candidate_refusal() {
+  local name=$1 out rc=0
+  retained_fingerprint > "$CASE_DIR/before-copy"
+  cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+  out=$(run_retained_spawn "$name") || rc=$?
+  [ "$rc" -ne 0 ] || fail "spawn accepted a recovered slot holding another task: $out"
+  printf '%s\n' "$out"
+  assert_contains "$out" "carries Treehouse's recovered-state lease" "selected-slot refusal lost its reason"
+  assert_contains "$out" "before assigning the allocated slot" "selected-slot refusal ran at the wrong boundary"
+  assert_contains "$out" "FM_HOME='$HOME_DIR' bin/fm-teardown.sh 'holder'" "refusal lost its completing command"
+  assert_contains "$out" "Land and finish task 'holder'" "refusal did not name the landing prerequisite"
+  grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "the selected-slot check did not observe allocation"
+  ! grep -Eq 'treehouse (return|lease)|reset' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refusal released or changed the held slot"
+  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "selected-slot refusal changed the existing copy"
+  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "selected-slot refusal changed the existing task record"
+  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "refused allocation claimed the held slot"
+  [ ! -e "$HOME_DIR/state/new-$name.meta" ] || fail "refused allocation published a new task"
+  jq -se 'last | [.guard, .decision, .source_ok] == ["spawn-retained-current-copy", "deny", true]' \
+    "$HOME_DIR/state/guard-events.jsonl" >/dev/null || fail "selected-slot denial was not recorded"
 }
 
 assert_retained_spawn() {
@@ -406,7 +428,7 @@ test_conflicting_unleased_alias_refuses_before_allocation() {
   pass "mixed leased/unleased aliases refuse with status/repair guidance in both entry orders"
 }
 
-test_conflicting_recovered_alias_refuses_before_allocation() {
+test_recovered_alias_refuses_selected_slot_assignment() {
   local spelling name alias
   local recovered='recovered: state file was corrupt or truncated; verify before reuse'
   for spelling in trailing-slash dot double-slash; do
@@ -421,11 +443,10 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
     printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
       "$SLOT_DIR" "$alias" "$recovered" > "$CASE_DIR/pool/treehouse-state.json"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-    assert_retained_refusal "$name" "carries Treehouse's recovered-state lease" \
-      "(cd '$PROJECT_DIR' && treehouse status)"
+    assert_recovered_candidate_refusal "$name"
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
   done
-  pass "conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state"
+  pass "recovered-lease aliases refuse assignment of the selected slot without changing pool state"
 }
 
 test_unprovable_entry_path_refusal_names_no_lease() {
@@ -450,9 +471,8 @@ test_unprovable_entry_path_refusal_names_no_lease() {
 }
 
 test_unprovable_slot_hold_still_refuses() {
-  local shape name entry reason remedy forbidden
-  local recovered='recovered: state file was corrupt or truncated; verify before reuse'
-  for shape in live-owner no-entry unreadable recovered-not-home; do
+  local shape name reason remedy forbidden
+  for shape in live-owner no-entry unreadable; do
     name="unproved-$shape"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
@@ -478,12 +498,6 @@ test_unprovable_slot_hold_still_refuses() {
         remedy="(cd '$PROJECT_DIR' && treehouse status)"
         forbidden="treehouse lease"
         ;;
-      recovered-not-home)
-        entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
-        add_free_second_slot "$entry"
-        reason="is not a Firstmate home and carries Treehouse's recovered-state lease"
-        remedy="treehouse lease refuses a slot that is already leased"
-        ;;
     esac
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
     assert_retained_refusal "$name" "$reason" "$remedy" "$forbidden"
@@ -491,6 +505,41 @@ test_unprovable_slot_hold_still_refuses() {
     assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$shape: refusal lost the nested work"
   done
   pass "a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it"
+}
+
+test_recovered_slot_itself_refuses_assignment() {
+  local name=recovered-selected
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  add_free_second_slot ',"leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"'
+  # A misdirected allocator reports the recovered slot instead of the free one.
+  PANE_DIR=$SLOT_DIR
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+  assert_recovered_candidate_refusal "$name"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "refusal changed the recovered lease"
+  pass "a selected recovered slot holding a live task refuses assignment until that task is landed and finished"
+}
+
+test_recovered_slot_allows_unrelated_allocation() {
+  local name=recovered-unrelated out rc=0
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  add_free_second_slot ',"leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"'
+  retained_fingerprint > "$CASE_DIR/before-copy"
+  cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+  out=$(run_retained_spawn "$name") || rc=$?
+  printf '%s\n' "$out"
+  expect_code 0 "$rc" "a recovered lease on an unrelated held slot stopped free-slot allocation"$'\n'"$out"
+  assert_contains "$out" "spawned new-$name" "the free-slot worker did not launch"
+  assert_grep "worktree=$PANE_DIR" "$HOME_DIR/state/new-$name.meta" "the worker did not receive the free slot"
+  assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "the free slot was not claimed"
+  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "the held recovered slot was claimed"
+  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "the recovered slot contents changed"
+  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "the existing holder record changed"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "allocation changed the recovered lease"
+  ! grep -Eq 'treehouse (return|lease)|reset' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "allocation issued a release, re-lease or reset"
+  pass "a recovered-lease slot keeps its nested unlanded copy while a new worker receives a free slot"
 }
 
 test_nested_copy_in_leased_slot_allows_allocation() {
@@ -653,6 +702,10 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
+fm_test_only
+
+test_recovered_slot_allows_unrelated_allocation || exit 1
+test_recovered_slot_itself_refuses_assignment || exit 1
 test_conflicting_unleased_alias_refuses_before_allocation || exit 1
 test_unsupported_entry_paths_are_unproved || exit 1
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1
@@ -661,7 +714,7 @@ test_missing_jq_refusal_names_install || exit 1
 test_unleased_directory_identity_aliases_are_not_held || exit 1
 test_recovered_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
-test_conflicting_recovered_alias_refuses_before_allocation
+test_recovered_alias_refuses_selected_slot_assignment
 test_unprovable_entry_path_refusal_names_no_lease
 test_unprovable_slot_hold_still_refuses
 test_nested_copy_in_leased_slot_allows_allocation

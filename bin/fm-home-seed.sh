@@ -410,6 +410,7 @@ acquire_treehouse_home() {
     echo "error: treehouse get --lease did not report a firstmate home" >&2
     return 1
   fi
+  fm_task_copy_pool_slots_hold_no_current_copy "$FM_ROOT" "$STATE" "$home" || return 1
   SEED_HOME=$home
 }
 
