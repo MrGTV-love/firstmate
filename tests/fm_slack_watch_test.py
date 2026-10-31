@@ -37,16 +37,20 @@ Usage:
   fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
   fm_slack_watch_test.py outbound-targets <outbound.jsonl> <method>
 """
+from contextlib import contextmanager
 import glob
 import json
 import os
 import sys
 import unittest
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
-from fm_slack_watch import CARD_LIMIT, Watch
+from fm_slack_watch import CARD_LIMIT, SlackError, Watch
+from fm_slack_replay import Replay
 
 
 class CardRenderingTest(unittest.TestCase):
@@ -98,6 +102,22 @@ class CardRenderingTest(unittest.TestCase):
         self.assertIn('Evidence: /tmp/review.md\n', text)
         self.assertNotIn('PRIVATE_BODY_NOTES', text)
 
+    def test_body_fields_do_not_include_unlabeled_prose(self):
+        for structured in (False, True):
+            for label in ('Decision sought', 'Brief', 'Recommendation', 'Alternatives', 'Evidence'):
+                with self.subTest(structured=structured, label=label):
+                    reason = 'Decision sought: Wait?' if structured else 'Choose a rollout.'
+                    value = '/tmp/review.md' if label == 'Evidence' else 'Wait for approval.'
+                    text = self.render(reason, [
+                        label + ': ' + value, 'PRIVATE_BODY_NOTES', '',
+                        'MORE_PRIVATE_NOTES', 'Option 1: Wait (wait)'])
+                    self.assertNotIn('PRIVATE', text)
+                    if structured and label == 'Decision sought':
+                        self.assertIn('Decision sought: Wait?\n', text)
+                        self.assertNotIn(value, text)
+                    elif structured or label in ('Decision sought', 'Recommendation', 'Evidence'):
+                        self.assertIn(value, text)
+
     def test_partial_labels_preserve_legacy_question_and_title(self):
         text = self.render('We need to decide the rollout.\nRecommendation: Wait for approval.',
                            ['Brief: Approval is missing.', 'Alternatives: Shipping bypasses approval.'])
@@ -109,6 +129,13 @@ class CardRenderingTest(unittest.TestCase):
         text = self.render('We need to decide the rollout.\nRecommendation: none recorded')
         self.assertIn('Decision: Release choice\nQuestion: We need to decide the rollout.\n', text)
         self.assertNotIn('none recorded', text)
+        question = ('We need to decide the rollout.\nBrief: Approval is missing.\n'
+                    'The owner is away.\nAlternatives: Shipping bypasses approval.\n'
+                    'It risks a rollback.')
+        for card in (None, {'decide': question}):
+            text = self.render(question + '\nRecommendation: Wait for approval.', card=card)
+            self.assertIn('Question: ' + question + '\n', text)
+            self.assertEqual(text.count('Wait for approval.'), 1)
 
     def test_footer_is_concise_and_scope_fault_stays_visible(self):
         for options in ([], ['Option 1: Wait (wait)']):
@@ -134,6 +161,85 @@ class CardRenderingTest(unittest.TestCase):
             self.assertIn(heading, text)
         self.assertIn('in this thread', text.splitlines()[-2])
         self.assertNotRegex(text, r'&(?!amp;|lt;|gt;)')
+
+
+class CardRefreshTest(unittest.TestCase):
+    @contextmanager
+    def fixture(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            home = Path(directory)
+            transcript = home / 'transcript.json'
+            transcript.write_text(json.dumps({
+                'schema': 'fm-slack-replay.v1',
+                'scopes': ['reactions:read', 'users:read'],
+            }))
+            with patch.dict(os.environ, {'FM_HOME': directory, 'FM_STATE_OVERRIDE': directory,
+                                         'FM_SLACK_DM_USER': 'U0TESTOWNER',
+                                         'FM_SLACK_POLL_MAX_ANSWERS': '1'}):
+                replay = Replay(transcript, home / 'slack-watch')
+                watch = Watch(replay=replay)
+                watch.state.update(channel='D0123456789', user='U0TESTOWNER')
+                rows = [{'id': key, 'title': key, 'hold_kind': 'captain',
+                         'hold_reason': 'Original question'} for key in ('first', 'second')]
+                with patch.object(watch, 'bound', return_value=True), \
+                     patch.object(watch, 'backlog', return_value=rows), \
+                     patch.object(watch, 'board', return_value=(None, {})), \
+                     patch.object(watch, 'probe', return_value=(0, 'live')):
+                    try:
+                        yield watch, replay, rows
+                    finally:
+                        watch.lock.close()
+
+    def test_answer_cap_does_not_limit_posts_or_edits(self):
+        with self.fixture() as (watch, replay, rows):
+            watch.mirror()
+            self.assertEqual(len(watch.load_state()['threads']), 2)
+            for row in rows:
+                row['hold_reason'] = 'Revised question'
+            watch.mirror()
+            self.assertTrue(all('Question: Revised question\n' in message['text']
+                                for message in replay.state['messages']))
+            watch.state = watch.load_state()
+            watch.mirror()
+            self.assertEqual([entry['method'] for entry in replay.state['log']].count('chat.update'), 2)
+
+    def test_local_update_failures_remain_retryable(self):
+        for error in ('request_budget_exhausted', 'unreachable'):
+            with self.subTest(error=error), self.fixture() as (watch, replay, rows):
+                watch.mirror()
+                for row in rows:
+                    row['hold_reason'] = 'Revised question'
+                call = replay.call
+                def fail_update(method, **fields):
+                    if method == 'chat.update':
+                        raise SlackError(error)
+                    return call(method, **fields)
+                with patch.object(replay, 'call', side_effect=fail_update):
+                    with self.assertRaisesRegex(SlackError, '^' + error + '$'):
+                        watch.mirror()
+                watch.state = watch.load_state()
+                self.assertTrue(all('update_attempt_digest' not in record
+                                    for record in watch.state['threads'].values()))
+                self.assertTrue(all('Question: Original question\n' in message['text']
+                                    for message in replay.state['messages']))
+                watch.mirror()
+                self.assertTrue(all('Question: Revised question\n' in message['text']
+                                    for message in replay.state['messages']))
+
+    def test_slack_rejection_is_recorded_without_starving_later_cards(self):
+        with self.fixture() as (watch, replay, rows):
+            watch.mirror()
+            ts = watch.state['threads']['first:live']['ts']
+            replay.state['failures']['chat.update:' + ts] = {'status': 400, 'times': 1}
+            for row in rows:
+                row['hold_reason'] = 'Revised question'
+            watch.mirror()
+            watch.state = watch.load_state()
+            self.assertIn('update_attempt_digest', watch.state['threads']['first:live'])
+            watch.mirror()
+            texts = [message['text'] for message in replay.state['messages']]
+            self.assertIn('Question: Original question\n', texts[0])
+            self.assertIn('Question: Revised question\n', texts[1])
 
 
 def messages(path):

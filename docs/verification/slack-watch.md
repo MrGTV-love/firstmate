@@ -255,7 +255,7 @@ No live Slack check was performed for this change.
 
 - X44 checks that a rewritten active hold reason causes one `chat.update` to the original timestamp, zero new posts, and unchanged thread options and reactions; fresh poll and mirror processes must then leave the card alone.
 - X45 checks that changing the option set leaves the original text and answer bindings unchanged and posts nothing.
-- X46 checks pre-digest layout migration in place with a one-write poll budget, followed by an unchanged restart and no new cards.
+- X46 checks pre-digest layout migration in place, followed by an unchanged restart and no new cards.
 - X47 checks that retired and replaced threads are never edited and that only a genuinely new hold lifecycle creates another card.
 - X48 checks a card created without reaction scopes, then re-armed after those scopes are granted: the same root loses its obsolete scope warning but never advertises unsupported taps or changes its recorded capability; a tap leaves the call open and typing its option number still records the expected value.
 - X49 checks that a rejected update leaves its root unchanged without stopping a later card's refresh, is reported once without retrying the same text after restart, and permits another attempt only when its text changes again.

@@ -3496,8 +3496,8 @@ The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
-Each card carries its task id once and reads explicit decision-card fields; unlabeled task-body lines are excluded unless they continue a labeled part up to the next recognized label or numbered option.
-Write a concise multiline hold reason with these four parts; each part continues until the next label, and the mirror renders them in this order even when the input order differs:
+Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
+Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
 
 | Hold reason or body label | Card heading | Content |
 | --- | --- | --- |
@@ -3507,7 +3507,7 @@ Write a concise multiline hold reason with these four parts; each part continues
 | `Alternatives:` | `Alternatives considered:` | The alternatives and why each is not as good as the recommendation. |
 
 Hold-reason fields override corresponding body fields and the current board's recommendation.
-The four-part layout requires a nonempty `Decision sought:` field in the reason or body; otherwise the legacy layout keeps the title and unlabeled question remainder, with the current board's about/question text when available, and renders recommendation and evidence separately without repeating their labeled parts inside the question.
+The four-part layout requires a nonempty `Decision sought:` field in the reason or body; otherwise the legacy layout keeps the title and question, with the current board's about/question text when available, and removes only recommendation and evidence parts from the question to render them separately. Brief and alternatives parts remain in the question.
 Missing fields are omitted, never filled with `none recorded`; an `Evidence:` pointer appears only for an absolute path or an HTTP(S) URL, followed by any numbered options.
 One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
 Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.
@@ -3515,10 +3515,10 @@ Only replies inside the card's thread map to that decision; messages typed in th
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
 Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
-A failed update is reported once for that text change and counts toward the write budget without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt.
+A Slack-returned update failure is reported once for that text change without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt. Local `request_budget_exhausted` and `unreachable` failures propagate without recording an attempted digest, so the next pass can try again.
 Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
 A changed option set is never applied to an existing card and requires a new hold lifecycle.
-Each mirror pass, including the mirror inside a poll, shares a write budget of `FM_SLACK_POLL_MAX_ANSWERS` across new cards and edits; deferred writes wait for the next pass.
+Card posts and edits are not limited by `FM_SLACK_POLL_MAX_ANSWERS`; the open cards and existing request deadline bound each mirror pass.
 Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
 Every value posted to Slack (card fields, option text, task ids, and conflict candidates) has `&`, `<`, and `>` escaped as `&amp;`, `&lt;`, and `&gt;`, so a placeholder such as `<source-id>` shows as written instead of being read as Slack markup; the card budget and the post cut count the escaped length and never split an escape, and the wake line keeps the plain text.
 Beyond the labeled parts above and evidence pointers, the mirror reads only explicit `Option N:` fields from the task body and never infers options from arbitrary prose.

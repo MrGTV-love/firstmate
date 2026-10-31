@@ -178,7 +178,7 @@ def parse_options(lines):
     return options
 
 
-def parse_fields(lines, remainder=None):
+def parse_fields(lines, remainder=None, multiline=False):
     fields, current = {}, None
     for line in lines:
         match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
@@ -187,12 +187,16 @@ def parse_fields(lines, remainder=None):
             if current == 'Brief description of issue':
                 current = 'Brief'
             fields[current] = match.group(2).strip()
+            if remainder is not None and current not in ('Recommendation', 'Evidence'):
+                remainder.append(line)
             if current == 'Evidence':
                 current = None
         elif OPTION_LINE.match(line):
             current = None
-        elif current:
+        elif current and multiline:
             fields[current] += '\n' + line.strip()
+            if remainder is not None and current not in ('Recommendation', 'Evidence'):
+                remainder.append(line)
         elif remainder is not None:
             remainder.append(line)
     return {key: value.strip() for key, value in fields.items()
@@ -369,7 +373,7 @@ class Watch:
         lines = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
         body = parse_fields(lines)
-        reason = parse_fields((row.get('hold_reason') or '').splitlines())
+        reason = parse_fields((row.get('hold_reason') or '').splitlines(), multiline=True)
         parts = dict(body)
         if card.get('recommend_value'):
             parts['Recommendation'] = card['recommend_value']
@@ -392,7 +396,7 @@ class Watch:
                 fields.append(('About: ', card['about']))
             question = card.get('decide') or row.get('hold_reason') or ''
             remainder = []
-            parse_fields(question.splitlines(), remainder)
+            parse_fields(question.splitlines(), remainder, multiline=True)
             question = '\n'.join(remainder).strip()
             if question:
                 fields.append(('Question: ', question))
@@ -620,10 +624,7 @@ class Watch:
         candidates = [r for r in rows if r.get('id') and r.get('hold_kind') == 'captain'
                       and r.get('state') != 'done']
         generated, cards = self.board()
-        writes = 0
         for row in candidates:
-            if writes >= self.cap:
-                break
             key = row['id']
             rc, identity = self.probe(key)
             if rc == 1:
@@ -654,20 +655,20 @@ class Watch:
                 continue
             if record:
                 channel = self.owner_channel()
-                record['update_attempt_digest'] = digest
-                self.commit()
-                writes += 1
                 try:
                     self.api.call('chat.update', channel=channel, ts=record['ts'],
                                   text=text, unfurl_links=False, unfurl_media=False)
                 except SlackError as error:
+                    if str(error) in ('request_budget_exhausted', 'unreachable'):
+                        raise
+                    record['update_attempt_digest'] = digest
+                    self.commit()
                     self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
                     continue
                 record['text_digest'] = digest
                 self.commit()
                 continue
             ts = self.post('card:' + occurrence, text)
-            writes += 1
             record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
                       'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
                       'reactions': usable, 'retired': False, 'text_digest': digest}

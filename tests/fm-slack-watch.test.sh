@@ -1625,7 +1625,7 @@ assert_eq "$(thread_field with-options options)" "$options" "X45 original option
 assert_eq "$(python3 "$HELPER" card-text "$(replay_file)" with-options)" "$card" "X45 original card text changed"
 printf 'ok - X45\n'
 
-# X46: pre-digest cards migrate in place, one write per poll at a cap of one.
+# X46: pre-digest cards migrate in place.
 new_home card-payload
 bind
 mirror card-payload >/dev/null
@@ -1633,11 +1633,9 @@ for key in with-options no-options no-recommendation; do
   python3 "$HELPER" legacy-card "$(state_file)" "$(replay_file)" "$key"
 done
 sent=$(outbound_count chat.postMessage)
-for expected in 1 2 3; do
-  FM_SLACK_POLL_MAX_ANSWERS=1 poll card-payload >/dev/null
-  assert_eq "$(outbound_count chat.update)" "$expected" "X46 edits exceeded or stalled at the poll cap"
-done
-FM_SLACK_POLL_MAX_ANSWERS=1 poll card-payload >/dev/null
+poll card-payload >/dev/null
+assert_eq "$(outbound_count chat.update)" 3 "X46 layout migration skipped cards"
+poll card-payload >/dev/null
 assert_eq "$(outbound_count chat.update)" 3 "X46 migrated cards edited again"
 assert_eq "$(outbound_count chat.postMessage)" "$sent" "X46 layout migration posted another card"
 python3 "$HELPER" card-payload "$(replay_file)"
