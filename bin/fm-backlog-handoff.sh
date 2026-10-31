@@ -800,9 +800,9 @@ remote_handoff() { # <secondmate-id> <keys...>
   done
   if [ "${#in_flight[@]}" -gt 0 ] || [ "${#done_items[@]}" -gt 0 ] ||
     [ "${#not_queued[@]}" -gt 0 ] || [ "${#missing[@]}" -gt 0 ]; then
-    [ "${#in_flight[@]}" -eq 0 ] || echo "error: refusing to hand off in-flight backlog items: ${in_flight[*]}" >&2
-    [ "${#done_items[@]}" -eq 0 ] || echo "error: refusing to hand off Done backlog items: ${done_items[*]}" >&2
-    [ "${#not_queued[@]}" -eq 0 ] || echo "error: refusing to hand off non-Queued outbox or backlog items: ${not_queued[*]}" >&2
+    [ "${#in_flight[@]}" -eq 0 ] || echo "error: refusing to hand off in-flight backlog items: ${in_flight[*]}. Remedy: keep these keys with their running owner and retry bin/fm-backlog-handoff.sh '$id' without them, with only genuinely queued work." >&2
+    [ "${#done_items[@]}" -eq 0 ] || echo "error: refusing to hand off Done backlog items: ${done_items[*]}. Remedy: leave these historical keys in their home and retry bin/fm-backlog-handoff.sh '$id' without them; file distinct queued work if needed." >&2
+    [ "${#not_queued[@]}" -eq 0 ] || echo "error: refusing to hand off non-Queued outbox or backlog items: ${not_queued[*]}. Remedy: resolve their actual holds or prerequisites through their owner before queuing them, or retry bin/fm-backlog-handoff.sh '$id' without these keys; do not relabel them to pass the guard." >&2
     [ "${#missing[@]}" -eq 0 ] || echo "error: no backlog or pending outbox item matched: ${missing[*]}" >&2
     echo "       nothing new was staged." >&2
     return 1
@@ -978,15 +978,15 @@ done
 
 FAILED=0
 if [ "${#IN_FLIGHT[@]}" -gt 0 ]; then
-  echo "error: refusing to hand off in-flight backlog items: ${IN_FLIGHT[*]}" >&2
+  echo "error: refusing to hand off in-flight backlog items: ${IN_FLIGHT[*]}. Remedy: keep these keys with their running owner; retry bin/fm-backlog-handoff.sh '$ID' without these keys and with only genuinely queued work from $MAIN_BACKLOG." >&2
   FAILED=1
 fi
 if [ "${#DONE[@]}" -gt 0 ]; then
-  echo "error: refusing to hand off Done (historical) backlog items: ${DONE[*]}; handoffs move in-scope queued work only - Done records stay with their home and are pruned/archived." >&2
+  echo "error: refusing to hand off Done (historical) backlog items: ${DONE[*]}; handoffs move in-scope queued work only - Done records stay with their home and are pruned/archived. Remedy: retry bin/fm-backlog-handoff.sh '$ID' without these historical keys; if new work is needed, file a distinct queued item instead of reopening Done history." >&2
   FAILED=1
 fi
 if [ "${#NOT_QUEUED[@]}" -gt 0 ]; then
-  echo "error: refusing to hand off non-queued backlog items: ${NOT_QUEUED[*]}; handoffs move in-scope queued work only." >&2
+  echo "error: refusing to hand off non-queued backlog items: ${NOT_QUEUED[*]}; handoffs move in-scope queued work only. Remedy: resolve each item's hold or prerequisite through its owner before it becomes genuinely queued in $MAIN_BACKLOG, or retry bin/fm-backlog-handoff.sh '$ID' without these keys; do not relabel held work merely to pass the guard." >&2
   FAILED=1
 fi
 if [ "${#MISSING[@]}" -gt 0 ]; then

@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import runpy
+import shlex
 import signal
 import sqlite3
 import subprocess
@@ -1831,6 +1832,21 @@ def render_overdue(rows):
     return "\n".join(lines)
 
 
+def render_action_remedies(rows, state, actor):
+    """Name each exact receipt target without inventing an action or its evidence."""
+    prefix = ["env", "FM_HOME=" + os.environ.get("FM_HOME", str(state.parent)),
+              "FM_STATE_OVERRIDE=" + str(state), "FM_SUPERVISION_ACTOR=" + actor,
+              "bash", str(BIN / "fm-open-loops.sh"), "action"]
+    lines = ["Remedy: perform each row's next action first, then record its actual evidence; "
+             "set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. "
+             "For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help."]
+    for row in rows:
+        lines.append(shlex.join([*prefix, row["id"]])
+                     + ' "${ACTION_KIND:?set the action actually performed}" --evidence '
+                     + '"${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"')
+    return "\n".join(lines)
+
+
 def ledger_action(args, state, now, batch=()):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
     try:
@@ -1933,8 +1949,10 @@ def ledger_action(args, state, now, batch=()):
                    and not ((row.get("category") == "review_pass_not_merged"
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
-            print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
+            print("error: overdue rows have no action recorded since presentation; acknowledgement refused. "
+                  "Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.")
             print(render_overdue(missing))
+            print(render_action_remedies(missing, state, actor))
             return 1
         return 0
     if args.report:

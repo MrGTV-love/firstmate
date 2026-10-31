@@ -3771,6 +3771,27 @@ def batch(items):
     return call(loops, 'action', '--batch', path, good=False)
 
 try:
+    # Execute the refusal's own per-row commands, including a shell-quoted id.
+    # Neither a read nor answering just one row may authorize the whole ack.
+    quoted = dict(rows[1], id="row-'quoted", subject='job:quoted-question')
+    publish([rows[0], quoted])
+    _, boundary = drain()
+    refused = ack(boundary, good=False)
+    assert refused.returncode == 1, refused
+    commands = [line for line in refused.stdout.splitlines() if line.startswith('env ')]
+    assert len(commands) == 2, refused.stdout
+    before = ledger.read_bytes()
+    assert call('bash', '-c', commands[0], good=False).returncode != 0, 'missing evidence must never record a receipt'
+    assert ledger.read_bytes() == before, 'a remedy without actual evidence changed the ledger'
+    call('env', 'ACTION_KIND=escalated', 'ACTION_EVIDENCE=fixture decision delivered', 'bash', '-c', commands[0])
+    assert set(stored()['handling']['actions']) == {'row-0'}
+    still_missing = ack(boundary, good=False)
+    assert still_missing.returncode == 1 and quoted['id'] in still_missing.stdout, still_missing
+    call('env', 'ACTION_KIND=escalated', 'ACTION_EVIDENCE=fixture second decision delivered', 'bash', '-c', commands[1])
+    assert set(stored()['handling']['actions']) == {'row-0', quoted['id']}
+    assert ack(boundary).returncode == 0
+    print('PASS: printed per-row remedy commands require real evidence and preserve the remaining acknowledgement gate', flush=True)
+
     publish(rows)
     presented, boundary = drain()
     assert 'action --batch' in presented.stdout, 'the overdue help names the batch form'

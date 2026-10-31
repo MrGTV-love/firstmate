@@ -31,7 +31,7 @@ fm_omp_api_billing_route_check() {
   provider="${provider%"${provider##*[![:space:]]}"}"
   case "$provider/" in
     [oO][pP][eE][nN][aA][iI]/* | [oO][pP][eE][nN][rR][oO][uU][tT][eE][rR]/*)
-      echo "error: omp $provider/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
+      echo "REFUSED: omp $provider/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check." >&2
       return 1
       ;;
   esac

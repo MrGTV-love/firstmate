@@ -783,7 +783,11 @@ retirement_capture_scan() {
     case "$seq" in ''|*[!0-9]*) die "remote reply capture has an invalid generation: $path" ;; esac
     [ -f "$base.adapter" ] && [ ! -L "$base.adapter" ] \
       || die "remote reply capture has no safe adapter record: $path"
-    [ -e "$base.handled" ] || pending=$((pending + 1))
+    if [ ! -e "$base.handled" ]; then
+      pending=$((pending + 1))
+      printf 'Remedy: FM_HOME=%q bash %q handle %q %q %q\n' \
+        "$FM_HOME" "$SCRIPT_DIR/fm-procevent-remote-reply.sh" "$id" "$seq" "$path" >&2
+    fi
   done
   RETIREMENT_PENDING=$pending
   RETIREMENT_INBOX=$inbox
@@ -799,7 +803,7 @@ cmd_retire_quiesce_locked() {
   RETIREMENT_PENDING=0
   retirement_capture_scan "$id" || true
   if [ "$force" != --force ] && [ "$RETIREMENT_PENDING" -gt 0 ]; then
-    die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s)"
+    die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command printed above to ingest and acknowledge every capture, then retry retirement; do not remove capture files or force retirement."
   fi
 }
 
@@ -811,7 +815,7 @@ cmd_retire_finalize_locked() {
   RETIREMENT_PENDING=0
   if retirement_capture_scan "$id"; then
     if [ "$force" != --force ] && [ "$RETIREMENT_PENDING" -gt 0 ]; then
-      die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s)"
+      die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command printed above to ingest and acknowledge every capture, then retry retirement; do not remove capture files or force retirement."
     fi
     if [ "$force" = --force ]; then
       for path in "$RETIREMENT_INBOX/$sid".*.result "$RETIREMENT_INBOX/$sid".*.adapter "$RETIREMENT_INBOX/$sid".*.handled; do

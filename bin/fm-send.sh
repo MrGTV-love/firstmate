@@ -872,7 +872,7 @@ else
           exit 1
         fi
       else
-        echo "error: pending-reply delivery for $TARGET_TASK_ID is unresolved; refusing to resend correlation $PENDING_REPLY_CORR" >&2
+        echo "error: pending-reply delivery for $TARGET_TASK_ID is unresolved; refusing to resend correlation $PENDING_REPLY_CORR. Remedy: the owning firstmate must reconcile the original request with the secondmate and obtain its actual corr=$PENDING_REPLY_CORR report in the parent status channel at $STATE/$TARGET_TASK_ID.status; run bin/fm-crew-state.sh '$TARGET_TASK_ID' to inspect it, then let pending-reply reconciliation resolve it before sending new work. Do not clear delivery markers or resend unknown delivery." >&2
         exit 1
       fi
     fi

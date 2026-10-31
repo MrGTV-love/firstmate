@@ -11,12 +11,14 @@ Usage:
 
 Output is one JSON object on stdout:
   paths      the scanned files, relative to the root
-  sites      one record per site: key, file, line, sig, text, entry, touched
+  sites      one record per site: key, file, line, sig, text, entry, touched,
+             remedy and inclusive remedy_spans (diagnostic plus local helper bodies)
   errors     mapping problems: rule, id, message
   helpers    the refusal helper names the scan derived from the code
 
 Exit: 0 on success; 2 on a usage or environment error.
 """
+import ast
 import hashlib
 import json
 import os
@@ -209,7 +211,7 @@ def is_docstring_open(stripped, prev_code):
     return prev_code is None or STRING.sub('S', prev_code).split('#', 1)[0].rstrip().endswith(':')
 
 
-def command_words(text):
+def command_words(text, with_remainder=False):
     """The words of one shell command, with quote provenance.
 
     Quoting is honored as bash does: a quoted character is part of a word and never syntax.
@@ -220,6 +222,7 @@ def command_words(text):
     word = []
     started = False  # a word is open, even an empty quoted one
     quote = None
+    comment = False
     index = 0
     while index < len(text):
         char = text[index]
@@ -251,6 +254,7 @@ def command_words(text):
         elif char in ';&|()<>':
             break
         elif char == '#' and not started:
+            comment = True
             break
         elif char == '}' and not started and (index >= len(text) or text[index] in ' \t;&|)'):
             break
@@ -259,6 +263,8 @@ def command_words(text):
             started = True
     if started and quote is None:
         words.append(''.join(word))
+    if with_remainder:
+        return words, '' if comment else text[index:]
     return words
 
 
@@ -392,6 +398,127 @@ def scan_file(root, rel, helpers, hook_names):
     return sites
 
 
+def diagnostic_statement(lines, index):
+    """Return the joined statement and its inclusive, one-based source span."""
+    if index and lines[index - 1].strip() == 'print(':
+        index -= 1
+    start = index + 1
+    text = lines[index].strip()
+    if re.match(r'(?:print|[A-Za-z_][A-Za-z0-9_]*' + HELPER_WORD + '|' + HELPER_WORD + r')\(', text):
+        # Python diagnostics may span adjacent literals inside a single call.
+        for end in range(index + 1, len(lines) + 1):
+            candidate = '\n'.join(line.lstrip() for line in lines[index:end])
+            try:
+                ast.parse(candidate)
+            except SyntaxError:
+                continue
+            return candidate, start, end
+        return text, start, start
+    while text.endswith('\\') and index + 1 < len(lines):
+        index += 1
+        text = text[:-1] + ' ' + lines[index].strip()
+    return text, start, index + 1
+
+
+def literal_message(value):
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return value.value
+    if isinstance(value, ast.JoinedStr):
+        return ''.join(part.value for part in value.values if isinstance(part, ast.Constant))
+    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.Add):
+        return literal_message(value.left) + literal_message(value.right)
+    return ''
+
+
+def diagnostic_arguments(statement):
+    """Literal output arguments only, excluding comments and neighboring commands."""
+    try:
+        program = ast.parse(statement)
+    except SyntaxError:
+        program = None
+    if program is not None:
+        for node in program.body:
+            value = node.value if isinstance(node, (ast.Expr, ast.Assign, ast.AnnAssign)) else None
+            if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) \
+                    and (value.func.id in ('print', 'die') or is_helper_name(value.func.id)):
+                name = value.func.id
+                values = value.args  # file= and other keyword arguments are not message text
+            elif isinstance(value, (ast.Constant, ast.JoinedStr)):
+                name, values = None, [value]
+            else:
+                continue
+            yield name, ' '.join(literal_message(value) for value in values)
+        return
+    remainder = statement
+    while remainder:
+        words, remainder = command_words(remainder, with_remainder=True)
+        while words and words[0] in ('then', 'else', 'do', '!', 'export', 'local'):
+            words = words[1:]
+        if not words:
+            continue
+        if words[0] == 'fm_refuse':
+            # The shared formatter owns this argument's printed envelope.
+            text = 'completing-command: ' + words[5] if len(words) >= 6 and words[4] == 'machine' else ''
+            yield words[0], text
+        elif words[0] in ('echo', 'printf', 'die', 'return') or is_helper_name(words[0]):
+            yield words[0], ' '.join(words[1:])
+        elif len(words) == 1 and re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', words[0]):
+            yield None, words[0].split('=', 1)[1]
+
+
+def statement_has_remedy(statement, root):
+    # A second command cannot lend its footer to a refusal that lacks one.
+    # This syntactic lint still leaves remedy safety/sufficiency to fixtures and review.
+    arguments = [text for _, text in diagnostic_arguments(statement)]
+    refusals = [text for text in arguments if MARKER.search(text) or WORD.search(text)]
+    for text in refusals or arguments:
+        marker = re.search(r'\b(?:Remedy|completing-command):', text)
+        if marker and remedy_has_command(text[marker.end():], root):
+            return True
+    return False
+
+
+def remedy_has_command(remedy, root):
+    paths = re.findall(r'\bbin/[A-Za-z0-9_./-]+', remedy)
+    if any(not os.path.isfile(os.path.join(root, path.rstrip('.'))) for path in paths):
+        return False
+    return bool(re.search(r'\bbin/[A-Za-z0-9_.-]+|\bgit\s+|\bherdr\s+|\benv\s+-u\s+', remedy))
+
+
+def site_remedies(root, lines, discovered, helpers):
+    """Retain diagnostic/helper spans even when their remedy has been removed."""
+    helper_remedies, helper_spans = set(), {}
+    names = set().union(*helpers.values())
+    for index, line in enumerate(lines):
+        definition = PY_DEF.match(line) or SH_DEF.match(line) or JS_DEF.match(line)
+        if not definition:
+            continue
+        name = next((group for group in definition.groups() if group), '')
+        if name not in names:
+            continue
+        indent = len(line) - len(line.lstrip())
+        end = index + 1
+        for body_index in range(index + 1, len(lines)):
+            body = lines[body_index]
+            if body.strip() and len(body) - len(body.lstrip()) <= indent:
+                break
+            end = body_index + 1
+            if body.lstrip().startswith(('echo ', 'printf ', 'print(')):
+                statement, _, _ = diagnostic_statement(lines, body_index)
+                if statement_has_remedy(statement, root):
+                    helper_remedies.add(name)
+        helper_spans[name] = [index + 1, end]
+    result = {}
+    for number, sig, _ in discovered:
+        statement, start, end = diagnostic_statement(lines, number - 1)
+        called = {name for name, _ in diagnostic_arguments(statement)}
+        direct = statement_has_remedy(statement, root)
+        call = bool(called.intersection(helper_remedies))
+        spans = [[start, end]] + [helper_spans[name] for name in sorted(called - {None}) if name in helper_spans]
+        result[number] = (direct or ('C' in sig.split(',') and call), spans)
+    return result
+
+
 def site_key(rel, text, seen):
     norm = ' '.join(text.split())
     digest = hashlib.sha1(norm.encode('utf-8', 'replace')).hexdigest()[:10]
@@ -401,7 +528,7 @@ def site_key(rel, text, seen):
 
 
 def touched_lines(root, ref, rels):
-    """File -> set of new-side line numbers changed since ref; None when the file is new."""
+    """File -> changed new-side lines/deletion boundaries; None when the file is new."""
     def git(*args):
         return subprocess.run(['git', '-C', root] + list(args), capture_output=True, text=True)
 
@@ -422,7 +549,12 @@ def touched_lines(root, ref, rels):
             if match:
                 start = int(match.group(1))
                 count = int(match.group(2)) if match.group(2) is not None else 1
-                changed[current].update(range(start, start + count))
+                if count:
+                    changed[current].update(range(start, start + count))
+                else:
+                    # A deleted footer has no new-side lines; retain both sides
+                    # of its boundary so an unchanged caller cannot hide it.
+                    changed[current].update((max(1, start), start + 1))
     untracked = git('ls-files', '--others', '--exclude-standard', '--', *rels).stdout.split('\n')
     for rel in untracked:
         if rel:
@@ -508,16 +640,20 @@ def main(argv):
     sites = []
     for rel in files:
         seen = {}
-        for number, sig, text in scan_file(root, rel, helpers, hook_names):
+        discovered = scan_file(root, rel, helpers, hook_names)
+        remedies = site_remedies(root, read_lines(os.path.join(root, rel)), discovered, helpers)
+        for number, sig, text in discovered:
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
-                          'text': text[:200], 'text_full': text, 'entry': None, 'touched': False})
+                          'text': text[:200], 'text_full': text, 'entry': None, 'touched': False,
+                          'remedy': remedies[number][0], 'remedy_spans': remedies[number][1]})
     errors = map_sites(sites, registry)
 
     if touched_ref:
         changed = touched_lines(root, touched_ref, files)
         for site in sites:
             lines = changed.get(site['file'], set())
-            site['touched'] = lines is None or site['line'] in lines
+            site['touched'] = lines is None or any(start <= line <= end
+                                                   for start, end in site['remedy_spans'] for line in lines)
 
     for site in sites:
         del site['text_full']

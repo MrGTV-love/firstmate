@@ -1158,8 +1158,17 @@ assert_grep 'unhandled captured result' "$TMP_ROOT/retire-pending.out" \
   "remote reply retirement did not explain its pending-result refusal"
 assert_absent "$PARENT/state/procevent/$SID.source" \
   "refused retirement left the reply source running past its pending-result check"
-remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_TWELVE" >/dev/null 2>&1 || [ "$?" -eq 3 ] \
-  || fail "pending continuity result could not be acknowledged after retirement refusal"
+remedy_count=0
+while IFS= read -r remedy; do
+  case "$remedy" in
+    'Remedy: FM_HOME='*)
+      remedy_count=$((remedy_count + 1))
+      remote_env bash -c "${remedy#Remedy: }" >/dev/null 2>&1 || [ "$?" -eq 3 ] \
+        || fail "the printed pending-result remedy did not handle its exact capture"
+      ;;
+  esac
+done < "$TMP_ROOT/retire-pending.out"
+[ "$remedy_count" -gt 0 ] || fail "retirement refusal did not print any completing capture command"
 remote_env "$ADAPTER" retire ios >/dev/null
 assert_absent "$PARENT/state/remote-replies/ios.cursor" "adapter retirement left its cursor"
 recorded_retirements=$(cat "$PARENT/state/remote-replies/ios.retirements" 2>/dev/null || true)
