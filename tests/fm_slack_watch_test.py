@@ -104,6 +104,7 @@ class CardRenderingTest(unittest.TestCase):
         self.assertIn('Decision: Release choice\n', text)
         self.assertIn('Question: We need to decide the rollout.\n', text)
         self.assertIn('Recommendation: Wait for approval.\n', text)
+        self.assertEqual(text.count('Wait for approval.'), 1)
         self.assertNotIn('Recommendation and key reasons:', text)
         text = self.render('We need to decide the rollout.\nRecommendation: none recorded')
         self.assertIn('Decision: Release choice\nQuestion: We need to decide the rollout.\n', text)

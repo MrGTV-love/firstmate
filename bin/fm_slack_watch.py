@@ -178,7 +178,7 @@ def parse_options(lines):
     return options
 
 
-def parse_fields(lines):
+def parse_fields(lines, remainder=None):
     fields, current = {}, None
     for line in lines:
         match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
@@ -193,6 +193,8 @@ def parse_fields(lines):
             current = None
         elif current:
             fields[current] += '\n' + line.strip()
+        elif remainder is not None:
+            remainder.append(line)
     return {key: value.strip() for key, value in fields.items()
             if value.strip() and value.strip().lower() != 'none recorded'}
 
@@ -389,8 +391,9 @@ class Watch:
             if card.get('about'):
                 fields.append(('About: ', card['about']))
             question = card.get('decide') or row.get('hold_reason') or ''
-            question = '\n'.join(line for line in question.splitlines()
-                                 if line.rpartition(':')[2].strip().lower() != 'none recorded')
+            remainder = []
+            parse_fields(question.splitlines(), remainder)
+            question = '\n'.join(remainder).strip()
             if question:
                 fields.append(('Question: ', question))
             if parts.get('Recommendation'):
