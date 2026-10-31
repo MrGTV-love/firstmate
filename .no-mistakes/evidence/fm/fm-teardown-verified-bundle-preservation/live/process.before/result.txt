@@ -1,0 +1,25 @@
+scenario=process code=before exit=1
+copy_head=98eaae62a18797da5217638acefa413518de2102 (work commit 98eaae62a18797da5217638acefa413518de2102)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.AzhY2n/pool/.treehouse/project-8a5461/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (39793)
+restored work.txt at 98eaae62a18797da5217638acefa413518de2102: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLkF6aFkybi9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDk4ZWFhZTYyYTE4Nzk3ZGE1MjE3NjM4YWNlZmE0MTM1MThkZTIxMDIgYjlhYWM4YjQ0ZjYyMWYyMWFhN2E0YTIwNDA2MDc1YmFjYWM2NmFjMC4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"

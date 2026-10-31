@@ -1,0 +1,44 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.7BGcP2/pool/.treehouse/project-f76ac8/1/project. Run 'treehouse return ~/tmp/fm-live-work.7BGcP2/pool/.treehouse/project-f76ac8/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.7BGcP2/pool/.treehouse/project-f76ac8/1/project
++ head=ea7ae907d2929676c3c696b6feb7d21779f0cf21
++ merged fm/task-x1 into local main (landed baseline)
++ foreign copy /Users/charlesabrooker/tmp/fm-live-work.7BGcP2/pool/.treehouse/project-f76ac8/1/project/.claude/worktrees/fc-one head=e5116a41fea6658043a45b8ba717338d567a3bb2
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.RvrUvU/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.RvrUvU/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.RvrUvU/data/backlog.md` when it ships
+/Users/charlesabrooker/tmp/fm-live-work.7BGcP2/durable/task.bundle is okay
+The bundle contains these 8 refs:
+e5116a41fea6658043a45b8ba717338d567a3bb2 refs/heads/fm/fc
+ea7ae907d2929676c3c696b6feb7d21779f0cf21 refs/heads/fm/task-x1
+ea7ae907d2929676c3c696b6feb7d21779f0cf21 refs/heads/main
+30bb58134dc1c87832411fa4ed7679958dd3d734 refs/remotes/origin/HEAD
+30bb58134dc1c87832411fa4ed7679958dd3d734 refs/remotes/origin/main
+e5116a41fea6658043a45b8ba717338d567a3bb2 HEAD
+ea7ae907d2929676c3c696b6feb7d21779f0cf21 main-worktree/HEAD
+ea7ae907d2929676c3c696b6feb7d21779f0cf21 worktrees/project/HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+task-x1

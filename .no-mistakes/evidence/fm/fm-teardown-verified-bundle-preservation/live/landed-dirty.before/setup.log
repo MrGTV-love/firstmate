@@ -1,0 +1,30 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.IPL5Ov/pool/.treehouse/project-3c4b43/1/project. Run 'treehouse return ~/tmp/fm-live-work.IPL5Ov/pool/.treehouse/project-3c4b43/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.IPL5Ov/pool/.treehouse/project-3c4b43/1/project
++ head=4b7ec39ff89aba929229975ee78d6b51cd8d7fd0
++ merged fm/task-x1 into local main (landed baseline)
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.Vlr63z/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.Vlr63z/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.Vlr63z/data/backlog.md` when it ships

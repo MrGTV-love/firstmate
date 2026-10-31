@@ -1,0 +1,24 @@
+scenario=tampered code=after exit=1
+copy_head=5b1c7ce68d50e288646ee567f8a2134b77b48bad (work commit 5b1c7ce68d50e288646ee567f8a2134b77b48bad)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.7A1nsD/pool/.treehouse/project-17d023/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 5b1c7ce68d50e288646ee567f8a2134b77b48bad: fatal: path 'work.txt' does not exist in '5b1c7ce68d50e288646ee567f8a2134b77b48bad'
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLjdBMW5zRC9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDViMWM3Y2U2OGQ1MGUyODg2NDZlZTU2N2Y4YTIxMzRiNzdiNDhiYWQgNjA4NzhlODQzOGViZTk3ZGIzYjViNmIxY2JiYjRmZDVhZTI5YTU0MS4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"

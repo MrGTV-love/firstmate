@@ -1,0 +1,23 @@
+first exit=1
+printed remedy: bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ task-x1\,\ tips\ 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle\,\ whose\ record\ lists\ advertised\ tips\ 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8\ a7011d4af3b4486356d5402129a5725f4f7592e4\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+task-x1
+remedy exit=0
+task:
+  id: task-x1
+  title: Land or drop the bundle-preserved commits of task-x1
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDEsIHRpcHMgNDIwOGNkMWM5ZWM1Y2ZiM2EwMmE2ZWFmMWMxYjk3YTE3NzRlMGFhODogdGhleSBhcmUgcHJlc2VydmVkIGluIGJ1bmRsZSAvVXNlcnMvY2hhcmxlc2Ficm9va2VyL3RtcC9mbS1saXZlLXdvcmsuMDVtVWVrL2R1cmFibGUvdGFzay5idW5kbGUsIHdob3NlIHJlY29yZCBsaXN0cyBhZHZlcnRpc2VkIHRpcHMgNDIwOGNkMWM5ZWM1Y2ZiM2EwMmE2ZWFmMWMxYjk3YTE3NzRlMGFhOCBhNzAxMWQ0YWYzYjQ0ODYzNTZkNTQwMjEyOWE1NzI1ZjRmNzU5MmU0OyBhbiBhZHZlcnRpc2VkIHRpcCBtYXkgYWxyZWFkeSBiZSBsYW5kZWQu"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: project
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-31T05:39:54Z\nDecision owner: captain"
+retry exit=0

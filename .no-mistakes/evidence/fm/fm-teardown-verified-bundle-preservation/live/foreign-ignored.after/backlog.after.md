@@ -1,0 +1,10 @@
+# Backlog
+
+## In flight
+## Queued
+- [ ] task-x1 - lab bundle ship (kind: ship) (since 2026-10-31) (hold: fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnJKY0tDei9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDg1YWU3YThmYjJlN2NjYmUwYWRkMmM4NTFiODAxYmZlZWU1MDc2YTUgOTBlNjBiZWQ3YWI3ZWRkODIyY2Q1MTI3Zjk4OWM1ZWUxMjRkN2RhZSA5ZTczZTQzYTM2ZTAzM2NhNTNiMzM5M2YxMTUxZDVmMzE5NzA5YmZhLg==) (hold-kind: captain)
+  Captain hold set: 2026-10-31T05:45:03Z
+  Decision owner: captain
+
+  Deliverable of the finished work: local main
+## Done

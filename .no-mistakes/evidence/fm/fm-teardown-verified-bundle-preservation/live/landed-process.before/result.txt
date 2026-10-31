@@ -1,0 +1,25 @@
+scenario=process code=before exit=0 landed=1 foreign=0 nobundle=1
+sleep_alive_after=no
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.L0OH9i/pool/.treehouse/project-5715fe/1/project/notes.local: No such file or directory
+copy_head=b958b32dcce0bc2fb521093caf9ceed5a5e1ad03 (work commit b958b32dcce0bc2fb521093caf9ceed5a5e1ad03)
+copy_work_txt_present=yes
+copy_status=
+meta_present=no
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.L0OH9i/pool/.treehouse/project-5715fe/1/project  (detached)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

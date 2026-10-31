@@ -1,0 +1,24 @@
+scenario=ignored code=before exit=0 landed=1 foreign=0 nobundle=1
+own_notes_local=only copy of notes
+copy_head=632387e3523ada99068350511b34485bf03fa1f7 (work commit 632387e3523ada99068350511b34485bf03fa1f7)
+copy_work_txt_present=yes
+copy_status=
+meta_present=no
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.f7YHif/pool/.treehouse/project-cb08e9/1/project  (detached)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

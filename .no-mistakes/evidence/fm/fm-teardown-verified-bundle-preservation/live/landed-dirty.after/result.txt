@@ -1,0 +1,24 @@
+scenario=dirty code=after exit=1 landed=1 foreign=0 nobundle=1
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.pTILD5/pool/.treehouse/project-9a7ba3/1/project/notes.local: No such file or directory
+copy_head=f731926721f3171f3f67e4cc1d1c63f309f130e7 (work commit f731926721f3171f3f67e4cc1d1c63f309f130e7)
+copy_work_txt_present=yes
+copy_status= M work.txt;
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.pTILD5/pool/.treehouse/project-9a7ba3/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

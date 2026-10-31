@@ -1,0 +1,24 @@
+scenario=no-hold code=after exit=1
+copy_head=e6ac8f2ef8d717167534b2c793a1671c9457ad4e (work commit e6ac8f2ef8d717167534b2c793a1671c9457ad4e)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.Uj2IVH/pool/.treehouse/project-f54be9/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at e6ac8f2ef8d717167534b2c793a1671c9457ad4e: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

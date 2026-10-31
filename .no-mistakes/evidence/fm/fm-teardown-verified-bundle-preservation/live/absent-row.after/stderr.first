@@ -1,0 +1,14 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zV7GL9
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle: task task-x1 has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+File the land-or-drop call as its row, then retry ordinary teardown: bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ task-x1\,\ tips\ 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle\,\ whose\ record\ lists\ advertised\ tips\ 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8\ a7011d4af3b4486356d5402129a5725f4f7592e4\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+4208cd1 unpublished work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.

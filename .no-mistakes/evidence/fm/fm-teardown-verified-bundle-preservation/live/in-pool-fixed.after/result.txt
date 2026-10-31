@@ -1,0 +1,25 @@
+scenario=in-pool code=after exit=1 landed=0 foreign=0 nobundle=0
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d/1/project/notes.local: No such file or directory
+copy_head=8681446cbf7b36ebffc3e60343d6cfa388cdf57e (work commit 8681446cbf7b36ebffc3e60343d6cfa388cdf57e)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 8681446cbf7b36ebffc3e60343d6cfa388cdf57e: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLlE1QVBScC9wb29sLy50cmVlaG91c2UvcHJvamVjdC1mY2MwMGQvdGFzay5idW5kbGUsIHJlY29yZGVkIHRpcHMgNjllYzczMmI0NTY2OGM2M2IxYjBiZTRlNGU5NTY2NDIyZmU3ZWEyMiA4NjgxNDQ2Y2JmN2IzNmViZmZjM2U2MDM0M2Q2Y2ZhMzg4Y2RmNTdlLg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"

@@ -1,0 +1,38 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive.sh: line 65: /Users/charlesabrooker/tmp/fm-live-work.bHIvOr/pool/.treehouse/project-340e13/1/project/.git/info/exclude: Not a directory
+scenario=ignored code=before exit=1
+copy_head=bc8791d34b7c0b338a50ae525a51d34174d092ba (work commit bc8791d34b7c0b338a50ae525a51d34174d092ba)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.bHIvOr/pool/.treehouse/project-340e13/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at bc8791d34b7c0b338a50ae525a51d34174d092ba: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLmJISXZPci9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDM0MTNiZTk2NDljMzVhYzEzMTA1MTVkY2FkMjdlMGI2MmE4NjQwNjAgYmM4NzkxZDM0YjdjMGIzMzhhNTBhZTUyNWE1MWQzNDE3NGQwOTJiYS4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.NKsryX
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+bc8791d unpublished work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.

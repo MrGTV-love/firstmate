@@ -1,0 +1,29 @@
+scenario=ignored code=after exit=0 landed=1 foreign=1 nobundle=0
+foreign_copy_present=yes
+foreign_notes_local=only copy of notes
+held_log=2026-10-31T05:45:12Z	task-x1	/Users/charlesabrooker/tmp/fm-live-work.rJcKCz/pool/.treehouse/project-aff298/1/project	/Users/charlesabrooker/tmp/fm-live-work.rJcKCz/pool/.treehouse/project-aff298/1/project/.claude/worktrees/fc-one	it holds ignored files that exist nowhere else: notes.local;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.rJcKCz/pool/.treehouse/project-aff298/1/project/notes.local: No such file or directory
+copy_head=9e73e43a36e033ca53b3393f1151d5f319709bfa (work commit 9e73e43a36e033ca53b3393f1151d5f319709bfa)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=no
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.rJcKCz/pool/.treehouse/project-aff298/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 9e73e43a36e033ca53b3393f1151d5f319709bfa: unpublished work
+restored fwork.txt at 90e60bed7ab7edd822cd5127f989c5ee124d7dae: unpublished foreign bytes
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnJKY0tDei9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDg1YWU3YThmYjJlN2NjYmUwYWRkMmM4NTFiODAxYmZlZWU1MDc2YTUgOTBlNjBiZWQ3YWI3ZWRkODIyY2Q1MTI3Zjk4OWM1ZWUxMjRkN2RhZSA5ZTczZTQzYTM2ZTAzM2NhNTNiMzM5M2YxMTUxZDVmMzE5NzA5YmZhLg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"

@@ -1,0 +1,41 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive.sh: line 65: /Users/charlesabrooker/tmp/fm-live-work.pXXb62/pool/.treehouse/project-94dc6d/1/project/.git/info/exclude: Not a directory
+scenario=ignored code=after exit=0
+copy_head=47e4a132677efc33e1bbbfde62c40d79158c0495 (work commit 709353c4128d7fcc2453481438b077552fee6696)
+copy_work_txt_present=no
+copy_status=
+meta_present=no
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.pXXb62/pool/.treehouse/project-94dc6d/1/project  (detached)
+restored work.txt at 709353c4128d7fcc2453481438b077552fee6696: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnBYWGI2Mi9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDQ3ZTRhMTMyNjc3ZWZjMzNlMWJiYmZkZTYyYzQwZDc5MTU4YzA0OTUgNzA5MzUzYzQxMjhkN2ZjYzI0NTM0ODE0MzhiMDc3NTUyZmVlNjY5Ni4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CRhn1R
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle sha256=f3c14abb5df80327ed3cb0e9e5d437cb751a34aab0553ce80a8eb7f4db8ff75d tips=47e4a132677efc33e1bbbfde62c40d79158c0495 709353c4128d7fcc2453481438b077552fee6696
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle sha256=f3c14abb5df80327ed3cb0e9e5d437cb751a34aab0553ce80a8eb7f4db8ff75d tips=47e4a132677efc33e1bbbfde62c40d79158c0495 709353c4128d7fcc2453481438b077552fee6696
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.pXXb62/durable/task.bundle sha256=f3c14abb5df80327ed3cb0e9e5d437cb751a34aab0553ce80a8eb7f4db8ff75d tips=47e4a132677efc33e1bbbfde62c40d79158c0495 709353c4128d7fcc2453481438b077552fee6696
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-home-summary-refresh.sh: child setpgid (59598 to 59598): Operation not permitted

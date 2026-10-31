@@ -1,0 +1,23 @@
+scenario=no-bundle code=after exit=1
+copy_head=b0241422a20c704e4097d7e4fe41e9f592190101 (work commit b0241422a20c704e4097d7e4fe41e9f592190101)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.A7A0sM/pool/.treehouse/project-8d530c/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

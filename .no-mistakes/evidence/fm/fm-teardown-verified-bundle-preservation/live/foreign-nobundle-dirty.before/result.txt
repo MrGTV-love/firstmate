@@ -1,0 +1,27 @@
+scenario=dirty code=before exit=1 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.d12L7V/pool/.treehouse/project-29be2b/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.ZDKbpX/data/held-foreign-copies.log: No such file or directory;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.d12L7V/pool/.treehouse/project-29be2b/1/project/notes.local: No such file or directory
+copy_head=8dbb922764a02f6ef30aef5c7b883142ae44aa41 (work commit 8dbb922764a02f6ef30aef5c7b883142ae44aa41)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.d12L7V/pool/.treehouse/project-29be2b/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

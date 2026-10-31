@@ -1,0 +1,40 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.vOK9Ox/pool/.treehouse/project-dd47f4/1/project. Run 'treehouse return ~/tmp/fm-live-work.vOK9Ox/pool/.treehouse/project-dd47f4/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/.treehouse/project-dd47f4/1/project
++ head=7a7491061e0702d207034deac2b64297ab96e67b
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.ttBhOq/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.ttBhOq/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.ttBhOq/data/backlog.md` when it ships
+/Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle is okay
+The bundle contains these 6 refs:
+7a7491061e0702d207034deac2b64297ab96e67b refs/heads/fm/task-x1
+4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d refs/heads/main
+4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d refs/remotes/origin/HEAD
+4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d refs/remotes/origin/main
+7a7491061e0702d207034deac2b64297ab96e67b HEAD
+4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d main-worktree/HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+task-x1

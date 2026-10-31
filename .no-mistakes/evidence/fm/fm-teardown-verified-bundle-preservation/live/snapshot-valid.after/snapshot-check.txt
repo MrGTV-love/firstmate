@@ -1,0 +1,32 @@
+snapshot exit=0
+{"id":"task-x1","state":"queued","kind":"ship","held":null,"hold_kind":"captain","captain_drop":false}
+bearings exit=0
+landed ids: []
+ok: unhold task-x1 -> cleared
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-31T05:46:03Z\nDecision owner: captain\n\nDeliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-live-work.yFhUjV/durable/task.bundle, not landed"
+help[1]:
+  - Run `tasks-axi ready --file=/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/data/backlog.md` to see dispatchable work
+unhold exit=0
+ok: done task-x1 -> Done
+help[1]:
+  - Run `tasks-axi ready --file=/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/data/backlog.md` to dispatch work unblocked by this
+done-with-bundle-note exit=0
+{"id":"task-x1","state":"done","kind":"ship","held":null,"captain_drop":false}
+landed ids after bundle-note close: []

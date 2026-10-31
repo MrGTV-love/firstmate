@@ -1,0 +1,28 @@
+## fm-teardown.test.sh remaining bundle cases
+ok - a branch another worktree has checked out never has to be in this copy's bundle
+ok - a removed copy's branch is judged by its own bundle, not by the project clone or sibling worktrees
+ok - a deleted but still registered worktree does not block a valid recorded bundle
+ok - a branch whose registered worktree is gone counts as a side branch the bundle must hold
+ok - repeated proofs of one unchanged bundle run the isolated restore once
+ok - a changed recorded tip set or changed bundle bytes is proved again, not taken from the remembered restore
+ok - the remembered restore is keyed by object format as well as bundle digest and tips
+ok - a copy with no local-only commits is not advised to build a bundle
+ok - a pushed copy whose only local-only commits sit on a side branch still needs its delivery proof
+ok - a HEAD that moves after a bundle admission refuses at final custody without advising a bundle
+rc=0
+## fm-teardown-cleanup.test.sh force
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+rc=0
+## fm-copy-sweep test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
+ok - a dirty copy and an unpushed copy with a verified recorded bundle are both kept
+rc=0
+## fm-copy-sweep test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one
+ok - a scan cut at its time bound wakes only on bytes it measured and records no completed scan
+rc=0
+## fm-bearings-snapshot.test.sh (whole file; no case selector)
+ok - landed excludes rows closed on a bundle alone while real deliveries stay
+ok - a restarted bundle-preserved row is not a drop and is listed once it is really delivered
+ok - a restarted bundle-preserved row closed with a plain done is not a drop and is listed as landed
+ok - a partial GitHub failure degrades gracefully
+ok - projection and TOON rendering failures exit nonzero with diagnostics
+rc=

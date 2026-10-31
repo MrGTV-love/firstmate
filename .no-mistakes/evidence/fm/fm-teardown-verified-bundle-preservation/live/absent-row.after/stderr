@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zV7GL9
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4

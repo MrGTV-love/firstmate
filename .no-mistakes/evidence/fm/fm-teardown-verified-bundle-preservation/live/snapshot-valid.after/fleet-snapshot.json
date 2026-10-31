@@ -1,0 +1,123 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-31T05:46:19Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "links": [],
+        "checked": false,
+        "current_role": "queued",
+        "hold_age_days": 0,
+        "body_excerpt": "Captain hold set: 2026-10-31T05:46:03Z Decision owner: captain Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-live-work.yFhUjV/durable/task.bundle, not landed",
+        "unresolved_blocker_ids": [],
+        "reported": null,
+        "kind": "ship",
+        "pr_url": null,
+        "hold_until": null,
+        "hold_bucket": "live",
+        "report_path": null,
+        "title": "lab bundle ship",
+        "id": "task-x1",
+        "hold_reason": "Land or drop the unlanded commits of task-x1: preserved in bundle /Users/charlesabrooker/tmp/fm-live-work.yFhUjV/durable/task.bundle, recorded tips 2ac0677ad13ba69328a7c628b08939ee5278e258 9c34187cc08338bc0fa939db22f05002c431bf17.",
+        "blocked_reason": null,
+        "body_lines": [
+          "Captain hold set: 2026-10-31T05:46:03Z",
+          "Decision owner: captain",
+          "Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-live-work.yFhUjV/durable/task.bundle, not landed"
+        ],
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "priority": null,
+        "done": null,
+        "since": "2026-10-31",
+        "order": 1,
+        "hold_set": "2026-10-31T05:46:03Z",
+        "repo": null,
+        "structured": true,
+        "captain_actionable": true,
+        "requires_child_metadata": false,
+        "state": "queued",
+        "captain_drop": false,
+        "hold_kind": "captain",
+        "merged": null,
+        "raw": "- [ ] task-x1 - lab bundle ship (kind: ship) (since 2026-10-31) (hold: fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnlGaFVqVi9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDJhYzA2NzdhZDEzYmE2OTMyOGE3YzYyOGIwODkzOWVlNTI3OGUyNTggOWMzNDE4N2NjMDgzMzhiYzBmYTkzOWRiMjJmMDUwMDJjNDMxYmYxNy4=) (hold-kind: captain)",
+        "local_note": null,
+        "blocked_by_ids": [],
+        "blocked_by": null
+      }
+    ]
+  },
+  "tasks": [],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-lab.Ke5E2K/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-31T05:46:19Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

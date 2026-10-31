@@ -1,0 +1,27 @@
+scenario=valid code=before exit=0 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.NmxyQD/pool/.treehouse/project-0e6e6c/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=2026-10-31T05:44:28Z	task-x1	/Users/charlesabrooker/tmp/fm-live-work.NmxyQD/pool/.treehouse/project-0e6e6c/1/project	/Users/charlesabrooker/tmp/fm-live-work.NmxyQD/pool/.treehouse/project-0e6e6c/1/project/.claude/worktrees/fc-one	its HEAD eda264bb1698 is not proved landed;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.NmxyQD/pool/.treehouse/project-0e6e6c/1/project/notes.local: No such file or directory
+copy_head=f61674ba5a2e2910b7b4ce08f7a484f4e141dd41 (work commit f61674ba5a2e2910b7b4ce08f7a484f4e141dd41)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=no
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.NmxyQD/pool/.treehouse/project-0e6e6c/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

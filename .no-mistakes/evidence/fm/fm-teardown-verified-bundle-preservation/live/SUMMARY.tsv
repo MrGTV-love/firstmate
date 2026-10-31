@@ -1,0 +1,37 @@
+run	exit	key stderr line
+absent-row.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a57|teardown: preserved unlanded commits in bundle <tmp> sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a57
+dirty.after	exit=1	REFUSED: worktree <tmp> has uncommitted changes.
+dirty.before	exit=1	REFUSED: worktree <tmp> has uncommitted changes.
+force.after	exit=1	REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+force.before	exit=1	REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+foreign-dirty.after	exit=1	REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=foreign copy <tmp> stays in pool slot <tmp> it has uncommitted or untracked-unignored changes.|REFUSED: pool slot <tmp> contains registered copy <tmp> that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+foreign-ignored.after	exit=0	
+foreign-nobundle-dirty.before	exit=1	REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=foreign copy <tmp> stays in pool slot <tmp> it has uncommitted or untracked-unignored changes.|REFUSED: pool slot <tmp> contains registered copy <tmp> that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+foreign-nobundle-ignored.before	exit=0	
+foreign-nobundle-process.before	exit=1	REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy <tmp> stays in pool slot <tmp> process 9953 is running in it.|REFUSED: pool slot <tmp> contains registered copy <tmp> that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+foreign-nobundle-valid.before	exit=0	
+foreign-process.after	exit=1	REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy <tmp> stays in pool slot <tmp> process 95242 is running in it.|REFUSED: pool slot <tmp> contains registered copy <tmp> that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+foreign-valid.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=32f32e8c4b937b6d649682db175715ad84ad4570728aa7f609566bc0eb2e0ffa tips=843906db6e6798a95fa77c0768ef078b09011a71 a54e73d2538427968ebca14819e92|teardown: preserved unlanded commits in bundle <tmp> sha256=32f32e8c4b937b6d649682db175715ad84ad4570728aa7f609566bc0eb2e0ffa tips=843906db6e6798a95fa77c0768ef078b09011a71 a54e73d2538427968ebca14819e92
+ignored.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=f3c14abb5df80327ed3cb0e9e5d437cb751a34aab0553ce80a8eb7f4db8ff75d tips=47e4a132677efc33e1bbbfde62c40d79158c0495 709353c4128d7fcc2453481438b07|teardown: preserved unlanded commits in bundle <tmp> sha256=f3c14abb5df80327ed3cb0e9e5d437cb751a34aab0553ce80a8eb7f4db8ff75d tips=47e4a132677efc33e1bbbfde62c40d79158c0495 709353c4128d7fcc2453481438b07
+ignored.before	exit=1	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+in-pool-fixed.after	exit=1	teardown: bundle preservation unavailable: <tmp> bundle is inside pool <tmp>|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+in-pool-fixturebug-bundle-was-outside-pool.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=42c20a3d887c2f5e7ebf72650397beee9485d7df0e5082842e39a580221de064 tips=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d 7a7491061e0702d207034deac2b64|teardown: preserved unlanded commits in bundle <tmp> sha256=42c20a3d887c2f5e7ebf72650397beee9485d7df0e5082842e39a580221de064 tips=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d 7a7491061e0702d207034deac2b64
+landed-dirty.after	exit=1	REFUSED: worktree <tmp> has uncommitted changes.
+landed-dirty.before	exit=1	REFUSED: worktree <tmp> has uncommitted changes.
+landed-ignored.after	exit=0	
+landed-ignored.before	exit=0	
+landed-process.after	exit=0	teardown: reaping leaked worktree process(es) for task-x1: 22524
+landed-process.before	exit=0	teardown: reaping leaked worktree process(es) for task-x1: 72792
+missing-tip.after	exit=1	teardown: bundle preservation unavailable: <tmp> bundle does not list unlanded tip 455c629d00f602722ffbb1460f6bfa7af6156755.|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+no-bundle.after	exit=1	teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): <tmp>|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+no-bundle.before	exit=1	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+no-hold-remedy.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910|teardown: preserved unlanded commits in bundle <tmp> sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910
+no-hold.after	exit=1	teardown: bundle preservation unavailable: <tmp> task task-x1 is not held for the captain's land-or-drop call naming the bundle and every recorded tip.|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+process.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=55cae06b2b1816bf55a5ca788b6dbe9df9e6ac9d84f7b132529a60d82b05655f tips=19dcc1dc228da68cf3a9e5bc01e4c34e0b26ea5c adf45585165cad4b6876e57e90d39|teardown: reaping leaked worktree process(es) for task-x1: 71137
+process.before	exit=1	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+snapshot-valid.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=3a79000013621a83da326375233c6c5cc8f382b88f4bbe6127ac1c7c8bc84fbf tips=2ac0677ad13ba69328a7c628b08939ee5278e258 9c34187cc08338bc0fa939db22f05|teardown: preserved unlanded commits in bundle <tmp> sha256=3a79000013621a83da326375233c6c5cc8f382b88f4bbe6127ac1c7c8bc84fbf tips=2ac0677ad13ba69328a7c628b08939ee5278e258 9c34187cc08338bc0fa939db22f05
+tampered.after	exit=1	teardown: bundle preservation unavailable: <tmp> bundle sha256 does not match record.|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unattended.after	exit=1	teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.|REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unattended.before	exit=1	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+valid.after	exit=0	teardown: preserved unlanded commits in bundle <tmp> sha256=87228b31093591e7113836ef774b7076c30fbc62e147eb8d85e3d31db84b8bd6 tips=34f4c27d76de0d663c5fe6a6eacf0b4809f4cb99 72a6c56cb8a791b489b910b8e8edd|teardown: preserved unlanded commits in bundle <tmp> sha256=87228b31093591e7113836ef774b7076c30fbc62e147eb8d85e3d31db84b8bd6 tips=34f4c27d76de0d663c5fe6a6eacf0b4809f4cb99 72a6c56cb8a791b489b910b8e8edd
+valid.before	exit=1	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.

@@ -1,0 +1,64 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project. Run 'treehouse return ~/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project
++ head=38b2b3931da45e10582281eacd12d1b36d6a341c
++ merged fm/task-x1 into local main (landed baseline)
++ foreign copy /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/.claude/worktrees/fc-one head=07d055617c8b4d5e2a3e750a31fbb466e0695ca5
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.jkmDqo/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.jkmDqo/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.jkmDqo/data/backlog.md` when it ships
++ live process pid=53316 cwd=/Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.44W3YU/pool/.treehouse/project-78c1d3/1/project. Run 'treehouse return ~/tmp/fm-live-work.44W3YU/pool/.treehouse/project-78c1d3/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.44W3YU/pool/.treehouse/project-78c1d3/1/project
++ head=20f7f6827538dc68a54f2488d9bebc3d50caab45
++ merged fm/task-x1 into local main (landed baseline)
++ foreign copy /Users/charlesabrooker/tmp/fm-live-work.44W3YU/pool/.treehouse/project-78c1d3/1/project/.claude/worktrees/fc-one head=960413b27b08c13b84583f4d561efdbf6170512c
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.3OdO6Y/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.3OdO6Y/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.3OdO6Y/data/backlog.md` when it ships
++ live process pid=9953 cwd=/Users/charlesabrooker/tmp/fm-live-work.44W3YU/pool/.treehouse/project-78c1d3/1/project

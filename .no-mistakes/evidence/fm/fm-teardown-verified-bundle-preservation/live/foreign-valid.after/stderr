@@ -1,0 +1,15 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.26P5Nv
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle sha256=32f32e8c4b937b6d649682db175715ad84ad4570728aa7f609566bc0eb2e0ffa tips=843906db6e6798a95fa77c0768ef078b09011a71 a54e73d2538427968ebca14819e92f0f1e2c1530 d6a4a0cc54517c864c4c64631dd93b5377fde340
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle sha256=32f32e8c4b937b6d649682db175715ad84ad4570728aa7f609566bc0eb2e0ffa tips=843906db6e6798a95fa77c0768ef078b09011a71 a54e73d2538427968ebca14819e92f0f1e2c1530 d6a4a0cc54517c864c4c64631dd93b5377fde340
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/durable/task.bundle sha256=32f32e8c4b937b6d649682db175715ad84ad4570728aa7f609566bc0eb2e0ffa tips=843906db6e6798a95fa77c0768ef078b09011a71 a54e73d2538427968ebca14819e92f0f1e2c1530 d6a4a0cc54517c864c4c64631dd93b5377fde340
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/pool/.treehouse/project-128ed4/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-live-work.CjyZAs/pool/.treehouse/project-128ed4/1/project

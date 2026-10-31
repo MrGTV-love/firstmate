@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JdM78C
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34

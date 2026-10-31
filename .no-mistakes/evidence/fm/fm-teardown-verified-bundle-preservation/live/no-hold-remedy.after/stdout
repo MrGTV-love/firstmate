@@ -1,0 +1,3 @@
+🌳 Worktree returned to pool.
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/pool/.treehouse/project-b6d001/1/project)
+Backlog: task-x1 stays open in /Users/charlesabrooker/tmp/fm-lab.JdM78C/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.

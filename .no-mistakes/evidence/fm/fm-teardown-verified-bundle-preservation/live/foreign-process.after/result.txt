@@ -1,0 +1,31 @@
+scenario=process code=after exit=1 landed=1 foreign=1 nobundle=0
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.AWGz8q/data/held-foreign-copies.log: No such file or directory;
+sleep_alive_after=yes
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project/notes.local: No such file or directory
+copy_head=b1f11ac01a59929e16ae0db8aef58f77d359a516 (work commit b1f11ac01a59929e16ae0db8aef58f77d359a516)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (95242)
+restored work.txt at b1f11ac01a59929e16ae0db8aef58f77d359a516: unpublished work
+restored fwork.txt at 9eaa20df5a9dceb12e2d073790f396087a896a42: unpublished foreign bytes
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLkZoR0w0di9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDNkZmM3NzY1YjE5NmQzYTM3OGQxZDYzZmViY2U5N2M4MmZlMmRhZDkgOWVhYTIwZGY1YTlkY2ViMTJlMmQwNzM3OTBmMzk2MDg3YTg5NmE0MiBiMWYxMWFjMDFhNTk5MjllMTZhZTBkYjhhZWY1OGY3N2QzNTlhNTE2Lg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"

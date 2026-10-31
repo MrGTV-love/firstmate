@@ -1,0 +1,27 @@
+scenario=ignored code=before exit=0 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=only copy of notes
+held_log=2026-10-31T05:45:28Z	task-x1	/Users/charlesabrooker/tmp/fm-live-work.APXqxJ/pool/.treehouse/project-ea1b7b/1/project	/Users/charlesabrooker/tmp/fm-live-work.APXqxJ/pool/.treehouse/project-ea1b7b/1/project/.claude/worktrees/fc-one	it holds ignored files that exist nowhere else: notes.local;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.APXqxJ/pool/.treehouse/project-ea1b7b/1/project/notes.local: No such file or directory
+copy_head=941b9a520f3f57dd54e38e06f03ff651666b553a (work commit 941b9a520f3f57dd54e38e06f03ff651666b553a)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=no
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.APXqxJ/pool/.treehouse/project-ea1b7b/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"

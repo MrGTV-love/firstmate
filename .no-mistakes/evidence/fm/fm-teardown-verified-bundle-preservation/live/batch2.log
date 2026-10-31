@@ -1,0 +1,513 @@
+scenario=in-pool code=after exit=1 landed=0 foreign=0 nobundle=0
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d/1/project/notes.local: No such file or directory
+copy_head=8681446cbf7b36ebffc3e60343d6cfa388cdf57e (work commit 8681446cbf7b36ebffc3e60343d6cfa388cdf57e)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 8681446cbf7b36ebffc3e60343d6cfa388cdf57e: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLlE1QVBScC9wb29sLy50cmVlaG91c2UvcHJvamVjdC1mY2MwMGQvdGFzay5idW5kbGUsIHJlY29yZGVkIHRpcHMgNjllYzczMmI0NTY2OGM2M2IxYjBiZTRlNGU5NTY2NDIyZmU3ZWEyMiA4NjgxNDQ2Y2JmN2IzNmViZmZjM2U2MDM0M2Q2Y2ZhMzg4Y2RmNTdlLg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.sMKIhU
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d/task.bundle: bundle is inside pool /Users/charlesabrooker/tmp/fm-live-work.Q5APRp/pool/.treehouse/project-fcc00d.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sMKIhU/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+8681446 unpublished work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=no-hold-remedy code=after exit=0 landed=0 foreign=0 nobundle=0
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/pool/.treehouse/project-b6d001/1/project/notes.local: No such file or directory
+copy_head=8bfd38e223f6db26d12c38635d910dcf54a40d34 (work commit 4c81997af745dacea3cd46730adad43d720fafa4)
+copy_work_txt_present=no
+copy_status=
+meta_present=no
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.Jn76Qx/pool/.treehouse/project-b6d001/1/project  (detached)
+restored work.txt at 4c81997af745dacea3cd46730adad43d720fafa4: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDEsIHRpcHMgNGM4MTk5N2FmNzQ1ZGFjZWEzY2Q0NjczMGFkYWQ0M2Q3MjBmYWZhNDogdGhleSBhcmUgcHJlc2VydmVkIGluIGJ1bmRsZSAvVXNlcnMvY2hhcmxlc2Ficm9va2VyL3RtcC9mbS1saXZlLXdvcmsuSm43NlF4L2R1cmFibGUvdGFzay5idW5kbGUsIHdob3NlIHJlY29yZCBsaXN0cyBhZHZlcnRpc2VkIHRpcHMgNGM4MTk5N2FmNzQ1ZGFjZWEzY2Q0NjczMGFkYWQ0M2Q3MjBmYWZhNCA4YmZkMzhlMjIzZjZkYjI2ZDEyYzM4NjM1ZDkxMGRjZjU0YTQwZDM0OyBhbiBhZHZlcnRpc2VkIHRpcCBtYXkgYWxyZWFkeSBiZSBsYW5kZWQu"
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JdM78C
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.Jn76Qx/durable/task.bundle sha256=d65376cf1130a3453eac4f5854117b7b144931637b18fbcedb182e81546c71f3 tips=4c81997af745dacea3cd46730adad43d720fafa4 8bfd38e223f6db26d12c38635d910dcf54a40d34
+scenario=absent-row code=after exit=0 landed=0 foreign=0 nobundle=0
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.05mUek/pool/.treehouse/project-b6368d/1/project/notes.local: No such file or directory
+copy_head=a7011d4af3b4486356d5402129a5725f4f7592e4 (work commit 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8)
+copy_work_txt_present=no
+copy_status=
+meta_present=no
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.05mUek/pool/.treehouse/project-b6368d/1/project  (detached)
+restored work.txt at 4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: Land or drop the bundle-preserved commits of task-x1
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDEsIHRpcHMgNDIwOGNkMWM5ZWM1Y2ZiM2EwMmE2ZWFmMWMxYjk3YTE3NzRlMGFhODogdGhleSBhcmUgcHJlc2VydmVkIGluIGJ1bmRsZSAvVXNlcnMvY2hhcmxlc2Ficm9va2VyL3RtcC9mbS1saXZlLXdvcmsuMDVtVWVrL2R1cmFibGUvdGFzay5idW5kbGUsIHdob3NlIHJlY29yZCBsaXN0cyBhZHZlcnRpc2VkIHRpcHMgNDIwOGNkMWM5ZWM1Y2ZiM2EwMmE2ZWFmMWMxYjk3YTE3NzRlMGFhOCBhNzAxMWQ0YWYzYjQ0ODYzNTZkNTQwMjEyOWE1NzI1ZjRmNzU5MmU0OyBhbiBhZHZlcnRpc2VkIHRpcCBtYXkgYWxyZWFkeSBiZSBsYW5kZWQu"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: project
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zV7GL9
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.05mUek/durable/task.bundle sha256=ee5fe95dce8aa48877052c8373b02b3fd8d883152695d8513111286ec274ca63 tips=4208cd1c9ec5cfb3a02a6eaf1c1b97a1774e0aa8 a7011d4af3b4486356d5402129a5725f4f7592e4
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 115: 91819 Terminated: 15          ( cd "$BCOPY" && exec sleep 600 )
+scenario=process code=before exit=1 landed=1 foreign=0 nobundle=1
+sleep_alive_after=yes
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.zm6ZhY/pool/.treehouse/project-7ea1fd/1/project/notes.local: No such file or directory
+copy_head=af740f8f5dc4c798b126ecc9476b0d54de179325 (work commit af740f8f5dc4c798b126ecc9476b0d54de179325)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.zm6ZhY/pool/.treehouse/project-7ea1fd/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (91819)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.lr1mEw
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 115: 98943 Terminated: 15          ( cd "$BCOPY" && exec sleep 600 )
+scenario=process code=after exit=1 landed=1 foreign=0 nobundle=1
+sleep_alive_after=yes
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.KXt8sm/pool/.treehouse/project-4c0abd/1/project/notes.local: No such file or directory
+copy_head=ebf24b55321efc8339e7e5ec4e23bc0d9ccef4be (work commit ebf24b55321efc8339e7e5ec4e23bc0d9ccef4be)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.KXt8sm/pool/.treehouse/project-4c0abd/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (98943)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.gdRkAu
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=ignored code=before exit=1 landed=1 foreign=0 nobundle=1
+own_notes_local=only copy of notes
+copy_head=1849dc680b54d7f23c200825d16d729fa037f804 (work commit 1849dc680b54d7f23c200825d16d729fa037f804)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.DihTpU/pool/.treehouse/project-b4b254/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.gdCJd1
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=ignored code=after exit=1 landed=1 foreign=0 nobundle=1
+own_notes_local=only copy of notes
+copy_head=0b4cae292ef13a359fbb1315ea381cb2bd89018a (work commit 0b4cae292ef13a359fbb1315ea381cb2bd89018a)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.HUKJOS/pool/.treehouse/project-324eb7/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.hOXA5T
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=valid code=after exit=1 landed=1 foreign=1 nobundle=0
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.vtPhDq/pool/.treehouse/project-daca39/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.FXADKD/data/held-foreign-copies.log: No such file or directory;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.vtPhDq/pool/.treehouse/project-daca39/1/project/notes.local: No such file or directory
+copy_head=66ddefee2c2828ced90232b1d07fef9ee8e56560 (work commit 66ddefee2c2828ced90232b1d07fef9ee8e56560)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.vtPhDq/pool/.treehouse/project-daca39/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 66ddefee2c2828ced90232b1d07fef9ee8e56560: unpublished work
+restored fwork.txt at 87094de50cbea0b5c4c1354bd2be5c49866a8e2a: unpublished foreign bytes
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnZ0UGhEcS9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDY2ZGRlZmVlMmMyODI4Y2VkOTAyMzJiMWQwN2ZlZjllZThlNTY1NjAgNzJkYzk0ZDM1YzAzYjQwMTA0MWI0YzlmYTE0ZjZmNTFjNGE5YTM5ZSA4NzA5NGRlNTBjYmVhMGI1YzRjMTM1NGJkMmJlNWM0OTg2NmE4ZTJhLg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXADKD
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.vtPhDq/durable/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.vtPhDq/durable/task.bundle sha256=1058e4c967b084ef52a8559aad02db7dda7c3b40a8166c1b1d84edfd32c1e22b tips=66ddefee2c2828ced90232b1d07fef9ee8e56560 72dc94d35c03b401041b4c9fa14f6f51c4a9a39e 87094de50cbea0b5c4c1354bd2be5c49866a8e2a
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=valid code=before exit=1 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.DwHZWp/pool/.treehouse/project-e4dba7/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.IzHmB4/data/held-foreign-copies.log: No such file or directory;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.DwHZWp/pool/.treehouse/project-e4dba7/1/project/notes.local: No such file or directory
+copy_head=1460ebcd704137719165cdbbbb5c55bf9d32d068 (work commit 1460ebcd704137719165cdbbbb5c55bf9d32d068)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.DwHZWp/pool/.treehouse/project-e4dba7/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.IzHmB4
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+scenario=dirty code=before exit=1 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.8kGxXp/data/held-foreign-copies.log: No such file or directory;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project/notes.local: No such file or directory
+copy_head=9f92916ef5a809856b33b893e484d0f5d19165ee (work commit 9f92916ef5a809856b33b893e484d0f5d19165ee)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project  [fm/task-x1]  (held by task-x1)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8kGxXp
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=foreign copy /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project/.claude/worktrees/fc-one (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project contains registered copy /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-live-work.x46Nxt/pool/.treehouse/project-c3f6e4/1/project, never by forcing the removal). Re-run this teardown afterwards.
+scenario=ignored code=after exit=1 landed=1 foreign=1 nobundle=0
+foreign_copy_present=yes
+foreign_notes_local=only copy of notes
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.ucSJ3O/data/held-foreign-copies.log: No such file or directory;
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.HziwLL/pool/.treehouse/project-b3215e/1/project/notes.local: No such file or directory
+copy_head=a6467ae3ebb88914c16e4442d0869c73a2e88a67 (work commit a6467ae3ebb88914c16e4442d0869c73a2e88a67)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.HziwLL/pool/.treehouse/project-b3215e/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at a6467ae3ebb88914c16e4442d0869c73a2e88a67: unpublished work
+restored fwork.txt at d4ef439123fd1b678e81e3f636ad5350cd4a257e: unpublished foreign bytes
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLkh6aXdMTC9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIGE2NDY3YWUzZWJiODg5MTRjMTZlNDQ0MmQwODY5YzczYTJlODhhNjcgYWExNGIxYjNmYTk1Mzk3YzVjMWY5NzRjZGYyODAwNjcxYjY0ZDc4NiBkNGVmNDM5MTIzZmQxYjY3OGU4MWUzZjYzNmFkNTM1MGNkNGEyNTdlLg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ucSJ3O
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 111: /Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/foreign-nobundle-ignored.before/result.txt: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 116: /Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/foreign-nobundle-ignored.before/teardown-line.txt: No such file or directory
+cat: /Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/foreign-nobundle-ignored.before/teardown-line.txt: No such file or directory
+cat: /Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/foreign-nobundle-ignored.before/result.txt: No such file or directory
+--- stderr
+cat: /Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/foreign-nobundle-ignored.before/stderr: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 115: 42498 Terminated: 15          ( cd "$BCOPY" && exec sleep 600 )
+scenario=process code=after exit=1 landed=1 foreign=1 nobundle=0
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.3jSSKC/data/held-foreign-copies.log: No such file or directory;
+sleep_alive_after=yes
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/notes.local: No such file or directory
+copy_head=27b94915de1d6d2af4de9e3751313ddc0be12cb2 (work commit 27b94915de1d6d2af4de9e3751313ddc0be12cb2)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (42498)
+restored work.txt at 27b94915de1d6d2af4de9e3751313ddc0be12cb2: unpublished work
+restored fwork.txt at ad5f11599b37062d6f298377585896500cf81277: unpublished foreign bytes
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLkFUR05LRi9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDI3Yjk0OTE1ZGUxZDZkMmFmNGRlOWUzNzUxMzEzZGRjMGJlMTJjYjIgYWQ1ZjExNTk5YjM3MDYyZDZmMjk4Mzc3NTg1ODk2NTAwY2Y4MTI3NyBkM2UxYjQ0MzIzN2I0YzYwOGEzMGI3NWE0NWI2YWE1Yzc2NDg2YmU0Lg=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.3jSSKC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project: process 42498 is running in it.
+human-only-exit: Which task or person owns process 42498, which is running in /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/.claude/worktrees/fc-one? Stop it or tell me it is yours.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project contains registered copy /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project, never by forcing the removal). Re-run this teardown afterwards.
+/Users/charlesabrooker/.no-mistakes/evidence/01M67VAH25S0376YM8DE0BNQ90/live/drive2.sh: line 115: 53316 Terminated: 15          ( cd "$BCOPY" && exec sleep 600 )
+scenario=process code=before exit=1 landed=1 foreign=1 nobundle=1
+foreign_copy_present=yes
+foreign_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/.claude/worktrees/fc-one/notes.local: No such file or directory
+held_log=cat: /Users/charlesabrooker/tmp/fm-lab.jkmDqo/data/held-foreign-copies.log: No such file or directory;
+sleep_alive_after=yes
+own_notes_local=cat: /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/notes.local: No such file or directory
+copy_head=38b2b3931da45e10582281eacd12d1b36d6a341c (work commit 38b2b3931da45e10582281eacd12d1b36d6a341c)
+copy_work_txt_present=yes
+copy_status=?? .claude/worktrees/fc-one/;
+meta_present=yes
+bundle_present=no
+record_present=no
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project  [fm/task-x1]  (held by task-x1)
+                   sleep (53316)
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jkmDqo
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.6K4zYM/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project: process 53316 is running in it.
+human-only-exit: Which task or person owns process 53316, which is running in /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/.claude/worktrees/fc-one? Stop it or tell me it is yours.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project contains registered copy /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-live-work.HcMNzk/pool/.treehouse/project-1f8bf9/1/project, never by forcing the removal). Re-run this teardown afterwards.
+done

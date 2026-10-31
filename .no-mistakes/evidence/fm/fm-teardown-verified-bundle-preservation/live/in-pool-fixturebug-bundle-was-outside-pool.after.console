@@ -1,0 +1,39 @@
+scenario=in-pool code=after exit=0
+copy_head=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d (work commit 7a7491061e0702d207034deac2b64297ab96e67b)
+copy_work_txt_present=no
+copy_status=
+meta_present=no
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     available    ~/tmp/fm-live-work.vOK9Ox/pool/.treehouse/project-dd47f4/1/project  (detached)
+restored work.txt at 7a7491061e0702d207034deac2b64297ab96e67b: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLnZPSzlPeC9wb29sL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDRkYzlhZWU5MWYzM2I5ZTQ0ZWVhNDJiN2I5MmM2YWE1NTg5YTdlOGQgN2E3NDkxMDYxZTA3MDJkMjA3MDM0ZGVhYzJiNjQyOTdhYjk2ZTY3Yi4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ttBhOq
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M67VAH25S0376YM8DE0BNQ90/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle sha256=42c20a3d887c2f5e7ebf72650397beee9485d7df0e5082842e39a580221de064 tips=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d 7a7491061e0702d207034deac2b64297ab96e67b
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle sha256=42c20a3d887c2f5e7ebf72650397beee9485d7df0e5082842e39a580221de064 tips=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d 7a7491061e0702d207034deac2b64297ab96e67b
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle is held on task task-x1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-live-work.vOK9Ox/pool/task.bundle sha256=42c20a3d887c2f5e7ebf72650397beee9485d7df0e5082842e39a580221de064 tips=4dc9aee91f33b9e44eea42b7b92c6aa5589a7e8d 7a7491061e0702d207034deac2b64297ab96e67b

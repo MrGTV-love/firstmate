@@ -1,0 +1,27 @@
+scenario=force code=before exit=1
+copy_head=45f50cbd980b0200a66c508413e2e232774b2fd4 (work commit 45f50cbd980b0200a66c508413e2e232774b2fd4)
+copy_work_txt_present=yes
+copy_status=
+meta_present=yes
+bundle_present=yes
+record_present=yes
+--- treehouse status (lab pool)
+base  main  (repository default)
+1     leased       ~/tmp/fm-live-work.malMeh/pool/.treehouse/project-916b61/1/project  [fm/task-x1]  (held by task-x1)
+restored work.txt at 45f50cbd980b0200a66c508413e2e232774b2fd4: unpublished work
+--- backlog row after
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:TGFuZCBvciBkcm9wIHRoZSB1bmxhbmRlZCBjb21taXRzIG9mIHRhc2steDE6IHByZXNlcnZlZCBpbiBidW5kbGUgL1VzZXJzL2NoYXJsZXNhYnJvb2tlci90bXAvZm0tbGl2ZS13b3JrLm1hbE1laC9kdXJhYmxlL3Rhc2suYnVuZGxlLCByZWNvcmRlZCB0aXBzIDQ1ZjUwY2JkOTgwYjAyMDBhNjZjNTA4NDEzZTJlMjMyNzc0YjJmZDQgODNhZTEwNmM0NDdlMWZmNzNjOGM1NjE3YWQ3NmNlODc5ZjZmMDQxYy4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.CQorda
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).

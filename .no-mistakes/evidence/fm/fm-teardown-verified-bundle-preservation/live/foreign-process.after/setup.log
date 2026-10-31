@@ -1,0 +1,90 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project. Run 'treehouse return ~/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project
++ head=27b94915de1d6d2af4de9e3751313ddc0be12cb2
++ merged fm/task-x1 into local main (landed baseline)
++ foreign copy /Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project/.claude/worktrees/fc-one head=ad5f11599b37062d6f298377585896500cf81277
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.3jSSKC/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.3jSSKC/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.3jSSKC/data/backlog.md` when it ships
+/Users/charlesabrooker/tmp/fm-live-work.ATGNKF/durable/task.bundle is okay
+The bundle contains these 8 refs:
+ad5f11599b37062d6f298377585896500cf81277 refs/heads/fm/fc
+27b94915de1d6d2af4de9e3751313ddc0be12cb2 refs/heads/fm/task-x1
+27b94915de1d6d2af4de9e3751313ddc0be12cb2 refs/heads/main
+d3e1b443237b4c608a30b75a45b6aa5c76486be4 refs/remotes/origin/HEAD
+d3e1b443237b4c608a30b75a45b6aa5c76486be4 refs/remotes/origin/main
+ad5f11599b37062d6f298377585896500cf81277 HEAD
+27b94915de1d6d2af4de9e3751313ddc0be12cb2 main-worktree/HEAD
+27b94915de1d6d2af4de9e3751313ddc0be12cb2 worktrees/project/HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+task-x1
++ live process pid=42498 cwd=/Users/charlesabrooker/tmp/fm-live-work.ATGNKF/pool/.treehouse/project-a58c7c/1/project
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project. Run 'treehouse return ~/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project' to release it.
++ slot=/Users/charlesabrooker/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project
++ head=b1f11ac01a59929e16ae0db8aef58f77d359a516
++ merged fm/task-x1 into local main (landed baseline)
++ foreign copy /Users/charlesabrooker/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project/.claude/worktrees/fc-one head=9eaa20df5a9dceb12e2d073790f396087a896a42
+ok: added task-x1 (ship) -> Queued
+task:
+  id: task-x1
+  title: lab bundle ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-31
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-x1 --file=/Users/charlesabrooker/tmp/fm-lab.AWGz8q/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-x1 --by <other> --file=/Users/charlesabrooker/tmp/fm-lab.AWGz8q/data/backlog.md` to record a dependency
+ok: start task-x1 -> In flight
+help[1]:
+  - Run `tasks-axi done task-x1 --pr <url> --file=/Users/charlesabrooker/tmp/fm-lab.AWGz8q/data/backlog.md` when it ships
+/Users/charlesabrooker/tmp/fm-live-work.FhGL4v/durable/task.bundle is okay
+The bundle contains these 8 refs:
+9eaa20df5a9dceb12e2d073790f396087a896a42 refs/heads/fm/fc
+b1f11ac01a59929e16ae0db8aef58f77d359a516 refs/heads/fm/task-x1
+b1f11ac01a59929e16ae0db8aef58f77d359a516 refs/heads/main
+3dfc7765b196d3a378d1d63febce97c82fe2dad9 refs/remotes/origin/HEAD
+3dfc7765b196d3a378d1d63febce97c82fe2dad9 refs/remotes/origin/main
+9eaa20df5a9dceb12e2d073790f396087a896a42 HEAD
+b1f11ac01a59929e16ae0db8aef58f77d359a516 main-worktree/HEAD
+b1f11ac01a59929e16ae0db8aef58f77d359a516 worktrees/project/HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+task-x1
++ live process pid=95242 cwd=/Users/charlesabrooker/tmp/fm-live-work.FhGL4v/pool/.treehouse/project-2f2819/1/project
