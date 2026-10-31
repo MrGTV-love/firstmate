@@ -1395,6 +1395,37 @@ test_crew_dispatch_active_rules_are_verbose_bootstrap_info() {
   pass "bootstrap surfaces active crew-dispatch rules only as verbose BOOTSTRAP_INFO"
 }
 
+test_inherited_dispatch_does_not_require_local_projects() {
+  local case_dir fakebin out registry
+  case_dir="$TMP_ROOT/inherited-dispatch"
+  mkdir -p "$case_dir/parent/config"
+  printf '%s\n' '{"judgments":{},"rules":[{"when":"Parent-only project","match":{"projects":["parent-app"]},"use":{"harness":"claude"}},{"when":"Shared fleet project","match":{"projects":["local-app","parent-app"]},"use":{"harness":"codex"}}]}' \
+    > "$case_dir/parent/config/crew-dispatch.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  add_real_jq "$fakebin"
+  for registry in subset empty absent; do
+    mkdir -p "$case_dir/$registry/config" "$case_dir/$registry/data"
+    printf '%s\n' manual > "$case_dir/$registry/config/backlog-backend"
+    case "$registry" in
+      subset) printf '%s\n' '- local-app - Local project' > "$case_dir/$registry/data/projects.md" ;;
+      empty) printf '# Projects\n' > "$case_dir/$registry/data/projects.md" ;;
+    esac
+    cp "$case_dir/parent/config/crew-dispatch.json" "$case_dir/$registry/config/crew-dispatch.json"
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/$registry" FM_ROOT_OVERRIDE="$case_dir/$registry" \
+      TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+    assert_not_contains "$out" 'CREW_DISPATCH: invalid' "$registry local registry must not invalidate inherited fleet policy"
+    printf '%s\n' '{"judgments":{},"rules":[{"when":"Parent-only malformed profile","match":{"projects":["parent-app"]},"use":{"harness":"spaceship"}}]}' \
+      > "$case_dir/$registry/config/crew-dispatch.json"
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/$registry" FM_ROOT_OVERRIDE="$case_dir/$registry" \
+      TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+    assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship' \
+      "$registry registry must not hide malformed parent-only profiles"
+  done
+  pass 'inherited fleet selectors survive subset, empty and absent registries without hiding malformed profiles'
+}
+
 test_crew_dispatch_validation() {
   local label body expect mode case_dir fakebin out child_env n
   n=0
@@ -1480,7 +1511,6 @@ typed rule without structured match is flagged^{"rules":[{"when":"legacy prose r
 typed match naming an unknown judgment is flagged^{"judgments":{},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match all, any, and none must be non-empty arrays of declared judgment ids
 typed judgment without criteria is flagged^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?"}},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false
 typed unknown match selector is flagged^{"judgments":{},"rules":[{"when":"vernant work","match":{"project":"vernant"},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout
-typed unknown project is flagged^{"judgments":{},"rules":[{"when":"unknown project","match":{"projects":["unregistered"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
 typed rule without a match object is flagged^{"judgments":{},"rules":[{"when":"w","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs a match object
 typed unsupported gemini effort is flagged^{"judgments":{},"rules":[{"when":"gemini work","match":{"projects":["firstmate"]},"use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google","effort":"minimal"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: gemini:minimal
 typed structured facts and judgments are accepted^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?","criteria":{"true":"Fresh facts are needed.","false":"Supplied facts suffice."}}},"rules":[{"when":"vernant fresh ship","match":{"projects":["vernant"],"kind":"ship","all":["fresh"]},"use":{"harness":"claude"}},{"when":"other scout","match":{"projects":["firstmate"],"kind":"scout","none":["fresh"]},"use":{"harness":"codex"}}]}^empty^
@@ -1530,12 +1560,6 @@ ROWS
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
-  mv "$case_dir/home/data/projects.md" "$case_dir/projects.md.saved"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable' ] \
-    || fail "typed bootstrap must name an unreadable project registry, got: $out"
-  mv "$case_dir/projects.md.saved" "$case_dir/home/data/projects.md"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"
@@ -1927,6 +1951,8 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
   pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
 }
 
+fm_test_only
+
 test_off_path_tools_get_actionable_path_diagnostics
 test_crew_dispatch_reports_off_path_jq
 test_omp_api_billing_config_diagnostics
@@ -1964,4 +1990,5 @@ test_network_sweeps_recheck_lock_ownership
 test_network_phases_record_per_step_elapsed_times
 test_tasks_axi_verdict_handoff_is_consumed_once
 test_crew_dispatch_active_rules_are_verbose_bootstrap_info
+test_inherited_dispatch_does_not_require_local_projects
 test_crew_dispatch_validation

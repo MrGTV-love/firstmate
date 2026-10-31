@@ -25,7 +25,8 @@
 #   task extraction. fm-dispatch-project.py derives project from the brief's
 #   typed clone path and a frozen data/projects.md registry, never task prose or
 #   a caller-typed id. Missing or invalid bindings escalate before anything is
-#   sent; every rule must name positive registered projects.
+#   sent; rules name positive fleet project ids, and only an exactly bound local
+#   project can make one applicable. Inherited foreign selectors stay inert.
 #   bin/fm-dispatch-level5.ts owns question assembly and effort floors; bun runs
 #   it when installed, otherwise node with type stripping.
 #   The shared client selects TypeSafe explicitly, retains the raw exchange,

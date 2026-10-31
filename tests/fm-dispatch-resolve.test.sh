@@ -183,9 +183,10 @@ cp "$RULES" "$TMP_ROOT/good-project.json"
 cp "$TMP_ROOT/bad-project.json" "$RULES"
 bind_brief "$BRIEF" "$HOME_DIR/projects/vernant"
 binding_resolve "$TMP_ROOT/bound-brief.md"
-expect_code 2 "$CODE" 'config cannot name an unregistered project'
-assert_contains "$(cat "$TMP_ROOT/error")" 'match.projects contains an unregistered project id' 'config load names the invalid positive selection'
-assert_equals "$before" "$(count)" 'invalid project configuration sends nothing'
+expect_code 0 "$CODE" 'inherited selectors absent from the local registry do not invalidate policy'
+assert_contains "$OUT" '  status: clear' 'a valid local binding still resolves alongside an inert foreign selector'
+assert_not_contains "$OUT" 'rule_1=' 'a foreign-only selector never participates in local selection'
+assert_equals "$((before + 1))" "$(count)" 'only the locally bound task reaches the provider'
 cp "$TMP_ROOT/good-project.json" "$RULES"
 jq '.rules[1].match.projects=["vernant"] | .rules[2].match.projects=["firstmate","pager","orion-private"]' "$RULES" > "$TMP_ROOT/positive-projects.json"
 cp "$TMP_ROOT/positive-projects.json" "$RULES"

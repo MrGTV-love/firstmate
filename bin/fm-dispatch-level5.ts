@@ -59,7 +59,8 @@ function config(path: string, registryPath: string): Config {
       (m.kind !== undefined && m.kind !== "ship" && m.kind !== "scout")) {
       throw new Error("match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout");
     }
-    if (m.projects.some(p => !Object.hasOwn(registry, p))) throw new Error("match.projects contains an unregistered project id");
+    // Fleet policy is inherited unchanged; foreign positive selectors are inert.
+    // fm-dispatch-project.py proves the actual task's local binding before prepare.
     for (const key of ["all", "any", "none"]) {
       const ids = m[key];
       if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 ||
