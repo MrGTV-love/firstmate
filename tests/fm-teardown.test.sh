@@ -2716,7 +2716,7 @@ test_verified_bundle_preserves_unlanded_copy() {
     [ -z "$second" ] || assert_grep "$second" "$case_dir/stderr" 'second preserved tip not reported'
     restored="$case_dir/restored.git"
     git init -q --bare "$restored"
-    stored=$(cut -f1 "$case_dir/data/task-x1/preserved-bundles.tsv")
+    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     assert_grep "$stored" "$case_dir/stderr" 'stored recovery path not reported'
     assert_equals "$digest" "$(shasum -a 256 "$stored" | awk '{print $1}')" 'stored bundle digest changed'
     rm "$BUNDLE_PATH"
@@ -2728,17 +2728,24 @@ test_verified_bundle_preserves_unlanded_copy() {
 }
 
 test_invalid_preservation_bundle_refuses() {
-  local shape case_dir rc reason record second digest first size stock_bash_path
-  for shape in missing-tip recorded-tip verify thin truncated hash no-record symlink malformed two-lines empty-field blank-tips; do
+  local shape case_dir rc reason refusal record second digest first size stock_bash_path
+  for shape in missing-tip missing-slot-tip recorded-tip verify thin truncated hash no-record symlink malformed two-lines empty-field blank-tips; do
     stock_bash_path=
+    refusal='REFUSED: the ship deliverable is not landed'
     make_bundle_copy_case "bundle-invalid-$shape"
     case_dir=$NESTED_CASE
     record="$case_dir/data/task-x1/preservation-bundles.tsv"
     case "$shape" in
       missing-tip)
-        second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'missing unpublished tip')
+        git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'missing unpublished tip'
+        second=$(git -C "$NESTED_COPY" rev-parse HEAD)
+        reason="bundle does not list unlanded tip $second"
+        ;;
+      missing-slot-tip)
+        second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'missing unpublished slot tip')
         git -C "$NESTED_SLOT" reset --hard -q "$second"
         reason="bundle does not list unlanded tip $second"
+        refusal="REFUSED: returning pool slot $NESTED_SLOT would sweep away task task-x1's claimed pool slot $NESTED_SLOT, whose HEAD $second is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor"
         ;;
       recorded-tip)
         digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
@@ -2808,7 +2815,7 @@ test_invalid_preservation_bundle_refuses() {
     FM_HOME="$case_dir/home" FM_TEARDOWN_TEST_PATH="${stock_bash_path:-$PATH}" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "bundle-$shape: invalid preservation must refuse"
-    assert_grep 'REFUSED:' "$case_dir/stderr" "bundle-$shape: original refusal missing: $(cat "$case_dir/stderr")"
+    assert_grep "$refusal" "$case_dir/stderr" "bundle-$shape: original refusal changed: $(cat "$case_dir/stderr")"
     assert_grep "$reason" "$case_dir/stderr" "bundle-$shape: missing predicate not named"
     assert_grep 'Create a self-contained external bundle' "$case_dir/stderr" "bundle-$shape: supported completing step missing"
     assert_present "$NESTED_COPY/.git" "bundle-$shape: copy was removed"
@@ -2879,6 +2886,30 @@ SH
   pass 'failed copying or mismatched stored bytes retain the copy and commits'
 }
 
+# Admission copies the bundle into task data once; every later proof of the
+# same teardown reuses the stored copy at its fixed path after a digest check.
+test_bundle_admission_stores_once() {
+  local case_dir rc proofs
+  make_bundle_copy_case bundle-store-once
+  case_dir=$NESTED_CASE
+  : > "$case_dir/stored-copies.log"
+  cat > "$case_dir/fakebin/cp" <<SH
+#!/usr/bin/env bash
+case "\${2:-}" in
+  */preserved-bundles/.bundle.*) printf '%s\\n' "\$2" >> '$case_dir/stored-copies.log' ;;
+esac
+exec /bin/cp "\$@"
+SH
+  chmod +x "$case_dir/fakebin/cp"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-store-once: verified preservation must allow ordinary teardown: $(cat "$case_dir/stderr")"
+  proofs=$(grep -c '^teardown: preserved unlanded commits in bundle ' "$case_dir/stderr")
+  [ "$proofs" -ge 2 ] || fail "bundle-store-once: the fixture ran $proofs bundle proofs, fewer than two"
+  assert_equals 1 "$(wc -l < "$case_dir/stored-copies.log" | tr -d ' ')" 'bundle-store-once: a later proof copied the bundle again'
+  pass 'one teardown copies a preservation bundle into task data once and reuses it for later proofs'
+}
+
 test_bundle_sources_and_durable_home_locations() {
   local shape case_dir rc stored head restored
   for shape in source-copy source-pool source-state source-scratch home-worktree home-pool; do
@@ -2908,7 +2939,7 @@ test_bundle_sources_and_durable_home_locations() {
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 0 "$rc" "bundle-location-$shape: safe storage must allow cleanup: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" 'copy not removed'
-    stored=$(cut -f1 "$case_dir/data/task-x1/preserved-bundles.tsv")
+    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     rm -f "$BUNDLE_PATH"
     restored="$case_dir/restored.git"
     git init -q --bare "$restored"
@@ -3248,7 +3279,7 @@ test_bundle_kept_ship_keeps_its_row_held_for_the_captain() {
       assert_grep "$tip" "$case_dir/backlog.decoded" "bundle-row-$shape: the held call lost recorded tip $tip"
     done
     [ "$shape" != local-only ] || [[ "$tips" == *"$second"* ]] || fail "bundle-row-$shape: the fixture does not record two tips"
-    assert_grep "Deliverable of the finished work: preserved in bundle $(cut -f1 "$case_dir/data/task-x1/preserved-bundles.tsv"), not landed" \
+    assert_grep "Deliverable of the finished work: preserved in bundle $case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle, not landed" \
       "$case_dir/data/backlog.md" "bundle-row-$shape: the row does not record the bundle"
     assert_no_grep 'local main' "$case_dir/data/backlog.md" "bundle-row-$shape: the row claims a local-main landing"
     assert_no_grep 'pull/7' "$case_dir/data/backlog.md" "bundle-row-$shape: the row links a PR that is not merged"
@@ -3698,6 +3729,7 @@ test_verified_bundle_preserves_unlanded_copy
 test_invalid_preservation_bundle_refuses
 test_bundle_storage_inside_removal_root_refuses
 test_bundle_storage_failure_keeps_copy
+test_bundle_admission_stores_once
 test_bundle_sources_and_durable_home_locations
 test_bundle_with_malformed_commit_refuses
 test_bundle_ignores_branches_other_worktrees_hold

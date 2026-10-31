@@ -639,13 +639,19 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
 }
 
 # Admission owns a durable copy, not the lifetime of the operator's source.
-# Stage beside the destination, verify the copied bytes, and publish a receipt
-# only after the stored bundle survives every removal root and Git verification.
-# The original record remains the captain-call identity; the receipt and close
-# note name the recoverable stored path even after the source is deleted.
-teardown_bundle_store() {  # <copy> <source> <sha256> <tips>
-  local copy=$1 source=$2 hash=$3 tips=$4 root="$DATA/$ID/preserved-bundles" stage digest receipt
+# Stage beside the destination and publish only after the copied bytes survive
+# every removal root and Git verification. Later proofs reuse the stored copy at
+# its fixed path once its digest matches the record. The record's SHA-256 and
+# that fixed path, which the close note also names, recover it after the source
+# is deleted.
+teardown_bundle_store() {  # <copy> <source> <sha256>
+  local copy=$1 source=$2 hash=$3 root="$DATA/$ID/preserved-bundles" stage digest
   TEARDOWN_BUNDLE_STORED="$root/$hash.bundle"
+  if [ -f "$TEARDOWN_BUNDLE_STORED" ] && [ ! -L "$TEARDOWN_BUNDLE_STORED" ] \
+      && digest=$(teardown_ignored_sha256 "$TEARDOWN_BUNDLE_STORED") && [ "$digest" = "$hash" ]; then
+    teardown_bundle_external "$copy" "$TEARDOWN_BUNDLE_STORED"
+    return
+  fi
   mkdir -p "$root" || { TEARDOWN_BUNDLE_REASON='bundle storage directory cannot be created'; return 1; }
   if [ -L "$TEARDOWN_BUNDLE_STORED" ] \
       || { [ -e "$TEARDOWN_BUNDLE_STORED" ] && [ ! -f "$TEARDOWN_BUNDLE_STORED" ]; }; then
@@ -666,15 +672,7 @@ teardown_bundle_store() {  # <copy> <source> <sha256> <tips>
     TEARDOWN_BUNDLE_REASON='stored bundle cannot be published'
   fi
   rm -f "$stage"
-  [ -z "$TEARDOWN_BUNDLE_REASON" ] || return 1
-  receipt=$(mktemp "$DATA/$ID/.preserved-bundles.XXXXXX") || {
-    TEARDOWN_BUNDLE_REASON='stored bundle receipt cannot be created'; return 1;
-  }
-  if ! printf '%s\t%s\t%s\n' "$TEARDOWN_BUNDLE_STORED" "$hash" "$tips" > "$receipt" \
-      || ! mv -f "$receipt" "$DATA/$ID/preserved-bundles.tsv"; then
-    rm -f "$receipt"
-    TEARDOWN_BUNDLE_REASON='stored bundle receipt cannot be published'; return 1
-  fi
+  [ -z "$TEARDOWN_BUNDLE_REASON" ]
 }
 
 # <ref> itself must carry a locally-only commit, or delivery proof is still
@@ -755,7 +753,7 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   fi
   if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
     teardown_bundle_require_captain_call "$source" "$(printf '%s' "$required" | paste -sd ' ' -)" "$tips" || return 1
-    if teardown_bundle_store "$copy" "$bundle" "$hash" "$tips"; then
+    if teardown_bundle_store "$copy" "$bundle" "$hash"; then
       echo "teardown: preserved unlanded commits in bundle $TEARDOWN_BUNDLE_STORED sha256=$hash tips=$tips (source $source)" >&2
       TEARDOWN_BUNDLE_ACCEPTED=$TEARDOWN_BUNDLE_STORED
       return 0

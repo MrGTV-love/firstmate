@@ -75,10 +75,10 @@
 # Re-bundling replaces the line; a record of more than one line, or a blank or
 # malformed one, refuses. The path cannot contain TAB, CR or newline.
 # The record and source bundle must be regular nonsymlink files. Admission
-# copies the proved bundle into $DATA/$ID/preserved-bundles/<sha256>.bundle,
-# verifies the stored SHA-256 and git bundle verify, and atomically writes
-# $DATA/$ID/preserved-bundles.tsv with the same three fields, naming the stored
-# path. Only the stored copy's physical location is checked: it must be outside
+# copies the proved bundle into $DATA/$ID/preserved-bundles/<sha256>.bundle and
+# verifies the stored SHA-256 and git bundle verify once; later proofs reuse that
+# fixed path while its SHA-256 matches the record. Only the stored copy's
+# physical location is checked: it must be outside
 # roots this cleanup removes (the copies, returned slot, tasktmp, launch-home
 # scratch, and task state directories: .inbox, .git-hooks, .dsh and
 # .nm-read-cache-<task-id>). Symlink aliases into those roots also refuse.
@@ -103,8 +103,8 @@
 # Every proof reads the record and the bundle's digest again and verifies coverage
 # again; only a completed isolated restore is remembered in this process, by
 # bundle digest, object format and recorded tips, so the final custody rechecks
-# and the nested, prior and foreign copy proofs do not repeat it. Nothing is
-# cached on disk.
+# and the nested, prior and foreign copy proofs do not repeat it. No proof
+# result is cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
 # Those commits still go to the captain to land or drop, so the bundle route
@@ -143,12 +143,14 @@
 # then file the captain's call with the command a refusal prints, for example
 #   bin/fm-captain-hold.sh hold "$task" --owner captain \
 #     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
-# The original record remains the held call's identity; the stored receipt and
-# close note name the recovery path. The original bundle may be deleted after
-# admission. Keep data/<task> until the commits are no longer needed; ordinary
-# task cleanup retains it. Residual: retiring a secondmate home deletes that
-# home's data/ and therefore its stored bundles. Move preservation elsewhere
-# before retirement if those commits still matter. Restore from the stored path:
+# The original record remains the held call's identity; its SHA-256 names the
+# fixed stored path, which the close note also names. The original bundle may be
+# deleted after admission. Keep data/<task> until the commits are no longer
+# needed; ordinary task cleanup retains it. Retiring a firstmate home (a
+# secondmate home, or a forced child home) refuses before any removal while any
+# data/*/preserved-bundles/*.bundle remains in it, and lists each one: remove a
+# stored bundle once its land-or-drop call is answered, or move it to a durable
+# location outside that home and update its record. Restore from the stored path:
 # git -C <restore-repo> fetch <stored-bundle-path> <tip-sha>:refs/heads/recovered.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
@@ -5120,11 +5122,22 @@ EOF
 }
 
 remove_firstmate_home() {
-  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path process_event_backup
+  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path process_event_backup bundle
+  local -a stored=()
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
   abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id" "$registry") || return 1
   [ -n "$abs_home_path" ] || return 0
+  for bundle in "$abs_home_path"/data/*/preserved-bundles/*.bundle; do
+    [ -e "$bundle" ] || [ -L "$bundle" ] || continue
+    stored+=("$bundle")
+  done
+  if [ "${#stored[@]}" -gt 0 ]; then
+    echo "REFUSED: $label $abs_home_path holds bundle-preserved commits that only its data/ keeps:" >&2
+    printf '  %s\n' "${stored[@]}" >&2
+    echo "Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
+    return 1
+  fi
   process_event_backup=$(snapshot_firstmate_home_process_events "$abs_home_path" "$label") || return 1
   if ! cleanup_firstmate_home_process_events "$abs_home_path" "$label"; then
     restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
