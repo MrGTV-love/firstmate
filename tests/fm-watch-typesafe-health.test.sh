@@ -146,7 +146,7 @@ test_memory_observation_wakes_with_the_process_identity() {
   start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
     FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
   pid=$!
-  fm_test_wait_until 100 grep -q 'xprotectd PID 101' "$out" || {
+  fm_test_wait_until --while-alive "$pid" --progress-file "$out" -- grep -q 'xprotectd PID 101' "$out" || {
     stop_owned_watcher "$pid"
     fail "the watcher failed to present the identifying memory alarm: $(cat "$out") $(cat "$out.err")"
   }
