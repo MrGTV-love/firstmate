@@ -74,27 +74,32 @@
 # space-separated full commit tips advertised by git bundle list-heads.
 # Re-bundling replaces the line; a record of more than one line, or a blank or
 # malformed one, refuses. The path cannot contain TAB, CR or newline.
-# The record and bundle must be regular nonsymlink files. The bundle's physical
-# parent must be outside every registered copy (symlink aliases included), every
-# enclosing Treehouse pool (non-copy directories in it included) and every
-# removal root this teardown removes: the task's own copy, its tasktmp, its
-# launch-home temp root, the whole state directory (every state-side removal
-# target, including .nm-read-cache-<task-id>), and $STATE/<task-id>.inbox and
-# .git-hooks.
+# The record and source bundle must be regular nonsymlink files. Admission
+# copies the proved bundle into $DATA/$ID/preserved-bundles/<sha256>.bundle,
+# verifies the stored SHA-256 and git bundle verify, and atomically writes
+# $DATA/$ID/preserved-bundles.tsv with the same three fields, naming the stored
+# path. Only the stored copy's physical location is checked: it must be outside
+# roots this cleanup removes (the copies, returned slot, tasktmp, launch-home
+# scratch, and task state directories: .inbox, .git-hooks, .dsh and
+# .nm-read-cache-<task-id>). Symlink aliases into those roots also refuse.
+# Other registered worktrees and enclosing pool folders are not removal roots;
+# a firstmate home can keep its data there. No source-location restriction is
+# needed once the stored copy is proved. A missing source can use the already
+# stored copy; an existing but changed source still refuses.
 # The recorded bundle must pass git bundle verify in the copy, match its recorded
 # SHA-256, advertise and record every maximal tip of git rev-list --children
-# <ref> <branches> --not --remotes, and restore on its own: fetching every
-# recorded tip from it into a fresh empty repository outside the copy and pool
-# must succeed and pass git fsck --strict.
-# <ref> is the copy's HEAD (detached included) or a removed copy's branch tip,
-# and it must carry a locally-only commit of its own: <branches> only widen
-# what the bundle must cover, they never make a pushed <ref> eligible, so a
+# <ref> <removed-refs> --not --remotes, and restore on its own: fetching every
+# recorded tip from it into a fresh empty repository must succeed and pass
+# git fsck --strict. <ref> is the copy's HEAD (detached included) or a removed
+# copy's branch tip, and must carry a locally-only commit of its own, so a
 # pushed-but-undelivered ship still requires the existing delivery proof.
-# <branches> are the local branches no live worktree has checked out, so side
-# branches count; a branch checked out in another worktree whose directory still
-# exists is that task's own, but a branch whose worktree directory is gone or
-# prunable counts. A thin bundle, a truncated pack or a missing tip refuses.
-# Ancestors need not be separate bundle heads.
+# <removed-refs> covers the task and returned slot HEADs in this ref store and
+# task archive branches archive/<task>-(submitted|pipeline)-<8hex>, the only
+# additional branch refs teardown can delete; the archive reaper still needs
+# its independent merged-lineage proof. Unrelated unheld branches survive and
+# need not be bundled. Each removed nested/foreign copy also gets its own proof.
+# A thin bundle, truncated pack or missing tip refuses; ancestors need not be
+# separate bundle heads.
 # Every proof reads the record and the bundle's digest again and verifies coverage
 # again; only a completed isolated restore is remembered in this process, by
 # bundle digest, object format and recorded tips, so the final custody rechecks
@@ -126,7 +131,7 @@
 # bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a drop.
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
-# choose an absolute durable bundle path OUTSIDE every copy, pool, state directory and scratch root,
+# choose an absolute source bundle path (temporary locations are supported),
 # set copy, task and FM_HOME explicitly, then run under bash:
 #   bundle=/durable/preservation/task.bundle
 #   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
@@ -138,9 +143,13 @@
 # then file the captain's call with the command a refusal prints, for example
 #   bin/fm-captain-hold.sh hold "$task" --owner captain \
 #     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
-# Keep the bundle and record until the preserved commits are no longer needed;
-# data/<task> survives cleanup. Restore into a new repository with
-# git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
+# The original record remains the held call's identity; the stored receipt and
+# close note name the recovery path. The original bundle may be deleted after
+# admission. Keep data/<task> until the commits are no longer needed; ordinary
+# task cleanup retains it. Residual: retiring a secondmate home deletes that
+# home's data/ and therefore its stored bundles. Move preservation elsewhere
+# before retirement if those commits still matter. Restore from the stored path:
+# git -C <restore-repo> fetch <stored-bundle-path> <tip-sha>:refs/heads/recovered.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
