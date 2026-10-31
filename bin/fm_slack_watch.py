@@ -376,8 +376,7 @@ class Watch:
         usable, missing = self.scope_state()
         usable = usable and reactions
         fields = [('Task: ', row['id'])]
-        structured = any(key != 'Evidence' for key in reason) or any(
-            key in body for key in ('Decision sought', 'Brief', 'Alternatives'))
+        structured = bool(parts.get('Decision sought'))
         if structured:
             for key, label in (('Decision sought', 'Decision sought: '),
                                ('Brief', 'Brief description of issue: '),
@@ -389,7 +388,9 @@ class Watch:
             fields.append(('Decision: ', card.get('title') or row.get('title') or row['id']))
             if card.get('about'):
                 fields.append(('About: ', card['about']))
-            question = card.get('decide') or row.get('hold_reason')
+            question = card.get('decide') or row.get('hold_reason') or ''
+            question = '\n'.join(line for line in question.splitlines()
+                                 if line.rpartition(':')[2].strip().lower() != 'none recorded')
             if question:
                 fields.append(('Question: ', question))
             if parts.get('Recommendation'):
@@ -641,18 +642,26 @@ class Watch:
                 row, card, text_only, reactions=record.get('reactions', False) if record else True)
             self.scope_notice()
             digest = hashlib.sha256(text.encode()).hexdigest()
-            if record and (record.get('options') != options or record.get('text_digest') == digest):
+            if record and (record.get('options') != options or digest in
+                           (record.get('text_digest'), record.get('update_attempt_digest'))):
                 continue
             # Re-check immediately before the network write.
             again, current = self.probe(key)
             if again == 1 or (current if again == 0 else 'uncertain') != identity:
                 continue
             if record:
-                self.api.call('chat.update', channel=self.owner_channel(), ts=record['ts'],
-                              text=text, unfurl_links=False, unfurl_media=False)
-                record['text_digest'] = digest
+                channel = self.owner_channel()
+                record['update_attempt_digest'] = digest
                 self.commit()
                 writes += 1
+                try:
+                    self.api.call('chat.update', channel=channel, ts=record['ts'],
+                                  text=text, unfurl_links=False, unfurl_media=False)
+                except SlackError as error:
+                    self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
+                    continue
+                record['text_digest'] = digest
+                self.commit()
                 continue
             ts = self.post('card:' + occurrence, text)
             writes += 1

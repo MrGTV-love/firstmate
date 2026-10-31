@@ -3496,7 +3496,7 @@ The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
-Each card carries its task id once and only explicit decision-card fields, never arbitrary task-body prose.
+Each card carries its task id once and reads explicit decision-card fields; unlabeled task-body lines are excluded unless they continue a labeled part up to the next recognized label or numbered option.
 Write a concise multiline hold reason with these four parts; each part continues until the next label, and the mirror renders them in this order even when the input order differs:
 
 | Hold reason or body label | Card heading | Content |
@@ -3507,14 +3507,15 @@ Write a concise multiline hold reason with these four parts; each part continues
 | `Alternatives:` | `Alternatives considered:` | The alternatives and why each is not as good as the recommendation. |
 
 Hold-reason fields override corresponding body fields and the current board's recommendation.
-Legacy reasons without these labels still render the title and question, with the current board's about/question text when available; explicit body decision fields can also supply the four-part layout.
+The four-part layout requires a nonempty `Decision sought:` field in the reason or body; otherwise the legacy layout keeps the title and question, with the current board's about/question text when available, even when some other labels are present.
 Missing fields are omitted, never filled with `none recorded`; an `Evidence:` pointer appears only for an absolute path or an HTTP(S) URL, followed by any numbered options.
 One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
 Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.
 Only replies inside the card's thread map to that decision; messages typed in the main DM window are not read.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
-A persisted text digest avoids repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
+Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
+A failed update is reported once for that text change and counts toward the write budget without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt.
 Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
 A changed option set is never applied to an existing card and requires a new hold lifecycle.
 Each mirror pass, including the mirror inside a poll, shares a write budget of `FM_SLACK_POLL_MAX_ANSWERS` across new cards and edits; deferred writes wait for the next pass.

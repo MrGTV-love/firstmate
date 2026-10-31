@@ -98,6 +98,17 @@ class CardRenderingTest(unittest.TestCase):
         self.assertIn('Evidence: /tmp/review.md\n', text)
         self.assertNotIn('PRIVATE_BODY_NOTES', text)
 
+    def test_partial_labels_preserve_legacy_question_and_title(self):
+        text = self.render('We need to decide the rollout.\nRecommendation: Wait for approval.',
+                           ['Brief: Approval is missing.', 'Alternatives: Shipping bypasses approval.'])
+        self.assertIn('Decision: Release choice\n', text)
+        self.assertIn('Question: We need to decide the rollout.\n', text)
+        self.assertIn('Recommendation: Wait for approval.\n', text)
+        self.assertNotIn('Recommendation and key reasons:', text)
+        text = self.render('We need to decide the rollout.\nRecommendation: none recorded')
+        self.assertIn('Decision: Release choice\nQuestion: We need to decide the rollout.\n', text)
+        self.assertNotIn('none recorded', text)
+
     def test_footer_is_concise_and_scope_fault_stays_visible(self):
         for options in ([], ['Option 1: Wait (wait)']):
             for scopes in (False, True):

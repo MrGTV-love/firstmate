@@ -243,12 +243,12 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
-## X44..X48 - current-card refresh
+## X44..X49 - current-card refresh
 
 The in-place edit contract is owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
 These replay cases use the public mirror and poll commands with disposable task homes; they do not inspect the real DM.
-On 2026-10-31, `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1` printed `ok - X44`, `ok - X45`, `ok - X46`, `ok - X47`, `ok - all Slack watch checks`, and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1327662`.
-The same process ran the five renderer cases and all earlier replay cases.
+On 2026-10-31, the corrected renderer and update-failure handling were verified with `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`, which printed `ok - X44`, `ok - X45`, `ok - X46`, `ok - X47`, `ok - X48`, `ok - X49`, and `ok - all Slack watch checks`; its `FM_TEST_SUMMARY` reported `total=1 failed=0 skipped_gate=0`.
+The same process passed all six renderer cases, including partially labeled legacy reasons, and all earlier replay cases.
 The intake-refusal and secret-scan suites, each run separately as `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/<suite>.test.sh -- bash bin/fm-test-run.sh tests/<suite>.test.sh --jobs 1` with `<suite>` set to `fm-slack-intake-unchanged` and `fm-slack-secret-scan`, printed `ok - intake refusals hold` and `ok - scan redacted and detected both planted copies`, respectively, and both summaries reported `failed=0`.
 `bash bin/fm-proc-budget.sh --own-procs 128 -- bash bin/fm-lint.sh tests/fm-slack-watch.test.sh` reported pinned ShellCheck 0.11.0 with full extended analysis and exited 0.
 No live Slack check was performed for this change.
@@ -258,6 +258,7 @@ No live Slack check was performed for this change.
 - X46 checks pre-digest layout migration in place with a one-write poll budget, followed by an unchanged restart and no new cards.
 - X47 checks that retired and replaced threads are never edited and that only a genuinely new hold lifecycle creates another card.
 - X48 checks a card created without reaction scopes, then re-armed after those scopes are granted: the same root loses its obsolete scope warning but never advertises unsupported taps or changes its recorded capability; a tap leaves the call open and typing its option number still records the expected value.
+- X49 checks that a rejected update leaves its root unchanged without stopping a later card's refresh, is reported once without retrying the same text after restart, and permits another attempt only when its text changes again.
 
 ## X1..X43 - review-round regressions
 

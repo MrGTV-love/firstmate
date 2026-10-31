@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X48.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X49.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1691,5 +1691,30 @@ out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/scope-upgrade.json")
 assert_contains "$out" 'closed: with-options' "X48 advertised typed answer did not close the call"
 assert_eq "$(answer_line with-options)" wait "X48 typed option no longer mapped to its value"
 printf 'ok - X48\n'
+
+# X49: an uneditable root is attempted once per text change and cannot starve later cards.
+new_home card-payload
+bind
+mirror card-payload >/dev/null
+ts=$(thread_field with-options ts)
+card=$(python3 "$HELPER" card-text "$(replay_file)" with-options)
+python3 "$HELPER" fail-call "$(replay_file)" "chat.update:$ts" 400 1
+reason=$'Decision sought: Wait for approval?\nBrief: Rollout lacks approval.\nRecommendation: Wait for approval.\nAlternatives: Shipping skips approval.'
+"$CAPTAIN" hold with-options --reason "$reason" >/dev/null
+"$CAPTAIN" hold no-options --reason "$reason" >/dev/null
+out=$(mirror card-payload) || { printf '%s\n' "$out"; fail "X49 failed edit aborted the pass"; }
+assert_contains "$out" 'card update failed:' "X49 failed edit was not reported"
+assert_eq "$(outbound_count chat.update "$ts")" 0 "X49 failed edit was reported as successful"
+assert_eq "$(outbound_count chat.update "$(thread_field no-options ts)")" 1 "X49 failed edit starved a later refresh"
+assert_eq "$(python3 "$HELPER" card-text "$(replay_file)" with-options)" "$card" "X49 failed edit changed its root"
+out=$(mirror card-payload)
+assert_not_contains "$out" 'card update failed:' "X49 unchanged failed edit was reported again"
+assert_eq "$(outbound_count chat.update "$ts")" 0 "X49 restart retried the failed text change"
+assert_eq "$(outbound_count chat.postMessage)" 3 "X49 failed edit posted another card"
+"$CAPTAIN" hold with-options --reason "${reason/Wait for approval?/Approve waiting?}" >/dev/null
+mirror card-payload >/dev/null
+assert_eq "$(outbound_count chat.update "$ts")" 1 "X49 a new text change was not attempted"
+assert_eq "$(python3 "$HELPER" root-count "$(replay_file)" with-options)" 1 "X49 new attempt replaced the root"
+printf 'ok - X49\n'
 
 printf 'ok - all Slack watch checks\n'
