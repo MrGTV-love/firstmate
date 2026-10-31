@@ -297,6 +297,77 @@ RUBY
   pass "both portable parallel jobs pass the concurrency the model starts from"
 }
 
+# Execute each producer's shell on an actual merge checkout, then resolve the
+# upload inputs from its outputs. This catches recording the event base rather
+# than the merge parent (a rerun may have a newer event base).
+test_pull_request_uploads_actual_tested_tree() {
+  ruby -ryaml -rtmpdir -ropen3 -rjson - "$ROOT" <<'RUBY' || fail "pull_request tested-tree artifacts"
+root = ARGV.fetch(0)
+%w[ci no-mistakes-required].each do |workflow|
+  doc = YAML.load_file("#{root}/.github/workflows/#{workflow}.yml")
+  context = {"github.event_name" => "pull_request", "matrix.partition" => 1,
+             "github.run_attempt" => 3}
+  expand = lambda do |value|
+    value.to_s.gsub(/\$\{\{\s*(.*?)\s*\}\}/) { context.fetch(Regexp.last_match(1)).to_s }
+  end
+  enabled = lambda do |step|
+    next true unless step.key?("if")
+    expression = step.fetch("if").gsub(/github\.event_name|matrix\.partition/) { |key| JSON.generate(context.fetch(key)) }
+    eval(expression) # The fixture resolves workflow predicates, not shell source.
+  end
+  uploads = []
+  doc.fetch("jobs").each_value do |job|
+    steps = job.fetch("steps", [])
+    steps.each_with_index do |step, index|
+      next unless step.fetch("uses", "").start_with?("actions/upload-artifact@")
+      next unless step.fetch("with").fetch("name").start_with?("fm-tested-tree-")
+      next unless enabled.call(step)
+      raise "tree upload needs a checkout first" unless steps.take(index).any? { |s| s.fetch("uses", "").start_with?("actions/checkout@") }
+      producer = steps.take(index).find { |s| s["id"] == "tested-tree" && enabled.call(s) }
+      raise "no enabled producer" unless producer
+      Dir.mktmpdir("fm-workflow-tree-") do |dir|
+        git = lambda do |*args|
+          out, status = Open3.capture2e("git", "-C", dir, *args)
+          raise out unless status.success?
+          out.strip
+        end
+        git.call("init", "-q")
+        git.call("config", "user.name", "fixture")
+        git.call("config", "user.email", "fixture@example.invalid")
+        File.write("#{dir}/base", "base")
+        git.call("add", "."); git.call("commit", "-qm", "base")
+        base = git.call("rev-parse", "HEAD")
+        git.call("checkout", "-qb", "fixture-pr")
+        File.write("#{dir}/head", "head")
+        git.call("add", "."); git.call("commit", "-qm", "head")
+        head = git.call("rev-parse", "HEAD")
+        git.call("checkout", "-q", "--detach", base)
+        git.call("merge", "--no-ff", "-qm", "merge", head)
+        tree = git.call("rev-parse", "HEAD^{tree}")
+        output = "#{dir}/outputs"
+        env = {"GITHUB_OUTPUT" => output, "RUNNER_TEMP" => dir}
+        result, status = Open3.capture2e(env, "bash", "-eu", "-c", producer.fetch("run"), chdir: dir)
+        raise result unless status.success?
+        File.readlines(output, chomp: true).each do |line|
+          key, value = line.split("=", 2)
+          context["steps.tested-tree.outputs.#{key}"] = value
+        end
+        context["runner.temp"] = dir
+        inputs = step.fetch("with")
+        name = expand.call(inputs.fetch("name"))
+        raise "record does not bind actual checked tree, merge parent and attempt: #{name}" unless name == "fm-tested-tree-#{tree}-base-#{base}-attempt-3"
+        raise "upload payload missing" unless File.read(expand.call(inputs.fetch("path"))).split == [tree, base]
+        uploads << name
+      end
+    end
+  end
+  raise "#{workflow}: no PR run record uploaded" if uploads.empty?
+end
+RUBY
+  pass "both pull_request workflows upload the actual checked merge tree and parent for the run attempt"
+}
+
+test_pull_request_uploads_actual_tested_tree
 test_ci_matrices_match_executable_partitions
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other

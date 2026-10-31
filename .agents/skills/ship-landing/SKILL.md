@@ -21,6 +21,10 @@ A captain instruction to merge is explicit authority; `yolo` and the standing me
 For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, never sit silent and CPU-idle for `FM_CHECK_TIMEOUT` (the watcher stops such a check and treats that pass as unknown), then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
+For the tested-tree landing rule and its conservative ancestry fallback, see `github_landing_tree_safe` in [`fm-pr-merge.sh`](../../../bin/fm-pr-merge.sh).
+Build train N+1 on train N's head so its CI already tests the predecessor's files; after train N lands, the guard can prove the successor's landing tree is unchanged without another head push.
+Rebuild successors above any failed or changed train rather than landing their stale combination.
+
 Tear down a ship task only after landing is confirmed.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority; follow [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s captain-words discard contract.

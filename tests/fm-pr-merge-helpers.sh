@@ -317,6 +317,17 @@ case "${1:-} ${2:-}" in
     exit 0
     ;;
   api\ *)
+    api_slurp=false
+    case " $* " in *' --slurp '*) api_slurp=true ;; esac
+    emit_json() {
+      if [ "$api_slurp" = true ]; then jq -s . "$1"; else cat "$1"; fi
+    }
+    # Tested-tree evidence is scoped to the exact Actions run and attempt.
+    case " $* " in
+      *"/actions/runs/"*"/artifacts"*) emit_json "$(dirname "$FM_TEST_GH_HEAD")/artifacts.json"; exit $? ;;
+      *"/actions/jobs/"*) emit_json "$(dirname "$FM_TEST_GH_HEAD")/job.json"; exit $? ;;
+      *"/actions/runs/"*"/attempts/"*) emit_json "$(dirname "$FM_TEST_GH_HEAD")/run.json"; exit $? ;;
+    esac
     # The required-check reads: the branch itself, and its rules read without
     # the merge-queue filter the queue reader below applies.
     case " $* " in
@@ -351,7 +362,7 @@ case "${1:-} ${2:-}" in
             exit 0
           fi
         fi
-        cat "$FM_TEST_GH_RUNS"
+        emit_json "$FM_TEST_GH_RUNS"
         exit $?
         ;;
       *" repos/"*"/rules/branches/"*merge_queue*) ;;

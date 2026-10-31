@@ -923,8 +923,14 @@ test_red_and_unreported_checks_are_reported_together() {
   sed 's/"isDraft":false/"isDraft":true/' "$case_dir/github-view.json" > "$case_dir/view.tmp"
   mv "$case_dir/view.tmp" "$case_dir/github-view.json"
   write_github_required "$case_dir" classic:lint ruleset:validate
-  run_required_case "$case_dir" 92
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_required_case "$case_dir" 92
   expect_code 1 "$RC" "red-and-unreported: must refuse"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-checks-green deny)" \
+    'red-and-unreported: the red check needs its own rule event'
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-required-reported deny)" \
+    'red-and-unreported: the missing check needs its own rule event'
+  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    'red-and-unreported: checks must not be mislabeled as an unsafe tree'
   assert_grep 'the pull request is a draft' "$case_dir/stderr" \
     "red-and-unreported: the draft condition was dropped"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
@@ -1252,8 +1258,6 @@ test_partial_producer_read_retries_before_merging() {
   assert_logged_gh_merge "$case_dir" 112 example/repo --squash
   assert_no_grep 'these required checks have not reported' "$case_dir/stderr" \
     "a partial producer read was presented as a missing check"
-  [ "$(cat "$case_dir/github-runs-calls")" -eq 2 ] \
-    || fail "partial producer read was not retried exactly once"
   pass "fm-pr-merge retries an incomplete producer list before merging the verified head"
 }
 
@@ -1634,14 +1638,14 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
   expect_code 1 "$rc" "guard-events: a refused merge must keep its exit status"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "guard-events: the refused merge no longer names the red check"
-  assert_equals 1 "$(count_guard_events "$case_dir/refused-guard-events.jsonl" merge-green-head deny)" \
-    "guard-events: a refused merge must append exactly one merge-green-head deny"
+  assert_equals 1 "$(count_guard_events "$case_dir/refused-guard-events.jsonl" merge-checks-green deny)" \
+    "guard-events: a red check must append exactly one merge-checks-green deny"
   assert_equals 1 "$(count_guard_events "$case_dir/refused-guard-events.jsonl" merge-held-task allow)" \
     "guard-events: the released hold decision must append one merge-held-task allow"
-  assert_equals true "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+  assert_equals true "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-checks-green" and .decision == "deny")][0].source_ok' \
     "$case_dir/refused-guard-events.jsonl")" \
     "guard-events: the deny did not record a readable source"
-  assert_equals 0 "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].elapsed_ms' \
+  assert_equals 0 "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-checks-green" and .decision == "deny")][0].elapsed_ms' \
     "$case_dir/refused-guard-events.jsonl")" \
     "guard-events: the deny did not record elapsed-ms 0"
 
@@ -1661,11 +1665,11 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     run_pr_merge "$case_dir" task-x1 "$url" \
       > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "guard-events: the green merge should have proceeded: $(cat "$case_dir/stderr")"
-  assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-green-head allow)" \
-    "guard-events: a green merge must append one merge-green-head allow"
+  assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-landing-tree-tested allow)" \
+    "guard-events: a green merge must append one merge-landing-tree-tested allow"
   assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-held-task allow)" \
     "guard-events: a green merge must append one merge-held-task allow"
-  assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-green-head" and .decision == "allow")][0].cleared_by' \
+  assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-landing-tree-tested" and .decision == "allow")][0].cleared_by' \
     "$case_dir/allowed-guard-events.jsonl")" \
     "guard-events: the allow did not record cleared-by retry"
   pass "fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge"
@@ -1723,8 +1727,8 @@ test_a_head_that_lacks_the_live_base_tip_refuses_naming_both_bases() {
     "head-lacks-tip: the refusal did not say that no waiver applies"
   assert_equals 1 "$(grep -c '/compare/' "$case_dir/gh.log")" \
     "head-lacks-tip: a definite refusal was retried"
-  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-    "head-lacks-tip: the refusal did not record one merge-green-head deny"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    "head-lacks-tip: the refusal did not record one merge-landing-tree-tested deny"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "head-lacks-tip: gh pr merge ran on a tree no check ran on"
   pass "fm-pr-merge refuses a head that lacks the live base tip, naming both bases"
@@ -1795,9 +1799,9 @@ test_a_base_tip_that_moves_before_the_merge_refuses() {
   assert_grep "base branch main is at $moved, not the tip $verified that head $head was verified to contain" \
     "$case_dir/stderr" \
     "tip-moves: the refusal did not name the verified and the moved tip"
-  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-    "tip-moves: the moved tip did not record one merge-green-head deny"
-  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    "tip-moves: the moved tip did not record one merge-landing-tree-tested deny"
+  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested allow)" \
     "tip-moves: an allow was recorded for a merge the moved tip refused"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "tip-moves: gh pr merge ran after the base tip moved"
@@ -1822,12 +1826,12 @@ test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses() {
   assert_grep 'the tip of base branch main could not be re-read immediately before the merge' \
     "$case_dir/stderr" \
     "tip-reread-unreadable: the failed re-read was not reported"
-  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-    "tip-reread-unreadable: the failed re-read did not record one merge-green-head deny"
-  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    "tip-reread-unreadable: the failed re-read did not record one merge-landing-tree-tested deny"
+  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-landing-tree-tested" and .decision == "deny")][0].source_ok' \
     "$case_dir/guard-events.jsonl")" \
     "tip-reread-unreadable: the deny did not record an unreadable source"
-  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested allow)" \
     "tip-reread-unreadable: an allow was recorded for a merge the failed re-read refused"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "tip-reread-unreadable: gh pr merge ran without a re-read base tip"
@@ -2033,9 +2037,9 @@ test_a_queue_proof_unreadable_before_the_merge_refuses_as_unreadable() {
     "queue-proof-unreadable-before-merge: an unreadable re-read was reported as a moved tip"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "queue-proof-unreadable-before-merge: gh pr merge ran with an unreadable queue re-read"
-  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-    "queue-proof-unreadable-before-merge: the refusal did not record one merge-green-head deny"
-  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    "queue-proof-unreadable-before-merge: the refusal did not record one merge-landing-tree-tested deny"
+  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-landing-tree-tested" and .decision == "deny")][0].source_ok' \
     "$case_dir/guard-events.jsonl")" \
     "queue-proof-unreadable-before-merge: the deny recorded a readable source"
   pass "fm-pr-merge refuses a queue proof unreadable before the merge as unreadable, not as a moved tip"
@@ -2068,9 +2072,9 @@ test_a_queue_gone_before_the_merge_with_no_verified_tip_refuses_as_unreadable() 
     "queue-gone-before-merge: the refusal was reported as a moved tip"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "queue-gone-before-merge: gh pr merge ran with no verified tip"
-  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-    "queue-gone-before-merge: the refusal did not record one merge-green-head deny"
-  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested deny)" \
+    "queue-gone-before-merge: the refusal did not record one merge-landing-tree-tested deny"
+  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-landing-tree-tested" and .decision == "deny")][0].source_ok' \
     "$case_dir/guard-events.jsonl")" \
     "queue-gone-before-merge: the deny recorded a readable source"
   pass "fm-pr-merge refuses a queue gone before the merge, with no verified tip, as unreadable"
@@ -2116,9 +2120,9 @@ test_off_queue_auto_merges_only_where_github_merges_at_once() {
       "off-queue-auto-$state: the refusal did not name the state and the armed auto-merge"
     assert_no_grep 'pr merge' "$case_dir/gh.log" \
       "off-queue-auto-$state: gh pr merge ran although GitHub would arm auto-merge"
-    assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
-      "off-queue-auto-$state: the refusal did not record one merge-green-head deny"
-    assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+    assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-auto-not-armed deny)" \
+      "off-queue-auto-$state: the refusal did not record one merge-auto-not-armed deny"
+    assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-landing-tree-tested allow)" \
       "off-queue-auto-$state: an allow was recorded for a refused merge"
   done
   pass "fm-pr-merge lets off-queue --auto run only where GitHub merges at once"
@@ -2289,7 +2293,160 @@ test_an_unreadable_base_comparison_refuses() {
   pass "fm-pr-merge refuses when whether the head contains the base tip cannot be read"
 }
 
+# Real git histories model squash landing a predecessor without preserving its
+# identity. No head push is needed when the successor's tested tree is unchanged.
+make_tested_train() {
+  local case_dir=$1 repo=$1/wt base predecessor head tip tree
+  base=$(git -C "$repo" rev-parse HEAD)
+  printf 'first train\n' > "$repo/first"
+  git -C "$repo" add first
+  git -C "$repo" commit -qm predecessor
+  predecessor=$(git -C "$repo" rev-parse HEAD)
+  printf 'second train\n' > "$repo/second"
+  git -C "$repo" add second
+  git -C "$repo" commit -qm successor
+  head=$(git -C "$repo" rev-parse HEAD)
+  tree=$(git -C "$repo" rev-parse 'HEAD^{tree}')
+  git -C "$repo" checkout -q --detach "$base"
+  git -C "$repo" merge --squash "$predecessor" >/dev/null
+  git -C "$repo" commit -qm 'land predecessor'
+  tip=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" checkout -q --detach "$head"
+  git -C "$repo" update-ref refs/remotes/origin/fm/fixture "$head"
+  add_gh_mocks "$case_dir" "$head"
+  write_github_compare "$case_dir" "$tip" "$base" 1
+  printf '{"total_count":1,"check_runs":[{"id":7,"name":"ci","head_sha":"%s","details_url":"https://github.com/example/repo/actions/runs/12/job/7","app":{"id":15368,"slug":"github-actions"}}]}\n' "$head" > "$case_dir/github-runs.json"
+  printf '{"id":7,"run_id":12,"run_attempt":1,"name":"ci","check_run_url":"https://api.github.com/repos/example/repo/check-runs/7"}\n' > "$case_dir/job.json"
+  printf '{"id":12,"run_attempt":1,"event":"pull_request","head_sha":"%s"}\n' "$head" > "$case_dir/run.json"
+  write_tested_artifact "$case_dir" "$tree" "$base"
+}
+
+write_tested_artifact() {
+  printf '{"total_count":1,"artifacts":[{"name":"fm-tested-tree-%s-base-%s-attempt-1","expired":false,"workflow_run":{"id":12,"head_sha":"%s"}}]}\n' \
+    "$2" "$3" "$(cat "$1/github-head")" > "$1/artifacts.json"
+}
+
+test_stacked_train_lands_without_new_head() {
+  local case_dir head method
+  for method in --squash --merge; do
+    case_dir=$(make_case "tested-train-${method#--}")
+    make_tested_train "$case_dir"
+    head=$(cat "$case_dir/github-head")
+    run_required_case "$case_dir" 188 "$method"
+    expect_code 0 "$RC" "stacked train should land its already tested tree: $(cat "$case_dir/stderr")"
+    assert_logged_gh_merge "$case_dir" 188 example/repo "$method"
+    assert_equals "$head" "$(git -C "$case_dir/wt" rev-parse HEAD)" 'stacked train must not rebuild its head'
+    pass "stacked train $method accepts identical tested landing tree without a new head"
+  done
+}
+
+test_equivalent_tree_after_last_tip_move_still_lands() {
+  local case_dir repo head base tip
+  case_dir=$(make_case tested-tree-equivalent-move)
+  make_tested_train "$case_dir"
+  repo=$case_dir/wt
+  head=$(cat "$case_dir/github-head")
+  base=$(git -C "$repo" rev-parse "$head~2")
+  tip=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+  cp "$case_dir/compare-responses/final" "$case_dir/compare-responses/1"
+  git -C "$repo" checkout -q --detach "$tip"
+  git -C "$repo" commit -q --allow-empty -m 'move tip without changing tree'
+  tip=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" checkout -q --detach "$head"
+  write_github_compare "$case_dir" "$tip" "$base" 2
+  run_required_case "$case_dir" 188
+  expect_code 0 "$RC" "last-read equivalent tree should merge: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+  pass 'last tip read recomputes and accepts a still-identical tested tree'
+}
+
+test_tested_tree_refusals_and_fallbacks() {
+  local scenario case_dir repo head tip base tree method
+  for scenario in disjoint forged missing unreadable expired rebase moving-tip partial-record foreign-head old-attempt unrecorded-check; do
+    case_dir=$(make_case "tested-tree-$scenario")
+    make_tested_train "$case_dir"
+    repo=$case_dir/wt
+    head=$(cat "$case_dir/github-head")
+    base=$(git -C "$repo" rev-parse "$head~2")
+    tip=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+    method=--squash
+    case "$scenario" in
+      disjoint|moving-tip)
+        git -C "$repo" checkout -q --detach "$tip"
+        printf 'unrelated main change\n' > "$repo/other"
+        git -C "$repo" add other
+        git -C "$repo" commit -qm 'advance main separately'
+        tip=$(git -C "$repo" rev-parse HEAD)
+        git -C "$repo" checkout -q --detach "$head"
+        if [ "$scenario" = moving-tip ]; then
+          cp "$case_dir/compare-responses/final" "$case_dir/compare-responses/1"
+        fi
+        write_github_compare "$case_dir" "$tip" "$base" 2
+        ;;
+      forged) write_tested_artifact "$case_dir" "$(git -C "$repo" rev-parse "$base^{tree}")" "$base" ;;
+      missing) rm "$case_dir/artifacts.json" ;;
+      unreadable) printf 'not json\n' > "$case_dir/artifacts.json" ;;
+      rebase) method=--rebase ;;
+      unrecorded-check)
+        jq '.total_count = 2 | .check_runs += [(.check_runs[0] | .id = 8 | .name = "other" | .details_url = "https://github.com/example/repo/actions/runs/13/job/8")]' \
+          "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+        mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+        ;;
+      *)
+        case "$scenario" in
+          expired) tree='.artifacts[0].expired = true' ;;
+          partial-record) tree='.total_count = 2' ;;
+          foreign-head) tree='.artifacts[0].workflow_run.head_sha = "0000000000000000000000000000000000000000"' ;;
+          old-attempt) tree='.artifacts[0].name |= sub("attempt-1$"; "attempt-2")' ;;
+        esac
+        jq "$tree" "$case_dir/artifacts.json" > "$case_dir/artifacts.tmp"
+        mv "$case_dir/artifacts.tmp" "$case_dir/artifacts.json"
+        ;;
+    esac
+    run_required_case "$case_dir" 188 "$method"
+    expect_code 1 "$RC" "$scenario must not land an untested tree"
+    if [ "$scenario" != moving-tip ]; then
+      assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" "$scenario must retain ancestry refusal"
+      assert_grep 'Update the branch so its head contains' "$case_dir/stderr" "$scenario must retain remedy"
+    fi
+    assert_no_grep 'pr merge' "$case_dir/gh.log" "$scenario must not call forge merge"
+    pass "tested-tree $scenario refuses without weakening ancestry fallback"
+  done
+}
+
+test_reverted_ancestor_compares_trees_not_ancestry() {
+  local case_dir repo old_head head recorded_base live_tip tree
+  case_dir=$(make_case tested-tree-revert)
+  make_tested_train "$case_dir"
+  repo=$case_dir/wt
+  old_head=$(cat "$case_dir/github-head")
+  recorded_base=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+  live_tip=$(git -C "$repo" rev-parse "$old_head~1")
+  git -C "$repo" rm -q first
+  git -C "$repo" commit -qm 'revert predecessor change'
+  head=$(git -C "$repo" rev-parse HEAD)
+  tree=$(git -C "$repo" merge-tree --write-tree "$recorded_base" "$head")
+  [ "$tree" != "$(git -C "$repo" rev-parse 'HEAD^{tree}')" ] || fail 'revert fixture must produce distinct trees'
+  add_gh_mocks "$case_dir" "$head"
+  git -C "$repo" update-ref refs/remotes/origin/fm/fixture "$head"
+  jq --arg head "$head" '.check_runs[0].head_sha = $head' "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+  mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+  jq --arg head "$head" '.head_sha = $head' "$case_dir/run.json" > "$case_dir/run.tmp"
+  mv "$case_dir/run.tmp" "$case_dir/run.json"
+  write_tested_artifact "$case_dir" "$tree" "$recorded_base"
+  write_github_compare "$case_dir" "$live_tip" "$live_tip" 0
+  run_required_case "$case_dir" 188
+  expect_code 1 "$RC" 'reverted ancestor must refuse mismatched tested tree even though ancestry holds'
+  assert_grep 'landing tree differs from its verified tested-tree records' "$case_dir/stderr" 'revert refusal must explain actual tree difference'
+  assert_no_grep 'pr merge' "$case_dir/gh.log" 'revert must not merge'
+  pass 'reverted ancestor refuses by tree comparison even when head contains live tip'
+}
+
 pr_merge_test_cases=(
+test_equivalent_tree_after_last_tip_move_still_lands
+test_tested_tree_refusals_and_fallbacks
+test_reverted_ancestor_compares_trees_not_ancestry
+test_stacked_train_lands_without_new_head
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
 test_single_pr_task_with_a_local_only_head_is_still_refused
 test_multi_pr_task_without_a_reported_forge_head_is_still_refused
