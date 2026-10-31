@@ -50,9 +50,9 @@ on file B when A runs, sources, copies, reads or lists B:
     test may assert on a file it never runs;
   - Python, JavaScript and TypeScript depend on every whole string literal that
     names a file. In the argument list of a git ls-files call a literal
-    pathspec matches as git matches it, and one that is not a literal (a
-    variable, a spread) names every tracked file, unless the call lists only
-    untracked files.
+    pathspec matches as git matches it, and an argument that is not a literal
+    (a variable, a spread, items joined to the list) names every tracked
+    file, unless the call lists only untracked files.
 A test is affected by a changed file when that file is reachable from the test
 through code files. Documents, data and other non-code files are leaves,
 because mentioning a script inside a document never runs it. Tests are
@@ -774,48 +774,63 @@ def ls_files_arguments(code):
     """The argument lists that hold a "ls-files" literal, as git receives them.
 
     Each list is the items of one bracketed or parenthesized group: a literal's
-    value, or None for anything else (a variable, a spread, a call).
+    value, or None for anything else (a variable, a spread, a call). A group
+    that is assigned to a name or joined to more items ("[...] + extra",
+    "[...].concat(extra)") can hold arguments it does not spell out, so it
+    ends with None too.
     """
-    groups, found = [[[]]], []
+    groups, opened, found = [[[]]], [False], []
+    previous, closed = "", None
     for match in ARGUMENT_TOKEN.finditer(code):
         literal = next((g for g in match.groups()[:3] if g is not None), None)
         mark = match.group(4)
+        text = match.group(0).strip()
+        if closed is not None and text.startswith(("+", ".")):
+            closed.append(None)
+        closed = None
         if mark in ("[", "("):
             groups.append([[]])
+            opened.append(previous.endswith(("+", "=")))
         elif mark in ("]", ")") and len(groups) > 1:
             group = groups.pop()
             items = [item[0] if len(item) == 1 and isinstance(item[0], str) else None
                      for item in group if item]
             if "ls-files" in items:
+                if opened.pop():
+                    items.append(None)
                 found.append(items)
+                closed = items if mark == "]" else None
+            else:
+                opened.pop()
             groups[-1][-1].append(None)
         elif mark == ",":
             groups[-1].append([])
         elif literal is not None:
             groups[-1][-1].append(literal)
-        elif match.group(0).strip():
+        elif text:
             groups[-1][-1].append(None)
+        previous = text if literal is None and mark is None else ""
     return found
 
 
 def pathspec_references(tree, items):
     """Files the pathspecs of one git ls-files argument list match.
 
-    A literal pathspec matches as git matches it. A pathspec that is not a
-    literal could be anything, so it names every tracked file, unless the call
-    lists only untracked files (--others without --cached).
+    A literal pathspec matches as git matches it. An argument that is not a
+    literal, before or after "--", could be any pathspec, so it names every
+    tracked file, unless the call lists only untracked files (--others without
+    --cached).
     """
     after = items[items.index("ls-files") + 1:]
     flags = {item for item in after if item and item.startswith("-")}
     if flags & {"--others", "-o"} and not flags & {"--cached", "-c"}:
         return set()
+    if None in after:
+        return set(tree.files)
     found, separated = set(), False
     for item in after:
         if item == "--" and not separated:
             separated = True
-        elif item is None:
-            if separated:
-                return set(tree.files)
         elif separated or not item.startswith("-"):
             found |= word_references(tree, item, False, True)
     return found

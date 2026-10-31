@@ -422,8 +422,9 @@ echo swept # touched')
 # name files, and a pathspec in its git ls-files call matches as git matches
 # it, where a bare pattern matches anywhere in the tree. A glob literal that git
 # never receives (a comment marker) names nothing. A "*" pathspec, and one that
-# is not a literal, name every tracked file, unless the call lists only
-# untracked files. A shell git ls-files with a bare pattern matches the tree too.
+# is not a literal, before or after "--" (a spread with no "--", a variable
+# argument, items joined to the list with +), name every tracked file, unless
+# the call lists only untracked files. A shell git ls-files with a bare pattern matches the tree too.
 test_an_interpreter_here_document_and_a_git_pathspec_name_files() {
   local repo base out n script
   repo=$(new_repo pathspec)
@@ -452,13 +453,24 @@ import sys
 def listed(patterns):
     return subprocess.run(["git", "ls-files", "-z", "--", *patterns], check=True)
 listed(sys.argv[1:])'
+  put "$repo" bin/fm-spread.py 'import subprocess
+PATTERNS = ["*.md"]
+subprocess.run(["git", "ls-files", "-z", *PATTERNS], check=True)'
+  put "$repo" bin/fm-argument.py 'import subprocess
+import sys
+path = sys.argv[1]
+subprocess.run(["git", "ls-files", path], check=True)'
+  put "$repo" bin/fm-joined.py 'import subprocess
+import sys
+subprocess.run(["git", "ls-files", "-z"] + sys.argv[1:], check=True)'
   put "$repo" bin/fm-untracked.py 'import subprocess
 import sys
 subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *sys.argv[1:]], check=True)'
-  for n in 1 2 3 4 5; do
+  for n in 1 2 3 4 5 6 7 8; do
     case "$n" in
       1) script=fm-doccheck.sh ;; 2) script=fm-conflist.sh ;; 3) script=fm-everything.py ;;
-      4) script=fm-listing.py ;; 5) script=fm-untracked.py ;;
+      4) script=fm-listing.py ;; 5) script=fm-untracked.py ;; 6) script=fm-spread.py ;;
+      7) script=fm-argument.py ;; 8) script=fm-joined.py ;;
     esac
     put "$repo" "tests/p$n.test.sh" '#!/usr/bin/env bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -467,19 +479,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   commit_all "$repo" pathspec
   base=$(change "$repo" data/inventory.json '{"changed": true}')
   out=$(decide "$repo" "$base")
-  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh tests/p6.test.sh tests/p7.test.sh tests/p8.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
     "the Python here-document reads data/inventory.json, and the * and non-literal pathspecs list it"
   base=$(change "$repo" docs/guide.md '# changed guide')
   out=$(decide "$repo" "$base")
-  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh tests/p6.test.sh tests/p7.test.sh tests/p8.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
     "the bare *.md handed to git ls-files lists docs/guide.md"
   base=$(change "$repo" README.md '# changed fixture')
   out=$(decide "$repo" "$base")
-  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh tests/p6.test.sh tests/p7.test.sh tests/p8.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
     "and the root-level README.md"
   base=$(change "$repo" conf/z.cfg 'changed')
   out=$(decide "$repo" "$base")
-  assert_equals "tests/p2.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+  assert_equals "tests/p2.test.sh tests/p3.test.sh tests/p4.test.sh tests/p6.test.sh tests/p7.test.sh tests/p8.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
     "git ls-files '*.cfg' in shell lists conf/z.cfg; the '*' and '/*' markers git never receives and the untracked-only listing do not"
   pass "an interpreter's here-document is read as its language, git ls-files pathspecs match as git matches them, and a glob git never receives names nothing"
 }

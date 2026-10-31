@@ -351,7 +351,7 @@ The default word of `${NAME:-word}`, `${NAME-word}`, `${NAME:=word}` and `${NAME
 A path spelled under some other directory (`$dir/code-root/bin/x.sh`, where `code-root/bin` links to `bin/`) names the tracked file with the longest suffix of it that keeps a directory and a name.
 A glob given to `git ls-files`, `git grep` or `git archive` in shell, or a literal in the argument list of a Python or JavaScript `git ls-files` call, is a git pathspec: `*` crosses `/` and a bare pattern such as `*.md` matches anywhere in the tree.
 A glob literal elsewhere in that code (a comment marker such as `'*'`) is not a pathspec.
-A pathspec in such an argument list that is not a literal (a variable or a spread such as `*patterns`) could match anything, so the code depends on every tracked file, unless the call lists only untracked files (`--others` without `--cached`).
+An argument in such a list that is not a literal (a variable or a spread such as `*patterns`, before or after `--`), or a list assigned to a name or joined to more items (`[...] + patterns`, `.concat(patterns)`), could hold any pathspec, so the code depends on every tracked file, unless the call lists only untracked files (`--others` without `--cached`).
 A here-document given to an interpreter as its script (`python3 - <<PY`) is read as code in that language.
 A root-level file such as `AGENTS.md`, or a whole directory, counts only when it is named through a repository-root variable (`$ROOT`, `$FM_ROOT`) or a command substitution, because the same name under `$home` or `$repo` belongs to a fixture.
 A `bash -c` argument counts only where the inline code runs it.
