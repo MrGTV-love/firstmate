@@ -2037,10 +2037,6 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-typesafe-health.test.sh"
       printf '%s\n' "__script__:fm-watch-typesafe-health.test.sh"
       ;;
-    bin/fm-jev-belay-hook.sh|bin/fm-jev-belay-policy.mjs)
-      printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
-      printf '%s\n' "__script__:fm-busy-adapter-wiring.test.sh"
-      ;;
     bin/fm-skill-pick.sh|bin/fm-skill-pick.mjs|\
     .agents/skills/hyper-jev/templates/starter/src/core/*.ts)
       # The picker imports the vendored hyper-jev client unchanged.

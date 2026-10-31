@@ -6892,9 +6892,8 @@ BUSY_GEN=
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
-    # a turn; accepted Stop, StopFailure (API-error turn end), and SessionEnd
-    # (process shutdown) close it. docs/configuration.md "Jev belay Stop hook"
-    # owns Stop acceptance and completion. Claude fires no hook for a manual
+    # a turn; Stop, StopFailure (API-error turn end), and SessionEnd
+    # (process shutdown) close it. Claude fires no hook for a manual
     # interrupt: fm-control preserves the adapter-owned state, while the
     # legacy fm-send --key Escape path records idle/fm-interrupt. Stop keeps
     # the turn-ended NOTIFICATION touch for the watcher. A secondmate gets no
@@ -6949,13 +6948,8 @@ BUSY_GEN=
       if [ "$busy_notify_turnend" = true ]; then
         stop_turnend="touch $(shell_quote "$TURNEND"); "
       fi
-      if [ "$KIND" = secondmate ]; then
       j_stop=$(json_escape "${stop_turnend}$busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      else
-    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      fi
-      j_stop_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-belay.claude-stop --fallback 25 --percentile 99 --margin 3) || exit 1
-      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":$j_stop_limit}]}],"
+      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\"}]}],"
     fi
     hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[${submit_entries}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
