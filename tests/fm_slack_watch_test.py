@@ -158,6 +158,44 @@ class CardRenderingTest(unittest.TestCase):
             self.assertIn('Question: ' + question + '\n', text)
             self.assertEqual(text.count('Wait for approval.'), 1)
 
+    def test_legacy_reason_options_stay_in_question_without_bindings(self):
+        reason_options = 'Option 1: Ship (ship)\nOption 2: Wait (wait)'
+        for body in ([], ['Option 1: Review (review)']):
+            with self.subTest(body=body):
+                watch = Watch.__new__(Watch)
+                watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+                text, options, _ = watch.card_payload({
+                    'id': 'release-call', 'title': 'Release choice',
+                    'hold_reason': 'Should we ship?\n' + reason_options,
+                    'body_lines': body}, {})
+                self.assertIn('Question: Should we ship?\n' + reason_options + '\n', text)
+                self.assertEqual([option['value'] for option in options],
+                                 ['review'] if body else [])
+                self.assertEqual(text.count('Option 1: Ship (ship)'), 1)
+                self.assertEqual(text.count('Option 2: Wait (wait)'), 1)
+                self.assertEqual('Tap a number reaction' in text, bool(body))
+
+    def test_four_part_reason_options_are_plain_text_without_bindings(self):
+        reason_options = 'Option 1: Ship <now> (ship)\nOption 2: Wait (wait)'
+        reason = ('Decision sought: Ship?\nBrief: Approval is pending.\n'
+                  'Recommendation: Wait for approval.\nAlternatives: Ship without approval.\n'
+                  + reason_options)
+        for card in ({}, {'options': [{'value': 'review', 'label': 'Review'}]}):
+            with self.subTest(card=card):
+                watch = Watch.__new__(Watch)
+                watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+                text, options, _ = watch.card_payload({
+                    'id': 'release-call', 'title': 'Release choice',
+                    'hold_reason': reason, 'body_lines': []}, card)
+                plain_options = 'Option 1: Ship &lt;now&gt; (ship)\nOption 2: Wait (wait)'
+                self.assertIn(plain_options + '\n', text)
+                self.assertLess(text.index('Alternatives considered:'), text.index(plain_options))
+                self.assertLess(text.index(plain_options), text.index('in this thread.'))
+                self.assertEqual([option['value'] for option in options],
+                                 ['review'] if card else [])
+                self.assertEqual(text.count('Option 1: Ship'), 1)
+                self.assertEqual('Tap a number reaction' in text, bool(card))
+
     def test_footer_is_concise_and_scope_fault_stays_visible(self):
         for options in ([], ['Option 1: Wait (wait)']):
             for scopes in (False, True):

@@ -3508,6 +3508,7 @@ Write a concise multiline hold reason with these four parts; only hold-reason pa
 
 Hold-reason fields override corresponding body fields and the current board's recommendation.
 The four-part layout requires a nonempty `Decision sought:` field in the reason or body; otherwise the legacy layout keeps the title and question, with the current board's about/question text when available, and removes only recommendation and evidence parts from the question to render them separately. Brief and alternatives parts remain in the question.
+Four-part cards show hold-reason option lines as plain text after the four parts and before the answer footer; these lines do not create answer bindings or reactions.
 Missing fields are omitted, never filled with `none recorded`; an `Evidence:` pointer appears only for an absolute path or an HTTP(S) URL, followed by any numbered options.
 One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
 Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.

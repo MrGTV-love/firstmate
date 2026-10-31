@@ -193,6 +193,8 @@ def parse_fields(lines, remainder=None, multiline=False):
                 current = None
         elif OPTION_LINE.match(line):
             current = None
+            if remainder is not None:
+                remainder.append(line)
         elif current and multiline:
             fields[current] += '\n' + line.strip()
             if remainder is not None and current not in ('Recommendation', 'Evidence'):
@@ -373,7 +375,8 @@ class Watch:
         lines = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
         body = parse_fields(lines)
-        reason = parse_fields((row.get('hold_reason') or '').splitlines(), multiline=True)
+        reason_lines = (row.get('hold_reason') or '').splitlines()
+        reason = parse_fields(reason_lines, multiline=True)
         parts = dict(body)
         if card.get('recommend_value'):
             parts['Recommendation'] = card['recommend_value']
@@ -412,6 +415,8 @@ class Watch:
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
+        if structured:
+            fields.extend(('', line) for line in reason_lines if OPTION_LINE.match(line))
         fields = [(prefix, slack_escape(value)) for prefix, value in fields
                   if str(value).strip().lower() != 'none recorded']
         if usable and options:
