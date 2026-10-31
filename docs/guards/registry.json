@@ -590,13 +590,14 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4}
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14}
       ],
-      "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
+      "invariant": "cleanup never discards uncommitted work or any commit that is not on a remote or in a verified recorded bundle",
       "layer": "runtime-block",
-      "source": "git status, forge PR merge state, PR head compared with local commits",
-      "trigger": "the copy holds uncommitted changes, or commits not proven present in a merged PR head",
-      "remedy": "land the work first: bin/fm-pr-merge.sh <pr>, or ask the captain for explicit discard authority and rerun bin/fm-teardown.sh <task> --force",
+      "source": "git status, forge PR merge state, PR head compared with local commits, recorded bundle digest, git bundle verify, advertised tips and isolated fsck --strict restore",
+      "trigger": "the copy holds uncommitted changes, or a required delivery or commit-preservation proof fails",
+      "remedy": "land the work first: bin/fm-pr-merge.sh <pr>; for attended bundle preservation follow the header of bin/fm-teardown.sh, or ask the captain for explicit discard authority and rerun bin/fm-teardown.sh <task> --force",
       "budget": 1,
       "test": "tests/fm-teardown.test.sh",
       "tier": "C",

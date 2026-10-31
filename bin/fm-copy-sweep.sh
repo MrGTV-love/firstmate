@@ -86,6 +86,8 @@
 #   PENDING-DRIVER    report/check's name for that local-proof candidate:
 #                      the driver has not been asked, so removability is not
 #                      proved. Report/check never call the closeout driver.
+# The attended recorded-bundle exception in bin/fm-teardown.sh's header does
+# not apply here: a bundle-only copy remains HELD-UNPUSHED.
 # HELD-LOCKED distinguishes lock/release custody from ordinary live ownership:
 # a retained execute cannot be bypassed merely because the lock is now absent.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names

@@ -59,7 +59,7 @@ Grok alone retains its isolated rendered-tail fallback.
 
 Cleanup keeps all shared Firstmate safety checks.
 A non-forced scout still requires its report and completed decision inventory.
-A non-forced ship with an existing copy still refuses dirty or unlanded work.
+A non-forced ship with an existing copy still refuses dirty work, and unlanded work that the attended recorded-bundle exception in [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header does not cover.
 Cleanup validates the recorded endpoint identity and removal target metadata; it does not resolve the backend worktree id to prove path equality with the inspected copy.
 When the recorded path is absent, cleanup closes the recorded terminal and retires task records without issuing an Orca worktree removal: the id may now identify a different, uninspected copy.
 This rule also applies to scouts, authorized forced drops, and recursive descendant cleanup.
