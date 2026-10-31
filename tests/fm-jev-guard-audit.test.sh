@@ -114,8 +114,9 @@ await test('T4(a): xd://report_issue and SendFeedback report uploads are refused
         let patch;
         const r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
         assert.equal(patch?.block, true, `${event.toolName}: report upload must not execute (grant: ${meta ?? 'none'})`);
-        assert.equal(r.branch, event.toolName === 'write' ? 'device' : 'coverage');
-        assert.equal(r.destination_class, undefined, 'no egress class can admit a report upload');
+        assert.equal(r.branch, event.toolName === 'write' ? 'egress' : 'coverage');
+        assert.equal(r.destination_class, event.toolName === 'write' ? 'provider' : undefined,
+          'device uploads have an egress owner but no grant can admit them');
         assert.equal(r.request_started, false);
         assert.ok(!JSON.stringify(r).includes('private-report-canary'));
       }

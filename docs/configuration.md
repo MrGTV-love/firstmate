@@ -2907,7 +2907,7 @@ The profile does not restrict reads, network access or system calls unrelated to
 In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
 macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
 `bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
-The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects only the task audit ledger, still reaches the helper.
+The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects the task audit ledger and enables the separate write-guard confinement probe, still reaches the helper.
 `bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`, and its macOS resident-memory watch reads each root's process-group tree through a long-lived helper `mem-tree` reader started at the root's first tick, falling back to `ps` for a tick the reader does not answer in time, and for the rest of the root once the reader is given up.
 The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
 Another user's argv cannot be read without setuid, so for that process the helper prints its short kernel name where `ps` prints the full command, and the two identities differ.
@@ -2949,7 +2949,14 @@ Without a grant, a provider-backed memory effect is refused with `destination_cl
 A `retain` or `learn` whose `mnemopi.llmMode` is `smol` or `remote` makes an extraction model call, and every `memory.backend: hindsight` operation calls the remote Hindsight API, so each requires a `provider` grant.
 An unreadable setting, another backend, `mnemopi.noEmbeddings` other than `true` or an unrecognized `mnemopi.llmMode` cannot prove a local effect, so the operation also requires a `provider` grant and its refusal names the operation, the effect it could not prove and the grant remedy; a host without live omp settings, such as Claude, proves nothing local.
 These effects were measured in the installed omp 18.12.6 binary; Mnemopi's background auto-recall and auto-retain are session behavior, not tool calls, and this rule does not judge them.
-`xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
+Native outbound devices have a separate `DEVICE_EGRESS` table in the same egress module; these rows preserve their existing unconditional refusals rather than granting another upload path:
+
+| Device | Destination and guard decision |
+| --- | --- |
+| `xd://report_issue` | `provider`; refused because native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so the worker prompt never offers it. The refusal says Auto QA is off for firstmate workers. No grant admits it. |
+| `xd://github` | `remote-storage`; refused because native results return as unscreened `write` output. Only `repo_view` and `file_read` name `gh-axi` through the shell as a read alternative; write and unknown ops name none. A top-level `github` call instead follows its tool row below. No grant admits the device. |
+
+These device writes record `branch=egress`, their destination class and a `jev-egress-grant` deny event before any filesystem check or confinement deferral. Device edits and non-omp invocations remain refused as invocation mismatches.
 Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
 omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
@@ -2967,7 +2974,7 @@ Each tool has at most one destination class, which must be granted, and a memory
 
 Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
 A native paid `find` records its deterministic decision even though it has no model classification.
-Local file `read` remains pre-tool unjudged, `bash` receives no model screening, and `write` and `edit` keep path and input screening; their content is checked for credentials only at [commit and push time](#jev-guard).
+Local file `read` remains pre-tool unjudged, `bash` receives no model screening, and `write` and `edit` keep input validation with filesystem ownership selected as [described below](#model-policy); their content is checked for credentials only at [commit and push time](#jev-guard).
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
@@ -2982,12 +2989,13 @@ omp `think`, `yield`, `checkpoint`, `rewind`, `context_notes` and `new_context` 
 Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
 omp `github` reaches GitHub, so a top-level `github` call requires a `remote-storage` grant, and only its read ops (`repo_view`, `file_read`, `search_issues`, `search_prs`, `search_code`, `search_commits`, `search_repos` and `run_watch`, the ops installed omp 18.12.6 approves as reads) can run under it.
 Every other `github` op, including `pr_checkout`, `pr_create`, `pr_push`, an unknown op or a missing op, writes worktrees, branches, git config, refs or the remote, so it is refused under every grant; the refusal names the op and points to git and the no-mistakes pipeline, or `gh-axi` through the shell for reads, and its terminal audit row records `branch=github-write-op` rather than the `branch=egress` of a missing-grant refusal.
-The `xd://github` device write stays refused by the native-device rule under every grant.
+The `xd://github` device write stays refused by the separate device-egress table under every grant.
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
-The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the native-device rule of the existing `jev-write-path-gate`.
+The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` and `xd://github` device writes are owned by `jev-egress-grant` and remain refused under every grant.
 Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for `jev-egress-grant`) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
-The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
+For grant-based decisions, the egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
+An unconditional device-egress refusal uses the compiled device row as its source, so `source_ok=true` does not imply that task metadata was read or any grant was accepted.
 The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
 
 ### Model policy
@@ -2996,7 +3004,7 @@ Questions and numeric policy are code-owned:
 
 - Bash pre-calls receive no model judgment or TypeSafe request, do not depend on provider or audit availability, and create no pre-call guard audit row.
   The guard does not assess shell effects or destructive intent and offers no shell deletion or write confinement guarantee.
-- Write/edit handling retains deterministic root and input checks only; file-kind and credential model questions are removed, and write contents are never sent for model screening.
+- Write/edit handling validates input and delegates filesystem paths to proved active T5 confinement; unconfined or unproved workers retain deterministic spelling/root checks. File-kind and credential model questions are removed, and write contents are never sent for model screening.
 
 omp and Claude tool results reach the worker unchanged: the guard installs no result handler, makes no TypeSafe request for results, and writes no `tool_result` audit rows.
 There is no result size budget or result-dependent read exemption.
@@ -3004,19 +3012,26 @@ Launch and steering records use the existing [launch publisher](../bin/fm-operat
 The steering carrier names the exact record, acknowledgement ordering and omp `:raw` hint in under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
 The removed result screen and the result-only decision points retired with it are recorded in [`docs/guards/retired.json`](guards/retired.json); their retirement tests, one per retired id, cover unchanged background notices, recorded bounded-wait help, launch/steering records, large results and result-free session accounting offline.
 
-The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
-The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
-File write and edit paths must use a plain absolute or worktree-relative spelling.
+Filesystem write/edit admission defers to active [worker OS write confinement](#worker-os-write-confinement) on confined macOS omp and Claude workers; it does not apply a second lexical spelling or root proxy there.
+The guard requires `FM_WRITE_CONFINEMENT=seatbelt-v1` and a successful read-only `bin/fm-write-confinement.py --check-active <state> <task>` query from a child inheriting the worker's sandbox.
+The query requires kernel sandbox membership and explicit kernel denial of both data writes and unlink to the existing regular, non-symlinked task metadata file; the marker alone is not proof.
+This proof is cached per installed guard. Missing metadata, another platform, no marker or any unavailable/failed proof retains the filesystem gate.
+An admitted confined filesystem call records `branch=confinement` and `confinement_owner=T5`, makes no model request, and still validates string content and records its terminal audit row.
+The OS boundary enforces its protected assets, not the lexical roots below; its documented unlisted-path and delegated-write residuals still apply.
+
+On an unconfined or unproved worker, allowed write roots remain the task worktree, the task's own data directory, and the system temporary directory.
+That root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
+Those filesystem write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
 Filesystem paths failing that spelling check are blocked without a Jev call because omp can rewrite them before execution.
+Native devices and other URI schemes are classified before filesystem deferral, so confinement never admits an outbound or unknown device.
 Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-guard.ts`, established against installed omp 18.12.6:
 
 | Device | Effect and guard decision |
 | --- | --- |
 | `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
 | `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
-| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. No egress grant admits it. |
-| `xd://github` | Refused by the native-device rule: its native results return as `write` tool output; no tool-result screening is active. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. A top-level `github` call instead follows its [tool row](#tool-coverage-and-outbound-calls): read ops need a `remote-storage` grant and the same write ops are refused under every grant. |
+| Outbound devices | Follow the separate [egress table](#tool-coverage-and-outbound-calls) before filesystem handling. |
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |

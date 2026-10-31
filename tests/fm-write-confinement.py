@@ -136,7 +136,7 @@ PACKED_HEADER = "# pack-refs with: peeled fully-peeled sorted \n"
 OWN_PACKED_ARCHIVE = "archive/task-submitted-fedcba98"
 # Results that must be false in the unconfined control: each proves the
 # fixture write is possible without the profile.
-CONTROL_KEYS = ("a", "b", "c", "e-other.status", "e-task.other.status", "foreign-audit-denied", "symlink")
+CONTROL_KEYS = ("a", "b", "c", "e-other.status", "e-task.other.status", "foreign-audit-denied", "symlink", "guard-filesystem-owner")
 
 
 def git(*args, **kwargs):
@@ -525,14 +525,53 @@ const current = JSON.parse(readFileSync(state + "/task.omp-session.json", "utf8"
 if (current.current_session_file !== session || current.task_session_file !== session || current.pid !== process.pid) throw Error("wrong session binding");
 proof.shutdown(ctx);
 if (JSON.parse(readFileSync(state + "/task.omp-session.json", "utf8")).current_session_file !== "") throw Error("session proof not invalidated");
-console.log(JSON.stringify({ foreignDenied }));
+const { pathToFileURL } = await import('node:url');
+const { installJevGuard } = await import(new URL('../../fm-jev-guard.ts', pathToFileURL(process.argv[5])));
+const worktree = process.argv[8];
+let filesystemOwner = true;
+for (const host of ['omp', 'claude']) {
+  const install = (task = 'task') => {
+    let handler;
+    installJevGuard({ on: (_, fn) => { handler = fn; } }, { ...context, noHelpers: false, task, worktree, data: state + '/../data/task',
+      project: 'firstmate', host, policy: 'FIRSTMATE_JEV_GUARD_V1' });
+    return handler;
+  };
+  const ctx = { cwd: worktree };
+  const event = (toolName, path, content = 'ordinary fixture') => ({ toolName, input: { path, content, new_string: content } });
+  const handler = install();
+  for (const tool of ['write', 'edit']) {
+    // Both targets fail the lexical gate, but contain no native device effect.
+    for (const path of ['~/guard-local.txt', '/etc/fm-guard-never-written']) {
+      const patch = await handler(event(tool, path), ctx);
+      filesystemOwner &&= patch === undefined;
+      if (!patch) {
+        const row = JSON.parse(readGuardAudit(state).trim().split('\\n').at(-1));
+        if (row.branch !== 'confinement' || row.confinement_owner !== 'T5' || row.request_started !== false) throw Error('missing filesystem owner');
+      }
+    }
+    if (!(await handler(event(tool, 'ssh://remote/file'), ctx))?.block) throw Error('remote URI admitted');
+    if (!(await install('missing-proof')(event(tool, '~/guard-local.txt'), ctx))?.block) throw Error('missing proof admitted');
+  }
+  // The launch marker without inherited kernel denial is exercised by baseline.
+  delete process.env.FM_WRITE_CONFINEMENT;
+  if (!(await install()(event('write', '~/guard-local.txt'), ctx))?.block) throw Error('missing marker admitted');
+  process.env.FM_WRITE_CONFINEMENT = 'seatbelt-v1';
+  for (const path of ['xd://report_issue', 'xd://github', 'xd://future_device']) {
+    if (!(await handler(event('write', path, '{}'), ctx))?.block) throw Error('device admitted by confinement');
+  }
+  if (!(await handler(event('write', 'ordinary.txt', null), ctx))?.block) throw Error('invalid content admitted');
+}
+console.log(JSON.stringify({ foreignDenied, filesystemOwner }));
 ''')
     proof_run = subprocess.run(["bun", str(proof_script), str(Path(manifest["repo"]) / ".omp/extensions/lib/fm-task-session.ts"), str(state), str(session),
-                                str(Path(manifest["repo"]) / "bin/ten-levels/extensions/report.ts"), str(Path(manifest["repo"]) / "bin/fm-jev-audit-read.mjs"), other],
+                                str(Path(manifest["repo"]) / "bin/ten-levels/extensions/report.ts"), str(Path(manifest["repo"]) / "bin/fm-jev-audit-read.mjs"), other, str(worktree)],
                                env=dict(os.environ, FM_SPAWN_GEN="proof-probe", FM_WRITE_CONFINEMENT="seatbelt-v1"), capture_output=True, text=True)
     results["native-session-proof"] = proof_run.returncode == 0
     results["task-audit-written"] = proof_run.returncode == 0
     results["foreign-audit-denied"] = json.loads(proof_run.stdout)["foreignDenied"] if proof_run.returncode == 0 else False
+    results["guard-filesystem-owner"] = json.loads(proof_run.stdout)["filesystemOwner"] if proof_run.returncode == 0 else False
+    if proof_run.returncode:
+        print(proof_run.stderr, file=sys.stderr)
     # A symlink in the allowed root must not turn a foreign target writable.
     try:
         (worktree / "escape" / "eval-target").write_text("replaced")
