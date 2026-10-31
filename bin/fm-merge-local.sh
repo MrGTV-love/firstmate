@@ -109,7 +109,7 @@ DEFAULT=$(default_branch) || { echo "error: cannot determine default branch for 
 cur=$(git -C "$PROJ" symbolic-ref --short HEAD 2>/dev/null || echo "")
 [ "$cur" = "$DEFAULT" ] || { echo "error: $PROJ is on '$cur', expected default branch '$DEFAULT'; cannot merge safely" >&2; exit 1; }
 if [ -n "$(git -C "$PROJ" status --porcelain 2>/dev/null | head -1)" ]; then
-  echo "error: $PROJ has a dirty working tree; refusing to merge into it" >&2
+  echo "error: $PROJ has a dirty working tree; refusing to merge into it. Remedy: inspect git -C '$PROJ' status --short, have the owner commit or move their changes to their own branch without discarding them, return this checkout to '$DEFAULT' clean, then retry bin/fm-merge-local.sh '$ID'." >&2
   exit 1
 fi
 

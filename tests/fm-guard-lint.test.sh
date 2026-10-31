@@ -560,6 +560,7 @@ out=$("$LINT" --root "$NATS" --mode new-or-touched --base HEAD 2>&1) && fail "di
 printf '%s\n' "$out" | grep -q "^VIOLATION S1 $NATS_ID" || fail "expected the touched legacy site to fail under diff.noprefix, got: $out"
 git -C "$NATS" config --unset diff.noprefix
 pass "new-or-touched fails a touched legacy site under diff.noprefix"
+printf 'legacy() {\n  echo "REFUSED: a legacy refusal. Remedy: run bin/gguard.sh --clear" >&2\n  return 1\n}\n' >"$NATS/bin/gnew.sh"
 mutate "$NATS" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a legacy refusal"}]'
 printf '{"schema_version":2,"allowed":[]}\n' >"$NATS/docs/guards/lint-allowlist.json"
 "$LINT" --root "$NATS" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
@@ -576,6 +577,7 @@ printf 'echo "REFUSED: a brand new refusal" >&2\n' >"$NEWSITE/bin/gnew.sh"
 out=$("$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) && fail "a new unmapped site must fail new-or-touched: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S1 site:bin/gnew.sh' || fail "expected S1 for the new site, got: $out"
 pass "new-or-touched fails a new refusal site that maps to nothing"
+printf 'echo "REFUSED: a brand new refusal. Remedy: run bin/gguard.sh --clear" >&2\n' >"$NEWSITE/bin/gnew.sh"
 mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand new refusal"}]'
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
   || fail "a new site mapped with full spec fields must pass new-or-touched"
@@ -624,5 +626,116 @@ printf '{"schema_version":1,"allowed":[]}\n' >"$GROW/docs/guards/lint-allowlist.
 out=$("$LINT" --root "$GROW" --mode new-or-touched --base HEAD 2>&1) && fail "dropping the schema must not unseal the allowlist: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S5 allowlist' || fail "expected S5 for the schema drop, got: $out"
 pass "S5 fails an allowlist that drops back below the sealed schema"
+
+# S3 checks the emitted diagnostic, not a registry remedy or neighboring prose.
+REMEDY=$(fixture site_remedy)
+git -C "$REMEDY" init -q
+git -C "$REMEDY" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$REMEDY" -c user.email=t@example.invalid -c user.name=t commit -qm base
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"REFUSED:"}]'
+assert_remedy_missing() {
+  local out
+  out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "missing diagnostic remedy passed: $out"
+  assert_contains "$out" 'VIOLATION S3 ' "the site itself must fail S3"
+}
+printf 'echo "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf '# Remedy: run bin/gguard.sh --clear\necho "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2 # "Remedy: run bin/gguard.sh --clear"\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2; echo "Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'test "Remedy: run bin/gguard.sh --clear" = ignored || echo "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2\necho "Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: ask someone" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run bin/missing.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed # pending. Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a diagnostic with its executable completing step must pass S3"
+pass "S3 rejects a registry-only, commented, neighboring or prose-only remedy and accepts an inline command"
+
+rm "$REMEDY/bin/gnew.sh"
+printf 'print("REFUSED: cannot proceed") # "Remedy: run bin/gguard.sh --clear"\n' >"$REMEDY/bin/gnew.py"
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}]'
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+def label(value):
+    return "pending"
+print(f"REFUSED: {label('Remedy: run bin/gguard.sh --clear')}")
+PY
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+def refuse(reason):
+    print("Remedy: run bin/gguard.sh --clear")
+    raise SystemExit(1)
+print("REFUSED: cannot proceed") # refuse("pending work")
+PY
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+import sys
+
+def refuse(reason):
+    print("REFUSED: " + reason + ". "
+          "Remedy: run bin/gguard.sh --clear", file=sys.stderr)
+    raise SystemExit(1)
+
+refuse("fixture work is pending")
+PY
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}, {"file":"bin/gnew.py","match":"refuse(\"fixture"}]'
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a direct helper's emitted multiline remedy must cover its call site"
+out=$(python3 "$REMEDY/bin/gnew.py" 2>&1) && fail "the refusal helper must still block"
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted helper must actually emit the completing step"
+pass "S3 accepts a directly called local helper's emitted multiline remedy without changing its refusal"
+
+rm "$REMEDY/bin/gnew.py"
+cat >"$REMEDY/bin/gnew.sh" <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule 'pending work' machine 'bin/gguard.sh --clear' task fixture
+SH
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"fm_refuse gguard"}]'
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "the shared formatter machine-command argument must satisfy S3 without a second footer"
+cat >"$REMEDY/bin/gnew.sh" <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule 'pending work' machine 'ask someone' task 'bin/gguard.sh --clear'
+SH
+assert_remedy_missing
+pass "S3 validates the shared formatter command argument, not a command in another argument"
+
+# A remedy edit is a site edit even when the refusal/call line is unchanged.
+for shape in direct helper deleted-helper; do
+  FOOTER=$(fixture "site_footer_$shape")
+  case "$shape" in
+    direct)
+      printf 'print("REFUSED: blocked. "\n      "Remedy: bin/gguard.sh --clear")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}]'
+      ;;
+    helper)
+      printf 'def refuse(reason):\n    print(reason,\n          "Remedy: bin/gguard.sh --clear")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"refuse(\"pending"}]'
+      ;;
+    deleted-helper)
+      printf 'def refuse(reason):\n    print(reason)\n    print("Remedy: bin/gguard.sh --clear")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"refuse(\"pending"}]'
+      ;;
+  esac
+  git -C "$FOOTER" init -q
+  git -C "$FOOTER" -c user.email=t@example.invalid -c user.name=t add -A
+  git -C "$FOOTER" -c user.email=t@example.invalid -c user.name=t commit -qm base
+  case "$shape" in
+    direct) printf 'print("REFUSED: blocked. "\n      "ask the owner")\n' >"$FOOTER/bin/gnew.py" ;;
+    helper) printf 'def refuse(reason):\n    print(reason,\n          "ask the owner")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py" ;;
+    deleted-helper) printf 'def refuse(reason):\n    print(reason)\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py" ;;
+  esac
+  out=$("$LINT" --root "$FOOTER" --mode new-or-touched --base HEAD 2>&1) && fail "$shape footer-only edit escaped S3: $out"
+  assert_contains "$out" 'VIOLATION S3 ' "$shape footer-only edit must touch its diagnostic and callers"
+done
+pass "S3 follows multiline diagnostic spans and local helper edits/deletions without a changed refusal line"
 
 printf 'ok - fm-guard-lint\n'

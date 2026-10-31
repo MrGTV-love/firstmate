@@ -777,6 +777,10 @@ test_local_home_walk_refuses_an_unreadable_registry() {
   expect_code 1 "$rc" "the walker accepted an unreadable descendant registry: $out"
   assert_contains "$out" "local Firstmate registry cannot be read at $registry" \
     "the walker did not name its unreadable registry"
+  assert_contains "$out" "Remedy:" "the unreadable-home refusal must name its completing step"
+  assert_contains "$out" "restore its availability and read access" \
+    "the refusal must require restoration, not skipping the unreadable home"
+  assert_contains "$out" "without --force" "the completing step must preserve ordinary custody proof"
   rc=0
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   chmod 600 "$registry"

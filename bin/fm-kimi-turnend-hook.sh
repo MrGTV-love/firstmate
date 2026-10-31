@@ -30,15 +30,15 @@ case "${1:-}" in
 esac
 
 if [ -z "${HOME:-}" ]; then
-  printf 'fm-kimi-turnend-hook: refused: HOME is unset.\n' >&2
+  printf 'fm-kimi-turnend-hook: refused: HOME is unset. Remedy: set HOME to the intended Kimi user home, then retry bin/fm-kimi-turnend-hook.sh with the same action.\n' >&2
   exit 1
 fi
 if ! command -v python3 >/dev/null 2>&1; then
-  printf 'fm-kimi-turnend-hook: refused: python3 with tomllib is required to validate config.toml.\n' >&2
+  printf 'fm-kimi-turnend-hook: refused: python3 with tomllib is required to validate config.toml. Remedy: install Python 3.11 or newer on PATH, then retry bin/fm-kimi-turnend-hook.sh with the same action.\n' >&2
   exit 1
 fi
 if [ "$ACTION" = install ] && ! command -v jq >/dev/null 2>&1; then
-  printf 'fm-kimi-turnend-hook: refused: jq is required by the installed Kimi turn-end hook.\n' >&2
+  printf 'fm-kimi-turnend-hook: refused: jq is required by the installed Kimi turn-end hook. Remedy: install jq on PATH, then retry bin/fm-kimi-turnend-hook.sh install.\n' >&2
   exit 1
 fi
 
@@ -54,7 +54,8 @@ try:
     import tomllib
 except ImportError:
     print(
-        "fm-kimi-turnend-hook: refused: python3 with tomllib is required to validate config.toml.",
+        "fm-kimi-turnend-hook: refused: python3 with tomllib is required to validate config.toml. "
+        "Remedy: install Python 3.11 or newer on PATH, then retry bin/fm-kimi-turnend-hook.sh with the same action.",
         file=sys.stderr,
     )
     raise SystemExit(1)
@@ -97,7 +98,12 @@ exit 0
 
 
 def refuse(reason: str) -> None:
-    print(f"fm-kimi-turnend-hook: refused: {reason}", file=sys.stderr)
+    print(f"fm-kimi-turnend-hook: refused: {reason} "
+          f"Remedy: repair the named file or directory under {CONFIG_DIR} through its owner "
+          "(valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, "
+          "and private hook permissions); preserve unrelated config and registry entries. "
+          f"Then retry bin/fm-kimi-turnend-hook.sh {ACTION}; do not delete user files or registry tokens to bypass validation.",
+          file=sys.stderr)
     raise SystemExit(1)
 
 

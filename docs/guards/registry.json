@@ -20,9 +20,122 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
-    "open-loops-one-deferral"
+    "open-loops-one-deferral",
+    "task-endpoint-identity-binding",
+    "procevent-retire-pending-results",
+    "merge-local-clean-primary",
+    "remote-endpoint-identity",
+    "pending-reply-no-duplicate-send",
+    "herdr-server-start-live-protection",
+    "handoff-queued-only",
+    "open-loops-ack-needs-action"
   ],
   "guards": [
+    {
+      "id": "task-endpoint-identity-binding",
+      "owner": "bin/fm-backend.sh",
+      "sites": [{"file": "bin/fm-backend.sh", "match": "preserving task state. Remedy:", "count": 21}],
+      "invariant": "endpoint access requires unique metadata binding the selected task to its recorded backend endpoint",
+      "layer": "runtime-block", "source": "the task metadata and backend-specific endpoint identity fields",
+      "trigger": "missing, ambiguous, malformed or foreign endpoint identity",
+      "remedy": "restore state/<task>.meta from that task's verified original launch evidence, then retry the refused operation; never guess or copy another task's endpoint",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-backend.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "procevent-retire-pending-results",
+      "owner": "bin/fm-procevent-remote-reply.sh",
+      "sites": [{"file": "bin/fm-procevent-remote-reply.sh", "match": "remote reply retirement refused with", "count": 2}],
+      "invariant": "ordinary remote reply retirement preserves every captured result until it is handled",
+      "layer": "runtime-block", "source": "captured result and handled records in state/procevent-inbox",
+      "trigger": "retirement sees a result without its handled receipt",
+      "remedy": "run each printed bin/fm-procevent-remote-reply.sh handle <secondmate> <sequence> <result-file> command, then retry retirement",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-remote-reply.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "merge-local-clean-primary",
+      "owner": "bin/fm-merge-local.sh",
+      "sites": [{"file": "bin/fm-merge-local.sh", "match": "has a dirty working tree; refusing"}],
+      "invariant": "a local landing never merges into a dirty primary checkout",
+      "layer": "runtime-block", "source": "git status of the primary checkout",
+      "trigger": "the primary checkout has uncommitted or untracked changes",
+      "remedy": "git -C <project> status --short; have the owner preserve their changes on their own branch and restore a clean default checkout, then retry bin/fm-merge-local.sh <task>",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-guard-lint.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "remote-endpoint-identity",
+      "owner": "bin/fm-remote-secondmate-control.sh",
+      "sites": [{"file": "bin/fm-remote-secondmate-control.sh", "match": "refusing access. Remedy:", "count": 4}],
+      "invariant": "remote secondmate access requires its exact task binding in the configured Herdr session",
+      "layer": "runtime-block", "source": "remote endpoint metadata and configured session identity",
+      "trigger": "invalid identity, foreign backend or session, or target outside that session",
+      "remedy": "restore state/<secondmate>.meta from its verified launch evidence with the exact task and session binding, then retry the refused operation",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-remote-reply.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "pending-reply-no-duplicate-send",
+      "owner": "bin/fm-send.sh",
+      "sites": [{"file": "bin/fm-send.sh", "match": "refusing to resend correlation"}],
+      "invariant": "unknown local pending-reply delivery never licenses a duplicate send",
+      "layer": "runtime-block", "source": "pending-reply delivery attempt and confirmation records",
+      "trigger": "reuse of a local correlation whose delivery attempt remains unresolved",
+      "remedy": "obtain the actual correlated report in state/<secondmate>.status and let pending-reply reconciliation resolve the original request before sending new work; inspect with bin/fm-crew-state.sh <secondmate>",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-pending-reply.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "herdr-server-start-live-protection",
+      "owner": "bin/backends/herdr.sh",
+      "sites": [
+        {"file": "bin/backends/herdr.sh", "match": "is unknown; refusing startup", "count": 2},
+        {"file": "bin/backends/herdr.sh", "match": "refused to start the herdr server for session"}
+      ],
+      "invariant": "an unknown or live Herdr server is never replaced by the startup boundary",
+      "layer": "runtime-block", "source": "session-scoped server status and serialized process/socket absence proof",
+      "trigger": "unreadable or malformed status or unproven absence",
+      "remedy": "run `herdr --session <session> status --json` read-only, restore readable compatible client/socket access through its owner, then retry without stopping a live or unknown server",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-backend-herdr.test.sh", "tier": "C", "harm": "irreversible"
+    },
+    {
+      "id": "handoff-queued-only",
+      "owner": "bin/fm-backlog-handoff.sh",
+      "sites": [
+        {"file": "bin/fm-backlog-handoff.sh", "match": "refusing to hand off in-flight backlog items", "count": 2},
+        {"file": "bin/fm-backlog-handoff.sh", "match": "refusing to hand off Done (historical) backlog items"},
+        {"file": "bin/fm-backlog-handoff.sh", "match": "refusing to hand off non-queued backlog items"},
+        {"file": "bin/fm-backlog-handoff.sh", "match": "refusing to hand off Done backlog items"},
+        {"file": "bin/fm-backlog-handoff.sh", "match": "refusing to hand off non-Queued outbox or backlog items"}
+      ],
+      "invariant": "backlog handoffs move queued work, never running work, held work or completed history",
+      "layer": "runtime-block", "source": "the canonical backlog section of every requested key",
+      "trigger": "a requested key is in flight, Done or otherwise not queued",
+      "remedy": "retry bin/fm-backlog-handoff.sh <secondmate> with only genuinely queued keys; leave running work and historical records with their owner and resolve holds before queuing held work",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-backlog-handoff.test.sh", "tier": "C", "harm": "reversible"
+    },
+    {
+      "id": "open-loops-ack-needs-action",
+      "owner": "bin/fm_open_loops.py",
+      "sites": [{"file": "bin/fm_open_loops.py", "match": "overdue rows have no action recorded since presentation"}],
+      "invariant": "a wake acknowledgement preserves each presented overdue obligation until its required action is recorded",
+      "layer": "runtime-block", "source": "per-actor presentations and verified action receipts in state/open-loops.json",
+      "trigger": "acknowledgement has a presented overdue row without an answering action",
+      "remedy": "perform each row's next action, then run its printed bin/fm-open-loops.sh action command with the actual action and evidence before retrying the acknowledgement",
+      "decision": "deny", "fail_direction": "closed", "budget": 1,
+      "telemetry": "state/guard-events.jsonl", "instrumented": false,
+      "test": "tests/fm-open-loops.test.sh", "tier": "C", "harm": "irreversible"
+    },
     {
       "decision": "deny",
       "fail_direction": "closed",
@@ -645,7 +758,8 @@
       "id": "claude-api-billing",
       "owner": "bin/fm-api-key-guard-lib.sh",
       "sites": [
-        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing deny"}
+        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing deny"},
+        {"file": "bin/fm-control.sh", "match": "refused before stopping $ID: an Anthropic credential"}
       ],
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",
@@ -671,11 +785,12 @@
       "version": "1",
       "id": "api-billing-preflight",
       "owner": "bin/fm-api-key-guard-lib.sh",
-      "invariant": "a launcher refuses an inherited credential that would silently bill an API",
+      "sites": [{"file": "bin/fm-api-key-guard-lib.sh", "match": "omp $provider/* routes use API billing"}],
+      "invariant": "explicit omp openai/* and openrouter/* routes never resolve or launch API-billed models",
       "layer": "runtime-block",
-      "source": "ANTHROPIC_API_KEY/AUTH_TOKEN in the inherited environment",
-      "trigger": "the harness would inherit an API credential with no explicit opt-in",
-      "remedy": "env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN <launcher>",
+      "source": "fm_omp_api_billing_route_check reads the provider-qualified selector before model resolution in bin/fm-spawn.sh (primary and fallback dependency checks), bin/fm-control.sh (replacement preflights) and bin/fm-dispatch-capacity-lib.sh (capability checks)",
+      "trigger": "the whitespace-normalized provider is openai or openrouter, case-insensitively, regardless of catalog availability or credential opt-in",
+      "remedy": "select --model openai-codex/<gpt-model> for omp, then retry the original bin/fm-spawn.sh or bin/fm-control.sh command; do not change credentials or enable API billing to pass this route guard",
       "budget": 1,
       "test": "tests/fm-api-key-guard-lib.test.sh",
       "tier": "C",
@@ -798,6 +913,10 @@
       "version": "1",
       "id": "kimi-hook-install-refusal",
       "owner": "bin/fm-kimi-turnend-hook.sh",
+      "sites": [
+        {"file": "bin/fm-kimi-turnend-hook.sh", "match": "fm-kimi-turnend-hook: refused:", "count": 5},
+        {"file": "bin/fm-kimi-turnend-hook.sh", "match": "refuse(", "count": 19}
+      ],
       "invariant": "a malformed or partially marked Kimi config is never rewritten",
       "layer": "runtime-block",
       "source": "tomllib parse of $HOME/.kimi-code/config.toml and its region markers",

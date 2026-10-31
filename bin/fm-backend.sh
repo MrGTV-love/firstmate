@@ -443,27 +443,27 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
   FM_BACKEND_VALIDATED_BACKEND=
   FM_BACKEND_VALIDATED_TARGET=
   [ -f "$meta" ] && [ ! -L "$meta" ] || {
-    echo "REFUSED: task $id has no regular endpoint metadata at $meta; preserving task state." >&2
+    echo "REFUSED: task $id has no regular endpoint metadata at $meta; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   }
   case "$id" in ''|*[!A-Za-z0-9._-]*)
-    echo "REFUSED: task endpoint identity has an invalid task id; preserving task state." >&2
+    echo "REFUSED: task endpoint identity has an invalid task id; preserving task state. Remedy: retry with the task id recorded by the original bin/fm-spawn.sh launch, using only letters, digits, dot, underscore or hyphen; do not rename or rebind another task's metadata." >&2
     return 1
   esac
   window=$(fm_backend_meta_exact_value "$meta" window) || {
-    echo "REFUSED: task $id has a missing, empty, or ambiguous window endpoint; preserving task state." >&2
+    echo "REFUSED: task $id has a missing, empty, or ambiguous window endpoint; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   }
   worktree=$(fm_backend_meta_exact_value "$meta" worktree) || {
-    echo "REFUSED: task $id has a missing, empty, or ambiguous worktree identity; preserving task state." >&2
+    echo "REFUSED: task $id has a missing, empty, or ambiguous worktree identity; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   }
   project=$(fm_backend_meta_exact_value "$meta" project) || {
-    echo "REFUSED: task $id has a missing, empty, or ambiguous project identity; preserving task state." >&2
+    echo "REFUSED: task $id has a missing, empty, or ambiguous project identity; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   }
   case "$worktree$project$window" in *$'\n'*|*$'\r'*|*$'\t'*)
-    echo "REFUSED: task $id has malformed endpoint metadata; preserving task state." >&2
+    echo "REFUSED: task $id has malformed endpoint metadata; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   esac
   backend_count=$(grep -c '^backend=' "$meta" 2>/dev/null || true)
@@ -473,7 +473,7 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
     *) backend= ;;
   esac
   if [ -z "$backend" ] || ! fm_backend_is_known "$backend"; then
-    echo "REFUSED: task $id has a missing, ambiguous, or unknown backend identity; preserving task state." >&2
+    echo "REFUSED: task $id has a missing, ambiguous, or unknown backend identity; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   fi
   binding_count=$(grep -c '^endpoint_task_id=' "$meta" 2>/dev/null || true)
@@ -481,17 +481,17 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
     0) binding= ;;
     1)
       binding=$(fm_backend_meta_exact_value "$meta" endpoint_task_id) || {
-        echo "REFUSED: task $id has an empty endpoint task binding; preserving task state." >&2
+        echo "REFUSED: task $id has an empty endpoint task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       ;;
     *)
-      echo "REFUSED: task $id has an ambiguous endpoint task binding; preserving task state." >&2
+      echo "REFUSED: task $id has an ambiguous endpoint task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
       return 1
       ;;
   esac
   if [ -n "$binding" ] && [ "$binding" != "$id" ]; then
-    echo "REFUSED: endpoint metadata belongs to task $binding, not $id; preserving task state." >&2
+    echo "REFUSED: endpoint metadata belongs to task $binding, not $id; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
     return 1
   fi
 
@@ -501,13 +501,13 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
       pane=${window#*:}
       if [ "$pane" = "$window" ] || [ "$pane" != "fm-$id" ] \
         || [ -z "$session" ]; then
-        echo "REFUSED: tmux endpoint '$window' is malformed or does not belong to task $id; preserving task state." >&2
+        echo "REFUSED: tmux endpoint '$window' is malformed or does not belong to task $id; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       fi
       ;;
     herdr)
       [ "$binding" = "$id" ] || {
-        echo "REFUSED: legacy Herdr endpoint metadata for task $id lacks an exact task binding; preserving task state." >&2
+        echo "REFUSED: legacy Herdr endpoint metadata for task $id lacks an exact task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       recorded_session=$(fm_backend_meta_exact_value "$meta" herdr_session) || recorded_session=
@@ -520,13 +520,13 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
         || ! fm_backend_endpoint_atom_valid "$workspace" \
         || ! fm_backend_endpoint_atom_valid "${tab//:/_}" \
         || ! fm_backend_endpoint_atom_valid "${pane//:/_}"; then
-        echo "REFUSED: Herdr endpoint metadata for task $id is malformed or inconsistent; preserving task state." >&2
+        echo "REFUSED: Herdr endpoint metadata for task $id is malformed or inconsistent; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       fi
       ;;
     zellij)
       [ "$binding" = "$id" ] || {
-        echo "REFUSED: legacy Zellij endpoint metadata for task $id lacks an exact task binding; preserving task state." >&2
+        echo "REFUSED: legacy Zellij endpoint metadata for task $id lacks an exact task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       recorded_session=$(fm_backend_meta_exact_value "$meta" zellij_session) || recorded_session=
@@ -536,36 +536,36 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
       if [ -z "$recorded_session" ] || [ -z "$tab" ] || [ -z "$pane" ] \
         || [ "$window" != "$recorded_session:$pane" ] \
         || ! fm_backend_endpoint_atom_valid "$recorded_session"; then
-        echo "REFUSED: Zellij endpoint metadata for task $id is malformed or inconsistent; preserving task state." >&2
+        echo "REFUSED: Zellij endpoint metadata for task $id is malformed or inconsistent; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       fi
       ;;
     orca)
       [ "$binding" = "$id" ] || {
-        echo "REFUSED: legacy Orca endpoint metadata for task $id lacks an exact task binding; preserving task state." >&2
+        echo "REFUSED: legacy Orca endpoint metadata for task $id lacks an exact task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       terminal=$(fm_backend_meta_exact_value "$meta" terminal) || terminal=
       worktree_id=$(fm_backend_meta_exact_value "$meta" orca_worktree_id) || worktree_id=
       [ -n "$terminal" ] || {
-        echo "REFUSED: missing terminal in $meta; cannot close Orca endpoint; preserving task state." >&2
+        echo "REFUSED: missing terminal in $meta; cannot close Orca endpoint; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       [ -n "$worktree_id" ] || {
-        echo "REFUSED: missing orca_worktree_id in $meta; cannot remove Orca worktree; preserving task state." >&2
+        echo "REFUSED: missing orca_worktree_id in $meta; cannot remove Orca worktree; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       if [ "$window" != "fm-$id" ] \
         || ! fm_backend_endpoint_atom_valid "$terminal" \
         || ! fm_backend_orca_worktree_id_valid "$worktree_id"; then
-        echo "REFUSED: Orca endpoint metadata for task $id is malformed or inconsistent; preserving task state." >&2
+        echo "REFUSED: Orca endpoint metadata for task $id is malformed or inconsistent; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       fi
       window=$terminal
       ;;
     cmux)
       [ "$binding" = "$id" ] || {
-        echo "REFUSED: legacy cmux endpoint metadata for task $id lacks an exact task binding; preserving task state." >&2
+        echo "REFUSED: legacy cmux endpoint metadata for task $id lacks an exact task binding; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       }
       workspace=$(fm_backend_meta_exact_value "$meta" cmux_workspace_id) || workspace=
@@ -573,7 +573,7 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
       if [ -z "$workspace" ] || [ -z "$surface" ] || [ "$window" != "$workspace:$surface" ] \
         || ! fm_backend_endpoint_atom_valid "$workspace" \
         || ! fm_backend_endpoint_atom_valid "$surface"; then
-        echo "REFUSED: cmux endpoint metadata for task $id is malformed or inconsistent; preserving task state." >&2
+        echo "REFUSED: cmux endpoint metadata for task $id is malformed or inconsistent; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-send.sh, bin/fm-peek.sh or bin/fm-teardown.sh operation as applicable; never copy another task's binding or guess an endpoint." >&2
         return 1
       fi
       ;;

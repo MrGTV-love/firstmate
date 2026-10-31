@@ -129,12 +129,23 @@ A site's id is `site:<file>:<hash of its normalized line>`, so it survives line 
 The lint computes the unregistered count as the number of sites that map to nothing.
 A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 
-Rules 10 to 13 are mechanically checked on top of the nine rules above:
+Rules 10 to 14 are mechanically checked on top of the nine rules above:
 
 10. **S1** Every refusal site maps to a registry entry.
 11. **S2** A `sites` item matches exactly the sites it declares, and no site has two owners.
-12. **S4** A typed `unregistered_ids` list has the computed length.
-13. **S5** The allowlist does not grow against the base (new-or-touched mode only).
+12. **S3** A new or touched diagnostic site (`A`, `B` or `C`) carries an executable `Remedy:` or shared `completing-command:` in its emitted statement or refusal helper, not only in the registry (new-or-touched mode).
+13. **S4** A typed `unregistered_ids` list has the computed length.
+14. **S5** The allowlist does not grow against the base (new-or-touched mode only).
+
+S3 joins adjacent Python string literals and shell backslash continuations in a diagnostic statement.
+Its touched boundary includes the entire joined statement and directly called local refusal-helper body, including deletion boundaries, so editing only a remedy footer still checks the unchanged refusal or caller line.
+S3 reads Python message arguments and shell diagnostic command words, excluding inline comments as well as separate comments.
+A neighboring branch, unrelated command, test operand, interpolated function argument or registry remedy cannot supply the diagnostic's remedy.
+A direct local refusal helper may own the common emitted remedy for its call sites.
+The shared `fm_refuse` formatter's existing machine-command argument and `completing-command:` envelope satisfy the same rule without adding a second footer; its argument must name a concrete command.
+The lint recognizes repository command paths, `git`, `herdr` and `env -u`; it does not prove the suggested step is safe or sufficient.
+Executable behavioral fixtures and review must prove completion without weakening the underlying guard.
+Unchanged legacy diagnostics are not newly allowlisted for S3; touching them is the point at which their printed remedy becomes mandatory.
 
 ## Tiers
 
@@ -208,5 +219,5 @@ The lint runs in three modes:
 The legacy refusal sites that map to nothing sit in the allowlist as `S1` entries, once, as the burn-down list.
 Once the base allowlist is at `schema_version` 2, the lint also fails an entry the base does not hold, so the allowlist cannot grow.
 The allowlist therefore only shrinks, and an empty allowlist is the end state.
-A site on a changed line must map even when the allowlist holds it, because touching a legacy site is the moment to give it a guard entry.
+A site whose diagnostic or directly called local refusal helper changes must map even when the allowlist holds it, because touching a legacy site is the moment to give it a guard entry.
 CI runs `enforce` on every change and `new-or-touched` against the pull request base.
