@@ -107,6 +107,9 @@
 # result is cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
+# The returned slot keeps its ignored files. Any other task copy whose HEAD only
+# the bundle holds refuses while it holds an ignored file outside the
+# teardown_preservable_ignored allow-list: land that commit or move the file out.
 # Those commits still go to the captain to land or drop, so the bundle route
 # also requires the captain's call to be filed already: this task's backlog row
 # must be held for the captain, and an open captain-held task in this home
