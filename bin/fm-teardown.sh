@@ -62,7 +62,12 @@
 # a run that pushed another head, or a missing record
 # (state database, run row, pushed head, input head) refuses and names the record.
 # Anything else refuses unless the recorded bundle alternative below holds.
-# Recorded bundle preservation is a cleanup alternative, not proof of delivery.
+# Recorded bundle preservation is an attended cleanup alternative, not proof of
+# delivery. The idle reaper (FM_IDLE_REAP_ADMISSION=1), supervision branch
+# (FM_SUPERVISION_ACTOR=branch), and away or quiet cleanup (a .afk or
+# .afk-contract record in $STATE) cannot use it, even on an interrupted return.
+# The independent bin/fm-copy-sweep.sh never uses this alternative either.
+# A close note is bookkeeping only and grants no removal authority.
 # Its record is $DATA/$ID/preservation-bundles.tsv (normally
 # $FM_HOME/data/<task-id>/preservation-bundles.tsv): exactly ONE line of three
 # TAB-separated fields: absolute bundle path, lowercase SHA-256 (64 hex), and

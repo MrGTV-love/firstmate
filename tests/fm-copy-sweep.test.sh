@@ -268,11 +268,19 @@ test_apply_removes_only_the_reapable_copy() {
 }
 
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
+  local bundle digest tips
   make_world edges
   add_copy one
   printf 'u\n' > "$(copy_path one)/just-one-untracked-file"
   add_copy two
   git -C "$(copy_path two)" commit -q --allow-empty -m unpushed
+  bundle="$W/bundles/two.bundle"
+  mkdir -p "${bundle%/*}" "$HOMED/data/two"
+  git -C "$(copy_path two)" bundle create "$bundle" --all 2>/dev/null || fail 'cannot bundle the unpushed tip'
+  git -C "$(copy_path two)" bundle verify "$bundle" >/dev/null 2>&1 || fail 'bundle must verify'
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$HOMED/data/two/preservation-bundles.tsv"
   take_snapshots before one two
   run_sweep --apply
   [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
@@ -280,7 +288,8 @@ test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
   assert_class two HELD-UNPUSHED
   take_snapshots after one two
   assert_untouched one two
-  pass "a copy with one untracked file and a copy whose tip is on no remote are both kept"
+  assert_present "$bundle" 'sweep deleted the external preservation bundle'
+  pass "a dirty copy and an unpushed copy with a verified recorded bundle are both kept"
 }
 
 test_landed_content_without_a_pushed_tip_is_reaped_by_apply() {

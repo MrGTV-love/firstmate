@@ -459,6 +459,16 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   local line='' extra='' extra_seen='' rest bundle hash tips tip own required side heads advertised digest
   local -a recorded=()
   TEARDOWN_BUNDLE_ACCEPTED=
+  # Automatic cleanup still requires landing, including replays of an attended
+  # teardown's interrupted return. Never let the mere record authorize it.
+  if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ] \
+      || [ "${FM_SUPERVISION_ACTOR:-main}" != main ] \
+      || [ -e "$STATE/.afk" ] || [ -L "$STATE/.afk" ] \
+      || [ -e "$STATE/.afk-contract" ] || [ -L "$STATE/.afk-contract" ]; then
+    teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
+    echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
+    return 1
+  fi
   own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
     teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
   }

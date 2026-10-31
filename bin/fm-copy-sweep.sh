@@ -57,6 +57,8 @@
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
+# The attended recorded-bundle exception in bin/fm-teardown.sh's header does
+# not apply here: a bundle-only copy remains HELD-UNPUSHED.
 # HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
 # `git worktree remove`, so calling it live or orphaned would mislead.
 #

@@ -75,7 +75,7 @@
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh" || exit 1
 # shellcheck source=tests/git-lock-helpers.sh
 . "$ROOT/tests/git-lock-helpers.sh"
 fm_git_identity fmtest fmtest@example.invalid
@@ -11022,6 +11022,81 @@ test_bundle_restore_memo_is_keyed_by_object_format() {
   pass 'the remembered restore is keyed by object format as well as bundle digest and tips'
 }
 
+# The same valid bundle accepted by an attended teardown must never authorize
+# automatic cleanup, including an old merge notification for a different head.
+test_unattended_teardown_refuses_bundle_only_copy() {
+  local case_dir rc shape old now out
+  for shape in idle-reap branch away quiet; do
+    make_bundle_copy_case "bundle-unattended-$shape"
+    case_dir=$NESTED_CASE
+    rc=0
+    case "$shape" in
+      idle-reap)
+        now=$(date +%s)
+        old=$((now - 7200))
+        append_pr_meta_url "$case_dir"
+        printf 'harness=claude\n' >> "$case_dir/state/task-x1.meta"
+        printf 'done [at=%s]: committed\n' "$old" > "$case_dir/state/task-x1.status"
+        printf 'g1.1.1\n' > "$case_dir/state/task-x1.busy-gen"
+        printf 'v1 gen=g1.1.1 seq=1 state=idle source=claude-hook event=Stop ts=%s\n' "$now" \
+          > "$case_dir/state/task-x1.busy-state"
+        printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nexample/repo\n7\n' \
+          > "$case_dir/state/task-x1.pr-poll-merge-notified"
+        chmod 0600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+        fm_touch_epoch "$old" "$case_dir/state/task-x1.pr-poll-merge-notified"
+        out=$(FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+          FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+          FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" \
+          FM_IDLE_REAP_TEARDOWN_BIN="$TEARDOWN" PATH="$case_dir/fakebin:$PATH" \
+          bash "$ROOT/bin/fm-idle-session-reap.sh" reap 2>&1) || rc=$?
+        expect_code 0 "$rc" "idle sweep must report its refusal: $out"
+        [[ "$out" == *$'teardown-refused\ttask-x1\t'* ]] \
+          || fail "idle sweep did not attempt and refuse bundle-only cleanup: $out"
+        assert_grep 'REFUSED: the ship deliverable is not landed' \
+          "$case_dir/state/.idle-reap/task-x1.refused" 'idle refusal changed'
+        ;;
+      branch)
+        FM_HOME="$case_dir/home" FM_SUPERVISION_ACTOR=branch run_teardown "$case_dir" \
+          > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        ;;
+      away|quiet)
+        printf '%s\n' "$shape" > "$case_dir/state/.afk"
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" \
+          > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        ;;
+    esac
+    if [ "$shape" != idle-reap ]; then
+      expect_code 1 "$rc" "$shape unattended teardown must refuse bundle-only cleanup"
+      assert_grep 'recorded bundles require attended teardown' "$case_dir/stderr" 'missing attended-only reason'
+      assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" 'original refusal changed'
+    fi
+    assert_present "$NESTED_COPY/work.txt" "$shape: copy was removed"
+    assert_present "$case_dir/state/task-x1.meta" "$shape: task record was removed"
+    assert_present "$BUNDLE_PATH" "$shape: preservation bundle was removed"
+    assert_absent "$case_dir/treehouse.log" "$shape: pool slot was returned"
+  done
+  pass 'idle reap, supervision branch and away or quiet cleanup refuse a copy held only by a bundle'
+}
+
+test_bundle_close_note_is_not_removal_authority() {
+  local case_dir rc
+  make_bundle_copy_case bundle-note-only
+  case_dir=$NESTED_CASE
+  seed_backlog_in_flight "$case_dir"
+  tasks-axi done task-x1 --note "preserved in bundle $BUNDLE_PATH, not landed" \
+    --file "$case_dir/data/backlog.md" >/dev/null || fail 'cannot record the bookkeeping note'
+  rm "$case_dir/data/task-x1/preservation-bundles.tsv"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'the close note alone must not allow removal'
+  assert_grep 'missing preservation record' "$case_dir/stderr" 'the note substituted for preservation proof'
+  assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" 'original refusal changed'
+  assert_present "$NESTED_COPY/work.txt" 'the close note authorized copy removal'
+  assert_present "$case_dir/state/task-x1.meta" 'the close note authorized record removal'
+  assert_absent "$case_dir/treehouse.log" 'the close note authorized a pool return'
+  pass 'a preserved-in-bundle close note is bookkeeping only, never removal authority'
+}
+
 test_bundle_kept_ship_closes_its_row_as_not_landed() {
   local shape case_dir rc
   for shape in local-only open-pr; do
@@ -14268,6 +14343,8 @@ test_bundle_must_hold_a_stale_siblings_unpushed_tip
 test_bundle_restore_runs_once_per_unchanged_proof
 test_bundle_restore_memo_misses_a_changed_record_or_bundle
 test_bundle_restore_memo_is_keyed_by_object_format
+test_unattended_teardown_refuses_bundle_only_copy
+test_bundle_close_note_is_not_removal_authority
 test_bundle_kept_ship_closes_its_row_as_not_landed
 test_bundle_kept_ship_records_no_landing_in_the_ledger
 test_bundle_hint_needs_unlanded_tips
