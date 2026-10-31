@@ -1,0 +1,23 @@
+--- mirror stdout ---
+slack: missing reaction scope: reactions:read, users:read
+--- card with-options ---
+Task: with-options
+Decision sought: Ship now?
+Brief description of issue: Release is ready.
+Recommendation and key reasons: Ship, tests are green.
+Alternatives considered: Waiting gains nothing.
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+Missing reaction scope: reactions:read, users:read.
+--- card no-options ---
+Task: no-options
+Decision: Open-ended decision
+Question: Select the release approach
+Recommendation: proceed with the default
+Evidence: /tmp/evidence-no-options.md
+Type your answer in this thread.
+Missing reaction scope: reactions:read, users:read.

@@ -1,0 +1,80 @@
+
+===== SCENARIO legacy: unlabeled reason, with options (task with-options) =====
+Task: with-options
+Decision: Choose a deployment
+Question: Select the release approach
+Recommendation: ship
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+
+===== SCENARIO legacy: unlabeled reason, no options (task no-options) =====
+Task: no-options
+Decision: Open-ended decision
+Question: Select the release approach
+Recommendation: proceed with the default
+Evidence: /tmp/evidence-no-options.md
+Type your answer in this thread.
+
+===== SCENARIO four-part: labels out of order, multiline Brief, reason option lines =====
+Task: four-part
+Decision sought: Which cache backend should sessions use?
+Brief description of issue: Sessions are lost on every deploy.
+The current in-process cache is wiped on restart.
+Recommendation and key reasons: Redis, because it persists and we already run it.
+Alternatives considered: Memcached is simpler but has no persistence.
+Options:
+1. Redis (redis) - managed
+2. Memcached (memcached) - simple
+Option 3: Postgres table (pg)
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+--- reason given to fm-captain-hold.sh ---
+Alternatives: Memcached is simpler but has no persistence.
+Recommendation: Redis, because it persists and we already run it.
+Brief: Sessions are lost on every deploy.
+The current in-process cache is wiped on restart.
+Decision sought: Which cache backend should sessions use?
+Option 3: Postgres table (pg)
+
+===== SCENARIO in-place refresh: rewrite active hold reason of with-options =====
+before: ts=900.000001 postMessage=4 chat.update=0
+after poll: ts=900.000001 postMessage=4 chat.update(ts)=1 options_same=yes roots=1
+Task: with-options
+Decision sought: Ship the release today?
+Brief description of issue: QA signed off; one flaky test remains.
+Recommendation and key reasons: Ship, because the flake is known and unrelated.
+Alternatives considered: Waiting a day delays a customer fix for no gain.
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+after restart (fresh poll + mirror processes): chat.update(ts)=1 postMessage=4
+
+===== SCENARIO answer binding unchanged: owner types 1 in edited thread =====
+closed: with-options
+Answer: ship
+retired=True
+
+===== SCENARIO options changed: no-recommendation board options change + reason rewrite =====
+chat.update total before=1 after=1 ; chat.update(ts)=0 ; card unchanged=yes
+
+===== SCENARIO replaced hold: release no-options, start a new hold lifecycle, rewrite =====
+old ts=901.000001 chat.update(old)=0 root cards for no-options=2
+after rewriting new lifecycle: chat.update(old)=0
+old thread texts:
+Superseded: no-options was held again. Answer in its newer thread.
+
+===== SCENARIO rejected refresh: A rejected, suppressed, B succeeds, A restored =====
+poll1 (A, Slack rejects): check: slack 903.000001 - card update failed: api_error
+poll2 (A unchanged): (no retry, no failure line)
+chat.update(four-part) successes so far=0
+after B: chat.update(four-part)=1 card has (B)=1
+after A restored: chat.update(four-part)=2 card has (A)=1
+postMessage roots for four-part=1
+"none recorded" occurrences in all Slack messages: 0
