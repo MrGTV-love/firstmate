@@ -1163,40 +1163,6 @@ $exclusions
 EOF
 }
 
-# A scaffolded exclusion list that is still blank is refused: independent review
-# reads that section as the task's stated boundary, so an empty one is a blank
-# the reviewer has to fill with scope the task never had.
-test_dispatch_verdict_refuses_a_blank_exclusion_list() {
-  local brief out rc
-  brief="$TMP_ROOT/dispatch-blank-out-of-scope.md"
-  write_exclusion_brief "$brief" ''
-  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
-  [ "$rc" -eq 0 ] || fail "a blank exclusion list was reported dispatchable"
-  assert_contains "$out" "### Out of scope is empty" "the dispatch verdict did not name the blank exclusion list"
-  pass "the dispatch verdict refuses a blank exclusion list"
-}
-
-# `None` is an answer, not a blank: the task states that it excludes nothing.
-test_dispatch_verdict_accepts_none_as_the_exclusion_answer() {
-  local brief out rc
-  brief="$TMP_ROOT/dispatch-none-out-of-scope.md"
-  write_exclusion_brief "$brief" 'None.'
-  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
-  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "an explicit None exclusion list did not pass: $out"
-  pass "the dispatch verdict accepts None as the exclusion answer"
-}
-
-# A relaunch re-checks only the Task bodies, so the exclusion list accepted at
-# the fresh spawn never blocks one.
-test_dispatch_verdict_task_only_scope_skips_the_exclusion_list() {
-  local brief out rc
-  brief="$TMP_ROOT/dispatch-task-only-out-of-scope.md"
-  write_exclusion_brief "$brief" ''
-  out=$(fm_brief_dispatch_problems "$brief" task-only); rc=$?
-  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "the task-only scope reported the exclusion list: $out"
-  pass "the task-only scope skips the exclusion list"
-}
-
 # The stated exclusions are what independent review receives, through the
 # verification plan built from the same brief.
 test_verification_plan_carries_the_stated_exclusions() {
@@ -1594,9 +1560,6 @@ test_task_owns_several_prs_only_on_positive_evidence
 test_promotion_keeps_the_recorded_base_branch
 test_dispatch_verdict_lists_all_problems_in_one_pass
 test_dispatch_verdict_passes_a_filled_brief
-test_dispatch_verdict_refuses_a_blank_exclusion_list
-test_dispatch_verdict_accepts_none_as_the_exclusion_answer
-test_dispatch_verdict_task_only_scope_skips_the_exclusion_list
 test_verification_plan_carries_the_stated_exclusions
 test_exclusion_list_does_not_satisfy_an_empty_firstmate_spec
 test_spec_content_survives_the_exclusion_list

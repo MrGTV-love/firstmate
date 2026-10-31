@@ -10,7 +10,6 @@
     "jev-egress-grant",
     "jev-github-write-op",
     "omp-worker-url-reads-off",
-    "spawn-brief-out-of-scope",
     "verification-plan-dod-shape",
     "git-commit-credential-shapes",
     "git-push-credential-shapes",
@@ -344,36 +343,6 @@
       "remedy": "edit <brief> and fill the listed DoD tokens, or add an unfenced line 'DoD file: <absolute path>' to the section; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
       "budget": 1,
       "test": "tests/fm-brief.test.sh",
-      "tier": "B",
-      "harm": "reversible",
-      "remedy_verified": "fixture",
-      "emitters": [
-        "bin/fm-spawn.sh"
-      ]
-    },
-    {
-      "decision": "deny",
-      "fail_direction": "closed",
-      "proxy": false,
-      "proxy_reason": "",
-      "precheck_gap": "",
-      "exemptions": [],
-      "instrumented": true,
-      "status": "active",
-      "telemetry": "state/guard-events.jsonl",
-      "version": "1",
-      "id": "spawn-brief-out-of-scope",
-      "owner": "bin/fm-dod-lib.sh",
-      "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "spawn-brief-out-of-scope deny"}
-      ],
-      "invariant": "a fresh dispatch refuses a brief whose scaffolded exclusion list is still blank",
-      "layer": "runtime-block",
-      "source": "brief text under ### Out of scope in # Task",
-      "trigger": "fm_brief_dispatch_problems finds a ### Out of scope heading in # Task with no stated exclusion",
-      "remedy": "edit <brief> and list the excluded work under ### Out of scope or write None; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the heading",
-      "budget": 1,
-      "test": "tests/fm-dod-lib.test.sh",
       "tier": "B",
       "harm": "reversible",
       "remedy_verified": "fixture",
@@ -1073,6 +1042,7 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "git-commit-credential-shapes",
+      "retirement_decision": "keep 2026-10-31: zero fires in 109 opportunities is the desired credential-screening state; the task pre-commit scan remains necessary because shared-pipeline pushes do not establish task-local pre-push coverage (data/fm-guard-policy-20261031/report.md action 9)",
       "owner": "bin/fm-git-secrets.py",
       "invariant": "a task commit never adds a line holding a known credential shape",
       "layer": "runtime-block",
@@ -1270,6 +1240,11 @@
     }
   ],
   "beyond_audit_retired": [
+    {
+      "point": "blank exclusion heading dispatch refusal",
+      "evidence": "data/fm-guard-retire-out-of-scope-belay/report.md",
+      "reason": "added after the audit; a blank exclusion heading and None state the same boundary, so this retirement stays outside the audited population"
+    },
     {
       "point": "D1 Bash gate",
       "evidence": "data/fm-jev-guard-e2e/report.md",
