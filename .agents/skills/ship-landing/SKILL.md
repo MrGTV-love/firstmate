@@ -32,3 +32,14 @@ Retire one only on an explicit captain or main-firstmate decision, after loading
 ### PR ready, landing, and teardown
 
 Load `ship-landing` when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.
+
+## Firstmate train landing order
+
+Main owns one landing order for this installation's Firstmate publication target, including PRs prepared in repair or secondmate homes.
+Before running trains, record their PR URLs, exact heads, dependencies, and intended landing order in Main's durable task notes.
+Preparation, review, and CI may run for several trains in parallel; only landing is serial.
+Do not insert an unrelated ready PR ahead of an in-flight train without replanning that order and revalidating any affected train.
+Other homes hand Main the ready PR URL, exact head, and review evidence; Main registers that PR and its review in its own task records before landing it in order.
+`bin/fm-pr-merge.sh` owns the mechanical home-routing and landing-lock rules in its header; a routing refusal is a handoff to Main, not a reason to merge directly at the forge.
+A single ready PR with no train uses the same Main merge path without creating a train.
+The live merge checks, exact-head review, and merge authority remain prerequisites, not consequences of a place in the order.

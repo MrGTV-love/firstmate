@@ -20,7 +20,8 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
-    "open-loops-one-deferral"
+    "open-loops-one-deferral",
+    "merge-single-owner"
   ],
   "guards": [
     {
@@ -544,6 +545,35 @@
       "remedy": "bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "merge-single-owner",
+      "owner": "bin/fm-pr-merge.sh",
+      "sites": [
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-single-owner deny", "count": 2},
+        {"file": "bin/fm-pr-merge.sh", "match": "refusing a firstmate landing outside its Main home"},
+        {"file": "bin/fm-pr-merge.sh", "match": "refusing a landing with an unreadable installation publication target"}
+      ],
+      "invariant": "a self-repository landing never runs outside the installation's Main home",
+      "layer": "runtime-block",
+      "source": "fm-role-lib.sh publication target identity, fm_firstmate_root_home parent-chain resolution, Git primary worktree registration, physical FM_HOME",
+      "trigger": "the installation publication target cannot be resolved, or the requested repository is that target and FM_HOME is not Main's primary worktree or Main cannot be resolved locally",
+      "remedy": "register the ready PR and exact-head review in the named Main home and place it in Main's order, then FM_HOME=<main-home> bin/fm-pr-merge.sh <main-task-id> <pr-url>; use the existing secondmate parent channel for a remote Main, repair .fm-secondmate-parent or git worktree registration for an unreadable Main, and restore an unreadable publication target with git remote set-url origin <canonical-repository-url>",
+      "budget": 1,
+      "test": "tests/fm-pr-merge.test.sh",
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture"

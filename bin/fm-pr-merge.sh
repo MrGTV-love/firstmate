@@ -10,6 +10,19 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
+# For the installation's own publication target (fm-role-lib.sh resolves the
+# remote identity), only its primary Git worktree is the landing home. A seeded
+# home's parent chain selects the Main installation, including separate local
+# clones; a remote or unreadable parent requires a parent-channel handoff.
+# Repair and secondmate homes hand the ready PR and review to that Main home instead
+# of merging independently. An unreadable target or primary-worktree record
+# stops the merge before bookkeeping. Its state/.firstmate-landing.lock serializes all
+# self-repository tasks from verification through the confirmed outcome and
+# notification. Other project repositories retain their existing merge path.
+# .agents/skills/ship-landing/SKILL.md owns the train planning procedure.
+# This is installation-local coordination, not a lock against external forge
+# users or independent installations; the live tree and head checks still apply.
+#
 # Every supported forge verifies recorded review evidence inside the away-record
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
@@ -488,6 +501,60 @@ if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
 fi
 MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
+# Firstmate's own publication target has one landing owner: the primary
+# worktree of this installation, not whichever repair/secondmate home calls.
+# This is routing, not merge authority; every gate below still applies in Main.
+# shellcheck source=bin/fm-role-lib.sh
+. "$SCRIPT_DIR/fm-role-lib.sh"
+MERGE_LANDING_LOCK=
+landing_target=$(fm_role_publication_target "$FM_ROOT")
+if [ -z "$landing_target" ]; then
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
+  printf 'error: refusing a landing with an unreadable installation publication target; restore the intended remote with: git -C %q remote set-url origin <canonical-repository-url>, then re-run this merge\n' "$FM_ROOT" >&2
+  exit 1
+fi
+if [ "$landing_target" = "$(fm_role_scope_norm "$PR_HOST/$PR_PATH")" ]; then
+  landing_home=
+  landing_root=$FM_ROOT
+  landing_parent=false
+  if [ -e "$FM_HOME/.fm-secondmate-parent" ] || [ -L "$FM_HOME/.fm-secondmate-parent" ]; then
+    landing_parent=true
+    landing_root=$(fm_firstmate_root_home "$FM_HOME") || landing_root=
+    # A remote parent has no local lockable Main home. Its existing parent
+    # channel carries the handoff; this machine must not become a second owner.
+    if [ -n "$landing_root" ] \
+      && { [ -e "$landing_root/.fm-secondmate-parent" ] || [ -L "$landing_root/.fm-secondmate-parent" ]; }; then
+      landing_root=
+    fi
+  fi
+  if [ -n "$landing_root" ]; then
+    while IFS= read -r landing_line; do
+      case "$landing_line" in
+        'worktree '*) landing_home=${landing_line#worktree }; break ;;
+      esac
+    done < <(git -C "$landing_root" worktree list --porcelain 2>/dev/null)
+  fi
+  if [ -n "$landing_home" ]; then
+    landing_home=$(CDPATH='' cd -- "$landing_home" 2>/dev/null && pwd -P) || landing_home=
+  fi
+  caller_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || caller_home=
+  if [ -z "$landing_home" ] || [ "$caller_home" != "$landing_home" ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok "$([ -n "$landing_home" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+    printf 'error: refusing a firstmate landing outside its Main home %s; ' "${landing_home:-(unreadable)}" >&2
+    if [ -z "$landing_home" ] && [ "$landing_parent" = true ]; then
+      printf 'hand the ready PR and review to Main through the existing secondmate parent channel; if that channel cannot resolve Main, repair .fm-secondmate-parent before retrying\n' >&2
+    elif [ -z "$landing_home" ]; then
+      printf 'restore the primary worktree registration, confirm it with git -C %q worktree list --porcelain, then re-run this merge\n' "$FM_ROOT" >&2
+    else
+      printf 'register the ready PR and its review in Main, place it in Main\047s train order, then run: FM_HOME=%q %q %q %q\n' \
+        "$landing_home" "$landing_home/bin/fm-pr-merge.sh" "$ID" "$URL" >&2
+    fi
+    exit 1
+  fi
+  MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner allow --cleared-by route-to-main 2>/dev/null
+fi
+
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
 MERGE_VERIFY_LOG=
@@ -496,8 +563,12 @@ merge_control_cleanup() {
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
+  [ -z "$MERGE_LANDING_LOCK" ] || fm_lock_release "$MERGE_LANDING_LOCK" || true
 }
 trap merge_control_cleanup EXIT
+# One Main-wide lock precedes the per-task lock and remains held through the
+# forge outcome read and its durable notification, not just the merge request.
+[ -z "$MERGE_LANDING_LOCK" ] || fm_lock_acquire_wait "$MERGE_LANDING_LOCK"
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
 if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then

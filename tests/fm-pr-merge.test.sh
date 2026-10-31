@@ -1877,7 +1877,154 @@ test_repo_override_args_refuse_before_recording() {
   pass "fm-pr-merge refuses repo override args before recording state"
 }
 
+test_firstmate_landings_belong_to_main_home() {
+  local case_dir head rc url main
+  case_dir=$(make_case firstmate-landing-home)
+  main="$case_dir/wt"
+  url=https://github.com/example/repo/pull/9
+  git -C "$main" remote add origin https://github.com/Example/Repo.git
+  head=$(git -C "$main" rev-parse HEAD)
+  add_gh_mocks "$case_dir" "$head"
+
+  # Two independent home/state records share the installation's repository.
+  # The repair home's formerly normal merge must not advance Main's train tip.
+  rc=0
+  FM_TEST_CODE_ROOT="$main" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "another home must hand its firstmate landing to Main"
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" 'repair home never hands the PR to the forge'
+  assert_absent "$case_dir/state/task-x1.check.sh" 'routing happens before PR bookkeeping'
+  assert_grep "$main" "$case_dir/stderr" 'routing names the canonical Main home'
+  assert_grep 'register the ready PR and its review in Main' "$case_dir/stderr" 'routing names the completing step'
+
+  # Main can still land one independently ready PR without building a train.
+  mkdir -p "$main/data" "$main/config" "$main/state"
+  cp "$case_dir/home/.tasks.toml" "$main/.tasks.toml"
+  cp "$case_dir/home/data/backlog.md" "$main/data/backlog.md"
+  cp "$case_dir/state/task-x1.meta" "$main/state/task-x1.meta"
+  rc=0
+  FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "Main's single ready PR lands normally: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_grep "pr=$url" "$main/state/task-x1.meta" 'Main owns its landed PR record'
+  assert_no_grep '^pr=' "$case_dir/state/task-x1.meta" 'repair task record was not changed by its refused merge'
+
+  rc=0
+  FM_TEST_CODE_ROOT="$main" run_pr_merge "$case_dir" task-x1 https://github.com/other/project/pull/11 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "ordinary project landings remain home-local: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 11 other/project --squash
+  pass 'firstmate landings route to Main; one Main PR and unrelated home-local projects land normally'
+}
+
+test_unreadable_landing_routing_refuses() {
+  local case_dir head rc
+  case_dir=$(make_case unreadable-landing-routing)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  add_gh_mocks "$case_dir" "$head"
+  rc=0
+  FM_TEST_CODE_ROOT="$case_dir/wt" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'a missing installation target must not silently disable routing'
+  assert_grep 'remote set-url origin' "$case_dir/stderr" 'unreadable target names its completing step'
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" 'unreadable routing never calls the forge'
+  assert_absent "$case_dir/state/task-x1.check.sh" 'unreadable routing never arms a merge poll'
+  pass 'an unreadable installation target fails closed before landing bookkeeping'
+}
+
+test_seeded_homes_cannot_create_a_second_landing_owner() {
+  local scenario case_dir head rc
+  for scenario in local remote corrupt; do
+    case_dir=$(make_case "seeded-landing-$scenario")
+    git -C "$case_dir/wt" remote add origin https://github.com/example/repo.git
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    add_gh_mocks "$case_dir" "$head"
+    fm_git_init_commit "$case_dir/main-home"
+    printf 'mate-x\n' > "$case_dir/wt/.fm-secondmate-home"
+    case "$scenario" in
+      local)
+        printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$case_dir/main-home" \
+          > "$case_dir/wt/.fm-secondmate-parent" ;;
+      remote)
+        printf 'schema=fm-secondmate-parent.v1\nroute=remote\nparent_host=fixture\n' \
+          > "$case_dir/wt/.fm-secondmate-parent" ;;
+      corrupt)
+        printf 'unreadable-parent\n' > "$case_dir/wt/.fm-secondmate-parent" ;;
+    esac
+    rc=0
+    (cd "$case_dir/wt" && FM_TEST_CODE_ROOT="$case_dir/wt" FM_TEST_HOME="$case_dir/wt" \
+      run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9) \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "a $scenario secondmate binding must not create another landing owner"
+    assert_no_grep 'pr merge ' "$case_dir/gh.log" "the $scenario home never calls forge merge"
+    if [ "$scenario" = local ]; then
+      assert_grep "$case_dir/main-home" "$case_dir/stderr" 'a separate clone still routes to its actual Main home'
+    else
+      assert_grep 'existing secondmate parent channel' "$case_dir/stderr" "an unreachable Main uses the existing parent handoff: $(cat "$case_dir/stderr")"
+    fi
+  done
+  pass 'local clones, remote homes, and corrupt bindings cannot become another landing owner'
+}
+
+landing_waiter_visible() {
+  local file
+  for file in "$1"/.lock-monitor.wait.*; do
+    [ -f "$file" ] || continue
+    grep -qF "$1/.firstmate-landing.lock" "$file" && return 0
+  done
+  return 1
+}
+
+test_main_serializes_firstmate_landings() (
+  local case_dir main head first= second= rc
+  case_dir=$(make_case serialized-firstmate-landings)
+  main="$case_dir/wt"
+  git -C "$main" remote add origin https://github.com/example/repo.git
+  head=$(git -C "$main" rev-parse HEAD)
+  add_gh_mocks "$case_dir" "$head"
+  mkdir -p "$main/data" "$main/config" "$main/state"
+  cp "$case_dir/home/.tasks.toml" "$main/.tasks.toml"
+  cp "$case_dir/home/data/backlog.md" "$main/data/backlog.md"
+  cp "$case_dir/state/task-x1.meta" "$main/state/task-x1.meta"
+  cp "$main/state/task-x1.meta" "$main/state/task-x2.meta"
+  cat > "$case_dir/hold-merge" <<SH
+#!/usr/bin/env bash
+: > "$case_dir/merge-entered"
+while [ ! -e "$case_dir/release-merge" ]; do sleep 0.1; done
+SH
+  chmod +x "$case_dir/hold-merge"
+  # Always release the private fixture's forge callback, including on failure.
+  trap ': > "$case_dir/release-merge"; [ -z "$first" ] || wait "$first" 2>/dev/null; [ -z "$second" ] || wait "$second" 2>/dev/null' EXIT
+  FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" FM_TEST_AWAY_MUTATE_AT_MERGE="$case_dir/hold-merge" \
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
+      > "$case_dir/first.out" 2> "$case_dir/first.err" &
+  first=$!
+  fm_test_wait_until --while-alive "$first" --progress-file "$case_dir/gh.log" \
+    -- test -e "$case_dir/merge-entered" || fail 'first merge never entered its forge callback'
+  FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" \
+    run_pr_merge "$case_dir" task-x2 https://github.com/example/repo/pull/10 \
+      > "$case_dir/second.out" 2> "$case_dir/second.err" &
+  second=$!
+  fm_test_wait_until --while-alive "$second" --progress-file "$main/state/guard-events.jsonl" \
+    -- landing_waiter_visible "$main/state" || fail 'second landing never waited for the first'
+  assert_no_grep '^pr merge 10 ' "$case_dir/gh.log" 'another task cannot merge while the first outcome is pending'
+  : > "$case_dir/release-merge"
+  rc=0; wait "$first" || rc=$?; first=
+  expect_code 0 "$rc" "first landing failed: $(cat "$case_dir/first.err")"
+  rc=0; wait "$second" || rc=$?; second=
+  expect_code 0 "$rc" "second landing failed: $(cat "$case_dir/second.err")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  assert_logged_gh_merge "$case_dir" 10 example/repo --squash
+  assert_absent "$main/state/.firstmate-landing.lock" 'landing lock is released after the confirmed outcome'
+  pass 'Main serializes different firstmate tasks through their forge outcomes'
+)
+
 pr_merge_test_cases=(
+test_seeded_homes_cannot_create_a_second_landing_owner
+test_unreadable_landing_routing_refuses
+test_main_serializes_firstmate_landings
+test_firstmate_landings_belong_to_main_home
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
 test_author_verification_requires_exact_identity
