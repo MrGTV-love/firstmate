@@ -102,6 +102,27 @@ class CardRenderingTest(unittest.TestCase):
         self.assertIn('Evidence: /tmp/review.md\n', text)
         self.assertNotIn('PRIVATE_BODY_NOTES', text)
 
+    def test_evidence_uses_first_valid_candidate(self):
+        candidates = ('https://example.com/reason', 'https://example.com/pull/1',
+                      '/tmp/report.md', '/tmp/body.md')
+        for structured in (False, True):
+            for invalid in ('PR pending', 'https://bad url', None, 42):
+                for first_valid in range(len(candidates) + 1):
+                    with self.subTest(structured=structured, invalid=invalid, first_valid=first_valid):
+                        values = [invalid if index < first_valid else value
+                                  for index, value in enumerate(candidates)]
+                        reason = 'Decision sought: Wait?' if structured else 'Choose a rollout.'
+                        if isinstance(values[0], str):
+                            reason += '\nEvidence: ' + values[0]
+                        body = ['Evidence: ' + values[3]] if isinstance(values[3], str) else []
+                        text = self.render(reason, body, card={
+                            'pr_url': values[1], 'report_path': values[2]})
+                        if first_valid < len(candidates):
+                            self.assertIn('Evidence: ' + candidates[first_valid] + '\n', text)
+                            self.assertEqual(text.count('Evidence: '), 1)
+                        else:
+                            self.assertNotIn('Evidence:', text)
+
     def test_body_fields_do_not_include_unlabeled_prose(self):
         for structured in (False, True):
             for label in ('Decision sought', 'Brief', 'Recommendation', 'Alternatives', 'Evidence'):
@@ -240,6 +261,32 @@ class CardRefreshTest(unittest.TestCase):
             texts = [message['text'] for message in replay.state['messages']]
             self.assertIn('Question: Original question\n', texts[0])
             self.assertIn('Question: Revised question\n', texts[1])
+
+    def test_successful_refresh_allows_restoring_rejected_text(self):
+        with self.fixture() as (watch, replay, rows):
+            watch.mirror()
+            ts = watch.state['threads']['first:live']['ts']
+            replay.state['failures']['chat.update:' + ts] = {'status': 400, 'times': 1}
+            rows[0]['hold_reason'] = 'Question A'
+            watch.mirror()
+            watch.state = watch.load_state()
+            watch.mirror()
+            self.assertIn('Question: Original question\n', replay.state['messages'][0]['text'])
+            self.assertEqual([entry['method'] for entry in replay.state['log']].count('chat.update'), 0)
+            rows[0]['hold_reason'] = 'Question B'
+            watch.mirror()
+            self.assertIn('Question: Question B\n', replay.state['messages'][0]['text'])
+            watch.state = watch.load_state()
+            rows[0]['hold_reason'] = 'Question A'
+            watch.mirror()
+            message = replay.state['messages'][0]
+            self.assertEqual(message['ts'], ts)
+            self.assertIn('Question: Question A\n', message['text'])
+            watch.state = watch.load_state()
+            watch.mirror()
+            methods = [entry['method'] for entry in replay.state['log']]
+            self.assertEqual(methods.count('chat.update'), 2)
+            self.assertEqual(methods.count('chat.postMessage'), 2)
 
 
 def messages(path):

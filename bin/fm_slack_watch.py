@@ -378,7 +378,10 @@ class Watch:
         if card.get('recommend_value'):
             parts['Recommendation'] = card['recommend_value']
         parts.update(reason)
-        evidence = reason.get('Evidence') or card.get('pr_url') or card.get('report_path') or body.get('Evidence', '')
+        evidence = next((value for value in (reason.get('Evidence'), card.get('pr_url'),
+                                            card.get('report_path'), body.get('Evidence'))
+                         if isinstance(value, str) and
+                         (value.startswith('/') or re.match(r'^https?://[^\s]+$', value))), '')
         usable, missing = self.scope_state()
         usable = usable and reactions
         fields = [('Task: ', row['id'])]
@@ -402,7 +405,7 @@ class Watch:
                 fields.append(('Question: ', question))
             if parts.get('Recommendation'):
                 fields.append(('Recommendation: ', parts['Recommendation']))
-        if isinstance(evidence, str) and (evidence.startswith('/') or re.match(r'^https?://[^\s]+$', evidence)):
+        if evidence:
             fields.append(('Evidence: ', evidence))
         if options:
             fields.append(('Options:', ''))
@@ -666,6 +669,7 @@ class Watch:
                     self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
                     continue
                 record['text_digest'] = digest
+                record.pop('update_attempt_digest', None)
                 self.commit()
                 continue
             ts = self.post('card:' + occurrence, text)

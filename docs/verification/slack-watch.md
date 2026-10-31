@@ -57,8 +57,8 @@ Result: pass.
 Command: `fm-slack-mirror.sh --replay tests/fixtures/slack/card-payload/transcript.json`.
 
 The current format and its four-label authoring contract are owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
-On 2026-10-31, `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 tests/fm_slack_watch_test.py` printed `Ran 5 tests` and `OK`.
-Those renderer cases proved ordered multiline parts from a reordered hold reason, the long brief-label alias and explicit body fields, legacy fallback without placeholders or invalid evidence, a one-line answer instruction plus at most one disagreement line and the missing-scope warning, and oversized four-part cards retaining all headings, evidence, options, and the answer line within 38,000 characters without splitting Slack escapes.
+An earlier 2026-10-31 run of `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 tests/fm_slack_watch_test.py` was recorded as printing `Ran 5 tests` and `OK`; that historical count does not describe current-head coverage.
+The renderer cases cover ordered multiline parts from a reordered hold reason, the long brief-label alias and explicit body fields, legacy fallback without placeholders or invalid evidence, a one-line answer instruction plus at most one disagreement line and the missing-scope warning, and oversized four-part cards retaining all headings, evidence, options, and the answer line within 38,000 characters without splitting Slack escapes.
 The replay suite also exercises a legacy 45,000-character held question with two options, a whole under-budget 5,000-character question, and an oversized resolution notice; the fixture body sentinel must stay private in both cards and notices.
 The replay double rejects any post or update over 40,000 characters, as Slack does.
 
@@ -248,7 +248,8 @@ Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 w
 The in-place edit contract is owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
 These replay cases use the public mirror and poll commands with disposable task homes; they do not inspect the real DM.
 On 2026-10-31, the corrected renderer and update-failure handling were verified with `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`, which printed `ok - X44`, `ok - X45`, `ok - X46`, `ok - X47`, `ok - X48`, `ok - X49`, and `ok - all Slack watch checks`; its `FM_TEST_SUMMARY` reported `total=1 failed=0 skipped_gate=0`.
-The same process passed all six renderer cases, including partially labeled legacy reasons, and all earlier replay cases.
+That historical record also reports six renderer cases and earlier replay cases passing; it is not verification of the current head.
+The focused review-fix run on 2026-10-31, `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 tests/fm_slack_watch_test.py`, printed `Ran 12 tests` and `OK`. It exercised first-valid evidence selection across both card layouts and rejected A → successful B → restored A on the same message, including persisted state reloads and unchanged-text suppression. No shell suite, lint suite, or live DM check was run in that review-fix round.
 The intake-refusal and secret-scan suites, each run separately as `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/<suite>.test.sh -- bash bin/fm-test-run.sh tests/<suite>.test.sh --jobs 1` with `<suite>` set to `fm-slack-intake-unchanged` and `fm-slack-secret-scan`, printed `ok - intake refusals hold` and `ok - scan redacted and detected both planted copies`, respectively, and both summaries reported `failed=0`.
 `bash bin/fm-proc-budget.sh --own-procs 128 -- bash bin/fm-lint.sh tests/fm-slack-watch.test.sh` reported pinned ShellCheck 0.11.0 with full extended analysis and exited 0.
 No live Slack check was performed for this change.
