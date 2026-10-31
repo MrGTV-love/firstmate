@@ -3339,6 +3339,9 @@ validate_worktree_teardown_safety() {
       fi
       return 1
     fi
+    if [ -n "$TEARDOWN_BUNDLE_PROOF" ] && [ "$wt_real" != "$TEARDOWN_RETURN_SLOT" ]; then
+      teardown_bundle_ignored_kept "$wt_real" "teardown would remove task $ID's copy" || return 1
+    fi
   fi
 }
 
@@ -4693,6 +4696,20 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     }
   done
 }
+# A recorded bundle holds only commits: a copy it admits that teardown removes
+# still refuses while it holds ignored files that no hash record preserves.
+# The returned slot keeps its ignored files, so it needs no such proof.
+teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
+  local unique
+  if unique=$(teardown_preservable_ignored "$1"); then
+    [ -n "$unique" ] || return 0
+    echo "REFUSED: $2 $1, whose HEAD only recorded bundle $TEARDOWN_BUNDLE_ACCEPTED holds, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
+  else
+    echo "REFUSED: $2 $1, whose HEAD only recorded bundle $TEARDOWN_BUNDLE_ACCEPTED holds, but its ignored files cannot be listed${3:+; $3}." >&2
+  fi
+  echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
+  return 1
+}
 teardown_own_copy_disposable() {  # <canonical-copy>
   local copy=$1 what="recorded prior_worktree" rc=0
   [ "$copy" != "$TEARDOWN_ENCLOSING_SLOT" ] || what="claimed pool slot"
@@ -4701,7 +4718,13 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   case "$rc" in
     0) return 0 ;;
     2)
-      ! teardown_landed "$copy" HEAD "" || return 0
+      TEARDOWN_BUNDLE_ACCEPTED=
+      if teardown_landed "$copy" HEAD ""; then
+        [ -n "$TEARDOWN_BUNDLE_ACCEPTED" ] && [ "$copy" != "$TEARDOWN_RETURN_SLOT" ] || return 0
+        teardown_bundle_ignored_kept "$copy" "returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what" \
+          "$TEARDOWN_PROOF_OUTCOME"
+        return
+      fi
       echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; $TEARDOWN_PROOF_OUTCOME." >&2
       echo "Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown." >&2
       return 1

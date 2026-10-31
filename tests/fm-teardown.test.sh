@@ -3556,6 +3556,41 @@ test_bundle_does_not_excuse_dirty_copy() {
   pass 'a verified bundle never excuses uncommitted changes'
 }
 
+# A bundle covers only commits. A task copy or own prior copy that teardown
+# removes from inside the pool slot keeps its refusal while it holds an ignored
+# file no hash record preserves, as it did before bundles were accepted.
+test_bundle_does_not_excuse_nested_copy_ignored_files() {
+  local case_dir rc run shape nested
+  for run in nested:control nested:.claude/worktrees/side nested:nested/side enclosing:control enclosing:nested/current; do
+    shape=${run%%:*}
+    nested=${run#*:}
+    make_nested_slot_case "bundle-ignored-$shape-${nested//\//-}" "$shape" "${nested/#control/nested/control}"
+    case_dir=$NESTED_CASE
+    printf 'copy work\n' > "$NESTED_COPY/work.txt"
+    git -C "$NESTED_COPY" add work.txt
+    git -C "$NESTED_COPY" commit -qm 'unpublished copy work'
+    record_preservation_bundle "$case_dir" "$NESTED_COPY" "$case_dir/bundles/work.bundle" --all \
+      || fail 'cannot create bundle fixture'
+    if [ "$nested" = control ]; then
+      rc=0
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "$run: a bundle must still admit a copy with no unique ignored file: $(cat "$case_dir/stderr")"
+      assert_absent "$NESTED_COPY" "$run: bundled copy was not removed"
+      continue
+    fi
+    printf 'unique.dat\n' >> "$(git -C "$NESTED_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'only copy\n' > "$NESTED_COPY/unique.dat"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$run: a bundle must not excuse a copy's unpreserved ignored file: $(cat "$case_dir/stderr")"
+    assert_grep 'ignored files no hash record preserves: unique.dat' "$case_dir/stderr" "$run: ignored-file refusal missing"
+    assert_equals 'only copy' "$(cat "$NESTED_COPY/unique.dat")" "$run: unpreserved ignored file lost"
+    assert_present "$NESTED_COPY/.git" "$run: copy was removed"
+    assert_present "$case_dir/state/task-x1.meta" "$run: task was retired"
+    assert_absent "$case_dir/treehouse.log" "$run: pool slot was returned"
+  done
+  pass 'a verified bundle never excuses a removed copy holding unpreserved ignored files'
+}
 
 test_foreign_bundle_preservation_keeps_other_proofs() {
   local shape rc head pid real_cp
@@ -3751,6 +3786,7 @@ test_bundle_needs_the_copys_own_unlanded_tip
 test_bundle_hint_skips_a_moved_head_at_final_custody
 test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
+test_bundle_does_not_excuse_nested_copy_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs
 )
 
