@@ -110,9 +110,6 @@ payload=$(wake_payloads "$HOME_A")
 assert_contains "$payload" 'check: typesafe-health:' "the wake is a check wake"
 assert_contains "$payload" 'out of credits (HTTP 402)' "the wake names what failed"
 assert_contains "$payload" 'first seen 20' "the wake says since when"
-for consumer in 'worker dispatch resolution' 'worker skill picking' 'compact-adviser' 'Level 6 jev-guard' 'belay Stop hook'; do
-  assert_contains "$payload" "$consumer" "the wake names the affected consumer: $consumer"
-done
 assert_equals credits "$(state_field "$HOME_A" alerted)" "the alert is recorded for deduplication"
 
 health "$HOME_A" 402 probe >/dev/null

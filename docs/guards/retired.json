@@ -158,5 +158,16 @@
     "evidence": "data/fm-guard-policy-20261031/report.md action 9; data/fm-guard-retire-out-of-scope-belay/report.md",
     "replaced_by": "nothing; the brief template retains the exclusion heading and review judges scope against the verification plan",
     "retirement_test": "tests/fm-retired-spawn-brief-out-of-scope.test.sh"
+  },
+  {
+    "id": "jev-belay-stop",
+    "system": "firstmate",
+    "invariant": "a turn that reports work as done names evidence the transcript or tests actually carry",
+    "retired": "2026-10-31",
+    "tier": "A",
+    "why": "no recorded catch; an uninstrumented fail-open model proxy at Stop can hold a headless worker busy, while independent review and DoD grading already judge the actual evidence",
+    "evidence": "data/fm-guard-policy-20261031/report.md action 10; data/fm-guard-retire-out-of-scope-belay/report.md (installed TypeSafe guidance assessment)",
+    "replaced_by": "nothing; ordinary Claude Stop lifecycle reporting remains, and task evidence stays with review and DoD grading",
+    "retirement_test": "tests/fm-retired-jev-belay-stop.test.sh"
   }
 ]

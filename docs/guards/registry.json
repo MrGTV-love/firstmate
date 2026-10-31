@@ -878,27 +878,6 @@
       "remedy_verified": "fixture"
     },
     {
-      "id": "jev-belay-stop",
-      "owner": "bin/fm-jev-belay-hook.sh",
-      "invariant": "a turn that reports work as done names evidence the transcript or tests actually carry",
-      "layer": "runtime-block",
-      "source": "Belay model judgment over the Stop payload plus the completed-work evidence in the transcript",
-      "trigger": "the judgment finds a completion claim with no supporting evidence and the model answered",
-      "decision": "deny",
-      "fail_direction": "open",
-      "proxy": true,
-      "proxy_reason": "a model judgment is the only available judge for 'does this completion claim have evidence'; a deterministic source would be a citation parser the audit did not authorize",
-      "remedy": "state the evidence and rerun the turn: cite the file, command, or test output that proves the claim, or bin/fm-jev-belay-hook.sh < stop-payload replays the judgment for one payload",
-      "budget": 1,
-      "test": "tests/fm-jev-guard.test.sh",
-      "tier": "A",
-      "harm": "reversible",
-      "telemetry": "state/guard-events.jsonl",
-      "instrumented": false,
-      "exemptions": [],
-      "exemptions_note": "fail-open on a model outage is disclosed here, not silent"
-    },
-    {
       "decision": "deny",
       "fail_direction": "closed",
       "proxy": false,

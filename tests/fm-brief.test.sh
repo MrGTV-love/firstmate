@@ -1741,7 +1741,7 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
   local home="$TMP_ROOT/budget-foreign-home" mode id brief rule command got
   local foreign_root="$TMP_ROOT/budget helper's root"
   mkdir -p "$home/data" "$foreign_root/bin"
-  cp "$ROOT/bin/fm-proc-budget.sh" "$foreign_root/bin/"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$ROOT/bin/fm-proc-info.py" "$foreign_root/bin/"
   for mode in no-mistakes direct-PR local-only scout; do
     id="brief-budget-foreign-$mode"
     if [ "$mode" = scout ]; then
