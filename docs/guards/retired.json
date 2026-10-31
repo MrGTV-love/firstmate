@@ -148,5 +148,15 @@
     "evidence": "data/fm-cd-guard-warn-not-block/harm-reassessment-inbox018.md; data/fm-remove-cd-guard-fix-cwd-writes/pr-evidence.md (cwd-relative writer harm analysis)",
     "replaced_by": "home-resolving writers: bin/fm-tasks-axi.sh resolves a relative home against the starting folder before any backlog write, and tests/fm-home-writes.test.sh runs firstmate-owned writes from a foreign folder and asserts they land in the home",
     "retirement_test": "tests/fm-retired-persistent-cd-guard.test.sh"
+  },
+  {
+    "id": "spawn-brief-out-of-scope",
+    "system": "firstmate",
+    "invariant": "a fresh dispatch refuses a brief whose scaffolded exclusion list is still blank",
+    "retired": "2026-10-31",
+    "why": "zero fires in 99 opportunities; a blank exclusion heading and None mean the same thing, so the refusal checks form rather than scope safety",
+    "evidence": "data/fm-guard-policy-20261031/report.md action 9; data/fm-guard-retire-out-of-scope-belay/report.md",
+    "replaced_by": "nothing; the brief template retains the exclusion heading and review judges scope against the verification plan",
+    "retirement_test": "tests/fm-retired-spawn-brief-out-of-scope.test.sh"
   }
 ]
