@@ -10,18 +10,22 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
-# For the installation's own publication target (fm-role-lib.sh resolves the
-# remote identity), only its primary Git worktree is the landing home. A seeded
-# home's parent chain selects the Main installation, including separate local
-# clones; a remote or unreadable parent requires a parent-channel handoff.
-# Repair and secondmate homes hand the ready PR and review to that Main home instead
-# of merging independently. An unreadable target or primary-worktree record
-# stops the merge before bookkeeping. Its state/.firstmate-landing.lock serializes all
-# self-repository tasks from verification through the confirmed outcome and
-# notification. Other project repositories retain their existing merge path.
+# A PR can be a Firstmate landing when its task copy shares Firstmate's Git
+# history or its repository is any remote of this code root. Such a landing runs
+# only in an unseeded primary Git worktree whose default publication target
+# (fm-role-lib.sh) is the PR's repository. Other homes refuse before bookkeeping
+# and name the next step: a seeded home's parent chain names Main or requires a
+# parent-channel handoff, and a standalone repair clone holds no record of Main's
+# path, so it names <main-home> by its publication target. An unreadable target
+# or primary-worktree record refuses the same way. --register creates Main's task
+# record from the source home's record; it never grants merge authority.
+# Main's state/.firstmate-landing.lock serializes all such landings from
+# verification through the confirmed outcome and notification. Every other
+# project keeps its existing merge path, with no lock.
 # .agents/skills/ship-landing/SKILL.md owns the train planning procedure.
 # This is installation-local coordination, not a lock against external forge
-# users or independent installations; the live tree and head checks still apply.
+# users or independent installations, including a clone that shares Main's
+# publication target; the live tree and head checks still apply.
 #
 # Every supported forge verifies recorded review evidence inside the away-record
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
@@ -220,6 +224,7 @@
 # away-record read, or a captain hold.
 #
 # Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [--allow-missing <check-name>] [-- <extra forge merge args>]
+#        fm-pr-merge.sh --register <source-home> <task-id> <pr-url>
 #
 # On GitLab, this script confirms the MR is actually merged before reporting it;
 # an auto-merge-queued or unconfirmed request leaves the poll armed and records
@@ -245,6 +250,15 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 # shellcheck source=bin/fm-afk-contract.sh
 . "$SCRIPT_DIR/fm-afk-contract.sh"
 
+REGISTER_FROM=
+if [ "${1:-}" = --register ]; then
+  if [ "$#" -ne 4 ]; then
+    echo "error: usage: fm-pr-merge.sh --register <source-home> <task-id> <pr-url>" >&2
+    exit 2
+  fi
+  REGISTER_FROM=$2
+  shift 2
+fi
 if [ "$#" -lt 2 ]; then
   echo "error: invalid PR merge request" >&2
   exit 2
@@ -491,32 +505,31 @@ META="$STATE/$ID.meta"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
-if [ ! -f "$META" ] || [ -L "$META" ]; then
-  echo "error: task metadata is unavailable" >&2
-  exit 1
-fi
-if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
-  exit 1
-fi
-MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
-
-# Firstmate's own publication target has one landing owner: the primary
-# worktree of this installation, not whichever repair/secondmate home calls.
-# This is routing, not merge authority; every gate below still applies in Main.
+# Firstmate's own repository has one landing owner. A PR can be that landing when
+# its task copy shares Firstmate's history or its repository is any remote of this
+# code root. Which remote a home publishes to by default does not decide this: a
+# repair clone defaults to its upstream while its PRs land on its origin.
 # shellcheck source=bin/fm-role-lib.sh
 . "$SCRIPT_DIR/fm-role-lib.sh"
-MERGE_LANDING_LOCK=
-landing_target=$(fm_role_publication_target "$FM_ROOT")
-if [ -z "$landing_target" ]; then
-  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
-  printf 'error: refusing a landing with an unreadable installation publication target; restore the intended remote with: git -C %q remote set-url origin <canonical-repository-url>, then re-run this merge\n' "$FM_ROOT" >&2
-  exit 1
-fi
-if [ "$landing_target" = "$(fm_role_scope_norm "$PR_HOST/$PR_PATH")" ]; then
-  landing_home=
-  landing_root=$FM_ROOT
-  landing_parent=false
+LANDING_REPO=$(fm_role_scope_norm "$PR_HOST/$PR_PATH")
+firstmate_landing_possible() {  # <task-worktree>
+  local remote url
+  if [ -n "$1" ] && fm_role_self_repo "$1" "$FM_ROOT"; then
+    return 0
+  fi
+  while IFS= read -r remote; do
+    url=$(git -C "$FM_ROOT" remote get-url "$remote" 2>/dev/null) || continue
+    [ "$(fm_role_remote_identity "$url" "$FM_ROOT")" != "$LANDING_REPO" ] || return 0
+  done < <(git -C "$FM_ROOT" remote 2>/dev/null)
+  return 1
+}
+
+# The landing home is an unseeded primary worktree that publishes to the PR's
+# repository by default. This is routing, not merge authority; every gate below
+# still applies in Main. Anything else refuses and exits with its next step.
+firstmate_landing_route() {
+  local landing_home='' landing_root=$FM_ROOT landing_parent=false landing_line caller_home
+  local landing_target landing_remote remote main_q caller_q
   if [ -e "$FM_HOME/.fm-secondmate-parent" ] || [ -L "$FM_HOME/.fm-secondmate-parent" ]; then
     landing_parent=true
     landing_root=$(fm_firstmate_root_home "$FM_HOME") || landing_root=
@@ -538,19 +551,120 @@ if [ "$landing_target" = "$(fm_role_scope_norm "$PR_HOST/$PR_PATH")" ]; then
     landing_home=$(CDPATH='' cd -- "$landing_home" 2>/dev/null && pwd -P) || landing_home=
   fi
   caller_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || caller_home=
-  if [ -z "$landing_home" ] || [ "$caller_home" != "$landing_home" ]; then
-    "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok "$([ -n "$landing_home" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
-    printf 'error: refusing a firstmate landing outside its Main home %s; ' "${landing_home:-(unreadable)}" >&2
-    if [ -z "$landing_home" ] && [ "$landing_parent" = true ]; then
-      printf 'hand the ready PR and review to Main through the existing secondmate parent channel; if that channel cannot resolve Main, repair .fm-secondmate-parent before retrying\n' >&2
-    elif [ -z "$landing_home" ]; then
-      printf 'restore the primary worktree registration, confirm it with git -C %q worktree list --porcelain, then re-run this merge\n' "$FM_ROOT" >&2
-    else
-      printf 'register the ready PR and its review in Main, place it in Main\047s train order, then run: FM_HOME=%q %q %q %q\n' \
-        "$landing_home" "$landing_home/bin/fm-pr-merge.sh" "$ID" "$URL" >&2
+  main_q=
+  [ -z "$landing_home" ] || main_q=$(printf '%q' "$landing_home")
+  if [ -n "$landing_home" ] && [ "$caller_home" = "$landing_home" ]; then
+    landing_target=$(fm_role_publication_target "$landing_root")
+    if [ -z "$landing_target" ]; then
+      landing_remote='remote add origin'
+      for remote in upstream github origin; do
+        if git -C "$landing_root" remote get-url "$remote" >/dev/null 2>&1; then
+          landing_remote="remote set-url $remote"
+          break
+        fi
+      done
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
+      printf 'error: refusing a landing with an unreadable installation publication target; restore the intended remote with: git -C %q %s <canonical-repository-url>, then re-run this merge\n' "$landing_root" "$landing_remote" >&2
+      exit 1
     fi
+    [ "$landing_target" != "$LANDING_REPO" ] || return 0
+    # A standalone clone holds no record that names Main, so it says which home
+    # to find rather than guessing a path.
+    main_q='<main-home>'
+    printf 'note: this home publishes to %s, not %s; <main-home> is the primary home whose default publication target is %s\n' \
+      "$landing_target" "$LANDING_REPO" "$LANDING_REPO" >&2
+  fi
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok "$([ -n "$main_q" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+  printf 'error: refusing a firstmate landing outside its Main home %s; ' "${main_q:-(unreadable)}" >&2
+  if [ -z "$main_q" ] && [ "$landing_parent" = true ]; then
+    printf 'hand the ready PR and review to Main through the existing secondmate parent channel; if that channel cannot resolve Main, repair .fm-secondmate-parent before retrying\n' >&2
+  elif [ -z "$main_q" ]; then
+    printf 'restore the primary worktree registration, confirm it with git -C %q worktree list --porcelain, then re-run this merge\n' "$FM_ROOT" >&2
+  else
+    caller_q=$(printf '%q' "${caller_home:-$FM_HOME}")
+    printf 'register the PR in Main: FM_HOME=%s %s/bin/fm-pr-merge.sh --register %s %q %q; record its exact-head review there: FM_HOME=%s %s/bin/fm-review-record.py review --pr %q --head <exact-head> plus the fields its header names; place it in Main\047s train order; then run: FM_HOME=%s %s/bin/fm-pr-merge.sh %q %q\n' \
+      "$main_q" "$main_q" "$caller_q" "$ID" "$URL" "$main_q" "$main_q" "$URL" "$main_q" "$main_q" "$ID" "$URL" >&2
+  fi
+  exit 1
+}
+
+# Register a ready PR from another home as an ordinary windowless ship record in
+# Main, with its own detached copy of the source head. fm-teardown.sh retires it
+# like any task whose endpoint is gone. It grants nothing: the merge still needs
+# its exact-head review and every live gate.
+register_firstmate_landing() {  # <source-home>
+  local source_meta="$1/state/$ID.meta" source_wt kind models head copy
+  if [ ! -f "$source_meta" ] || [ -L "$source_meta" ]; then
+    echo "error: cannot register $ID: no task record at $source_meta" >&2
     exit 1
   fi
+  if [ -e "$META" ] || [ -L "$META" ]; then
+    echo "error: cannot register $ID: this home already has a task record at $META; use another task id or retire that record" >&2
+    exit 1
+  fi
+  source_wt=$(grep '^worktree=' "$source_meta" | tail -1 | cut -d= -f2- || true)
+  kind=$(grep '^kind=' "$source_meta" | tail -1 | cut -d= -f2- || true)
+  if [ "${kind:-ship}" != ship ]; then
+    echo "error: cannot register $ID: only a ship task carries a landing; this record is kind=$kind" >&2
+    exit 1
+  fi
+  if ! firstmate_landing_possible "$source_wt"; then
+    echo "error: cannot register $ID: $URL is not a landing of this installation; land it from its own home" >&2
+    exit 1
+  fi
+  firstmate_landing_route
+  # A registered record has one model line and no spawn history, so a task with
+  # several authors would lose review-coverage evidence. Refuse that shape.
+  models=$( {
+    grep '^model=' "$source_meta" | cut -d= -f2- || true
+    [ ! -f "$1/state/$ID.launch-models" ] || cut -f3 "$1/state/$ID.launch-models"
+    [ ! -f "$1/state/$ID.control-relaunch.meta-prior" ] \
+      || { grep '^model=' "$1/state/$ID.control-relaunch.meta-prior" | cut -d= -f2- || true; }
+  } | grep . | sort -u | wc -l)
+  if [ "$models" -gt 1 ]; then
+    echo "error: cannot register $ID: it ran under $models models, and a registered record keeps one; spawn its landing in Main with bin/fm-spawn.sh instead" >&2
+    exit 1
+  fi
+  if ! head=$(git -C "$source_wt" rev-parse --verify 'HEAD^{commit}' 2>/dev/null); then
+    echo "error: cannot register $ID: its task copy $source_wt has no readable head; restore that copy, then retry" >&2
+    exit 1
+  fi
+  copy="$FM_HOME/data/$ID/landing"
+  mkdir -p "$FM_HOME/data/$ID"
+  git -C "$FM_HOME" fetch -q "$source_wt" HEAD
+  git -C "$FM_HOME" worktree add -q --detach "$copy" "$head"
+  umask 077
+  {
+    printf 'worktree=%s\nproject=%s\nkind=ship\nregistered_from=%s\n' "$copy" "$FM_HOME" "$1"
+    grep -E '^(model|branch|mode)=' "$source_meta" || true
+  } > "$META.tmp.$$"
+  if ! ln -- "$META.tmp.$$" "$META" 2>/dev/null; then
+    rm -f -- "$META.tmp.$$"
+    echo "error: cannot register $ID: another task record appeared at $META; nothing was registered" >&2
+    exit 1
+  fi
+  rm -f -- "$META.tmp.$$"
+  printf 'registered %s in %s at %s; record its exact-head review here, then merge\n' "$URL" "$META" "$head"
+}
+
+if [ -n "$REGISTER_FROM" ]; then
+  register_firstmate_landing "$REGISTER_FROM"
+  exit 0
+fi
+
+if [ ! -f "$META" ] || [ -L "$META" ]; then
+  echo "error: task metadata is unavailable" >&2
+  exit 1
+fi
+if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+  echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  exit 1
+fi
+MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
+
+MERGE_LANDING_LOCK=
+if firstmate_landing_possible "$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)"; then
+  firstmate_landing_route
   MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
   "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner allow --cleared-by route-to-main 2>/dev/null
 fi
