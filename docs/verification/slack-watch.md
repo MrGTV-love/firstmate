@@ -1,8 +1,9 @@
 # Slack watch verification
 
-Date: 2026-10-30 for the three latest full `tests/fm-slack-watch.test.sh` runs, which added X24 through X32, then X33 through X40, then X41 through X43; the 2026-10-23 targeted suite run, the 2026-10-22 replay refresh, and the 2026-10-19 live read-only probe are recorded separately below.
+Date: 2026-10-31 for the four-part renderer and current-card refresh verification; earlier replay and read-only scope evidence is recorded separately below.
 Host: macOS arm64, shared operator host.
-Validation tool: no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
+Current verification tools: Python 3.13.6, tasks-axi 0.2.6, ShellCheck 0.11.0.
+Earlier pipeline evidence used no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
 No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
 Every Slack response came from `--replay` transcripts under `tests/fixtures/slack/`.
 Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <tmpdir>`.
@@ -55,19 +56,11 @@ Result: pass.
 
 Command: `fm-slack-mirror.sh --replay tests/fixtures/slack/card-payload/transcript.json`.
 
-Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evidence:`, a line telling the captain to reply in the thread, a line saying `Messages typed in the main DM window are not read.`, and `If you both tap and type:`.
-`with-options` carried `Recommendation: ship`, `Evidence: /tmp/evidence-with-options.md`, and a numbered option block.
-`no-options` carried no option block.
-`no-recommendation` rendered `Recommendation: none recorded` and `Evidence: none recorded` for its invalid evidence value.
-Exactly two `none recorded` occurrences appeared across the three cards.
-On 2026-10-22, the strengthened regression first failed before the repair with `not ok - DOD-02 oversized card lost its option block: missing [Options:]`.
-After the repair, a fourth task with a 45,000-character body and a 45,000-character held question preserved all six required card parts: task id, decision/question, recommendation, evidence, both numbered options, and the disagreement rule.
-Its rendered card stayed within 38,000 characters and omitted the `PRIVATE_TASK_BODY` sentinel from both the card and the resolution notice.
-Answering that task closed it; its `Resolved: oversized-card` notice posted without a transport failure and the thread was retired.
-A fifth task whose 5,000-character held question fits the budget was posted whole, with no `...` cut.
-A staged notice of 45,000 characters was posted cut to the 38,000-character post bound, ending with `Full text remains in the local backlog.`, with no transport failure.
-The replay double rejects any post over 40,000 characters, as Slack does.
-Result: pass.
+The current format and its four-label authoring contract are owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
+On 2026-10-31, `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 tests/fm_slack_watch_test.py` printed `Ran 5 tests` and `OK`.
+Those renderer cases proved ordered multiline parts from a reordered hold reason, the long brief-label alias and explicit body fields, legacy fallback without placeholders or invalid evidence, a one-line answer instruction plus at most one disagreement line and the missing-scope warning, and oversized four-part cards retaining all headings, evidence, options, and the answer line within 38,000 characters without splitting Slack escapes.
+The replay suite also exercises a legacy 45,000-character held question with two options, a whole under-budget 5,000-character question, and an oversized resolution notice; the fixture body sentinel must stay private in both cards and notices.
+The replay double rejects any post or update over 40,000 characters, as Slack does.
 
 ## DOD-03 - typed reply through the existing intake
 
@@ -81,9 +74,9 @@ Result: pass.
 
 Commands: `fm-slack-mirror.sh` then `fm-slack-poll.sh` with `reaction-answer`, `single-char-answer`, and `free-nine`.
 
-Observed: `reaction-answer` rendered `Affordance: reaction` and recorded `Answer: wait`, option 2's value, with `Answer as shown to the captain: Wait`, its label.
+Observed: `reaction-answer` recorded `Answer: wait`, option 2's value, with `Answer as shown to the captain: Wait`, its label.
 The unauthorized reaction for option 3, the unbound `heart` reaction, and the reaction on a non-card message were ignored.
-`single-char-answer` rendered `Affordance: single-character` and recorded `Answer: wait` with the label `Wait`.
+`single-char-answer` recorded `Answer: wait` with the label `Wait`.
 `free-nine` recorded `Answer: 9` as free text against a three-option card.
 Result: pass.
 
@@ -176,7 +169,8 @@ Result: pass.
 
 Commands: `fm-slack-mirror.sh` then `fm-slack-poll.sh` with `missing-scope`.
 
-Observed: `slack: missing reaction scope: reactions:read, users:read` once, `Affordance: single-character` on the card, and a typed `2` reply that still closed `scope-call` with `Answer: wait`.
+Observed: `slack: missing reaction scope: reactions:read, users:read` once and a typed `2` reply that still closed `scope-call` with `Answer: wait`.
+The current card retains the missing-scope warning and directs the reader to type an option number rather than tap.
 The poll after the mirror did not repeat the diagnostic, because the missing set had not changed; a poll alone on a fresh home printed it once.
 Result: pass.
 
@@ -248,6 +242,21 @@ Result: pass.
 
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
+
+## X44..X47 - current-card refresh
+
+The in-place edit contract is owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
+These replay cases use the public mirror and poll commands with disposable task homes; they do not inspect the real DM.
+On 2026-10-31, `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1` printed `ok - X44`, `ok - X45`, `ok - X46`, `ok - X47`, `ok - all Slack watch checks`, and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1327662`.
+The same process ran the five renderer cases and all earlier replay cases.
+The intake-refusal and secret-scan suites, each run separately as `bash bin/fm-proc-budget.sh --own-procs 128 -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/<suite>.test.sh -- bash bin/fm-test-run.sh tests/<suite>.test.sh --jobs 1` with `<suite>` set to `fm-slack-intake-unchanged` and `fm-slack-secret-scan`, printed `ok - intake refusals hold` and `ok - scan redacted and detected both planted copies`, respectively, and both summaries reported `failed=0`.
+`bash bin/fm-proc-budget.sh --own-procs 128 -- bash bin/fm-lint.sh tests/fm-slack-watch.test.sh` reported pinned ShellCheck 0.11.0 with full extended analysis and exited 0.
+No live Slack check was performed for this change.
+
+- X44 checks that a rewritten active hold reason causes one `chat.update` to the original timestamp, zero new posts, and unchanged thread options and reactions; fresh poll and mirror processes must then leave the card alone.
+- X45 checks that changing the option set leaves the original text and answer bindings unchanged and posts nothing.
+- X46 checks pre-digest layout migration in place with a one-write poll budget, followed by an unchanged restart and no new cards.
+- X47 checks that retired and replaced threads are never edited and that only a genuinely new hold lifecycle creates another card.
 
 ## X1..X43 - review-round regressions
 

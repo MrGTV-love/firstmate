@@ -179,18 +179,22 @@ def parse_options(lines):
 
 
 def parse_fields(lines):
-    recommendation = ''
-    evidence = ''
+    fields, current = {}, None
     for line in lines:
-        match = re.match(r'^\s*Recommendation:\s*(.*)$', line)
+        match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
         if match:
-            recommendation = match.group(1).strip()
-        match = re.match(r'^\s*Evidence:\s*(.*)$', line)
-        if match:
-            evidence = match.group(1).strip()
-    if not (evidence.startswith('/') or re.match(r'^https?://[^\s]+$', evidence)):
-        evidence = ''
-    return recommendation, evidence
+            current = match.group(1)
+            if current == 'Brief description of issue':
+                current = 'Brief'
+            fields[current] = match.group(2).strip()
+            if current == 'Evidence':
+                current = None
+        elif OPTION_LINE.match(line):
+            current = None
+        elif current:
+            fields[current] += '\n' + line.strip()
+    return {key: value.strip() for key, value in fields.items()
+            if value.strip() and value.strip().lower() != 'none recorded'}
 
 
 def option_from_board(card):
@@ -362,42 +366,52 @@ class Watch:
     def card_payload(self, row, card, text_only=False):
         lines = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
-        recommendation, evidence = parse_fields(lines)
-        if isinstance(card, dict):
-            recommendation = card.get('recommend_value') or recommendation
-            evidence = card.get('pr_url') or card.get('report_path') or evidence
-        if not (isinstance(evidence, str) and (evidence.startswith('/')
-                or re.match(r'^https?://[^\s]+$', evidence))):
-            evidence = ''
+        body = parse_fields(lines)
+        reason = parse_fields((row.get('hold_reason') or '').splitlines())
+        parts = dict(body)
+        if card.get('recommend_value'):
+            parts['Recommendation'] = card['recommend_value']
+        parts.update(reason)
+        evidence = reason.get('Evidence') or card.get('pr_url') or card.get('report_path') or body.get('Evidence', '')
         usable, missing = self.scope_state()
-        fields = [('Task: ', row['id']),
-                  ('Decision: ', card.get('title') or row.get('title') or row['id'])]
-        if card.get('about'):
-            fields.append(('About: ', card['about']))
-        question = card.get('decide') or row.get('hold_reason')
-        if question:
-            fields.append(('Question: ', question))
-        fields.extend([('Recommendation: ', recommendation or 'none recorded'),
-                       ('Evidence: ', evidence or 'none recorded')])
+        fields = [('Task: ', row['id'])]
+        structured = any(key != 'Evidence' for key in reason) or any(
+            key in body for key in ('Decision sought', 'Brief', 'Alternatives'))
+        if structured:
+            for key, label in (('Decision sought', 'Decision sought: '),
+                               ('Brief', 'Brief description of issue: '),
+                               ('Recommendation', 'Recommendation and key reasons: '),
+                               ('Alternatives', 'Alternatives considered: ')):
+                if parts.get(key):
+                    fields.append((label, parts[key]))
+        else:
+            fields.append(('Decision: ', card.get('title') or row.get('title') or row['id']))
+            if card.get('about'):
+                fields.append(('About: ', card['about']))
+            question = card.get('decide') or row.get('hold_reason')
+            if question:
+                fields.append(('Question: ', question))
+            if parts.get('Recommendation'):
+                fields.append(('Recommendation: ', parts['Recommendation']))
+        if isinstance(evidence, str) and (evidence.startswith('/') or re.match(r'^https?://[^\s]+$', evidence)):
+            fields.append(('Evidence: ', evidence))
         if options:
             fields.append(('Options:', ''))
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
-        fields = [(prefix, slack_escape(value)) for prefix, value in fields]
-        footer = ['Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character')]
+        fields = [(prefix, slack_escape(value)) for prefix, value in fields
+                  if str(value).strip().lower() != 'none recorded']
         if usable and options:
-            footer.append('React with ' + '/'.join(REACTIONS[:len(options)])
-                          + ' or reply in this thread with the option number.')
+            footer = ['Tap a number reaction or type the option number in this thread.']
         elif options:
-            footer.append('Reply in this thread with the option number.')
+            footer = ['Type the option number in this thread.']
         else:
-            footer.append('Reply in this thread with your answer.')
-        footer.append('Messages typed in the main DM window are not read.')
-        footer.append('If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.')
+            footer = ['Type your answer in this thread.']
+        if options:
+            footer.append('If you both tap and type: disagreement records neither answer.')
         if not usable:
             footer.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
-        footer.append('Full decision remains in the local backlog.')
         text = '\n'.join([prefix + value for prefix, value in fields] + footer)
         if len(text) <= CARD_LIMIT:
             return text, options, usable
@@ -601,7 +615,10 @@ class Watch:
         candidates = [r for r in rows if r.get('id') and r.get('hold_kind') == 'captain'
                       and r.get('state') != 'done']
         generated, cards = self.board()
+        writes = 0
         for row in candidates:
+            if writes >= self.cap:
+                break
             key = row['id']
             rc, identity = self.probe(key)
             if rc == 1:
@@ -609,7 +626,8 @@ class Watch:
             if rc == 2:
                 identity = 'uncertain'
             occurrence = key + ':' + identity
-            if occurrence in self.state['threads']:
+            record = self.state['threads'].get(occurrence)
+            if record and (record.get('retired') or rc != 0):
                 continue
             # Uncertain open-state is deliberately shown rather than hidden.
             if not self.state.get('channel'):
@@ -620,14 +638,25 @@ class Watch:
                 card = {}
             text, options, usable = self.card_payload(row, card, text_only)
             self.scope_notice()
-            # Re-check immediately before the network post.
+            digest = hashlib.sha256(text.encode()).hexdigest()
+            if record and (record.get('options') != options or record.get('text_digest') == digest):
+                continue
+            # Re-check immediately before the network write.
             again, current = self.probe(key)
             if again == 1 or (current if again == 0 else 'uncertain') != identity:
                 continue
+            if record:
+                self.api.call('chat.update', channel=self.owner_channel(), ts=record['ts'],
+                              text=text, unfurl_links=False, unfurl_media=False)
+                record['text_digest'] = digest
+                self.commit()
+                writes += 1
+                continue
             ts = self.post('card:' + occurrence, text)
+            writes += 1
             record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
                       'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
-                      'reactions': usable, 'retired': False}
+                      'reactions': usable, 'retired': False, 'text_digest': digest}
             self.state['threads'][occurrence] = record
             self.commit()
             if usable and 'reactions:write' in getattr(self.api, 'scopes', set()) and options:

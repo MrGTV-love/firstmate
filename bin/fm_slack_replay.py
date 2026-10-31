@@ -127,6 +127,17 @@ class Replay:
                       'channel': channel, 'thread_ts': fields.get('thread_ts'),
                       'ts': ts, 'text': fields.get('text', '')})
             data = {'ok': True, 'ts': ts, 'channel': channel}
+        elif method == 'chat.update':
+            channel, ts = fields.get('channel'), fields.get('ts')
+            if channel != self.transcript.get('channel', 'D0123456789'):
+                raise SlackError('channel_not_found')
+            message = next((m for m in self.state['messages'] if m.get('ts') == ts), None)
+            if message is None or len(fields.get('text', '')) > 40000:
+                raise SlackError('api_error')
+            message['text'] = fields['text']
+            self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
+                      'channel': channel, 'ts': ts, 'text': fields['text']})
+            data = {'ok': True, 'ts': ts, 'channel': channel, 'text': fields['text']}
         elif method == 'reactions.get':
             timestamp = fields.get('timestamp')
             message = next((m for m in self.state['messages'] if m.get('ts') == timestamp), None)
