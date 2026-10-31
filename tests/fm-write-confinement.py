@@ -260,13 +260,13 @@ def child(manifest):
     other_branch = git("-C", str(worktree), "rev-parse", "fm/other").stdout
     git("-C", str(worktree), "update-ref", "refs/heads/fm/other", "HEAD")
     results["refused-other-branch"] = git("-C", str(worktree), "rev-parse", "fm/other").stdout == other_branch
-    # The custody-return route creates this task's own archive branches, the
-    # one-level names archive/task-<name>. They must work with the route's own
-    # git commands, while no other ref name does: another task's archive, ids
-    # that contain, are part of or extend this task's id, a name one folder
-    # deeper and a name outside archive/. No case-only variant of an own name
-    # is tried: the default macOS volume is case-insensitive, so that path is
-    # the very same file and the kernel treats it as one.
+    # The custody-return route creates this task's own archive branches. They
+    # must work with the route's own git commands, while no other ref name
+    # does: another task's archive, ids that contain or extend this task's id,
+    # including tasks created after the profile was built, names outside the
+    # two documented shapes and a name outside archive/. No case-only variant
+    # of an own name is tried: the default macOS volume is case-insensitive,
+    # so that path is the very same file and the kernel treats it as one.
     def ref_exists(name):
         return git("-C", str(worktree), "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
 
@@ -276,9 +276,7 @@ def child(manifest):
         return failed
 
     head, base = (git("-C", str(worktree), "rev-parse", ref).stdout.strip() for ref in ("HEAD", "HEAD~1"))
-    for label, name in (("submitted", "archive/task-submitted"), ("pipeline", "archive/task-pipeline"),
-                        ("submitted-hex", "archive/task-submitted-0123abcd"), ("pipeline-hex", "archive/task-pipeline-89abcdef"),
-                        ("other-shape", "archive/task-other-0123abcd")):
+    for label, name in (("submitted", "archive/task-submitted-0123abcd"), ("pipeline", "archive/task-pipeline-89abcdef")):
         created = git("-C", str(worktree), "branch", name, head)
         again = git("-C", str(worktree), "branch", name, head)
         moved = git("-C", str(worktree), "update-ref", "refs/heads/" + name, base, head)
@@ -292,22 +290,32 @@ def child(manifest):
                         ("extending-id", "archive/task-2-submitted-0123abcd"),
                         ("contained-id", "archive/tas-submitted-0123abcd"),
                         ("containing-id", "archive/xtask-submitted-0123abcd"),
+                        # Tasks recorded only after the profile was built.
+                        ("late-extending-id", "archive/task-late-submitted-0123abcd"),
+                        ("late-shape-id", "archive/task-pipeline-pipeline-0123abcd"),
+                        ("own-id-other-shape", "archive/task-other-0123abcd"),
+                        ("own-id-no-hex", "archive/task-submitted"),
+                        ("own-id-short-hex", "archive/task-submitted-0123abc"),
+                        ("own-id-long-hex", "archive/task-submitted-0123abcde"),
+                        ("own-id-non-hex", "archive/task-submitted-0123abcg"),
+                        ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
                         ("own-id-alone", "archive/task"),
-                        ("own-id-no-hyphen", "archive/tasksubmitted"),
-                        ("own-id-nested", "archive/task-nested/submitted"),
+                        ("own-id-nested", "archive/task-submitted-0123abcd/more"),
                         ("outside-archive", "task-submitted-0123abcd")):
         results[f"refused-archive-{label}"] = ref_refused(name)
+    results["late-tasks-recorded"] = all(Path(path).exists() for path in manifest["late_tasks"])
     common = Path(manifest["packed_refs"]).parent
     for folder in ("refs/heads", "logs/refs/heads"):
-        shutil.rmtree(common / folder / "archive/task-nested", ignore_errors=True)  # the deeper name's folder Git leaves behind
+        shutil.rmtree(common / folder / "archive/task-submitted-0123abcd", ignore_errors=True)  # the deeper name's folder Git may leave
         (common / folder / "archive").mkdir(exist_ok=True)  # unconfined Git removes it with its last ref
-    for label, name in (("other-task", "other-submitted-0123abcd"), ("extending-id", "task-2-submitted-0123abcd")):
+    for label, name in (("other-task", "other-submitted-0123abcd"), ("extending-id", "task-2-submitted-0123abcd"),
+                        ("late-extending-id", "task-late-pipeline-0123abcd")):
         reflog_path = common / "logs/refs/heads/archive" / name
         results[f"refused-archive-reflog-{label}"] = refused(reflog_path)
         reflog_path.unlink(missing_ok=True)  # leave the unconfined control clean
     # An own archive name must not become a second name for another task's
     # branch: a hard link to it, a symbolic link to it or to its folder, or a
-    # rename of it into the archive namespace.
+    # rename of it onto an own archive name.
     other_ref, archive = common / "refs/heads/fm/other", common / "refs/heads/archive"
     other_bytes = other_ref.read_bytes()
 
@@ -335,12 +343,12 @@ def child(manifest):
                 stream.write("replaced")
         return run
 
-    results["refused-archive-hard-link-other-branch"] = other_ref_kept(lambda: os.link(other_ref, archive / "task-alias"), archive / "task-alias")
-    results["refused-archive-symlink-other-branch"] = other_ref_kept(
-        through_symlink(other_ref, archive / "task-link", archive / "task-link"), archive / "task-link")
-    results["refused-archive-symlink-folder-other-branch"] = other_ref_kept(
-        through_symlink(other_ref.parent, archive / "task-folder", archive / "task-folder/other"), archive / "task-folder")
-    results["refused-archive-rename-other-branch"] = other_ref_kept(lambda: other_ref.rename(archive / "task-moved"), archive / "task-moved")
+    hard, link, folder, moved = (archive / name for name in ("task-submitted-a11a5000", "task-pipeline-5e11a000",
+                                                             "task-submitted-f01de000", "task-pipeline-e0a1e000"))
+    results["refused-archive-hard-link-other-branch"] = other_ref_kept(lambda: os.link(other_ref, hard), hard)
+    results["refused-archive-symlink-other-branch"] = other_ref_kept(through_symlink(other_ref, link, link), link)
+    results["refused-archive-symlink-folder-other-branch"] = other_ref_kept(through_symlink(other_ref.parent, folder, folder / "other"), folder)
+    results["refused-archive-rename-other-branch"] = other_ref_kept(lambda: other_ref.rename(moved), moved)
     deleted = git("-C", str(worktree), "branch", "-d", OWN_PACKED_ARCHIVE)
     results["refused-packed-own-archive-delete"] = (
         deleted.returncode == 1 and f"error: could not delete reference refs/heads/{OWN_PACKED_ARCHIVE}: {refusal}" in deleted.stderr
@@ -785,7 +793,8 @@ def fixture(repo, base, harness, user_home, other):
     }
     # A task created after the profile was built: its records are written
     # only after the build, so no launch-time task list can name it.
-    late = {"late-task-meta": state / "late.meta", "late-task-control-relaunch": state / "late.control-relaunch"}
+    late = {"late-task-meta": state / "late.meta", "late-task-control-relaunch": state / "late.control-relaunch",
+            "late-extending-task-meta": state / "task-late.meta", "late-shape-task-meta": state / "task-pipeline.meta"}
     protected.update(late)
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
@@ -831,6 +840,7 @@ def fixture(repo, base, harness, user_home, other):
             "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha, "stash_sha": stash_sha,
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
+            "late_tasks": [str(state / "task-late.meta"), str(state / "task-pipeline.meta")],
             "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
