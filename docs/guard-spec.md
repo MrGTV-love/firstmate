@@ -129,6 +129,8 @@ A refusal message should therefore stay on one line, or carry the `REFUSED:` mar
 A site maps to a registry entry through the entry's `sites` list.
 Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
 The lint requires the item to match exactly `count` sites, so a new site that a marker would silently absorb changes the count and fails until a reviewer updates it.
+When identical source lines in one file enforce different invariants, an item may also name the exact discovered `key` to select one occurrence; `file`, `match` and `count` are still checked against that selected site.
+A keyed marker never absorbs another occurrence, so a new identical refusal remains S1 until it is separately mapped.
 Two entries may not map the same site, and a marker that matches nothing is stale.
 
 A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.

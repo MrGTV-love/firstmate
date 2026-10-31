@@ -4,6 +4,8 @@
   "spec": "docs/guard-spec.md",
   "audited": 30,
   "beyond_audit_active": [
+    "jev-block-renderer",
+    "spawn-write-confinement-raw-parse",
     "slot-provision-attestation",
     "spawn-local-source-selection",
     "jev-tool-coverage",
@@ -23,6 +25,156 @@
     "open-loops-one-deferral"
   ],
   "guards": [
+    {
+      "id": "jev-block-renderer",
+      "version": "1",
+      "owner": "bin/fm-jev-guard.ts",
+      "invariant": "The shared Jev renderer preserves a block or review decision as a tool refusal.",
+      "layer": "runtime-block",
+      "source": "the terminal block/review decision, refusal reason and explicit alternative of the shared guard handler; existing decision points: bin/fm-jev-guard.ts:168",
+      "trigger": "[shared block renderer for every registered jev-* guard] composes block:true reason with refused path and do-not-retry guidance",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Report the refused action and reason to Firstmate rather than retrying equivalent inputs; inspect the deterministic rule owner in bin/fm-jev-guard.ts before an authorized correction.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-jev-guard.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "const next = `${alternative && !final.audit_error_type ? \"Apart from the alternative this refusal names, do\" : \"Do\"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;"
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "const path = final.refused_path === undefined ? \"\" : ` Refused path: ${JSON.stringify(final.refused_path)}.`;"
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };"
+        }
+      ]
+    },
+    {
+      "id": "spawn-write-confinement-raw-parse",
+      "version": "1",
+      "owner": "bin/fm-raw-launch.py",
+      "invariant": "Confinement admission never evaluates raw shell text whose program and options cannot be read statically.",
+      "layer": "runtime-block",
+      "source": "the raw launch command's token and shell-syntax structure without evaluation; existing decision points: bin/fm-raw-launch.py:136",
+      "trigger": "[enforces registered spawn-write-confinement, fail-closed parse] raw launch text it cannot read without evaluating: command/process/backtick substitution, $'..', zsh forced-glob forms, unterminated quotes/escapes/heredocs, here-strings, grouping/array, case, control structures, expanded program word or shell -c text",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Replace dynamic shell text with a literal supported launch or the canonical adapter, then retry bash bin/fm-spawn.sh <task> <project> --harness <harness> --mode <mode> --yolo <on-or-off>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-write-confinement.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"backtick command substitution in double quote\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"backtick command substitution\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"case control operator\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"command substitution in double quote\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"command substitution in here-document\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"command substitution\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"dollar-quoted string\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"expanded here-document delimiter\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"expanded program word, wrapper argument or shell -c text\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"here-string\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"line continuation in here-document delimiter\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"line continuation in here-document\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"missing redirection operand\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"process substitution\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"shell control structure\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"shell grouping or array syntax\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"unterminated double quote\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"unterminated escape\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"unterminated here-document\")",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"unterminated single quote\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(PARAMETER_FLAGS_REFUSAL)",
+          "count": 4
+        }
+      ]
+    },
     {
       "decision": "deny",
       "fail_direction": "closed",
@@ -88,6 +240,12 @@
     },
     {
       "id": "spawn-confinement-coverage",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "\"$SCRIPT_DIR/fm-guard-event.sh\" spawn-confinement-coverage \"$confinement_coverage_decision\" --source-ok true \\"
+        }
+      ],
       "version": "1",
       "owner": "bin/fm-spawn.sh",
       "invariant": "every task worker launch names its actual OS confinement coverage",
@@ -114,7 +272,63 @@
       "version": "1",
       "owner": "bin/fm-write-confinement.py",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "spawn-write-confinement deny", "count": 2}
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "spawn-write-confinement deny",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"--session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(\"shell expansion in a claude argument, which can produce options such as --resume that this check cannot see\")"
+        },
+        {
+          "file": "bin/fm-raw-launch.py",
+          "match": "refuse(f\"{moved} before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root\")"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "${confinement_args[@]+\"${confinement_args[@]}\"} || { confinement_refuse false \"cannot derive the protected-asset write profile\"; exit 1; }"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "CLAUDE_SESSION_ID=$(uuidgen | tr 'A-F' 'a-f') || { confinement_refuse false \"cannot mint the Claude session id\"; exit 1; }"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "[ -n \"$confinement_claude_dirs\" ] || { confinement_refuse false \"cannot read the Claude config root $confinement_claude_root\"; exit 1; }"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "[ -x /usr/bin/sandbox-exec ] || { confinement_refuse false \"sandbox-exec is required for macOS workers\"; exit 1; }"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_os=$(uname -s) || { confinement_refuse false \"cannot identify worker OS\"; exit 1; }"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"cannot list the local Firstmate homes to protect: $FM_LOCAL_FIRSTMATE_ERROR\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"this raw $HARNESS launch command sets $confinement_raw_var to a value that needs shell expansion or is not one leading assignment, so its write profile cannot follow it; pass the resolved absolute path as a leading literal $confinement_raw_var= assignment instead\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"this raw omp launch command selects its own omp config directory, so its write profile cannot be derived; launch with --harness omp and set PI_CONFIG_DIR in the environment instead\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "confinement_refuse false \"this raw omp launch command selects its own omp profile, so its write profile cannot follow it; launch the profile through --harness omp with OMP_PROFILE set in the environment instead\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "|| { confinement_refuse false \"cannot create $confinement_claude_root/$confinement_dir for this Claude session\"; exit 1; }"
+        }
       ],
       "emitters": ["bin/fm-spawn.sh"],
       "invariant": "a macOS omp or Claude task worker launches with writes to every named protected asset denied",
@@ -151,7 +365,39 @@
       "id": "turnend-supervision-block",
       "owner": "bin/fm-turnend-guard.sh",
       "sites": [
-        {"file": "bin/fm-turnend-guard.sh", "match": "guard_event deny --source-ok \"$source_ok\""}
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "guard_event deny --source-ok \"$source_ok\""
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "block_stop",
+          "key": "site:bin/fm-turnend-guard.sh:42636292f3"
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "block_stop",
+          "key": "site:bin/fm-turnend-guard.sh:42636292f3~2"
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "budget_account_current_epoch block || block_stop"
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "exit 2",
+          "key": "site:bin/fm-turnend-guard.sh:f05ba9904f"
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "exit 2",
+          "key": "site:bin/fm-turnend-guard.sh:f05ba9904f~2"
+        },
+        {
+          "file": "bin/fm-turnend-guard.sh",
+          "match": "fm_failure_episode_reset \"$STATE\" || exit 2",
+          "count": 2
+        }
       ],
       "invariant": "an in-flight primary turn never ends while no live watcher supervises this home",
       "layer": "runtime-block",
@@ -282,7 +528,14 @@
       "id": "spawn-worktree-isolation",
       "owner": "bin/fm-spawn.sh",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "spawn-worktree-isolation deny"}
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "spawn-worktree-isolation deny"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: $source did not yield an isolated worktree (resolved '$WT'; worktree root '${FM_TASK_COPY_TOP:-none}'; spawning project '$PROJ_ABS'); refusing to launch to avoid tangling the primary checkout. Inspect target $inspect_target\" >&2"
+        }
       ],
       "invariant": "a worker launch never targets the primary checkout",
       "layer": "runtime-block",
@@ -421,13 +674,42 @@
       "id": "gate-agent-containment",
       "owner": "bin/fm-gate-refuse-lib.sh",
       "sites": [
-        {"file": "bin/fm-gate-refuse-lib.sh", "match": "gate-agent-containment deny"},
-        {"file": "bin/fm-gate-refuse-lib.sh", "match": "refusing fleet lifecycle from inside a no-mistakes gate worktree"},
-        {"file": "bin/fm-control.sh", "match": "fm_refuse_if_gate_agent"},
-        {"file": "bin/fm-reboot-recover.sh", "match": "fm_refuse_if_gate_agent"},
-        {"file": "bin/fm-send.sh", "match": "fm_refuse_if_gate_agent"},
-        {"file": "bin/fm-spawn.sh", "match": "fm_refuse_if_gate_agent"},
-        {"file": "bin/fm-teardown.sh", "match": "fm_refuse_if_gate_agent"}
+        {
+          "file": "bin/fm-gate-refuse-lib.sh",
+          "match": "gate-agent-containment deny"
+        },
+        {
+          "file": "bin/fm-gate-refuse-lib.sh",
+          "match": "refusing fleet lifecycle from inside a no-mistakes gate worktree"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
+          "file": "bin/fm-reboot-recover.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
+          "file": "bin/fm-gate-refuse-lib.sh",
+          "match": "fm_gate_refuse_event"
+        },
+        {
+          "file": "bin/fm-watch-arm.sh",
+          "match": "echo \"watcher: FAILED - refusing to arm from a disposable validation checkout: $SCRIPT_DIR\""
+        }
       ],
       "invariant": "a no-mistakes gate agent never drives the real fleet",
       "layer": "runtime-block",
@@ -454,7 +736,22 @@
       "id": "upstream-publish-role",
       "owner": "bin/fm-role-lib.sh",
       "sites": [
-        {"file": "bin/fm-role-lib.sh", "match": "upstream-publish-role deny"}
+        {
+          "file": "bin/fm-role-lib.sh",
+          "match": "upstream-publish-role deny"
+        },
+        {
+          "file": "bin/fm-promote.sh",
+          "match": "echo \"error: promotion refused for $ID: $FM_ROLE_PUB_DENIAL\" >&2"
+        },
+        {
+          "file": "bin/fm-role.sh",
+          "match": "printf 'refused: %s\\n' \"$FM_ROLE_PUB_DENIAL\""
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused for $ID: $FM_ROLE_PUB_DENIAL\" >&2"
+        }
       ],
       "invariant": "a home without publication authority never pushes, opens a PR, or files an issue against firstmate upstream",
       "layer": "runtime-block",
@@ -481,10 +778,29 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 5},
-        {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge", "count": 2},
-        {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"},
-        {"file": "bin/fm-pr-merge.sh", "match": "where GitHub merges at once"}
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "merge-green-head deny",
+          "count": 5
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "could not be re-read immediately before the merge",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "that head %s was verified to contain"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "where GitHub merges at once"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "printf 'error: refusing to merge %s\\n' \"$URL\" >&2",
+          "count": 3
+        }
       ],
       "invariant": "a PR is never merged while a required check is red or has not reported at that head; a GitHub PR is also never merged while that head lacks the base branch's live tip, so the landed tree is one no check ran on, nor does an off-queue --auto request leave auto-merge armed to land later on a moved tip; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
       "layer": "runtime-block",
@@ -509,6 +825,24 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "merge-away-waiver",
+      "sites": [
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "echo \"error: GitHub merge refused while away because the base branch's merge-queue state does not prove an immediate merge; nothing was handed to the forge\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "echo \"error: PR merge refused - the away-posture record could not be locked for the merge; nothing was merged\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "echo \"error: PR merge refused - the away-posture record could not be read; nothing was merged\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "refuse_github_queue_while_away || exit 2"
+        }
+      ],
       "owner": "bin/fm-pr-merge.sh",
       "invariant": "an away session never waives a check or queues an unattended merge",
       "layer": "runtime-block",
@@ -535,7 +869,18 @@
       "id": "merge-held-task",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-held-task deny"}
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "merge-held-task deny"
+        },
+        {
+          "file": "bin/fm-merge-local.sh",
+          "match": "echo \"error: could not determine whether task $ID is still held for the captain; refusing to merge\" >&2"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "printf 'error: could not determine whether task %s is still held for the captain; refusing to merge, and nothing was merged\\n' \\"
+        }
       ],
       "invariant": "a merge never runs while its task is still held for the captain",
       "layer": "runtime-block",
@@ -590,7 +935,60 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4}
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown-unlanded deny",
+          "count": 4
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot inspect worktree $WT for commits not on a remote.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot inspect worktree $WT for uncommitted changes.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which $FM_TASK_COPY_REASON; $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; $TEARDOWN_PROOF_OUTCOME.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID shares pool slot $TEARDOWN_SHARED_SLOT, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its record and slot claim stay in place.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $ID's recorded copy $WT was reassigned to task $TEARDOWN_SLOT_REASSIGNED_TO, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its records stay in place.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: worktree $WT has uncommitted changes.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown_refuse_removed_nested_copy",
+          "count": 2
+        }
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",
@@ -645,7 +1043,14 @@
       "id": "claude-api-billing",
       "owner": "bin/fm-api-key-guard-lib.sh",
       "sites": [
-        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing deny"}
+        {
+          "file": "bin/fm-api-key-guard-lib.sh",
+          "match": "claude-api-billing deny"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "|| die \"refused before stopping $ID: an Anthropic credential would reach the replacement worker\""
+        }
       ],
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",
@@ -720,11 +1125,39 @@
       "id": "watcher-arm-pretool",
       "owner": "bin/fm-arm-pretool-check.sh",
       "sites": [
-        {"file": "bin/fm-arm-pretool-check.sh", "match": "permissionDecision"},
-        {"file": "bin/fm-arm-pretool-check.sh", "match": "\"decision\":\"deny\""},
-        {"file": "bin/fm-arm-pretool-check.sh", "match": "exit 2"},
-        {"file": "bin/fm-arm-command-policy.mjs", "match": "deny(\"", "count": 10},
-        {"file": "bin/fm-arm-command-policy.mjs", "match": "return { decision: \"deny\""}
+        {
+          "file": "bin/fm-arm-pretool-check.sh",
+          "match": "permissionDecision"
+        },
+        {
+          "file": "bin/fm-arm-pretool-check.sh",
+          "match": "\"decision\":\"deny\""
+        },
+        {
+          "file": "bin/fm-arm-pretool-check.sh",
+          "match": "exit 2"
+        },
+        {
+          "file": "bin/fm-arm-command-policy.mjs",
+          "match": "deny(\"",
+          "count": 10
+        },
+        {
+          "file": "bin/fm-arm-command-policy.mjs",
+          "match": "return { decision: \"deny\""
+        },
+        {
+          "file": ".omp/extensions/fm-primary-turnend-guard.ts",
+          "match": "return { block: true, reason: result.stderr.trim() || \"denied by the watcher-arm PreToolUse seatbelt\" };"
+        },
+        {
+          "file": ".opencode/plugins/fm-primary-pretool-check.js",
+          "match": "throw new Error(reason);"
+        },
+        {
+          "file": ".pi/extensions/fm-primary-turnend-guard.ts",
+          "match": "return { block: true, reason: result.stderr.trim() || \"denied by the watcher-arm PreToolUse seatbelt\" };"
+        }
       ],
       "invariant": "a watcher arm never runs backgrounded in the shell",
       "layer": "runtime-block",
@@ -797,6 +1230,82 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "kimi-hook-install-refusal",
+      "sites": [
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "print(f\"fm-kimi-turnend-hook: refused: {reason}\", file=sys.stderr)"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(",
+          "key": "site:bin/fm-kimi-turnend-hook.sh:be80339146"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(\"config.toml references fm-turn-end.sh outside the Firstmate-owned region.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(\"the Firstmate begin marker is not at a line boundary.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(\"the Firstmate end marker is missing.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(\"the Firstmate end marker is not a complete line.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(\"the Firstmate region claims a preceding newline that is absent.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Firstmate hook path has unexpected content at {HOOK}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Firstmate hook script has unexpected content at {HOOK}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Firstmate hook script has unexpectedly broad permissions at {HOOK}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Firstmate registry contains an unexpected entry at {path}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Firstmate registry is not a regular directory at {REGISTRY}.\")",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"Kimi config directory is missing or unexpected at {CONFIG_DIR}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"{label} has an unexpected non-array 'hooks' value.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"{label} is malformed TOML: {error}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"{label} is missing at {path}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"{label} is not UTF-8: {error}.\")"
+        },
+        {
+          "file": "bin/fm-kimi-turnend-hook.sh",
+          "match": "refuse(f\"{label} is not a regular non-symlink file at {path}.\")"
+        }
+      ],
       "owner": "bin/fm-kimi-turnend-hook.sh",
       "invariant": "a malformed or partially marked Kimi config is never rewritten",
       "layer": "runtime-block",
@@ -821,6 +1330,17 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "jev-pretool-deny",
+      "sites": [
+        {
+          "file": "bin/fm-jev-guard-claude.ts",
+          "match": "process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: result.reason } }));"
+        },
+        {
+          "file": "bin/fm-jev-guard-hook.sh",
+          "match": "exit 2",
+          "count": 2
+        }
+      ],
       "owner": "bin/fm-jev-guard-hook.sh",
       "invariant": "a write or edit action whose input cannot be validated or whose terminal audit record cannot be written never runs",
       "layer": "runtime-block",
@@ -847,8 +1367,32 @@
       "id": "jev-write-path-gate",
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
-        {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3},
-        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1}
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "branch: \"deterministic\"",
+          "count": 3
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "do not read or fetch this URI to investigate it.",
+          "count": 1
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: \"block\", enforcement: \"pretool_deny\" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);"
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "if (device.effect === \"unknown\") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);"
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "if (tool !== \"write\" || (c.host ?? \"omp\") !== \"omp\") return deny(\"native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.\");"
+        },
+        {
+          "file": "bin/fm-jev-guard.ts",
+          "match": "return admitted ? finishCall(terminal) : deny(device.remedy);"
+        }
       ],
       "invariant": "a filesystem write without proved active T5 confinement must pass the filesystem path/root gate; a native local device must prove its measured effect and scope",
       "layer": "runtime-block",
@@ -1057,6 +1601,24 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "git-commit-credential-shapes",
+      "sites": [
+        {
+          "file": "bin/fm-git-secrets.py",
+          "match": "\"The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.\")"
+        },
+        {
+          "file": "bin/fm-git-secrets.py",
+          "match": "print(\"error: credential inspection failed; commit or push refused\")"
+        },
+        {
+          "file": "bin/fm-git-secrets.py",
+          "match": "print(f\"escalate: this check refused {count} times in a row, past its budget of {BUDGET}; \""
+        },
+        {
+          "file": "bin/fm-git-secrets.py",
+          "match": "record(guard, \"deny\" if denied else \"allow\", source_ok, started, count)"
+        }
+      ],
       "owner": "bin/fm-git-secrets.py",
       "invariant": "a task commit never adds a line holding a known credential shape",
       "layer": "runtime-block",
@@ -1068,7 +1630,7 @@
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",
@@ -1093,7 +1655,7 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",

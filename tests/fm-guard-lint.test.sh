@@ -566,6 +566,25 @@ mutate "$TWICE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"contested re
 : >"$TWICE/bin/gother.sh"; : >"$TWICE/tests/gother.test.sh"
 assert_fails_with "S2 fails a site that two entries map" "$TWICE" S2
 
+KEYED=$(fixture site_keyed)
+printf 'echo "REFUSED: repeated line" >&2\necho "REFUSED: repeated line" >&2\n' >"$KEYED/bin/a.sh"
+read -r KEY_A KEY_B < <(site_ids "$KEYED" | tr '\n' ' '; printf '\n')
+mutate "$KEYED" ".guards[0].sites = [{\"file\":\"bin/a.sh\",\"match\":\"REFUSED: repeated line\",\"key\":\"$KEY_A\"}]
+  | .guards += [(.guards[0] | .id = \"gother\" | .invariant = \"another invariant\" | .sites[0].key = \"$KEY_B\")]
+  | .beyond_audit_active = [\"gother\"]"
+assert_mapped "exact site keys distinguish identical lines enforcing different invariants" "$KEYED" 2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_A\""
+assert_fails_with "an exact site key still cannot have two owners" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_B\" | .guards[1].sites[0].match = \"missing text\""
+assert_fails_with "a valid key does not bypass its marker text" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].match = "REFUSED: repeated line" | .guards[1].sites[0].key = "site:missing"'
+assert_fails_with "a missing exact site key is stale" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].key = 1'
+assert_fails_with "a non-string exact site key is invalid" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_B\""
+printf 'echo "REFUSED: repeated line" >&2\n' >>"$KEYED/bin/a.sh"
+assert_fails_with "a keyed marker does not excuse a new identical refusal" "$KEYED" S1
+
 # --- computed unregistered count ---------------------------------------------
 TYPED=$(fixture typed_unregistered)
 printf 'echo "REFUSED: an unmapped refusal" >&2\n' >"$TYPED/bin/gnew.sh"
