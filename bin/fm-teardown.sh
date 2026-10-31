@@ -5070,6 +5070,8 @@ safe_rm_rf_child_worktree() {  # <target> <project> <owner-task>
 
 validate_firstmate_home_for_removal() {
   local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path marker_id conflict child_id child_home
+  local bundle
+  local -a stored=()
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
   abs_home_path=$(validate_removal_target "$home" "$label") || return 1
@@ -5118,16 +5120,6 @@ EOF
     echo "REFUSED: unsafe $label removal target $home contains registered secondmate home $child_home for $child_id" >&2
     return 1
   fi
-  printf '%s\n' "$abs_home_path"
-}
-
-remove_firstmate_home() {
-  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path process_event_backup bundle
-  local -a stored=()
-  [ -n "$home" ] || return 0
-  [ -e "$home" ] || return 0
-  abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id" "$registry") || return 1
-  [ -n "$abs_home_path" ] || return 0
   for bundle in "$abs_home_path"/data/*/preserved-bundles/*.bundle; do
     [ -e "$bundle" ] || [ -L "$bundle" ] || continue
     stored+=("$bundle")
@@ -5138,6 +5130,15 @@ remove_firstmate_home() {
     echo "Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown." >&2
     return 1
   fi
+  printf '%s\n' "$abs_home_path"
+}
+
+remove_firstmate_home() {
+  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path process_event_backup
+  [ -n "$home" ] || return 0
+  [ -e "$home" ] || return 0
+  abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id" "$registry") || return 1
+  [ -n "$abs_home_path" ] || return 0
   process_event_backup=$(snapshot_firstmate_home_process_events "$abs_home_path" "$label") || return 1
   if ! cleanup_firstmate_home_process_events "$abs_home_path" "$label"; then
     restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?

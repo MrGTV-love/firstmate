@@ -3463,10 +3463,10 @@ test_secondmate_retirement_exempts_only_its_own_missing_home() {
 }
 
 # A stored preservation bundle can be the only copy of unlanded commits, so
-# retiring the home that keeps it, forced or not, refuses before any removal
-# until the bundle has left that home.
+# retiring the home that keeps it, forced or not, refuses before any removal,
+# including a forced retirement's child cleanup, until the bundle has left it.
 test_secondmate_retirement_keeps_stored_preservation_bundles() {
-  local case_dir posture home bundle moved rc
+  local case_dir posture home bundle moved rc child_wt
   for posture in ordinary forced; do
     case_dir=$(make_case "secondmate-stored-bundle-$posture")
     write_meta "$case_dir" local-only secondmate
@@ -3477,6 +3477,13 @@ test_secondmate_retirement_keeps_stored_preservation_bundles() {
     bundle="$home/data/child-a/preserved-bundles/$(printf 'ab%.0s' {1..32}).bundle"
     mkdir -p "${bundle%/*}"
     printf 'only copy of unlanded commits\n' > "$bundle"
+    child_wt="$case_dir/child-a-wt"
+    if [ "$posture" = forced ]; then
+      git -C "$case_dir/project" worktree add -q -b fm/child-a "$child_wt" main
+      fm_write_meta "$home/state/child-a.meta" "window=firstmate:fm-child-a" "endpoint_task_id=child-a" \
+        "worktree=$child_wt" "project=$case_dir/project" "kind=ship" "mode=local-only"
+      : > "$home/state/child-a.status"
+    fi
     rc=0
     if [ "$posture" = forced ]; then
       run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -3492,6 +3499,10 @@ test_secondmate_retirement_keeps_stored_preservation_bundles() {
     assert_equals 'only copy of unlanded commits' "$(cat "$bundle")" "$posture stored-bundle: the stored bundle was lost"
     assert_present "$home/.fm-secondmate-home" "$posture stored-bundle: the home was removed"
     assert_present "$case_dir/state/task-x1.meta" "$posture stored-bundle: the record was retired"
+    if [ "$posture" = forced ]; then
+      assert_present "$home/state/child-a.meta" "forced stored-bundle: the refusal came after the child was retired"
+      assert_present "$child_wt/.git" "forced stored-bundle: the refusal came after the child copy was removed"
+    fi
     moved="$case_dir/durable/${bundle##*/}"
     mkdir -p "${moved%/*}"
     mv "$bundle" "$moved"
