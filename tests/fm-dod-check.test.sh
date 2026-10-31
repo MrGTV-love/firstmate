@@ -197,9 +197,11 @@ pointer = {'id': 'C1', 'run_id': '123', 'commit': head, 'file': 'value', 'line':
 claims = {'items': [pointer], 'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Replaced unconditional exit with a real regression.'} for f in flags]}
 run_record = {'id': 123, 'event': 'workflow_dispatch', 'path': '.github/workflows/dod-evidence.yml',
               'status': 'completed', 'conclusion': 'success', 'repository': {'full_name': 'example/repo'},
-              'head_sha': head, 'run_attempt': 2}
+              'head_branch': 'main', 'head_sha': base, 'run_attempt': 2}
 run_file = temp / 'run.json'
 run_file.write_text(json.dumps(run_record))
+(temp / 'repo.json').write_text(json.dumps({'default_branch': 'main'}))
+(temp / 'pr.json').write_text(json.dumps({'state': 'open', 'head': {'ref': 'fm/test', 'sha': head}}))
 artifacts_file = temp / 'artifacts.json'
 artifacts_file.write_text(json.dumps({'total_count': 1, 'artifacts': [{'name': f'fm-dod-evidence-{head}', 'expired': False}]}))
 fakebin = temp / 'fakebin'
@@ -212,11 +214,20 @@ import shutil, sys
 root = Path(os.environ['FM_FORGE_FIXTURE'])
 args = sys.argv[1:]
 if args[0] == 'api':
-    name = 'artifacts.json' if args[1].endswith('/artifacts?per_page=100') else 'run.json'
+    if args[1].endswith('/artifacts?per_page=100'):
+        name = 'artifacts.json'
+    elif '/actions/runs/' in args[1]:
+        name = 'run.json'
+    elif args[1].endswith('/pulls/9'):
+        name = 'pr.json'
+    else:
+        name = 'repo.json'
     data = (root / name).read_bytes()
     print('api_response:\\n  body: ' + base64.b64encode(data).decode() + '\\n  truncated: false')
 elif args[:2] == ['run', 'download']:
     shutil.copytree(root / 'hosted-artifact', Path(args[args.index('--dir') + 1]))
+elif args[:2] == ['workflow', 'run']:
+    (root / 'dispatched.json').write_text(json.dumps(args))
 else:
     sys.exit(2)
 ''')
@@ -232,7 +243,7 @@ def resolve(document=claims, expected=0):
 
 assert 'evidence: resolved' in resolve()
 resolve({**claims, 'items': [{'id': 'C1', 'run_id': '123'}]})
-resolve({**claims, 'run_id': '123', 'items': [{'id': 'C1', 'commit': head}]})
+resolve({**claims, 'run_id': '123', 'items': [{'id': 'C1', 'commit': head}]}, 1)
 resolve({'items': []}, 1)
 unruled = resolve({**claims, 'rulings': []}, 1)
 assert flags[0]['file'] + ':' + str(flags[0]['line']) in unruled
@@ -241,14 +252,24 @@ for change in ({'commit': base}, {'line': 99}, {'file': 'absent'}, {'log_sha256'
     resolve({**claims, 'items': [{**pointer, **change}]}, 1)
 run_file.write_text(json.dumps({**run_record, 'conclusion': 'failure'}))
 resolve(expected=1)
-run_file.write_text(json.dumps({**run_record, 'head_sha': base}))
-assert 'exact PR head' in resolve(expected=1)
+run_file.write_text(json.dumps({**run_record, 'head_branch': 'fm/test', 'head_sha': head}))
+assert 'not the default branch' in resolve(expected=1)
 run_file.write_text(json.dumps(run_record))
 original_log = (artifact / pointer['log']).read_bytes()
 (artifact / pointer['log']).write_text('fabricated pass\n')
 resolve(expected=1)
 (artifact / pointer['log']).write_bytes(original_log)
-print('ok - real machine proof resolves; missing items, stale head, invalid file:line, wrong log digest, failed CI and missing exact-line rulings refuse')
+print('ok - real machine proof resolves; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, PR-branch workflow runs and missing exact-line rulings refuse')
+
+call(sys.executable, checker, 'dispatch', '--meta', meta, '--pr', 'https://github.com/example/repo/pull/9', env=forge_env)
+dispatched = json.loads((temp / 'dispatched.json').read_text())
+assert dispatched[dispatched.index('--ref') + 1] == 'main'
+assert f'head={head}' in dispatched and f'dod={text}' in dispatched
+generated = json.loads(call(sys.executable, checker, 'claims', '--meta', meta, '--run', '123'))
+assert generated == {'items': [{'id': 'C1', 'run_id': '123'}]}
+assert 'evidence: resolved' in resolve({**generated, 'rulings': claims['rulings']})
+call(sys.executable, checker, 'claims', '--meta', meta, '--run', 'latest', expected=1)
+print('ok - dispatch targets the default-branch workflow with the exact head, and a finished run id becomes resolving claims')
 
 report = temp / 'review.md'
 report.write_text(f'VERDICT: PASS head={head}\nIndependent review.\n')
@@ -264,9 +285,16 @@ claims_file.write_text('{}')
 verify_args = [sys.executable, record, 'verify', '--pr', 'https://github.com/example/repo/pull/9',
                '--head', head, '--base', base, '--task', 'task', '--machine-checked']
 assert call(*verify_args, env=review_env).strip() == 'review: PASS'
+(artifact / pointer['log']).write_text('fabricated pass\n')
+refusal = call(*verify_args, expected=1, env=review_env)
+assert 'CI log digest does not resolve' in refusal and 'fm-dod-check.py dispatch --meta' in refusal
+(state / 'legacy.meta').write_text(f"worktree={repo}\nmodel=gpt-5.1\nmode=direct-PR\nbranch=fm/test\n")
+legacy = subprocess.run([*map(str, verify_args[:-2]), 'legacy', '--machine-checked'],
+                        capture_output=True, text=True, env=review_env)
+assert legacy.returncode == 0 and legacy.stdout.strip() == 'review: PASS', (legacy.stdout, legacy.stderr)
+assert 'not machine-checked: no dispatch-time DoD digest' in legacy.stderr
 call(sys.executable, record, 'captain-word', '--pr', 'https://github.com/example/repo/pull/9',
      '--head', head, '--words', 'Merge this exact PR.', env=review_env)
-(artifact / pointer['log']).write_text('fabricated pass\n')
-call(*verify_args, expected=1, env=review_env)
-print('ok - review copies pointers immutably, resolves them at merge verification, and captain words cannot waive a broken log')
+assert call(*verify_args, env=review_env).strip() == 'review: captain-word'
+print('ok - review copies pointers immutably and resolves them for an independent PASS; a task without a dispatch digest and captain words keep their existing route')
 PY

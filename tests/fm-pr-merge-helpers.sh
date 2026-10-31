@@ -825,8 +825,9 @@ claims = {'items': [{'id': 'C1', 'run_id': '123', 'commit': head}],
           'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Obsolete row removed; retained behavior reviewed.'} for f in flags]}
 (case / 'machine-claims.json').write_text(json.dumps(claims))
 (case / 'machine-run.json').write_text(json.dumps({'id': 123, 'event': 'workflow_dispatch',
-    'path': '.github/workflows/dod-evidence.yml', 'head_sha': head, 'run_attempt': 1,
+    'path': '.github/workflows/dod-evidence.yml', 'head_branch': 'main', 'head_sha': base, 'run_attempt': 1,
     'status': 'completed', 'conclusion': 'success', 'repository': {'full_name': forge_repo}}))
+(case / 'machine-repo.json').write_text(json.dumps({'default_branch': 'main'}))
 (case / 'machine-artifacts.json').write_text(json.dumps({'total_count': 1, 'artifacts': [
     {'name': f'fm-dod-evidence-{head}', 'expired': False}]}))
 (case / 'github-base').write_text(base + '\n')
@@ -839,12 +840,12 @@ install_machine_forge_mock() {
   mv "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh-axi-merge"
   cat > "$case_dir/fakebin/gh-axi" <<'PY'
 #!/usr/bin/env python3
-import base64, os, shutil, sys
+import base64, os, re, shutil, sys
 from pathlib import Path
 case = Path(__file__).resolve().parent.parent
 args = sys.argv[1:]
-if args[:1] == ['api'] and '/actions/runs/123' in args[1]:
-    name = 'machine-artifacts.json' if '/artifacts?' in args[1] else 'machine-run.json'
+if args[:1] == ['api'] and ('/actions/runs/123' in args[1] or re.fullmatch(r'/repos/[^/]+/[^/]+', args[1])):
+    name = 'machine-artifacts.json' if '/artifacts?' in args[1] else 'machine-run.json' if '/actions/' in args[1] else 'machine-repo.json'
     print('api_response:\n  body: ' + base64.b64encode((case / name).read_bytes()).decode() + '\n  truncated: false')
 elif args[:3] == ['run', 'download', '123']:
     shutil.copytree(case / 'machine-artifact', args[args.index('--dir') + 1])

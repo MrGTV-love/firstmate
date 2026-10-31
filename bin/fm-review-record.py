@@ -14,9 +14,14 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
 --dod-evidence copies per-item pointers and explicit weakened-test rulings into
 this append-only review record, never just the mutable input file's path.
 The JSON format and resolver are owned by bin/fm-dod-check.py --help.
---machine-checked additionally requires an exact-head PASS whose pointers all
-resolve; fm-pr-merge.sh always supplies it, including with captain merge words.
-Without it verify reports review authority only, not machine-checked DoD success.
+--machine-checked applies only to the independent-review basis of a task whose
+meta carries the dispatch-time dod_sha256: that exact-head PASS's pointers must
+all resolve, and any weakened-test ruling needs a reader whose family is not an
+author family. A refusal names the dispatch and claims commands. The
+captain-word basis keeps its existing route. A task without dod_sha256 keeps the
+existing contract, and verify prints "not machine-checked: no dispatch-time DoD
+digest" on stderr. fm-pr-merge.sh supplies it on GitHub; the readiness ledger
+uses the same mode. Without it verify reports review authority only.
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
 FM_STATE_OVERRIDE selects its state directory, as in the PR merge/poll helpers.
@@ -579,7 +584,7 @@ def main():
         if name == "captain-word":
             command.add_argument("--words", required=True)
         if name == "verify":
-            command.add_argument("--machine-checked", action="store_true", help="merge: additionally resolve all frozen DoD evidence pointers")
+            command.add_argument("--machine-checked", action="store_true", help="merge and readiness: for an independent-review basis of a task with a dispatch-time DoD digest, additionally resolve all frozen DoD evidence pointers")
             command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
             command.add_argument("--json", action="store_true", help="print one fm-review-verification.v1 object built from the same locked read")
     args = parser.parse_args()
@@ -643,24 +648,31 @@ def main():
                 print(json.dumps(records, separators=(",", ":")))
             else:
                 basis, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, args.review_only)
-                if args.machine_checked:
-                    # Captain words affect review authority, never machine proof.
-                    proof = records["review"]
-                    if proof is None or proof["head"] != args.head or proof["verdict"] != "PASS":
-                        raise VerificationError("machine-checked DoD requires an exact-head PASS with per-item evidence")
-                    if proof.get("dod_evidence", {}).get("rulings"):
-                        _, authors = derived_authors(home, pr, args.head, args.task, args.base)
-                        reader = model(proof["reader_model"], "reader_model")
-                        families = {a["family"] for values in authors.values() for a in values}
-                        if reader == "unknown" or "unknown" in families or not families - {reader}:
-                            raise VerificationError("weakened-test rulings require an independently qualified reviewer, not the implementation author")
-                    resolved = subprocess.run([sys.executable, str(BIN / "fm-dod-check.py"), "verify",
-                                               "--meta", str(state_dir(home) / f"{args.task}.meta"),
-                                               "--pr", pr, "--head", args.head, "--base", args.base],
-                                              input=json.dumps(proof.get("dod_evidence", {})),
-                                              capture_output=True, text=True, check=False)
-                    if resolved.returncode:
-                        raise VerificationError(f"machine-checked DoD unresolved: {resolved.stdout.strip()} {resolved.stderr.strip()}")
+                if args.machine_checked and basis == "independent-review":
+                    _, meta = task_metadata(home, args.task)
+                    if "dod_sha256" not in meta:
+                        print("not machine-checked: no dispatch-time DoD digest", file=sys.stderr)
+                    else:
+                        meta_path = str(state_dir(home) / f"{args.task}.meta")
+                        checker = str(BIN / "fm-dod-check.py")
+                        repair = (f"; dispatch the default-branch DoD workflow with: {shlex.join([checker, 'dispatch', '--meta', meta_path, '--pr', pr])}"
+                                  f"; after that run finishes, build its claims with: {shlex.join([checker, 'claims', '--meta', meta_path, '--run', 'RUN_ID'])}"
+                                  " > CLAIMS.json, add an accept ruling with a reason for each named weakened-test flag,"
+                                  " and record the PASS again with --dod-evidence CLAIMS.json")
+                        if evidence["head"] != args.head or evidence["verdict"] != "PASS":
+                            raise VerificationError("machine-checked DoD requires an exact-head PASS with per-item evidence" + repair)
+                        if evidence.get("dod_evidence", {}).get("rulings"):
+                            _, authors = derived_authors(home, pr, args.head, args.task, args.base)
+                            reader = model(evidence["reader_model"], "reader_model")
+                            families = {a["family"] for values in authors.values() for a in values}
+                            if reader == "unknown" or "unknown" in families or reader in families:
+                                raise VerificationError("weakened-test rulings require an independently qualified reviewer, not the implementation author")
+                        resolved = subprocess.run([sys.executable, checker, "verify", "--meta", meta_path,
+                                                   "--pr", pr, "--head", args.head, "--base", args.base],
+                                                  input=json.dumps(evidence.get("dod_evidence", {})),
+                                                  capture_output=True, text=True, check=False)
+                        if resolved.returncode:
+                            raise VerificationError(f"machine-checked DoD unresolved: {resolved.stdout.strip()} {resolved.stderr.strip()}{repair}")
                 if emit_json:
                     print(json.dumps(verification_json(pr, args.head, basis, evidence), separators=(",", ":")))
                 else:

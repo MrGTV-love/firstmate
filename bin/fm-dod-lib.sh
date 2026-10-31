@@ -642,7 +642,7 @@ fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
       if (s ~ /^#{1,6}([ \t]|$)/) { finish(); next }
       # Recognize a labeled field before looking for item headers: Check
       # commands can contain literal Source labels and must remain opaque.
-      sub(/^[-*+][ \t]+/, "", s)
+      if (s ~ ("^[-*+][ \t]+" check_field ":")) sub(/^[-*+][ \t]+/, "", s)
       if (s ~ labelre) {
         if (id == "") {
           print "mandatory item has no id: " s
@@ -665,7 +665,9 @@ fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
       # An item header carries its id and the lead field on one line.
       p = index(s, lead ":")
       if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/) {
-        candidate = trim(substr(s, 1, p - 1))
+        prefix = trim(substr(s, 1, p - 1))
+        sub(/^[-*+][ \t]+/, "", prefix)
+        candidate = trim(prefix)
         sub(/[.:)]+$/, "", candidate)
         # The scaffold instruction line mentions the lead field too; only a
         # lone id token starts an item, and other prose is ignored.

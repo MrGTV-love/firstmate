@@ -831,12 +831,13 @@ class Collector:
         ordinary absence of qualifying review; unreadable or corrupt history and
         invalid input degrade coverage instead of reading as unreviewed. The
         record owner derives authors from the owning task and the PR's live
-        base, so a PR no task owns is not checked.
+        base, so a PR no task owns is not checked. It uses the same
+        --machine-checked verify mode as fm-pr-merge.sh on GitHub.
         """
         if slug.casefold() not in self.review_lanes or task is None:
             return None
         url, sha, base = pr["html_url"], pr["head"]["sha"], pr["base"]["sha"]
-        script = ('"$1" verify --pr "$2" --head "$3" --task "$4" --base "$5" --review-only --json; '
+        script = ('"$1" verify --pr "$2" --head "$3" --task "$4" --base "$5" --review-only --machine-checked --json; '
                   'rc=$?; printf "\\n__FM_REVIEW_EXIT=%s\\n" "$rc"; exit 0')
         try:
             out = self.bash(script, BIN / "fm-review-record.py", url, sha, task["id"], base)

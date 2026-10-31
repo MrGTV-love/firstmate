@@ -11,7 +11,7 @@
 # parse below owns why.
 #
 # Every supported forge verifies recorded review evidence inside the away-record
-# hold immediately before its merge command, always with --machine-checked.
+# hold immediately before its merge command, with --machine-checked on GitHub.
 # bin/fm-review-record.py's header owns the proof, review/captain-word rule and recording CLI; neither --attended-override nor
 # away authority substitutes for this evidence, and captain words waive no guard.
 #

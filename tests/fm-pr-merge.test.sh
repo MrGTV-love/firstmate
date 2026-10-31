@@ -16,7 +16,7 @@
 test_machine_checked_merge_evidence() {
   local scenario case_dir head url rc expected flag
   url=https://github.com/example/repo/pull/9
-  for scenario in unresolved-id unruled-line wrong-line resolved; do
+  for scenario in unresolved-id unruled-line wrong-line mixed-author-ruling no-digest resolved; do
     case_dir=$(make_case "machine-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -27,22 +27,55 @@ test_machine_checked_merge_evidence() {
     : > "$case_dir/gh-axi.log"
     flag=$("$JQ_BIN" -r '.flags[0] | .file + ":" + (.line | tostring)' "$case_dir/machine-artifact/weakening.json")
     case "$scenario" in
-      unresolved-id) expected=C1; "$JQ_BIN" '.items=[]' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
+      unresolved-id|no-digest) expected=C1; "$JQ_BIN" '.items=[]' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
       unruled-line) expected=$flag; "$JQ_BIN" '.rulings=[]' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
       wrong-line) expected=$flag; "$JQ_BIN" '.rulings[0].id="different-line"' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
+      mixed-author-ruling) expected='independently qualified reviewer'; cp "$case_dir/machine-claims.json" "$case_dir/changed-claims.json" ;;
       resolved) cp "$case_dir/machine-claims.json" "$case_dir/changed-claims.json" ;;
     esac
-    record_review "$case_dir" "$url" "$head" --dod-evidence "$case_dir/changed-claims.json" >/dev/null || fail "$scenario PASS record failed"
+    if [ "$scenario" = no-digest ]; then
+      # A task dispatched before the freeze has no digest and keeps the existing contract.
+      grep -v '^dod_' "$case_dir/state/task-x1.meta" > "$case_dir/meta-without-digest"
+      cat "$case_dir/meta-without-digest" > "$case_dir/state/task-x1.meta"
+    fi
+    if [ "$scenario" = mixed-author-ruling ]; then
+      # ship=anthropic plus no-mistakes:openai: each family reads the other's group,
+      # and the anthropic author family's newest PASS carries the weakened-test ruling.
+      printf '\nmodel=claude-opus-5-5\n' >> "$case_dir/state/task-x1.meta"
+      python3 - "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt" "$url" <<'PY'
+import sqlite3
+import sys
+with sqlite3.connect(sys.argv[1]) as db:
+    db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3]))
+    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'acp:omp', 'gpt-5.1-codex', 'openai'))
+PY
+      record_review "$case_dir" "$url" "$head" --reader-model gpt-5.1-codex --author-groups '{"ship":["claude-opus-5-5"]}' \
+        --covered-groups '["ship"]' >/dev/null || fail 'record OpenAI read of the Claude ship group'
+      record_review "$case_dir" "$url" "$head" --author-groups '{"no-mistakes:openai":["gpt-5.1-codex"]}' \
+        --covered-groups '["no-mistakes:openai"]' --dod-evidence "$case_dir/changed-claims.json" >/dev/null \
+        || fail 'record Claude read of the OpenAI pipeline group with rulings'
+    else
+      record_review "$case_dir" "$url" "$head" --dod-evidence "$case_dir/changed-claims.json" >/dev/null || fail "$scenario PASS record failed"
+    fi
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    if [ "$scenario" = resolved ]; then
-      expect_code 0 "$rc" "resolved proof and line ruling must merge: $(cat "$case_dir/stderr")"
+    if [ "$scenario" = resolved ] || [ "$scenario" = no-digest ]; then
+      expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
       assert_logged_gh_merge "$case_dir" 9 example/repo --squash
-      assert_grep "pr_head=$head" "$case_dir/state/task-x1.meta" 'resolved proof did not record exact-head landing'
+      assert_grep "pr_head=$head" "$case_dir/state/task-x1.meta" "$scenario did not record exact-head landing"
+      if [ "$scenario" = no-digest ]; then
+        assert_grep 'not machine-checked: no dispatch-time DoD digest' "$case_dir/stderr" 'a task without a dispatch digest must say it was not machine-checked'
+      else
+        assert_no_grep 'not machine-checked' "$case_dir/stderr" 'a frozen task must be machine-checked'
+      fi
     else
       [ "$rc" -ne 0 ] || fail "$scenario merged without resolving its evidence"
-      assert_grep "$expected" "$case_dir/stderr" "$scenario did not name the unresolved item or exact flagged line"
+      assert_grep "$expected" "$case_dir/stderr" "$scenario did not name the unresolved item, exact flagged line or unqualified ruling reader"
       assert_no_grep 'pr merge' "$case_dir/gh-axi.log" "$scenario reached the forge merge"
+      if [ "$scenario" = unresolved-id ]; then
+        assert_grep 'fm-dod-check.py dispatch --meta' "$case_dir/stderr" 'an unresolved pointer refusal must name the dispatch command'
+      fi
     fi
     pass "fm-pr-merge: machine evidence $scenario"
   done
@@ -673,7 +706,6 @@ test_captain_word_refused_while_away() {
   : > "$case_dir/explicit-review"
   add_gh_mocks "$case_dir" "$head"
   printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
-  record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record pre-away machine evidence'
   review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null \
     || fail "captain-word before /afk must record"
   write_away_record "$case_dir" --words 'merge PR 9 when green'
@@ -852,16 +884,9 @@ test_recorded_review_merge_conditions() {
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|trigger-list|trigger-guard|trigger-data|captain-word|cross-family-model|unknown-author-captain|captain-fail-pass)
+      valid|trigger-list|trigger-guard|trigger-data|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
-      captain-only|fail-then-captain)
-        review_record_command "$case_dir" verify --pr "$url" --head "$head" --task task-x1 --base "$(cat "$case_dir/github-base")" \
-          > "$case_dir/authority" || fail "$scenario captain authority must remain valid"
-        assert_grep 'review: captain-word' "$case_dir/authority" 'machine proof must not change captain authority'
-        expect_code 1 "$rc" "$scenario cannot substitute captain authority for per-item PASS evidence"
-        assert_grep 'machine-checked DoD requires an exact-head PASS' "$case_dir/stderr" 'missing PASS proof was not identified'
-        assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario must not bypass proof" ;;
       *)
         expect_code 1 "$rc" "$scenario must refuse"
         assert_grep "$expected" "$case_dir/stderr" "$scenario refusal names field"
