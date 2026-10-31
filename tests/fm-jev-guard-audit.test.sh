@@ -109,6 +109,7 @@ await test('T4(a): xd://report_issue and SendFeedback report uploads are refused
     if (meta) writeFileSync(`${state}/audit.meta`, meta);
     try {
       for (const event of [{ toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } },
+        { toolName: 'write', input: { path: '[xd://report_issue#ABCD]', content: 'private-report-canary' } },
         { toolName: 'report_issue', input: { body: 'private-report-canary' } },
         { toolName: 'sendfeedback', input: { description: 'private-report-canary' } }]) {
         let patch;
@@ -434,6 +435,12 @@ await test('M4: each coverage and egress decision emits one content-free central
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github-write', true]]);
   await decide({ toolName: 'github', input: { op: 'repo_view', repo: 'private-event-canary' } },
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github-read', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
+  for (const path of ['xd://github', '[xd://github#ABCD]', '[xd://github]  ']) {
+    await decide({ toolName: 'write', input: { path, content: '{"op":"pr_push","body":"private-event-canary"}' } },
+      [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://github', true]]);
+  }
+  await decide({ toolName: 'write', input: { path: '[xd://report_issue#0aF9]', content: 'private-event-canary' } },
+    [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://report_issue', true]]);
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
   const log = `${state}/metrics-events.jsonl`;
@@ -445,13 +452,16 @@ await test('M4: an unrelated allow never clears a later deny in the real metrics
     await handlers.tool_call({ toolName: 'find', input: { query: 'synthetic' } }, { cwd: state });
     await handlers.tool_call({ toolName: 'web_search', input: { query: 'synthetic' } }, { cwd: state });
     for (const op of ['pr_push', 'repo_view', 'pr_create']) await handlers.tool_call({ toolName: 'github', input: { op } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'write', input: { path: 'xd://github', content: '{"op":"pr_push"}' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'github', input: { op: 'repo_view' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'write', input: { path: '[xd://github#ABCD]', content: '{"op":"pr_push"}' } }, { cwd: state });
   } finally { rmSync(`${state}/audit.meta`); delete process.env.FM_GUARD_EVENT_LOG; }
   const out = JSON.parse(execFileSync('bash', [`${process.env.AUDIT_ROOT}/bin/fm-guard-metrics.sh`, '--log', log,
     '--registry', `${process.env.AUDIT_ROOT}/docs/guards/registry.json`, '--min-opportunities', '1', '--json'], { encoding: 'utf8' }));
   const metric = id => out.guards.find(g => g.id === id);
-  for (const id of ['jev-tool-coverage', 'jev-egress-grant']) {
-    assert.equal(metric(id).denies, 1, id);
-    assert.equal(metric(id).recurrences, 0, `${id}: an allow of another subject is not a clear`);
+  for (const [id, denies] of [['jev-tool-coverage', 1], ['jev-egress-grant', 3]]) {
+    assert.equal(metric(id).denies, denies, id);
+    assert.equal(metric(id).recurrences, 0, `${id}: an allow of another subject, including a granted class beside a device refusal, is not a clear`);
     assert.equal(metric(id).median_clear_attempts, 0, id);
     assert.equal(metric(id).verdict, 'keep', id);
   }

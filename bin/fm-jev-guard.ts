@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { confinementOwner, deviceEgress, egressClass, egressGranted, githubReadAlternative, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
+import { confinementOwner, deviceEgress, egressClass, egressGranted, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -62,6 +62,12 @@ const lspEffects: Readonly<Record<string, "file-read" | "session-read" | "previe
 function plainPath(path: string): boolean {
   return /^[/A-Za-z0-9_.-]/.test(path) && !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(path)
     && !path.endsWith("]");
+}
+
+// Measured omp write strips a hashline header ([PATH] or [PATH#XXXX], trailing
+// whitespace ignored) before routing; devices are classified on that path.
+function routedPath(path: string): string {
+  return /^\[([^#]+)(?:#[0-9A-Fa-f]{4})?\]$/.exec(path.trimEnd())?.[1] ?? path;
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -221,7 +227,8 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it.");
       }
       const path = typeof input.path === "string" ? input.path : "";
-      const device = deviceEgress(path) ?? deviceRule(path);
+      const routed = routedPath(path);
+      const device = deviceEgress(routed) ?? deviceRule(routed);
       if (device) {
         terminal.branch = "device";
         const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
@@ -230,17 +237,16 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (device.effect === "egress") {
           terminal.branch = "egress";
           terminal.destination_class = device.destination;
-          await guardEvent("jev-egress-grant", device.destination, "deny", egressStarted, remainingMs);
+          await guardEvent("jev-egress-grant", routed, "deny", egressStarted, remainingMs);
           let alternative: string | undefined;
-          try { if (path === "xd://github") alternative = githubReadAlternative(input); } catch { /* Unparsed arguments name no alternative. */ }
+          try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
           return deny(`${device.reason}. No task egress grant admits this device.`, alternative);
         }
         let admitted = false;
-        try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+        try { admitted = device.prove({ ...input, path: routed }, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
         return admitted ? finishCall(terminal) : deny(device.remedy);
       }
-      if (path && process.platform === "darwin" && process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1"
-        && (c.host === undefined || c.host === "omp" || c.host === "claude")) {
+      if (path && process.platform === "darwin" && process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1") {
         filesystemConfinement ??= runWriter("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "fm-write-confinement.py"),
           "--check-active", c.state, c.task], { timeout: remainingMs() }).then(() => true, () => false);
         if (await filesystemConfinement) {
