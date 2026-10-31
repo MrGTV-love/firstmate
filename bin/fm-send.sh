@@ -223,6 +223,7 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never steer
 # a crewmate (see bin/fm-gate-refuse-lib.sh).
+FM_GATE_EVENT_TASK=${1:-}
 fm_refuse_if_gate_agent
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
@@ -230,9 +231,11 @@ if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   echo "usage: FM_HOME=<home> bin/fm-send.sh <task> <message>" >&2
   # Record the refusal as guard telemetry. The writer always exits 0; the
   # fallback keeps a missing writer from changing the refusal's exit code.
-  "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed deny --source-ok true 2>/dev/null || true
+  "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed deny --rule explicit-home --task "${1:-}" --source-ok true 2>/dev/null || true
   exit 1
 fi
+
+"$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed allow --rule explicit-home --task "${1:-}" 2>/dev/null || true
 
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 if [ ! -d "$FM_HOME" ]; then

@@ -21,9 +21,137 @@
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
     "open-loops-one-deferral",
-    "pipeline-start-unreadable-source"
+    "pipeline-start-unreadable-source",
+    "backlog-transition",
+    "compact-adviser",
+    "secondmate-inherit",
+    "secondmate-sync"
   ],
   "guards": [
+    {
+      "id": "backlog-transition",
+      "owner": "bin/fm-backlog-transition-lib.sh",
+      "invariant": "automatic backlog transitions defer to the configured manual backend",
+      "source": "config/backlog-backend",
+      "trigger": "manual backlog backend selected",
+      "remedy": "bin/fm-backlog-transition-lib.sh - consult the configured backend before updating the backlog",
+      "test": "tests/fm-guard-telemetry.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-backlog-transition-lib.sh",
+          "match": "backlog-transition bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "compact-adviser",
+      "owner": "bin/fm-compact-adviser-lib.sh",
+      "invariant": "compact adviser emergency disable remains an explicit operator input",
+      "source": "FM_COMPACT_ADVISER_DISABLE",
+      "trigger": "the invoking operator supplies a truthy emergency disable",
+      "remedy": "bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off> with the operator disable unset",
+      "test": "tests/fm-guard-telemetry.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-compact-adviser-lib.sh",
+          "match": "compact-adviser bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "secondmate-inherit",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "secondmate launch normally propagates primary inheritance",
+      "source": "FM_SKIP_SECONDMATE_INHERIT at the host-local launch or convergence boundary",
+      "trigger": "host-local launch or convergence skips inheritance",
+      "remedy": "bin/fm-spawn.sh <id> --secondmate through the parent home inheritance path",
+      "test": "tests/fm-secondmate-sync.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "secondmate-inherit bypass"
+        },
+        {
+          "file": "bin/fm-session-launch-policy-lib.sh",
+          "match": "secondmate-inherit bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "secondmate-sync",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "secondmate launch normally attempts the primary tracked sync",
+      "source": "FM_SKIP_SECONDMATE_SYNC at the host-local launch boundary",
+      "trigger": "host-local launch skips tracked sync after parent convergence",
+      "remedy": "bin/fm-spawn.sh <id> --secondmate through the parent home sync path",
+      "test": "tests/fm-secondmate-sync.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "secondmate-sync bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
     {
       "decision": "deny",
       "fail_direction": "closed",
@@ -152,6 +280,7 @@
       "id": "turnend-supervision-block",
       "owner": "bin/fm-turnend-guard.sh",
       "sites": [
+        {"file":"bin/fm-turnend-guard.sh","match":"fm-guard-event.sh\" turnend-supervision-block"},
         {"file": "bin/fm-turnend-guard.sh", "match": "guard_event deny --source-ok \"$source_ok\""}
       ],
       "invariant": "an in-flight primary turn never ends while no live watcher supervises this home",
@@ -185,6 +314,8 @@
       "version": "1",
       "id": "guard-watcher-down-warning",
       "owner": "bin/fm-guard.sh",
+      "emitters": ["bin/fm-spawn.sh"],
+      "sites": [{"file":"bin/fm-spawn.sh","match":"guard-watcher-down-warning bypass"}],
       "invariant": "a fleet command warns when supervision is not live",
       "layer": "runtime-warn",
       "source": "watcher lock, beacon age, per-actor pending wake rows",
@@ -422,7 +553,9 @@
       "id": "gate-agent-containment",
       "owner": "bin/fm-gate-refuse-lib.sh",
       "sites": [
-        {"file": "bin/fm-gate-refuse-lib.sh", "match": "gate-agent-containment deny"},
+        {"file":"bin/fm-gate-refuse-lib.sh","match":"fm_gate_refuse_event","count":4},
+        {"file":"bin/fm-watch-arm.sh","match":"fm_gate_refuse_event"},
+        {"file": "bin/fm-gate-refuse-lib.sh", "match": "gate-agent-containment \"${1:-deny}\""},
         {"file": "bin/fm-gate-refuse-lib.sh", "match": "refusing fleet lifecycle from inside a no-mistakes gate worktree"},
         {"file": "bin/fm-control.sh", "match": "fm_refuse_if_gate_agent"},
         {"file": "bin/fm-reboot-recover.sh", "match": "fm_refuse_if_gate_agent"},
@@ -455,7 +588,7 @@
       "id": "upstream-publish-role",
       "owner": "bin/fm-role-lib.sh",
       "sites": [
-        {"file": "bin/fm-role-lib.sh", "match": "upstream-publish-role deny"}
+        {"file": "bin/fm-role-lib.sh", "match": "upstream-publish-role \"${1:-deny}\""}
       ],
       "invariant": "a home without publication authority never pushes, opens a PR, or files an issue against firstmate upstream",
       "layer": "runtime-block",
@@ -482,6 +615,7 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
+        {"file":"bin/fm-pr-merge.sh","match":"merge-green-head bypass","count":2},
         {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 5},
         {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge", "count": 2},
         {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"},
@@ -511,6 +645,7 @@
       "version": "1",
       "id": "merge-away-waiver",
       "owner": "bin/fm-pr-merge.sh",
+      "sites": [{"file":"bin/fm-pr-merge.sh","match":"merge-away-waiver bypass"}],
       "invariant": "an away session never waives a check or queues an unattended merge",
       "layer": "runtime-block",
       "source": "away-posture record, its lock, and live session ownership",
@@ -597,6 +732,7 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
+        {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
@@ -657,7 +793,7 @@
       "id": "claude-api-billing",
       "owner": "bin/fm-api-key-guard-lib.sh",
       "sites": [
-        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing deny"}
+        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing \"$1\""}
       ],
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",

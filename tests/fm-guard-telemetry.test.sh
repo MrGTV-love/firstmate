@@ -27,6 +27,8 @@ METRICS="$ROOT/bin/fm-guard-metrics.sh"
 TMP=$(fm_test_tmproot fm-guard-telemetry)
 trap 'fm_test_cleanup' EXIT
 LOG="$TMP/events.jsonl"
+unset FM_TASK_ID
+export FM_GUARD_EVENT_LOG="$LOG"
 
 registry_with_harm() {  # <path> <id> <harm>
   cat >"$1" <<JSON
@@ -42,6 +44,39 @@ verdict_of() {  # <log> <registry> <id>
   "$METRICS" --log "$1" --registry "$2" --guards "$3" --min-opportunities 1 2>/dev/null \
     | sed -n "s/^METRIC $3 .*verdict=\([a-z]*\).*/\1/p"
 }
+
+test_claude_session_attribution() {
+  local named="$TMP/claude" log="$TMP/claude-sessions.jsonl" session
+  # Use the existing session-lock suite's real named-process fixture, not a
+  # fake ancestry function. The native Claude classifier remains its owner.
+  ln -sf /bin/bash "$named"
+  for session in claude-one claude-two; do
+    env -u FM_TASK_ID -u FM_SESSION_ID -u CLAUDE_SESSION_ID \
+      -u CODEX_THREAD_ID -u PI_SESSION_ID -u OMP_SESSION_ID -u GROK_SESSION_ID \
+      FM_HOME="$TMP" "$named" -c '
+        export CLAUDE_CODE_SESSION_ID="$1" CLAUDE_PID=$$
+        "$2" gclaude deny --task "" --log "$3"
+        "$2" gclaude allow --task "" --log "$3"
+        "$2" gclaude allow --task task-wins --log "$3"
+        :
+      ' _ "$session" "$EVENT" "$log" || fail "Claude process fixture failed"
+  done
+  jq -se --arg home "$TMP" '
+    .[0].session == ($home + ":claude-one") and .[1].session == .[0].session
+    and .[3].session == ($home + ":claude-two") and .[4].session == .[3].session
+    and .[0].session != .[3].session and .[0].task == "" and .[3].task == ""
+    and .[2].session == "task-wins" and .[5].session == "task-wins"' "$log" >/dev/null \
+    || fail "two trusted Claude sessions must stay distinct and task identity must take precedence"
+  env -u FM_TASK_ID -u FM_SESSION_ID -u CODEX_THREAD_ID -u PI_SESSION_ID \
+    -u OMP_SESSION_ID -u GROK_SESSION_ID FM_HOME="$TMP" \
+    CLAUDE_CODE_SESSION_ID=stale-session CLAUDE_PID=99999999 \
+    "$EVENT" gstale allow --task '' --log "$log"
+  jq -se --arg home "$TMP" '.[6].session == ($home + ":unattributed")' "$log" >/dev/null \
+    || fail "an inherited Claude id without matching process ancestry must be ignored"
+  pass "trusted Claude session IDs are stable, distinct, and never borrowed from unrelated ancestry"
+}
+
+fm_test_only
 
 # --- writer schema ----------------------------------------------------------
 "$EVENT" gschema deny --log "$LOG" --session s1 --elapsed-ms 14 --cleared-by retry --repeat 2 --override
@@ -264,5 +299,132 @@ for mode in --undecided "--undecided --json"; do
   [ -z "$got" ] || fail "$mode on a missing log must print nothing, got '$got'"
 done
 pass "--undecided on a missing log prints nothing"
+
+test_claude_session_attribution
+
+# Task identity survives a harness restart; unrelated homes cannot collide.
+ATTR="$TMP/attributed.jsonl"
+"$EVENT" merge-green-head deny --rule base-containment --task task-a --session before --log "$ATTR"
+"$EVENT" merge-green-head allow --rule base-containment --task task-a --session after --log "$ATTR"
+jq -se 'all(.[]; .task == "task-a" and .rule == "base-containment" and .session == "task-a")' "$ATTR" >/dev/null \
+  || fail "task attribution must survive a session change"
+FM_HOME="$TMP" FM_SESSION_ID=stable "$EVENT" ghome deny --log "$ATTR"
+FM_HOME="$TMP" FM_SESSION_ID=stable "$EVENT" ghome allow --log "$ATTR"
+FM_HOME="$TMP/other" FM_SESSION_ID=stable "$EVENT" ghome allow --log "$ATTR"
+jq -se '.[2].session == .[3].session and .[3].session != .[4].session and .[2].task == ""' "$ATTR" >/dev/null \
+  || fail "harness sessions must be stable and home-scoped"
+"$EVENT" gcontrol deny --task $'task\nwith\tcontrols' --log "$ATTR"
+jq -se '.[5].task == "task\nwith\tcontrols"' "$ATTR" >/dev/null || fail "JSON control characters were not escaped"
+"$EVENT" malformed deny --rule >/dev/null || fail "missing option value failed its caller"
+mkfifo "$TMP/events.fifo"
+"$EVENT" fifo deny --log "$TMP/events.fifo" || fail "a nonregular log failed its caller"
+pass "rule/task attribution, home-scoped sessions, and nonblocking malformed or FIFO logs"
+
+# Different rules and tasks cannot clear each other's refusals. Extra denies
+# for the same task remain measurable even when legacy sessions differ.
+RULES="$TMP/rules.jsonl"
+"$EVENT" grules deny --rule base --task task-a --session one --log "$RULES"
+"$EVENT" grules allow --rule checks --task task-a --log "$RULES"
+"$EVENT" grules allow --rule base --task task-b --log "$RULES"
+"$EVENT" grules deny --rule base --task task-a --session two --log "$RULES"
+"$EVENT" grules allow --rule base --task task-a --log "$RULES"
+"$EVENT" grules deny --rule base --task task-a --session three --log "$RULES"
+"$EVENT" grules bypass --rule base --task task-a --override --log "$RULES"
+"$EVENT" grules allow --rule checks --task task-a --override --log "$RULES"
+# The detector output may contain duplicate snapshots of the same signature.
+printf '%s\n%s\n' \
+  '{"guard":"grules","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' \
+  '{"guard":"grules","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' > "$TMP/workarounds.jsonl"
+# Historical callers may have recorded a new harness session for each row.
+jq -sc 'to_entries[] | .value.session = ("harness-" + (.key | tostring)) | .value' "$RULES" > "$TMP/cross-session.jsonl"
+"$METRICS" --log "$TMP/cross-session.jsonl" --workarounds "$TMP/workarounds.jsonl" --json > "$TMP/rules.json"
+jq -e '.rules[] | select(.rule == "base") | .opportunities == 5 and .denies == 3 and .bypasses == 1
+  and .workarounds == 1 and .refusal_to_bypass_ratio == 0.667 and .recurrences == 1
+  and .median_clear_attempts == 2 and .repeat_denies == 2
+  and .repeat_denies_per_task == [{task:"task-a",denies:3,repeat_denies:2}]' "$TMP/rules.json" >/dev/null \
+  || fail "rule metrics lost task/rule isolation, deduplication, or ratio semantics"
+jq -e '.rules[] | select(.rule == "checks") | .denies == 0 and .refusal_to_bypass_ratio == null
+  and .recurrences == 0 and .repeat_denies == 0' "$TMP/rules.json" >/dev/null \
+  || fail "zero-deny ratio must be undefined, not fabricated"
+pass "per-rule metrics count cross-session task repeats and refusal-to-bypass ratios"
+
+# Exercise real library entrypoints. No credential contents enter the log.
+EMITTERS="$TMP/emitters.jsonl"
+(
+  export FM_GUARD_EVENT_LOG="$EMITTERS" FM_TASK_ID=emitter-task
+  # shellcheck source=bin/fm-api-key-guard-lib.sh
+  . "$ROOT/bin/fm-api-key-guard-lib.sh"
+  unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+  fm_api_key_guard claude 0 '' 0 '' '' || fail "clean billing environment was refused"
+  fm_api_key_guard claude 1 '' 0 '' '' || fail "existing explicit billing option was refused"
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  FM_GATE_REFUSE_BYPASS=1 fm_refuse_if_gate_agent
+  # shellcheck source=bin/fm-compact-adviser-lib.sh
+  . "$ROOT/bin/fm-compact-adviser-lib.sh"
+  [ "$(FM_COMPACT_ADVISER_DISABLE=' True ' fm_compact_adviser_force_off)" = 1 ] || fail "compact disable result changed"
+  # shellcheck source=bin/fm-tasks-axi-lib.sh
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  # shellcheck source=bin/fm-backlog-transition-lib.sh
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  mkdir -p "$TMP/manual-config"
+  printf 'manual\n' > "$TMP/manual-config/backlog-backend"
+  fm_backlog_transition_applies "$TMP/manual-config" "$TMP" ship
+  [ "$?" -eq 1 ] || fail "manual backlog admission result changed"
+)
+jq -se 'any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == false)
+  and any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == true)
+  and any(.[]; .rule == "FM_GATE_REFUSE_BYPASS" and .decision == "bypass" and .override == true)
+  and any(.[]; .rule == "FM_COMPACT_ADVISER_DISABLE" and .decision == "bypass")
+  and any(.[]; .guard == "backlog-transition" and .decision == "bypass")
+  and all(.[]; .task == "emitter-task")' "$EMITTERS" >/dev/null || fail "existing allows and escapes were not attributed"
+pass "real billing, containment, compact, and manual-backlog paths emit without changing their results"
+
+# Real Git history, not a stub: a redundant base merge is distinguishable
+# from an implementation commit after a refusal, and reads preserve all refs.
+REPO="$TMP/workaround-repo"
+STATE_DIR="$TMP/workaround-state"
+mkdir -p "$REPO" "$STATE_DIR"
+git init -q -b main "$REPO"
+fm_git_identity fmtest fmtest@example.invalid
+git -C "$REPO" commit -q --allow-empty -m seed
+git -C "$REPO" checkout -qb feature
+printf 'same content\n' > "$REPO/change.txt"
+git -C "$REPO" add change.txt
+git -C "$REPO" commit -qm feature
+refused=$(git -C "$REPO" rev-parse HEAD)
+git -C "$REPO" checkout -q main
+printf 'same content\n' > "$REPO/change.txt"
+git -C "$REPO" add change.txt
+git -C "$REPO" commit -qm base
+git -C "$REPO" checkout -q feature
+"$EVENT" merge-green-head deny --task merge-task --rule base-containment --head "$refused" --base main --log "$STATE_DIR/guard-events.jsonl"
+git -C "$REPO" merge -q --no-ff main -m 'merge base'
+merged=$(git -C "$REPO" rev-parse HEAD)
+printf 'kind=ship\nworktree=%s\nbranch=feature\n' "$REPO" > "$STATE_DIR/merge-task.meta"
+before_refs=$(git -C "$REPO" show-ref)
+before_status=$(git -C "$REPO" status --porcelain)
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/signatures.jsonl" \
+  || fail "read-only workaround scan failed"
+jq -se --arg head "$merged" 'length == 2 and all(.[]; .head == $head and .task == "merge-task")
+  and any(.[]; .kind == "tree-equal-merge") and any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/signatures.jsonl" >/dev/null \
+  || fail "redundant base merge did not produce both signatures"
+[ "$(git -C "$REPO" show-ref)" = "$before_refs" ] && [ "$(git -C "$REPO" status --porcelain)" = "$before_status" ] \
+  || fail "workaround detection changed repository state"
+printf 'real work\n' > "$REPO/work.txt"
+git -C "$REPO" add work.txt
+git -C "$REPO" commit -qm implementation
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/real-work.jsonl"
+jq -se 'all(.[]; .kind != "base-merge-only-after-refusal")' "$TMP/real-work.jsonl" >/dev/null \
+  || fail "an implementation change was misreported as only a base merge"
+# Another task's refusal is not evidence for this branch.
+jq -c '.task = "other-task"' "$STATE_DIR/guard-events.jsonl" > "$TMP/other-task.jsonl"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$TMP/other-task.jsonl" --json > "$TMP/other-task-result.jsonl"
+jq -se 'length == 1 and .[0].kind == "tree-equal-merge"' "$TMP/other-task-result.jsonl" >/dev/null \
+  || fail "a refusal from another task was correlated with this head"
+git -C "$REPO" branch -f main "$merged"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/inherited-result.jsonl"
+jq -se 'length == 0' "$TMP/inherited-result.jsonl" >/dev/null || fail "base history was misreported as a task workaround"
+pass "real tree-equal/base-only merges are detected read-only without blaming actual implementation or inherited base history"
 
 printf 'ok - fm-guard-telemetry\n'

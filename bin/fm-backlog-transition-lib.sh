@@ -334,6 +334,7 @@ fm_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   fi
   if fm_backlog_backend_manual "$config"; then
     FM_BACKLOG_TRANSITION_SKIP="config/backlog-backend selects manual editing"
+    "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" backlog-transition bypass --rule manual-backend --task "${FM_TASK_ID:-${ID:-}}" --override 2>/dev/null || true
     return 1
   fi
   if ! data=$(fm_backlog_data_absolute "$2"); then

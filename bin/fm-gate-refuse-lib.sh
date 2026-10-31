@@ -138,6 +138,7 @@ fm_gate_lab_permitted() {
 fm_is_gate_agent() {
   local anchor=${1:-.} common
   if [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ]; then
+    fm_gate_refuse_event bypass --rule FM_GATE_REFUSE_BYPASS --override
     return 1
   fi
   if [ "${NO_MISTAKES_GATE+x}" = x ]; then
@@ -162,7 +163,7 @@ fm_is_gate_agent() {
 fm_gate_refuse_event() {
   local dir
   dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
-  "$dir/fm-guard-event.sh" gate-agent-containment deny --source-ok true 2>/dev/null || true
+  "$dir/fm-guard-event.sh" gate-agent-containment "${1:-deny}" --rule gate-context --task "${FM_GATE_EVENT_TASK:-${ID:-${FM_TASK_ID:-}}}" "${@:2}" --source-ok true 2>/dev/null || true
 }
 
 # fm_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
@@ -171,8 +172,12 @@ fm_gate_refuse_event() {
 # session, a permitted lab home, or when firstmate's own test harness sets
 # FM_GATE_REFUSE_BYPASS=1 (see the header).
 fm_refuse_if_gate_agent() {
-  fm_is_gate_agent "${1:-.}" || return 0
+  if ! fm_is_gate_agent "${1:-.}"; then
+    [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ] || fm_gate_refuse_event allow
+    return 0
+  fi
   if fm_gate_lab_permitted; then
+    fm_gate_refuse_event allow
     echo "fm-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
     return 0
   fi

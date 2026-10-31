@@ -16,6 +16,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-compact-adviser)
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 
 # A synthetic pane value the launch must override rather than inherit: the
 # switch is a floor, so a pane that already carries the wrong value still has to
