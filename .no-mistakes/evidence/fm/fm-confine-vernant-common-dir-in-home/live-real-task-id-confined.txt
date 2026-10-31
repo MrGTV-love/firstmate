@@ -1,0 +1,58 @@
+MODE=confined fixture=/private/tmp/fmwc-live-confined.kLkdNy
++ python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M69Q256Q4GRQQ83NG6ESHRE7/bin/fm-write-confinement.py --worktree /private/tmp/fmwc-live-confined.kLkdNy/wt --home /private/tmp/fmwc-live-confined.kLkdNy/fmhome --config /private/tmp/fmwc-live-confined.kLkdNy/fmhome/config --projects /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects --data /private/tmp/fmwc-live-confined.kLkdNy/fmhome/data/fm-confine-vernant-common-dir-in-home --state /private/tmp/fmwc-live-confined.kLkdNy/fmhome/state --task fm-confine-vernant-common-dir-in-home --branch fm/fm-confine-vernant-common-dir-in-home --harness claude --agent-dir /private/tmp/fmwc-live-confined.kLkdNy/userhome/.claude --claude-session 11111111-2222-4333-8444-555555555555 --profile /private/tmp/fmwc-live-confined.kLkdNy/fm-confine-vernant-common-dir-in-home.write-confinement.sb
++ echo 'build rc=0'
+build rc=0
++ set +x
+late task recorded after build: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/state/fm-confine-vernant-common-dir-in-home-other.meta
+profile archive rules:
+61:(allow file-write* (regex #"^/private/tmp/fmwc\-live\-confined\.kLkdNy/fmhome/projects/proj/\.git/refs/heads/archive/fm\-confine\-vernant\-common\-dir\-in\-home-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+62:(allow file-write* (regex #"^/private/tmp/fmwc\-live\-confined\.kLkdNy/fmhome/projects/proj/\.git/logs/refs/heads/archive/fm\-confine\-vernant\-common\-dir\-in\-home-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+73:(allow file-write-create (require-all (literal "/private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/refs/heads/archive") (vnode-type DIRECTORY)))
+74:(allow file-write-create (require-all (literal "/private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/logs/refs/heads/archive") (vnode-type DIRECTORY)))
+--- own custody names (must be allowed) ---
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc rc=0 
+update archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc rc=0 
+  ref target: 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 (expect 8e6f2fafd85f86f04933150ff0d24f6cd121ee80)
+  reflog: 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 593fb96f6fdbefab235e5ad36985d9263f9dcfdd  (expect 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 593fb96f6fdbefab235e5ad36985d9263f9dcfdd)
+create archive/fm-confine-vernant-common-dir-in-home-submitted-138f2abc rc=0 
+update archive/fm-confine-vernant-common-dir-in-home-submitted-138f2abc rc=0 
+  ref target: 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 (expect 8e6f2fafd85f86f04933150ff0d24f6cd121ee80)
+  reflog: 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 593fb96f6fdbefab235e5ad36985d9263f9dcfdd  (expect 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 593fb96f6fdbefab235e5ad36985d9263f9dcfdd)
+--- refused names (must be denied, not created) ---
+create archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc': Unable to create '/private/tmp/fmwc-live-confined.kLk
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-other-submitted-138f2abc rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-submitted-138f2abc': Unable to create '/private/tmp/fmwc-live-confined.kL
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-submitted-138f2abc
+create archive/other-task-pipeline-138f2abc      rc=128 fatal: cannot lock ref 'refs/heads/archive/other-task-pipeline-138f2abc': Unable to create '/private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/ref
+  absent refs/heads/archive/other-task-pipeline-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-pipeline rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline': Unable to create '/private/tmp/fmwc-live-confined.kLkdNy/fmhome/proj
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline
+create archive/fm-confine-vernant-common-dir-in-home-other-138f2abc rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-138f2abc': Unable to create '/private/tmp/fmwc-live-confined.kLkdNy/fmhom
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC rc=128 fatal: a branch named 'archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC' already exists
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc0 rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc0': Unable to create '/private/tmp/fmwc-live-confined.kLkdNy/f
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc0
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x': 'refs/heads/archive/fm-confine-vernant-common-dir-in-home
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x
+create fm/new-branch                             rc=128 fatal: cannot lock ref 'refs/heads/fm/new-branch': Unable to create '/private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/refs/heads/fm/new-branch.l
+  absent refs/heads/fm/new-branch
+write late reflog directly                       rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/logs/refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc: Oper
+move other task branch                           rc=128 fatal: update_ref failed for ref 'refs/heads/fm/other-task': cannot lock ref 'refs/heads/fm/other-task': Unable to create '/private/tmp/fmwc-live-confined.kLkdN
+  fm/other-task: 8e6f2fafd85f86f04933150ff0d24f6cd121ee80 (before 8e6f2fafd85f86f04933150ff0d24f6cd121ee80)
+--- PR 310 shared Git protections ---
+pack-refs (rewrite packed-refs)                  rc=128 fatal: unable to write new packed-refs: unable to create file /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/packed-refs.new: Operation not pe
+write packed-refs                                rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/packed-refs: Operation not permitted
+write packed-refs.new                            rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/packed-refs.new: Operation not permitted
+write commondir                                  rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/commondir: Operation not permitted
+create reftable                                  rc=1 mkdir: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/projects/proj/.git/reftable: Operation not permitted
+write replace ref                                rc=255 error: cannot lock ref 'refs/replace/593fb96f6fdbefab235e5ad36985d9263f9dcfdd': unable to create directory for /private/tmp/fmwc-live-confined.kLkdNy/fmhome/pro
+--- supervisor home ---
+write home config                                rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/config/settings: Operation not permitted
+write other data                                 rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/data/other.txt: Operation not permitted
+write task meta                                  rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/state/fm-confine-vernant-common-dir-in-home.meta: Operation not permitted
+write late meta                                  rc=1 sh: /private/tmp/fmwc-live-confined.kLkdNy/fmhome/state/fm-confine-vernant-common-dir-in-home-other.meta: Operation not permitted
+--- own branch still works ---
+commit on own branch                             rc=0 
+  own branch: 0d1da2e6870f1ba7385f5b1bd45b21ca3d45b75e
+teardown: rm -rf /private/tmp/fmwc-live-confined.kLkdNy

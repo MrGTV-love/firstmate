@@ -1,0 +1,59 @@
+MODE=baseline fixture=/private/tmp/fmwc-live-baseline.UpxX8D
++ python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M69Q256Q4GRQQ83NG6ESHRE7/bin/fm-write-confinement.py --worktree /private/tmp/fmwc-live-baseline.UpxX8D/wt --home /private/tmp/fmwc-live-baseline.UpxX8D/fmhome --config /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/config --projects /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects --data /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/data/fm-confine-vernant-common-dir-in-home --state /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/state --task fm-confine-vernant-common-dir-in-home --branch fm/fm-confine-vernant-common-dir-in-home --harness claude --agent-dir /private/tmp/fmwc-live-baseline.UpxX8D/userhome/.claude --claude-session 11111111-2222-4333-8444-555555555555 --profile /private/tmp/fmwc-live-baseline.UpxX8D/fm-confine-vernant-common-dir-in-home.write-confinement.sb
++ echo 'build rc=0'
+build rc=0
++ set +x
+late task recorded after build: /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/state/fm-confine-vernant-common-dir-in-home-other.meta
+profile archive rules:
+61:(allow file-write* (regex #"^/private/tmp/fmwc\-live\-baseline\.UpxX8D/fmhome/projects/proj/\.git/refs/heads/archive/fm\-confine\-vernant\-common\-dir\-in\-home-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+62:(allow file-write* (regex #"^/private/tmp/fmwc\-live\-baseline\.UpxX8D/fmhome/projects/proj/\.git/logs/refs/heads/archive/fm\-confine\-vernant\-common\-dir\-in\-home-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+73:(allow file-write-create (require-all (literal "/private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects/proj/.git/refs/heads/archive") (vnode-type DIRECTORY)))
+74:(allow file-write-create (require-all (literal "/private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects/proj/.git/logs/refs/heads/archive") (vnode-type DIRECTORY)))
+--- own custody names (must be allowed) ---
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc rc=0 
+update archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc rc=0 
+  ref target: bc8e63f69e51d8974a780cd9372e204095e97307 (expect bc8e63f69e51d8974a780cd9372e204095e97307)
+  reflog: bc8e63f69e51d8974a780cd9372e204095e97307 9e7e56607b8ff360f9126b046a796d8ed9c39730  (expect bc8e63f69e51d8974a780cd9372e204095e97307 9e7e56607b8ff360f9126b046a796d8ed9c39730)
+create archive/fm-confine-vernant-common-dir-in-home-submitted-138f2abc rc=0 
+update archive/fm-confine-vernant-common-dir-in-home-submitted-138f2abc rc=0 
+  ref target: bc8e63f69e51d8974a780cd9372e204095e97307 (expect bc8e63f69e51d8974a780cd9372e204095e97307)
+  reflog: bc8e63f69e51d8974a780cd9372e204095e97307 9e7e56607b8ff360f9126b046a796d8ed9c39730  (expect bc8e63f69e51d8974a780cd9372e204095e97307 9e7e56607b8ff360f9126b046a796d8ed9c39730)
+--- refused names (must be denied, not created) ---
+create archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc rc=0 
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-pipeline-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-other-submitted-138f2abc rc=0 
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-submitted-138f2abc
+create archive/other-task-pipeline-138f2abc      rc=0 
+  EXISTS refs/heads/archive/other-task-pipeline-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-pipeline rc=0 
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline
+create archive/fm-confine-vernant-common-dir-in-home-other-138f2abc rc=0 
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-other-138f2abc
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC rc=128 fatal: a branch named 'archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC' already exists
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138F2ABC
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc0 rc=0 
+  EXISTS refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc0
+create archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x rc=128 fatal: cannot lock ref 'refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x': 'refs/heads/archive/fm-confine-vernant-common-dir-in-home
+  absent refs/heads/archive/fm-confine-vernant-common-dir-in-home-pipeline-138f2abc/x
+create fm/new-branch                             rc=0 
+  EXISTS refs/heads/fm/new-branch
+write late reflog directly                       rc=0 
+move other task branch                           rc=0 
+  fm/other-task: 9e7e56607b8ff360f9126b046a796d8ed9c39730 (before bc8e63f69e51d8974a780cd9372e204095e97307)
+--- PR 310 shared Git protections ---
+pack-refs (rewrite packed-refs)                  rc=0 
+write packed-refs                                rc=0 
+write packed-refs.new                            rc=0 
+write commondir                                  rc=0 
+create reftable                                  rc=0 
+write replace ref                                rc=128 fatal: unexpected line in /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects/proj/.git/packed-refs: x
+--- supervisor home ---
+write home config                                rc=0 
+write other data                                 rc=0 
+write task meta                                  rc=0 
+write late meta                                  rc=0 
+--- own branch still works ---
+commit on own branch                             rc=128 fatal: unexpected line in /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects/proj/.git/packed-refs: x
+fatal: unexpected line in /private/tmp/fmwc-live-baseline.UpxX8D/fmhome/projects/proj/.git/packed-refs: x
+  own branch: 
+teardown: rm -rf /private/tmp/fmwc-live-baseline.UpxX8D
