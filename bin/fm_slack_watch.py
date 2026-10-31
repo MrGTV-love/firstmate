@@ -178,7 +178,7 @@ def parse_options(lines):
     return options
 
 
-def parse_fields(lines, remainder=None, multiline=False):
+def parse_fields(lines, remainder=None, multiline=False, loose=None):
     fields, current = {}, None
     for line in lines:
         match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
@@ -191,16 +191,15 @@ def parse_fields(lines, remainder=None, multiline=False):
                 remainder.append(line)
             if current == 'Evidence':
                 current = None
-        elif OPTION_LINE.match(line):
-            current = None
-            if remainder is not None:
-                remainder.append(line)
-        elif current and multiline:
+        elif current and multiline and not OPTION_LINE.match(line):
             fields[current] += '\n' + line.strip()
             if remainder is not None and current not in ('Recommendation', 'Evidence'):
                 remainder.append(line)
-        elif remainder is not None:
-            remainder.append(line)
+        else:
+            current = None
+            for kept in (remainder, loose):
+                if kept is not None:
+                    kept.append(line)
     return {key: value.strip() for key, value in fields.items()
             if value.strip() and value.strip().lower() != 'none recorded'}
 
@@ -376,7 +375,8 @@ class Watch:
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
         body = parse_fields(lines)
         reason_lines = (row.get('hold_reason') or '').splitlines()
-        reason = parse_fields(reason_lines, multiline=True)
+        loose = []
+        reason = parse_fields(reason_lines, multiline=True, loose=loose)
         parts = dict(body)
         if card.get('recommend_value'):
             parts['Recommendation'] = card['recommend_value']
@@ -416,7 +416,7 @@ class Watch:
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
         if structured:
-            fields.extend(('', line) for line in reason_lines if OPTION_LINE.match(line))
+            fields.extend(('', line) for line in loose if line.strip())
         fields = [(prefix, slack_escape(value)) for prefix, value in fields
                   if str(value).strip().lower() != 'none recorded']
         if usable and options:

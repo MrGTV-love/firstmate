@@ -196,6 +196,28 @@ class CardRenderingTest(unittest.TestCase):
                 self.assertEqual(text.count('Option 1: Ship'), 1)
                 self.assertEqual('Tap a number reaction' in text, bool(card))
 
+    def test_four_part_unlabeled_reason_lines_are_plain_text(self):
+        text = self.render('PR #328 review gate; see report.\n'
+                           'Decision sought: Merge?\nBrief: Review passed.\n'
+                           'Option 1: Merge (merge)\nThe owner is away.')
+        self.assertIn('Decision sought: Merge?\nBrief description of issue: Review passed.\n', text)
+        self.assertIn('PR #328 review gate; see report.\nOption 1: Merge (merge)\n'
+                      'The owner is away.\nType your answer in this thread.', text)
+        self.assertEqual(text.count('PR #328 review gate'), 1)
+        self.assertNotIn('Question:', text)
+
+    def test_body_selected_four_part_shows_whole_unlabeled_reason(self):
+        watch = Watch.__new__(Watch)
+        watch.api = SimpleNamespace(scopes={'reactions:read', 'users:read'})
+        text, options, _ = watch.card_payload({
+            'id': 'release-call', 'title': 'Release choice',
+            'hold_reason': 'Should we merge PR #328?\nCI is green.',
+            'body_lines': ['Decision sought: Merge?', 'Option 1: Merge (merge)']}, {})
+        self.assertIn('Decision sought: Merge?\nOptions:\n1. Merge (merge)\n'
+                      'Should we merge PR #328?\nCI is green.\n', text)
+        self.assertEqual([option['value'] for option in options], ['merge'])
+        self.assertNotIn('Question:', text)
+
     def test_footer_is_concise_and_scope_fault_stays_visible(self):
         for options in ([], ['Option 1: Wait (wait)']):
             for scopes in (False, True):
