@@ -52,8 +52,11 @@ on file B when A runs, sources, copies, reads or lists B:
     names a file. In the argument list of a git ls-files call a literal
     pathspec matches as git matches it, and an argument that is not a literal
     (a variable, a spread, items joined to the list, a list assigned,
-    returned or yielded for other code to add to) names every tracked file,
-    unless the call lists only untracked files.
+    returned, yielded, made the body of an arrow function or lambda or a
+    dict or object value, for other code to add to) names every tracked file,
+    and so does a call with no pathspec, unless the call lists only untracked
+    files. In shell, git ls-files with no pathspec names every tracked file
+    when it runs here or under a -C named through the repository root.
 A test is affected by a changed file when that file is reachable from the test
 through code files. Documents, data and other non-code files are leaves,
 because mentioning a script inside a document never runs it. Tests are
@@ -298,6 +301,10 @@ def double_quoted(text, start, commands, bodies):
     return "".join(out), i + 1
 
 
+class Redirected(str):
+    """A word that names the file a command's input or output is redirected to."""
+
+
 def scan(text, bodies):
     """Split shell text into simple commands, each a list of words.
 
@@ -318,17 +325,21 @@ def scan(text, bodies):
     i = 0
     size = len(text)
 
+    target = False
+
     def end_word():
-        nonlocal have
+        nonlocal have, target
         if have:
-            words.append("".join(buf))
+            words.append(Redirected("".join(buf)) if target else "".join(buf))
+            target = False
         buf.clear()
         have = False
 
     def end_command():
-        nonlocal redirected
+        nonlocal redirected, target
         end_word()
         redirected = False
+        target = False
         if words:
             commands.append(list(words))
             words.clear()
@@ -411,11 +422,38 @@ def scan(text, bodies):
             end_word()
             if ">" in token and ">&" not in token:
                 redirected = True
+            target = re.search(r"&[0-9-]", token) is None
         else:
             buf.append(token)
             have = True
     end_command()
     return commands
+
+
+def lists_only_untracked(flags):
+    """Whether git ls-files flags list untracked files only (--others and no
+    tracked category such as --cached, --modified or --stage)."""
+    letters = set("".join(f[1:] for f in flags if not f.startswith("--")))
+    longs = {f.split("=", 1)[0] for f in flags if f.startswith("--")}
+    return ("o" in letters or "--others" in longs) and not (
+        letters & set("cdkmsu")
+        or longs & {"--cached", "--deleted", "--killed", "--modified", "--stage", "--unmerged"})
+
+
+def lists_this_tree(args):
+    """Whether "git ARGS" lists every tracked file of this repository: ls-files
+    with no pathspec and a tracked category, run here (no -C) or with a -C
+    named through the repository root."""
+    at = args.index("ls-files")
+    rest = [a for a in args[at + 1:] if not isinstance(a, Redirected)]
+    if lists_only_untracked([a for a in rest if a.startswith("-")]):
+        return False
+    if any(not a.startswith("-") for a in rest):
+        return False
+    before = args[:at]
+    if "-C" not in before[:-1]:
+        return True
+    return root_qualified(before[before.index("-C") + 1])[1]
 
 
 def heredoc_language(words):
@@ -534,6 +572,8 @@ def command_words(words, enumerating):
         reads.append(arg.split("=", 1)[1] if ASSIGNMENT.match(arg) else arg)
     if base == "git" and any(a in ("ls-files", "grep", "archive", "clone") for a in args):
         enumerating.append("git")
+        if "ls-files" in args and lists_this_tree(args):
+            reads.append("$ROOT/**")
     elif (base in ENUMERATORS
             or (base == "cp" and any(set(f[1:]) & set("rRa") for f in flags))
             or (base == "grep" and any("r" in f[1:].lower() for f in flags))):
@@ -715,12 +755,17 @@ def normal_path(word):
     return "/".join(parts).rstrip(".")
 
 
-def _word_references(tree, raw, enumerating, pathspec):
+def root_qualified(raw):
+    """(the leading variable of a word, whether it names the repository root)."""
     variable = LEADING_VARIABLE.match(raw)
-    qualified = False
-    if variable:
-        name = re.sub(r"[${}()…]", "", variable.group(0))
-        qualified = name in REPO_ROOT_VARIABLES or variable.group(0).startswith("$(")
+    if not variable:
+        return None, False
+    name = re.sub(r"[${}()…]", "", variable.group(0))
+    return variable, name in REPO_ROOT_VARIABLES or variable.group(0).startswith("$(")
+
+
+def _word_references(tree, raw, enumerating, pathspec):
+    variable, qualified = root_qualified(raw)
     word = raw[variable.end():] if variable else raw
     if not word or re.search(r"\s", word) or ":" in word:
         return set()
@@ -777,7 +822,8 @@ def ls_files_arguments(code):
 
     Each list is the items of one bracketed or parenthesized group: a literal's
     value, or None for anything else (a variable, a spread, a call). A group
-    that is assigned to a name, returned or yielded, or joined to more items
+    that is assigned to a name, returned, yielded, the body of an arrow
+    function or lambda, a dict or object value, or joined to more items
     ("[...] + extra", "(...) + extra", "[...].concat(extra)") can hold
     arguments it does not spell out, so it ends with None too.
     """
@@ -792,7 +838,7 @@ def ls_files_arguments(code):
         closed = None
         if mark in ("[", "("):
             groups.append([[]])
-            opened.append(previous.endswith(("+", "="))
+            opened.append(previous.endswith(("+", "=", "=>", ":"))
                           or re.search(r"(?:^|\W)(?:return|yield)$", previous) is not None)
         elif mark in ("]", ")") and len(groups) > 1:
             group = groups.pop()
@@ -821,22 +867,26 @@ def pathspec_references(tree, items):
     """Files the pathspecs of one git ls-files argument list match.
 
     A literal pathspec matches as git matches it. An argument that is not a
-    literal, before or after "--", could be any pathspec, so it names every
-    tracked file, unless the call lists only untracked files (--others without
-    --cached).
+    literal, before or after "--", could be any pathspec, and a call with no
+    pathspec lists the whole tree, so either names every tracked file, unless
+    the call lists only untracked files.
     """
     after = items[items.index("ls-files") + 1:]
-    flags = {item for item in after if item and item.startswith("-")}
-    if flags & {"--others", "-o"} and not flags & {"--cached", "-c"}:
+    if lists_only_untracked([item for item in after if item and item.startswith("-")]):
         return set()
     if None in after:
         return set(tree.files)
-    found, separated = set(), False
+    pathspecs, separated = [], False
     for item in after:
         if item == "--" and not separated:
             separated = True
         elif separated or not item.startswith("-"):
-            found |= word_references(tree, item, False, True)
+            pathspecs.append(item)
+    if not pathspecs:
+        return set(tree.files)
+    found = set()
+    for item in pathspecs:
+        found |= word_references(tree, item, False, True)
     return found
 
 

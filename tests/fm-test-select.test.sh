@@ -428,8 +428,10 @@ echo swept # touched')
 # never receives (a comment marker) names nothing. A "*" pathspec, and one that
 # is not a literal, before or after "--" (a spread with no "--", a variable
 # argument, items joined to a list or tuple with + or .concat, a list assigned
-# to a name or returned), name every tracked file, unless the call lists only
-# untracked files. A shell git ls-files with a bare pattern matches the tree too.
+# to a name, returned, the body of an arrow function or lambda or a dict value),
+# name every tracked file, and so does a listing with no pathspec, in code and
+# in shell run on this repository, unless the call lists only untracked files;
+# a shell listing of a fixture's own tree (-C "$dir") names nothing here. A shell git ls-files with a bare pattern matches the tree too.
 test_an_interpreter_here_document_and_a_git_pathspec_name_files() {
   local repo base out n script
   repo=$(new_repo pathspec)
@@ -483,15 +485,38 @@ import sys
 def command():
     return ["git", "ls-files", "-z"]
 subprocess.run(command() + sys.argv[1:], check=True)'
+  put "$repo" bin/fm-arrow.mjs 'import { execFileSync } from "node:child_process";
+const command = () => ["ls-files", "-z"];
+execFileSync("git", command().concat(process.argv.slice(2)));'
+  put "$repo" bin/fm-lambda.py 'import subprocess
+import sys
+command = lambda: ["git", "ls-files", "-z"]
+subprocess.run(command() + sys.argv[1:], check=True)'
+  put "$repo" bin/fm-dict-value.py 'import subprocess
+import sys
+options = {"args": ["git", "ls-files", "-z"]}
+options["args"] += sys.argv[1:]
+subprocess.run(options["args"], check=True)'
+  put "$repo" bin/fm-all-tracked.py 'import subprocess
+subprocess.run(["git", "ls-files", "-z"], capture_output=True, check=True)'
+  put "$repo" bin/fm-all-tracked.sh '#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+git -C "$ROOT" ls-files -z 2>/dev/null | tr "\0" "\n" | grep -c .'
+  put "$repo" bin/fm-fixture-tree.sh '#!/usr/bin/env bash
+dir=$(mktemp -d)
+git -C "$dir" init -q
+git -C "$dir" ls-files --stage'
   put "$repo" bin/fm-untracked.py 'import subprocess
 import sys
 subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *sys.argv[1:]], check=True)'
-  for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do
     case "$n" in
       1) script=fm-doccheck.sh ;; 2) script=fm-conflist.sh ;; 3) script=fm-everything.py ;;
       4) script=fm-listing.py ;; 5) script=fm-untracked.py ;; 6) script=fm-spread.py ;;
       7) script=fm-argument.py ;; 8) script=fm-joined.py ;; 9) script=fm-assigned.py ;;
       10) script=fm-concat.mjs ;; 11) script=fm-tuple.py ;; 12) script=fm-returned.py ;;
+      13) script=fm-arrow.mjs ;; 14) script=fm-lambda.py ;; 15) script=fm-dict-value.py ;;
+      16) script=fm-all-tracked.py ;; 17) script=fm-all-tracked.sh ;; 18) script=fm-fixture-tree.sh ;;
     esac
     put "$repo" "tests/p$n.test.sh" '#!/usr/bin/env bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -499,7 +524,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   done
   commit_all "$repo" pathspec
   local broad=()
-  for n in 3 4 6 7 8 9 10 11 12; do broad+=("tests/p$n.test.sh"); done
+  for n in 3 4 6 7 8 9 10 11 12 13 14 15 16 17; do broad+=("tests/p$n.test.sh"); done
   base=$(change "$repo" data/inventory.json '{"changed": true}')
   out=$(decide "$repo" "$base")
   assert_equals "$(sorted tests/p1.test.sh "${broad[@]}")" "$(picked "$out" | sorted)" \
@@ -515,7 +540,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   base=$(change "$repo" conf/z.cfg 'changed')
   out=$(decide "$repo" "$base")
   assert_equals "$(sorted tests/p2.test.sh "${broad[@]}")" "$(picked "$out" | sorted)" \
-    "git ls-files '*.cfg' in shell lists conf/z.cfg; the '*' and '/*' markers git never receives and the untracked-only listing do not"
+    "git ls-files '*.cfg' in shell lists conf/z.cfg; the '*' and '/*' markers git never receives, the untracked-only listing and a listing of a fixture's own tree do not"
   pass "an interpreter's here-document is read as its language, git ls-files pathspecs match as git matches them, and a glob git never receives names nothing"
 }
 
