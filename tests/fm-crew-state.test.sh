@@ -180,6 +180,8 @@ case "${1:-} ${2:-}" in
   "mr view")
     [ -z "${FM_FAKE_GLAB_READ_LOG:-}" ] || printf '%s|%s\n' "${GITLAB_HOST:-}" "$*" >> "$FM_FAKE_GLAB_READ_LOG"
     [ "${FM_FAKE_GLAB_READ_FAIL:-0}" = 1 ] && exit 1
+    # A forge answer that is late: silent for this many seconds (a network wait).
+    [ -z "${FM_FAKE_GLAB_READ_DELAY:-}" ] || sleep "$FM_FAKE_GLAB_READ_DELAY"
     printf '{"state":"%s"}\n' "${FM_FAKE_GLAB_STATE:-merged}"
     exit 0 ;;
 esac
@@ -316,16 +318,6 @@ SH
   printf '%s\n' "$fb"
 }
 
-make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
-  local dir=$1 tb="$1/notimeoutbin" tool real
-  mkdir -p "$tb"
-  for tool in bash git grep sed head cut tail dirname perl sleep; do
-    real=$(command -v "$tool" || true)
-    [ -n "$real" ] || fail "missing tool for no-timeout path: $tool"
-    ln -s "$real" "$tb/$tool"
-  done
-  printf '%s\n' "$tb"
-}
 
 # Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
@@ -381,6 +373,7 @@ reset_fakes() {
   FM_FAKE_PR_STATE_AXI=merged
   FM_FAKE_GLAB_STATE=merged
   FM_FAKE_GLAB_READ_FAIL=0
+  FM_FAKE_GLAB_READ_DELAY=
   FM_FAKE_GLAB_READ_LOG=
   FM_FAKE_TEA_STATE=closed
   FM_FAKE_TEA_MERGED=true
@@ -397,7 +390,7 @@ reset_fakes() {
   export FM_FAKE_DAEMON_DOWN FM_FAKE_DAEMON_TIMEOUT FM_FAKE_DAEMON_PROBE_LOG FM_FAKE_AXI_HOME
   export FM_FAKE_AXI_HOME_ERROR FM_FAKE_AXI_STATUS_RUN_ERROR FM_FAKE_AXI_STATUS_ERROR
   export FM_FAKE_PR_STATE FM_FAKE_PR_MERGED FM_FAKE_PR_READ_FAIL FM_FAKE_PR_READ_LOG FM_FAKE_PR_STATE_AXI
-  export FM_FAKE_GLAB_STATE FM_FAKE_GLAB_READ_FAIL FM_FAKE_GLAB_READ_LOG
+  export FM_FAKE_GLAB_STATE FM_FAKE_GLAB_READ_FAIL FM_FAKE_GLAB_READ_DELAY FM_FAKE_GLAB_READ_LOG
   export FM_FAKE_TEA_STATE FM_FAKE_TEA_MERGED FM_FAKE_TEA_READ_FAIL FM_FAKE_TEA_READ_LOG
   export FM_FAKE_GERRIT_STATUS FM_FAKE_GERRIT_CHANGE FM_FAKE_GERRIT_URL_JSON
   export FM_FAKE_GERRIT_READ_FAIL FM_FAKE_GERRIT_READ_LOG
@@ -1530,6 +1523,144 @@ test_terminal_passed_with_skips() {
   pass "terminal passed-with-skips run reads done with the skip kept visible"
 }
 
+# A passing no-mistakes run is completion evidence only with its supported
+# verification-plan snapshot: the run must expose the snapshot, its bytes must
+# still hash to the recorded sha256, and the run head must be the recorded
+# pr_head or attribute to HEAD (equal to it or descending from it).
+test_no_mistakes_pass_requires_verification_plan_evidence() {
+  reset_fakes
+  local d head plan_source plan_snapshot sha out saved_status
+  d=$(new_case no-mistakes-evidence)
+  make_repo_on_branch "$d/wt" fm/feat-evidence
+  head=$(git -C "$d/wt" rev-parse HEAD)
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-evidence.meta" "window=fm:fm-feat-evidence" \
+    "worktree=$d/wt" "kind=ship" "mode=no-mistakes"
+  mkdir -p "$d/data/feat-evidence"
+  plan_source="$d/data/feat-evidence/verification-plan.md"
+  plan_snapshot="$d/data/feat-evidence/verification-plan.txt"
+  printf 'author-supplied verification plan\n' > "$plan_source"
+  cp "$plan_source" "$plan_snapshot"
+  sha=$(shasum -a 256 "$plan_source" | awk '{print $1}')
+
+  # No snapshot at all.
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-evidence
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+  verification_plan: none
+outcome: passed
+EOF
+)"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "a passing run without plan evidence must not read done"
+  assert_contains "$out" "verification-plan snapshot" "the refusal did not name the missing evidence"
+  assert_not_contains "$out" "state: done" "missing plan evidence was promoted to done"
+
+  # Snapshot and source plan bound to this head.
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-evidence
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+  verification_plan:
+    path: $plan_snapshot
+    sha256: $sha
+    source_path: $plan_source
+    captured_at: $(date +%s)
+outcome: passed
+EOF
+)"
+  # A same-head snapshot from another task's plan is not this task's plan.
+  saved_status=$FM_FAKE_AXI_STATUS
+  FM_FAKE_AXI_STATUS=${saved_status//$plan_source/$d/data/other/verification-plan.md}
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "another task's plan snapshot must not read done"
+  assert_contains "$out" "is not this task's plan" "the refusal did not name the plan binding"
+  FM_FAKE_AXI_STATUS=$saved_status
+
+  # Replacement of the durable plan at the same path is observed by comparing
+  # the expected source bytes with the snapshot hash.
+  printf 'replacement criteria at the same path\n' > "$plan_source"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "replaced plan source bytes must not read done"
+  assert_contains "$out" "bytes do not match" "the refusal did not name the source-byte mismatch"
+  printf 'author-supplied verification plan\n' > "$plan_source"
+
+  # A changed captured snapshot is still caught by its own hash.
+  printf 'rewritten snapshot\n' > "$plan_snapshot"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "a changed plan snapshot must not read done"
+  assert_contains "$out" "hash does not match" "the refusal did not name the snapshot hash mismatch"
+  cp "$plan_source" "$plan_snapshot"
+
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: done" "matching plan evidence must complete the run"
+  assert_not_contains "$out" "state: unknown" "matching plan evidence must not be unverified"
+
+  # A relative state directory names the same absolute task plan the snapshot
+  # records, as the status-log completion path resolves it.
+  out=$(cd "$d" && PATH="$d/fakebin:$PATH" FM_HERDR_PS_BIN="$d/fakebin/herdr-ps" \
+    FM_STATE_OVERRIDE=state "$CREW_STATE" feat-evidence)
+  assert_contains "$out" "state: done" "a relative state directory did not bind the task's absolute plan"
+  pass "no-mistakes completion consumes revision-bound verification-plan evidence"
+}
+
+# A final status-log `done: PR ... checks green` on a no-mistakes task is also
+# an acceptance boundary: it must carry the same task-bound plan evidence.
+test_no_mistakes_status_log_done_requires_plan_evidence() {
+  reset_fakes
+  local d head plan sha out
+  d=$(new_case no-mistakes-status-evidence)
+  make_repo_on_branch "$d/wt" fm/feat-status
+  head=$(git -C "$d/wt" rev-parse HEAD)
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-status.meta" "window=fm:fm-feat-status" \
+    "worktree=$d/wt" "project=$d/wt" "kind=ship" "mode=no-mistakes" "harness=claude"
+  printf 'done: PR https://github.com/o/r/pull/4 checks green\n' > "$d/state/feat-status.status"
+  arm_idle_record "$d/state" feat-status
+
+  FM_FAKE_AXI_STATUS=""
+  out=$(run_crew_state "$d" feat-status)
+  assert_contains "$out" "state: blocked" "a final status-log done without plan evidence must not read done"
+  assert_contains "$out" "verification-plan evidence" "the refusal did not name the missing evidence"
+  assert_not_contains "$out" "state: done" "missing plan evidence was promoted to done"
+
+  mkdir -p "$d/data/feat-status"
+  plan="$d/data/feat-status/verification-plan.md"
+  printf 'author-supplied verification plan\n' > "$plan"
+  sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-status
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/4"
+  findings: none
+  verification_plan:
+    path: $plan
+    sha256: $sha
+    source_path: $plan
+    captured_at: $(date +%s)
+outcome: passed
+EOF
+)"
+  out=$(run_crew_state "$d" feat-status)
+  assert_contains "$out" "state: done" "matching task-bound plan evidence must allow the final done"
+  pass "a no-mistakes status-log final done consumes task-bound plan evidence"
+}
+
 test_terminal_passed_uses_matching_retirement_receipt_without_forge() {
   reset_fakes
   local d url read_log out
@@ -1664,6 +1795,69 @@ test_terminal_passed_with_merged_gitlab_mr_reports_merged() {
   out=$(run_crew_state "$d" feat-dgitlabmerged)
   assert_contains "$out" "run passed: PR merged" "merged GitLab MR is reported merged"
   pass "terminal passed run reads merged GitLab MR state"
+}
+
+# A forge read cannot show progress, so its bound is this host's measured one, and
+# running out of it says nothing about the PR. A host where the same read has taken
+# five seconds gets fifteen: a read that takes eight is slow, not hung, and must name
+# the PR's state. One that never answers is stopped and the state is unknown, said as
+# "timed out; try again" so it is not mistaken for a read that failed.
+test_forge_read_bound_follows_the_measured_ledger() {
+  reset_fakes
+  local d out ledger i
+  d=$(new_case passed-forge-read-measured)
+  make_repo_on_branch "$d/wt" fm/feat-dforgeslow
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-dforgeslow.meta" "window=fm:fm-feat-dforgeslow" \
+    "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/14"
+  ledger="$d/durations.jsonl"
+  for i in 1 2 3 4 5; do
+    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 5000 0 >/dev/null 2>&1 \
+      || fail "could not seed the duration ledger"
+  done
+  FM_FAKE_GLAB_STATE=opened
+  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dforgeslow https://gitlab.com/group/repo/-/merge_requests/14)"
+  FM_FAKE_GLAB_READ_DELAY=8
+  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  assert_contains "$out" "run passed: PR open" "a forge read slower than the cold-start floor but inside the measured bound was dropped"
+  FM_FAKE_GLAB_READ_DELAY=40
+  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  assert_contains "$out" "run passed: PR state unknown (forge read timed out; try again)" "a forge read that never answered was not reported as a timeout"
+  assert_not_contains "$out" "(unreadable)" "a timed-out forge read was reported as an unreadable one"
+  assert_not_contains "$out" "PR merged" "a timed-out forge read must not be reported merged"
+  pass "a forge read gets its host's measured bound: slow names the state, silent is unknown and retryable"
+}
+
+# A host without perl still reads the PR state: the forge read keeps its measured
+# bound through fm_run_timed instead of failing before it starts.
+test_forge_read_without_perl_names_the_pr_state() {
+  reset_fakes
+  local d out nopath dir tool name
+  local -a dirs
+  d=$(new_case passed-forge-read-no-perl)
+  make_repo_on_branch "$d/wt" fm/feat-dnoperl
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-dnoperl.meta" "window=fm:fm-feat-dnoperl" \
+    "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/15"
+  nopath="$d/nopath"
+  mkdir -p "$nopath"
+  IFS=: read -r -a dirs <<< "$PATH"
+  for dir in "${dirs[@]}"; do
+    [ -d "$dir" ] || continue
+    for tool in "$dir"/*; do
+      name=${tool##*/}
+      case "$name" in perl*) continue ;; esac
+      [ -x "$tool" ] && [ ! -d "$tool" ] && [ ! -e "$nopath/$name" ] || continue
+      ln -s "$tool" "$nopath/$name"
+    done
+  done
+  ! PATH="$nopath" command -v perl >/dev/null 2>&1 || fail "the perl-less fixture still finds perl"
+  FM_FAKE_GLAB_STATE=opened
+  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dnoperl https://gitlab.com/group/repo/-/merge_requests/15)"
+  out=$(PATH="$nopath" FM_DURATION_FILE=off run_crew_state "$d" feat-dnoperl)
+  assert_contains "$out" "run passed: PR open" "a host without perl did not read the PR state"
+  assert_not_contains "$out" "(unreadable)" "a host without perl reported the PR state unreadable"
+  pass "a host without perl still reads the PR state through the measured bound"
 }
 
 test_terminal_passed_with_failed_gitlab_read_reports_unknown() {
@@ -2628,9 +2822,11 @@ test_unpushed_ship_done_is_blocked() {
   make_fakebin "$d" >/dev/null
   fm_write_meta "$d/state/unpushed.meta" \
     "window=fm:fm-unpushed" "worktree=$d/wt" "project=$d/wt" \
-    "kind=ship" "mode=no-mistakes" "harness=claude"
+    "kind=ship" "mode=direct-PR" "harness=claude"
   printf 'done: PR https://example.test/o/r/pull/9 checks green\n' \
     > "$d/state/unpushed.status"
+  # Publication-only fallback: no attributed no-mistakes run, so the
+  # status-log done reaches the named-head reachability gate directly.
   FM_FAKE_AXI_STATUS=""
   FM_FAKE_RUNS_LIST=""
   FM_FAKE_BUSY=0
@@ -3046,6 +3242,27 @@ test_no_run_idle_pane_uses_log() {
   pass "no run + idle pane uses the status-log verb"
 }
 
+# A status log the read limits refuse (bin/fm-status-cap-lib.sh) cannot be read, which is
+# not the same as having no events: the lane reads unknown and names the log, instead of
+# taking whatever the pane alone says (here an idle pane, which would read as ordinary).
+test_status_log_past_the_read_limits_reads_unknown() {
+  reset_fakes
+  local d out; d=$(new_case refused-log)
+  make_repo_on_branch "$d/wt" fm/feat-big
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-big.meta" "window=fm:fm-feat-big" "worktree=$d/wt" "kind=ship" "harness=claude"
+  { printf 'needs-decision [key=q1]: which database?\n'; perl -e 'print "text\n" x 40000'; } > "$d/state/feat-big.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_BUSY=0
+  arm_idle_record "$d/state" feat-big
+  out=$(FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 run_crew_state "$d" feat-big)
+  assert_contains "$out" "state: unknown" "an unreadable status log reads unknown"
+  assert_contains "$out" "source: status-log" "the unknown names the status log as its source"
+  assert_contains "$out" "feat-big.status is past the status read limits" "the unknown does not name the refused log"
+  assert_not_contains "$out" "state: parked" "a refused log was read as its stale decision"
+  pass "a status log past the read limits reads unknown and names the log"
+}
+
 test_no_run_idle_pane_uses_keyed_log() {
   reset_fakes
   local d; d=$(new_case keyed-idle)
@@ -3398,52 +3615,87 @@ test_dead_window_still_reports_active_run_step() {
   pass "closed pane still reports an active run-step"
 }
 
-test_no_timeout_uses_perl_bound() {
+make_python_free_toolbin() {  # <dir> -> echoes toolbin path
+  local dir=$1 tb="$1/nopythonbin" tool real
+  mkdir -p "$tb"
+  for tool in bash git grep sed head cut tail dirname perl sleep ps; do
+    real=$(command -v "$tool" || true)
+    [ -n "$real" ] || fail "missing tool for the Python-free path: $tool"
+    ln -s "$real" "$tb/$tool"
+  done
+  printf '%s\n' "$tb"
+}
+
+# A wedged daemon (no output, no CPU) costs one no-progress interval: its first
+# read is cut, no later run-store read runs, and the pane and status-log
+# fallback still answer, with the cut disclosed. Python-free, so the Perl
+# progress runner owns the bound.
+test_wedged_daemon_falls_back_to_pane() {
   reset_fakes
   local d toolbin out start elapsed calls_file calls pidfile i
-  d=$(new_case no-timeout)
-  make_repo_on_branch "$d/wt" fm/feat-timeout
+  d=$(new_case wedged-daemon)
+  make_repo_on_branch "$d/wt" fm/feat-wedged
   make_fakebin "$d" >/dev/null
   calls_file="$d/no-mistakes.calls"
   : > "$calls_file"
-  # The fake blocks past the bound, so the bound is what ends it. It records its
-  # pid so the test can prove the bound left nothing behind and reap it even when
-  # an assertion fails or the run is interrupted, and it stops itself at the
-  # suite's stub ceiling so a leaked one costs no CPU and ends on its own.
+  # The fake records its pid so the test can prove the bound left nothing
+  # behind, then blocks without output or CPU until the suite's stub ceiling.
   pidfile="$d/no-mistakes.pid"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
 fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
-while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+exec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
 SH
   chmod +x "$d/fakebin/no-mistakes"
-  fm_test_track_process "$pidfile" "$d/fakebin/no-mistakes"
-  toolbin=$(make_no_timeout_toolbin "$d")
-  fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
+  fm_test_track_process "$pidfile" sleep
+  toolbin=$(make_python_free_toolbin "$d")
+  fm_write_meta "$d/state/feat-wedged.meta" "window=fm:fm-feat-wedged" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
   FM_FAKE_BUSY=1
-  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-timeout)
-  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-wedged)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-wedged busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
   start=$SECONDS
-  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
+  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-wedged)
   elapsed=$((SECONDS - start))
   [ -s "$pidfile" ] || fail "the fake no-mistakes never ran, so the bound proved nothing"
   # The bound must take the fake down with it, not merely stop waiting for it.
   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" || break
+    fm_test_process_alive "$pidfile" sleep || break
     sleep 0.1
   done
-  ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
-    || fail "the timed-out no-mistakes call was left running after the bound"
-  assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
-  assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed, not hidden"
-  [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"
+  ! fm_test_process_alive "$pidfile" sleep \
+    || fail "the stalled no-mistakes call was left running after the bound"
+  assert_contains "$out" "state: working" "a wedged daemon falls back to the pane"
+  assert_contains "$out" "source: pane" "a wedged daemon leaves the pane as the source"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed, not hidden"
+  # 2026-10-24, Mac-Studio.local: eight loaded-host runs took 2,2,3,2,2,2,2,1s
+  # (worst 3s). CI run 40058102924 passed this same <10s check: integer elapsed
+  # <=9s is all its buffered log proves, not an exact per-case duration.
+  # Keep 10s above both observed bounds, without raising the ceiling: detect a
+  # broken sampler/latch waiting for the 120s stub instead of prompt pane fallback.
+  [ "$elapsed" -lt 10 ] || fail "the no-progress bound did not cut the wedged read (elapsed ${elapsed}s)"
   calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
-  [ "$calls" -eq 1 ] || fail "empty no-mistakes status triggered extra lookups ($calls calls)"
-  pass "no timeout command uses perl bound"
+  [ "$calls" -eq 1 ] || fail "a wedged daemon was read again after the cut ($calls calls)"
+  pass "a wedged daemon costs one read and leaves the pane to answer (elapsed ${elapsed}s)"
+}
+
+# A healthy daemon pays no extra probe: a bound live run makes no daemon status call.
+test_healthy_daemon_read_makes_no_probe() {
+  reset_fakes
+  local d out probes
+  d=$(new_case healthy-no-probe)
+  make_repo_on_branch "$d/wt" fm/feat-healthy
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-healthy.meta" "window=fm:fm-feat-healthy" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_running fm/feat-healthy)"
+  FM_FAKE_DAEMON_PROBE_LOG="$d/probes"
+  out=$(run_crew_state "$d" feat-healthy)
+  assert_contains "$out" "source: run-step" "a healthy daemon's run answers"
+  probes=$(awk 'END { print NR + 0 }' "$d/probes" 2>/dev/null || echo 0)
+  [ "$probes" -eq 0 ] || fail "a healthy read made $probes daemon status probe(s)"
+  pass "a healthy daemon read makes no daemon status probe"
 }
 
 # A cut run-store lookup is skipped, so the pane still decides liveness: a dead
@@ -3471,7 +3723,7 @@ SH
   assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
   assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
   assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed"
   pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
 }
 
@@ -4444,15 +4696,20 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
-# The capped-overview sqlite reader runs inside the same per-read budget as
-# every other no-mistakes state read, so a contended database cannot stall a
-# crew poll: a reader that never returns must be killed and fall through to the
+# The capped-overview sqlite reader shares the operational no-progress bound.
+# A silent reader that does no CPU work must be stopped and fall through to the
 # reader-unavailable verdict, disclosed as a skipped run-store lookup.
+# Keep the interpreter for the independent progress owner real in this fixture.
 test_capped_inventory_reader_is_time_bounded() {
   make_capped_runs_case capped-slow-reader running pending hidden
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
   cat > "$d/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
+# Stall the inventory, not the independent progress monitor's interpreter or
+# its POSIX capability check; both run the real interpreter on this PATH.
+if [ "${1##*/}" = fm-duration.py ] || [ "${1:-}" = -c ]; then
+  exec "${FM_TEST_PROGRESS_PYTHON:?}" "$@"
+fi
 printf 'invoked\n' >> "${0%/*}/python3.calls"
 exec sleep 30
 SH
@@ -4460,14 +4717,16 @@ SH
   FM_CREW_STATE_NM_TIMEOUT=2
   export FM_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
-  out=$(run_crew_state "$d" competing)
+  # The interpreter itself, not a version-manager shim that would put its own
+  # python3 ahead of this fixture's on PATH.
+  out=$(FM_TEST_PROGRESS_PYTHON="$(python3 -c 'import sys; print(sys.executable)')" run_crew_state "$d" competing)
   elapsed=$((SECONDS - started))
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
   assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
   [ -s "$d/fakebin/python3.calls" ] || fail 'the inventory reader never ran, so the bound proved nothing'
-  assert_contains "$out" 'run-store: skipped (read budget exceeded)' 'the killed reader is disclosed as a skipped lookup'
+  assert_contains "$out" 'run-store: skipped (no output or CPU progress)' 'the stopped reader is disclosed as a skipped lookup'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 
@@ -5999,6 +6258,8 @@ test_top_level_fixing_done_log_stays_working
 test_terminal_passed
 test_terminal_passed_with_override
 test_terminal_passed_with_skips
+test_no_mistakes_pass_requires_verification_plan_evidence
+test_no_mistakes_status_log_done_requires_plan_evidence
 test_terminal_passed_uses_matching_retirement_receipt_without_forge
 test_terminal_passed_no_forge_switch_skips_read_but_keeps_receipt
 test_terminal_passed_with_open_pr_does_not_claim_merged
@@ -6008,6 +6269,8 @@ test_terminal_passed_with_open_gitlab_mr_does_not_claim_merged
 test_terminal_passed_with_forgejo_pull_reports_its_state
 test_terminal_passed_with_merged_gitlab_mr_reports_merged
 test_terminal_passed_with_failed_gitlab_read_reports_unknown
+test_forge_read_bound_follows_the_measured_ledger
+test_forge_read_without_perl_names_the_pr_state
 test_terminal_passed_with_open_gerrit_change_does_not_claim_merged
 test_terminal_passed_with_merged_gerrit_change_reports_merged
 test_terminal_passed_with_unreadable_gerrit_change_reports_unknown
@@ -6048,6 +6311,7 @@ test_no_run_herdr_husk_dead_still_reads_gone
 test_no_run_herdr_idle_agent_status_outranked_by_record
 test_no_run_herdr_idle_agent_status_and_idle_record_stays_idle
 test_no_run_idle_pane_uses_log
+test_status_log_past_the_read_limits_reads_unknown
 test_no_run_idle_pane_uses_keyed_log
 test_no_run_idle_pane_paused
 test_no_run_idle_pane_custom_paused_verb
@@ -6056,7 +6320,8 @@ test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
-test_no_timeout_uses_perl_bound
+test_wedged_daemon_falls_back_to_pane
+test_healthy_daemon_read_makes_no_probe
 test_cut_store_does_not_revive_dead_worker_from_old_status
 test_responsive_lookups_are_not_pooled
 test_scout_skips_run_lookup

@@ -14,7 +14,6 @@ Firstmate's worker guard uses those policies and the canonical client through `b
 These files remain byte-for-byte copies at their upstream paths:
 
 - `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
-- `src/levels/level06/index.ts` and `bash-gate.ts`
 - `src/levels/level05/intent-router.ts` and `index.ts`
 - `tests/level05.test.ts`
 - `LICENSE`
@@ -30,45 +29,39 @@ Level 5 was copied from the same pinned commit on 2026-10-14 (UTC).
 Their original route functions consume those objects unchanged.
 This is the only change in those copies: combining independent agent and model questions in one paid dispatch request requires access to the objects without invoking two separate route calls.
 Question wording, criteria, pure decisions, and thresholds remain upstream's.
-`bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the approved candidates.
+`bin/fm-dispatch-level5.ts` uses the unchanged model questions, model decision and ambiguity rubric, but owns Firstmate's structured rule predicates, desktop criteria and capability policy outside the vendored copies.
+It does not ask or apply the upstream workflow/profile Choice or agent decision.
+The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns that adapter's routing semantics.
 
-## Changed copies: Level 6 result policy and service
+## Changed copies: Level 6 policies and service
 
-- `src/levels/level06/result-screen.ts` owns the frozen, calibrated injection Noul and pure clear/flag/review policy.
-  Invalid answers throw the canonical contract error, empty output invents no probability, and complete result text replaces prefix-only screening.
-  The [accepted frozen calibration summary](../../docs/verification/runtime-backends.md#accepted-frozen-live-calibration) owns measured denominators, abstentions, fixture exclusions and estimated-cost uncertainty.
-- `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
-- `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
-- `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
-  It snapshots and checks the complete request before key lookup, plans an oversized payload as overlapping pieces that each fit the request ceiling (`plan`), refuses one that no complete cover fits, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
-  Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
-  Durable-record failure is explicit rather than silently optional while active.
-  It allows Claude, and omp's pre-tool shell and write judgments, up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget; the worker overlay raises omp's pre-tool handler deadline above that budget.
-  It keeps omp's result screening at two 12-second tries with 500 ms backoff inside 25 seconds because that native handler times out at 30 seconds, without a setting, and forwards the original output.
-  It retains outage-only deny guidance and records elapsed tries and time; each call is judged on its own, with no state carried between calls.
-  These Firstmate-only changes leave the upstream client, questions, thresholds, egress checks and `REVIEW_ON_UNAVAILABLE_V1` pre-tool denial unchanged; the operator contract above owns measurements and enclosing host limits.
+- `src/levels/level06/index.ts` exports only the lexical write-root helper.
+- `src/levels/level06/write-gate.ts` retains only the lexical root helper and the shared `Decide` type; file-kind and credential questions, thresholds, `GateDecision` and model-call entry points are removed in favor of the per-task Git credential hooks.
+- `tests/level06.test.ts` exercises lexical root admission and the refusal of escapes and the root itself.
+- `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
+  The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, failure normalization and cancellation budgets.
+  The write-only planner and coverage audit are removed because write/edit content is no longer screened; no guard question or threshold remains active.
+  Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only the tool's single destination class from the egress policy, never outbound arguments or destinations.
+  Confinement-owned effects record `confinement_owner: T5` before egress authorization, so a compound skill-bearing `learn` retains its write owner even when its memory effect is refused for a missing provider grant.
+  This identifies the launch-time enforcement owner and is not proof that confinement is active.
+  The canonical client is unchanged.
+  There is no result policy, result request budget or result audit path.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
-  It judges every piece of an oversized payload with the unchanged level 6 policies; shell/write payloads pass only when every piece passes, while result handling applies the explicit advisory and trusted-read rules below.
-  Its host response handling preserves answered middle-band results with an advisory and audit row.
-  Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
-  Native source metadata normalizes numeric and database selectors before bounded path admission.
-  Untrusted flags at or above 0.80 remain withheld on omp; shell/write outages still deny.
+- `bin/fm-jev-guard.ts` is the single worker pre-tool event entry point and applies deterministic tool coverage, egress authorization and input/root/device checks.
+  `bin/fm-jev-egress.ts` owns the tool classifications and each tool's egress row; the operator contract above owns task grants and the table's non-sandbox limits.
+  Native device admission uses the adapter context's host (default `omp`, explicitly `claude` in the Claude adapter), not the model service; host identity remains required even without host-specific result budgets.
+  Credential shape matching moves to `bin/fm-git-secrets.py` at commit and push time; write/edit content receives no model or local credential screening.
+  Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers, classifying read-only commands or writing audit rows.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
-  The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
-  The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
-- `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
-  Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
+  The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and outage behavior.
+- `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
 - `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
-  Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
-- The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
-  The [inbox owner's header](../fm-task-inbox-lib.sh) owns delivery and retry semantics.
 
 [`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) exercises the public service and adapters with isolated synthetic HTTP fixtures.
-[Native verification](../../docs/verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes actual host delivery, controlled decision fixtures, live calibration and deployed acceptance.
+[Native verification](../../docs/verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes actual host delivery, controlled decision fixtures and deployed acceptance.

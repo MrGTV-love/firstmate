@@ -2,7 +2,7 @@
 # fm-lint.sh - the single owner of firstmate's lint definition.
 #
 # Runs ShellCheck's default severity and extended, source-aware analysis with
-# ambient configuration disabled and one exact ShellCheck version.
+# ambient configuration disabled and one maintained ShellCheck version.
 # CI selects the complete canonical set; local branches select changed files,
 # known transitive sourcing callers, and possible callers of unresolved imports.
 # Every mode attempts --norc --external-sources and the same diagnostic rules.
@@ -16,6 +16,12 @@
 # The default (no explicit-path) path also runs bin/fm-lint-workflows.sh so a
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.
+#
+# The ShellCheck and actionlint versions are maintained pins, not a freeze.
+# CI and --strict-version refuse a different local ShellCheck; an ordinary local
+# run warns and proceeds so a newer local tool is not a wall. --check-version
+# compares both pins with the latest upstream releases (exit 0 current, 1
+# behind, 2 unknown) so a bump is routine rather than discovered by a failure.
 #
 # With no explicit paths, the file set depends on context:
 #   - In CI (GITHUB_ACTIONS=true or CI=true), on the main branch, or when no
@@ -81,8 +87,17 @@
 # or lint exits 2, even with the pool off. The cap is the only host-wide bound:
 # a lone default two-worker run keeps both workers unless an explicit cap of one
 # is selected. The CPU-derived default keeps the memory protection of the
-# original pool (some ShellChecks reach several GB); the per-root memory limit
-# is enforced only where ulimit -v works, and native macOS cannot enforce it.
+# original pool (some ShellChecks reach several GB); the per-root address-space
+# limit is enforced only where ulimit -v works, and native macOS cannot enforce it.
+# On native macOS, where the enforced envelope below does not apply, each root's
+# process tree is instead watched for memory, the larger of its resident size
+# and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
+# positive decimal integer or lint exits 2 on every host). A root that crosses
+# it is ended and takes the memory retry described below, and the roots log's
+# last end-record column counts the samples each source gave (libproc, or ps
+# for a tick libproc did not answer in time) and names any attempt that gave
+# up its libproc reader, with the reason. Linux runs are never watched, and CI
+# runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
 # Slot directory, file, or locking failures warn and run ungated rather than failing lint.
@@ -113,10 +128,12 @@
 # named error, so a required-bounds run never lints uncapped. Without
 # FM_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
 # cannot apply the address-space limit at all) each root still runs in its
-# own ShellCheck process with identical diagnostics and no deadline or memory
-# limit; the host-wide concurrency pool remains enabled unless disabled above.
+# own ShellCheck process with identical diagnostics, no deadline and no
+# address-space limit, under the resident-memory watch above on macOS; the host-wide
+# concurrency pool remains enabled unless disabled above.
 #
-# If a source-following root exits with a memory failure, it is retried once
+# If a source-following root exits with a memory failure, including a resident
+# bound crossing (status 98, named on stderr), it is retried once
 # without --external-sources under the same memory limit and only the time
 # left in that root's original deadline; with under a second left, the
 # memory failure stands without a retry. A clean retry passes
@@ -161,6 +178,8 @@
 #   fm-lint.sh --partition <1of3|2of3|3of3> lint one canonical CI partition (see fallback above)
 #   fm-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   fm-lint.sh --required-version      print the ShellCheck pin
+#   fm-lint.sh --check-version         report whether the ShellCheck/actionlint pins are current
+#   fm-lint.sh --strict-version        refuse a local ShellCheck that differs from the pin
 #   fm-lint.sh --list-files            print the file set that would be linted
 #   fm-lint.sh --help                  print this usage
 set -u
@@ -225,6 +244,18 @@ fm_lint_root_rss() {  # <rss-file>
   printf '%s\n' "${kib:-unavailable}"
 }
 
+# Samples each source gave the macOS resident-memory watch across a root's
+# attempts, as libproc:<n>,ps:<n>, followed by ,reader-unavailable:<reason>
+# for each attempt that gave up its libproc reader, or none when no watch
+# sampled the root.
+fm_lint_root_rss_samples() {  # <rss-file>...
+  cat "$@" 2>/dev/null | awk -F '[=:,]' '
+    /^rss_samples=/ { for (i = 2; i < NF; i += 2) count[$i] += $(i + 1); found = 1 }
+    /^rss_reader_unavailable=/ { reasons = reasons ",reader-unavailable:" $2 }
+    END { if (found) printf "libproc:%d,ps:%d%s\n", count["libproc"], count["ps"], reasons; else print "none" }
+  '
+}
+
 fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
   local first=$1 second=$2
   case "$first" in ''|unavailable|*[!0-9]*) printf '%s\n' "$second"; return ;; esac
@@ -239,8 +270,9 @@ fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
 # Map a root's exit status onto the reported reason vocabulary without
 # pretending every signal or nonzero exit is a memory kill: only process-level
 # memory-failure evidence earns the memory reason - GHC's heap-exhaustion
-# status 251, or a complete runtime memory-error line on the root's stderr,
-# including the cache wrapper's Perl "Out of memory!" exit 1 - and that
+# status 251, the resident-memory watch's own status 98, or a complete runtime
+# memory-error line on the root's stderr, including the cache wrapper's Perl
+# "Out of memory!" exit 1 - and that
 # evidence is checked before a generic findings or signal reason.
 # Diagnostics and their echoed source excerpts are on stdout and never count,
 # and each stderr form is matched whole to its line end, so a root path that
@@ -250,7 +282,7 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
   case "$rc" in
     0) printf 'ok\n'; return 0 ;;
     97) printf 'limit-unavailable\n'; return 0 ;;
-    251) printf 'memory\n'; return 0 ;;
+    251|98) printf 'memory\n'; return 0 ;;
   esac
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
     printf 'timeout\n'; return 0
@@ -299,6 +331,14 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     else
       analysis_command=(/usr/bin/time -f 'max_rss_kib=%M' -o "$rss_file" "${analysis_command[@]}")
     fi
+  fi
+  # Native macOS cannot apply ulimit -v, so without the enforced envelope the
+  # resident-memory watch sits outside /usr/bin/time and ends the root's
+  # process group when its tree crosses the bound.
+  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ] \
+    && [ "$(uname)" = Darwin ]; then
+    analysis_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" rsswatch \
+      "$FM_LINT_INTERNAL_RSS_KIB" "$rss_file" -- "${analysis_command[@]}")
   fi
   # The host-wide slot gate sits outside the watchdog and /usr/bin/time, so
   # queue time counts toward neither the root deadline nor its peak RSS.
@@ -439,10 +479,10 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
@@ -550,9 +590,81 @@ if [ "${1:-}" = "--internal-timed" ]; then
   fm_exec_timed "$2" "$3" "${@:4}"
 fi
 
+# --- version currency -------------------------------------------------------
+# The pinned versions are maintained snapshots. --check-version makes an
+# upstream release visible before the pin silently diverges from CI; it uses
+# only the public release API and never needs a local linter installed.
+fm_lint_release_url() {  # <owner/repo>
+  printf 'https://api.github.com/repos/%s/releases/latest' "$1"
+}
+
+fm_lint_latest_tag() {  # <owner/repo>; prints the tag without a leading v, or returns 2
+  local repo=$1 url json tag
+  command -v curl >/dev/null 2>&1 || return 2
+  url=$(fm_lint_release_url "$repo")
+  # measured: value=15 date=2026-10-27 host=Mac-Studio.local margin=36x (three public release API reads, slowest 0.414 s)
+  json=$(curl -fsSL --max-time 15 -H 'Accept: application/vnd.github+json' "$url" 2>/dev/null) || return 2
+  if command -v jq >/dev/null 2>&1; then
+    tag=$(printf '%s' "$json" | jq -r '.tag_name // empty' 2>/dev/null)
+  else
+    tag=$(printf '%s' "$json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+  fi
+  [ -n "$tag" ] || return 2
+  printf '%s\n' "${tag#v}"
+}
+
+fm_lint_check_one() {  # <tool> <owner/repo> <pinned> <bump-hint>; 0 current, 1 behind, 2 unknown
+  local tool=$1 repo=$2 pinned=$3 hint=$4 latest
+  if latest=$(fm_lint_latest_tag "$repo"); then
+    if [ "$latest" = "$pinned" ]; then
+      printf '%s: pinned %s, latest %s (current)\n' "$tool" "$pinned" "$latest"
+      return 0
+    fi
+    printf '%s: pinned %s, latest %s (BEHIND; bump %s)\n' "$tool" "$pinned" "$latest" "$hint"
+    return 1
+  fi
+  printf '%s: pinned %s, latest UNKNOWN (could not read %s)\n' "$tool" "$pinned" "$(fm_lint_release_url "$repo")"
+  return 2
+}
+
+fm_lint_check_versions() {
+  local behind=0 unknown=0 current=0 rc required_actionlint
+  fm_lint_check_one shellcheck koalaman/shellcheck "$REQUIRED_SHELLCHECK" \
+    'REQUIRED_SHELLCHECK in bin/fm-lint.sh and the SHA table in bin/fm-install-shellcheck.sh'
+  rc=$?
+  case "$rc" in
+    0) current=$((current + 1)) ;;
+    1) behind=$((behind + 1)) ;;
+    *) unknown=$((unknown + 1)) ;;
+  esac
+  required_actionlint=$("$SELF_DIR/fm-lint-workflows.sh" --required-version 2>/dev/null) || required_actionlint=
+  if [ -n "$required_actionlint" ]; then
+    fm_lint_check_one actionlint rhysd/actionlint "$required_actionlint" \
+      'REQUIRED_ACTIONLINT in bin/fm-lint-workflows.sh and the SHA table in bin/fm-install-actionlint.sh'
+    rc=$?
+    case "$rc" in
+      0) current=$((current + 1)) ;;
+      1) behind=$((behind + 1)) ;;
+      *) unknown=$((unknown + 1)) ;;
+    esac
+  else
+    printf 'actionlint: pinned UNKNOWN (could not read bin/fm-lint-workflows.sh --required-version)\n'
+    unknown=$((unknown + 1))
+  fi
+  printf 'fm-lint.sh: version check: %s behind, %s unknown, %s current\n' "$behind" "$unknown" "$current" >&2
+  [ "$behind" -eq 0 ] || return 1
+  [ "$unknown" -eq 0 ] || return 2
+  return 0
+}
+
 if [ "${1:-}" = "--required-version" ]; then
   printf '%s\n' "$REQUIRED_SHELLCHECK"
   exit 0
+fi
+
+if [ "${1:-}" = "--check-version" ]; then
+  fm_lint_check_versions
+  exit $?
 fi
 
 fm_lint_usage() {
@@ -810,6 +922,7 @@ JOBS=${FM_LINT_JOBS:-2}
 TELEMETRY=${FM_LINT_TELEMETRY:-}
 FAST=0
 ANALYSIS_MODE=full
+STRICT_VERSION=0
 PARTITION=
 PARTITION_REQUESTED=0
 LIST_FILES=0
@@ -847,6 +960,10 @@ while [ "$#" -gt 0 ]; do
     --fast)
       FAST=1
       ANALYSIS_MODE=fast
+      shift
+      ;;
+    --strict-version)
+      STRICT_VERSION=1
       shift
       ;;
     --list-files)
@@ -968,6 +1085,13 @@ fi
 TAB=$(printf '\t')
 # Slowest successful per-root duration_ms from three Ubuntu main runs.
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
+# Exception: the four tests/fm-pr-merge*.sh hints are apportioned estimates
+# sized from the former single-file 3825 ms hint, pending measurement.
+# Exception: the tests/fm-lint.test.sh, tests/fm-lint-policy.test.sh,
+# tests/fm-lint-slots.test.sh, tests/fm-lint-report.test.sh, and
+# tests/fm-lint-helpers.sh hints are approximate sizing estimates from each
+# file's line count at the split (tests/fm-lint-report.test.sh is rounded from
+# 617 lines), pending measurement; they are not Ubuntu durations.
 # Hints affect assignment only, never source analysis or canonical coverage.
 fm_lint_partition_weight_hints() {
   cat <<'EOF'
@@ -1000,7 +1124,6 @@ bin/fm-brief.sh	21315
 bin/fm-busy-event.sh	918
 bin/fm-busy-lib.sh	668
 bin/fm-captain-hold.sh	24125
-bin/fm-cd-pretool-check.sh	215
 bin/fm-check-lib.sh	217
 bin/fm-check-register.sh	2121
 bin/fm-check-unregister.sh	2020
@@ -1272,7 +1395,6 @@ tests/fm-captain-hold-lifecycle-helpers.sh	438
 tests/fm-captain-hold-lifecycle.test.sh	2388
 tests/fm-captain-hold-reconcile.test.sh	2543
 tests/fm-captain-hold-sweep.test.sh	1481
-tests/fm-cd-pretool-check.test.sh	1067
 tests/fm-check-unregister.test.sh	868
 tests/fm-ci-workflow.test.sh	867
 tests/fm-classify-corr-token.test.sh	10038
@@ -1296,7 +1418,10 @@ tests/fm-contributions-read-saved.test.sh	768
 tests/fm-contributions.test.sh	2221
 tests/fm-control-herdr-smoke.test.sh	1069
 tests/fm-control-reassociate.test.sh	3073
-tests/fm-control-relaunch.test.sh	9888
+tests/fm-control-relaunch-backends.test.sh	2997
+tests/fm-control-relaunch-helpers.sh	1839
+tests/fm-control-relaunch-recovery.test.sh	2724
+tests/fm-control-relaunch.test.sh	2922
 tests/fm-control.test.sh	9788
 tests/fm-cpu-pass.test.sh	1370
 tests/fm-crew-state.test.sh	6482
@@ -1355,7 +1480,11 @@ tests/fm-kimi-harness.test.sh	1819
 tests/fm-launch-prompt-signals-live-e2e.test.sh	56051
 tests/fm-launch-proof.test.sh	15948
 tests/fm-lint-workflows.test.sh	1069
-tests/fm-lint.test.sh	3523
+tests/fm-lint-report.test.sh	600
+tests/fm-lint-policy.test.sh	452
+tests/fm-lint-slots.test.sh	1437
+tests/fm-lint.test.sh	1083
+tests/fm-lint-helpers.sh	552
 tests/fm-live-gate.test.sh	1119
 tests/fm-live-lab-up-mate.test.sh	967
 tests/fm-live-lab.test.sh	2070
@@ -1400,7 +1529,10 @@ tests/fm-pi-watch-loader-live.test.sh	717
 tests/fm-pi-windows-shell-invocation.test.sh	716
 tests/fm-pipeline-spend.test.sh	968
 tests/fm-pr-check-security.test.sh	13798
-tests/fm-pr-merge.test.sh	3825
+tests/fm-pr-merge-checks.test.sh	1280
+tests/fm-pr-merge-forges.test.sh	1250
+tests/fm-pr-merge-helpers.sh	240
+tests/fm-pr-merge.test.sh	1250
 tests/fm-pr-reviewers.test.sh	767
 tests/fm-pr-state-live-e2e.test.sh	716
 tests/fm-pr-state.test.sh	869
@@ -1497,8 +1629,11 @@ tests/fm-task-inbox.test.sh	2322
 tests/fm-tasks-axi.test.sh	2121
 tests/fm-teamclaude-launch-live-e2e.test.sh	718
 tests/fm-teamclaude-launch.test.sh	1119
+tests/fm-teardown-cleanup.test.sh	4219
 tests/fm-teardown-endpoint-safety.test.sh	2321
-tests/fm-teardown.test.sh	10286
+tests/fm-teardown-helpers.sh	2194
+tests/fm-teardown-pool.test.sh	2043
+tests/fm-teardown.test.sh	1830
 tests/fm-test-fixture-cleanup.test.sh	819
 tests/fm-test-fixtures.test.sh	1270
 tests/fm-test-isolation-proof.test.sh	917
@@ -1600,10 +1735,17 @@ unset SHELLCHECK_OPTS
 SHELLCHECK_BIN=$(command -v shellcheck)
 resolved=$("$SHELLCHECK_BIN" --version | awk '/^version:/ {print $2; exit}')
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
+if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+  export FM_LINT_STRICT_VERSION=1
+fi
 if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
-  printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
-    "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
-  exit 1
+  if [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ]; then
+    printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
+      "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
+    exit 1
+  fi
+  printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to make this an error.\n' \
+    "$resolved" "$REQUIRED_SHELLCHECK" "$REQUIRED_SHELLCHECK" >&2
 fi
 CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
 if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
@@ -1653,10 +1795,18 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # under its cap. The roots sidecar records peak RSS even without bounds; roots
 # peaking above about 3 GiB resident remain source-graph reduction candidates.
 ROOT_MEMORY_KIB=${FM_LINT_ROOT_MEMORY_KIB:-12582912}
+# 8 GiB of memory (resident size or footprint) per analysis tree on native macOS without the enforced envelope.
+# Native macOS has no ulimit -v, so a source-following root there could grow
+# without bound (tests/fm-spawn-acquisition-cleanup.test.sh reached 65 GB);
+# the resident-memory watch ends such a root and takes the memory retry.
+# The bound equals the ~8 GiB usable heap the 12 GiB address-space cap above
+# leaves a root, so it admits every root the enforced envelope admits.
+ROOT_RSS_KIB=${FM_LINT_ROOT_RSS_KIB:-8388608}
 for bound_pair in \
   "FM_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
   "FM_LINT_ROOT_GRACE=$ROOT_GRACE" \
-  "FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB"; do
+  "FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB" \
+  "FM_LINT_ROOT_RSS_KIB=$ROOT_RSS_KIB"; do
   case "${bound_pair#*=}" in
     ''|0*|*[!0-9]*)
       printf 'fm-lint.sh: %s must be a positive integer, got %s.\n' \
@@ -1702,6 +1852,17 @@ if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
     done
     printf 'fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.\n' >&2
     exit 2
+  fi
+fi
+
+# The resident-memory watch starts each libproc reader with the real python3
+# interpreter, resolved once per lint, so no shim (pyenv's, say) starts between
+# it and each reader; plain python3 is used only when resolution fails.
+WATCH_PYTHON=python3
+if [ "$BOUND_MECH" = none ] && [ "$(uname)" = Darwin ]; then
+  resolved_python=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || resolved_python=
+  if [ "${resolved_python#/}" != "$resolved_python" ] && [ -x "$resolved_python" ]; then
+    WATCH_PYTHON=$resolved_python
   fi
 fi
 
@@ -1870,7 +2031,9 @@ fm_lint_load_average() {
 }
 
 fm_lint_aggregate_cpu() {
-  ps -A -o %cpu= 2>/dev/null | awk '{sum += $1} END {printf "%.2f", sum + 0}'
+  local sample
+  sample=$(ps -A -o %cpu= 2>/dev/null) || { printf 'unavailable'; return 0; }
+  printf '%s\n' "$sample" | awk '{sum += $1} END {printf "%.2f", sum + 0}'
 }
 
 TELEMETRY_START_EPOCH=0
@@ -1894,6 +2057,8 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_FAST="$FAST"
     FM_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
     FM_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
+    FM_LINT_INTERNAL_RSS_KIB="$ROOT_RSS_KIB"
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON"
     FM_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"

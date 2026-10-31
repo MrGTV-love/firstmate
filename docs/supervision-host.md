@@ -20,15 +20,15 @@ An arm owner is the component in each primary harness that starts watcher cycles
 
 ## Scope today
 
-The host runs by default on a Claude primary and is opt-in per home on the other five primaries it supports; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the home gate and inherited opt-out.
+The host runs by default on a Claude primary and is opt-in per home on the other six primaries it supports; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the home gate and inherited opt-out.
 A home that does not run the host behaves exactly as it does without it.
-Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
+Today it runs beside a Claude, Cursor, OpenCode, omp, DSH, Grok, or Codex primary: away on all seven, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
 
 ### Behavior by posture and harness
 
 - Attended (no away record: no `state/.afk-contract`, or quiet mode's) on Claude and Cursor, the engine takes the wakes the Pi branch would take and never wakes main for a routine outcome; see [Postures](#postures).
   Every other close reaches main exactly as the plain watcher arm delivers it.
-- Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
+- Attended on OpenCode, omp, DSH, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
 - Away (an away record exists), the host hands each close to the engine.
   Main stays parked unless the host hands the wake back.
 - `/afk` launches no away daemon on a home of those harnesses that runs the host, because the host is the away session there.
@@ -39,7 +39,7 @@ Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: aw
 
 ### Not yet on the host
 
-Attended supervision beside a Codex primary, running the host by default on the other five primaries, and the daemon's retirement are later steps of the same design.
+Attended supervision beside a Codex primary, running the host by default on the other six primaries, and the daemon's retirement are later steps of the same design.
 Until they land, their current behavior stays as described in their own owners.
 
 ## Components and their owners
@@ -70,11 +70,12 @@ The host's header owns the output contract they read.
 | Cursor | the `stop` hook park, `bin/fm-turnend-guard-cursor.sh` | the park's `watcher` follow-up |
 | OpenCode | the TUI plugin, `.opencode/plugins/fm-primary-watch-arm.js`, which restarts its own successor after each close | a `watcher` prompt through `promptAsync` |
 | omp | the watch extension, `.omp/extensions/fm-primary-omp-watch.ts`, which restarts its own successor after each close | the extension's `watcher` message; [watcher continuity](watcher-continuity.md#omp-stale-wake-gating) owns delivery |
+| DSH | the native primary plugin, `.dsh/fm-primary.mjs`, which starts its next park after the turn that handles a close | the plugin's `watcher` follow-up |
 | Grok | the model's tracked background call, rendered as `bin/fm-supervision-host.sh park` at session start | the background task's completion notification |
 | Codex | the foreground checkpoint, `bin/fm-watch-checkpoint.sh`, in the watcher's place | the checkpoint's own output |
 
-Hook, plugin, extension, and checkpoint owners pass their harness as the primary pin.
-Grok's model-owned call relies on primary detection.
+Hook, extension, and checkpoint owners and the OpenCode plugin pass their harness as the primary pin.
+Grok's model-owned call and the DSH plugin rely on primary detection.
 The host pins dispatched work to the primary's crew harness rather than the engine's.
 
 Grok's arm command is fixed when the session-start block renders.
@@ -108,8 +109,10 @@ Only an away record is away: no record, or the record daemon-backed quiet mode w
 The host asks the Pi branch's offer rule (`branchOfferForWake`, through `bin/fm-branch-dispatch.mjs offer`) whether the branch may take the close.
 So a close reaches main off Pi exactly when it would on Pi: a check trigger, a decision-owned signal or stale trigger, and a scan that is unsafe or holds nothing for the branch stay main's.
 On that main-only pass-through the host starts the successor watcher cycle and leaves it running, then prints the close unchanged.
+When the successor start fails or the successor is still starting, the close still reaches main unchanged; with no healthy watcher, the re-arm owner commits it even when a concurrent drain left the marker in handling.
+A failed start is not retried before the close reaches main.
 That successor, like one a turn hands back at its start (see [Away](#away)), runs in a process group of its own, so the harness tearing down the hook's group after the rewake does not stop it.
-The host leaves the watcher's recovery marker reading downtime, confirming no handling handoff, because the re-arm owner delivers a close to main only while that marker reads downtime.
+The host leaves the watcher's recovery marker as it found it, confirming no engine handling handoff; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns the re-arm owner's commit when a concurrent drain changes that phase.
 The session's next park without `--restart` requests a take-over to restore a single host-owned arm; the [host header](../bin/fm-supervision-host.sh) owns successor persistence and cleanup, and the [arm header](../bin/fm-watch-arm.sh) owns take-over eligibility and fallback.
 OpenCode and omp still launch the host with `--restart`, which takes precedence over recorded take-over and lacks its acknowledgement-preserving handover; changing that first-cycle path remains a follow-up.
 The host-off Claude Stop hook's detached handling successor is also unchanged; see [Claude handling successor](watcher-continuity.md#claude-handling-successor).
@@ -229,9 +232,11 @@ The captain row is still durable, and the next drain presents it until it is ack
 
 Every path that cannot finish a wake the engine took hands that wake to main, with one `supervision-host: <why>` line after the close.
 Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
-That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
+That successor-generation publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
-On Claude, a Stop hook whose rewake is refused while the recovery marker is still `pending:handling` and no watcher is live commits the auto-arm failure notice once per failure episode (`failed-suppressed` after that) and still exits 2, so the hand-back reaches main; every other refused rewake stays silent as before.
+With no recorded successor generation, it leaves the marker as the closed watcher and any drain left it, and an acknowledgement main made meanwhile stays in force; no close it hands to main without a live successor is refused in silence, because the re-arm owner commits a handling-episode close whenever no healthy watcher runs.
+Claude delivers an actionable host close through its normal generation-owned rewake even when a concurrent drain leaves the unacknowledged marker in handling, as long as main still has a queued row its drains have not presented, or no healthy watcher runs, regardless of queued rows or a hold.
+When main's own drain presented every row, the main turn that presented them still holds them, and a healthy watcher runs, the rewake is refused, because that turn holds the close; once that hold is released without an acknowledgement, a later close is delivered once, and a close refused before the release is redelivered by the next Stop firing that takes a new generation; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns eligibility and refusal.
 So the owner's next arm starts from the same state as without the host, and the wake stays durable in the queue.
 
 ### Paths that hand the wake back
@@ -291,7 +296,7 @@ But a host absorbs its own wakes, so it ends its park itself before that registr
 
 `FM_SUPERVISION_HOST_PARK_SECONDS` sets that boundary (default 27,000).
 A value that is not a positive integer below 28,800 is treated as the default.
-The OpenCode, omp, and Grok owners have no hook timeout and keep the same default, so their parks end on the same cadence.
+The OpenCode, omp, DSH, and Grok owners have no hook timeout and keep the same default, so their parks end on the same cadence.
 
 ### At the boundary
 
@@ -300,7 +305,7 @@ Main drains and acknowledges, and the owner starts the next park:
 
 | Primary | When the next park starts |
 |---|---|
-| Claude and Cursor | At the next turn end. |
+| Claude, Cursor, and DSH | At the next turn end. |
 | OpenCode and omp | At once. |
 | Grok | At the model's re-arm. |
 
@@ -401,8 +406,8 @@ Such a process is never recorded and survives the turn, the same residual `bin/f
 The default model is `sonnet`, which handled every measured wake correctly at a fraction of a larger model's cost.
 `config/supervision-host` can name another.
 
-The Claude engine runs beside any of the six primaries, but only a Claude primary selects it by default when the host is enabled, even with no file.
-A Cursor, OpenCode, omp, Grok, or Codex home names it (`claude`, optionally with a model) in `config/supervision-host`.
+The Claude engine runs beside any of the seven primaries, but only a Claude primary selects it by default when the host is enabled, even with no file.
+A Cursor, OpenCode, omp, DSH, Grok, or Codex home names it (`claude`, optionally with a model) in `config/supervision-host`.
 `/afk` there says so when the file selects no engine.
 
 ## Verification
@@ -417,6 +422,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 | `tests/fm-cursor-primary.test.sh` | The Cursor arm owner's host mode against a stub host. |
 | `tests/fm-pi-watch-extension.test.sh` | The OpenCode plugin's host mode against a stub host. |
 | `tests/fm-omp-harness.test.sh` | The omp arm owner's host mode against a stub host. |
+| `tests/fm-dsh-primary.test.sh` | The DSH plugin's host mode against a stub host, gated by the real `bin/fm-dsh-primary.sh inspect` verdict. |
 | `tests/fm-watch-checkpoint.test.sh` | The Codex checkpoint's host mode against a stub host. |
 | `tests/fm-supervision-instructions.test.sh` | The rendered protocol, including Grok's arm command. |
 | `tests/fm-host-mirror.test.sh` | The dialog mirror's writers through the tracked Claude and Cursor registrations, the home gate, the feed, and the verified-writer list. |

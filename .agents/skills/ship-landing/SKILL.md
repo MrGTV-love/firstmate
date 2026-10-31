@@ -9,15 +9,16 @@ metadata:
 # Ship landing
 
 For PR-based ship tasks, the ready signal depends on mode: `no-mistakes` reports `done [at=<epoch>]: PR <url> checks green` after CI is green, while `direct-PR` reports `done [at=<epoch>]: PR <url>` after opening the PR, each only for a non-draft PR; a lane that deliberately holds a draft declares a wait instead, and `bin/fm-pr-check.sh` refuses to arm merge monitoring on a draft.
-Run `bin/fm-pr-check.sh <id> <PR url>` with the URL copied from that ready signal or the resolved checks-green `fm-crew-state.sh` line - it records `pr=` and the forge's `pr_head=` when available in the task's meta and arms the watcher's merge poll.
+The watcher's bounded housekeeping pass automatically registers that ready signal, or a no-mistakes run that `fm-crew-state.sh` reads as `checks green: PR ready for review` naming its PR, through `bin/fm-pr-check.sh`, recording `pr=` and the forge's `pr_head=` when available in the task's meta and arming the merge poll; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason, so fix the cause it names, then let the ten-minute retry register it or run `bin/fm-pr-check.sh <id> <PR url>` by hand, which is also the step for a lane with neither reading, with the URL copied from the ready signal or resolved checks-green `fm-crew-state.sh` line.
 `bin/fm-dod-lib.sh` owns the named-head gate on that ready signal: a ship `done:` whose named head exists only in the worker's disposable copy is not ready (`bin/fm-crew-state.sh` reports blocked, `bin/fm-pr-check.sh` refuses to register, and a secondmate does not publish that done upstream).
 That blocked reading is the gate working, not a stuck worker, so steer the worker on the commit the refusal names rather than waiting.
 A direct-PR worker pushes that commit to its PR branch, and a local-only worker commits it on its ship branch.
 A no-mistakes worker re-validates it with /no-mistakes so the pipeline stays the one publisher; it never pushes from its copy.
 In no-mistakes mode the earlier `done [at=<epoch>]: {summary}` is the pipeline handoff and is not gated.
 Tell the captain the PR's full `https://...` URL copied from the worker's ready line, the resolved checks-green crew-state line, or the task's `pr=` metadata, a concise outcome summary, and the no-mistakes risk level when applicable.
-A captain instruction to merge is explicit authority; `yolo` is the only standing routine merge authority.
-For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, finish before `FM_CHECK_TIMEOUT`, then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
+A captain instruction to merge is explicit authority; `yolo` and the standing merge rule in AGENTS.md section 7 are the standing routine merge authority.
+`bin/fm-pr-merge.sh` enforces commit/run-derived author-group coverage or the captain's recorded live-head merge words through `bin/fm-review-record.py`, whose header owns the rule and its harm-model rationale.
+For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, never sit silent and CPU-idle for `FM_CHECK_TIMEOUT` (the watcher stops such a check and treats that pass as unknown), then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
 Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
@@ -27,3 +28,7 @@ After successful teardown, record completion, retain only the configured recent 
 
 A secondmate is persistent and an empty queue is healthy.
 Retire one only on an explicit captain or main-firstmate decision, after loading `secondmate-provisioning`; its home must contain no work under way, and forced discard still requires explicit captain authority.
+
+### PR ready, landing, and teardown
+
+Load `ship-landing` when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.

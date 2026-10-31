@@ -25,14 +25,16 @@ Every captain-facing outcome that leaves durable evidence in the mate home is pu
 | Ship child PR ready | the child's `done:` PR ready line, whose accepted spellings the publisher below owns; `pr=` in the child's record once registered | `bin/fm-inactive-reconcile.sh` on the next poll with the child's line; `bin/fm-pr-check.sh` at registration with the canonical URL |
 | Scout child findings | the child's `done:` line plus `data/<child>/report.md` | `bin/fm-inactive-reconcile.sh` on the next poll, with the report pointer |
 | Child failed | the child's `failed:` line | `bin/fm-inactive-reconcile.sh` on the next poll |
-| Child decision escalated to the captain | the task held for the captain in the mate backlog | `bin/fm-captain-hold.sh hold`, and its answer by `answer` |
+| Child decision escalated to the captain | the task held for the captain in the mate backlog, with `Decision owner: captain` | `bin/fm-captain-hold.sh hold --owner captain`, and its answer by `answer` |
+| Child decision the main firstmate makes itself | never held: a keyed `needs-decision` line for the main firstmate, and the work continues on its answer | the mate's own appended line |
 | PR merged | the merge poll or the mate's own merge | `bin/fm-merge-outcome-lib.sh` |
-| Child leaving the home | its final ledger line | `bin/fm-teardown.sh`, which refuses to remove the child while that line is undelivered |
+| Child leaving the home | its final ledger line | `bin/fm-teardown.sh`, which does not remove the child while that line is undelivered |
 | Child ended silently | terminal current state with a silent ledger | the existing inactive-outcome scan in `bin/fm-inactive-reconcile.sh` |
 | Answer to a marked request | a correlated line guarded by the pending-reply record | `bin/fm-secondmate-report.sh`, which resolves the parent channel from the mate home; the pending-reply guard repairs a line stranded in the local mate's same-basename status file before recovery or escalation |
 | An outcome that exists only in the mate's reasoning | none | the charter and the `AGENTS.md` carve-outs only |
 
-The ledger delivery reads files, plus a local git reachability check on a ship `done:` with no delivery record yet (`bin/fm-dod-lib.sh`): it calls no harness, no forge, and no current-state reader, so it is identical for every harness and runtime backend.
+The ledger delivery reads files, plus the completion gate on a ship `done:` with no delivery record yet (`bin/fm-dod-lib.sh`): a local git reachability check and, for a `mode=no-mistakes` child, the run's status read, whose silence leaves the line owed rather than accepted (`bin/fm-inactive-reconcile.sh`'s header owns that retry).
+It calls no harness, no forge, and no current-state reader, so it is identical for every harness and runtime backend.
 Each delivery is keyed with the first eight hexadecimal characters of its receipt fingerprint and uses the shared append contract above, and the ledger path reuses the inactive scan's per-fingerprint receipts, so a replayed poll or restart cannot deliver an event twice while a genuinely new terminal event is delivered again.
 A duplicate line is harmless and a missed one is not, so the mate may still append its own judgement about a delivered outcome, and the parent reads the script's line as the fact and the mate's line as commentary.
 For marked replies, the report helper accepts no caller-selected destination and uses the channel resolver for both local and remote homes; its script header owns the exact invocation contract.
@@ -45,7 +47,7 @@ A missed-reply escalation includes the complete first sighting path and line num
 ## What is deliberately not built
 
 - No mirror of the mate's chat: chat can mix outcomes with other conversation, so choosing which sentence is an outcome would itself be model behavior, and every harness exposes turn text differently.
-- No threshold escalation of a child's open decision or blocker: a decision the mate escalates is a captain hold, which is published; a decision the mate neither answers nor escalates is a supervision-quality question, separable from channel delivery.
+- No threshold escalation of a child's open decision or blocker: a decision the mate escalates is a held task that declares its owner, which is published; a decision the mate neither answers nor escalates is a supervision-quality question, separable from channel delivery.
 - No second watcher or standalone scanner: a lightweight ledger pass runs inside the existing inactive-outcome command on every watcher poll and reuses its receipts and upstream append.
 - No orphan lifecycle: teardown refuses instead of removing an undelivered outcome, the same way it refuses on other unlanded conditions.
 
@@ -53,8 +55,9 @@ A missed-reply escalation includes the complete first sighting path and line num
 
 `tests/fm-inactive-reconcile.test.sh` covers the ledger delivery against real ledgers with no harness: immediate done and failed delivery with note, PR, mode, posture, and report pointer, once-only delivery across polls, a ship `done:` withheld while its named head exists only in the worker copy, a pending one still delivered after teardown removes that copy, a line still being appended, later routine status prose not minting a fresh parent event because the inactive receipt identity binds structured fields only, the remote route, the yield of the inactive path to a terminal ledger, and the real watcher poll driving it.
 `tests/fm-captain-hold-lifecycle.test.sh` covers a mate home publishing a hold, its answer, and a distinct occurrence on re-hold, and a main home publishing nothing.
-`tests/fm-pr-merge.test.sh` covers the PR-ready line at registration and the merge outcome's upward report.
-`tests/fm-teardown.test.sh` covers teardown delivering a child's final line and refusing when the channel cannot be written.
+`tests/fm-captain-hold-owner.test.sh` covers a mate home declaring each hold's owner, refusing to hold a call the main firstmate owns, and a captain call released only by the captain's words or a recorded captain ruling.
+`tests/fm-pr-merge-forges.test.sh` covers the PR-ready line at registration and the merge outcome's upward report.
+`tests/fm-teardown-cleanup.test.sh` covers teardown delivering a child's final line and refusing when the channel cannot be written.
 `tests/fm-brief.test.sh` pins the charter's channel rule.
 `tests/fm-pending-reply.test.sh` covers helper-selected local routing, remote-channel classification, same-basename restatement before false escalation, readable wrong-home diagnostics, and the rule that arbitrary mate-home sightings never acknowledge a reply.
 `tests/fm-parent-channel-scan-exclusion.test.sh` covers the home-shape-aware scan exclusion against real remote, main-home, and local-mate fixtures: the watcher signal scan, both heartbeat backstops, the fleet-wide folds, and the real `fm-wake-drain.sh` end to end.

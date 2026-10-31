@@ -530,6 +530,10 @@ test_kimi_hook_fails_closed_on_missing_malformed_or_partial_config() {
   out=$(HOME="$partial" "$KIMI_HOOK" install 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "partial Firstmate marker was accepted"
   assert_contains "$out" "partial, duplicated, or altered" "partial marker refusal lacked its concrete reason"
+  assert_contains "$out" "$partial/.kimi-code/config.toml" \
+    "partial marker refusal must name the config path to repair"
+  assert_contains "$out" "bin/fm-kimi-turnend-hook.sh install" \
+    "partial marker refusal must name the command that succeeds once the file is whole"
   cmp -s "$partial/before" "$partial/.kimi-code/config.toml" \
     || fail "partial marker refusal changed config bytes"
   pass "Kimi hook install refuses missing, malformed, and surprising config without writing"
@@ -696,7 +700,7 @@ test_kimi_readiness_gate_precedes_pointer() {
   assert_contains "$out" "kimi did not show a verified ready signal" \
     "kimi readiness failure lacked a loud diagnostic"
   [ ! -s "$CASE_DIR/pointer.log" ] || fail "kimi pointer was sent before readiness"
-  fm_test_wait_until 60 jq -e --arg id "$id" "any(.endpoints[]; .id == \$id)" \
+  fm_test_wait_until --progress-file "$HOME_DIR/state/home-summary.json" -- jq -e --arg id "$id" "any(.endpoints[]; .id == \$id)" \
     "$HOME_DIR/state/home-summary.json" \
     || fail "kimi readiness failure omitted its durable endpoint from the home summary"
   pass "fm-spawn: kimi never sends the brief pointer before an observable ready signal"

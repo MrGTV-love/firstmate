@@ -65,7 +65,8 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   pipeline-spend.jsonl  optional per-task no-mistakes pipeline spend, written only when config/pipeline-spend is present; bin/fm-pipeline-spend.sh owns the schema
 projects/            cloned repos; gitignored; read-only except under hard rule 1's concrete captain-approved project operation exception
 state/               runtime records and signals; gitignored
-  <id>.status        append-only wake events, not current-state truth; bin/fm-status-decision-lib.sh owns line parsing and bin/fm-status-record-lib.sh owns emission metadata
+  <id>.status        append-only wake events, not current-state truth; bin/fm-status-decision-lib.sh owns line parsing and bin/fm-status-record-lib.sh owns emission metadata; append only through bin/fm-status-append.sh, which bounds its size (docs/configuration.md "Status log size bounds")
+  .status-cap-alerted.<name>  per-file marker holding the identity, path and size at which a status log or sidecar last raised the over-cap wake; written by bin/fm-status-cap-guard.sh mark, retired by bin/fm-status-cap-lib.sh once the file is gone, replaced or back under the cap, and safe to delete (that file then alarms again)
   <id>.turn-ended    touched by turn-end hooks
   <id>.progress      touched for observed native-harness activity inside one Pi turn; bin/fm-busy-event.sh owns its generation binding and bin/fm-watch.sh reads it beside turn-ended for the busy-age bound only, never as a completed turn
   <id>.busy-state <id>.busy-gen   semantic busy-state record (one line, atomically replaced) and its per-incarnation gen sidecar; bin/fm-busy-event.sh is the only writer and bin/fm-busy-lib.sh owns the record format and classification; arming again replaces the previous incarnation so late events carrying its gen are rejected as stale; removed by retire and teardown
@@ -77,7 +78,12 @@ state/               runtime records and signals; gitignored
   <id>.claude-diagnostics.jsonl  Claude's own diagnostics file, including the shutdown_signal event, written only by a --claude-debug launch (bin/fm-spawn.sh header); teardown leaves it as evidence of the stop
   <id>.muse-session  muse busy-source binding (sessions root plus task worktree) written by fm-spawn; removed by teardown
   <id>.cursor-session  cursor busy-source binding (projects root, task worktree, prior conversations) written by fm-spawn; removed by teardown
-  <id>.git-hooks/    per-task git hooksPath that strips AI commit trailers at the commit object unless config/keep-ai-trailers is present; written by fm-spawn, removed by teardown (bin/fm-git-strip-ai-trailers.sh)
+  <id>.dsh-session  dsh busy-source and resume binding (launch root, task worktree, generation, model, effort, and for a secondmate primary_root) published by bin/fm-dsh.py prepare or prepare-primary; removed by teardown
+  <id>.dsh/  per-launch dsh generation directories: a private HOME symlinking every operator-home entry except .dsh and .dsh-tui, its DSH_HOME holding a credentials copy, and the session logs the binding reads; bin/fm-dsh.py prepare or prepare-primary writes them and retires the generation it replaces, and teardown removes the whole directory (`references/harness/dsh.md` in the `harness-adapters` skill)
+  dsh-primary.dsh-session  this home's DSH primary binding (launch root, home, generation, model, effort, primary_root); bin/fm-dsh.py prepare-primary publishes it, bin/fm-dsh-primary.sh --resume and own-model spawns read it, and it persists across exits so the conversation can resume; no teardown removes it
+  dsh-primary.dsh/  the DSH primary's generation directory: a private HOME symlinking every operator-home entry except .dsh and .dsh-tui, its DSH_HOME, and the session logs; a fresh bin/fm-dsh-primary.sh launch retires the previous generation, never while a live DSH session holds this home's lock
+  .dsh-primary-events.jsonl  the native DSH primary plugin's event log (startup, watcher, guard, follow-up, error, disposal rows with the native pid); .dsh/fm-primary.mjs bounds it to its newest 400 rows once it passes 600
+  <id>.git-hooks/    per-task git hooksPath, installed on every launch: pre-commit and pre-push credential checks (bin/fm-git-secrets.py), plus the commit-msg AI trailer strip unless config/keep-ai-trailers is present; written by fm-spawn, removed by teardown (bin/fm-git-strip-ai-trailers.sh)
   <id>.reconcile-nudged  epoch second of the last inventory-reconcile nudge sent to this secondmate; bin/fm-secondmate-reconcile.sh owns its per-home cooldown window
   <id>.backlog-close  the exact backlog transition a teardown recorded before removing the task's record, so an interrupted cleanup can still be finished at the next session start; bin/fm-backlog-transition-lib.sh owns its format and replay, and a landed transition removes it
   <id>.teardown-processes  retained pre-signal identity audit; bin/fm-teardown.sh's header (Fix 2) owns its format and signalling contract
@@ -88,6 +94,7 @@ state/               runtime records and signals; gitignored
   <id>.herdr-presentation  quarantinable attempt and restart-binding journal for Herdr's optional visual projection; never task or endpoint authority; see docs/herdr-backend.md "Presentation spaces"
   <id>.check.sh      authenticated slow poll; the watcher dispatches validated PR data and the byte-identified Relay shim through trusted repository scripts, runs registered custom checks from hash-validated private snapshots, and rejects every other state check without execution
   <id>.check-trust   private content binding created by fm-check-register.sh for an intentional custom check
+  <id>.check-stopped  watcher marker for an open episode of stopped runs of that check, so the stop wakes firstmate once; bin/fm-watch.sh run_check_capture owns its lifecycle
   <id>.pr-poll       private validated data sidecar for the byte-static PR merge poll
   <id>.pr-poll-registration  private transactional provenance record binding the task, canonical metadata identity, sidecar, and static poll publication
   <id>.pr-poll-retirement  private identity-bound crash-recovery receipt for one exact validated merged result; removed after its poll artifacts retire
@@ -95,7 +102,7 @@ state/               runtime records and signals; gitignored
   <id>.pr-poll-merge-notified  canonical PR identity of the last merge outcome delivered for this task; bin/fm-pr-lib.sh owns the marker format and identity mechanics, while bin/fm-merge-outcome-lib.sh owns locked publication, duplicate suppression, and replacement
   branch-outcomes.jsonl .branch-outcomes-cursor .branch-outcomes-processed .<task>.branch-outcome-index .branch-outcome-index-ready .branch-outcomes-tail.jsonl  Pi supervision-branch durable outcome store, its read cursor, main's processed marker, bounded latest per-task status-coverage caches, their recovery marker, and a bounded display copy of the newest rows; bin/fm-branch-outcome.sh owns the formats
   branch-session/ .branch-session .branch-mirror-cursor  the branch's per-main-session conversations, the pointer to the current one, and the dialog-mirror cursor; extension-owned (docs/pi-supervision-branch.md)
-  .branch-eligible-rows .branch-eligible-owner .main-eligible-rows  per-actor wake-row claims and branch-owner evidence; docs/watcher-continuity.md owns the acknowledgement contract
+  .branch-eligible-rows .branch-eligible-owner .main-eligible-rows .main-eligible-rows.held  per-actor wake-row claims, branch-owner evidence, and main's presentation hold (set by main's drain, released when that turn ends through Stop, StopFailure, or the next prompt); docs/watcher-continuity.md owns the acknowledgement contract and when a held supervision-host close is refused
   .supervision-host*  supervision host process record, engine conversation, current turn scope and report receipts, and bounded ledger of every close and engine turn; bin/fm-supervision-host.sh owns them; never touch
   .lease-<task>        per-task supervision lease naming which actor (main or branch) may change that task; bin/fm-lease-lib.sh owns the contract the guarded scripts enforce
   x-watch.check.sh   generated Relay poll shim; present only when opted in (section 14)
@@ -121,6 +128,7 @@ state/               runtime records and signals; gitignored
   .wake-queue        durable queued wakes retained until post-handling acknowledgement: epoch<TAB>seq<TAB>kind<TAB>key<TAB>payload
   .watcher-down      private generation-bound recovery state coupling watcher downtime, durable wake presentation, and post-handling acknowledgement; never touch
   .<id>.open-decisions-cursor  per-task fold checkpoint; format and reuse contract: bin/fm-status-decision-lib.sh; live persistence and scratch-copy carry: bin/fm-classify-lib.sh; removed by teardown, safe to delete (forces one full re-fold)
+  .<id>.wait-identity  watcher's per-task declared-wait identity cache; format and proof checks: bin/fm-status-event-lib.sh (_fm_status_wait_identity_cached); read bound: docs/configuration.md; removed by teardown, safe to delete (the next poll walks the episode again)
   .<id>.home-appends  per-task ledger of byte ranges this home itself appended as bookkeeping closes, so a wake scan can tell its own growth from a foreign write instead of waking on it; presentation is unaffected, so both the signal annotation and UNREAD STATUS still print those lines; written only by fm-status-wake-lib.sh's status_home_appends_record; its sibling .<id>.home-appends.lock serializes that ledger's read-merge-write; both removed by teardown, safe to delete
   .status-presentation-cursor .status-presentation-lock  fleet-wide per-task status identity plus independent annotation and outcome-backstop byte offsets, with a serialization lock preventing already-presented lines from replaying while preserving delayed signal annotations; owned by fm-classify-lib.sh, with each task's row retired by teardown
   .afk-contract      the away or quiet posture record; bin/fm-afk-contract.sh owns its mode, schema, entry, archive, and lock contract; its sibling .afk-contract.lock serializes actions authorized by the live record
@@ -130,7 +138,7 @@ state/               runtime records and signals; gitignored
   .watch.lock .wake-queue.lock watcher singleton and queue serialization locks
   .claude-autoarm.lock .claude-autoarm-epoch .claude-autoarm-failure-notified .claude-autoarm-failure-alarmed .turnend-claude-blocks .turnend-claude-blocks.lock   Claude Stop auto-arm single-flight, epoch, failure-episode, attended-alarm, guard-budget, and budget-lock records; never touch
   .cursor-park-owner .cursor-park-owner.lock .turnend-cursor-blocks   Cursor stop-hook owner record, publication and commit lock, and bounded repair-nag budget; never touch
-  .hash-* .count-* .stale-* .stale-since-* .churn-since-* .paused-* .wedge-escalations-* .dead-reported-* .writing-* .waiting-* .seen-* .hb-surfaced-* .last-* .heartbeat-streak .secondmate-liveness-tick .secondmate-liveness-*.lock*   watcher internals; never touch
+  .hash-* .count-* .stale-* .stale-since-* .churn-since-* .paused-* .wedge-escalations-* .dead-reported-* .writing-* .waiting-* .seen-* .hb-surfaced-* .last-* .heartbeat-streak .secondmate-liveness-tick .secondmate-liveness-*.lock* .status-cap-handoff.*   watcher internals; never touch
   .secondmate-relaunch-<id> .secondmate-relaunch-bound-<id>   durable relaunch history and parked-bound state; never touch (bin/fm-secondmate-liveness-lib.sh owns the ledger contract)
   extensions/omp-primary-watch/lifecycle.log extensions/pi-primary-watch/lifecycle.log   primary watcher extension session-lifecycle record (size-capped with one .1 rotation); evidence only, safe to delete (.pi/extensions/lib/fm-watch-lifecycle.ts)
   .session-end-relaunch-<id> .session-end-handled-<id> <id>.control-exit   ship/scout session-end auto-relaunch attempt ledger, handled marker, and fm-control timed-out-exit marker (a completed exit retires the busy record instead); never touch (bin/fm-session-end-relaunch-lib.sh owns them); removed by teardown
@@ -139,3 +147,13 @@ state/               runtime records and signals; gitignored
   .subsuper-* .supervise-daemon.*   sub-supervisor internals; never touch
 .no-mistakes/        local validation state and evidence; gitignored
 ```
+
+Load `operational-home-layout` when locating, interpreting, or changing Firstmate home, config, data, state, project, or generated runtime paths.
+
+## Home layout ownership
+
+`docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
+`FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
+Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
+
+Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to firstmate except under hard rule 1's concrete captain-approved project operation exception.

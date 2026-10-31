@@ -129,6 +129,14 @@ stalled = task_copy('stalled', commit_age=5)
 fresh = task_copy('fresh', commit_age=0)
 merged = task_copy('merged', commit_age=50)
 covered = task_copy('covered', commit_age=50)
+review_author = task_copy('review-author')
+# The record owner derives PR authors from the owning task's commits outside the
+# live base, so PR 9's head is a real commit in that task's copy (no ref moves).
+review_base = git(review_author, 'rev-parse', 'HEAD')
+review_head = git(review_author, 'commit-tree', git(review_author, 'rev-parse', 'HEAD^{tree}'),
+                  '-p', review_base, '-m', 'review work')
+author_meta_text = lambda model, gen: f'model={model}\nspawn_gen={gen}\nworktree={review_author}\nmode=direct-PR\n'
+(home / 'state/review-author.meta').write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
 merged_head = git(merged, 'rev-parse', 'HEAD')
 covered_head = git(covered, 'rev-parse', 'HEAD')
 for name, path in (('stalled', stalled), ('fresh', fresh)):
@@ -141,6 +149,7 @@ os.utime(logs, (hours(5), hours(5)))
 PR_URL = 'https://github.com/test/project/pull/'
 tasks = [task('lost', lost), task('stalled', stalled), task('fresh', fresh),
          task('merged', merged, pr=PR_URL + '5'), task('covered', covered, pr=PR_URL + '7'),
+         task('review-author', review_author, pr=PR_URL + '9'),
          task('gone', world / 'nowhere', exists=False, alive='dead'),
          task('broken', world / 'nowhere', state='failed')]
 backlog = [
@@ -164,14 +173,14 @@ double = dict(
     pulls=[dict(number=7, html_url=PR_URL + '7', head=dict(sha=covered_head), state='open', draft=False, updated_at=iso(hours(3))),
            dict(number=8, html_url=PR_URL + '8', head=dict(sha='b' * 40), draft=False, updated_at=iso(hours(2)),
                 requested_reviewers=[dict(login='reviewer')]),
-           dict(number=9, html_url=PR_URL + '9', head=dict(sha='c' * 40), draft=False, updated_at=iso(hours(1)))],
+           dict(number=9, html_url=PR_URL + '9', head=dict(sha=review_head), draft=False, updated_at=iso(hours(1)))],
     checks={covered_head: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4)))],
             'b' * 40: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4))),
                        dict(id=2, name='unit', app=dict(id=3), status='completed', conclusion='success',
                            completed_at=iso(hours(3)))],
-            'c' * 40: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
+            review_head: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
     single={'5': dict(merged_at=iso(hours(1)), head=dict(sha=merged_head)), '7': dict(merged_at=None)})
 (world / 'gh.json').write_text(json.dumps(double))
 
@@ -186,6 +195,11 @@ assert 'broken' in cat('failed_task')
 stall = cat('stalled_worker')
 assert set(stall) == {'stalled'} and 'usage limit' in stall['stalled']['evidence'] and stall['stalled']['overdue'], stall
 assert 'fresh' not in stall, 'recent progress must not read as stalled'
+later_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                             env=dict(env, FM_OPEN_LOOPS_NOW=str(now + 60))))
+later_stall = rows(later_report, 'stalled_worker')['stalled']
+assert later_stall['evidence'] == stall['stalled']['evidence'], 'elapsed time alone changed obligation evidence'
+assert later_stall['age_seconds'] == stall['stalled']['age_seconds'] + 60
 # Backlog: only dependency-cleared, unheld work is ready; historical Done records are not audited.
 assert set(cat('ready_not_started')) == {'ready'}, cat('ready_not_started')
 # Commits: default-branch or actual PR-head coverage suppresses only represented work.
@@ -206,6 +220,9 @@ open_prs = cat('open_pr')
 assert set(open_prs) == {PR_URL + '8', PR_URL + '9'}, open_prs
 assert open_prs[PR_URL + '8']['owner'] == 'reviewer' and open_prs[PR_URL + '9']['owner'] == 'firstmate', open_prs
 assert open_prs[PR_URL + '9']['age_seconds'] == 3600 and open_prs[PR_URL + '9']['overdue'], open_prs
+# Merge authority for a green PR is AGENTS.md section 7's standing rule: the row points at it and never asks for approval.
+assert 'AGENTS.md section 7' in open_prs[PR_URL + '9']['next_action'], open_prs
+assert 'approv' not in open_prs[PR_URL + '9']['next_action'].lower(), open_prs
 # Every row names an owner, a next action and an age (or an unknown age that stays overdue).
 for row in report['rows']:
     assert row['owner'] and row['next_action'] and 'age_seconds' in row and row['id'], row
@@ -223,26 +240,135 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
-# Independent review must bind the exact live head; absent required checks prevent readiness.
-review_path = home / 'state/review-lane.status'
-review_url, review_head = PR_URL + '9', 'c' * 40
-review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+# Independent review is only the record owner's verified exact-head evidence.
+# review_lanes is a discovery hint, not authority: the ledger asks
+# bin/fm-review-record.py once for the live head and consumes one atomic
+# fm-review-verification.v1 object. Typed not-qualified is ordinary absence;
+# unreadable or corrupt history degrades coverage instead of reading as unreviewed.
+review_url = PR_URL + '9'
+review_report = world / 'review.md'
+review_records = home / 'state/review-records.jsonl'
 config_path = home / 'config/open-loops.json'
-config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane']},
+author_meta = home / 'state/review-author.meta'
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
+# The lane ids are only discovery hints: no status or metadata file exists for them.
+config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane', 'second-lane']},
                                      age_limits_seconds={'review_pass_not_merged': 600})))
-double['pulls'][2]['base'] = dict(ref='main')
+double['pulls'][2]['base'] = dict(ref='main', sha=review_base)
 double['checks'][review_head][0]['completed_at'] = iso(now - 700)
 (world / 'gh.json').write_text(json.dumps(double))
-reviewed = ledger('--heartbeat')
-assert rows(reviewed, 'review_pass_not_merged')[review_url]['overdue'], reviewed
-assert review_url not in rows(reviewed, 'open_pr'), 'one actionable obligation per reviewed PR'
-review_path.write_text(f'done [at={now - 601}]: review PASS head={"d" * 40} PR {review_url}\n')
-assert not rows(ledger(), 'review_pass_not_merged'), 'replaced-head review is stale'
-review_path.write_text(f'done [at={now - 601}]: review FAIL head={review_head} PR {review_url}\n')
-assert not rows(ledger(), 'review_pass_not_merged'), 'latest review rejection supersedes PASS'
-review_path.write_text(f'done [at={now - 599}]: review PASS head={review_head} PR {review_url}\n')
+
+def record_review(head=review_head, verdict='PASS', reader='openai-codex/gpt-6.1-sol',
+                  authors=None, trigger=None, pr=review_url):
+    review_report.write_text(f'VERDICT: {verdict} head={head}\nIndependent reader evidence.\n')
+    flags = {'loosens-deny-allow-list': 'no', 'widens-guard': 'no', 'customer-data-billing-spend': 'no'}
+    if trigger:
+        flags[trigger.replace('_', '-')] = 'yes'
+    args = [code / 'bin/fm-review-record.py', 'review', '--pr', pr, '--head', head,
+            '--verdict', verdict, '--reader-model', reader,
+            '--author-groups', json.dumps(authors or {'all': ['anthropic/claude-sonnet-5']}),
+            '--report', str(review_report)]
+    for flag, value in flags.items():
+        args += ['--' + flag, value]
+    done = run(args)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+
+def clear_reviews():
+    if review_records.exists() or review_records.is_symlink():
+        review_records.unlink()
+
+def set_review_age(seconds):
+    stored = [json.loads(line) for line in review_records.read_text().splitlines()]
+    for item in stored:
+        if item.get('kind') == 'review':
+            item['at'] = now - seconds
+    review_records.write_text(''.join(json.dumps(item, separators=(',', ':')) + '\n' for item in stored))
+
+def assert_no_qualifying_review(label):
+    current = ledger()
+    assert not rows(current, 'review_pass_not_merged'), (label, current)
+    assert current['complete'] is True and 'ledger degraded' not in rows(current, 'coverage'), (label, current)
+    assert review_url in rows(current, 'open_pr'), (label, 'not-qualified must leave an ordinary open obligation')
+
+# A verified independent PASS at the exact live head is the valid control.
+record_review()
+set_review_age(601)
+assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'a recorded independent PASS did not qualify'
+assert 'openai reviewing anthropic' in rows(ledger(), 'review_pass_not_merged')[review_url]['evidence'], \
+    'the review evidence did not name both model families'
+reviewed_action = rows(ledger(), 'review_pass_not_merged')[review_url]['next_action']
+assert 'AGENTS.md section 7' in reviewed_action and 'approv' not in reviewed_action.lower(), reviewed_action
+assert review_url not in rows(ledger(), 'open_pr'), 'one actionable obligation per reviewed PR'
+
+# review_lanes is a discovery hint only: dropping it stops the check even though
+# the record still holds a valid PASS, and restoring it resumes the same answer.
+config_path.write_text(json.dumps(dict(age_limits_seconds={'review_pass_not_merged': 600})))
+assert not rows(ledger(), 'review_pass_not_merged'), 'an unconfigured repository must not be checked for review'
+config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane', 'second-lane']},
+                                     age_limits_seconds={'review_pass_not_merged': 600})))
+assert rows(ledger(), 'review_pass_not_merged'), 'restoring the discovery hint must resume the check'
+
+# A lane status PASS is not authority anymore: only the record qualifies.
+review_lane_status = home / 'state/review-lane.status'
+review_lane_status.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+clear_reviews()
+assert_no_qualifying_review('a lane status file alone must not qualify')
+review_lane_status.unlink()
+assert_no_qualifying_review('a missing review record must not qualify')
+
+# Every typed not-qualified answer is ordinary absence of qualifying review.
+record_review(head='d' * 40)
+assert_no_qualifying_review('a stale-head record must not qualify')
+clear_reviews(); record_review(verdict='FAIL')
+assert_no_qualifying_review('a FAIL record must not qualify')
+clear_reviews(); record_review(reader='anthropic/claude-opus-5')
+assert_no_qualifying_review('a same-family reader must not qualify')
+clear_reviews(); record_review(authors={'all': ['mystery-9']})
+assert_no_qualifying_review('an unknown author family must not qualify')
+clear_reviews(); record_review(reader='mystery-9')
+assert_no_qualifying_review('an unknown reader family must not qualify')
+clear_reviews(); record_review(trigger='widens_guard')
+assert_no_qualifying_review('a yes escalation trigger must not qualify')
+clear_reviews()
+word = run([code / 'bin/fm-review-record.py', 'captain-word', '--pr', review_url, '--head', review_head,
+            '--words', 'Merge it.'])
+assert word.returncode == 0, (word.stdout, word.stderr)
+assert_no_qualifying_review('a captain-word alone must not qualify')
+
+# Unreadable or corrupt history is degraded coverage, not a silent "no review".
+clear_reviews()
+review_records.write_text('{"schema":"fm-review-record.v1"\n')
+degraded_report = ledger()
+assert degraded_report['complete'] is False, degraded_report
+assert 'review record' in rows(degraded_report, 'coverage')['ledger degraded']['evidence'], degraded_report
+assert review_url in rows(degraded_report, 'open_pr'), 'degraded review coverage must still leave the PR open'
+review_records.unlink()
+review_records.symlink_to(world / 'no-such-ledger')
+unreadable = ledger()
+assert unreadable['complete'] is False, unreadable
+assert 'review record' in rows(unreadable, 'coverage')['ledger degraded']['evidence'], unreadable
+review_records.unlink()
+
+# Authors are re-derived from the owning task at every read: a relaunch in the
+# reader's family withdraws the qualifying review. The recorded review itself is
+# immutable, so a later report edit does not change it.
+record_review()
+set_review_age(601)
+author_meta.write_text(author_meta_text('openai/gpt-6.1-sol', f's{now - 1}.1.1'))
+assert_no_qualifying_review('a same-family relaunch must withdraw the independent review')
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
+review_report.write_text(f'VERDICT: PASS head={review_head}\nA later, unrelated edit.\n')
+invariant = rows(ledger(), 'review_pass_not_merged')[review_url]
+assert invariant['overdue'] and 'openai reviewing anthropic' in invariant['evidence'], invariant
+
+# The reviewed-green age begins at the later of the review and the checks.
+set_review_age(599)
 assert not rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'one interval grace boundary'
-review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+set_review_age(601)
+assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'past the interval boundary'
+set_review_age(-60)
+assert_no_qualifying_review('a review recorded after the sweep began must not read as overdue')
+set_review_age(601)
 double['rules'] = [dict(type='required_status_checks', parameters=dict(required_status_checks=[
     dict(context='missing', integration_id=3)]))]
 (world / 'gh.json').write_text(json.dumps(double))
@@ -273,8 +399,9 @@ double['pulls'].append(review_pr)
 double['single'].pop('9')
 (world / 'gh.json').write_text(json.dumps(double))
 config_path.unlink()
-review_path.unlink()
-print('PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion', flush=True)
+review_records.unlink()
+review_report.unlink()
+print('PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion', flush=True)
 
 # Unseen presented rows stay stale and not overdue until a complete sweep; resolved rows drop their receipts.
 def loops(*args, **kw):
@@ -323,7 +450,7 @@ for name in ('a', 'b'):
     (home / f'state/{name}.status').write_text(f'blocked [at={hours(10)}] [key=answer]: {name} needs an answer\n')
     (home / f'state/{name}.meta').write_text(f'kind=scout\nspawn_gen={name}-generation\n')
 a_meta = home / 'state/a.meta'
-lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/route-9.meta'
+lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/review-author.meta'
 for refresh in (False, True):
     if refresh:
         ledger('--heartbeat')
@@ -331,6 +458,8 @@ for refresh in (False, True):
     a_meta.unlink()
     a_meta.symlink_to(home / 'missing-meta')
     lost_meta.symlink_to(home / 'missing-meta')
+    if pr_meta.exists():
+        pr_meta.unlink()
     pr_meta.symlink_to(home / 'missing-meta')
     degraded = ledger('--heartbeat')
     assert not degraded['complete'], degraded
@@ -836,7 +965,7 @@ with sqlite3.connect(step_store / 'state.sqlite') as db:
     db.execute('INSERT INTO step_results VALUES (?, ?, ?, ?)', (1, 'lint.full.whole', iso(hours(4)), None))
 step_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'], env=dict(env, NM_HOME=str(step_store))))
 step_evidence = rows(step_report, 'stalled_worker')['stalled']['evidence']
-assert 'lint.full.whole' in step_evidence and str(4 * 3600) in step_evidence, step_report
+assert 'lint.full.whole' in step_evidence, step_report
 for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: worker exploded',
                    'Fatal: unable to proceed', 'Error: generic failure', 'network connection timed out',
                    'ENOSPC'):
@@ -847,12 +976,16 @@ for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: 
     assert last_error in evidence and 'usage limit earlier' not in evidence, diagnosed
     human = out([code / 'bin/fm-open-loops.sh'])
     assert last_error in human, human
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint step; retrying in 37 seconds (attempt 3/10)\\n"\n')
+counted = rows(ledger(), 'stalled_worker')['stalled']['evidence']
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint step; retrying in 12 seconds (attempt 4/10)\\n"\n')
+assert rows(ledger(), 'stalled_worker')['stalled']['evidence'] == counted and 'attempt #/#' in counted, counted
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint.full.whole\\n"\n')
 wait_row = rows(ledger(), 'stalled_worker')['stalled']
-assert 'lint.full.whole' in wait_row['evidence'] and str(5 * 3600) in wait_row['evidence'], wait_row
+assert 'lint.full.whole' in wait_row['evidence'] and wait_row['age_seconds'] == 5 * 3600, wait_row
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env python3\nprint("waiting " + "x" * 500)\nprint("Error: " + "y" * 500)\n')
 long_row = rows(ledger(), 'stalled_worker')['stalled']
-assert f'{5 * 3600}s without progress' in long_row['evidence'] and 'Error: yyy' in long_row['evidence'], long_row
+assert long_row['age_seconds'] == 5 * 3600 and 'Error: yyy' in long_row['evidence'], long_row
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Codex usage limit reached; retrying\\n"\n')
 print('PASS: last-error JSON and human representations', flush=True)
 tasks, backlog = saved_tasks, saved_backlog
@@ -1408,7 +1541,7 @@ def process_alive(pid, identity):
     state, current = observed.stdout.strip().split(None, 1)
     return current.strip() == identity and not state.startswith('Z')
 
-for expiry in ('command', 'collection'):
+for expiry in ('command',):
     timeout_root = world / ('descendants-' + expiry)
     timeout_home, timeout_code = timeout_root / 'home', timeout_root / 'code'
     for name in ('state', 'data', 'config', 'projects'):
@@ -1428,8 +1561,6 @@ subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
 until = time.monotonic() + 20
 while not (home / 'descendant-pid').exists() and time.monotonic() < until:
     time.sleep(0.01)
-if os.environ['EXPIRY'] == 'collection':
-    os.kill(os.getppid(), signal.SIGALRM)
 time.sleep(120)
 ''')
     try:
@@ -1437,10 +1568,7 @@ time.sleep(120)
                               env=dict(env, FM_HOME=str(timeout_home), EXPIRY=expiry), timeout=60))
         assert not timed['complete'] and len(rows(timed, 'coverage')) == 1, timed
         evidence = rows(timed, 'coverage')['ledger degraded']['evidence']
-        if expiry == 'collection':
-            assert 'collection exceeded its deadline' in evidence, timed
-        else:
-            assert 'fleet snapshot' in evidence or 'collection exceeded its deadline' in evidence, timed
+        assert 'fleet snapshot' in evidence, timed
         assert json.loads((timeout_home / 'state/open-loops.json').read_text()) == timed
         pids = [(int((timeout_home / (role + '-pid')).read_text()),
                  (timeout_home / (role + '-identity')).read_text().strip())
@@ -1459,84 +1587,117 @@ time.sleep(120)
                         os.kill(pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
-    print('PASS: ' + expiry + ' deadline owns resistant descendant cleanup', flush=True)
+    print('PASS: no-progress source failure owns resistant descendant cleanup', flush=True)
 
-# Overall deadlines escape every reader's normal error recovery and stop later work.
-for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
-    deadline_root = world / ('deadline-' + reader)
-    deadline_home, deadline_code, deadline_bin = (deadline_root / n for n in ('home', 'code', 'fakebin'))
-    for name in ('state', 'data', 'config', 'projects'):
-        (deadline_home / name).mkdir(parents=True)
-    deadline_bin.mkdir()
-    shutil.copytree(code / 'bin', deadline_code / 'bin')
-    # The named reader injects SIGALRM; allow normal REST-helper startup on loaded hosts.
-    (deadline_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=30)))
-    deadline_tasks = []
-    if reader == 'pr-state':
-        deadline_tasks = [task('failed-' + str(i), deadline_root / 'absent', state='failed', pr=PR_URL + str(i))
-                          for i in range(24)]
-        for deadline_task in deadline_tasks:
-            deadline_task['project'] = None
-    if reader in ('origins', 'pr-checks'):
-        for i in range(24 if reader == 'origins' else 1):
-            (deadline_home / 'projects' / str(i) / '.git').mkdir(parents=True)
-    if reader == 'questions':
-        for i in range(24):
-            (deadline_home / 'state' / (str(i) + '.status')).write_text('needs-decision [key=q]: question\n')
-    (deadline_home / 'attempts').write_text('')
-    (deadline_home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
-        tasks=deadline_tasks, backlog=dict(present=True, records=(
-            [dict(id='owns-prs', structured=True, state='done', links=[PR_URL + str(i) for i in range(24)])]
-            if reader == 'pr-checks' else [])))))  # owned PRs are the ones whose checks are fetched
-    script(deadline_code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env python3\n'
-           'import os\nfrom pathlib import Path\nhome = Path(os.environ["FM_HOME"])\n'
-           '(home / "collector-pid").write_text(str(os.getppid()))\nprint((home / "snapshot.json").read_text())\n')
-    driver = r'''#!/usr/bin/env python3
-import base64, json, os, signal, sys, time
+# A genuine live process group plus a syscall-level EPERM still refuses cleanup:
+# only a completed child or a group with no live member may swallow the refusal.
+import importlib.util
+from unittest import mock
+seam_spec = importlib.util.spec_from_file_location('fm_open_loops_regression', code / 'bin/fm_open_loops.py')
+seam_module = importlib.util.module_from_spec(seam_spec)
+seam_spec.loader.exec_module(seam_module)
+seam_home = world / 'killpg-seam-home'
+(seam_home / 'config').mkdir(parents=True)
+(seam_home / 'state').mkdir()
+seam_collector = seam_module.Collector(seam_home, int(time.time()))
+live = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], start_new_session=True)
+try:
+    with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+        try:
+            seam_collector.signal_command_group(live, signal.SIGSTOP)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError('a live process group must keep the EPERM refusal')
+    assert live.poll() is None, 'the refused group signal must leave the live process running'
+finally:
+    try:
+        os.killpg(live.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    live.wait()
+print('PASS: live process-group EPERM still refuses and leaves the process running', flush=True)
+
+# The Darwin race the seam exists for: EPERM arrives while poll() has not yet
+# observed the exit. A group whose members are all zombies, or a group that is
+# already gone, needs no signal, so the refusal is swallowed for exactly those.
+class RacingChild:
+    def __init__(self, pid):
+        self.pid = pid
+    def poll(self):
+        return None
+zombie = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+try:
+    deadline = time.monotonic() + 30
+    while not (states := seam_collector.group_state(zombie.pid)) \
+            or not all(state.startswith(('Z', 'X')) for state in states):
+        assert time.monotonic() < deadline, 'the unreaped leader never became a zombie'
+        time.sleep(0.05)
+    with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+        seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+finally:
+    zombie.wait()
+assert seam_collector.group_state(zombie.pid) == [], 'a reaped group must read as having no members'
+with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+    seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+print('PASS: an all-zombie or vanished process group swallows the Darwin EPERM race', flush=True)
+
+interval_home = world / 'interval-home'
+for name in ('state', 'data', 'config', 'projects'):
+    (interval_home / name).mkdir(parents=True)
+(interval_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=2)))
+script(world / 'inactive-source.py', r'''#!/usr/bin/env python3
+import os, subprocess, sys, time
 from pathlib import Path
-reader, command = os.environ['DEADLINE_READER'], Path(sys.argv[0]).name
-if command == 'git' and reader != 'origins':
-    print('https://github.com/test/project.git' if '--get' in sys.argv else '.git')
-    sys.exit(0)
-if command == 'git' and '--get' not in sys.argv:
-    print('.git')
-    sys.exit(0)
-if command == 'gh' and '/pulls?' in sys.argv[-1]:
-    pulls = [] if reader == 'pr-state' else [dict(number=i, html_url='https://github.com/test/project/pull/' + str(i),
-                  head=dict(sha='a' * 40), state='open') for i in range(24)]
-    sys.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + json.dumps(pulls))
-    sys.exit(0)
-attempts = Path(os.environ['FM_HOME']) / 'attempts'
-with attempts.open('a') as stream:
-    stream.write(json.dumps([command, *sys.argv[1:]]) + '\n')
-if len(attempts.read_text().splitlines()) == 2:
-    (attempts.parent / 'deadline-trigger').write_text(json.dumps([command, *sys.argv[1:]]))
-    os.kill(int((attempts.parent / 'collector-pid').read_text()), signal.SIGALRM)
-time.sleep(0.7)
-print('source command failure', file=sys.stderr)
-sys.exit(1)
+home = Path(os.environ['FM_HOME'])
+identity = subprocess.check_output(['ps', '-p', str(os.getpid()), '-o', 'lstart='], text=True).strip()
+(home / 'source-identity').write_text(identity)
+(home / 'source-pid').write_text(str(os.getpid()))
+body = "import os,signal,subprocess,time;from pathlib import Path;signal.signal(signal.SIGTERM,signal.SIG_IGN);home=Path(os.environ['FM_HOME']);identity=subprocess.check_output(['ps','-p',str(os.getpid()),'-o','lstart='],text=True).strip();home.joinpath('descendant-identity').write_text(identity);home.joinpath('descendant-pid').write_text(str(os.getpid()));time.sleep(120)"
+subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
+until = time.monotonic() + 20
+while not (home / 'descendant-pid').exists() and time.monotonic() < until:
+    time.sleep(0.01)
+print('source-started', flush=True)
+print('source-diagnostic', file=sys.stderr, flush=True)
+time.sleep(120)
+''')
+probe = r'''
+import json, runpy, subprocess, sys, time
+collector = runpy.run_path(sys.argv[1], run_name='fm_open_loops_probe')['Collector'](sys.argv[2], int(time.time()))
+text = lambda value: value.decode() if isinstance(value, bytes) else (value or '')
+try:
+    collector.run([sys.executable, sys.argv[3]])
+except subprocess.TimeoutExpired as error:
+    print(json.dumps(dict(timeout=error.timeout, stdout=text(error.output), stderr=text(error.stderr))))
+else:
+    print(json.dumps(None))
 '''
-    for command in (('git', 'gh', 'cat') if reader == 'questions' else ('git', 'gh')):
-        script(deadline_bin / command, driver)
-    deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
-                        PATH=f'{deadline_bin}:{env["PATH"]}')
-    deadline_report = json.loads(out([deadline_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
-                                    env=deadline_env, timeout=120))
-    assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
-    assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence'], (reader, deadline_report)
-    attempts = [json.loads(line) for line in (deadline_home / 'attempts').read_text().splitlines()]
-    expected_requests = {
-        'origins': [['git', '-C', str(deadline_home / 'projects' / str(i)),
-                     'config', '--get', 'remote.origin.url'] for i in range(24)],
-        'pr-checks': [['gh', 'api', '-i',
-                       'repos/test/project/commits/' + 'a' * 40 + '/check-runs?per_page=100']],
-        'pr-state': [['gh', 'api', '-i', 'repos/test/project/pulls/' + str(i)] for i in range(24)],
-        'questions': [['cat', str(deadline_home / 'state' / (str(i) + '.status'))] for i in range(24)],
-    }
-    assert len(attempts) == 2 and all(request in expected_requests[reader] for request in attempts), (reader, attempts)
-    assert json.loads((deadline_home / 'deadline-trigger').read_text()) == attempts[-1], (reader, attempts)
-    assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
-    print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
+try:
+    expired = json.loads(out([sys.executable, '-I', '-c', probe, code / 'bin/fm_open_loops.py', interval_home,
+                              world / 'inactive-source.py'], env=dict(env, FM_HOME=str(interval_home)), timeout=60))
+    assert expired is not None, 'inactive source must expire'
+    assert expired['timeout'] == 2, expired
+    assert 'source-started' in expired['stdout'] and 'source-diagnostic' in expired['stderr'], expired
+    pids = [(int((interval_home / (role + '-pid')).read_text()),
+             (interval_home / (role + '-identity')).read_text().strip())
+            for role in ('source', 'descendant')]
+    until = time.monotonic() + 2
+    while any(process_alive(pid, identity) for pid, identity in pids) and time.monotonic() < until:
+        time.sleep(0.01)
+    assert not any(process_alive(pid, identity) for pid, identity in pids), pids
+finally:
+    for role in ('source', 'descendant'):
+        pid_path, identity_path = (interval_home / (role + suffix) for suffix in ('-pid', '-identity'))
+        if pid_path.exists() and identity_path.exists():
+            pid, identity = int(pid_path.read_text()), identity_path.read_text().strip()
+            if process_alive(pid, identity):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+print('PASS: no-progress expiry reports the configured interval and keeps captured output', flush=True)
+
 # Conditional reads and the quota floor: a repeated run over unchanged forge data is answered with 304s, and a run
 # that finds the recorded quota below the floor publishes the last rows marked stale with the reset time.
 double.pop('pulls_by_repo', None)
@@ -1921,14 +2082,19 @@ assert identity
 time.sleep(120)
 ''')
 (code / 'bin/fm-crew-state.sh').chmod(0o755)
+# The nested per-lane read owns its own no-progress bound, far inside the
+# collector's: the hung lane is cut there and the snapshot source still answers.
 try:
     expired = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json'],
-                             env=env, text=True, capture_output=True, timeout=60)
+                             env=dict(env, FM_SNAPSHOT_CREW_STATE_TIMEOUT='2'), text=True,
+                             capture_output=True, timeout=60)
     assert expired.returncode == 0, (expired.stdout, expired.stderr)
     report = json.loads(expired.stdout)
     assert not report['complete'], report
     coverage = [row for row in report['rows'] if row['category'] == 'coverage']
-    assert len(coverage) == 1 and 'fleet snapshot' in coverage[0]['evidence'], report
+    assert (len(coverage) == 1 and 'fleet snapshot' not in coverage[0]['evidence']
+            and 'worker: current-state command failed (exit 124)' in coverage[0]['evidence']), report
+    assert any(row['category'] == 'unanswered_question' for row in report['rows']), report
     assert (home / 'crew-pid').exists(), 'real snapshot must reach its nested bounded worker read'
     pid = int((home / 'crew-pid').read_text())
     identity = (home / 'crew-identity').read_text().strip()
@@ -1938,7 +2104,7 @@ try:
         if not alive or time.monotonic() >= until:
             break
         time.sleep(0.01)
-    assert not alive, 'snapshot nested timeout group must not outlive collector cancellation'
+    assert not alive, 'the nested no-progress cut must not leave the worker read running'
     assert not list(temporary.glob('fm-fleet-*')), list(temporary.iterdir())
     assert json.loads((home / 'state/open-loops.json').read_text()) == report
 finally:
@@ -1949,7 +2115,7 @@ finally:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-print('PASS: real snapshot cancellation reaps nested groups and removes temporary inventory', flush=True)
+print('PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory', flush=True)
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 import datetime as dt, json, os, re, shutil, subprocess, sys, time
@@ -2014,6 +2180,238 @@ def case(name, actor='main', empty=False, **fields):
                     '--recovery-generation', boundary[1])
     return home, ledger, row, call, ok, drain, ack
 
+# New rows gate; an unchanged captain-owned row remains listed without unproved captain-delivery status.
+home, ledger, row, call, ok, drain, ack = case('change-gating', owner='captain')
+_, boundary = drain()
+assert ack(boundary).returncode == 1
+assert ok(code / 'bin/fm-open-loops.sh', '--digest').stdout == '', 'an empty waiting list printed a header'
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger "check: open-loop-ledger (1 overdue)"',
+   '_', code / 'bin/fm-wake-lib.sh')
+change_wake, boundary = drain()
+assert ack(boundary).returncode == 0, 'an unchanged unproved escalation needs no new action'
+assert 'WAITING OPEN WORK' not in change_wake.stdout, 'a change wake printed the full waiting list'
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"',
+   '_', code / 'bin/fm-wake-lib.sh')
+unchanged, boundary = drain()
+assert ack(boundary).returncode == 0, 'an unchanged unproved escalation needs no new action'
+assert 'WAITING OPEN WORK' in unchanged.stdout and row['id'] in unchanged.stdout, unchanged.stdout
+assert '7200' in unchanged.stdout and 'escalated, no proof it reached the captain' in unchanged.stdout, unchanged.stdout
+assert 'escalated, waiting on the captain' not in unchanged.stdout, unchanged.stdout
+clock['now'] = now + 30
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1
+changed, boundary = drain()
+assert row['id'] in changed.stdout
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the resumed lane')
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'].append(dict(row, id='new-row', subject='new-worker'))
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'an unpresented new row gated the ack'
+ok(code / 'bin/fm-open-loops.sh', '--present-overdue')
+missing = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+digest = ok(code / 'bin/fm-open-loops.sh', '--digest')
+assert missing.returncode == 1 and 'new-row' in missing.stdout
+assert row['id'] in digest.stdout and 'new-row' not in digest.stdout
+clock['now'] = now
+print('PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage')
+
+# A stamped escalation with no captain hold binding is never captain waiting: its unchanged row needs no new action
+# and stays in the periodic waiting list without that label, and a change gates it again.
+home, ledger, row, call, ok, drain, ack = case('stamped-escalation')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'escalated')
+assert ack(boundary).returncode == 0, 'an escalation is the action on new work'
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"',
+   '_', code / 'bin/fm-wake-lib.sh')
+stamped, boundary = drain()
+assert 'OVERDUE' not in stamped.stdout, 'unchanged previously acted-on work was gated again'
+assert ack(boundary).returncode == 0, 'unchanged previously acted-on work refused acknowledgement'
+listed = [line for line in stamped.stdout.splitlines() if line.startswith('  ' + json.dumps(row['id']) + ',')]
+assert len(listed) == 1 and 'escalated, no proof it reached the captain' in listed[0], stamped.stdout
+assert 'waiting on the captain' not in stamped.stdout, 'a stamped escalation was listed as waiting on the captain'
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+changed, boundary = drain()
+assert changed.stdout.startswith('OVERDUE:') and row['id'] in changed.stdout, changed.stdout
+assert ack(boundary).returncode == 1, 'changed work after a stamped escalation was not gated'
+assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'changed work stayed in the waiting list'
+print('PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates')
+
+# A row whose age clock restarted after its action is changed work, even when its text returns to the old value.
+home, ledger, row, call, ok, drain, ack = case('clock-restart', owner='captain')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 8000
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'an unchanged clock stays covered'
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
+assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
+clock['now'] = now
+# A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
+# the episode follows the row's obligation clock as well as its digest.
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 8000
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: after the restart"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+old = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert old.returncode == 1 and 'new delivery' in old.stdout + old.stderr, (
+    'a delivery from before the restarted obligation clock must be refused', old.stdout, old.stderr)
+assert ack(boundary).returncode == 1, 'the refused delivery must leave the restarted row gated'
+inbox(home, '002.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '002.msg')
+assert ack(boundary).returncode == 0, 'a delivery sent after the restarted overdue boundary answers it'
+clock['now'] = now
+# Control: re-presenting an unchanged row, with no restart, still reuses its valid delivery.
+home, ledger, row, call, ok, drain, ack = case('clock-steady-steer', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+clock['now'] = now
+# The unpause case: a new head is pushed after the presented ledger was generated (G) but before the action (T).
+home, ledger, row, call, ok, drain, ack = case('restart-before-record', owner='captain')
+_, boundary = drain()
+clock['now'] = now + 300
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+recorded = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert recorded['clock_start'] == now - 7200, recorded
+assert ack(boundary).returncode == 0
+pushed = now + 100
+clock['now'] = pushed + 7200
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = pushed + 7200
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a head pushed between G and T stayed covered', restarted)
+home, ledger, row, call, ok, drain, ack = case('unchanged-clock', owner='captain')
+_, boundary = drain()
+clock['now'] = now + 300
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 9000
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+record['rows'][0]['age_seconds'] = 7200 + 8000
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a republished unchanged clock stays covered'
+# An action recorded before the clock start was stored keeps comparing against its action time.
+record = json.loads(ledger.read_text())
+del record['handling']['actions'][row['id']]['clock_start']
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a legacy action lost its cover'
+clock['now'] = now
+# A ledger published after the action read its clock (while it waited for the receipt lock) keeps the action's cover.
+home, ledger, row, call, ok, drain, ack = case('ledger-after-clock', owner='captain')
+_, boundary = drain()
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 60
+record['rows'][0]['age_seconds'] = 7200 + 60
+ledger.write_text(json.dumps(record))
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+recorded = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert recorded['clock_start'] == now - 7200, recorded
+clock['now'] = now + 120
+assert ack(boundary).returncode == 0, 'an action recorded before its ledger was generated lost its cover'
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'changed evidence stayed covered'
+record['rows'][0]['evidence'] = row['evidence']
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'unchanged work lost its cover'
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+clock['now'] = now + 8000
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock stayed covered', restarted)
+clock['now'] = now
+# One actor's acknowledgement is never gated by a row only the other actor's later drain presented.
+home, ledger, row, call, ok, drain, ack = case('cross-actor-gate', empty=True)
+assert loops_as(home, 'branch', '--present-overdue').stdout == ''
+record = json.loads(ledger.read_text())
+record['rows'].append(row)
+ledger.write_text(json.dumps(record))
+assert row['id'] in loops_as(home, 'main', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 0, "another actor's presentation gated the branch ack"
+assert loops_as(home, 'main', '--check-actions').returncode == 1
+assert row['id'] in loops_as(home, 'branch', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 1, "the branch actor's next drain did not gate the row"
+home, ledger, row, call, ok, drain, ack = case('cross-actor-changed')
+assert row['id'] in loops_as(home, 'main', '--present-overdue').stdout
+inbox(home, '001.msg')
+assert loops_as(home, 'main', 'action', row['id'], 'steered', '--evidence', '001.msg').returncode == 0
+assert loops_as(home, 'main', '--check-actions').returncode == 0
+assert row['id'] not in loops_as(home, 'branch', '--present-overdue').stdout
+assert row['id'] not in json.loads(ledger.read_text())['handling']['presentations'].get('branch', {})
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+assert loops_as(home, 'branch', '--check-actions').returncode == 0, 'a row changed after the branch drain gated its ack'
+assert row['id'] in loops_as(home, 'branch', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 1, 'the next branch drain did not gate the changed row'
+inbox(home, '002.msg')
+assert loops_as(home, 'branch', 'action', row['id'], 'steered', '--evidence', '002.msg').returncode == 0
+assert loops_as(home, 'branch', '--check-actions').returncode == 0
+print('PASS: each actor gates only the rows its own drain presented')
+
+# A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.
+home, ledger, row, call, ok, drain, ack = case('resurface-reserved', owner='captain')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"'
+   ' && fm_wake_append check report "check: main work"', '_', code / 'bin/fm-wake-lib.sh')
+resurface_seq = next(line.split('\t')[1] for line in (home / 'state/.wake-queue').read_text().splitlines()
+                     if line.split('\t')[3] == 'open-loop-ledger-resurface')
+(home / 'config/supervision-host').write_text('claude\n')
+ok(code / 'bin/fm-wake-grant.sh', 'activate', os.getpid(), 'engine-turn')
+ok(code / 'bin/fm-wake-grant.sh', 'publish', 'engine-turn', resurface_seq)
+main_view = ok(code / 'bin/fm-wake-drain.sh')
+assert 'check: main work' in main_view.stdout and 'WAITING OPEN WORK' not in main_view.stdout, main_view.stdout
+branch_view = ok('env', 'FM_SUPERVISION_ACTOR=branch', code / 'bin/fm-wake-drain.sh')
+assert 'WAITING OPEN WORK' in branch_view.stdout and row['id'] in branch_view.stdout, branch_view.stdout
+ok(code / 'bin/fm-wake-grant.sh', 'deactivate', os.getpid(), 'engine-turn')
+
+# The away supervise daemon acknowledges the wakes it handled without the ledger gate; firstmate's own acknowledgement stays gated.
+home, ledger, row, call, ok, drain, ack = case('away-daemon-ack')
+_, boundary = drain()
+def daemon_ack():
+    return call('env', 'FM_WAKE_ACK_AWAY_DAEMON=1', code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0],
+                '--recovery-generation', boundary[1])
+assert daemon_ack().returncode == 1, 'outside away mode the daemon marker is no bypass'
+(home / 'state/.afk').write_text(str(now) + '\n')
+assert daemon_ack().returncode == 0, 'an unactioned overdue row retained the away daemon wake'
+assert not (home / 'state/.wake-queue').read_text(), 'the away daemon did not consume the wake it handled'
+assert json.loads(ledger.read_text())['handling']['actions'] == {}, 'the away daemon acknowledgement wrote a receipt'
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'the obligation stays gated for firstmate'
+_, boundary = drain()
+assert ack(boundary).returncode == 1, "firstmate's own acknowledgement keeps the change-gated check"
+
 for kind in ('steered', 'merged', 'escalated', 'deferred'):
     pr_row = dict(category='review_pass_not_merged', subject=PR, owner='firstmate', limit_seconds=600)
     home, ledger, row, call, ok, drain, ack = case(kind, **(pr_row if kind == 'merged' else {}))
@@ -2028,7 +2426,7 @@ for kind in ('steered', 'merged', 'escalated', 'deferred'):
     assert refused.returncode == 1 and 'no action recorded' in refused.stdout, refused
     assert (home / 'state/.wake-queue').read_bytes() == queue, 'refusal must preserve queued work'
     evidence = {'steered': '001.msg', 'merged': 'https://github.com/test/project/pull/9',
-                'escalated': 'reported missing credential to captain', 'deferred': 'lint still producing output'}[kind]
+                'escalated': 'asked the captain about the stalled lint', 'deferred': 'lint still producing output'}[kind]
     args = [code / 'bin/fm-open-loops.sh', 'action', row['id'], kind, '--evidence', evidence]
     if kind == 'deferred':
         args += ['--recheck', dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()]
@@ -2052,7 +2450,7 @@ for kind in ('steered', 'merged', 'escalated', 'deferred'):
         assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
         assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
         assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1
-        ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'second deferral escalated')
+        ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
         ok(code / 'bin/fm-open-loops.sh', '--check-actions')
 
 # The actual supervision-host actor and secondmate home use the same executable gate.
@@ -2068,23 +2466,23 @@ for name, actor in (('host', 'branch'), ('secondmate', 'main')):
     report = ok(code / 'bin/fm-open-loops.sh', '--report').stdout
     assert row['id'] in report and '7200' in report and 'COMPLETIONS' not in report, report
 
-# Re-presentation is idempotent while an action is still missing. A later turn requires a new action.
-home, ledger, row, call, ok, drain, ack = case('repeat')
+# Re-presentation is idempotent; unchanged overdue evidence remains covered by its prior action.
+home, ledger, row, call, ok, drain, ack = case('repeat', owner='captain')
 _, boundary = drain()
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'reported the wait')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: followup"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
 _, again = drain()
 assert boundary == again
-assert ack(boundary).returncode == 1, 'old action cannot discharge a later turn'
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'needs intervention')
+assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prior escalation'
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
 
-# A steer must be a new delivery sent after the row's presentation, and each record is cited once.
+# A steer must be a delivery sent after the row's overdue episode began; the unchanged steered row stays covered.
 home, ledger, row, call, ok, drain, ack = case('steer-fresh')
 _, boundary = drain()
-inbox(home, '003.msg', handled=True, offset=-60)
+inbox(home, '003.msg', handled=True, offset=-3700)
 stale = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '003.msg')
 assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
 inbox(home, '004.msg')
@@ -2092,12 +2490,68 @@ ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', 
 assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
-assert ack(boundary).returncode == 1, 'a steer answers only the turn it followed'
-reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
-assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
-inbox(home, '005.msg')
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+assert ack(boundary).returncode == 0, 'unchanged evidence is covered by the prior steer'
+# A reviewed green PR is re-presented after a steer; re-presenting the unchanged row accepts the same delivery again.
+home, ledger, row, call, ok, drain, ack = case('steer-represent', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '004.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
 assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: next turn"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
+reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
+assert reused.returncode == 0, ('the same unchanged row needs no newer message', reused)
+assert ack(boundary).returncode == 0
+# A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
+home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
+                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '005.msg', offset=-600)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+clock['now'] = now + 13799
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'the steer stands until four hours'
+clock['now'] = now + 13800
+expired = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert expired.returncode == 1 and row['id'] in expired.stdout, ('four hours from the delivery have passed', expired)
+clock['now'] = now
+
+# PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
+for handled in (False, True):
+    home, ledger, row, call, ok, drain, ack = case(
+        'pr-steer-' + str(handled), category='open_pr', subject=PR, owner='firstmate',
+        source=dict(task='worker'))
+    _, boundary = drain()
+    args = [code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence']
+    foreign = home / 'state/another-task.inbox/001.msg'
+    foreign.parent.mkdir()
+    foreign.write_text(inbox(home, '001.msg').read_text())
+    (home / 'state/worker.inbox/001.msg').unlink()
+    refused = call(*args, '001.msg')
+    assert refused.returncode == 1 and 'task inbox' in refused.stdout, refused
+    inbox(home, '002.msg', handled=handled, offset=-3700)
+    refused = call(*args, '002.msg')
+    assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
+    inbox(home, '003.msg', handled=handled, offset=1)
+    ok(*args, '003.msg')
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
+    assert ack(boundary).returncode == 0
+    reused = call(*args, '003.msg')
+    assert reused.returncode == 0, ('the same unchanged row accepts its earlier delivery', reused)
+print('PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement', flush=True)
+
+# A damaged ledger row whose source is not an object still steers through its owner.
+for index, damaged in enumerate(('a string', None, ['worker'], 7)):
+    home, ledger, row, call, ok, drain, ack = case('damaged-source-' + str(index), source=damaged)
+    _, boundary = drain()
+    inbox(home, '001.msg', offset=1)
+    ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'steered' and action['evidence'] == '001.msg', (damaged, action)
+    assert ack(boundary).returncode == 0
+print('PASS: a steer on a row with a non-object source falls back to its owner inbox', flush=True)
 
 # Steering evidence is judged against the acting actor's own presentation, not another actor's later one.
 home, ledger, row, call, ok, drain, ack = case('actors')
@@ -2149,8 +2603,37 @@ ok('bash', '-c', '. "$1"; fm_wake_append check report "check: deferred approval 
 result, boundary = drain()
 assert row['id'] in result.stdout and 'STANDING' not in result.stdout, result
 assert ack(boundary).returncode == 1, 'a deferral cannot hold a mergeable reviewed PR across turns'
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral that never stands leaves the printed row captain-visible', shown)
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is True, record['handling']['actions']
+assert record['handling']['actions'][row['id']]['requires_followup'] is True, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
+# An action marked for follow-up never lets its deferral stand, whatever its stored visibility mark says.
+home, ledger, row, call, ok, drain, ack = case('followup-deferred')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']].update(requires_followup=True, captain_visible=False)
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: followup deferral"', '_', code / 'bin/fm-wake-lib.sh')
+result, boundary = drain()
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral marked for follow-up does not stand, so the row prints captain-visible', shown)
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']]['captain_visible'] = False
+record['rows'][0].pop('captain_visible', None)
+ledger.write_text(json.dumps(record))
+ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json')
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is False, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
 
-# One escalation of a captain-owned row stands until the row changes.
+# An unproved escalation of a captain-owned row needs no new action until its evidence changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
                                                owner='captain', next_action='resolve the captain hold',
                                                evidence='awaiting budget approval', limit_seconds=1800)
@@ -2190,7 +2673,11 @@ record = json.loads(ledger.read_text())
 record['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker', owner='worker:other-worker'))
 ledger.write_text(json.dumps(record))
 mixed = ok(code / 'bin/fm-wake-drain.sh')
-assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout and mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING'), mixed
+assert 'row-fresh' in mixed.stdout and 'STANDING' not in mixed.stdout and row['id'] not in mixed.stdout, mixed
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: periodic waiting list"',
+   '_', code / 'bin/fm-wake-lib.sh')
+periodic = ok(code / 'bin/fm-wake-drain.sh')
+assert 'STANDING' in periodic.stdout and row['id'] in periodic.stdout, periodic
 
 # An unreadable ledger never blocks a drain or an acknowledgement; it names the exact repair command.
 for label in ('corrupt', 'symlink'):
@@ -2207,7 +2694,7 @@ for label in ('corrupt', 'symlink'):
     assert 'OVERDUE' not in result.stdout, result
     assert ack(boundary).returncode == 0, 'an unreadable ledger must not refuse an acknowledgement'
     assert not (home / 'state/.wake-queue').read_text(), 'the acknowledged wake was consumed'
-    assert call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'x').returncode == 1
+    assert call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'unverified').returncode == 1
     if label == 'corrupt':
         rebuilt = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
         assert rebuilt['schema'] == 'fm-open-loops.v1' and json.loads(ledger.read_text()) == rebuilt
@@ -2237,22 +2724,93 @@ refreshed = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'
 kept = next(r for r in refreshed['rows'] if r['id'] == row['id'])
 assert not refreshed['complete'] and kept['stale'] and not kept['overdue'], refreshed
 assert refreshed['handling']['actions'][row['id']]['sequence'] == sequence, 'publication must retain action receipts'
+# Coverage degradation first published after the drain does not block that drain's acknowledgement;
+# the next drain presents it and gates it like any new row.
+assert ack(boundary).returncode == 0, 'a row first published after the drain blocked its acknowledgement'
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'the next drain did not gate the newly published row'
+for degraded in refreshed['rows']:
+    if degraded['overdue']:
+        ok(code / 'bin/fm-open-loops.sh', 'action', degraded['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
+
+# A changed row is new work with a fresh deferral allowance; an unchanged row still allows one deferral.
+home, ledger, row, call, ok, drain, ack = case('deferral-per-change')
+_, boundary = drain()
+recheck = dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+_, boundary = drain()
+fresh = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run',
+             '--recheck', recheck)
+assert fresh.returncode == 0, ('a changed row inherited the old deferral', fresh.stdout)
+assert ack(boundary).returncode == 0
+second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
+              '--recheck', recheck)
+assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+
+# A row once made captain-visible by a refused second deferral gets a working fresh deferral after it changes.
+home, ledger, row, call, ok, drain, ack = case('deferral-visible-change')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
+refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', recheck)
+assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
+assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', recheck)
+stored = json.loads(ledger.read_text())
+assert stored['handling']['actions'][row['id']]['captain_visible'] is False, stored['handling']['actions'][row['id']]
+assert not stored['rows'][0].get('captain_visible'), stored['rows'][0]
+assert ack(boundary).returncode == 0, 'a fresh deferral on changed work did not cover the row'
 
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
 _, boundary = drain()
+assert row['id'] in json.loads(ledger.read_text())['handling']['episodes'], 'presentation opens the overdue episode'
 inbox(home, '030.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '030.msg')
 clock['now'] = now + 3600
 first = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 kept = next(r for r in first['rows'] if r['id'] == row['id'])
 assert kept['stale'] and kept['last_seen'] == now and row['id'] in first['handling']['actions'], first
+assert row['id'] in first['handling']['episodes'], 'a row an incomplete pass keeps stale keeps its episode'
 clock['now'] = now + 86400
 second = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 assert row['id'] not in {r['id'] for r in second['rows']}, second
 assert row['id'] not in second['handling']['actions'], 'a returning stall starts a fresh row history'
 assert row['id'] not in second['handling']['presentations']['main'], second
+clock['now'] = now
+
+# A stale-retained row is unconfirmed, not no longer overdue: its episode survives the incomplete pass, so a steer
+# sent before a deferral does not count again once a complete pass presents the same row.
+home, ledger, row, call, ok, drain, ack = case('stale-episode')
+_, boundary = drain()
+inbox(home, '040.msg', offset=-60)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck',
+   dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat())
+assert ack(boundary).returncode == 0
+assert json.loads(ledger.read_text())['handling']['episodes'][row['id']]['start'] == now, 'a deferral restarts the episode'
+clock['now'] = now + 60
+incomplete = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert not incomplete['complete'] and next(r for r in incomplete['rows'] if r['id'] == row['id'])['stale'], incomplete
+assert incomplete['handling']['episodes'][row['id']]['start'] == now, 'a stale-retained row keeps its episode'
+clock['now'] = now + 700
+record = json.loads(ledger.read_text())
+record.update(complete=True, generated_epoch=clock['now'], rows=[dict(row, age_seconds=row['age_seconds'] + 700)])
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: complete pass"', '_', code / 'bin/fm-wake-lib.sh')
+drain()
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '040.msg')
+assert again.returncode == 1 and 'became overdue' in again.stdout, ('a steer older than the deferral stays refused', again)
 clock['now'] = now
 
 home, ledger, row, call, ok, drain, ack = case('recheck')
@@ -2270,7 +2828,7 @@ home, ledger, row, call, ok, drain, ack = case('no-wake')
 (home / 'state/.wake-queue').write_text('')
 _, boundary = drain()
 assert boundary[0] == '0' and ack(boundary).returncode == 1
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'reported overdue work')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
 home, ledger, row, call, ok, drain, ack = case('empty', empty=True)
 result, boundary = drain()
@@ -2399,7 +2957,7 @@ assert report['complete'],report
 p=row(report,pr); question=row(report,'held-job:ci-control'); hold=row(report,'held-job:captain-hold')
 boundary=drain()
 assert ack(boundary).returncode==1
-action(hold['id'],'escalated','existing exact recovery decision was routed')
+action(hold['id'],'escalated','asked the captain')
 for obligation in (p,question):
     action(obligation['id'],'waiting','this exact obligation awaits the recorded recovery question',
            '--prerequisite',hold['id'],'--recheck',iso(now+600))
@@ -2609,7 +3167,7 @@ for route in ('status-log','full-run','coarse-run'):
     assert forge_calls.read_text()=='',(route,'standing receipt revalidation queried the forge')
     current=row(json.loads(ledger.read_text()),obligation['subject'])
     assert current['owner']=='firstmate' and current['overdue'] and not current.get('informational'),current
-    action(obligation['id'],'escalated','published prerequisite requires followup')
+    action(obligation['id'],'escalated','asked the captain')
     assert ack(boundary).returncode==0,route
 print('PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers')
 
@@ -2636,7 +3194,7 @@ for producer, consumer in (('main','branch'),('branch','main')):
             boundary=drain()
             if dependency=='question':
                 prerequisite=row(report,'held-job:dependency')
-                action(prerequisite['id'],'escalated','prerequisite question routed')
+                action(prerequisite['id'],'escalated','asked the captain')
                 options=('--prerequisite',prerequisite['id'])
                 evidence='explicit prerequisite question'
             else:
@@ -2653,7 +3211,7 @@ for producer, consumer in (('main','branch'),('branch','main')):
             env['FM_SUPERVISION_ACTOR']=consumer
             boundary=drain()
             if dependency=='question':
-                action(prerequisite['id'],'escalated','prerequisite followup routed')
+                action(prerequisite['id'],'escalated','asked the captain')
             assert call(loops,'--check-actions').returncode==0
             if transition=='due':
                 env['FM_OPEN_LOOPS_NOW']=str(now+600)
@@ -2665,18 +3223,22 @@ for producer, consumer in (('main','branch'),('branch','main')):
                 event=(f'working [at={now}]: changed prerequisite scope\n' if transition=='changed'
                        else f'done [at={now}]: delivered prerequisite\n')
                 (home/'state/repair-owner.status').write_text(event)
+            assert ack(boundary).returncode==0,(producer,dependency,transition,'an unpresented lapsed wait gated the ack')
+            if consumer=='branch':
+                ok(code/'bin/fm-wake-grant.sh','deactivate',os.getpid(),'wait-turn')
+            boundary=drain()
             queued=(home/'state/.wake-queue').read_bytes()
             refused=ack(boundary)
             assert refused.returncode==1 and obligation['id'] in refused.stdout,(producer,dependency,transition,refused)
             assert (home/'state/.wake-queue').read_bytes()==queued
-            action(obligation['id'],'escalated','invalidated dependency followup routed')
+            action(obligation['id'],'escalated','asked the captain')
             assert ack(boundary).returncode==0
             current=row(json.loads(ledger.read_text()),obligation['subject'])
             assert current['owner']=='firstmate' and current['overdue'] and not current.get('informational'),current
 print('PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-# A firstmate-owned row parked behind a live captain hold takes a standing escalation, like a captain-owned row.
+# A firstmate-owned row parked behind a captain hold: its escalation waits on the captain, and the end of that hold needs a new action.
 import datetime as dt, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
@@ -2685,13 +3247,21 @@ shutil.copytree(root / 'bin', code / 'bin')
 now = int(time.time())
 iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 loops = code / 'bin/fm-open-loops.sh'
+STAMP = '  Captain hold set: ' + iso(now - 7200) + '\n'
 HELD = ('## In flight\n- [ ] held-job - Recover the run (repo: firstmate) (kind: ship) '
-        '(hold: exact run recovery) (hold-kind: captain)\n  Captain hold set: ' + iso(now - 7200) + '\n\n## Queued\n\n## Done\n')
+        '(hold: exact run recovery) (hold-kind: captain)\n' + STAMP + '\n## Queued\n\n## Done\n')
 RELEASED = HELD.replace(' (hold-kind: captain)', '')
 ANSWERED = HELD.replace('- [ ] held-job', '- [x] held-job').replace('## In flight', '## Done')
 DEFERRED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (hold-until: 2999-01-01)')
 BLOCKED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (blocked-by: unfinished-prerequisite)')
 REHELD = HELD.replace(iso(now - 7200), iso(now - 3600))
+# The resolution block bin/fm-captain-hold.sh writes first in the task body when it records the captain's answer.
+ANSWERED_WORDS = ANSWERED.replace(STAMP, ''.join('  ' + line + '\n' for line in (
+    'Resolution recorded by fm-captain-hold.', 'Decision digest: test-decision', 'Resolution mode: answered',
+    'Resolves hold set: ' + iso(now - 7200), 'Resolved at: ' + iso(now), 'Answered by: main', 'Captain decision:',
+    'Merge it.')))
+WAITING = 'escalated, waiting on the captain'
+NO_PROOF = 'escalated, no proof it reached the captain'
 PR = 'https://github.com/test/project/pull/9'
 
 def park(name, **fields):
@@ -2738,12 +3308,18 @@ def park(name, **fields):
         return json.loads(ledger.read_text())
     return home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored
 
-# (a) One escalation of the parked row stands: later drains neither present it nor refuse the acknowledgement.
-home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stands')
+def status_of(ok, ident):
+    listed = [line for line in ok(loops, '--digest').stdout.splitlines() if line.startswith('  ' + json.dumps(ident) + ',')]
+    assert len(listed) == 1, listed
+    return WAITING if WAITING in listed[0] else listed[0]
+
+# (a) One escalation covers the parked row on unchanged evidence: later drains neither present it nor refuse acknowledgement,
+# and it is listed as waiting on the captain because nothing proves it reached the captain.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('covers')
 result, boundary = drain('first')
 assert result.stdout.startswith('OVERDUE:') and row['id'] in result.stdout, result
 assert ack(boundary).returncode == 1, 'an unreceipted overdue row refuses acknowledgement'
-recorded = act('escalated', 'asked the captain to decide the recovery')
+recorded = act('escalated', 'asked the captain about the recovery control')
 assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
 assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job'
 assert ack(boundary).returncode == 0
@@ -2752,20 +3328,20 @@ for label, later in (('same-day', 0), ('two-days', 2 * 86400)):
     result, boundary = drain(label)
     assert 'OVERDUE' not in result.stdout and row['id'] not in result.stdout, (label, result.stdout)
     assert ack(boundary).returncode == 0, (label, 'an unchanged parked row needs no second receipt')
-assert row['id'] in ok(loops, '--report').stdout, 'a standing receipt never resolves the obligation'
+assert status_of(ok, row['id']) == WAITING, 'an escalation is listed as waiting on the captain'
+assert row['id'] in ok(loops, '--report').stdout, 'a receipt never resolves the obligation'
 assert call(loops, '--check-actions').returncode == 0
-# With no queued wake the same standing row opens no handling episode and demands nothing.
+# With no queued wake the same covered row opens no handling episode and demands nothing.
 (home / 'state/.wake-queue').write_text('')
 idle = ok(code / 'bin/fm-wake-drain.sh')
 assert 'OVERDUE' not in idle.stdout and 'WAKE_ACK_REQUIRED' not in idle.stderr, idle
-# Beside new work it is listed under STANDING, after the row that needs an action.
-record = stored()
-record['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker',
-                           owner='worker:other-worker', source=None))
-ledger.write_text(json.dumps(record))
+# A change wake presents only the fresh row; a periodic wake includes the covered row.
+record_ = stored()
+record_['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker',
+                            owner='worker:other-worker', source=None))
+ledger.write_text(json.dumps(record_))
 mixed, boundary = drain('mixed')
-assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout, mixed
-assert mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING') and mixed.stdout.count(row['id']) == 1, mixed
+assert 'row-fresh' in mixed.stdout and 'STANDING' not in mixed.stdout and row['id'] not in mixed.stdout, mixed
 assert ack(boundary).returncode == 1, 'the fresh row still needs its own action'
 
 # One receipt binds exactly one held task: the explicit --hold, else the first held of the row's key, its legacy
@@ -2774,36 +3350,39 @@ KEY, ORIGIN = 'd1-expired-preservation-ledger', 'vernant-d1-intake'
 LEGACY = ORIGIN + '-decision-' + KEY
 KEYED = dict(subject=ORIGIN + ':' + KEY, source=dict(kind='status', task=ORIGIN, key=KEY))
 ENTRY = HELD.split('## In flight\n')[1].split('\n\n## Queued')[0]
-def held(*tasks):
-    return '## In flight\n' + '\n'.join(ENTRY.replace('held-job', task) for task in tasks) + '\n\n## Queued\n\n## Done\n'
+def held(*tasks, answered=()):
+    entries = [ENTRY.replace('held-job', task) for task in tasks]
+    done = [ANSWERED_WORDS.split('## Done\n')[1].split('\n\n## Queued')[0].replace('held-job', task) for task in answered]
+    return '## In flight\n' + '\n'.join(entries) + '\n\n## Queued\n\n## Done\n' + ''.join(line + '\n' for line in done)
 def bound_to(label, tasks, expected):
     home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(label, **KEYED)
     backlog.write_text(held(*tasks))
     _, boundary = drain()
-    recorded = act('escalated', 'asked the captain')
+    recorded = act('escalated', 'asked the captain about ' + ' and '.join(tasks))
     assert recorded.returncode == 0 and 'standing: captain hold ' + expected + ';' in recorded.stdout, (label, recorded)
     action = stored()['handling']['actions'][row['id']]
     assert action['hold']['task'] == expected and 'holds' not in action, (label, action)
     assert ack(boundary).returncode == 0
     result, boundary = drain(label + '-later')
     assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
-    return home, backlog, row, drain, ack, stored
+    return home, backlog, row, ok, drain, ack, stored
 bound_to('key-named', [KEY], KEY)
 bound_to('origin-task', [ORIGIN], ORIGIN)
 bound_to('legacy-name', [LEGACY], LEGACY)
 bound_to('order-legacy-first', [ORIGIN, LEGACY], LEGACY)
-home, backlog, row, drain, ack, stored = bound_to('order-key-first', [ORIGIN, LEGACY, KEY], KEY)
-backlog.write_text(held(KEY))
+home, backlog, row, ok, drain, ack, stored = bound_to('order-key-first', [ORIGIN, LEGACY, KEY], KEY)
+backlog.write_text(held(KEY, answered=[ORIGIN, LEGACY]))
 result, boundary = drain('other-candidates-ended')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'only the bound hold ends the receipt'
-backlog.write_text(held(ORIGIN, LEGACY))
-result, boundary = drain('bound-ended')
-assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the bound hold ending re-presents the row'
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'only the bound hold ends the cover'
+assert status_of(ok, row['id']) == WAITING
+backlog.write_text(held(ORIGIN, LEGACY, answered=[KEY]))
+result, boundary = drain('bound-answered')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the captain answer to the bound keyed hold re-presents the row'
 
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('explicit', **KEYED)
 backlog.write_text(held(KEY, ORIGIN, 'elsewhere'))
 _, boundary = drain()
-mentioned = act('escalated', 'tracked as elsewhere; captain notified.', '--hold', 'not-held')
+mentioned = act('escalated', 'asked the captain', '--hold', 'not-held')
 assert mentioned.returncode == 1 and 'still held for the captain' in mentioned.stdout, mentioned
 assert row['id'] not in stored()['handling']['actions'], 'a refused --hold records no receipt'
 named = act('escalated', 'asked the captain', '--hold', ORIGIN)
@@ -2814,22 +3393,29 @@ assert wrong_kind.returncode == 1 and 'only valid for escalated' in wrong_kind.s
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('evidence-only', **KEYED)
 backlog.write_text(held('elsewhere'))
 _, boundary = drain()
-mentioned = act('escalated', 'tracked as elsewhere; captain notified.')
-assert mentioned.returncode == 0 and 'standing: no' in mentioned.stdout and 'captain hold' not in mentioned.stdout, mentioned
-assert 'hold' not in stored()['handling']['actions'][row['id']], 'free text in the evidence must not bind a hold'
+mentioned = act('escalated', 'asked the captain about held task elsewhere')
+assert mentioned.returncode == 0 and 'no task held for the captain was named' in mentioned.stdout, mentioned
+assert 'hold' not in stored()['handling']['actions'][row['id']], 'a task id written in the evidence must not bind a hold'
+backlog.write_text(held(answered=['elsewhere']))
+result, boundary = drain('unbound-later')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'unchanged work after an unbound escalation was gated'
+assert status_of(ok, row['id']) != WAITING and NO_PROOF in status_of(ok, row['id']), 'an unbound escalation was captain waiting'
 
-# (b) A changed row, or a hold that is answered, released, blocked on an unresolved task, or re-held, restores the requirement.
+# (b) A changed row, or a bound hold that is answered, released, blocked on an unresolved task, or re-held, needs a new
+# firstmate action; an unchanged pending hold keeps covering the row.
 def changed_row(record):
     record['rows'][0]['evidence'] = 'blocked: the captain asked for a revised plan'
     return record
-transitions = (('digest', None), ('released', RELEASED), ('answered', ANSWERED), ('blocked', BLOCKED), ('reheld', REHELD))
+transitions = (('changed', None), ('released', RELEASED), ('answered', ANSWERED), ('answered-words', ANSWERED_WORDS),
+               ('blocked', BLOCKED), ('reheld', REHELD))
 for label, text in transitions:
-    home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('change-' + label)
+    home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('hold-' + label)
     _, boundary = drain()
     assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
     assert ack(boundary).returncode == 0
-    _, boundary = drain('quiet')
-    assert ack(boundary).returncode == 0
+    result, boundary = drain('quiet')
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, 'an unchanged pending hold covers the row')
+    assert status_of(ok, row['id']) == WAITING
     if text is None:
         ledger.write_text(json.dumps(changed_row(stored())))
     else:
@@ -2839,20 +3425,20 @@ for label, text in transitions:
     assert 'STANDING' not in result.stdout, (label, result.stdout)
     refused = ack(boundary)
     assert refused.returncode == 1 and row['id'] in refused.stdout, (label, refused)
+    assert row['id'] not in ok(loops, '--digest').stdout, (label, 'a row needing an action belongs in the gate, not the list')
     renewed = act('escalated', 'asked the captain again')
     assert renewed.returncode == 0, (label, renewed)
     if text in (None, REHELD):
         # A changed row or a fresh hold lifecycle is bound again by the new escalation.
         assert 'standing: captain hold held-job' in renewed.stdout, renewed
     else:
-        # The captain is no longer holding it, so a fresh escalation answers only this turn.
-        assert 'standing: no' in renewed.stdout and 'answers only the turn' in renewed.stdout, (label, renewed.stdout)
+        assert 'hold' not in stored()['handling']['actions'][row['id']]
     assert ack(boundary).returncode == 0
     if text not in (None, REHELD):
         result, boundary = drain('next-' + label)
-        assert row['id'] in result.stdout, (label, 'a receipt without a live hold must not stand')
-        assert ack(boundary).returncode == 1, label
-# A hold the captain defers to a date is still held for the captain: the receipt keeps standing until the hold ends.
+        assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, 'unchanged work was gated again')
+        assert status_of(ok, row['id']) != WAITING and NO_PROOF in status_of(ok, row['id']), (label, 'an answered row was captain waiting')
+# A hold the captain defers to a date is still held for the captain: the escalation keeps covering until the hold ends.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated')
 _, boundary = drain()
 assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
@@ -2861,8 +3447,7 @@ backlog.write_text(DEFERRED)
 for label in ('deferred', 'next-turn'):
     result, boundary = drain(label)
     assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
-assert call(loops, '--check-actions').returncode == 0
-assert row['id'] in ok(loops, '--report').stdout, 'a standing receipt never resolves the obligation'
+assert status_of(ok, row['id']) == WAITING
 backlog.write_text(RELEASED)
 result, boundary = drain('released-after-dated')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a deferred hold that is then released needs a new action'
@@ -2876,7 +3461,7 @@ assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job'
 assert ack(boundary).returncode == 0
 result, boundary = drain('after-dated-record')
 assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result.stdout
-# An unreadable backlog never buys standing acknowledgement.
+# An unreadable backlog cannot show the bound hold still waits, so the row needs a new action.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('unreadable')
 _, boundary = drain()
 assert 'standing: captain hold' in act('escalated', 'asked the captain').stdout
@@ -2885,7 +3470,7 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 result, boundary = drain('unreadable')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 
-# Categories a captain decision cannot park never take a standing escalation, even when the task is held.
+# Other categories cannot bind captain holds; their escalation is never captain waiting, and their unchanged row stays listed.
 for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: code or test', limit_seconds=0)),
                          ('stalled_worker', dict(subject='held-job', owner='worker:held-job',
                                                  source=dict(kind='task', task='held-job')))):
@@ -2893,12 +3478,13 @@ for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: c
                                                                                          category=category, **fields)
     _, boundary = drain()
     recorded = act('escalated', 'asked the captain about held-job')
-    assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
+    assert recorded.returncode == 0 and 'hold' not in stored()['handling']['actions'][row['id']], recorded
     assert ack(boundary).returncode == 0
     result, boundary = drain('again')
-    assert row['id'] in result.stdout and ack(boundary).returncode == 1, (category, result.stdout)
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (category, result.stdout)
     refused = act('escalated', 'asked the captain', '--hold', 'held-job')
     assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, (category, refused)
+    assert status_of(ok, row['id']) != WAITING and NO_PROOF in status_of(ok, row['id']), category
 
 # (c) A reviewed green PR has no standing receipt of any kind, however it is held.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
@@ -2913,10 +3499,11 @@ assert ack(boundary).returncode == 0
 result, boundary = drain('again')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an escalation cannot silence a mergeable reviewed PR'
 assert 'hold' not in stored()['handling']['actions'][row['id']]
-# Even a forged binding on the stored receipt cannot make it stand.
-record = stored()
-record['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=iso(now - 7200))
-ledger.write_text(json.dumps(record))
+# Even a forged binding to an answered hold on the stored receipt cannot make it stand.
+record_ = stored()
+record_['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=iso(now - 7200))
+ledger.write_text(json.dumps(record_))
+backlog.write_text(ANSWERED_WORDS)
 result, boundary = drain('forged')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 
@@ -2937,28 +3524,28 @@ assert second.returncode == 1 and 'second deferral refused' in second.stdout, se
 assert stored()['handling']['actions'][row['id']]['captain_visible'] is True
 assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
 assert call(loops, '--check-actions').returncode == 1
-escalated = act('escalated', 'asked the captain to decide')
+escalated = act('escalated', 'asked the captain')
 assert escalated.returncode == 0 and 'standing: captain hold held-job' in escalated.stdout, escalated
 assert ack(boundary).returncode == 0
 result, boundary = drain('settled')
 assert row['id'] not in result.stdout and ack(boundary).returncode == 0
-# (e) Hold standing reads only the local backlog and the row, so a quota-stale ledger neither voids it nor blocks recording it.
+# (e) The hold check reads only the local backlog and the row, so a quota-stale ledger neither voids it nor blocks recording it.
 def go_stale(ledger):
-    record = json.loads(ledger.read_text())
-    record.update(stale=True, stale_reason='quota low (500 of 5000); resets in an hour', complete=False)
-    for each in record['rows']:
+    record_ = json.loads(ledger.read_text())
+    record_.update(stale=True, stale_reason='quota low (500 of 5000); resets in an hour', complete=False)
+    for each in record_['rows']:
         each['stale'] = True
-    ledger.write_text(json.dumps(record))
+    ledger.write_text(json.dumps(record_))
 
-home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stale-stands')
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stale-covers')
 _, boundary = drain()
 assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
 assert ack(boundary).returncode == 0
 go_stale(ledger)
 result, boundary = drain('stale')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, ('a live hold stands on a stale ledger', result)
-assert call(loops, '--check-actions').returncode == 0
-backlog.write_text(ANSWERED)
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, ('a pending escalation covers a stale ledger', result)
+assert status_of(ok, row['id']) == WAITING
+backlog.write_text(ANSWERED_WORDS)
 result, boundary = drain('stale-answered')
 assert row['id'] in result.stdout and result.stdout.startswith('OVERDUE:'), result
 assert ack(boundary).returncode == 1, 'a hold that ended is presented again on a stale ledger'
@@ -2981,16 +3568,16 @@ home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = 
 _, boundary = drain()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 recorded = act('escalated', 'asked the captain')
-assert recorded.returncode == 0 and 'standing: no' in recorded.stdout, recorded
+assert recorded.returncode == 0, recorded
 assert 'could not be verified' in recorded.stdout and 'no task held for the captain was named' not in recorded.stdout, recorded
 assert 'hold' not in stored()['handling']['actions'][row['id']]
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
-assert ack(boundary).returncode == 0
+assert ack(boundary).returncode == 0, 'an unverified escalation answers the turn it followed'
 result, boundary = drain('unverified-after')
-assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverified receipt answers only its own turn'
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverified escalation never covers the next presentation'
 
-# (f) Only a row owned by firstmate can be parked: a reviewer-owned open_pr stays presented under a live captain hold.
+# (f) Only firstmate-owned rows may bind a captain hold.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('marker')
 _, boundary = drain()
 assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
@@ -2999,47 +3586,1173 @@ home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = 
     'reviewer', category='open_pr', subject=PR, owner='alice', next_action='complete the requested PR review',
     evidence='', limit_seconds=600, source=dict(kind='pr', task='held-job'))
 _, boundary = drain()
-recorded = act('escalated', 'asked the captain about held-job')
+recorded = act('escalated', 'asked the captain')
 assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
 assert ack(boundary).returncode == 0
 result, boundary = drain('again')
-assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a reviewer-owned row must keep being presented'
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'unchanged reviewer evidence was gated again'
+assert NO_PROOF in status_of(ok, row['id']), 'a reviewer row escalation was captain waiting'
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, refused
-# Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row stand.
-record = stored()
-assert 'hold' not in record['handling']['actions'][row['id']]
-record['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=marker)
-ledger.write_text(json.dumps(record))
+# Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row wait on that hold.
+record_ = stored()
+assert 'hold' not in record_['handling']['actions'][row['id']]
+record_['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=marker)
+ledger.write_text(json.dumps(record_))
 result, boundary = drain('forged')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
-# (g) One presentation reads the backlog at most once, however many standing rows depend on it, and a failed read fails closed.
+# (g) One presentation reads the backlog at most once, however many covered rows depend on it, and a failed read fails closed.
 shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
 counting = code / 'bin/fm-fleet-snapshot.sh'
 counting.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$FM_HOME/snapshot-runs"\n'
                     'exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
 counting.chmod(0o755)
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('read-once')
-standing = [row] + [dict(row, id=f'row-read-once-{n}', subject=f'held-job:ci-control-{n}',
-                         source=dict(kind='status', task='held-job', key=f'ci-control-{n}')) for n in (2, 3)]
-publish(standing)
+covered = [row] + [dict(row, id=f'row-read-once-{n}', subject=f'held-job:ci-control-{n}',
+                        source=dict(kind='status', task='held-job', key=f'ci-control-{n}')) for n in (2, 3)]
+publish(covered)
 runs = home / 'snapshot-runs'
 snapshot_runs = lambda: len(runs.read_text().splitlines()) if runs.exists() else 0
 _, boundary = drain()
-for each in standing:
+for each in covered:
     recorded = call(loops, 'action', each['id'], 'escalated', '--evidence', 'asked the captain')
     assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
 assert ack(boundary).returncode == 0
 runs.unlink(missing_ok=True)
 healthy = ok(loops, '--present-overdue')
-assert not any(each['id'] in healthy.stdout for each in standing) and snapshot_runs() == 1, (healthy, snapshot_runs())
+assert not any(each['id'] in healthy.stdout for each in covered) and snapshot_runs() == 1, (healthy, snapshot_runs())
 runs.unlink()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
-assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
-assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
-print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
-      ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
-      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
+assert all(each['id'] in broken.stdout for each in covered) and 'STANDING' not in broken.stdout, broken
+assert snapshot_runs() == 1, ('an unreadable backlog was read again for each covered row', snapshot_runs())
+# With fm-fleet-snapshot timing out, an escalation of a parkable row answers only the turn it followed.
+counting.write_text('#!/usr/bin/env bash\n[ ! -e "$FM_HOME/hang-snapshot" ] || exec sleep 30\n'
+                    'exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('snapshot-timeout')
+(home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=1)))
+_, boundary = drain()
+(home / 'hang-snapshot').touch()
+recorded = act('escalated', 'asked the captain')
+assert recorded.returncode == 0 and 'could not be verified' in recorded.stdout, recorded
+assert 'answers only the turn it followed' in recorded.stdout, recorded
+assert 'hold' not in stored()['handling']['actions'][row['id']]
+assert ack(boundary).returncode == 0, 'the timed-out escalation is accepted for the turn it followed'
+(home / 'hang-snapshot').unlink()
+result, boundary = drain('after-timeout')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the row needs an action at its next presentation'
+print('PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain,'
+      ' also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold'
+      ' needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and'
+      ' other categories cannot bind holds, so their escalations are never captain waiting; the deferral limit remains enforced; one presentation reads the backlog once;'
+      ' an unverifiable escalation answers only the turn it followed')
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+# A real status append and collector refresh reactivate an unchanged paused obligation.
+import datetime as dt, json, os, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code, home = world / 'unpause-code', world / 'unpause-home'
+shutil.copytree(root / 'bin', code / 'bin')
+for name in ('state', 'data', 'config', 'projects'):
+    (home / name).mkdir(parents=True)
+now = int(time.time())
+env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now),
+           FM_TEST_SEAM='1', FM_TEST_HARNESS='codex', FM_SUPERVISION_ACTOR='main')
+for key in ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+    env.pop(key, None)
+snapshot = dict(schema='fm-fleet-home-input.v1', backlog=dict(present=True, records=[]), tasks=[
+    dict(id='paused-worker', kind='ship', project=None, branch=None, backend='tmux',
+         current_state=dict(state='paused', source='status-log'), endpoint=dict(exists=True, agent_alive='alive'),
+         pr=dict(url=None), paths=dict(worktree=dict(path=None)), hints={})])
+(home / 'snapshot.json').write_text(json.dumps(snapshot))
+script = code / 'bin/fm-fleet-snapshot.sh'
+script.write_text('#!/usr/bin/env bash\ncat "$FM_HOME/snapshot.json"\n'); script.chmod(0o755)
+status = home / 'state/paused-worker.status'
+status.write_text(f'paused [at={now-72000}]: awaiting external dependency\n')
+loops = code / 'bin/fm-open-loops.sh'
+def call(*args):
+    return subprocess.run([str(x) for x in args], env=env, text=True, capture_output=True)
+def ok(*args):
+    result = call(*args)
+    assert result.returncode == 0, (args, result.stdout, result.stderr)
+    return result.stdout
+report = json.loads(ok(loops, '--heartbeat', '--json'))
+row = next(r for r in report['rows'] if r['category'] == 'silent_report')
+assert row['overdue'], report
+ok(loops, '--present-overdue')
+inbox = home / 'state/paused-worker.inbox/handled'; inbox.mkdir(parents=True)
+(inbox / '001.msg').write_text('at=' + dt.datetime.fromtimestamp(now, dt.timezone.utc).isoformat() + '\n--\ncheck in\n')
+ok(loops, 'action', row['id'], 'steered', '--evidence', '001.msg')
+# Preserve unchanged acknowledgement state: no collector refresh has happened yet.
+assert row['id'] not in call(loops, '--check-actions').stdout
+# Resume with a real current status; normal age limits still apply, without a manual revert.
+with status.open('a') as stream:
+    stream.write(f'working [at={now}]: resumed the lane\n')
+# No inbox acknowledgement mtime may mask the status-derived overdue age.
+shutil.rmtree(inbox.parent)
+report = json.loads(ok(loops, '--heartbeat', '--json'))
+resumed = next(r for r in report['rows'] if r['id'] == row['id'])
+assert resumed['evidence'] != row['evidence'] and not resumed['overdue'], resumed
+env['FM_OPEN_LOOPS_NOW'] = str(now + resumed['limit_seconds'])
+report = json.loads(ok(loops, '--heartbeat', '--json'))
+resumed = next(r for r in report['rows'] if r['id'] == row['id'])
+assert resumed['overdue'], resumed
+missing = call(loops, '--check-actions')
+assert missing.returncode == 1 and row['id'] in missing.stdout, missing
+assert row['id'] not in ok(loops, '--digest'), 'changed evidence belongs in the gate, not the waiting list'
+print('PASS: a paused worker status append changes its collected row and gates acknowledgement again')
+PY
+# Batched receipts and read-stable, bounded handling through the real CLI.
+python3 - "$ROOT" <<'PY'
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+root = Path(sys.argv[1]).resolve()
+world = Path(tempfile.mkdtemp(prefix='ledger-receipts-'))
+code = world / 'code'
+shutil.copytree(root / 'bin', code / 'bin')
+# Count the actual local snapshot reader, not a fabricated snapshot.
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+snapshot = code / 'bin/fm-fleet-snapshot.sh'
+snapshot.write_text('#!/usr/bin/env bash\nprintf "snapshot\\n" >> "$FM_HOME/snapshot-runs"\nexec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
+snapshot.chmod(0o755)
+now = int(time.time())
+clock = now
+home = world / 'home'
+for directory in ('state', 'config', 'data', 'projects'):
+    (home / directory).mkdir(parents=True)
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+rows = [dict(id=f'row-{i}', category='unanswered_question', subject=f'job:question-{i}',
+             owner='firstmate', next_action='obtain decision', evidence='decision pending',
+             age_seconds=7200, limit_seconds=1800, overdue=True) for i in range(50)]
+ledger = home / 'state/open-loops.json'
+loops = code / 'bin/fm-open-loops.sh'
+drain_cli = code / 'bin/fm-wake-drain.sh'
+def publish(items):
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now,
+                                     home=str(home), complete=True, rows=items)))
+def environment():
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
+               FM_OPEN_LOOPS_NOW=str(clock), FM_TEST_SEAM='1', FM_TEST_HARNESS='codex',
+               FM_SUPERVISION_ACTOR='main', FM_DURATION_FILE='off')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        env.pop(key, None)
+    return env
+def call(binary, *args, good=True, input_text=None):
+    result = subprocess.run([str(binary), *map(str,args)], env=environment(), text=True, capture_output=True,
+                            input=input_text)
+    if good:
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+    return result
+
+def drain():
+    result = call(drain_cli)
+    match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+    assert match, result
+    return result, match.groups()
+def ack(boundary, good=True):
+    return call(drain_cli, '--ack-through', boundary[0], '--recovery-generation', boundary[1], good=good)
+def act(ident, kind='escalated', evidence='reported decision'):
+    return call(loops, 'action', ident, kind, '--evidence', evidence)
+def stored():
+    return json.loads(ledger.read_text())
+def batch(items):
+    path = home / 'actions.jsonl'
+    path.write_text(''.join(json.dumps(item) + '\n' for item in items))
+    return call(loops, 'action', '--batch', path, good=False)
+
+try:
+    publish(rows)
+    presented, boundary = drain()
+    assert 'action --batch' in presented.stdout, 'the overdue help names the batch form'
+    # Each failed batch row reports its own result without rolling back valid actions.
+    runs = home / 'snapshot-runs'
+    runs.unlink(missing_ok=True)
+    result = batch([dict(row_id=row['id'], kind='escalated', evidence='reported decision') for row in rows]
+                   + [dict(row_id='absent', kind='escalated', evidence='not a row'),
+                      dict(row_id='row-0', kind='unknown', evidence='invalid kind')])
+    assert result.returncode == 1, result
+    assert len(runs.read_text().splitlines()) == 1, 'a 50-row batch must read one snapshot'
+    assert len(stored()['handling']['actions']) == 50, result
+    assert 'absent' in result.stdout and 'unknown' in result.stdout, result
+    assert len(result.stdout.splitlines()) == 53, result.stdout
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: batch validates per row, preserves valid actions and uses one real snapshot', flush=True)
+
+    # Reads and a refused ack cannot throw away another row's completed work.
+    publish([dict(rows[0], owner='worker:job'), rows[1]])
+    _, boundary = drain()
+    act('row-0')
+    prior = stored()['handling']['presented_at']['main']['row-0']
+    clock += 1
+    drain()
+    assert ack(boundary, good=False).returncode == 1
+    assert stored()['handling']['presented_at']['main']['row-0'] == prior
+    act('row-1')
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: drain and refused acknowledgement preserve unchanged recorded work', flush=True)
+
+    # Malformed stdin rows do not prevent a later valid action from being recorded.
+    publish([rows[0]])
+    _, boundary = drain()
+    result = call(loops, 'action', '--batch', '-', good=False,
+                  input_text='not-json\n' + json.dumps(dict(row_id='row-0', kind='escalated', evidence='followed up')) + '\n')
+    assert result.returncode == 1 and len(result.stdout.splitlines()) == 3, result
+    assert stored()['handling']['actions']['row-0']['kind'] == 'escalated'
+    ack(boundary)
+
+    # A partial acknowledgement must not restart action requirements for the remaining queue.
+    publish([dict(rows[0], owner='worker:job')])
+    for label in ('first', 'second'):
+        call('bash', '-c', '. "$1"; fm_wake_append check "$2" "check: $2"', '_', code / 'bin/fm-wake-lib.sh', label)
+    _, boundary = drain()
+    act('row-0')
+    ack((str(int(boundary[0]) - 1), boundary[1]))
+    drain()
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: stdin batch recovery and partial acknowledgements preserve completed actions', flush=True)
+
+    # All five identity fields invalidate a receipt even before another presentation.
+    for field in ('category', 'subject', 'owner', 'next_action', 'evidence'):
+        publish([rows[0]])
+        _, boundary = drain()
+        act('row-0')
+        record = stored()
+        record['rows'][0][field] += '-changed'
+        ledger.write_text(json.dumps(record))
+        assert call(loops, '--check-actions', good=False).returncode == 1, field
+        assert ack(boundary, good=False).returncode == 1, field
+    print('PASS: every obligation identity change requires new evidence', flush=True)
+
+    # Firstmate escalations and steers cover unchanged work across turns with no time bound; a change gates again.
+    for kind in ('escalated', 'steered'):
+        publish([rows[0]])
+        _, boundary = drain()
+        if kind == 'steered':
+            delivery = home / 'state/job.inbox/001.msg'
+            delivery.parent.mkdir(exist_ok=True)
+            delivery.write_text(f'schema=fm-task-inbox.v1\nat={dt.datetime.fromtimestamp(clock, dt.timezone.utc).isoformat()}\n--\nfollow up\n')
+        act('row-0', kind, '001.msg' if kind == 'steered' else 'reported decision')
+        ack(boundary)
+        receipt_time = clock
+        for clock in (receipt_time + 14399, receipt_time + 14400, receipt_time + 3 * 14400):
+            result = call(drain_cli)
+            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, (kind, result)
+        record = stored()
+        record['rows'][0]['evidence'] += '-changed'
+        ledger.write_text(json.dumps(record))
+        _, boundary = drain()
+        assert ack(boundary, good=False).returncode == 1, kind
+        act('row-0')
+        ack(boundary)
+    print('PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work', flush=True)
+
+    # Free-text escalation is not proof it reached the captain, even after its turn closes.
+    # Exercise the exact receipt text the away daemon used to emit through the real CLI.
+    publish([rows[0]])
+    _, boundary = drain()
+    act('row-0', evidence='away supervisor escalation digest')
+    receipt_time = clock
+    for clock in (receipt_time + 14399, receipt_time + 14400):
+        call(loops, '--check-actions')
+        listed = call(loops, '--digest').stdout
+        assert 'escalated, no proof it reached the captain' in listed and 'waiting on the captain' not in listed, listed
+    ack(boundary)
+    print('PASS: a free-text escalation stays listed without proof it reached the captain, not re-gated by time', flush=True)
+
+    # A heartbeat that changes only a stalled worker's elapsed-time counters changes no obligation.
+    stalled = dict(rows[0], category='stalled_worker', subject='job', owner='worker:job',
+                   next_action='follow up on the recorded wait and recover the worker')
+    def heartbeat(seconds, wait='lint still producing output'):
+        record = stored()
+        record['rows'][0]['evidence'] = (f'{wait}; {seconds}s without progress; step age {seconds}s;'
+                                         f' declaration age {seconds}s')
+        ledger.write_text(json.dumps(record))
+    recheck_at = lambda seconds: dt.datetime.fromtimestamp(clock + seconds, dt.timezone.utc).isoformat()
+    for kind in ('escalated', 'steered', 'deferred'):
+        publish([stalled])
+        heartbeat(3600)
+        _, boundary = drain()
+        if kind == 'steered':
+            delivery = home / 'state/job.inbox/001.msg'
+            delivery.parent.mkdir(exist_ok=True)
+            delivery.write_text(f'schema=fm-task-inbox.v1\nat={dt.datetime.fromtimestamp(clock, dt.timezone.utc).isoformat()}\n--\nfollow up\n')
+        if kind == 'deferred':
+            call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                 '--recheck', recheck_at(3600))
+        else:
+            act('row-0', kind, '001.msg' if kind == 'steered' else 'reported decision')
+        clock += 600
+        heartbeat(4200)
+        call(loops, '--check-actions')
+        if kind == 'escalated':
+            heartbeat(4200, wait='lint failed: 3 errors')
+            assert call(loops, '--check-actions', good=False).returncode == 1, 'a changed wait is a changed obligation'
+            heartbeat(4200)
+            call(loops, '--check-actions')
+        ack(boundary)
+        if kind == 'deferred':
+            clock += 600
+            heartbeat(4800)
+            result = call(drain_cli)
+            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, result
+            call(loops, '--check-actions')
+            heartbeat(4800, wait='lint failed: 3 errors')
+            result, boundary = drain()
+            assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
+    print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
+
+    # A timer the worker's own pane paints, in any unit and shape, is elapsed time too.
+    def retime(timer, work='Running lint…'):
+        record = stored()
+        record['rows'][0]['evidence'] = f'{work} ({timer} · esc to interrupt); 3600s without progress'
+        ledger.write_text(json.dumps(record))
+    for kind in ('escalated', 'deferred'):
+        for first, second in (('45s', '46s'), ('3m 12s', '3m 13s'), ('1h 2m', '1h 3m'), ('59m 59s', '1h 0m 0s')):
+            publish([stalled])
+            retime(first)
+            _, boundary = drain()
+            if kind == 'deferred':
+                call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                     '--recheck', recheck_at(3600))
+            else:
+                act('row-0')
+            stamped = stored()['handling']['presented_at']['main']['row-0']
+            clock += 60
+            retime(second)
+            call(loops, '--check-actions')
+            drain()
+            assert stored()['handling']['presented_at']['main']['row-0'] == stamped, (kind, first, second)
+            call(loops, '--check-actions')
+            retime(second, work='Running tests…')
+            assert call(loops, '--check-actions', good=False).returncode == 1, (kind, first, 'a changed task is a change')
+            retime(second)
+            ack(boundary)
+    print('PASS: a pane timer in any unit changes no obligation; a different task still does', flush=True)
+
+    # A malformed or unsupported config file never blocks a presentation, a check or an acknowledgement.
+    for text in ('{"age_limits_seconds": {', json.dumps(dict(receipt_interval_seconds=120))):
+        (home / 'config/open-loops.json').write_text(text)
+        publish([rows[0]])
+        presented = call(loops, '--present-overdue')
+        assert 'row-0' in presented.stdout, presented
+        result, boundary = drain()
+        assert 'row-0' in result.stdout and 'error' not in result.stderr, result
+        assert call(loops, '--check-actions', good=False).returncode == 1
+        act('row-0')
+        call(loops, '--check-actions')
+        call(loops, '--report')
+        ack(boundary)
+    (home / 'config/open-loops.json').unlink()
+    print('PASS: an unreadable config file never blocks the receipt gate', flush=True)
+
+    # The repeated-deferral refusal cannot be covered by an earlier standing escalation.
+    publish([rows[0]])
+    _, boundary = drain()
+    recheck = dt.datetime.fromtimestamp(clock + 60, dt.timezone.utc).isoformat()
+    call(loops, 'action', 'row-0', 'deferred', '--evidence', 'short wait', '--recheck', recheck)
+    ack(boundary)
+    act('row-0')
+    refused = call(loops, 'action', 'row-0', 'deferred', '--evidence', 'another wait',
+                   '--recheck', recheck, good=False)
+    assert refused.returncode == 1
+    assert call(loops, '--check-actions', good=False).returncode == 1
+    assert ack(boundary, good=False).returncode == 1
+    act('row-0')
+    call(loops, '--check-actions')
+    print('PASS: second deferral requires new follow-up even after a standing escalation', flush=True)
+
+    publish([dict(rows[0], category='review_pass_not_merged')])
+    _, boundary = drain()
+    act('row-0')
+    # A repeated read within this turn still preserves the action.
+    drain()
+    call(loops, '--check-actions')
+    ack(boundary)
+    _, boundary = drain()
+    assert ack(boundary, good=False).returncode == 1
+    print('PASS: reviewed PRs keep their next-turn action requirement', flush=True)
+
+    # A refused batch line leaves no presentation change behind for a valid sibling to persist.
+    publish([rows[0], rows[1]])
+    _, boundary = drain()
+    prior = stored()['handling']['presented_at']['main']['row-0']
+    clock += 60
+    result = batch([dict(row_id='row-0', kind='deferred', evidence='short wait', hold='job',
+                         recheck=dt.datetime.fromtimestamp(clock + 600, dt.timezone.utc).isoformat()),
+                    dict(row_id='row-1', kind='escalated', evidence='reported decision')])
+    assert result.returncode == 1 and '"refused"' in result.stdout and '"recorded"' in result.stdout, result
+    assert stored()['handling']['presented_at']['main']['row-0'] == prior, 'a refused line must not restamp its row'
+    assert 'row-0' not in stored()['handling']['actions']
+    act('row-0')
+    ack(boundary)
+    print('PASS: a refused batch line leaks no state into its siblings', flush=True)
+
+    # A hold answer or unreadable proof ends its receipt even before acknowledgement.
+    backlog = home / 'data/backlog.md'
+    held = ('## In flight\n- [ ] job - Recover the run (repo: firstmate) (kind: ship) (hold: exact run recovery)'
+            ' (hold-kind: captain)\n  Captain hold set: '
+            + dt.datetime.fromtimestamp(clock - 7200, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            + '\n\n## Queued\n\n## Done\n')
+    empty = backlog.read_text()
+    for label, change in (('answered', lambda: backlog.write_text(
+                               held.replace('- [ ] job', '- [x] job').replace('## In flight', '## Done', 1))),
+                          ('unreadable', lambda: (backlog.unlink(), backlog.symlink_to(home / 'missing-backlog')))):
+        backlog.write_text(held)
+        publish([rows[0]])
+        _, boundary = drain()
+        recorded = act('row-0')
+        assert 'standing: captain hold job' in recorded.stdout, (label, recorded)
+        change()
+        clock += 60
+        result, boundary = drain()
+        assert 'row-0' in result.stdout, (label, result.stdout)
+        assert call(loops, '--check-actions', good=False).returncode == 1, label
+        assert ack(boundary, good=False).returncode == 1, label
+        act('row-0')
+        ack(boundary)
+        backlog.unlink()
+        backlog.write_text(empty)
+    print('PASS: a hold ending or becoming unreadable restores the same-turn action requirement', flush=True)
+
+    # A home with no ledger acknowledges its wakes without starting the ledger receipt command.
+    home = world / 'ledgerless'
+    for directory in ('state', 'config', 'data', 'projects'):
+        (home / directory).mkdir(parents=True)
+    (home / 'data/backlog.md').write_text(empty)
+    call('bash', '-c', '. "$1"; fm_wake_append check "$2" "check: $2"', '_', code / 'bin/fm-wake-lib.sh', 'plain')
+    _, boundary = drain()
+    ack(boundary)
+    assert not (home / 'state/.open-loops.lock').exists(), 'acknowledgement without a ledger must not touch it'
+    print('PASS: a home without a ledger acknowledges without the receipt command', flush=True)
+
+    # A batch waiting on a slow producer holds no ledger lock: --report can feed the very batch it is piped into.
+    home = world / 'home'
+    fifo = home / 'actions.fifo'
+    os.mkfifo(fifo)
+    for source in ('stdin', 'file'):
+        publish(rows[:3])
+        _, boundary = drain()
+        command = [str(loops), 'action', '--batch', '-' if source == 'stdin' else str(fifo)]
+        with subprocess.Popen(command, env=environment(), text=True, stdin=subprocess.PIPE if source == 'stdin'
+                              else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as batcher:
+            time.sleep(1.5)
+            try:
+                report = subprocess.run([str(loops), '--report'], env=environment(), text=True,
+                                        capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired:
+                if source == 'file':
+                    open(fifo, 'w').close()
+                raise AssertionError(f'a batch waiting on {source} must not hold the ledger lock')
+            ids = re.findall(r'^  "(row-\d+)"', report.stdout, re.M)
+            assert ids == ['row-0', 'row-1', 'row-2'], report
+            lines = ''.join(json.dumps(dict(row_id=ident, kind='escalated', evidence='reported decision')) + '\n'
+                            for ident in ids[:2])
+            if source == 'stdin':
+                out, err = batcher.communicate(lines, timeout=60)
+            else:
+                with open(fifo, 'w') as sink:
+                    sink.write(lines)
+                out, err = batcher.communicate(timeout=60)
+        assert batcher.returncode == 0 and out.count('"recorded"') == 2, (source, out, err)
+        assert set(stored()['handling']['actions']) == {'row-0', 'row-1'}, source
+        missing = call(loops, '--check-actions', good=False)
+        assert missing.returncode == 1 and 'row-2' in missing.stdout, (source, 'an unactioned row stays gated')
+        assert ack(boundary, good=False).returncode == 1, source
+        act('row-2')
+        call(loops, '--check-actions')
+        ack(boundary)
+    print('PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated', flush=True)
+finally:
+    shutil.rmtree(world)
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+# Ledger actions that tell the truth about common real states: a steer that predates a re-presentation, a remote
+# secondmate's delivery id, one visibility value, and a wait on a named live task.
+import datetime as dt, json, os, re, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code = world / 'evidence-code'
+shutil.copytree(root / 'bin', code / 'bin')
+now = int(time.time())
+clock = dict(now=now)
+iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+WAKE = '. "$1"; fm_wake_append check report "check: %s"'
+
+def inbox(home, record, offset=0, task='worker', handled=False):
+    path = home / 'state' / (task + '.inbox') / ('handled' if handled else '') / record
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'schema=fm-task-inbox.v1\nat={iso(clock["now"] + offset)}\n--\nfollow up\n')
+    return path
+
+def case(name, actor='main', **fields):
+    home = world / ('evidence-' + name)
+    for directory in ('state', 'config', 'data'):
+        (home / directory).mkdir(parents=True)
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now),
+               FM_SUPERVISION_ACTOR=actor, FM_TEST_SEAM='1', FM_TEST_HARNESS='codex')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        env.pop(key, None)
+    row = dict(id='row-' + name, category='stalled_worker', subject='worker', owner='worker:worker',
+               next_action='follow up on lint.full.whole', age_seconds=7200, limit_seconds=3600,
+               overdue=True, evidence='waiting for lint.full.whole; declaration age 7200s')
+    row.update(fields)
+    ledger = home / 'state/open-loops.json'
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now, complete=True, rows=[row])))
+    def call(*args):
+        return subprocess.run([str(a) for a in args], env=dict(env, FM_OPEN_LOOPS_NOW=str(clock['now'])),
+                              text=True, capture_output=True)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    def wake(label='board report'):
+        ok('bash', '-c', WAKE % label, '_', code / 'bin/fm-wake-lib.sh')
+    def drain():
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, (result.stdout, result.stderr)
+        return result, match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0],
+                    '--recovery-generation', boundary[1])
+    def act(kind, evidence, *extra):
+        return call(code / 'bin/fm-open-loops.sh', 'action', row['id'], kind, '--evidence', evidence, *extra)
+    def stored():
+        return json.loads(ledger.read_text())
+    wake()
+    return home, ledger, row, call, ok, wake, drain, ack, act, stored
+
+# 1. A delivery sent after the row's overdue episode began keeps counting when the unchanged row is presented again.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('represent')
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+wake('again')
+_, boundary = drain()
+assert ack(boundary).returncode == 0, 'an unchanged steered row needs no new action until it changes'
+clock['now'] = now
+# A reviewed green PR is re-presented after a steer, so the same delivery must keep counting there.
+PR = 'https://github.com/test/project/pull/9'
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
+    'represent-reviewed', category='review_pass_not_merged', subject=PR, owner='firstmate',
+    source=dict(task='worker'), limit_seconds=600)
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 120
+wake('again')
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'a steer on a reviewed green PR answers only the presentation it followed'
+again = act('steered', '001.msg')
+assert again.returncode == 0, ('re-presenting the same unchanged row must not demand a new message', again.stdout)
+assert ack(boundary).returncode == 0
+clock['now'] = now + 300
+wake('third')
+_, boundary = drain()
+inbox(home, '002.msg', offset=-30)
+minutes_before = act('steered', '002.msg')
+assert minutes_before.returncode == 0, ('a steer sent minutes before the re-presentation still counts', minutes_before.stdout)
+assert ack(boundary).returncode == 0
+clock['now'] = now
+print('PASS: a steer delivered after the overdue episode began counts on every re-presentation of the unchanged row', flush=True)
+
+# A delivery older than the receipt window, and one sent before the episode, never counts.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('old-steer', age_seconds=100000)
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+inbox(home, '002.msg', offset=-96500)
+before = act('steered', '002.msg')
+assert before.returncode == 1 and 'new delivery' in before.stdout, before
+clock['now'] = now + 5 * 3600
+old = act('steered', '001.msg')
+assert old.returncode == 1 and 'four hours' in old.stdout, old
+clock['now'] = now
+# Materially changed evidence opens a new episode: the earlier delivery no longer answers it.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('changed-evidence')
+_, boundary = drain()
+inbox(home, '001.msg', offset=1)
+assert act('steered', '001.msg').returncode == 0 and ack(boundary).returncode == 0
+record = stored()
+record['rows'][0]['evidence'] = 'waiting for lint.full.whole and a new failing step; declaration age 7200s'
+ledger.write_text(json.dumps(record))
+clock['now'] = now + 60
+wake('changed')
+_, boundary = drain()
+stale = act('steered', '001.msg')
+assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
+inbox(home, '002.msg', offset=1)
+assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
+clock['now'] = now
+print('PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused', flush=True)
+
+# The episode opens when the row became overdue, not when a drain first presents it.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('overdue-before-presentation')
+inbox(home, '001.msg', offset=-3700)
+inbox(home, '002.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now - 3600, stored()['handling']['episodes']
+before = act('steered', '001.msg')
+assert before.returncode == 1 and 'became overdue' in before.stdout, ('a delivery before the row went overdue', before.stdout)
+after = act('steered', '002.msg')
+assert after.returncode == 0, ('a delivery after the row went overdue but before its first presentation', after.stdout)
+assert ack(boundary).returncode == 0
+# A record that cannot say when it became overdue falls back to its first presentation, never earlier.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('uncomputable-overdue', age_seconds=None)
+inbox(home, '001.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now, stored()['handling']['episodes']
+early = act('steered', '001.msg')
+assert early.returncode == 1 and 'became overdue' in early.stdout, early
+inbox(home, '002.msg', offset=1)
+assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
+print('PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say',
+      flush=True)
+
+# 2. A remote secondmate keeps its inbox record on its own host; the parent's pending-reply record is the delivery id.
+def reply_record(home, corr, task='mini', delivered=''):
+    directory = home / 'state/pending-replies'
+    directory.mkdir(exist_ok=True)
+    (directory / corr).write_text(f'schema=fm-pending-reply.v1\ncorr_id={corr}\ntask_id={task}\n'
+                                  f'created_epoch={clock["now"]}\ndelivered_epoch={delivered}\nphase=awaiting_report\n')
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
+    'remote', category='silent_report', subject='mini', owner='firstmate',
+    next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
+_, boundary = drain()
+reply_record(home, '0123456789abcdef', delivered='')
+undelivered = act('steered', '0123456789abcdef')
+assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undelivered
+reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
+foreign = act('steered', 'fedcba9876543210')
+assert foreign.returncode == 1, foreign
+reply_record(home, '0011223344556677', delivered=str(now - 3700))
+early = act('steered', '0011223344556677')
+assert early.returncode == 1 and 'new delivery' in early.stdout, early
+reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
+accepted = act('steered', 'aabbccddeeff0011')
+assert accepted.returncode == 0, ('a delivered pending-reply id is a remote secondmate delivery record', accepted.stdout)
+assert stored()['handling']['actions'][row['id']]['evidence'] == 'aabbccddeeff0011'
+assert ack(boundary).returncode == 0
+link = home / 'state/pending-replies/1100110011001100'
+link.symlink_to(home / 'state/pending-replies/aabbccddeeff0011')
+home2, ledger2, row2, call2, ok2, wake2, drain2, ack2, act2, stored2 = case(
+    'remote-link', category='silent_report', subject='mini', owner='firstmate',
+    next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
+_, boundary2 = drain2()
+reply_record(home2, 'aabbccddeeff0011', delivered=str(now + 5))
+(home2 / 'state/pending-replies/2211221122112211').symlink_to(home2 / 'state/pending-replies/aabbccddeeff0011')
+linked = act2('steered', '2211221122112211')
+assert linked.returncode == 1, linked
+print('PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused', flush=True)
+
+# 3. One owner decides captain visibility: the printed row and the deferral check agree.
+def printed_visibility(result, ident):
+    line = next(l for l in result.stdout.splitlines() if ident in l and l.startswith('  '))
+    return line.rsplit(',', 1)[1]
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('visibility')
+_, boundary = drain()
+assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+assert ack(boundary).returncode == 0
+clock['now'] = now + 700
+wake('lapsed')
+result, boundary = drain()
+shown = printed_visibility(result, row['id'])
+second = act('deferred', 'still running', '--recheck', iso(now + 1300))
+assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+assert 'wait on' not in second.stdout, ('a row that cannot take a wait is not told to wait', second.stdout)
+assert shown == 'true', ('a row whose deferral check refuses must print captain_visible true', shown)
+assert stored()['handling']['actions'][row['id']]['captain_visible'] is True
+assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
+clock['now'] = now
+# A second deferral is refused even while the first still stands; the refusal marks the row and it prints captain-visible.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('standing-deferral')
+_, boundary = drain()
+assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+assert ack(boundary).returncode == 0
+repeat = act('deferred', 'lint still running', '--recheck', iso(now + 900))
+assert repeat.returncode == 1 and 'second deferral refused' in repeat.stdout, repeat
+action = stored()['handling']['actions'][row['id']]
+assert action['captain_visible'] is True and action['requires_followup'] is True, action
+assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'the refusal voids the standing deferral'
+wake('refused')
+result, boundary = drain()
+assert printed_visibility(result, row['id']) == 'true', ('the refused row must print captain_visible true', result.stdout)
+# The refusal names a wait only for a row that can take one.
+for category, named in (('red_check', 'wait on a named live task'),
+                        ('unanswered_question', 'wait on a task through a delivery naming the row')):
+    home, ledger, row, call, ok, wake, drain, ack, act, stored = case('visibility-' + category, category=category)
+    clock['now'] = now
+    _, boundary = drain()
+    assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+    assert ack(boundary).returncode == 0
+    clock['now'] = now + 700
+    wake('lapsed')
+    drain()
+    second = act('deferred', 'still running', '--recheck', iso(now + 1300))
+    assert second.returncode == 1 and 'second deferral refused' in second.stdout and named in second.stdout, second
+clock['now'] = now
+print('PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check', flush=True)
+
+# 4. A dependency wait on a named live task, for a red PR row whose worker is parked on purpose.
+fake = world / 'evidence-fakebin'
+fake.mkdir()
+def executable(path, text):
+    path.write_text(text); path.chmod(0o755)
+executable(fake / 'tmux', '''#!/usr/bin/env bash
+if [ -e "$FM_HOME/session-gone" ]; then
+  [ "$1" = list-windows ] && exit 0
+  exit 1
+fi
+case "$1" in
+  list-windows) printf 'fm-repair-owner\\n' ;;
+  display-message) printf '%%1\\n' ;;
+  capture-pane) printf 'all quiet\\n' ;;
+  *) exit 1 ;;
+esac
+''')
+# The crew-state read (FM_CREW_STATE_NO_FORGE=1) sees no run, so the verdict comes from the status log; the
+# ledger's own run read sees the run and its pr field once run-pr exists.
+executable(fake / 'no-mistakes', '''#!/usr/bin/env python3
+import os, sys
+args = sys.argv[1:]
+run_pr = os.path.join(os.environ.get('FM_HOME', ''), 'run-pr')
+run_stall = os.path.join(os.environ.get('FM_HOME', ''), 'run-stall')
+ledger_read = args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1'
+if ledger_read and os.path.exists(run_stall):
+    left = open(run_stall).read().strip()
+    if left == '1':
+        os.unlink(run_stall)
+    elif left:
+        open(run_stall, 'w').write(str(int(left) - 1))
+    sys.exit(1)  # a read that gives no answer; a count limits it to that many reads
+if ledger_read and os.path.exists(os.path.join(os.environ.get('FM_HOME', ''), 'run-uninit')):
+    print("error: repo not initialized (run 'no-mistakes init' first)")
+    print('help[1]: Run `no-mistakes init` to set up the gate in this repository')
+    sys.exit(1)
+if ledger_read and os.path.exists(run_pr):
+    print('run:\\n  id: run-1\\n  branch: fm/repair-owner\\n  pr: ' + open(run_pr).read().strip())
+elif args in (['axi'], ['axi', 'status']) or args[:2] == ['daemon', 'status'] or args[:1] == ['runs']:
+    pass
+else:
+    raise AssertionError(args)
+''')
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+executable(code / 'bin/fm-fleet-snapshot.sh', '''#!/usr/bin/env python3
+import json, os, subprocess, sys
+from pathlib import Path
+p = Path(__file__).parent
+if sys.argv[1] == '--contribution-input':
+    os.execv(str(p / 'real-fleet-snapshot.sh'), [str(p / 'real-fleet-snapshot.sh'), *sys.argv[1:]])
+assert sys.argv[1] == '--home-input'
+snap = json.loads(subprocess.check_output([str(p / 'real-fleet-snapshot.sh'), '--contribution-input']))
+for task in snap['tasks']:
+    task.update(current_state={'state': 'working', 'source': 'status-log'},
+                endpoint={'exists': True, 'agent_alive': 'alive'}, paths={'worktree': {'path': None}}, hints={})
+snap['schema'] = 'fm-fleet-home-input.v1'
+print(json.dumps(snap))
+''')
+executable(code / 'bin/fm-gh-rest.sh', '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+p = json.loads((Path(os.environ['FM_HOME']) / 'forge.json').read_text())
+url = sys.argv[2]
+if '/pulls?' in url: value = [p]
+elif '/check-runs' in url and (Path(os.environ['FM_HOME']) / 'checks-pending').exists():
+    value = {'check_runs': [{'name': 'ci', 'status': 'in_progress', 'conclusion': None, 'id': 1, 'app': {'id': 1}}]}
+elif '/check-runs' in url:
+    value = {'check_runs': [{'name': 'Behavior portable serial 17', 'status': 'completed', 'conclusion': 'failure',
+                             'completed_at': '2026-10-28T00:00:00Z', 'id': 1, 'app': {'id': 1}}]}
+elif '/statuses?' in url: value = []
+else: raise AssertionError(url)
+print(json.dumps([value]))
+''')
+pr = 'https://github.com/test/project/pull/283'
+task_env = dict(os.environ, FM_ROOT_OVERRIDE='', FM_TEST_SEAM='1', FM_TEST_HARNESS='codex', FM_SUPERVISION_ACTOR='main',
+                NM_HOME=str(world / 'evidence-nm'), PATH=str(fake) + os.pathsep + os.environ['PATH'])
+for key in ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+    task_env.pop(key, None)
+
+def wait_fixture(name):
+    home = world / ('evidence-wait-' + name)
+    for directory in ('state', 'data', 'config', 'projects'):
+        (home / directory).mkdir(parents=True)
+    env = dict(task_env, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now))
+    def call(*args):
+        return subprocess.run([str(x) for x in args], env=env, text=True, capture_output=True, timeout=120)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    (home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+    (home / 'forge.json').write_text(json.dumps(dict(html_url=pr, number=283, state='open', draft=False,
+                                                     head={'sha': 'a' * 40}, updated_at=iso(now - 7200))))
+    (home / 'state/parked-job.meta').write_text(f'kind=ship\nspawn_gen=s-parked\npr={pr}\n')
+    (home / 'state/parked-job.status').write_text(f'working [at={now}]: parked on purpose until repair-owner merges\n')
+    tree = world / ('evidence-tree-' + name)
+    ok('git', 'init', '-q', '-b', 'fm/repair-owner', tree)
+    ok('git', '-C', tree, 'commit', '-q', '--allow-empty', '-m', 'fixture')
+    meta = f'kind=ship\nspawn_gen=s-repair\nworktree={tree}\nharness=claude\nwindow=fm:fm-repair-owner\n'
+    (home / 'state/repair-owner.meta').write_text(meta)
+    working = f'working [at={now}]: fixing the red main\n'
+    (home / 'state/repair-owner.status').write_text(working)
+    ok(code / 'bin/fm-busy-event.sh', 'arm', home / 'state', 'repair-owner')
+    def activity(state):
+        ok(code / 'bin/fm-busy-event.sh', 'apply', home / 'state', 'repair-owner', state,
+           '--current-gen', '--source', 'claude-hook', '--event', 'fixture')
+    activity('busy')
+    loops = code / 'bin/fm-open-loops.sh'
+    ledger = home / 'state/open-loops.json'
+    def publish():
+        stamp = int(env['FM_OPEN_LOOPS_NOW'])
+        for path in (home / 'state').glob('*.status'):
+            os.utime(path, (stamp, stamp))
+        return json.loads(ok(loops, '--heartbeat', '--json').stdout)
+    def drain():
+        ok('bash', '-c', WAKE % 'dependency followup', '_', code / 'bin/fm-wake-lib.sh')
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, (result.stdout, result.stderr)
+        return match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0], '--recovery-generation', boundary[1])
+    report = publish()
+    assert report['complete'], report
+    red = next(r for r in report['rows'] if r['subject'] == pr)
+    assert red['category'] == 'red_check' and red['owner'] == 'worker:parked-job', red
+    return dict(home=home, env=env, call=call, ok=ok, loops=loops, ledger=ledger, publish=publish, drain=drain,
+                ack=ack, red=red, activity=activity, working=working, meta=meta)
+
+reason = 'PR is red because main is red; parked until repair-owner merges'
+fx = wait_fixture('live')
+boundary = fx['drain']()
+waited = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert waited.returncode == 0, ('a red PR row can wait on a named live task', waited.stdout)
+assert fx['ack'](boundary).returncode == 0
+boundary = fx['drain']()
+assert fx['ack'](boundary).returncode == 0, 'an unchanged live wait stands across presentations'
+assert fx['red']['id'] in fx['ok'](fx['loops'], '--report').stdout, 'a standing wait stays visible'
+# It never stands past its recheck, and a renewal needs the prerequisite to still be live.
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 3600)
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a due recheck restores the action requirement'
+fx['publish']()
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('a live prerequisite can carry a renewed wait', renewed.stdout)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+
+# It resurfaces when the prerequisite merges, fails or stalls, and refuses a prerequisite that is not live.
+def waiting_fixture(name):
+    fx = wait_fixture(name)
+    boundary = fx['drain']()
+    ok = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    assert ok.returncode == 0, ok.stdout
+    assert fx['ack'](boundary).returncode == 0
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 0
+    return fx
+fx = waiting_fixture('merged')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite merged'
+fx = waiting_fixture('failed')
+(fx['home'] / 'state/repair-owner.status').write_text(f'failed [at={now}]: tests still red\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite failed'
+fx = waiting_fixture('stalled')
+stalled = json.loads(fx['ledger'].read_text())
+stalled['rows'].append(dict(id='stalled-repair', category='stalled_worker', subject='repair-owner',
+                            owner='worker:repair-owner', next_action='follow up', age_seconds=7200,
+                            limit_seconds=3600, overdue=True, evidence='no progress'))
+fx['ledger'].write_text(json.dumps(stalled))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite stalled'
+fx = waiting_fixture('replaced')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('s-repair', 's-replacement'))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a replacement worker cannot inherit the wait'
+fx = waiting_fixture('session-missing')
+fx['activity']('idle')
+(fx['home'] / 'session-gone').write_text('')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite session is missing'
+fx = waiting_fixture('absent-record')
+(fx['home'] / 'state/repair-owner.status').unlink()
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an absent task record is not live'
+# A live prerequisite need not be busy right now: idle between turns, or parked with its PR awaiting review.
+fx = waiting_fixture('idle-turn')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an idle prerequisite between turns still carries the wait'
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'needs-decision [at={now}] [key=review]: PR 290 parked awaiting review\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a parked prerequisite still carries the wait'
+# A done prerequisite with an unmerged recorded PR stays live until its merge is recorded.
+fx = waiting_fixture('done-pr')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR 290 opened; awaiting other-family review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done prerequisite with an unmerged PR carries the wait'
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite whose PR merged has landed'
+# A trouble row that crosses its limit between collections ends the wait at its current age, with no recollection.
+fx = waiting_fixture('trouble-ages')
+aged = json.loads(fx['ledger'].read_text())
+aged['rows'].append(dict(id='stalled-repair', category='stalled_worker', subject='repair-owner',
+                         owner='worker:repair-owner', next_action='follow up', age_seconds=3590,
+                         limit_seconds=3600, overdue=False, evidence='no progress'))
+fx['ledger'].write_text(json.dumps(aged))
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a trouble row still under its limit keeps the wait'
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 20)
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the trouble row crossed its limit without a recollection'
+crossed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3620))
+assert crossed.returncode == 1 and 'stalled, missing or failed' in crossed.stdout, ('no new wait on a stalled task', crossed)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A prerequisite's PR on any provider the PR parser accepts ends the wait when its canonical merge record exists.
+def gitlab_done(fx, url):
+    (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=' + url + '\n')
+    (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: MR opened; awaiting review\n')
+    fx['activity']('idle')
+fx = waiting_fixture('merged-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('an unmerged GitLab MR accepts a renewed wait', renewed.stdout)
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the GitLab MR merged'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert landed.returncode == 1 and 'merged' in landed.stdout, ('no renewal after the MR merged', landed)
+# A merge record for another MR of the same project does not end it.
+fx = waiting_fixture('merged-other-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 291',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a merge record for another MR leaves the wait'
+# A merge record the canonical reader cannot validate is unreadable, never "open": the wait is not kept or renewed.
+fx = waiting_fixture('unreadable-marker-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a valid merge record ends the wait'
+marker = fx['home'] / 'state/repair-owner.pr-poll-merge-notified'
+marker.chmod(0)
+try:
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable merge record does not keep the wait'
+    unreadable_marker = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+    assert unreadable_marker.returncode == 1 and 'unreadable' in unreadable_marker.stdout, \
+        ('no wait on an unreadable merge record', unreadable_marker)
+finally:
+    marker.chmod(0o600)
+# A prerequisite whose PR identity the landing check cannot read never keeps or admits a wait.
+fx = waiting_fixture('unreadable-pr-identity')
+gitlab_done(fx, 'https://gitlab.com/test/project/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable PR identity does not keep the wait'
+unreadable = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                        '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert unreadable.returncode == 1 and 'identity' in unreadable.stdout, ('no wait on an unreadable PR identity', unreadable)
+# A done note naming an open PR keeps the prerequisite live before pr= is registered, until that PR's merge is recorded.
+fx = waiting_fixture('done-note')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290 opened; awaiting review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done note naming an open PR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('a done note naming an open PR accepts a new wait', renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the PR its done note named merged'
+# A done note whose PR URL does not parse names no PR, so the task has landed.
+fx = waiting_fixture('done-note-malformed')
+fx['ok']('git', '-C', world / 'evidence-tree-done-note-malformed', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290, checks green\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a malformed done-note PR URL is no PR'
+malformed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                       '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert malformed.returncode == 1 and 'done with no PR' in malformed.stdout, malformed
+# A ship's no-mistakes run records its PR even when the done note names none and pr= is not registered yet.
+fx = waiting_fixture('run-pr')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, "the run's PR carries the wait"
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ("the run's open PR accepts a new wait", renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, "the run's PR merged"
+# A run read that gives no answer is unknown, never a verdict: the wait stands and the next pass reads again.
+fx = waiting_fixture('run-pr-stall')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr-stall', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, "the run's PR carries the wait"
+(fx['home'] / 'run-pr').unlink()
+(fx['home'] / 'run-stall').write_text('')
+stalled_read = fx['call'](fx['loops'], '--check-actions')
+assert stalled_read.returncode == 0, ('a stalled run read leaves the wait standing', stalled_read.stdout)
+unread = fx['call'](fx['loops'], '--present-overdue')
+assert 'PR source unreadable this pass for repair-owner' in unread.stderr, unread
+refused = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert refused.returncode == 1 and 'could not be read' in refused.stdout, ('no new wait on an unread done task', refused)
+(fx['home'] / 'run-stall').unlink()
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an answering read finding no PR ends the wait'
+# A stalled read refuses its own batch line only; a later line whose read answers clears the mark and records.
+fx = waiting_fixture('run-pr-stall-batch')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr-stall-batch', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+(fx['home'] / 'run-stall').write_text('1')
+line = json.dumps(dict(row_id=fx['red']['id'], kind='waiting', evidence=reason, prerequisite_task='repair-owner',
+                       recheck=iso(now + 7200)))
+batch = subprocess.run([str(fx['loops']), 'action', '--batch', '-'], env=fx['env'], text=True, capture_output=True,
+                       timeout=120, input=line + '\n' + line + '\n')
+assert batch.returncode == 1, ('the stalled line is refused', batch.stdout, batch.stderr)
+assert re.search(r'^  1,.*"refused",.*could not be read', batch.stdout, re.M), batch.stdout
+assert re.search(r'^  2,.*"recorded"', batch.stdout, re.M), ('an answering read clears the unread mark', batch.stdout)
+# A repo with no no-mistakes setup answers that there is no run: a done ship with no PR has landed, never unread.
+fx = waiting_fixture('run-uninit')
+fx['ok']('git', '-C', world / 'evidence-tree-run-uninit', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-uninit').write_text('')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: no change needed\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an uninitialized repo answers: the task has landed'
+uninit = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert uninit.returncode == 1 and 'done with no PR' in uninit.stdout, ('an uninitialized repo is an answer', uninit)
+assert 'could not be read' not in uninit.stdout and 'unreadable' not in uninit.stderr, uninit
+# A done scout whose done note names another task's PR has landed: only a ship's done note names its own PR.
+fx = waiting_fixture('done-scout-note')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('kind=ship', 'kind=scout'))
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/293 reviewed: FAIL, 3 findings\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, "a done scout naming another task's PR has landed"
+scouted = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert scouted.returncode == 1 and 'done with no PR' in scouted.stdout, scouted
+# A done prerequisite with no PR from any source has landed: its report is its delivery.
+fx = waiting_fixture('done-no-pr')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: findings reported\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite with no PR has landed'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert landed.returncode == 1 and 'done with no PR' in landed.stdout, landed
+fx = wait_fixture('idle')
+boundary = fx['drain']()
+fx['activity']('idle')
+idle = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert idle.returncode == 0, ('a wait on an idle live prerequisite is recorded', idle.stdout)
+(fx['home'] / 'session-gone').write_text('')
+gone = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert gone.returncode == 1 and 'not live' in gone.stdout, gone
+missing = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'no-such-task', '--recheck', iso(now + 3600))
+assert missing.returncode == 1, missing
+own = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                 '--prerequisite-task', 'parked-job', '--recheck', iso(now + 3600))
+assert own.returncode == 1 and 'distinct' in own.stdout, own
+assert json.loads(fx['ledger'].read_text())['handling']['actions'][fx['red']['id']]['evidence'] == reason
+print('PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, '
+      'loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live '
+      'is refused', flush=True)
+
+# The delivery form of a task wait shares the steer's boundary: the start of the row's current overdue episode.
+def delivery(fx, record, sent):
+    path = fx['home'] / 'state/repair-owner.inbox' / record
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'schema=fm-task-inbox.v1\nat={iso(sent)}\n--\nopen-loop-row: {fx["red"]["id"]}\nland the red-main fix\n')
+fx = wait_fixture('delivery-episode')
+boundary = fx['drain']()
+published = json.loads(fx['ledger'].read_text())
+episode = published['handling']['episodes'][fx['red']['id']]['start']
+red = next(r for r in published['rows'] if r['id'] == fx['red']['id'])
+assert episode == published['generated_epoch'] - red['age_seconds'] + red['limit_seconds'], (episode, red)
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 60)
+delivery(fx, '001.msg', now + 60)
+delivery(fx, '002.msg', episode - 60)
+assert fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 200)).returncode == 0
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 300)
+boundary = fx['drain']()
+stored = json.loads(fx['ledger'].read_text())['handling']
+assert stored['presented_at']['main'][fx['red']['id']] == now + 300, 'the due recheck re-presented the unchanged row'
+assert stored['episodes'][fx['red']['id']]['start'] == episode, 're-presenting an unchanged row keeps its episode'
+older = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '002.msg',
+                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert older.returncode == 1 and 'became overdue' in older.stdout, ('a delivery older than the episode is refused', older.stdout)
+inside = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '001.msg',
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert inside.returncode == 0, ('a delivery inside the episode counts after a re-presentation', inside.stdout)
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A complete pass whose row is no longer overdue closes its episode: a PR update resets the open PR's age.
+fx = wait_fixture('episode-closes')
+(fx['home'] / 'checks-pending').write_text('')
+pending = next(r for r in fx['publish']()['rows'] if r['subject'] == pr)
+assert pending['category'] == 'open_pr' and pending['overdue'], pending
+fx['drain']()
+assert pending['id'] in json.loads(fx['ledger'].read_text())['handling']['episodes'], 'presentation opens the episode'
+forge = json.loads((fx['home'] / 'forge.json').read_text())
+(fx['home'] / 'forge.json').write_text(json.dumps(dict(forge, updated_at=iso(now))))
+closed = fx['publish']()
+row = next(r for r in closed['rows'] if r['id'] == pending['id'])
+assert closed['complete'] and not row['overdue'] and not row.get('stale'), row
+assert pending['id'] not in closed['handling']['episodes'], 'a published row that is no longer overdue closes its episode'
+print('PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; '
+      'one older than the episode is refused; a row no longer overdue closes its episode', flush=True)
+
+# Only a PR row waits on a task by reason alone; a question or unlanded-commit row cites a delivery naming it.
+fx = wait_fixture('reason-scope')
+boundary = fx['drain']()
+for number, category in enumerate(('open_pr', 'red_check', 'unanswered_question', 'unlanded_commit'), 1):
+    published = json.loads(fx['ledger'].read_text())
+    next(r for r in published['rows'] if r['id'] == fx['red']['id'])['category'] = category
+    fx['ledger'].write_text(json.dumps(published))
+    by_reason = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                           '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    if category in ('open_pr', 'red_check'):
+        assert by_reason.returncode == 0, (category, 'a PR row waits on a live task by reason', by_reason.stdout)
+        continue
+    assert by_reason.returncode == 1 and 'NNN.msg' in by_reason.stdout, (category, by_reason.stdout)
+    record = f'{number:03d}.msg'
+    delivery(fx, record, now)
+    by_delivery = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', record,
+                             '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    assert by_delivery.returncode == 0, (category, 'the delivery form still binds this row', by_delivery.stdout)
+print('PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows '
+      'are refused that form and still wait through a delivery naming them', flush=True)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

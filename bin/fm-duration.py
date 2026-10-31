@@ -5,11 +5,49 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
-       fm-duration.py gate [--log-fd N] [--wait-file PATH] KEY -- COMMAND [ARGS...]
+       fm-duration.py gate [--log-fd N] [--wait-file PATH] [--cpu-file PATH] KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
+       fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
+       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS|default [PATH...] [--while-alive]
        fm-duration.py check-literals [--base REF | --report]
+
+keep-going is the record-free operational command runner: its only automatic
+stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
+It has no absolute wall-clock bound and writes no timing or backlog records.
+Each nested runner keeps its own bound, so a hung inner read is stopped by its
+own owner and an outer owner sees an inner sampler's CPU only until then.
+Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
+(/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
+on Darwin, whose ps omits waited-child time). A failed native root read makes
+the sample blind; only non-root members may fall back to ps CPU. Where a
+confined worker's sandbox refuses to execute setuid ps, the process table, the
+process-group check behind a Darwin EPERM group signal and a slot holder's
+start time come from bin/fm-proc-info.py instead. Without a complete sample,
+including unavailable native imports, one cpu_telemetry_unavailable line names
+the platform and nothing is stopped for inactivity: a missing sample is neither
+progress nor a stall.
+Samples include waited-child CPU so reaping cannot erase work between polls.
+Runnable descendants also prevent an idle verdict: a rounded CPU counter is
+not proof that a process awaiting or using a CPU made no progress.
+communicate_progress provides the same inactivity rule for captured Python
+sources whose caller owns descendant cleanup. progress-check keeps an atomic,
+identity-bound observation record for an existing PID plus optional file
+signatures; it returns 124 only after consecutive valid observations show no
+progress for the inactivity interval. First, failed, corrupt or reused-PID
+observations never authorize a stop. Missing telemetry does not prove a stall.
+PID 0 selects file-only observation and requires at least one watched path; the
+observer's own CPU never becomes publisher progress. --while-alive on a positive
+PID additionally returns 3 for a dead/zombie peer or an observed PID reuse once
+no descendant it was last observed with remains; it never signals anything. In that mode the PID is a liveness fence only: activity
+(CPU, runnable work, forks) is not progress toward an outcome, so only watched
+files reset inactivity. Tests use it to distinguish a missing outcome after
+peer exit from a productive publisher that is merely slow. An inactivity of
+"default" selects the operational no-progress policy below.
+These inactivity bounds exist to recover genuinely hung work, not to cap the
+duration of productive work. The default operational policy is 15 quiet minutes;
+callers' historical timeout overrides now select inactivity intervals instead.
 
 The JSONL table is FM_DURATION_FILE, otherwise FM_DURATION_HOME/data/command-durations.jsonl
 (the owning home fm-spawn exports to ship and scout workers), otherwise
@@ -68,11 +106,18 @@ command only at a true extreme: no output and no process-tree CPU progress for
 call whose client waits quietly on the shared daemon, is exempt from the
 no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
 forwarded signal or the absolute stop began still follows the cleanup rule
-below for every key. Polling cadence is observation, not a failure
-deadline, and neither an idle or failed sample nor an elapsed read wait kills
-work. Completion of the command's leader, a forwarded signal, or one of those
-two extremes ends the run; descendants that outlive the leader and still hold
-its output streams are neither awaited nor counted as live work.
+below for every key. Outside a cleanup, every key also keeps only the 6 hour
+absolute stop while no complete process-tree CPU sample exists (a failed
+native root read, ps and fm-proc-info.py both unavailable, or native imports
+that cannot load): run then makes no no-progress decision and prints one
+cpu_telemetry_unavailable line, because a missing sample is neither progress
+nor a stall. Once a forwarded signal or the absolute stop begins a cleanup,
+the cleanup SIGKILL rule below still applies. Polling cadence is observation,
+not a failure deadline, and neither an idle or failed sample nor an elapsed
+read wait kills work. Completion of the command's leader, a forwarded signal,
+or one of those two extremes ends the run; descendants that outlive the
+leader and still hold its output streams are neither awaited nor counted as
+live work.
 An expiry or the first forwarded signal sends SIGTERM to the process group and
 then waits for the leader to exit, with no guessed grace number, so a leader's
 own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
@@ -97,7 +142,8 @@ a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
 writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
 starts (0 when a slot was free at once), so that caller can leave the wait out of
-its sample. Slots are exclusive
+its sample. --cpu-file receives the command tree's CPU milliseconds after
+COMMAND exits; gate's docstring owns what that sample counts. Slots are exclusive
 non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
 $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
@@ -105,7 +151,8 @@ needs repair and a killed run frees its slot at once; the lock is held by this
 process alone and never inherited by COMMAND, so a test's own leftover daemon
 can never hold a slot for good. Each holder writes a record of its pid and
 the epoch at which it took the slot; taking a free slot runs no ps. A waiter's
-notice names the key it waits on and each holder, with one ps call per holder,
+notice names the key it waits on and each holder, with one ps call (or
+fm-proc-info.py call under confinement) per holder,
 and flags a record whose pid is gone or whose process started more than 2
 seconds after the recorded epoch (the pid was reused; ps start times have
 one-second resolution, hence the slack), so a reused pid is never taken for the
@@ -164,7 +211,6 @@ import re
 import signal
 import shlex
 import selectors
-import sqlite3
 import stat
 import struct
 import subprocess
@@ -174,6 +220,7 @@ import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
+PROC_INFO = ROOT / 'bin' / 'fm-proc-info.py'
 HOST = platform.node()
 MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit applies
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
@@ -495,8 +542,14 @@ def own_timeout(key, milliseconds, event_id=None):
 
 
 def import_nm(database, run_id):
-    with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
-        steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
+    # Progress-only execution does not consume SQLite; load it only for statistics.
+    import sqlite3
+
+    try:
+        with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
+            steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
+    except sqlite3.Error as error:
+        raise RuntimeError(str(error)) from error
     with ledger() as (handle, rows):
         known = {r.get('sample_id') for r in rows}
         for identity, name, duration, code in steps:
@@ -508,17 +561,63 @@ def import_nm(database, run_id):
                                           cpus=None, recorded_at=now_iso()))
 
 
-def tree_cpu(pid, observed):
+def proc_table(pid):
+    """{pid: (ppid, cpu_seconds, identity, runnable)} from /proc, or None.
+
+    Git Bash/MSYS exposes /proc/<pid>/stat but its Cygwin ps rejects the -o
+    fields below, so the source is chosen by capability, never by platform name
+    (the same rule as fm_pid_identity in fm-wake-lib.sh).
+    """
+    root = Path(os.environ.get('FM_PROC_ROOT_OVERRIDE') or '/proc')
+    if not os.access(root / str(pid) / 'stat', os.R_OK):
+        return None
     try:
-        result = subprocess.run(['ps', '-axo', 'pid=,ppid=,time=,lstart='], capture_output=True, text=True,
-                                env=dict(os.environ, LC_ALL='C'))
+        ticks = os.sysconf('SC_CLK_TCK')
+    except (AttributeError, OSError, ValueError):
+        ticks = 100
+    table = {}
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return None
+    for name in names:
+        if not name.isdigit():
+            continue
+        try:
+            line = (root / name / 'stat').read_text()
+            # Include waited-for children (cutime+cstime): a child can do work
+            # and be reaped entirely between snapshots, including its last burst.
+            fields = line[line.rindex(')') + 1:].split()
+            seconds = sum(int(fields[index]) for index in (11, 12, 13, 14)) / ticks
+            table[int(name)] = (int(fields[1]), seconds, ('proc', fields[19]), fields[0] == 'R')
+        except (OSError, ValueError, IndexError):
+            continue  # The process exited between the listing and the read.
+    return table
+
+
+def proc_read(command, info, **kwargs):
+    """Run the ps COMMAND, or bin/fm-proc-info.py INFO where a confined worker's
+    sandbox refuses to execute setuid ps; the flag is True when ps ran."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, **kwargs), True
+    except PermissionError:
+        return subprocess.run([sys.executable, str(PROC_INFO), *info], capture_output=True, text=True, **kwargs), False
+
+
+def ps_table():
+    # The helper prints no CPU column; Darwin's libproc reader supplies the CPU
+    # (tree_cpu), and a zero here never exceeds a retained high-water value.
+    try:
+        result, timed = proc_read(['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='], ['table', 'pid,ppid,stat,lstart'],
+                                  env=dict(os.environ, LC_ALL='C'))
         if result.returncode:
             return None
-        children = collections.defaultdict(list)
-        times = {}
+        table = {}
         for line in result.stdout.splitlines():
             fields = line.split()
-            if len(fields) < 4:
+            if not timed:
+                fields[2:2] = ['0']
+            if len(fields) < 5:
                 continue
             child, parent = map(int, fields[:2])
             days, separator, clock = fields[2].rpartition('-')
@@ -527,19 +626,239 @@ def tree_cpu(pid, observed):
             clock_seconds = 0.0
             for part in parts:
                 clock_seconds = clock_seconds * 60 + float(part)
-            seconds += clock_seconds
-            children[parent].append(child)
-            times[child] = (seconds, tuple(fields[3:]))
+            table[child] = (parent, seconds + clock_seconds, tuple(fields[4:]), fields[3].startswith('R'))
+        return table
     except (OSError, ValueError):
-        return None  # A failed telemetry sample is no progress sample, never a stop reason.
+        return None
+
+
+@functools.lru_cache(maxsize=1)
+def darwin_cpu_reader():
+    """Native CPU including waited children; macOS ps -S can omit that CPU.
+
+    Each process total is truncated to ps's 0.01 s step, the resolution /proc
+    clock ticks also report, so idle timer wakeups are judged as on other hosts.
+    """
+    import ctypes
+
+    class Usage(ctypes.Structure):
+        # sys/resource.h rusage_info_v1: UUID followed by sixteen uint64 fields.
+        _fields_ = [('uuid', ctypes.c_ubyte * 16), ('counters', ctypes.c_uint64 * 16)]
+
+    class Timebase(ctypes.Structure):
+        _fields_ = [('numer', ctypes.c_uint32), ('denom', ctypes.c_uint32)]
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
+    libc.proc_pid_rusage.restype = ctypes.c_int
+    libc.mach_timebase_info.argtypes = [ctypes.POINTER(Timebase)]
+    libc.mach_timebase_info.restype = ctypes.c_int
+    timebase = Timebase()
+    if ctypes.sizeof(Usage) != 144 or libc.mach_timebase_info(ctypes.byref(timebase)) or not timebase.denom:
+        raise ValueError('cannot read Darwin CPU accounting ABI/timebase')
+
+    def read_cpu(pid):
+        usage = Usage()
+        if libc.proc_pid_rusage(pid, 1, ctypes.byref(usage)):
+            return None
+        # ri_user_time, ri_system_time, ri_child_user_time, ri_child_system_time.
+        nanoseconds = sum(usage.counters[index] for index in (0, 1, 10, 11)) * timebase.numer // timebase.denom
+        return nanoseconds // 10_000_000 / 100
+
+    return read_cpu
+
+
+def tree_cpu(pid, observed):
+    """(CPU high-water sum, runnable), or (None, False) without telemetry.
+
+    Waited-child CPU preserves work missed between snapshots. Retained child
+    maxima may overlap that CPU; this sum proves growth, not resource usage.
+    A runnable tree is not proven idle even when counters round away its CPU.
+    """
+    table = proc_table(pid)
+    native_cpu = None
+    if table is None:
+        table = ps_table()
+        if sys.platform == 'darwin':
+            try:
+                native_cpu = darwin_cpu_reader()
+            except (AttributeError, ImportError, OSError, ValueError):
+                return None, False
+    if table is None:
+        return None, False  # Missing evidence never proves a stall.
+    children = collections.defaultdict(list)
+    for child, (parent, _, _, _) in table.items():
+        children[parent].append(child)
     todo = [pid]
+    runnable = False
     while todo:
         child = todo.pop()
-        if child in times:
-            seconds, identity = times[child]
+        if child in table:
+            _, seconds, identity, running = table[child]
+            native = None if native_cpu is None else native_cpu(child)
+            if child == pid and native_cpu is not None and native is None:
+                return None, False  # ps omits the root's waited-child CPU on Darwin.
+            if native is not None:
+                seconds = native
+            runnable = runnable or running
             observed[(child, identity)] = max(observed.get((child, identity), 0), seconds)
         todo.extend(children[child])
-    return sum(observed.values())
+    return sum(observed.values()), runnable
+
+
+def warn_blind_telemetry():
+    scalar('cpu_telemetry_unavailable', f'cannot sample complete process-tree CPU on '
+           f'{sys.platform}; hung work cannot be recovered here, so nothing is stopped '
+           'for inactivity while CPU cannot be sampled', sys.stderr)
+
+
+def communicate_progress(child, inactivity):
+    """Wait for a captured source, raising TimeoutExpired only on proven inactivity.
+
+    The caller owns cleanup so its existing descendant/identity discipline is
+    retained. TimeoutExpired carries accumulated output on each observation;
+    the raised one names the inactivity interval, not the short poll slice,
+    because callers publish str(error) as operator evidence.
+    """
+    observed = {}
+    previous_cpu, previous_bytes = -1, -1
+    last_progress = time.monotonic()
+    warned = False
+    while True:
+        try:
+            return child.communicate(timeout=min(1, inactivity / 4))
+        except subprocess.TimeoutExpired as error:
+            cpu, runnable = tree_cpu(child.pid, observed)
+            size = len(error.output or b'') + len(error.stderr or b'')
+            now = time.monotonic()
+            if runnable or (cpu is not None and cpu > previous_cpu) or size > previous_bytes:
+                last_progress = now
+            previous_bytes = size
+            if cpu is None:
+                if not warned:
+                    warned = True
+                    warn_blind_telemetry()
+                continue
+            previous_cpu = max(previous_cpu, cpu)
+            if now - last_progress >= inactivity:
+                error.timeout = inactivity
+                raise
+
+
+def descendants_alive(pid, old):
+    """Whether a process recorded beside PID, other than PID, still runs."""
+    members = [(child, start) for child, start in old if child != pid]
+    if not members:
+        return False
+    table = proc_table(os.getpid())
+    if table is None:
+        table = ps_table()
+    if table is None:
+        return True  # An unreadable table is unknown, not a death verdict.
+    return any(child in table and table[child][2] == start for child, start in members)
+
+
+def observer_clock():
+    # Records cross interpreter processes. On macOS Python < 3.10 monotonic()
+    # has a process-local epoch; CLOCK_UPTIME_RAW shares the kernel's clock and,
+    # like monotonic() elsewhere, does not count system sleep as inactivity.
+    if sys.platform == 'darwin':
+        return 'uptime_raw', time.clock_gettime(time.CLOCK_UPTIME_RAW)
+    return 'monotonic', time.monotonic()
+
+
+def progress_check(path, pid, inactivity, paths, while_alive=False):
+    """124 only after repeated valid samples prove no CPU or file progress.
+
+    The saved process start identity fences PID reuse. A first/failed sample,
+    corrupt record, missing process, or clock reset never authorizes a signal.
+    Callers own their lock and must recheck its identity before acting.
+    Persisted times use a cross-process kernel clock that excludes system
+    sleep; records from another clock domain start a fresh window.
+    PID 0 observes files only. The opt-in while_alive mode returns 3 for a
+    proven dead/zombie/reused peer once the descendants recorded with it are
+    gone too, independently of the inactivity verdict, and counts only
+    watched-file changes as progress.
+    """
+    observed = {}
+    identity = ()
+    runnable = False
+    previous, old = None, {}
+    with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+        candidate = json.loads(path.read_text())
+        if (candidate['pid'] == pid and 0 <= candidate['since'] <= candidate['sampled']
+                and isinstance(candidate['identity'], list) and isinstance(candidate['files'], list)):
+            old = {(child, tuple(start)): value for child, start, value in candidate['cpu']}
+            previous = candidate
+    gone = False
+    if while_alive:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            gone = True
+        except PermissionError:
+            pass  # An unreadable peer is unknown, not dead.
+    if while_alive and not gone:
+        # kill(0) alone accepts zombies. Prefer the native stat where available;
+        # confined Darwin workers use the existing process-info fallback.
+        try:
+            stat_line = (Path(os.environ.get('FM_PROC_ROOT_OVERRIDE') or '/proc') / str(pid) / 'stat').read_text()
+            state = stat_line[stat_line.rindex(')') + 1:].split()[0]
+        except (OSError, ValueError, IndexError):
+            try:
+                result, native = proc_read(['ps', '-o', 'stat=', '-p', str(pid)], ['table', 'pid,stat'])
+                state = result.stdout.strip() if native else next(
+                    (line.split()[1] for line in result.stdout.splitlines()
+                     if len(line.split()) == 2 and line.split()[0] == str(pid)), '')
+            except OSError:
+                state = ''  # Unavailable state is unknown, not a death verdict.
+        gone = state.startswith(('Z', 'X'))
+    if pid and not gone:
+        cpu, runnable = tree_cpu(pid, observed)
+        if cpu is None:
+            warn_blind_telemetry()
+            return 0
+        if not any(child == pid for child, _ in observed):
+            return 0
+        identity = next(identity for (child, identity) in observed if child == pid)
+        gone = (while_alive and previous is not None and previous['identity'] != list(identity)
+                and (pid, tuple(previous['identity'])) in old)  # A reused PID is not the peer's successor.
+    if gone:
+        if previous is None or not descendants_alive(pid, old):
+            return 3
+        identity, observed = tuple(previous['identity']), dict(old)
+    files = []
+    for name in paths:
+        try:
+            info = os.stat(name)
+            files.append([name, info.st_ino, info.st_size, info.st_mtime_ns])
+        except FileNotFoundError:
+            files.append([name, None])
+        except OSError:
+            return 0
+    clock, now = observer_clock()
+    record = dict(pid=pid, identity=list(identity), files=files,
+                  cpu=[[child, list(start), value] for (child, start), value in observed.items()],
+                  clock=clock, since=now, sampled=now)
+    if (previous is not None and previous.get('clock') == clock
+            and previous['sampled'] <= now and previous['identity'] == list(identity)):
+        advancing = files != previous['files'] or not while_alive and (
+            runnable or any(value > old.get(key, -1) for key, value in observed.items()))
+        if not advancing:
+            record['since'] = previous['since']
+    temporary = path.with_name(path.name + '.' + str(os.getpid()))
+    try:
+        temporary.write_text(json.dumps(record))
+        os.replace(temporary, path)
+    except OSError:
+        return 0  # Unpublishable evidence is not permission to stop work.
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+    if now - record['since'] >= inactivity:
+        scalar('no_progress', f'pid={pid} no CPU or watched-file progress for {now - record["since"]:.1f}s', sys.stderr)
+        return 124
+    return 0
 
 
 def signal_group(child, sig):
@@ -555,7 +874,7 @@ def signal_group(child, sig):
         # zombie or is exiting (flag E); neither can run again.
         if child.poll() is None:
             raise
-        inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
+        inventory, _ = proc_read(['ps', '-axo', 'pgid=,stat='], ['table', 'pgid,stat'])
         if inventory.returncode:
             raise
         for line in inventory.stdout.splitlines():
@@ -653,8 +972,7 @@ def slot_holders(directory, limit):
 def holder_is_stale(pid, since):
     """True when PID is gone, or started after the epoch SINCE and so cannot be the process that took the slot."""
     try:
-        result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
-                                env=dict(os.environ, LC_ALL='C'))
+        result, _ = proc_read(['ps', '-o', 'lstart=', '-p', str(pid)], ['lstart', str(pid)], env=dict(os.environ, LC_ALL='C'))
     except OSError:
         return False
     if result.returncode != 0 or not result.stdout.strip():
@@ -751,8 +1069,20 @@ def release_slot(fd):
         os.close(fd)
 
 
-def gate(key, command, log_fd, wait_file=None):
-    """Run COMMAND while holding one of KEY's slots; exit with its status."""
+def gate(key, command, log_fd, wait_file=None, cpu_file=None):
+    """Run COMMAND while holding one of KEY's slots; exit with its status.
+
+    With cpu_file, write the command tree's CPU milliseconds there after it
+    exits. The sample is the same process-tree accounting the progress runner
+    uses, taken once from this wrapper, so it includes descendants that were
+    already reaped into this process's waited-child time. A killed or orphaned
+    subtree is not counted, because nothing waits for it back up to this
+    wrapper, and work COMMAND leaves running past the sample is not counted
+    either. It is measurement
+    evidence, not a busy-versus-idle verdict: a wrapper waiting on a lock while
+    its command waits on I/O occupies no CPU either way. A cpu_file that cannot
+    be written never changes COMMAND's exit status.
+    """
     kept = ()
     if log_fd > 2:
         try:
@@ -793,6 +1123,13 @@ def gate(key, command, log_fd, wait_file=None):
             slot_log(log_fd, f'command not executable: {command[0]}')
             return 126
         code = child.wait()
+        if cpu_file:
+            try:
+                cpu, _ = tree_cpu(os.getpid(), {})
+                Path(cpu_file).write_text(('' if cpu is None else f'{round(cpu * 1000)}') + '\n',
+                                          encoding='utf-8')
+            except OSError as error:
+                slot_log(log_fd, f'cannot report the command CPU to {cpu_file}: {error}')
         return 128 - code if code < 0 else code
     finally:
         for sig, handler in ignored.items():
@@ -800,20 +1137,24 @@ def gate(key, command, log_fd, wait_file=None):
         release_slot(fd)
 
 
-def run(key, command, calibration_file):
+def run(key, command, calibration_file, *, inactivity=None):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
-    try:
-        advisory = limit(key, 99, 3, 0)
-    except (OSError, ValueError) as error:
-        scalar('calibration_error', f'{error}; running {key} with no measured advisory', sys.stderr)
-        advisory = 0
-    no_progress = positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT)
-    absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT)
+    advisory = 0
+    if inactivity is None:
+        try:
+            advisory = limit(key, 99, 3, 0)
+        except (OSError, ValueError) as error:
+            scalar('calibration_error', f'{error}; running {key} with no measured advisory', sys.stderr)
+    no_progress = positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT) if inactivity is None else inactivity
+    # Operational reads have no wall-clock cutoff: this mode owns only a
+    # no-output/no-CPU bound, to recover a genuinely stalled command.
+    absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT) if inactivity is None else math.inf
     started = time.monotonic()
     load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key)
+    owner = os.getppid()
     if calibration_file is not None:
         child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
     child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -852,24 +1193,31 @@ def run(key, command, calibration_file):
     next_progress_report = started
     slower_reported = False
     killed = False
+    blind = warned_blind = False
+    cadence = min(1, no_progress / 4)
     try:
         while child.poll() is None:
             if not streams.get_map():
                 with contextlib.suppress(subprocess.TimeoutExpired):
-                    child.wait(1)  # observation cadence, not a deadline
-            for ready, _ in streams.select(1) if streams.get_map() else ():
+                    child.wait(cadence)  # observation cadence, not a deadline
+            for ready, _ in streams.select(cadence) if streams.get_map() else ():
                 if not relay(ready.fileobj, ready.data, 65536):
                     streams.unregister(ready.fileobj)
             elapsed = time.monotonic() - started
             cpu = max(0, previous_cpu)
+            runnable = False
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
-                sample = tree_cpu(child.pid, observed_cpu)
+                sample, runnable = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
-                next_cpu_sample = time.monotonic() + 1  # observation cadence, not a deadline
+                blind = sample is None  # Missing evidence cannot prove a stall.
+                if blind and not warned_blind:
+                    warned_blind = True
+                    warn_blind_telemetry()
+                next_cpu_sample = time.monotonic() + cadence  # Observation, not a deadline.
             now = time.monotonic()
-            if cpu > previous_cpu or output_bytes > previous_bytes:
+            if runnable or cpu > previous_cpu or output_bytes > previous_bytes:
                 last_progress = now
-                if now >= next_progress_report:
+                if now >= next_progress_report and inactivity is None:
                     scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
                     next_progress_report = now + PROGRESS_REPORT_AFTER
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
@@ -879,11 +1227,14 @@ def run(key, command, calibration_file):
                     signal_group(child, signal.SIGKILL)  # the cleanup stalled or outlived the absolute limit
             elif child.poll() is None:
                 idle = now - last_progress
-                if now - started >= absolute:
+                if inactivity is not None and os.getppid() != owner:
+                    interrupted.append(signal.SIGTERM)
+                    begin_stop()
+                elif now - started >= absolute:
                     expired = True
                     scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping', sys.stderr)
                     begin_stop()
-                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX):
+                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX) and not blind:
                     expired = True
                     scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
                     begin_stop()
@@ -907,6 +1258,8 @@ def run(key, command, calibration_file):
             code = 128 - code
         if interrupted:
             code = 128 + interrupted[-1]
+        if inactivity is not None:
+            return code  # Read-only operational mode never writes timing/backlog records.
         duration_ms = round((time.monotonic() - started) * 1000)
         calibration = calibration_file is None or not calibration_file.exists() or calibration_file.read_text().strip() == '1'
         timed_out = expired and not interrupted
@@ -1085,8 +1438,18 @@ def main():
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
+    progress = commands.add_parser('keep-going')
+    progress.add_argument('inactivity', type=float)
+    progress.add_argument('command', nargs=argparse.REMAINDER)
+    observer = commands.add_parser('progress-check')
+    observer.add_argument('record', type=Path)
+    observer.add_argument('pid', type=int)
+    observer.add_argument('inactivity', type=lambda value: float(
+        positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT) if value == 'default' else value))
+    observer.add_argument('paths', nargs='*')
+    observer.add_argument('--while-alive', action='store_true')
     gater = commands.add_parser('gate')
-    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -1114,6 +1477,17 @@ def main():
         import_nm(args.database, args.run_id)
     elif args.action == 'check-literals':
         return check_literals(args.base, args.report)
+    elif args.action in ('keep-going', 'progress-check'):
+        if not math.isfinite(args.inactivity) or args.inactivity <= 0:
+            parser.error('inactivity must be finite and positive')
+        if args.action == 'progress-check':
+            if args.pid < 0 or (args.pid == 0 and (args.while_alive or not args.paths)):
+                parser.error('progress-check needs a positive PID, or PID 0 with watched files only')
+            return progress_check(args.record, args.pid, args.inactivity, args.paths, args.while_alive)
+        command = args.command[1:] if args.command[:1] == ['--'] else args.command
+        if not command:
+            parser.error('keep-going requires -- COMMAND')
+        return run('operational-read', command, None, inactivity=args.inactivity)
     elif args.action == 'run':
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
@@ -1134,13 +1508,13 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('gate requires -- COMMAND')
-        return gate(args.key, command, args.log_fd, args.wait_file)
+        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file)
     return 0
 
 
 if __name__ == '__main__':
     try:
         sys.exit(main())
-    except (OSError, ValueError, RuntimeError, sqlite3.Error, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, RuntimeError, ImportError, subprocess.CalledProcessError) as error:
         scalar('error', str(error))
         sys.exit(1)

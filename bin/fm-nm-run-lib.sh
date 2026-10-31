@@ -18,7 +18,11 @@
 #
 # Bounded call to an arbitrary command in dir $1, timeout $2 seconds, and its
 # `no-mistakes "$@"` specialization. The bounded
-# form preserves stdout, stderr, and exit status; the checked form discards
+# form preserves stdout, stderr, and exit status. FM_NM_READ_PROGRESS=1 selects
+# fm_run_progress for read-only crew-state consumers; mutation/abort callers keep
+# their explicit hard-bound contract. Once such a consumer sets
+# FM_NM_READ_STALLED=1 after a read stopped for no progress, its later progress
+# reads return 124 without running. The checked form discards
 # command stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
 # Successful explicit --run queries import completed step durations through
 # fm-duration.py, whose header owns idempotence and historical-load handling;
@@ -32,6 +36,12 @@ fi
 fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   local dir=$1 timeout_secs=$2 have_timeout=none
   shift 2
+  if [ "${FM_NM_READ_PROGRESS:-0}" = 1 ]; then
+    [ "${FM_NM_READ_STALLED:-0}" != 1 ] || return 124
+    fm_posix_python || true
+    ( cd "$dir" && fm_run_progress "$timeout_secs" "$@" )
+    return $?
+  fi
   if command -v timeout >/dev/null 2>&1; then have_timeout=timeout
   elif command -v gtimeout >/dev/null 2>&1; then have_timeout=gtimeout
   elif command -v perl >/dev/null 2>&1; then have_timeout=perl
@@ -207,8 +217,10 @@ fm_nm_run_status_class() {  # <status_word>
 # The recorded spelling is matched exactly, so an overview without exactly one
 # absolute `repo:` line, or with one the inventory does not record, reads as
 # unreadable rather than guessed among candidates.
-# The reader subprocess is bounded by $4 seconds (default 10), so a contended
-# database can never outlast the caller's per-read budget.
+# The reader subprocess is a read-only query, so it is stopped by silence only: $4
+# seconds (default fm_progress_quiet_secs) without output or process-tree CPU
+# progress, never by how long a loaded host takes. A reader that goes silent is
+# unknown, exactly like one that cannot open the database.
 # If that reader or inventory is unavailable, report unknown with available
 # candidate ids rather than treating the displayed window as complete.
 # Structural completeness applies to the whole table; semantic validation
@@ -230,9 +242,9 @@ fm_nm_run_status_class() {  # <status_word>
 # same-branch candidate id. An unavailable reader still prints its unknown
 # verdict and returns the reader's own exit status, 124 when its bound cut it.
 fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
-  local selection inventory available_ids timeout_secs=${4:-10}
+  local selection inventory available_ids timeout_secs=${4:-}
   local reader_rc=0
-  case "$timeout_secs" in ''|*[!0-9]*) timeout_secs=10 ;; esac
+  case "$timeout_secs" in ''|*[!0-9]*) timeout_secs=$(fm_progress_quiet_secs) ;; esac
   selection=$(printf '%s\n' "$2" | awk -v branch="$1" '
     function scalar(s) {
       sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s)
@@ -306,7 +318,7 @@ fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
     incomplete\|*) available_ids=${selection#*|} ;;
     *) printf '%s\n' "$selection"; return ;;
   esac
-  inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
+  inventory=$(FM_NM_READ_PROGRESS=1 fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
 import json
 import os
 import re
@@ -324,6 +336,8 @@ try:
     repo_path = json.loads(repos[0]) if repos[0].startswith('"') else repos[0]
     if not isinstance(repo_path, str) or not os.path.isabs(repo_path):
         raise ValueError
+    # The 30 s is SQLite's busy wait for a writer's lock, the one wait this reader
+    # cannot watch; running out raises sqlite3.Error, answered below as unknown.
     with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
         db.execute("BEGIN")
         repo = db.execute("SELECT id FROM repos WHERE working_path = ?", (repo_path,)).fetchall()
@@ -402,12 +416,12 @@ fm_nm_branch_sync_state() {  # <toon-output>
 # Indentation bounds each block, so a same-named key in a sibling sub-block
 # (every sub-block of branch_sync carries its own `head`-like keys) is never
 # read in its place.
-fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
+fm_nm_nested_in_block() {  # <toon-output> <parent-block> <sub-block> <key>
   local s
-  s=$(printf '%s\n' "$1" | awk -v sub_block="$2" -v key="$3" '
+  s=$(printf '%s\n' "$1" | awk -v parent="$2" -v sub_block="$3" -v key="$4" '
     function indent(line) { match(line, /[^ ]/); return RSTART - 1 }
-    /^[^[:space:]]/ { in_sync = ($0 ~ /^branch_sync:[[:space:]]*$/); in_sub = 0; next }
-    !in_sync { next }
+    /^[^[:space:]]/ { in_parent = ($0 ~ ("^" parent ":[[:space:]]*$")); in_sub = 0; next }
+    !in_parent { next }
     {
       ind = indent($0)
       if (in_sub && ind <= sub_ind) in_sub = 0
@@ -419,6 +433,124 @@ fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
       }
     }')
   fm_nm_strip_quotes "$s"
+}
+
+fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
+  fm_nm_nested_in_block "$1" branch_sync "$2" "$3"
+}
+
+# sha256 of regular file $1, with the same tool preference as the rest of the
+# fleet: shasum when present, else sha256sum.
+fm_nm_sha256_file() {  # <file>
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" 2>/dev/null | awk '{print $1}'
+  else
+    return 1
+  fi
+}
+
+# Print why a terminal passing run's revision-bound verification-plan evidence
+# is unusable and return 0; return 1 when the evidence is present and matches
+# the run's captured snapshot.
+#
+# The supported source is the `verification_plan` block that `no-mistakes axi
+# status` renders for a run: path, sha256, source_path, and captured_at. That
+# snapshot is immutable for the run and was captured before any branch
+# mutation. Re-hashing the file proves the bytes at that path are still the
+# captured bytes. The run head must be the validated revision of this copy's
+# work: it is the task's recorded forge pr_head, or it attributes to this copy
+# by fm_nm_head_matches_worktree (HEAD equals the run head or is an ancestor of
+# it, as when a fix round commits past the worker copy), or its tree is HEAD's
+# tree (a Gerrit copy whose recovered fixes were restamped on publish). This
+# proves review accounting inputs, never that an item was semantically graded
+# or passed.
+fm_nm_evidence_problem() {  # <worktree> <toon-output> [expected-source-path] [recorded-pr-head]
+  local wt=$1 out=$2 expected_source=${3:-} recorded_head=${4:-} path sha source expected_sha captured run_head head_tree run_tree actual now
+  path=$(fm_nm_nested_in_block "$out" run verification_plan path)
+  sha=$(fm_nm_nested_in_block "$out" run verification_plan sha256)
+  source=$(fm_nm_nested_in_block "$out" run verification_plan source_path)
+  captured=$(fm_nm_nested_in_block "$out" run verification_plan captured_at)
+  if [ -z "$path" ]; then
+    printf '%s\n' "the run exposes no verification-plan snapshot, so its review coverage cannot be accounted for"
+    return 0
+  fi
+  case "$path" in
+    /*) ;;
+    *)
+      printf '%s\n' "the run's verification-plan path is not absolute: $path"
+      return 0 ;;
+  esac
+  [ -f "$path" ] && [ -r "$path" ] || {
+    printf '%s\n' "the run's verification-plan snapshot is not a readable file: $path"
+    return 0
+  }
+  [ ! -L "$path" ] || {
+    printf '%s\n' "the run's verification-plan snapshot is a symbolic link: $path"
+    return 0
+  }
+  [ -n "$source" ] || {
+    printf '%s\n' "the run's verification-plan snapshot names no source path"
+    return 0
+  }
+  if [ -n "$expected_source" ]; then
+    [ "$source" = "$expected_source" ] || {
+      printf '%s\n' "the run's verification-plan snapshot source $source is not this task's plan $expected_source"
+      return 0
+    }
+    [ -f "$expected_source" ] && [ -r "$expected_source" ] || {
+      printf '%s\n' "this task's verification-plan source is not a readable file: $expected_source"
+      return 0
+    }
+    [ ! -L "$expected_source" ] || {
+      printf '%s\n' "this task's verification-plan source is a symbolic link: $expected_source"
+      return 0
+    }
+    expected_sha=$(fm_nm_sha256_file "$expected_source") || {
+      printf '%s\n' "this task's verification-plan source could not be hashed: $expected_source"
+      return 0
+    }
+    [ "$expected_sha" = "$sha" ] || {
+      printf '%s\n' "this task's verification-plan source bytes do not match the run's captured snapshot: $expected_source"
+      return 0
+    }
+  fi
+  case "$sha" in
+    ''|*[!0-9a-fA-F]*)
+      printf '%s\n' "the run's verification-plan snapshot carries no valid sha256"
+      return 0 ;;
+  esac
+  actual=$(fm_nm_sha256_file "$path") || {
+    printf '%s\n' "the run's verification-plan snapshot could not be hashed: $path"
+    return 0
+  }
+  [ "$actual" = "$sha" ] || {
+    printf '%s\n' "the run's verification-plan snapshot hash does not match the file: $path"
+    return 0
+  }
+  case "$captured" in
+    ''|*[!0-9]*)
+      printf '%s\n' "the run's verification-plan snapshot carries no captured_at timestamp"
+      return 0 ;;
+  esac
+  now=$(date +%s)
+  [ "$captured" -le "$((now + 300))" ] || {
+    printf '%s\n' "the run's verification-plan snapshot captured_at is in the future"
+    return 0
+  }
+  run_head=$(fm_nm_strip_quotes "$(fm_nm_field "$out" head_sha)")
+  [[ $run_head =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || {
+    printf '%s\n' "the run exposes no full head sha to bind its verification-plan evidence"
+    return 0
+  }
+  [ "$run_head" != "$recorded_head" ] || return 1
+  fm_nm_head_matches_worktree "$wt" "$run_head" && return 1
+  head_tree=$(git -C "$wt" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null) || head_tree=
+  run_tree=$(git -C "$wt" rev-parse --verify --quiet "$run_head^{tree}" 2>/dev/null) || run_tree=
+  [ -z "$head_tree" ] || [ "$head_tree" != "$run_tree" ] || return 1
+  printf '%s\n' "the run head $run_head is not this task's recorded PR head and does not attribute to this copy's HEAD, so the run evidence does not describe the completed work"
+  return 0
 }
 
 # 0 if the run in captured `axi status` TOON $1 is still in flight: no
@@ -480,10 +612,13 @@ fm_nm_run_is_parked() {  # <toon-output>
 # 0 if the run in captured `axi status` TOON $1 is EXECUTING: in flight and
 # actively working (pending, running, fixing, or ci), not parked at a gate.
 # Read-only current-state reporting (fm-crew-state.sh) treats an executing run
-# on the task's own branch as authoritative REGARDLESS of head: the pipeline
-# rebases the branch and commits fix rounds in its own checkout, so a live run's
-# head routinely differs from the task worktree's local head, and falling back
-# to an older run that matches the local head reads a working crew as failed.
+# on the task's own branch as authoritative REGARDLESS of head: the rebase step
+# integrates newer main into the branch, by merge where `rebase: strategy: merge`
+# is set and otherwise by rewriting the submitted commits, CI merge-conflict
+# repair can still rewrite its history, and fix rounds commit in the pipeline's
+# own checkout, so a live run's head routinely differs from the task worktree's
+# local head, and falling back to an older run that matches the local head reads
+# a working crew as failed.
 # A run parked at a gate keeps the strict head rule, and no destructive caller
 # uses this predicate: teardown stays on fm_nm_head_matches_worktree and the
 # ledger rule below.

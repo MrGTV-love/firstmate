@@ -24,6 +24,12 @@
 #     open;
 #   - the durable captain-hold `open` predicate confirms no open captain call
 #     (an open call or an inconclusive read is parked, not reaped);
+#   - no open captain hold in this home, or in any local home above a
+#     secondmate home, declares the task's project frozen
+#     (`fm-captain-hold.sh frozen`, asked last, once every other gate here
+#     passes; a freeze or an inconclusive read is parked with its reason, never
+#     offered to teardown, and needs no refusal memo because the next sweep
+#     after the hold is answered finds it eligible);
 #   - landing evidence exists locally, without any forge call: a scout needs a
 #     nonempty regular data/<id>/report.md, and a ship needs the merge poll's
 #     state/<id>.pr-poll-merge-notified marker for the PR recorded in its meta;
@@ -62,9 +68,9 @@
 # the same measured stall bound as every other waiter. A stalled wait exits
 # FM_PROJECT_LOCK_BUSY_EXIT with that durable record kept, reported by the
 # open-work ledger, and the next sweep selects the task by that record and
-# retries it. So does a teardown that outlasts the 600-second limit below
+# retries it. So does a teardown that goes silent for the stall interval below
 # while that record still stands: the wait has no total bound of its own, the
-# limit is what ends it, and the timeout records no refusal memo for it.
+# stall interval is what ends it, and the stop records no refusal memo for it.
 # A lock error is recorded as a refusal (bin/fm-teardown.sh's header owns the
 # mechanics).
 #
@@ -76,7 +82,12 @@
 # state/idle-sessions.report so the parked sessions and their pause reasons
 # can be read without rerunning the scan.
 #
-# At most 3 teardowns start per `reap` run, each bounded by 600 seconds.
+# At most 3 teardowns start per `reap` run. A teardown is stopped only when it
+# prints nothing and its process tree burns no CPU for FM_IDLE_REAP_TEARDOWN_STALL_SECS
+# (default: the repo-wide quiet interval of fm_progress_quiet_secs), never for taking
+# long: a teardown that waits its turn in the project-lock queue or returns a pool slot
+# on a loaded host has run for hours (bin/fm-duration.py recorded 6884 s), and a
+# wall-clock cap would kill that healthy work and park its task behind a refusal memo.
 # A home-local single-flight lock keeps overlapping sweeps from queuing.
 # bin/fm-watch.sh starts `reap` detached; docs/configuration.md owns the
 # FM_IDLE_REAP_INTERVAL setting and deadline behavior.
@@ -105,6 +116,8 @@ LOCK="$STATE/.idle-reap.lock"
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 
 TEARDOWN_BIN="${FM_IDLE_REAP_TEARDOWN_BIN:-$SCRIPT_DIR/fm-teardown.sh}"
+TEARDOWN_STALL_SECS=${FM_IDLE_REAP_TEARDOWN_STALL_SECS:-}
+case "$TEARDOWN_STALL_SECS" in ''|*[!0-9]*|0*) TEARDOWN_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
 
 usage() {
   sed -n '2,/^set -u$/s/^# \{0,1\}//p' "$0" | sed '$d'
@@ -235,7 +248,7 @@ reap_one() {  # <task-id> <status-line>
   local id=$1 last=$2 out rc=0 reason
   replace_reap_row "$id"
   out=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 \
-    fm_run_timed 600 "$TEARDOWN_BIN" "$id" </dev/null 2>&1) || rc=$?
+    fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$id" </dev/null 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f -- "$REAP_DIR/$id.refused"
     add_row reaped "$id" - - "teardown completed"
@@ -246,7 +259,7 @@ reap_one() {  # <task-id> <status-line>
     return 0
   fi
   if [ "$rc" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
-    add_row lock-skipped "$id" - - "another operation holds or is queued for the task's project lock"
+    add_row lock-skipped "$id" - - "teardown asked to be retried: another operation holds or is queued for the task's project lock, or a no-mistakes read it needs went silent"
     return 0
   fi
   # The first line that names a refusal is the reason; fall back to the last
@@ -256,10 +269,10 @@ reap_one() {  # <task-id> <status-line>
   [ -n "$reason" ] || reason="exit status $rc"
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     if fm_teardown_return_pending "$STATE" "$id"; then
-      add_row teardown-timeout "$id" - - "teardown exceeded 600s; its pool slot return is pending and the next sweep retries it"
+      add_row teardown-timeout "$id" - - "teardown made no output or CPU progress for ${TEARDOWN_STALL_SECS}s; its pool slot return is pending and the next sweep retries it"
       return 0
     fi
-    add_row teardown-timeout "$id" - - "teardown exceeded 600s"
+    add_row teardown-timeout "$id" - - "teardown made no output or CPU progress for ${TEARDOWN_STALL_SECS}s"
   else
     add_row teardown-refused "$id" - - "$reason"
   fi

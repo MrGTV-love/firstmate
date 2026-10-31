@@ -52,6 +52,10 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# A Claude worker launch unsets HERDR_ENV while preserving runtime-only
+# detection. Fixtures set this marker explicitly when exercising that boundary.
+unset FM_HERDR_RUNTIME
+
 # Model freshness (bin/fm-model-freshness.sh) reads each harness's live catalog,
 # which would run the developer's real claude, omp and agy from every spawn and
 # bootstrap case. The suite turns it off; tests/fm-model-freshness.test.sh turns
@@ -74,12 +78,23 @@ unset FM_DURATION_HOME
 # into the next scenario that reuses the same task id and state directory. The
 # suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
 export FM_CREW_STATE_NM_CACHE=off
+# A snapshot caller may carry paths for one captured task. Fixtures must resolve
+# their own task metadata/status instead of inheriting that unrelated capture.
+unset FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE
+
+# bin/fm-merge-prune.sh arms and starts a pool-copy prune after every verified
+# merge, which would run the real teardown against a fixture home. The suite
+# arms nothing by default; tests/fm-merge-prune.test.sh turns it on against a
+# fake pool and a fake treehouse.
+export FM_MERGE_PRUNE=0
 
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
-unset FM_TASK_ID
+# under the marker; the omp primary extensions it loads as a home also skip
+# their home setup under it (.omp/extensions/lib/fm-task-worker.ts). A case that
+# verifies either behavior sets FM_TASK_ID itself.
+unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
 # marker an adviser-enabled worker carries, so they can neither force a
@@ -96,6 +111,28 @@ unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
 # explicit --file, or bin/fm-tasks-axi.sh; a case that verifies the wrapper
 # against an ambient override sets TASKS_AXI_FILE itself.
 unset TASKS_AXI_FILE TASKS_AXI_BACKEND
+
+# Clear the arm's confirmation override an operator shell may export. It sets
+# the arm's post-cycle successor window and startup no-progress interval and the
+# Claude Stop hook's successor notice window, so an inherited value (60 on one
+# operator host) silently stretches every arm fixture past its assertion
+# deadline. A case that verifies the override sets it itself.
+unset FM_ARM_CONFIRM_TIMEOUT
+
+# Clear the operator's no-mistakes home. An inherited NM_HOME outranks a
+# fixture's HOME, so author-evidence cases would read the operator's live
+# pipeline database instead of their own. A case that needs one sets it itself.
+unset NM_HOME
+
+# fm_test_empty_pipeline_db <nm-home>: an existing, readable no-mistakes home
+# whose pipeline database records no run. Author evidence treats a missing
+# database as unknown for a no-mistakes task, so merge fixtures point NM_HOME
+# (or HOME/.no-mistakes) here rather than at whatever the host happens to hold.
+fm_test_empty_pipeline_db() {  # <nm-home>
+  mkdir -p "$1"
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$1/state.sqlite"
+}
 
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
@@ -117,6 +154,7 @@ TOML
 # test files, not by this library, so it reads as "unused" here.
 # shellcheck disable=SC2034
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export FM_GUARD_AUDIT_READER="$ROOT/bin/fm-jev-audit-read.mjs"
 
 # --- reporters --------------------------------------------------------------
 
@@ -127,6 +165,111 @@ fail() {
 
 pass() {
   printf 'ok - %s\n' "$1"
+}
+
+# --- single-case selection --------------------------------------------------
+#
+# Every test file that can run one named case goes through this section, so one
+# rule decides which names are cases and what the file's exit status is. A bare
+# `"$FM_TEST_ONLY"; exit 0` ran an unknown name as a command, printed "command
+# not found", and exited 0, and it exited 0 for a case that returned nonzero, so
+# a renamed case left CI's stock-Bash lane green with nothing tested.
+#
+# fm_test_run_cases [registered-case...] -- [requested-case...]
+#   Refuses an unknown requested name before running anything: "Unknown test
+#   case: <name>" on stderr, exit 2. With registered cases, a requested name must
+#   be one of them and the requested cases run in registration order, or every
+#   registered case runs when none is requested. Without them, a requested name
+#   must be a defined test_ function and runs in the order given. The first case
+#   to return nonzero ends the file with that status, and a case that turns
+#   errexit (set -e) on or off fails the file, so a case sees the same errexit
+#   state in a full run as when it runs alone. A file that must prepare
+#   state at a particular point in its registry defines fm_test_before_case,
+#   which receives each registered case name in order, selected or not, so a
+#   selected case runs in the same shell state as in the full run.
+# fm_test_only [short-name=test_function...]
+#   For a file that selects one case by FM_TEST_ONLY: does nothing when the
+#   variable is empty, otherwise runs that case, or the case a given short name
+#   stands for, and exits with its status. No other file reads FM_TEST_ONLY.
+# fm_test_case_known <name> [registered-case...]
+#   The membership test both use.
+
+fm_test_case_known() {
+  local name=$1 registered
+  shift
+  if [ "$#" -gt 0 ]; then
+    for registered in "$@"; do
+      if [ "$name" = "$registered" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
+  case "$name" in
+    test_*[!A-Za-z0-9_]*) return 1 ;;
+    test_?*) declare -F "$name" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+fm_test_run_one() {
+  local rc errexit=${-//[!e]/}
+  "$1"
+  rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  [ "${-//[!e]/}" = "$errexit" ] || fail "$1 changed errexit (set -e); a case must leave it as it found it"
+}
+
+fm_test_run_cases() {
+  local -a registered=()
+  local name case_name selected
+  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+    registered+=("$1")
+    shift
+  done
+  [ "$#" -gt 0 ] || fail "fm_test_run_cases: put -- between the registered cases and the requested ones"
+  shift
+
+  for name in "$@"; do
+    if [ "${#registered[@]}" -gt 0 ]; then
+      if fm_test_case_known "$name" "${registered[@]}"; then continue; fi
+    elif fm_test_case_known "$name"; then
+      continue
+    fi
+    printf 'Unknown test case: %s (not defined by %s)\n' "$name" "$(basename "$0")" >&2
+    exit 2
+  done
+
+  if [ "${#registered[@]}" -eq 0 ]; then
+    for case_name in "$@"; do
+      fm_test_run_one "$case_name"
+    done
+    return 0
+  fi
+
+  for case_name in "${registered[@]}"; do
+    if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$case_name"; fi
+    if [ "$#" -gt 0 ]; then
+      selected=false
+      for name in "$@"; do
+        if [ "$name" = "$case_name" ]; then selected=true; fi
+      done
+      [ "$selected" = true ] || continue
+    fi
+    fm_test_run_one "$case_name"
+  done
+  return 0
+}
+
+# shellcheck disable=SC2120 # Most callers pass no short names.
+fm_test_only() {
+  local requested=${FM_TEST_ONLY:-} short_name
+  [ -n "$requested" ] || return 0
+  for short_name in "$@"; do
+    if [ "${short_name%%=*}" = "$requested" ]; then requested=${short_name#*=}; fi
+  done
+  fm_test_run_cases -- "$requested"
+  exit 0
 }
 
 # --- self-cleaning temp root ------------------------------------------------
@@ -180,19 +323,35 @@ fm_test_tmpdir() {
 
 FM_TEST_TMPDIR=$(fm_test_tmpdir) || return 1
 
-FM_TEST_CLEANUP_DIRS=()
-FM_TEST_CLEANUP_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-cleanup.$$.XXXXXX") || return 1
-
+# One record directory per sourcing shell holds everything the shell owns that
+# a hard kill could strand: its cleanup, process-event, watcher and process
+# registries, the shared fixture words file, the slot gate and the claim root.
+# The record carries the .fm-test-fixture marker written below, so a shell that
+# is killed leaves exactly one marked entry, kept where the sweep reads it
+# without enumerating the rest of the shared temp dir (fm_test_reap_orphans).
+FM_TEST_OWNERS_DIR="$FM_TEST_TMPDIR/fm-test-owners"
+(umask 077; mkdir -p "$FM_TEST_OWNERS_DIR") || return 1
+if [ ! -d "$FM_TEST_OWNERS_DIR" ] || [ -L "$FM_TEST_OWNERS_DIR" ] || [ ! -O "$FM_TEST_OWNERS_DIR" ]; then
+  printf 'tests/lib.sh: %s is not a directory this user owns\n' "$FM_TEST_OWNERS_DIR" >&2
+  return 1
+fi
 fm_test_pid_identity() {
   local pid=$1
   FM_STATE_OVERRIDE="$FM_TEST_TMPDIR" bash -c \
     '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$pid"
 }
 
-FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
-  rm -f "$FM_TEST_CLEANUP_REGISTRY"
+FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || return 1
+FM_TEST_SHELL_DIR=$(umask 077; mktemp -d "$FM_TEST_OWNERS_DIR/$$.XXXXXX") || return 1
+printf '%s\n%s\n' "$$" "$FM_TEST_OWNER_IDENTITY" > "$FM_TEST_SHELL_DIR/.fm-test-fixture" || {
+  rm -rf "$FM_TEST_SHELL_DIR"
   return 1
 }
+FM_TEST_SHELL_DIR=$(cd -P -- "$FM_TEST_SHELL_DIR" && pwd -P) || return 1
+
+FM_TEST_CLEANUP_DIRS=()
+FM_TEST_CLEANUP_REGISTRY="$FM_TEST_SHELL_DIR/cleanup"
+: > "$FM_TEST_CLEANUP_REGISTRY" || return 1
 
 # --- process-event runner reaping -------------------------------------------
 #
@@ -208,7 +367,8 @@ FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
 # private one). It never matches on a script or process name, which would reach
 # into another home's live runners.
 
-FM_TEST_PROCEVENT_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-procevent.$$.XXXXXX") || return 1
+FM_TEST_PROCEVENT_REGISTRY="$FM_TEST_SHELL_DIR/procevent"
+: > "$FM_TEST_PROCEVENT_REGISTRY" || return 1
 
 fm_test_track_procevent_home() {  # <home> [claim-root]
   [ -n "${1:-}" ] || return 1
@@ -247,7 +407,8 @@ fm_test_reap_procevent_homes() {
 # deleted has no lock and is skipped; that watcher exits on its own home-gone
 # check within one poll.
 
-FM_TEST_WATCHER_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-watcher.$$.XXXXXX") || return 1
+FM_TEST_WATCHER_REGISTRY="$FM_TEST_SHELL_DIR/watcher"
+: > "$FM_TEST_WATCHER_REGISTRY" || return 1
 
 fm_test_track_watcher_state() {  # <state-dir>
   [ -n "${1:-}" ] || return 1
@@ -294,7 +455,8 @@ fm_test_reap_watchers() {
 # Reaping requires that birth identity and the registered command needle to
 # match, so a reused PID cannot authorize killing an unrelated process.
 
-FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
+FM_TEST_PROCESS_REGISTRY="$FM_TEST_SHELL_DIR/process"
+: > "$FM_TEST_PROCESS_REGISTRY" || return 1
 
 fm_test_track_process() {  # <pidfile> <command-needle>
   [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
@@ -391,6 +553,7 @@ fm_test_reap_fixture_processes() {
   local d
   local -a args=()
   [ -f "$FM_TEST_CLEANUP_REGISTRY" ] || return 0
+  [ ! -d "$FM_TEST_SHELL_DIR" ] || args+=(--root "$FM_TEST_SHELL_DIR")
   while IFS= read -r d; do
     [ -n "$d" ] && [ -d "$d" ] && args+=(--root "$d")
   done < "$FM_TEST_CLEANUP_REGISTRY"
@@ -416,6 +579,7 @@ fm_test_cleanup() {
     done < "$FM_TEST_CLEANUP_REGISTRY"
     rm -f "$FM_TEST_CLEANUP_REGISTRY"
   fi
+  fm_test_remove_tree "$FM_TEST_SHELL_DIR"
 }
 
 fm_test_tmproot() {
@@ -436,7 +600,8 @@ fm_test_tmproot() {
 # case; it is created here, in the sourcing shell, so command substitutions reuse it.
 fm_test_drop_file() {
   if [ ! -f "${FM_TEST_DROP_WORDS:-}" ]; then
-    FM_TEST_DROP_WORDS=$(fm_test_tmproot fm-drop-words)/captain-words.txt
+    mkdir -p "$FM_TEST_SHELL_DIR/drop-words" || return 1
+    FM_TEST_DROP_WORDS="$FM_TEST_SHELL_DIR/drop-words/captain-words.txt"
     printf 'Fixture: the captain approved discarding this work.\n' > "$FM_TEST_DROP_WORDS"
     export FM_TEST_DROP_WORDS
   fi
@@ -447,7 +612,8 @@ fm_test_drop_file >/dev/null
 # The per-key test slot gate (bin/fm-duration.py) is host-wide by default, so a
 # fixture that runs a test.* key must never take or wait on a real slot.
 if [ -z "${FM_TEST_SLOT_DIR:-}" ]; then
-  FM_TEST_SLOT_DIR=$(fm_test_tmproot fm-test-slots)
+  FM_TEST_SLOT_DIR="$FM_TEST_SHELL_DIR/slots"
+  mkdir -p "$FM_TEST_SLOT_DIR" || return 1
   export FM_TEST_SLOT_DIR
 fi
 
@@ -458,7 +624,7 @@ export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 # The private root starts with the standing pile-up detector's claim held by this
 # suite's shell, so a test bootstrap sees a live owner and launches no detector
 # runner. A suite that tests the detector exports an empty claim root instead.
-FM_PROCEVENT_CLAIM_ROOT=$(fm_test_tmproot fm-procevent-claims)/claims || return 1
+FM_PROCEVENT_CLAIM_ROOT="$FM_TEST_SHELL_DIR/procevent-claims/claims"
 export FM_PROCEVENT_CLAIM_ROOT
 (umask 077; mkdir -p "$FM_PROCEVENT_CLAIM_ROOT" \
   && printf '%s\n%s\n%s\n%s\n' "${FM_PROCEVENT_CLAIM_ROOT%/claims}/no-detector-home" "$$" \
@@ -473,40 +639,153 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # fm_test_reap_orphans: best-effort sweep for fixture roots left behind by a
 # prior run that was killed hard enough to skip the traps above (e.g. a
 # SIGKILL timeout). Only removes directories carrying the .fm-test-fixture
-# marker fm_test_tmproot writes, so it never touches unrelated fm-* tmp dirs
-# from real (non-test) firstmate commands. The marker identifies the owning
-# shell across PID reuse, so the same live owner always wins over the age
-# fallback for dead or unowned roots.
+# marker fm_test_tmproot and each per-shell record carry, so it never touches
+# unrelated fm-* tmp dirs from real (non-test) firstmate commands. The marker
+# identifies the owning shell across PID reuse, so the same live owner always
+# wins over the age fallback for dead or unowned roots.
+#
+# The sweep reads only what a test run owns: the per-shell records under
+# fm-test-owners (each names its shell's fixture roots), marked fm-test-*
+# roots at the top of the temp dir, and the fmlab.* labs and fm-test-run.*
+# runner containers there (bin/fm-test-reap-orphans.sh --owners). The shared
+# per-prefix scratch containers (bin/fm-scratch-lib.sh) keep the other fm-*
+# entries that tools leave in a shared temp dir out of the way, and the sweep
+# makes no stat call and no process per such entry. It does still read the temp
+# dir's names a few times (about 0.06 s per read at 50000 entries). Once per age
+# floor it also looks at every top-level fm-* directory, for marked roots that
+# predate the records (a stamp in the owners dir says when it last did); that
+# look costs a stat per entry. Roots the look kept (owner alive, or too young)
+# are listed beside the stamp, and every sweep checks that short list.
+# FM_TEST_SWEEP_ALL=1 always looks and also reaps dead shells' legacy
+# registries; bin/fm-test-run.sh does that once per run.
 FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 fm_test_reap_orphans() {
-  local marker dir mtime now owner_pid owner_identity current_identity
-  # Stop what a dead owner left running before any root (and so its proof) goes.
-  "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$FM_TEST_TMPDIR" >/dev/null 2>&1 || true
-  now=$(date +%s)
-  for marker in "$FM_TEST_TMPDIR"/fm-*/.fm-test-fixture; do
+  local marker dir mtime now owner_pid owner_identity current_identity shell root entry
+  local pattern='fm-test-*' stamp="$FM_TEST_OWNERS_DIR/.legacy-discovery" stamp_mtime
+  local kept_list="$FM_TEST_OWNERS_DIR/.legacy-kept" kept_root kept_tmp discovered=0
+  local seen=$'\n'
+  local -a markers=() fm_test_sweep_candidates=() reaper_args=()
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    pattern='fm-*'
+  else
+    # Roots from before the records (any fm-* name) sit in no record, so finding
+    # them takes a look at every fm-* entry. That look is the one part of the
+    # sweep whose cost follows the temp dir, so it runs once per age floor: a
+    # root younger than the floor cannot be removed anyway, and the floor is the
+    # longest a dead owner's root waits. The stamp is this shell's own business.
+    stamp_mtime=$(stat -c %Y "$stamp" 2>/dev/null || stat -f %m "$stamp" 2>/dev/null) || stamp_mtime=
+    if [ -L "$stamp" ] || [ -z "$stamp_mtime" ] || [ $(( $(date +%s) - stamp_mtime )) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ]; then
+      pattern='fm-*'
+      discovered=1
+      rm -f "$stamp" 2>/dev/null
+      : > "$stamp" 2>/dev/null || true
+    fi
+  fi
+  for shell in "$FM_TEST_OWNERS_DIR"/*; do
+    [ -d "$shell" ] && [ ! -L "$shell" ] && [ -O "$shell" ] || continue
+    # A shell's fixture roots go before its record, which is removed last.
+    if [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ] && [ -O "$shell/cleanup" ]; then
+      while IFS= read -r root; do
+        [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] || continue
+        markers+=("$root/.fm-test-fixture")
+        seen+="$root/.fm-test-fixture"$'\n'
+      done < "$shell/cleanup"
+    fi
+    [ -f "$shell/.fm-test-fixture" ] && markers+=("$shell/.fm-test-fixture")
+  done
+  for marker in "$FM_TEST_TMPDIR"/$pattern/.fm-test-fixture; do
     [ -e "$marker" ] || continue
+    case "$seen" in *$'\n'"$marker"$'\n'*) continue ;; esac
+    markers+=("$marker")
+    fm_test_sweep_candidates+=("${marker%/.fm-test-fixture}")
+  done
+  # A sweep that does not look at every fm-* entry still checks the legacy roots
+  # an earlier look kept (owner alive or root too young), so one that has since
+  # become eligible goes at the next sweep. The cost follows that short list.
+  # Only a direct fm-* child of the temp dir that this user owns is trusted from it.
+  if [ "$discovered" = 0 ] && [ -f "$kept_list" ] && [ ! -L "$kept_list" ] && [ -O "$kept_list" ]; then
+    while IFS= read -r kept_root; do
+      case "$kept_root" in "$FM_TEST_TMPDIR"/fm-*) ;; *) continue ;; esac
+      [ "${kept_root%/*}" = "${FM_TEST_TMPDIR%/}" ] && [ -d "$kept_root" ] && [ ! -L "$kept_root" ] && [ -O "$kept_root" ] || continue
+      marker="$kept_root/.fm-test-fixture"
+      [ -f "$marker" ] || continue
+      case "$seen" in *$'\n'"$marker"$'\n'*) continue ;; esac
+      seen+="$marker"$'\n'
+      markers+=("$marker")
+      fm_test_sweep_candidates+=("$kept_root")
+    done < "$kept_list"
+  fi
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    # Registries from before the per-shell records lived beside the fixture roots.
+    # They record no owner identity, so any live process with the owner's PID
+    # keeps one; only a PID with no process proves the owner dead.
+    for entry in "$FM_TEST_TMPDIR"/.fm-test-cleanup.* "$FM_TEST_TMPDIR"/.fm-test-procevent.* \
+      "$FM_TEST_TMPDIR"/.fm-test-watcher.* "$FM_TEST_TMPDIR"/.fm-test-process.*; do
+      [ -f "$entry" ] && [ ! -L "$entry" ] && [ -O "$entry" ] || continue
+      owner_pid=${entry##*/}
+      owner_pid=${owner_pid#.fm-test-*.}
+      owner_pid=${owner_pid%%.*}
+      case "$owner_pid" in '' | *[!0-9]*) continue ;; esac
+      ! kill -0 "$owner_pid" 2>/dev/null || continue
+      mtime=$(stat -c %Y "$entry" 2>/dev/null || stat -f %m "$entry" 2>/dev/null) || continue
+      [ $(( $(date +%s) - mtime )) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
+      rm -f "$entry"
+    done
+  fi
+  [ "${#markers[@]}" -gt 0 ] || return 0
+  # Stop what a dead owner left running before any root (and so its proof) goes.
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    reaper_args=(--owners "$FM_TEST_OWNERS_DIR" --tmpdir "$FM_TEST_TMPDIR")
+  else
+    reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
+    for dir in ${fm_test_sweep_candidates[@]+"${fm_test_sweep_candidates[@]}"}; do
+      reaper_args+=(--candidate "$dir")
+    done
+  fi
+  "$ROOT/bin/fm-test-reap-orphans.sh" "${reaper_args[@]}" >/dev/null 2>&1 || true
+  now=$(date +%s)
+  for marker in "${markers[@]}"; do
+    [ -e "$marker" ] || continue
+    mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
+    [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || owner_pid=
     owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || owner_identity=
     case "$owner_pid" in
       '' | *[!0-9]*) ;;
       *)
-        current_identity=$(fm_test_pid_identity "$owner_pid" 2>/dev/null) || current_identity=
-        if [ -n "$owner_identity" ] && [ "$current_identity" = "$owner_identity" ]; then
-          continue
+        if kill -0 "$owner_pid" 2>/dev/null; then
+          [ -n "$owner_identity" ] || continue
+          current_identity=$(fm_test_pid_identity "$owner_pid" 2>/dev/null) || continue
+          [ "$current_identity" != "$owner_identity" ] || continue
         fi
         ;;
     esac
-    mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
-    [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     dir=$(dirname "$marker")
+    case "$dir" in
+      "$FM_TEST_OWNERS_DIR"/*)
+        if [ -f "$dir/cleanup" ]; then
+          while IFS= read -r root; do
+            [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] && continue 2
+          done < "$dir/cleanup"
+        fi
+        ;;
+    esac
     fm_test_remove_tree "$dir"
   done
+  # Roots outside the records that are still here are the ones the look kept.
+  [ "$discovered" = 1 ] || [ -f "$kept_list" ] || return 0
+  kept_tmp="$kept_list.$$"
+  : > "$kept_tmp" 2>/dev/null || return 0
+  for kept_root in ${fm_test_sweep_candidates[@]+"${fm_test_sweep_candidates[@]}"}; do
+    [ -f "$kept_root/.fm-test-fixture" ] && printf '%s\n' "$kept_root" >> "$kept_tmp"
+  done
+  if [ -s "$kept_tmp" ]; then mv -f "$kept_tmp" "$kept_list" 2>/dev/null || rm -f "$kept_tmp"; else rm -f "$kept_tmp" "$kept_list"; fi
 }
 
 # A parent coordinator can reap once before it starts isolated child sections.
 # Those children use their own EXIT cleanup and must not spend their bounded
-# execution window repeating the same global stale-fixture scan.
+# execution window repeating the same stale-fixture sweep.
 if [ "${FM_TEST_SKIP_ORPHAN_REAP:-0}" != 1 ]; then
   fm_test_reap_orphans
 fi
@@ -1069,6 +1348,45 @@ fm_git_add_origin() {
   git -C "$repo" remote add origin "file://$remote_abs"
 }
 
+# fm_test_dod_item <id> [<field>=<value>|-<field>]...: one mandatory DoD item
+# line built from `bash bin/fm-dod-lib.sh --shape`, the single owner of the item
+# shape, so a shape edit needs no fixture edit. Every field gets a nonempty
+# value and the authority field its first allowed value; <field>=<value>
+# overrides one field and -<field> omits it. A field outside the shape fails.
+fm_test_dod_item() {
+  local id=$1 shape lead fields authority_field authorities arg name field value line omit
+  local -a names
+  shift
+  shape=$(bash "$ROOT/bin/fm-dod-lib.sh" --shape) || return 1
+  lead=$(printf '%s\n' "$shape" | sed -n 's/^lead=//p')
+  fields=$(printf '%s\n' "$shape" | sed -n 's/^fields=//p')
+  authority_field=$(printf '%s\n' "$shape" | sed -n 's/^authority_field=//p')
+  authorities=$(printf '%s\n' "$shape" | sed -n 's/^authorities=//p')
+  for arg in "$@"; do
+    name=${arg#-}
+    name=${name%%=*}
+    case "|$lead|$fields|" in
+      *"|$name|"*) ;;
+      *) printf 'fm_test_dod_item: %s is not a field of the item shape\n' "$name" >&2; return 1 ;;
+    esac
+  done
+  IFS='|' read -ra names <<<"$lead|$fields"
+  line="- $id"
+  for field in "${names[@]}"; do
+    value="$id $field value"
+    [ "$field" != "$authority_field" ] || value=${authorities%%|*}
+    omit=0
+    for arg in "$@"; do
+      case "$arg" in
+        "-$field") omit=1 ;;
+        "$field="*) value=${arg#*=} ;;
+      esac
+    done
+    [ "$omit" = 1 ] || line+=" $field: ${value%.}."
+  done
+  printf '%s\n' "$line"
+}
+
 # fm_git_worktree <repo> <worktree> <branch>: initialize <repo> with one commit
 # and a local bare origin, then add a worktree on a fresh branch.
 fm_git_worktree() {
@@ -1076,6 +1394,52 @@ fm_git_worktree() {
   fm_git_init_commit "$repo"
   fm_git_add_origin "$repo" "$repo.origin.git"
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
+}
+
+# fm_test_graft_output <copy>: the output graft's session hook leaves at the root
+# of a worker copy, taken from a real worker: its .ignore overlay byte for byte,
+# and a graft/ index with a card, the graph and caches. The copy's git ignores
+# both, as graft's own global ignore does on a worker host.
+fm_test_graft_output() {
+  local copy=$1
+  printf '/.ignore\n/graft/\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  cat > "$copy/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+  mkdir -p "$copy/graft/.graph" "$copy/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$copy/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$copy/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$copy/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$copy/graft/work.md"
+  cat > "$copy/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
+}
+
+# fm_fake_ship_review_history <fakebin>: legacy forge/hold fixtures have symbolic
+# heads, not Git objects. Mock only the author-history query shapes with one ship
+# commit; real attribution regressions must NOT install this adapter.
+fm_fake_ship_review_history() {
+  local fakebin=$1
+  printf '#!/usr/bin/env bash\nREAL_GIT=%q\n' "$(command -v git)" > "$fakebin/git"
+  cat >> "$fakebin/git" <<'SH'
+if [ "${GIT_NO_REPLACE_OBJECTS:-}" = 1 ] && [ "${1:-}" = -C ]; then
+  case "${3:-} ${4:-}" in
+    'cat-file -e') exit 0 ;;
+    'rev-parse --verify')
+      case "${5:-}" in *'^{commit}') printf '%040d\n' 0; exit 0 ;; esac ;;
+    'merge-base '*)
+      if [ "${5:-}" = 0000000000000000000000000000000000000000 ]; then printf '%040d\n' 0; exit 0; fi ;;
+    'log --format=%H%x00%s') printf '%s\000ship fixture implementation\n' "${5##*..}"; exit 0 ;;
+  esac
+fi
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$fakebin/git"
 }
 
 # --- state/<id>.meta writers ------------------------------------------------
@@ -1207,16 +1571,240 @@ fm_test_base_path_sans() {
   printf '%s\n' "$dir"
 }
 
-# fm_test_wait_until <seconds> <command> [args...]
-# Polls until the command succeeds or the ceiling passes. For a result that a
-# detached background job publishes, such as bin/fm-home-summary-refresh.sh
-# --detach, where the foreground command under test returns before it exists.
-fm_test_wait_until() {
-  local limit=$1 ticks=0
-  shift
-  while ! "$@" >/dev/null 2>&1; do
-    ticks=$((ticks + 1))
-    [ "$ticks" -le $((limit * 10)) ] || return 1
-    sleep 0.1
+# fm_test_refresh_fence_stub <dir>
+# Writes a stub ln into <dir> (put it first on PATH) that pins the instant a
+# home-summary refresh worker, which already owns the refresh lock, first reaches
+# for its fence (the lock's steal mutex). FM_TEST_FENCE_ACTION picks what happens
+# there: remove deletes FM_TEST_FENCE_HOME; refuse writes
+# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
+# holds it; await-removal records the worker's pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
+# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# that takes the mutex first, records its pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
+# FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
+# gone (or it is killed). Any other
+# case, or any other target, runs the real ln. A refresh waiting on a fence is
+# reproduced this way without timing luck.
+fm_test_refresh_fence_stub() {
+  mkdir -p "$1" || return 1
+  FM_TEST_REAL_LN=$(command -v ln)
+  FM_TEST_FENCE_LIB="$ROOT/bin/fm-wake-lib.sh"
+  export FM_TEST_REAL_LN FM_TEST_FENCE_LIB
+  cat > "$1/ln" <<'SH'
+#!/usr/bin/env bash
+case "${*: -1}" in
+  */.home-summary-refresh.lock.steal)
+    state=${FM_TEST_FENCE_HOME:-}/state
+    case "${FM_TEST_FENCE_ACTION:-}" in
+      remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
+      refuse) : > "$state/.test-fence-refused"; exit 1 ;;
+      await-removal)
+        printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        exit 1
+        ;;
+      hold)
+        if [ ! -e "$state/.test-fence-holder" ]; then
+          env -u FM_TEST_FENCE_ACTION nohup bash -c '
+            . "$1"
+            fm_lock_acquire_wait "$2"
+            printf "%s\n" "$$" > "$3"
+            while [ ! -e "$4" ] && [ -d "${4%/*}" ]; do sleep 0.1; done
+            fm_lock_release "$2"
+          ' _ "$FM_TEST_FENCE_LIB" "${*: -1}" "$state/.test-fence-holder" "$state/.test-fence-release" \
+            >/dev/null 2>&1 </dev/null &
+          i=0
+          while [ ! -s "$state/.test-fence-holder" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+        fi
+        ;;
+    esac
+    ;;
+esac
+exec "${FM_TEST_REAL_LN:?}" "$@"
+SH
+  chmod +x "$1/ln"
+}
+
+# fm_test_sampler_probe: print a PYTHONPATH directory whose sitecustomize makes
+# every pile-up sampler (bin/fm-proc-guard.py watch) started with
+# FM_TEST_SAMPLER_CYCLES=<file> add its completed samples, the sampler's own unit
+# of work, to that file, so a wait for something a procevent runner should
+# produce can be bounded with fm_test_wait_until --cycles.
+fm_test_sampler_probe() {
+  local dir
+  dir=$(fm_test_tmproot fm-sampler-probe) || return 1
+  cat > "$dir/sitecustomize.py" <<'PY'
+import os
+import sys
+import time
+
+samples = os.environ.get('FM_TEST_SAMPLER_CYCLES')
+if samples and sys.argv and sys.argv[0].endswith('fm-proc-guard.py'):
+    real_sleep = time.sleep
+
+    def counted_sleep(seconds):
+        try:
+            with open(samples) as handle:
+                done = int(handle.read())
+        except (OSError, ValueError):
+            done = 0
+        with open(samples + '.tmp', 'w') as handle:
+            handle.write('%d\n' % (done + 1))
+        os.replace(samples + '.tmp', samples)
+        real_sleep(seconds)
+
+    time.sleep = counted_sleep
+PY
+  printf '%s\n' "$dir"
+}
+
+# fm_test_export_sleep_counter <function>: export a sleep that makes each poll
+# loop whose wait is a sleep called directly from <function>, such as a
+# process-event owner guard (cmd_owner_watchdog in bin/fm-procevent.sh) or a
+# home-summary refresh worker's fence (home_summary_fence in
+# bin/fm-home-summary-refresh.sh), started with FM_TEST_SLEEP_COUNT=<file> add its
+# completed polls, the loop's own unit of work, to that file, so a wait for
+# something the loop should end or produce can be bounded with
+# fm_test_wait_until --cycles. Call it in the subshell that starts the loop's
+# ancestor; every other caller of sleep is unchanged.
+fm_test_export_sleep_counter() {
+  FM_TEST_SLEEP_CALLER=$1
+  export FM_TEST_SLEEP_CALLER
+  # shellcheck disable=SC2329 # Exported to the poll loops a child starts.
+  sleep() {
+    local polls
+    if [ "${FUNCNAME[1]:-}" = "${FM_TEST_SLEEP_CALLER:-}" ] && [ -n "${FM_TEST_SLEEP_COUNT:-}" ]; then
+      polls=$(cat "$FM_TEST_SLEEP_COUNT" 2>/dev/null) || polls=0
+      case "$polls" in ''|*[!0-9]*) polls=0 ;; esac
+      printf '%s\n' "$((polls + 1))" > "$FM_TEST_SLEEP_COUNT.tmp" \
+        && mv -f "$FM_TEST_SLEEP_COUNT.tmp" "$FM_TEST_SLEEP_COUNT"
+    fi
+    command sleep "$@"
+  }
+  export -f sleep
+}
+
+# fm_test_wait_until [--while-alive PID] [--progress-file PATH]...
+#                    [--cycles N COUNT_FILE] [--inactivity SECONDS]
+#                    -- COMMAND [ARGS...]
+# Wait for an outcome, not a total duration. It succeeds when COMMAND holds and
+# fails when the awaited work did its work without the outcome, died, or went
+# silent. Activity alone (CPU, forks) is not progress toward an outcome.
+# --cycles names a file holding the peer's own completed unit-of-work count (a
+# decimal integer; absent means 0): the wait fails once the peer completes N more
+# cycles than it had when the wait began, so a live poller that keeps polling
+# without producing the outcome cannot hang the suite. A live poller must pass
+# it, with N stated by the caller and small. --while-alive fails once that PID
+# is dead, a zombie or reused and no descendant it was last observed with remains
+# (also for a disappearance predicate); never pass the waiting test's own PID.
+# Silence means no change in any --progress-file or COUNT_FILE, outcome-specific
+# observables only, for the inactivity interval:
+# by default the operational 15-quiet-minute no-progress policy owned by
+# bin/fm-duration.py (NO_PROGRESS_LIMIT, via progress-check's "default"), with
+# --inactivity a failure-fixture override. An unreadable count or sample is
+# unknown and retried, never a stall. Every failure returns 1 only after one
+# final predicate probe, so completion at peer exit wins. Invalid
+# arguments/observer errors return 2. No peer is killed; its owner retains
+# cleanup. Predicates must be quick, nonblocking probes and may be shell
+# functions; each probe runs in a subshell with output suppressed. The probe and
+# count run every 0.1s; the observer runs at the repo's progress cadence,
+# min(1, inactivity / 4) seconds (communicate_progress in bin/fm-duration.py),
+# and at once when kill -0 first shows the peer gone.
+fm_test_wait_until() (
+  local pid=0 inactivity=default progress_record rc cycles=0 tally='' base='' count reached
+  local cadence=10 tick=0 exited=0
+  local paths=() observer=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --while-alive)
+        [ "$#" -ge 2 ] || return 2
+        pid=$2
+        case "$pid" in ''|*[!0-9]*|0) return 2 ;; esac
+        [ "$pid" != "$$" ] || return 2
+        shift 2 ;;
+      --progress-file)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        paths+=("$2")
+        shift 2 ;;
+      --cycles)
+        [ "$#" -ge 3 ] && [ -n "$3" ] && [ -z "$tally" ] || return 2
+        case "$2" in ''|*[!0-9]*|0) return 2 ;; esac
+        cycles=$2 tally=$3
+        paths+=("$3")
+        shift 3 ;;
+      --inactivity)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        inactivity=$2
+        shift 2 ;;
+      --) shift; break ;;
+      *) printf 'fm_test_wait_until: expected observation options then -- COMMAND\n' >&2; return 2 ;;
+    esac
   done
+  [ "$#" -gt 0 ] || return 2
+  [ "$pid" -gt 0 ] || [ "${#paths[@]}" -gt 0 ] || return 2
+  read_count() {
+    count=0
+    [ ! -e "$tally" ] || count=$(cat "$tally" 2>/dev/null) || count=''
+    case "$count" in ''|*[!0-9]*) return 1 ;; esac
+  }
+  [ -z "$tally" ] || ! read_count || base=$count
+  if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+  progress_record=$(mktemp "$FM_TEST_TMPDIR/.fm-test-wait.XXXXXX") || return 2
+  trap 'rm -f "$progress_record"' EXIT
+  observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$progress_record" "$pid" "$inactivity")
+  [ "${#paths[@]}" -eq 0 ] || observer+=("${paths[@]}")
+  [ "$pid" -eq 0 ] || observer+=(--while-alive)
+  [ "$inactivity" = default ] \
+    || cadence=$(awk -v seconds="$inactivity" 'BEGIN { ticks = int(seconds * 2.5); print (ticks < 1 ? 1 : (ticks > 10 ? 10 : ticks)) }') \
+    || return 2
+  while :; do
+    reached=0
+    if [ -n "$tally" ] && read_count; then
+      if [ -z "$base" ]; then
+        base=$count
+      elif [ "$count" -ge $((base + cycles)) ]; then
+        reached=1
+      fi
+    fi
+    if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+    if [ "$reached" -eq 1 ]; then
+      printf 'fm_test_wait_until: condition unmet after %s peer cycles (%s -> %s in %s)\n' "$cycles" "$base" "$count" "$tally" >&2
+      return 1
+    fi
+    rc=0
+    if [ "$pid" -gt 0 ] && [ "$exited" -eq 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+      exited=1 tick=0
+    fi
+    if [ "$tick" -eq 0 ]; then
+      "${observer[@]}" || rc=$?
+      tick=$cadence
+    fi
+    tick=$((tick - 1))
+    case "$rc" in
+      0) ;;
+      3|124)
+        if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+        printf 'fm_test_wait_until: condition unmet (%s, pid=%s)\n' "$rc" "$pid" >&2
+        return 1 ;;
+      *) return 2 ;;
+    esac
+    sleep 0.1  # Observation cadence, not a failure deadline.
+  done
+)
+
+# fm_test_tree_leash <command...>
+# Runs a test's command tree under a stop on the tree's OWN process count.
+# Harm: a tree that forks without end starves every other process of the user.
+# Observable: the number of members of the command's tree, which neighbour lanes
+# and a slow host leave alone (bin/fm-proc-budget.sh --own-procs). Expiry: the
+# tree is frozen and killed and the wrapper exits 98. The leash has no clock and
+# does not count the whole user, so neighbour lanes and a slow host cannot spend
+# it. The kernel limit stays as a wide whole-user safety net, 1500 over the
+# user's count at launch.
+# 128 is far over any tree these suites start and far under the kernel limit this
+# mode keeps.
+readonly FM_TEST_TREE_PROCS=128
+fm_test_tree_leash() {
+  "$ROOT/bin/fm-proc-budget.sh" --own-procs "$FM_TEST_TREE_PROCS" -- "$@"
 }

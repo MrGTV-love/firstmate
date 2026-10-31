@@ -142,8 +142,8 @@
 #     is pure weight - 10 done rows cost 3.3KB in an observed main-home digest.
 #   - Every in-flight, held, and blocked row is listed IN FULL, with its
 #     hold_kind/hold_reason and blocked_by. Those are the rows AGENTS.md
-#     sections 7 and 10 make actionable at startup, so they are never bounded
-#     away.
+#     sections 7 and 10 and the backlog-maintenance skill make actionable at
+#     startup, so they are never bounded away.
 #   - Only the plain queued (dispatchable-now) listing is bounded, by
 #     FM_SESSION_START_QUEUED_LIMIT, default 20. Anything it omits is disclosed
 #     with an exact remainder count and the command that shows the rest, so a
@@ -277,12 +277,16 @@ done
 SESSION_START_STAGES='lock role bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step'
 
 stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
-  [ -n "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
+  [ -f "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
   printf '%s\n' "$1" > "$FM_SESSION_START_STAGE_FILE" 2>/dev/null || true
 }
 
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
+# shellcheck source=bin/fm-timing-lib.sh
+. "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
@@ -293,29 +297,33 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   # rather than silently removing the bound.
   case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
   [ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
-  SESSION_START_STAGE_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-stage.XXXXXX" 2>/dev/null) || SESSION_START_STAGE_FILE=
+  # The child sizes its bounded backlog reads from what is left of this bound.
+  SESSION_START_DEADLINE=$(( $(date +%s) + SESSION_START_BUDGET ))
+  SESSION_START_STAGE_FILE=$(fm_scratch_new f fm-session-start-stage 2>/dev/null) || SESSION_START_STAGE_FILE=
   if [ -z "$SESSION_START_STAGE_FILE" ]; then
     # Without a breadcrumb the bound still holds; only the banner's precision
     # is lost, so the child still runs bounded.
     SESSION_START_STAGE_FILE=/dev/null
+  else
+    trap 'fm_scratch_release "$SESSION_START_STAGE_FILE"' EXIT
   fi
   if [ "$REEMIT" -eq 1 ]; then
     if [ -n "$SESSION_SOURCE" ]; then
       fm_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
         "$SCRIPT_DIR/fm-session-start.sh" --reemit --source "$SESSION_SOURCE"
     else
       fm_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
         "$SCRIPT_DIR/fm-session-start.sh" --reemit
     fi
   elif [ -n "$SESSION_SOURCE" ]; then
     fm_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
       "$SCRIPT_DIR/fm-session-start.sh" --source "$SESSION_SOURCE"
   else
     fm_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
       "$SCRIPT_DIR/fm-session-start.sh"
   fi
   SESSION_START_RC=$?
@@ -352,7 +360,6 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
     fi
     printf '%s\n' "$BAR"
   fi
-  rm -f "$SESSION_START_STAGE_FILE" 2>/dev/null || true
   exit 0
 fi
 
@@ -386,12 +393,20 @@ STATUS_TAIL=${FM_SESSION_START_STATUS_TAIL:-5}
 case "$STATUS_TAIL" in ''|*[!0-9]*) STATUS_TAIL=5 ;; esac
 QUEUED_LIMIT=${FM_SESSION_START_QUEUED_LIMIT:-20}
 case "$QUEUED_LIMIT" in ''|*[!0-9]*|0) QUEUED_LIMIT=20 ;; esac
-# One per-task endpoint read may never outlive this bound: a hung backend CLI
-# becomes that task's endpoint: error line instead of the digest's whole
-# runtime budget.
+# One per-task endpoint read may never outlive its bound: a hung backend CLI
+# becomes that task's endpoint: unknown line instead of the digest's whole
+# runtime budget. The read is a backend CLI call that cannot show progress, so
+# its bound is this host's measured one (fm_duration_limit, key
+# session-start.endpoint-read, asked once per digest); this value is only the
+# cold-start floor until the ledger holds enough samples, and a measured limit can
+# raise it, never lower it. The reads' samples are recorded in one batch after the
+# fleet-state loop, so the ledger is opened twice per digest, not twice per task.
 ENDPOINT_TIMEOUT=${FM_SESSION_START_ENDPOINT_TIMEOUT:-10}
 case "$ENDPOINT_TIMEOUT" in ''|*[!0-9]*) ENDPOINT_TIMEOUT=10 ;; esac
 [ "$ENDPOINT_TIMEOUT" -gt 0 ] 2>/dev/null || ENDPOINT_TIMEOUT=10
+ENDPOINT_BOUND=
+ENDPOINT_LOAD=
+ENDPOINT_SAMPLES=
 BACKLOG_FIELDS=blocked_by,hold_kind,hold_reason
 
 RULE='================================================================================'
@@ -568,7 +583,7 @@ print_status_tail() {
   # and the full log path above reaches the rest.
   while IFS= read -r line || [ -n "$line" ]; do
     fm_cap_line "$line"
-  done < <(tail -n "$STATUS_TAIL" "$status")
+  done < <(tail -c 262144 "$status" 2>/dev/null | head -c 262144 | tail -n "$STATUS_TAIL")
 }
 
 # fm_session_start_endpoint_read <backend> <target> [expected-label]: ONE
@@ -577,15 +592,38 @@ print_status_tail() {
 # a per-task backend liveness read that dies mid-read would otherwise take
 # every later stage with it. Isolation turns any death, hang, or nonzero
 # surprise in one task's read into that task's own endpoint line - never a
-# silently missing rest of digest. The inner bash re-sources fm-backend.sh
+# silently missing rest of digest. A read that only ran out of time (124) is
+# reported unknown, because not answering says nothing about the endpoint. The inner bash re-sources fm-backend.sh
 # per read; that cost is a few milliseconds per task and buys the isolation.
 fm_session_start_endpoint_read() {  # <backend> <target> [expected-label]
-  local backend=$1 target=$2 label=${3:-}
+  local backend=$1 target=$2 label=${3:-} started finished rc=0 timed_out=0
+  if [ -z "$ENDPOINT_BOUND" ]; then
+    ENDPOINT_BOUND=$(fm_duration_limit session-start.endpoint-read "$ENDPOINT_TIMEOUT" 2>/dev/null) || ENDPOINT_BOUND=
+    case "$ENDPOINT_BOUND" in ''|*[!0-9]*|0*) ENDPOINT_BOUND=$ENDPOINT_TIMEOUT ;; esac
+    ENDPOINT_LOAD=$(fm_duration_load)
+  fi
+  started=$(fm_timing_now_ms)
   # shellcheck disable=SC2016  # Positional parameters expand inside the child bash, not here.
-  fm_run_timed "$ENDPOINT_TIMEOUT" bash -c '
+  fm_run_timed "$ENDPOINT_BOUND" bash -c '
     . "$1"
     fm_backend_target_exists "$2" "$3" "$4"
-  ' _ "$SCRIPT_DIR/fm-backend.sh" "$backend" "$target" "$label"
+  ' _ "$SCRIPT_DIR/fm-backend.sh" "$backend" "$target" "$label" 2>/dev/null || rc=$?
+  finished=$(fm_timing_now_ms)
+  # A command's own 124 is not a timeout: only an expired bound is one.
+  [ "$rc" -ne 124 ] || [ $((finished - started)) -lt $((ENDPOINT_BOUND * 1000)) ] || timed_out=1
+  ENDPOINT_SAMPLES+="$((finished - started))"$'\t'"$rc"$'\t'"$timed_out"$'\n'
+  return "$rc"
+}
+
+# Records every endpoint read of this digest in one ledger write.
+fm_session_start_endpoint_record() {
+  local load_end ms rc timed_out
+  [ -n "$ENDPOINT_SAMPLES" ] || return 0
+  load_end=$(fm_duration_load)
+  while IFS=$'\t' read -r ms rc timed_out; do
+    printf 'session-start.endpoint-read\t%s\t%s\t1\t%s\t%s\t%s\n' "$ms" "$rc" "$ENDPOINT_LOAD" "$load_end" "$timed_out"
+  done <<< "${ENDPOINT_SAMPLES%$'\n'}" | fm_duration_record_batch 2>/dev/null
+  ENDPOINT_SAMPLES=
 }
 
 hash_file_sha256() {
@@ -743,16 +781,32 @@ fi
 # re-block this digest and race the worker's sweeps against themselves.
 stage bootstrap
 subsection "BOOTSTRAP"
+# Bootstrap's backlog reads keep their no-progress bound inside this digest's
+# runtime bound: each gets a third of the time left, so a wedged backend cut
+# once in each of bootstrap's two sweeps (close replay, reconcile) still leaves
+# a third for the sections after them. An operator value stays an upper limit.
+BOOT_BACKLOG_SECS=${FM_BACKLOG_ROW_TIMEOUT_SECS:-}
+case "${FM_SESSION_START_DEADLINE:-}" in
+  ''|*[!0-9]*) ;;
+  *)
+    boot_share=$(( (FM_SESSION_START_DEADLINE - $(date +%s)) / 3 ))
+    [ "$boot_share" -ge 1 ] || boot_share=1
+    case "$BOOT_BACKLOG_SECS" in
+      ''|*[!0-9]*) BOOT_BACKLOG_SECS=$boot_share ;;
+      *) [ "$BOOT_BACKLOG_SECS" -gt 0 ] && [ "$BOOT_BACKLOG_SECS" -le "$boot_share" ] || BOOT_BACKLOG_SECS=$boot_share ;;
+    esac
+    ;;
+esac
 if [ "$READ_ONLY" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+  BOOT_OUT=$(FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
     FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1)
 elif [ "$REEMIT" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_LOCKED=1 FM_BOOTSTRAP_NETWORK=skip \
+  BOOT_OUT=$(FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_LOCKED=1 FM_BOOTSTRAP_NETWORK=skip \
     FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1)
 else
   BOOT_OUT=$(
     "$SCRIPT_DIR/fm-herdr-session-cleanup.sh" 2>&1 || true
-    FM_BOOTSTRAP_NETWORK=skip FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
+    FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_NETWORK=skip FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
       "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1
   )
 fi
@@ -761,6 +815,38 @@ if [ -n "$BOOT_OUT" ]; then
 else
   printf '(silent - all good)\n'
 fi
+
+# --- 2b. guard retirement pass --------------------------------------------
+# The guard audit's data-driven pass is the one open item that closes on real
+# traffic rather than on work, so no ordinary turn ever asks for it: a guard
+# reaches the cut threshold weeks after anyone last looked, and the nomination
+# then sits unread in a log. Ask once a day, cache the answer, and print only
+# while a nomination carries no recorded decision in the tracked registry.
+# The recorded decision is what silences this line, so it retires itself.
+stage guard-pass
+GUARD_STAMP="$STATE/.guard-pass-checked"
+guard_line=''
+if [ -f "$GUARD_STAMP" ]; then
+  case "$(uname -s)" in
+    Darwin) guard_mtime=$(/usr/bin/stat -f %m "$GUARD_STAMP" 2>/dev/null || echo 0) ;;
+    *) guard_mtime=$(stat -c %Y "$GUARD_STAMP" 2>/dev/null || echo 0) ;;
+  esac
+else
+  guard_mtime=0
+fi
+if [ "$SCRIPT_DIR/../docs/guards/registry.json" -nt "$GUARD_STAMP" ]; then
+  guard_mtime=0
+fi
+if [ $(( $(date +%s) - guard_mtime )) -ge 86400 ]; then
+  guard_ids=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-metrics.sh" --undecided 2>/dev/null) || guard_ids=''
+  if [ -n "$guard_ids" ]; then
+    guard_line="GUARD PASS: $(printf '%s' "$guard_ids" | tr '\n' ' ' | sed 's/ $//') nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json"
+  fi
+  [ "$READ_ONLY" -eq 1 ] || printf '%s\n' "$guard_line" > "$GUARD_STAMP" 2>/dev/null || true
+else
+  guard_line=$(cat "$GUARD_STAMP" 2>/dev/null || true)
+fi
+[ -n "$guard_line" ] && printf '%s\n' "$guard_line"
 
 # --- 3. wake-drain ---------------------------------------------------------
 # The inactive-outcome startup scan runs in the deferred worker launched above,
@@ -920,9 +1006,12 @@ for meta in "$STATE"/*.meta; do
       printf 'endpoint: alive (backend=%s window=%s)\n' "$backend" "$window"
     elif [ "$backend" = tmux ] && [ "$endpoint_rc" -eq 2 ]; then
       printf 'endpoint: unknown (backend=%s window=%s - endpoint inventory unreadable)\n' "$backend" "$window"
-    elif [ "$endpoint_rc" -eq 124 ] || [ "$endpoint_rc" -ge 128 ]; then
-      printf 'endpoint: error (backend=%s window=%s - the endpoint read died or hit its %ss bound; the digest continued past it)\n' \
-        "$backend" "$window" "$ENDPOINT_TIMEOUT"
+    elif [ "$endpoint_rc" -eq 124 ]; then
+      printf 'endpoint: unknown (backend=%s window=%s - the endpoint read did not answer in time; this is not a dead verdict, read it again with bin/fm-crew-state.sh %s)\n' \
+        "$backend" "$window" "$id"
+    elif [ "$endpoint_rc" -ge 128 ]; then
+      printf 'endpoint: error (backend=%s window=%s - the endpoint read died; the digest continued past it)\n' \
+        "$backend" "$window"
     else
       printf 'endpoint: dead (backend=%s window=%s)\n' "$backend" "$window"
     fi
@@ -938,6 +1027,7 @@ for meta in "$STATE"/*.meta; do
   fi
 done
 [ "$META_FOUND" -eq 1 ] || printf '(none)\n'
+fm_session_start_endpoint_record
 
 subsection "Orphan status logs (state/*.status without matching .meta)"
 ORPHAN_STATUS_FOUND=0

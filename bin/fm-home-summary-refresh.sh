@@ -15,15 +15,26 @@
 # successful publication into that directory. After a failed, interrupted, or
 # killed refresh, an existing ledger remains complete, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
-# summary cannot overwrite one computed after a later status change. The deadline
+# summary cannot overwrite one computed after a later status change. The parent
 # owner retains the lock through publication and streak reset or failure accounting.
 # The existing lock's steal mutex fences handoff, pending-marker consumption,
 # publication, streak changes, wake appends, and release against stale-owner recovery;
 # each critical section checks parent liveness and ownership while holding it.
-# The shared timeout owner bounds state initialization, lock acquisition, validation,
-# and publication with FM_HOME_SUMMARY_TIMEOUT (default 60 seconds).
+# The shared progress owner covers state initialization, lock acquisition,
+# validation and publication. FM_HOME_SUMMARY_TIMEOUT selects its no-output/no-CPU
+# interval (default 900 seconds), never a wall-clock deadline; productive work
+# keeps running. bin/fm-duration.py owns progress detection and signal cleanup.
 # Failure logging, streak accounting, and owner-checked release have independent
 # deadlines of 4, 10, and 4 seconds, so logging failure cannot skip the latter two.
+# The progress owner counts a polling loop's forks as progress, so waiting for the
+# fence ends on what the wait is for, never on elapsed time. The fence is the lock's
+# short critical-section mutex, not the refresh itself (the refresh lock above
+# coalesces concurrent refreshes), so a waiter cannot skip it: it still has to hand
+# off, publish, or account. It waits only while another live process holds the fence
+# (or is publishing it) and fails at once when nothing holds the fence yet it cannot
+# be created (as when the home's state directory is gone: a retired home or a removed
+# test fixture can never grant it), or when its holder is gone and the existing
+# stale-owner reclaim in fm_lock_try_acquire_steal_mutex could not take it over.
 # No reader can observe temporary output through the ledger path.
 #
 # With --best-effort, a failure is appended to the bounded home-local
@@ -67,7 +78,8 @@ REFRESH_LOCK="$STATE/.home-summary-refresh.lock"
 PENDING_MARK="$STATE/.home-summary-refresh.pending"
 STREAK_FILE="$STATE/.home-summary-refresh.streak"
 ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
-HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-60}
+# Match fm-duration.py's 15-minute no-progress policy, not a wall deadline.
+HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-$((15 * 60))}
 HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
 BEST_EFFORT=0
 DETACH=0
@@ -106,7 +118,7 @@ case "$ERROR_LOG_MAX_BYTES" in
   ''|*[!0-9]*|0) ERROR_LOG_MAX_BYTES=65536 ;;
 esac
 case "$HOME_SUMMARY_TIMEOUT" in
-  ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=60 ;;
+  ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=$((15 * 60)) ;;
 esac
 case "$HOME_SUMMARY_IF_IDLE" in
   0|1) ;;
@@ -157,7 +169,7 @@ home_summary_refresh_once() {
   fm_current_pid worker_pid || return 1
   home_summary_fence "$worker_pid" || return 1
   if ! printf '%s\n' "$FM_HOME_SUMMARY_PARENT_PID" > "$REFRESH_LOCK/pid" 2>/dev/null; then
-    home_summary_fail "could not hand the refresh lock to its timeout owner"
+    home_summary_fail "could not hand the refresh lock to its parent owner"
     return 1
   fi
   HOME_SUMMARY_LOCK_HELD=0
@@ -310,8 +322,29 @@ home_summary_unfence() {
 
 home_summary_fence() {
   local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-} owner_pid=${1:-${FM_HOME_SUMMARY_PARENT_PID:-}}
+  local holder gone_holder=
   case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
   while ! fm_lock_try_acquire_steal_mutex "$REFRESH_LOCK.steal"; do
+    # Waiting helps only while another actor holds the fence. FM_LOCK_BUSY is 0
+    # when the refusal was an acquisition error that no wait can clear, such as
+    # a state directory that is gone.
+    if [ "${FM_LOCK_BUSY:-0}" != 1 ]; then
+      home_summary_fail "could not create the refresh fence and no process holds it"
+      return 1
+    fi
+    # A holder that is gone yet still blocks the reclaim above, seen on two
+    # consecutive attempts so a reclaim in flight is not mistaken for it, will not
+    # release the fence: stop instead of waiting for it.
+    holder=$(cat "$REFRESH_LOCK.steal/pid" 2>/dev/null || true)
+    if fm_lock_owner_alive "$REFRESH_LOCK.steal" "$holder" \
+      || fm_lock_mid_acquire_is_fresh "$REFRESH_LOCK.steal" "$holder"; then
+      gone_holder=
+    elif [ "$gone_holder" = "${holder:-none}" ]; then
+      home_summary_fail "refresh fence holder ${holder:-unknown} is gone and the fence could not be reclaimed"
+      return 1
+    else
+      gone_holder=${holder:-none}
+    fi
     sleep 0.1
   done
   HOME_SUMMARY_FENCE_HELD=1
@@ -354,6 +387,8 @@ if [ "$HOME_SUMMARY_MODE" = release-lock ]; then
 fi
 
 if [ "$HOME_SUMMARY_MODE" = parent ]; then
+  # Answer the Python capability probe once here: each attempt runs in a subshell.
+  fm_posix_python || true
   if [ "$DETACH" -eq 1 ]; then
     # Detached three ways, as bin/fm-startup-network.sh detaches its worker:
     # stdio to /dev/null so no caller's pipe is held open, nohup so the refresh
@@ -369,7 +404,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   while :; do
     attempt_stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || attempt_stamp=
     attempt_start=$SECONDS
-    if worker_error=$(fm_run_timed "$HOME_SUMMARY_TIMEOUT" env \
+    if worker_error=$(fm_run_progress "$HOME_SUMMARY_TIMEOUT" env \
       FM_HOME_SUMMARY_PARENT_PID="$$" \
       FM_HOME_SUMMARY_WORKER_BEST_EFFORT="$BEST_EFFORT" \
       FM_HOME_SUMMARY_IF_IDLE="$HOME_SUMMARY_IF_IDLE" \
@@ -390,7 +425,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   done
   if [ "$BEST_EFFORT" -eq 1 ]; then
     if [ "$refresh_rc" -eq 124 ]; then
-      parent_error="refresh exceeded its ${HOME_SUMMARY_TIMEOUT}-second deadline"
+      parent_error="refresh made no output or CPU progress for ${HOME_SUMMARY_TIMEOUT} seconds"
     elif [ -n "$worker_error" ]; then
       parent_error=$worker_error
     else
@@ -412,7 +447,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   fi
   home_summary_release_parent_lock || true
   if [ "$refresh_rc" -eq 124 ]; then
-    printf 'fm-home-summary-refresh: refresh exceeded its %s-second deadline\n' \
+    printf 'fm-home-summary-refresh: refresh made no output or CPU progress for %s seconds\n' \
       "$HOME_SUMMARY_TIMEOUT" >&2
   fi
   exit "$refresh_rc"

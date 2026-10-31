@@ -91,7 +91,8 @@
 #                                   way bin/fm-backend.sh's fm_backend_detect
 #                                   resolves the runtime firstmate itself is
 #                                   executing inside - $TMUX_PANE selects tmux,
-#                                   $HERDR_ENV=1 selects herdr - falling back to
+#                                   $HERDR_ENV=1 or $FM_HERDR_RUNTIME=1 selects
+#                                   herdr - falling back to
 #                                   tmux). zellij, orca, and cmux are not yet
 #                                   supported as supervisor backends; the daemon
 #                                   refuses loudly at startup rather than trying
@@ -132,7 +133,7 @@
 #                                   and docs/configuration.md.
 #          FM_WEDGE_ALARM_EXEC      notifier seam: when set, every notifier
 #                                   channel routes through this command as
-#                                   `<cmd> <channel> <summary>` instead of
+#                                   `<cmd> <channel> <summary> <title>` instead of
 #                                   invoking its real notifier; "discard" fires
 #                                   nothing. Unset in production. When SOURCED the
 #                                   daemon defaults this to "discard" so no test
@@ -220,6 +221,7 @@ HOUSEKEEPING_TICK_DEFAULT=15
 # alarm. The escape hatch makes a guard false-positive visible instead of silent.
 MAX_DEFER_SECS_DEFAULT=300
 WEDGE_ALARM_TIMEOUT_SECS_DEFAULT=10
+WEDGE_ALARM_TITLE_DEFAULT='firstmate: away-mode escalations WEDGED'
 WEDGE_ALARM_LAST_EPOCH=0
 WEDGE_ALARM_NOTIFIER_PID=
 # Why the latest delivery attempt did not land; the wedge alarm reports it.
@@ -355,7 +357,7 @@ _collapse_newlines() {  # <text>
 # them exactly as before; the away launcher reuses the identical resolution to
 # pass the captain pane in as FM_SUPERVISOR_TARGET.
 
-# --- classification helpers (PURE: no side effects, testable) ---------------
+# --- classification helpers (device-marker adoption is explicit) -----------
 # last_status_line, status_is_captain_relevant, window_to_task, and the
 # status-span reader come from bin/fm-classify-lib.sh (sourced above),
 # the single classifier shared with bin/fm-watch.sh. The decision-string wrappers
@@ -372,6 +374,7 @@ classify_signal() {  # <reason-after-colon> <state>
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
     task=$(basename "$f"); task="${task%.status}"
+    status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
     record=$(status_span_first_actionable_record "$f" \
       "$(status_seen_offset "$state" "$task")")
     rc=$?
@@ -986,20 +989,20 @@ wedge_alarm_stop_active_notifier() {
 
 # The single execution seam for every configured notifier channel.
 # FM_WEDGE_ALARM_EXEC, when set, REPLACES the real notifier: the resolved channel
-# name and summary are handed to that command instead of ever invoking osascript
+# name, summary, and title are handed to that command instead of ever invoking osascript
 # or herdr or a captain-supplied command. This is the one injection point the test harness forces to a recorder
 # so no test can post a real desktop notification - the library-mode guard at the
 # foot of this file defaults it to "discard" whenever the daemon is SOURCED
 # rather than executed, which is the only way a test reaches these functions. The
 # special value "discard" fires nothing; unset means production (the executed
 # daemon), so the real channels fire.
-wedge_alarm_os_notifier_override() {  # <channel> <summary>
+wedge_alarm_os_notifier_override() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 rc exec_override=${FM_WEDGE_ALARM_EXEC:-}
   case "$exec_override" in
     '') return 2 ;;
     discard) return 0 ;;
     *)
-      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" >/dev/null 2>&1
+      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1
       rc=$?
       [ "$rc" -eq 0 ] && return 0
       log "wedge alarm: notifier override exited $rc for channel '$channel'"
@@ -1022,8 +1025,8 @@ wedge_alarm_via_osascript() {  # <summary>
   command -v osascript >/dev/null 2>&1 || {
     log "wedge alarm: osascript not found; cannot post a macOS notification"; return 1; }
   wedge_alarm_run_bounded osascript osascript -e 'on run argv' \
-    -e 'display notification (item 1 of argv) with title "firstmate: away-mode escalations WEDGED" sound name "Basso"' \
-    -e 'end run' "$summary" >/dev/null 2>&1 && return 0
+    -e 'display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"' \
+    -e 'end run' "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1 && return 0
   log "wedge alarm: osascript notification failed"
   return 1
 }
@@ -1040,7 +1043,7 @@ wedge_alarm_via_herdr() {  # <summary>
   esac
   command -v herdr >/dev/null 2>&1 || {
     log "wedge alarm: herdr not found; cannot post a herdr notification"; return 1; }
-  wedge_alarm_run_bounded herdr herdr notification show "firstmate: away-mode escalations WEDGED" \
+  wedge_alarm_run_bounded herdr herdr notification show "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" \
     --body "$summary" --sound request >/dev/null 2>&1 && return 0
   log "wedge alarm: herdr notification failed"
   return 1
@@ -1064,13 +1067,13 @@ wedge_alarm_via_command() {  # <cmd> <summary>
   return 1
 }
 
-wedge_alarm_emit() {  # <channel> <summary>
+wedge_alarm_emit() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 cmd=${3:-} rc exec_override=${FM_WEDGE_ALARM_EXEC:-} WEDGE_ALARM_EMIT_ACTIVE=1
   case "$exec_override" in
     '') ;;
     discard) return 0 ;;
     *)
-      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" >/dev/null 2>&1
+      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1
       rc=$?
       [ "$rc" -eq 0 ] && return 0
       log "wedge alarm: notifier override exited $rc for channel '$channel'"
@@ -1088,8 +1091,9 @@ wedge_alarm_emit() {  # <channel> <summary>
 # `off` directive disables the alert, regardless of position; an unresolvable
 # `auto` (no OS channel on this platform) logs that the durable marker is the
 # only signal. Every notifier routes through the test-forced recorder seam.
-wedge_alarm_notify() {  # <summary> <marker>
+wedge_alarm_notify() {  # <summary> <marker> [title]
   local summary=$1 marker=$2 ch
+  local WEDGE_ALARM_TITLE=${3:-$WEDGE_ALARM_TITLE_DEFAULT}
   local -a channels=()
   while IFS= read -r ch; do
     [ -n "$ch" ] || continue
@@ -1350,6 +1354,7 @@ housekeeping() {  # <state>
       [ -e "$f" ] || [ -L "$f" ] || continue
       [ "$f" = "$exclude" ] && continue
       task=$(basename "$f"); task="${task%.status}"
+      status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
       record=$(status_span_first_actionable_record "$f" \
         "$(status_seen_offset "$state" "$task")")
       rc=$?
@@ -1568,6 +1573,7 @@ handle_wake() {  # <reason> <state>
               case "$arg" in *" ("*) stale_detail="${arg#*" ("}"; arg="${arg%% \(*}" ;; esac
               task=$(window_to_task "$arg" "$state")
               if [ -n "$task" ]; then
+                status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$state/$task.status" || true
                 span_record=$(status_span_first_actionable_record "$state/$task.status" \
                   "$(status_seen_offset "$state" "$task")")
                 span_rc=$?
@@ -1689,30 +1695,62 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
-# Away mode owns no follow-up of its own: every overdue open-loops row the drain
-# presented without a recorded action joins the escalation digest, and that
-# escalation is recorded as the row's receipt, so the acknowledgement gate
-# neither wedges these wakes nor lets them be consumed silently.
-escalate_overdue_rows() {  # <state>
-  local state=$1 report line id
-  [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
-  report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions) && return 0
-  case "$report" in
-    *'acknowledgement refused'*) ;;
-    *) printf '%s\n' "$report" >&2; return 1 ;;
+# Away mode records no ledger action of its own, and its acknowledgement never
+# waits on the ledger gate: firstmate's own --ack-through keeps that gate. Each
+# overdue row still needing an action joins the escalation digest for firstmate
+# once per row id and evidence identity, and again only after
+# FM_OPEN_LOOPS_RESURFACE seconds (default 21600, invalid or zero values use the
+# default), as state/.subsuper-open-work-forwarded records; a row that becomes
+# covered or leaves the ledger loses its entry, so it is forwarded again when it
+# returns to the gate. The drain's periodic WAITING OPEN WORK list joins the
+# same digest.
+forward_overdue_rows() {  # <state> <drain-output>
+  local state=$1 out=$2 report='' line id identity seen now readable=1
+  local marker="$state/.subsuper-open-work-forwarded" resurface=${FM_OPEN_LOOPS_RESURFACE:-21600}
+  case "$resurface" in
+    ''|*[!0-9]*) resurface=21600 ;;
+    *) resurface=$((10#$resurface)) ;;
   esac
+  [ "$resurface" -gt 0 ] || resurface=21600
+  [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
+  if ! report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
+    case "$report" in
+      *'acknowledgement refused'*) ;;
+      *) printf '%s\n' "$report" >&2; readable=0 ;;
+    esac
+  fi
+  if [ "$readable" -eq 1 ]; then
+    now=$(_now)
+    : > "$marker.tmp" || return 1
+    while IFS= read -r line; do
+      case "$line" in '  "'*) ;; *) continue ;; esac
+      id=${line#  \"}
+      id=${id%%\"*}
+      identity=$(jq -r --arg id "$id" '.rows[] | select(.id == $id)
+        | [.category, .subject, .owner, .next_action, .evidence] | @json' "$state/open-loops.json" | cksum) \
+        || { rm -f "$marker.tmp"; return 1; }
+      identity=${identity// /:}
+      seen=$(awk -F '\t' -v id="$id" -v identity="$identity" '$1 == id && $2 == identity { print $3; exit }' \
+        "$marker" 2>/dev/null)
+      if [ -z "$seen" ] || [ $((now - seen)) -ge "$resurface" ]; then
+        escalate_add "$state" "overdue open work: ${line#  }" || { rm -f "$marker.tmp"; return 1; }
+        seen=$now
+      fi
+      printf '%s\t%s\t%s\n' "$id" "$identity" "$seen" >> "$marker.tmp" || { rm -f "$marker.tmp"; return 1; }
+    done <<EOF
+$report
+EOF
+    mv -f "$marker.tmp" "$marker" || return 1
+  fi
   while IFS= read -r line; do
     case "$line" in '  "'*) ;; *) continue ;; esac
     id=${line#  \"}
     id=${id%%\"*}
-    # One buffered digest item per row until the digest flushes.
-    if ! grep -qF "overdue open work: \"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
-      escalate_add "$state" "overdue open work: ${line#  }" || return 1
+    if ! grep -qF "waiting open work: \"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
+      escalate_add "$state" "waiting open work: ${line#  }" || return 1
     fi
-    "$FM_DAEMON_DIR/fm-open-loops.sh" action "$id" escalated \
-      --evidence "away supervisor escalation digest" > /dev/null || return 1
   done <<EOF
-$report
+$(awk '/^WAITING OPEN WORK/ { on = 1; next } on && /^  "/ { print; next } on && !/^rows\[/ { on = 0 }' "$out")
 EOF
 }
 
@@ -1736,7 +1774,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     handled=$((handled + 1))
   done < "$out"
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi
-  escalate_overdue_rows "$state" || failed=1
+  forward_overdue_rows "$state" "$out" || failed=1
 
   ack_through=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err" | tail -1)
   ack_generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err" | tail -1)
@@ -1750,7 +1788,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     log "wake drain omitted its generation-bound acknowledgement; retaining durable wakes"
     return 1
   fi
-  "$FM_DAEMON_DIR/fm-wake-drain.sh" --ack-through "$ack_through" \
+  FM_WAKE_ACK_AWAY_DAEMON=1 "$FM_DAEMON_DIR/fm-wake-drain.sh" --ack-through "$ack_through" \
     --recovery-generation "$ack_generation"
 }
 
@@ -1817,8 +1855,8 @@ fm_super_main() {
   fi
 
   # --- auto-discover the supervisor BACKEND (tmux vs herdr) first -----------
-  # Priority: FM_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > $HERDR_ENV=1
-  # (herdr) > tmux fallback. Resolved before the target below, since target
+  # Priority: FM_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > Herdr
+  # runtime marker (bin/fm-backend.sh) > tmux fallback. Resolved before the target below, since target
   # discovery composes a herdr "<session>:<pane-id>" string using the same
   # $HERDR_PANE_ID/$HERDR_SESSION markers this checks. Exporting the result
   # into FM_SUPERVISOR_BACKEND makes inject_msg/pane_is_busy/pane_input_pending
@@ -1829,8 +1867,9 @@ fm_super_main() {
   if [ -z "${FM_SUPERVISOR_BACKEND:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       backend_source="TMUX_PANE"
-    elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
-      backend_source="HERDR_ENV"
+    elif { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
+      backend_source="FM_HERDR_RUNTIME"
+      [ "${HERDR_ENV:-}" != 1 ] || backend_source="HERDR_ENV"
     else
       backend_source="FALLBACK($FM_SUPERVISOR_BACKEND_DEFAULT)"
     fi
@@ -1863,8 +1902,9 @@ fm_super_main() {
   if [ -z "${FM_SUPERVISOR_TARGET:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       target_source="TMUX_PANE"
-    elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
-      target_source="HERDR_ENV(HERDR_PANE_ID)"
+    elif { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
+      target_source="FM_HERDR_RUNTIME(HERDR_PANE_ID)"
+      [ "${HERDR_ENV:-}" != 1 ] || target_source="HERDR_ENV(HERDR_PANE_ID)"
     else
       target_source="FALLBACK(firstmate:0)"
     fi
@@ -1872,7 +1912,7 @@ fm_super_main() {
   if discovered=$(discover_supervisor_target); then
     : # resolved cleanly
   else
-    echo "warn: could not auto-discover supervisor pane (no FM_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
+    echo "warn: could not auto-discover supervisor pane (no FM_SUPERVISOR_TARGET, TMUX_PANE, or Herdr runtime marker/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
   fi
   FM_SUPERVISOR_TARGET="$discovered"
   local TARGET="$FM_SUPERVISOR_TARGET"

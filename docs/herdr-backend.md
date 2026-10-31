@@ -38,7 +38,7 @@ Prerequisites:
 - Herdr protocol 14 or newer, installed from [herdr.dev](https://herdr.dev).
 - `jq` for JSON responses.
 - The universal harness and toolchain requirements in [`configuration.md`](configuration.md#toolchain).
-- `python3` for kernel-backed process-environment ownership proof, and for optional protocol-16 presentation-space ordering and native event subscription.
+- `python3` for kernel-backed process-environment ownership proof, for the server-start absence proof, and for optional protocol-16 presentation-space ordering and native event subscription.
 
 Herdr is dual-licensed AGPL-3.0-or-later or commercial.
 Firstmate invokes its CLI as a separate process.
@@ -53,7 +53,7 @@ Select Herdr in any of these ways:
 
 A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
 
-Herdr is also auto-detected when the primary runs natively under `HERDR_ENV=1` and is not inside tmux.
+Herdr is also auto-detected outside tmux from native `HERDR_ENV=1` or the managed Claude child's `FM_HERDR_RUNTIME=1` signal.
 A tmux pane nested inside Herdr resolves to tmux because the innermost multiplexer wins.
 An auto-detected Herdr spawn stays silent, matching the verified tmux default path.
 
@@ -123,7 +123,7 @@ The metadata rules in [`configuration.md`](configuration.md#runtime-backend-conf
 A tmux task missing from Herdr's Agents pane is therefore expected, even if another primary agent is visible there.
 
 For new tasks, inspect the environment of the Firstmate process issuing the spawn, rather than an unrelated shell or the terminal displaying it.
-Native Herdr auto-detection needs `HERDR_ENV=1`; an attaching viewer does not add that marker to an already-running Firstmate process.
+Native Herdr auto-detection uses `HERDR_ENV=1`, while a Firstmate-managed Claude child retains the runtime-only signal described in [ownership after native restoration](#ownership-after-native-restoration); an attaching viewer adds neither signal to an already-running Firstmate process.
 An absent marker, a nested tmux marker, or an explicit override can select a different backend according to the [selection order](configuration.md#backend-selection-order).
 When this home should always create Herdr endpoints, set its local `config/backend` to `herdr`, and check for a higher-priority environment or per-task override.
 This also lets a Firstmate running outside Herdr create visible workers through the [per-home workspace path](#firstmate-running-outside-herdr).
@@ -157,7 +157,7 @@ Later task creation does not intentionally steal focus.
 Herdr does not enforce workspace or tab label uniqueness, so a label can never decide where a worker goes.
 
 Herdr 0.7.5 exports `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_SESSION`, `HERDR_SOCKET_PATH`, `HERDR_TAB_ID`, and `HERDR_WORKSPACE_ID` into every process it manages a pane for.
-A Firstmate or secondmate agent's own commands inherit them.
+A Firstmate or secondmate agent's own commands inherit them, except that a Firstmate-launched Claude child loses `HERDR_ENV` as described in [ownership after native restoration](#ownership-after-native-restoration).
 Older injection shapes are unverified, so a claimed launcher pane without the injected socket identity cannot be trusted.
 
 With presentation spaces disabled, a crewmate or scout is created in the exact workspace that identity currently resolves to.
@@ -583,11 +583,26 @@ Workspace and tab ids support verification and cleanup but are not inferred from
 
 ### Named server and session routing
 
-The adapter starts and polls a named server before workspace, tab, pane, or agent calls.
-Every Herdr invocation goes through `fm_backend_herdr_cli`, which sets the environment and passes an explicit trailing `--session <name>`.
+Mutating operations may ensure a named server before using it; passive state, capture, cwd, foreground-process, and busy probes never start one.
+Every Herdr invocation passes an explicit `--session <name>` alongside the environment variable, through `fm_backend_herdr_cli` or the dedicated startup helper.
 An environment variable alone is not reliable when another Herdr server is running.
 
-When the selected named server is not running, the adapter launches it without these inherited values:
+A failed, empty, or malformed status is unknown and refuses startup.
+A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and that the session socket path is missing or is a socket with no listener; any other file at that path refuses.
+The session socket comes from the status `.server.socket`, or from `session list --json` `.socket_path` when status omits it; with neither, startup and the absence proof refuse.
+The [fm-remote guard](../bin/fm-remote-herdr-guard.sh) execs its own server only after the helper's `--hold-for-exec` mode takes the same start lock and proves absence; that helper process holds the lock until the server reports running or exits.
+A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads NUL-separated environment entries from `/proc/<pid>/environ` on Linux.
+On macOS, `ps -E` flattens those entry boundaries, so a `HERDR_SESSION=` token could be text inside another variable's value; the helper treats any such token as unknown ownership and refuses the absence proof, even when it could be a real session entry.
+When the readable macOS environment contains no such token, the unscoped server belongs to `default`.
+When that environment cannot be read from a process that is still alive, the process's session is unknown and it blocks startup; a process that exited before the read is skipped.
+A live process, accepting socket, or unreadable proof refuses rather than replacing a server.
+A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
+After a launch, the starter polls status from 0.1 seconds, doubling to a 5-second cap, with no deadline; a failed status read is not fatal.
+The helper's exit status names the cause: 1 is a refusal that protects a live or unknown server, 3 is a launched server that exited before reporting running, and 4 is a failure to prepare the start lock or launch the server; `fm_backend_herdr_server_ensure_failure` turns a status into the message the doctor and AFK launch report.
+The absence proof reads process arguments as whitespace words and replaces undecodable bytes, so quote characters or non-UTF-8 bytes in a client's arguments never block startup; only a server process whose session cannot be read refuses.
+The detached launch closes inherited file descriptors so neither a background starter shell nor a caller's capture pipe survives for the server's lifetime.
+
+When absence is proven, the adapter launches the server without these inherited values:
 
 - Firstmate home and directory overrides.
 - Harness identity markers.
@@ -767,7 +782,14 @@ Disabling `session.resume_agents_on_restore` would also disable restoration of u
 The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
 Changing a user's global configuration is therefore not the scoped repair.
 
-The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only.
+Firstmate Claude launches suppress `HERDR_ENV` only in the launched child, while the pane shell, unrelated workers and the child's other `HERDR_*` pane identity variables keep their values.
+The suppression is intended to stop Herdr's Claude integration from registering a bare-Claude resume recipe; that effect on installed Herdr is not yet proven.
+Whether the same suppression also stops Herdr's native agent-status and session reports for that pane, which the Herdr adapter reads, is also not yet proven.
+`fm-spawn.sh` owns this child-only boundary for normal, raw-command and secondmate launches; the TeamClaude wrapper continues to own proxy setup.
+The child retains `FM_HERDR_RUNTIME=1` as a runtime-only detection signal, so a Claude secondmate without explicit backend configuration still selects Herdr for later spawns and supervisor routing; it grants no lifecycle ownership.
+Existing saved registrations are not retroactively removed by an environment change.
+Already-restored Claude workers are not yet covered by this prevention boundary; it neither changes lifecycle attribution nor releases saved native registrations.
+The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's [session-record repair](agent-control.md#repairing-a-restored-omp-session-record).
 The [runtime verification record](verification/runtime-backends.md) owns captured composer evidence and the current native-restoration preservation guard.
 
 ### Stale agent registrations
@@ -803,16 +825,19 @@ An unreadable or unparseable process view reads `unknown`, which refuses lifecyc
 
 ### Agent-liveness probe
 
-The generic Herdr agent-liveness probe reuses that pane classifier, then applies one recovery-only exception.
+The generic Herdr agent-liveness probe reads the pane first through the pane classifier, so a failed or timed-out status read never hides an answering pane.
+Only a pane read that cannot be interpreted consults the server status.
+A stopped status counts as session absence only when the same read-only proof that guards startup also finds no server process and no accepting socket; the probe never starts a server.
+Absence of the server is not proof that its saved endpoint was destroyed, so recovery that would re-create an endpoint first restores the server and rechecks the pane ([Agent control](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone)).
 
 | Pane read | Probe verdict |
 | --- | --- |
-| A structurally gone pane, or a pane read from a session positively reported as having no running server | `missing` |
+| A running server confirms the recorded pane is structurally gone, or a stopped session's server absence is proven | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
 | A verified live harness, registered or not, or a registered agent backed by a non-shell process | `alive` |
-| Every other unexpected read | `unreadable` |
+| A failed or timed-out status probe, a stopped status whose absence is unproven, or any other unexpected read | `unreadable` |
 
-Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
+The stale-registration verdict does not widen husk detection or any close authority.
 Those paths still refuse an unreadable pane.
 A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
 

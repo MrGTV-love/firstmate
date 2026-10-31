@@ -1,11 +1,6 @@
 ---
 name: stuck-crewmate-recovery
-description: >-
-  Agent-only playbook for stuck or missing ordinary Firstmate direct reports.
-  Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer.
-  Also use on the inverse case: a live crewmate reporting the no-mistakes pipeline dead, unreachable, or timed out.
-  Also use when a task record still names a local copy its worker has moved the work out of.
-  Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.
+description: Load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims.
 user-invocable: false
 metadata:
   internal: true
@@ -13,16 +8,23 @@ metadata:
 
 # stuck-crewmate-recovery
 
+  Agent-only playbook for stuck or missing ordinary Firstmate direct reports.
+  Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer; `demand-deep-inspection` or repeated escalation requires loading this skill before any verdict, even for a worker previously confirmed idle by design.
+  Also use on the inverse case: a live crewmate reporting the no-mistakes pipeline dead, unreachable, or timed out.
+  Also use when a task record still names a local copy its worker has moved the work out of.
+  Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.
+
 Use this playbook when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or when a direct report is stale, looping, repeatedly confused, asking a question its brief already answers, unresponsive, or when a steer failed to land.
 A stale or dead-endpoint report for a worker whose pull request has already landed is not a recovery case: the work is finished, so close the task through ordinary teardown (`AGENTS.md` section 7 for firstmate, the landed-work rule in `bin/fm-branch-prompt.sh` for the supervision branch) instead of this playbook, never with `--force`.
 
 Follow the crew-hosted Lavish board contract in [`docs/configuration.md`](../../../docs/configuration.md#crew-hosted-lavish-review-boards) when recovering a worker that hosts a board.
 
 Interrupt, stop, and relaunch a worker through `bin/fm-control.sh <task-id> interrupt|exit|relaunch`, which resolves the recorded runtime itself, verifies each action, and never tears down or discards anything ([`docs/agent-control.md`](../../../docs/agent-control.md)).
-That plane covers workers running in this home; a remotely placed secondmate is refused by name and reconciled through `secondmate-provisioning` instead.
+That plane covers workers running in this home; for a remotely placed secondmate, `stay` is delegated to its owning host, while `interrupt`, `exit`, and `relaunch` are refused by name and reconciled through `secondmate-provisioning` instead.
 A Claude worker parked on its "Background work is running" picker, with steering messages queued behind it, is released with `bin/fm-control.sh <task-id> stay` even when its task is finished; let it read and acknowledge the queued steering before `exit`, never use improvised key presses ([`docs/agent-control.md`](../../../docs/agent-control.md#exit-and-the-background-task-picker)).
 A relaunch admission refusal is not a failed launch; reconcile it through the [instruction-owner recovery policy](../../../docs/agent-control.md#recovering-an-exited-instruction-owner), not by stopping the preserved live owner or marking the task failed.
 When a worker moved the task's work into a replacement copy and the record still names the old one, re-point the record with `bin/fm-control.sh <task-id> reassociate` ([`docs/agent-control.md`](../../../docs/agent-control.md#reassociating-a-task-with-a-replacement-copy)) instead of supervising around it by run id.
+When a restored omp task's session record is stale, repair it with `bin/fm-control.sh <task-id> adopt` ([`docs/agent-control.md`](../../../docs/agent-control.md#repairing-a-restored-omp-session-record)), which sends no input and refuses with the missing proof named.
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 

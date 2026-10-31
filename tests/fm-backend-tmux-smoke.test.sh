@@ -14,17 +14,58 @@ fail() { printf 'not ok - %s\n' "$1" >&2; cleanup_all; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
 wait_for_capture_text() {  # <target> <text> [samples]
-  local target=$1 text=$2 samples=${3:-100} out i=0
+  local target=$1 text=$2 samples=${3:-100} out='' pane_state status signal i=0
   while [ "$i" -lt "$samples" ]; do
-    out=$(fm_backend_tmux_capture "$target" 200 2>/dev/null || true)
+    # Unlike display-message, list-panes refuses an unresolved window target.
+    pane_state=$(tmux list-panes -t "$target" -F '#{pane_dead}:#{pane_dead_status}:#{pane_dead_signal}' 2>/dev/null || true)
+    case "$pane_state" in
+      0:*|1:*) : ;;
+      *)
+        printf 'tmux pane disappeared: target=%s pane_dead_status=unavailable\nlast captured output:\n%s\n' "$target" "$out" >&2
+        return 1 ;;
+    esac
+    out=$(fm_backend_tmux_capture "$target" 200 2>/dev/null || printf '%s' "$out")
+    case "$pane_state" in
+      # tmux marks the pane dead when its output closes, before it reaps the
+      # exit status; poll again until the status or signal is recorded.
+      1::) sleep 0.1; i=$((i + 1)); continue ;;
+      1:*)
+        status=${pane_state#*:}
+        signal=${status#*:}
+        status=${status%%:*}
+        printf 'tmux pane exited: target=%s pane_dead_status=%s pane_dead_signal=%s\ncaptured output:\n%s\n' "$target" "${status:-unavailable}" "${signal:-unavailable}" "$out" >&2
+        return 1 ;;
+    esac
     case "$out" in
       *"$text"*) return 0 ;;
     esac
     sleep 0.1
     i=$((i + 1))
   done
+  printf 'tmux capture timed out: target=%s expected=%s\nlast captured output:\n%s\n' "$target" "$text" "$out" >&2
   return 1
 }
+
+# --- a dead pane whose exit status is not yet recorded never becomes ready ---
+# Fake tmux, no server: the pane reads `1::` until the first poll sleep, then
+# `1:23:`, while the captured output already holds the requested text. The fake
+# sleep advances the sample count in this shell, where the fakes can read it.
+if diagnostics=$(
+  fake_samples=0
+  tmux() { if [ "$fake_samples" -eq 0 ]; then printf '1::\n'; else printf '1:23:\n'; fi; }
+  fm_backend_tmux_capture() { printf 'shell-ready\n'; }
+  sleep() { fake_samples=$((fake_samples + 1)); }
+  wait_for_capture_text "fake:startup" "shell-ready" 5 2>&1
+); then
+  printf 'not ok - %s\n' "a dead pane with an unrecorded exit status became ready from captured text" >&2
+  exit 1
+fi
+case "$diagnostics" in
+  *'pane_dead_status=23'*'shell-ready'*) : ;;
+  *) printf 'not ok - %s\n%s\n' "a dead pane with an unrecorded exit status did not wait for status 23" "$diagnostics" >&2
+     exit 1 ;;
+esac
+pass "fake tmux: a dead pane polls again until its exit status is recorded and never becomes ready"
 
 command -v tmux >/dev/null 2>&1 || { echo "skip: tmux not found"; exit 0; }
 REAL_TMUX=$(command -v tmux)
@@ -41,11 +82,32 @@ cleanup_all() {
 # socket, so bin/backends/tmux.sh's bare `tmux ...` invocations never touch the
 # host's real sessions.
 SHIM_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-backend-smoke.XXXXXX")
+TEST_BASH=$(command -v bash)
+# Ignore host tmux and shell startup files. Keep exited panes so a failed
+# startup retains its exit status and output instead of erasing the evidence.
+cat > "$SHIM_DIR/tmux.conf" <<'CONF'
+set -g default-shell /bin/sh
+set -g remain-on-exit on
+CONF
+cat > "$SHIM_DIR/bashrc" <<'RC'
+PS1='smoke$ '
+PROMPT_COMMAND=
+printf 'shell-%s\n' ready
+RC
+cat > "$SHIM_DIR/start-shell" <<SH
+#!/bin/sh
+unset ENV BASH_ENV
+# Hold startup until the test has observed this phase, even on a loaded runner.
+# The old Ctrl-C probe kills this noninteractive process before it is released.
+printf 'startup-%s\\n' waiting
+while [ ! -e "$SHIM_DIR/startup-release" ]; do sleep 0.1; done
+exec "$TEST_BASH" --noprofile --rcfile "$SHIM_DIR/bashrc" -i
+SH
 cat > "$SHIM_DIR/tmux" <<SH
 #!/usr/bin/env bash
-exec "$REAL_TMUX" -L "$SOCKET" "\$@"
+exec "$REAL_TMUX" -L "$SOCKET" -f "$SHIM_DIR/tmux.conf" "\$@"
 SH
-chmod +x "$SHIM_DIR/tmux"
+chmod +x "$SHIM_DIR/tmux" "$SHIM_DIR/start-shell"
 PATH="$SHIM_DIR:$PATH"
 export PATH
 
@@ -59,8 +121,11 @@ TARGET="$SESSION:$WINDOW"
 
 # --- create session ----------------------------------------------------------
 
-tmux new-session -d -s "$SESSION" -x 200 -y 50 \
+tmux new-session -d -s "$SESSION" -x 200 -y 50 'exec /bin/sh' \
   || fail "real tmux: new-session failed"
+printf -v START_COMMAND 'exec %q' "$SHIM_DIR/start-shell"
+tmux set-option -t "$SESSION" default-command "$START_COMMAND" \
+  || fail "real tmux: could not configure the isolated startup shell"
 fm_backend_tmux_create_task "$SESSION" "$WINDOW" "$HOME" \
   || fail "fm_backend_tmux_create_task failed to create the task window"
 tmux list-windows -t "$SESSION" -F '#{window_name}' | grep -qx "$WINDOW" \
@@ -75,21 +140,36 @@ pass "real tmux: fm_backend_tmux_create_task creates a window and refuses a dupl
 
 # --- send text + Enter -------------------------------------------------------
 
-# A newly-created interactive shell can exist before its startup files and line
-# editor are ready to accept Enter. Prove command execution with an output token
-# that does not appear contiguously in the command, retrying the harmless probe
-# until the shell acknowledges it.
-SHELL_READY=false
-for _ in $(seq 1 100); do
-  tmux send-keys -t "$TARGET" C-c
-  tmux send-keys -t "$TARGET" -l "printf 'shell-%s\\n' ready"
-  tmux send-keys -t "$TARGET" Enter
-  if wait_for_capture_text "$TARGET" "shell-ready" 10; then
-    SHELL_READY=true
-    break
-  fi
-done
-[ "$SHELL_READY" = true ] || fail "the tmux task shell did not become ready"
+# Observe the slow pre-interactive phase before awaiting the rc-file handshake.
+# No keys, especially Ctrl-C, may reach that unverified startup process.
+wait_for_capture_text "$TARGET" "startup-waiting" \
+  || fail "the slow pre-interactive startup did not begin"
+touch "$SHIM_DIR/startup-release"
+wait_for_capture_text "$TARGET" "shell-ready" \
+  || fail "the tmux task shell did not become ready"
+pass "real tmux: passive readiness survives slow pre-interactive startup"
+
+# Control: Ctrl-C must not disturb an interactive shell. The rc file prints its
+# readiness marker while it is still running, and CI proved that marker can be
+# observed before the terminal is in the interactive state: the captured pane
+# then showed "^Cprintf ..." followed by the shell running "rintf ...", so the
+# control key was taken by the terminal instead of the prompt and swallowed the
+# first byte of the command behind it. The message that used to fail here blamed
+# the shell dying, which that capture disproves. Submit a probe command, then
+# wait for its output followed by the redrawn prompt line. The probe output alone
+# only proves the command ran; bash prints it before it returns to readline.
+# readline draws the prompt only after it owns the terminal, so the prompt line
+# after the probe output proves readline owns the terminal before Ctrl-C is sent.
+fm_backend_tmux_send_text_line "$TARGET" "printf 'interactive-%s\\n' ready" \
+  || fail "could not submit a probe command once the rc file acknowledged startup"
+wait_for_capture_text "$TARGET" "interactive-ready"$'\n'"smoke\$" \
+  || fail "the tmux task shell did not dispatch a submitted command after startup"
+tmux send-keys -t "$TARGET" C-c
+fm_backend_tmux_send_text_line "$TARGET" "printf 'after-interactive-%s\\n' interrupt" \
+  || fail "the interactive shell did not accept input after Ctrl-C"
+wait_for_capture_text "$TARGET" "after-interactive-interrupt" \
+  || fail "the shell did not run the command sent after Ctrl-C"
+pass "real tmux: Ctrl-C after the prompt is live preserves command execution"
 
 tmux send-keys -t "$TARGET" "cd /tmp && PS1='smoke\$ ' && clear && printf 'setup-%s\\n' ready" Enter
 wait_for_capture_text "$TARGET" "setup-ready" || fail "the tmux task shell did not complete setup"
@@ -168,6 +248,27 @@ state=$(fm_backend_agent_state tmux "$TARGET")
 # Best-effort contract: killing an already-gone window must not error.
 fm_backend_tmux_kill "$TARGET" || fail "fm_backend_tmux_kill on an already-dead target must stay best-effort (never fail)"
 pass "real tmux: kill removes the window and the readable session inventory authoritatively classifies it missing"
+
+# --- readiness failures retain the cause instead of polling a dead pane ------
+DIAGNOSTIC_TARGET="$SESSION:startup-exit"
+tmux new-window -d -t "$SESSION:" -n startup-exit "printf 'startup-exit-evidence\\n'; exit 23" \
+  || fail "real tmux: could not create the failed-startup diagnostic case"
+if diagnostics=$(wait_for_capture_text "$DIAGNOSTIC_TARGET" "never-ready" 100 2>&1); then
+  fail "an exited startup pane must not become ready"
+fi
+case "$diagnostics" in
+  *'pane_dead_status=23'*'startup-exit-evidence'*) : ;;
+  *) fail "startup failure lost its exit status or captured output"$'\n'"$diagnostics" ;;
+esac
+tmux kill-window -t "$DIAGNOSTIC_TARGET"
+if diagnostics=$(wait_for_capture_text "$DIAGNOSTIC_TARGET" "never-ready" 100 2>&1); then
+  fail "a removed startup window must not become ready"
+fi
+case "$diagnostics" in
+  *'pane disappeared:'*'pane_dead_status=unavailable'*'last captured output:'*) : ;;
+  *) fail "a removed startup window did not report the missing pane evidence"$'\n'"$diagnostics" ;;
+esac
+pass "real tmux: readiness stops on exited or removed panes and reports exit/output evidence"
 
 cleanup_all
 trap - EXIT

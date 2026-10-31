@@ -59,7 +59,9 @@
 #            Consumers that need readiness call this explicitly after arming.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
-#            drains its owned process group in EXIT cleanup, unless the source
+#            drains its owned process group in EXIT cleanup. Output-reader
+#            lifetime follows docs/configuration.md "Prove ownership before
+#            stopping a runner". Polling continues only if the source
 #            command is the tracked adapter script and `relisten` accepts
 #            polling again in this same runner.
 #            It blocks for the runner's lifetime and is meant to run supervised,
@@ -1015,7 +1017,7 @@ require_isolated_group() {  # <role>
   local role=$1 pgid
   [ "${FM_PROCEVENT_RUNNER_GROUP:-}" = "$$" ] \
     || die "$role process group was not isolated"
-  pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d '[:space:]') \
+  pgid=$(fm_procevent_proc pgid "$$" | tr -d '[:space:]') \
     || die "cannot inspect $role process group"
   [ -n "$pgid" ] || die "cannot inspect $role process group"
   [ "$pgid" = "$$" ] || die "$role does not lead its process group"
@@ -1435,9 +1437,18 @@ EOF
     perl -e '
       use strict;
       use warnings;
-      my $limit = shift;
+      my ($limit, $parent) = @ARGV;
       my ($written, $truncated) = (0, 0);
+      my $readers = "";
+      vec($readers, fileno(STDIN), 1) = 1;
       while (1) {
+        # SIGKILL cannot run shell cleanup, and the source may keep the FIFO
+        # open after its runner dies. Never block indefinitely awaiting EOF.
+        exit 2 if getppid() != $parent;
+        my $ready = $readers;
+        my $available = select($ready, undef, undef, 1);
+        exit 2 if $available < 0;
+        next unless $available;
         my $count = sysread(STDIN, my $buffer, 65536);
         exit 2 unless defined $count;
         last if $count == 0;
@@ -1455,7 +1466,7 @@ EOF
         $truncated = 1 if $take < $count;
       }
       exit($truncated ? 3 : 0);
-    ' "$MAX_OUTPUT_BYTES" <&4 > "$out" &
+    ' "$MAX_OUTPUT_BYTES" "$$" <&4 > "$out" &
     bound_pid=$!
     # A trapped signal interrupts wait immediately. A foreground drain would
     # defer the TERM trap for as long as the native poll keeps stdout open.
@@ -2242,17 +2253,19 @@ cmd_ensure_listening() {
 # as settled design and eventually relax it.
 # Exit cleanup holds its own leader alive, so group quiescence here means no
 # member other than that leader. The inspector moves to a separate group before
-# invoking ps: neither it nor its ps child can look like a surviving source.
+# reading the process table: neither it nor its reader child can look like a
+# surviving source. The table comes from fm_procevent_proc, so a confined runner
+# reads it without setuid ps.
 # Return 0 when drained, 1 while children remain, 2 when inspection is uncertain.
 runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
   perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
     use strict;
     use warnings;
-    my ($pid, $wait) = @ARGV;
+    my ($pid, $wait, @table) = @ARGV;
     setpgrp(0, 0) or exit 2;
     my $deadline = clock_gettime(CLOCK_MONOTONIC) + $wait;
     while (1) {
-      open my $ps, "-|", "ps", "-axo", "pid=,pgid=" or exit 2;
+      open my $ps, "-|", @table or exit 2;
       my ($leader, $children) = (0, 0);
       while (my $line = <$ps>) {
         $line =~ /\A\s*(\d+)\s+(\d+)\s*\z/ or exit 2;
@@ -2265,7 +2278,7 @@ runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
       exit 1 if clock_gettime(CLOCK_MONOTONIC) >= $deadline;
       sleep 0.1;
     }
-  ' "$1" "$2"
+  ' "$1" "$2" bash -c "SCRIPT_DIR=$(printf '%q' "$SCRIPT_DIR"); $(declare -f fm_procevent_proc); fm_procevent_proc table pid,pgid"
 }
 
 runner_group_signal() {  # <signal> <pid> <identity> [proved]
@@ -2287,7 +2300,7 @@ runner_group_signal() {  # <signal> <pid> <identity> [proved]
       1) fm_procevent_group_alive "$pid" && return 2; return 1 ;;
       *) return 2 ;;
     esac
-    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || return 2
+    pgid=$(fm_procevent_proc pgid "$pid" | tr -d '[:space:]') || return 2
     [ "$pgid" = "$pid" ] || return 2
   fi
   # KNOWN LIMIT: portable shell cannot make this verification and signal atomic,

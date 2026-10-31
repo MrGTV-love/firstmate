@@ -17,8 +17,11 @@ mkdir -p "$STATE"
 # Everything this suite starts runs through a symlink under $LAB, so one pattern
 # names exactly this suite's processes and nothing else.
 ln -s "$(command -v bash)" "$LAB/bash"
-ln -s "$(command -v sleep)" "$LAB/nestsleep"
-ln -s "$(command -v sleep)" "$LAB/burstsleep"
+# A host sleep may dispatch on argv[0], so renaming it is not portable.
+# Keep real, suite-named native processes for both the census and its cleanup.
+STANDIN=$(fm_agent_standin "$LAB/standin") || fail "cannot create the process-tree stand-in"
+ln -s "$STANDIN" "$LAB/nestsleep"
+ln -s "$STANDIN" "$LAB/burstsleep"
 cat > "$LAB/nest.sh" <<'SH'
 #!/bin/sh
 # A self-recursive tree: every level waits for the next, the last level sleeps.
@@ -33,11 +36,13 @@ SH
 cat > "$LAB/burst.sh" <<'SH'
 #!/bin/sh
 # Starts $1 sleepers and exits; they outlive it until the suite kills them.
+# An optional $2 records the last sleeper's PID.
 i=0
 while [ "$i" -lt "$1" ]; do
   "$BURSTSLEEP" 60 &
   i=$((i + 1))
 done
+[ -z "${2:-}" ] || echo "$!" > "$2"
 SH
 
 stop_lab_processes() { pkill -f "$LAB/(bash|nestsleep|burstsleep)" >/dev/null 2>&1; return 0; }
@@ -88,6 +93,24 @@ pass "check reads the user's process count and reports its limit or UNKNOWN"
 if "$GUARD" check --check --limit 1 >/dev/null; then fail "--check exited zero on a CRITICAL verdict"; fi
 pass "check classifies the count against the limit and --check exits on WARNING or CRITICAL"
 
+# The warning must carry the rerun probe, so a reader is never left to invent it.
+# A small burst makes a WARNING reachable even on a quiet host with a tiny count.
+warning_pids=()
+for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 60 & warning_pids+=("$!"); done
+sleep 0.2
+warning_count=$("$GUARD" check --json | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["count"])')
+warning_limit=$(python3 -I -c 'import sys; print(max(3, int(int(sys.argv[1]) / 0.75)))' "$warning_count")
+warning_json=$("$GUARD" check --json --limit "$warning_limit")
+for warning_pid in "${warning_pids[@]}"; do kill "$warning_pid" 2>/dev/null || true; done
+wait "${warning_pids[@]}" 2>/dev/null || true
+printf '%s\n' "$warning_json" | python3 -I -c '
+import json, sys
+j = json.load(sys.stdin)
+assert j["status"] == "WARNING", j
+assert "bin/fm-proc-guard.py check --json" in j["recommendation"], j
+' || fail "a WARNING recommendation must carry the rerun probe: $warning_json"
+pass "the warning carries the exact rerun probe and the census command"
+
 for command in check census watch; do
   for bad in "--warn-pct 60" "--clear-pct 50" "--crit-pct 90" "--keep 20"; do
     # shellcheck disable=SC2086
@@ -106,27 +129,30 @@ pass "threshold and retention customization are refused, as are invalid remainin
 export NESTSLEEP="$LAB/nestsleep" BURSTSLEEP="$LAB/burstsleep"
 "$LAB/bash" "$LAB/nest.sh" 60 --user alice:secret >/dev/null 2>&1 &
 ROOT_PID=$!
-fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
+fm_test_wait_until --while-alive "$ROOT_PID" -- pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
 
 path=$("$GUARD" census --state-dir "$STATE/census" --limit 1000000) || fail "census exited nonzero"
 [ -f "$path" ] || fail "census did not print an existing file: $path"
 mode=$(python3 -I -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$path")
 [ "$mode" = 0o600 ] || fail "census file mode is $mode, not 0600"
-python3 -I - "$path" <<'PY' || fail "census did not describe the recursive tree"
-import json, re, sys
+python3 -I - "$path" "$NESTSLEEP" "$STANDIN" <<'PY' || fail "census did not describe the recursive tree"
+import json, os, re, sys
 c = json.load(open(sys.argv[1]))
 cmds = {e["command"]: e["count"] for e in c["by_command"]}
 # The kernel names a process after the binary it runs on macOS and after the path it
 # was started through on Linux, so the shell and sleeper may carry either name.
 shells = sum(n for name, n in cmds.items() if "bash" in name)
 assert shells >= 60, "bash-named processes: %d" % shells
-assert any("sleep" in name for name in cmds), "no sleep in by_command"
+# The sleeper is the stand-in started through the nestsleep symlink: one of its two
+# names is the process name and the other is the executable the guard reads.
+sleeper = {os.path.basename(sys.argv[2]), os.path.basename(os.path.realpath(sys.argv[3]))}
+assert any(name in sleeper for name in cmds), "no stand-in in by_command"
 assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_parent_chain"]), \
     c["by_parent_chain"][:5]
 deepest = c["deepest_chains"]
 assert 1 <= len(deepest) <= 5, len(deepest)
 top = deepest[0]
-assert "sleep" in top["leaf"]["executable"] and top["leaf"]["script"] == "", top["leaf"]
+assert {top["leaf"]["command"], top["leaf"]["executable"]} == sleeper and top["leaf"]["script"] == "", top["leaf"]
 runs = [int(n) for n in re.findall(r"bash\(x(\d+)\)", top["chain"])]
 assert runs and max(runs) >= 60, top["chain"]
 assert top["run_length"] >= 60 and top["depth"] >= 61, top
@@ -221,8 +247,8 @@ if [ "$room" = 1 ]; then
   # burst, and dropping the burst returns well below it, however busy the host is.
   limit=$(python3 -I -c 'import sys; print(int((int(sys.argv[1]) + int(sys.argv[2]) // 2) / 0.6) + 1)' "$base" "$burst")
   D="$STATE/dip"
-  "$LAB/bash" "$LAB/burst.sh" "$burst"
-  fm_test_wait_until 60 burst_ready || fail "the first burst never started"
+  "$LAB/bash" "$LAB/burst.sh" "$burst" "$LAB/burst.last"
+  fm_test_wait_until --while-alive "$(cat "$LAB/burst.last")" -- burst_ready || fail "the first burst never started"
   first=$(now)
   "$GUARD" watch --state-dir "$D" --limit "$limit" --hold 4 --interval 0.2 --source-id t-dip > "$LAB/dip.out" &
   WATCH_PID=$!
@@ -247,7 +273,7 @@ fi
 # --- never kills -------------------------------------------------------------
 
 "$LAB/bash" "$LAB/nest.sh" 5 >/dev/null 2>&1 &
-fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the survivor tree never reached its leaf"
+fm_test_wait_until --while-alive "$!" -- pgrep -f "$LAB/nestsleep 120" || fail "the survivor tree never reached its leaf"
 "$GUARD" watch --state-dir "$STATE/survivors" --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "watch exited nonzero over the survivor tree"
 pgrep -f "$LAB/nestsleep 120" >/dev/null || fail "watch killed a process of the tree it reported"
 pass "a reported pile-up is never killed"

@@ -328,10 +328,11 @@ test_attached_arm_follows_a_slow_live_holder() {
   pass "watch-arm: an attached arm keeps following a slow live holder and reports its wake"
 }
 
-# The stall bound is where following ends. A live holder whose beacon reaches it
-# is what the watcher's own re-arm evicts, so the attached arm stops there with
-# the typed stalled-holder line, and its owner's retry replaces the holder
-# instead of being refused.
+# Proven no progress for the stall bound is where following ends. A live holder
+# whose process tree and beacon make no progress for it is what the watcher's
+# own re-arm evicts, so the attached arm stops there with the typed
+# stalled-holder line, and its owner's retry replaces the holder instead of
+# being refused.
 test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   local dir state fakebin armout rearmout holder identity status
   dir=$(make_case attached-stalled-holder)
@@ -359,7 +360,7 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   status=$?
   grep -qF "watcher: attached pid=$holder" "$armout" \
     || fail "arm did not attach to the fresh holder: $(cat "$armout")"
-  grep -E "^watcher: FAILED - attached watcher pid=$holder stalled \(beacon [0-9]+s at or past hard bound 12s\)\$" "$armout" >/dev/null \
+  grep -E "^watcher: FAILED - attached watcher pid=$holder stalled \(no CPU or beacon progress for 12s; beacon [0-9]+s\)\$" "$armout" >/dev/null \
     || fail "attached arm did not report the stalled holder: $(cat "$armout")"
   ! grep -qF 'cycle ended without an actionable reason' "$armout" \
     || fail "attached arm gave up on the live holder before the stall bound: $(cat "$armout")"
@@ -387,7 +388,7 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   expect_code 0 "$status" "the retry that replaced a stalled holder must close with an ordinary wake"
   wait_for_pid_gone "$holder" 50 || fail "the stalled holder survived its replacement"
   wait "$holder" 2>/dev/null || true
-  pass "watch-arm: an attached arm hands a holder stalled past the bound to its owner's replacement"
+  pass "watch-arm: an attached arm hands a holder proven stalled for the bound to its owner's replacement"
 }
 
 test_rearm_resurfaces_durable_queue_and_remote_open_decision() {

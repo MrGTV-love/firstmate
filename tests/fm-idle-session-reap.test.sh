@@ -33,7 +33,9 @@ case "$mode" in
   ok) rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
+  nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
   hang) exec sleep 30 ;;
+  slow) for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo "teardown step $i"; sleep 1; done; rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   real) exec "$ROOT/bin/fm-teardown.sh" "$@" ;;
   steer-race)
     if [ "$1" = a-first ]; then
@@ -123,6 +125,12 @@ calls() {
   else
     printf 0
   fi
+}
+
+# The task ids the stand-in teardown was asked about, one per line.
+calls_ids() {
+  [ -f "$STUB_LOG" ] || return 0
+  sed -n 's/.*|args=\([^|]*\)|home=.*/\1/p' "$STUB_LOG"
 }
 
 calls_at_least() { [ "$(calls)" -ge "$1" ]; }
@@ -400,6 +408,25 @@ test_lease_refusal_is_transient() {
   pass "a lease refusal is skipped without a memo and retried next pass"
 }
 
+# Teardown whose no-mistakes read went silent knows nothing yet and exits 75. That
+# is a retry, never a refusal: no memo, so the task is not parked for the retry
+# interval, and the next sweep offers it again.
+test_unknown_no_mistakes_read_is_retried_not_parked() {
+  local home out
+  home=$(make_home nmunknown)
+  : > "$STUB_LOG"
+  printf 'nm-unknown\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-nm scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-nm
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-nm lock-skipped "an unknown no-mistakes read is a retry"
+  assert_absent "$home/state/.idle-reap/scout-nm.refused" "an unknown no-mistakes read records no refusal memo"
+  assert_present "$home/state/scout-nm.meta" "an unknown no-mistakes read preserves the task record"
+  out=$(run_reap "$home" reap) || fail "second reap failed: $out"
+  [ "$(calls)" = 2 ] || fail "a task whose no-mistakes read was unknown is offered again on the next pass (calls=$(calls))"
+  pass "an unknown no-mistakes read is retried on the next pass, with no memo and no park"
+}
+
 
 # A finished, idle pool-slot scout whose tmux endpoint record validates, so the
 # real teardown reaches its project-lock admission.
@@ -586,7 +613,7 @@ test_single_flight_lock() {
   scout_report "$home" scout-lock
   run_reap "$home" reap >/dev/null 2>&1 &
   pid=$!
-  fm_test_wait_until 10 calls_at_least 1 || fail "first sweep never reached teardown"
+  fm_test_wait_until --while-alive "$pid" -- calls_at_least 1 || fail "first sweep never reached teardown"
   hung=$(cut -d'|' -f1 "$STUB_LOG" | head -n 1)
   out=$(run_reap "$home" reap) || fail "overlapping sweep failed: $out"
   [ "$(calls)" = 1 ] || fail "an overlapping sweep must not start another teardown (calls=$(calls))"
@@ -709,6 +736,199 @@ test_captain_holds() {
   pass "durable and unreadable captain holds prevent automatic cleanup"
 }
 
+# A captain hold that declares a project frozen keeps the sweep, and the
+# teardown admission it relies on, away from every finished task of that
+# project, whatever the task is named. The scope is the project the hold
+# declares: a plain hold of the same repo freezes nothing, and a same-prefix
+# task of another project is still reaped. Answering the hold frees the task.
+test_project_freeze() {
+  local home out rc=0 pr=https://github.com/acme/widget/pull/41
+  home=$(make_home freeze)
+  mk_task "$home" vernant-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/vernant"
+  merge_marker "$home" vernant-merged acme/widget 41
+  mk_task "$home" other-name-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/vernant"
+  merge_marker "$home" other-name-merged acme/widget 41
+  mk_task "$home" vernant-sibling ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/sample"
+  merge_marker "$home" vernant-sibling acme/widget 41
+  mk_task "$home" vernant-scout scout idle "done [at=$OLD]: report written" -- "project=$home/projects/vernant"
+  scout_report "$home" vernant-scout
+  mk_task "$home" no-project ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr"
+  merge_marker "$home" no-project acme/widget 41
+  printf 'Frozen by the captain.\n' > "$home/release.txt"
+
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "with no hold, the finished task is reap-ready"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null || fail "hold failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "a hold that declares no project freezes nothing, whatever its repo"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "freeze declaration failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged parked "an open freeze parks the finished ship of its project"
+  expect_class "$out" other-name-merged parked "the scope is the declared project, not a task-name prefix"
+  expect_class "$out" vernant-scout parked "a finished scout of the frozen project is parked too"
+  expect_class "$out" vernant-sibling reap "a same-prefix task of another project is still reaped"
+  expect_class "$out" no-project reap "a task that records no project is outside every declared scope"
+  case "$(row_detail "$out" vernant-merged)" in
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the parked row must name the freezing hold and project: $(row_detail "$out" vernant-merged)" ;;
+  esac
+
+  : > "$STUB_LOG"
+  printf 'ok\n' > "$STUB_MODE_FILE"
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  case "$(calls_ids)" in
+    *vernant-merged*|*other-name-merged*|*vernant-scout*) fail "the sweep offered a frozen task to teardown: $(calls_ids)" ;;
+  esac
+  assert_present "$home/state/vernant-merged.meta" "a frozen task keeps its record"
+  assert_absent "$home/state/.idle-reap/vernant-merged.refused" "a frozen task is never offered to teardown, so no refusal memo is written"
+  assert_grep "frozen by captain hold vernant-freeze" "$home/state/idle-sessions.report" "the published report carries the freeze reason"
+  assert_absent "$home/state/vernant-sibling.meta" "the unfrozen sibling was reaped"
+
+  out=$(FM_HOME="$home" FM_IDLE_REAP_ADMISSION=1 "$ROOT/bin/fm-teardown.sh" vernant-merged 2>&1) || rc=$?
+  expect_code 1 "$rc" "automatic teardown admission refuses a frozen task"
+  case "$out" in *"automatic reap ineligible: parked: frozen by captain hold vernant-freeze"*) ;; *) fail "admission must refuse by the freeze: $out" ;; esac
+  assert_present "$home/state/vernant-merged.meta" "the refused admission left the task alone"
+
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/vernant-merged.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged parked "an interrupted teardown of a frozen project's task is not retried"
+  rm -f "$home/state/vernant-merged.teardown-return-pending"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$home/release.txt" --release >/dev/null || fail "release failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "releasing the hold makes the task eligible again"
+  expect_class "$out" other-name-merged reap "releasing the hold frees every task of the project"
+  pass "an open project freeze parks only the declared project's finished tasks until it is released"
+}
+
+# A local secondmate home also reads its parent home's open captain holds
+# through the parent binding its parent channel uses, so the parent declares a
+# freeze once and the mate needs no mirror. A binding or a parent backlog that
+# cannot be read parks the task with that reason, and the parent's answer frees
+# it.
+test_secondmate_parent_freeze() {
+  local main mate pr=https://github.com/acme/widget/pull/41 out
+  main=$(make_home freeze-main)
+  mate=$(make_home freeze-mate)
+  printf 'mate\n' > "$mate/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$main" > "$mate/.fm-secondmate-parent"
+  mk_task "$mate" vernant-mate-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$mate/projects/vernant"
+  merge_marker "$mate" vernant-mate-merged acme/widget 41
+  mk_task "$mate" sample-mate-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$mate/projects/sample"
+  merge_marker "$mate" sample-mate-merged acme/widget 41
+  printf 'Frozen by the captain.\n' > "$main/release.txt"
+
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "with no parent hold, the mate's finished task is reap-ready"
+
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
+    || fail "parent hold failed"
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "parent freeze declaration failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "the mate's reaper honors its parent's freeze"
+  expect_class "$out" sample-mate-merged reap "the parent's freeze covers only its declared project"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the mate's parked row must name the parent's hold: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+
+  mv "$main/data" "$main/data.off"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "an unreadable parent backlog parks the task"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"captain freeze unreadable"*"parent home"*) ;;
+    *) fail "the parked row must say the parent could not be read: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+  mv "$main/data.off" "$main/data"
+
+  mv "$mate/.fm-secondmate-parent" "$mate/.fm-secondmate-parent.off"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "a missing parent binding parks the task"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"captain freeze unreadable"*"parent binding"*) ;;
+    *) fail "the parked row must say the parent binding could not be read: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+  mv "$mate/.fm-secondmate-parent.off" "$mate/.fm-secondmate-parent"
+
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$main/release.txt" --release >/dev/null || fail "parent release failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "the parent's release makes the mate's task eligible again"
+  pass "a secondmate home honors its parent's freeze, fails closed when the parent cannot be read, and frees the task on release"
+}
+
+# A freeze at the captain's home reaches every local home below it: a
+# grandchild mate walks each local parent binding up to the root and reads
+# every backlog on the way. A middle link that is missing or cannot be read, or
+# a binding that loops back, parks the task and names the failed link, and the
+# root's release frees it.
+test_grandchild_mate_root_freeze() {
+  local root mid grand pr=https://github.com/acme/widget/pull/41 out
+  root=$(make_home freeze-root)
+  mid=$(make_home freeze-mid)
+  grand=$(make_home freeze-grand)
+  printf 'mid\n' > "$mid/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$root" > "$mid/.fm-secondmate-parent"
+  printf 'grand\n' > "$grand/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$mid" > "$grand/.fm-secondmate-parent"
+  mk_task "$grand" vernant-grand-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$grand/projects/vernant"
+  merge_marker "$grand" vernant-grand-merged acme/widget 41
+  printf 'Frozen by the captain.\n' > "$root/release.txt"
+
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged reap "with no freeze anywhere, the grandchild's finished task is reap-ready"
+
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
+    || fail "root hold failed"
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "root freeze declaration failed"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "the grandchild's reaper honors the root's freeze"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the grandchild's parked row must name the root's hold: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
+  mv "$mid/.fm-secondmate-parent" "$mid/.fm-secondmate-parent.off"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "a middle mate whose binding is missing parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"parent binding of"*"freeze-mid"*) ;;
+    *) fail "the parked row must name the middle mate's missing binding: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
+  printf 'garbage\n' > "$mid/.fm-secondmate-parent"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "an unreadable middle link parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"parent binding of"*"freeze-mid"*) ;;
+    *) fail "the parked row must name the unreadable middle link: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$grand" > "$mid/.fm-secondmate-parent"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "a parent chain that loops parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"loops back"*) ;;
+    *) fail "the parked row must name the looping link: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+  mv "$mid/.fm-secondmate-parent.off" "$mid/.fm-secondmate-parent"
+
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$root/release.txt" --release >/dev/null || fail "root release failed"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged reap "the root's release makes the grandchild's task eligible again"
+  pass "a grandchild mate honors a root freeze, fails closed on a broken or looping link, and frees the task on release"
+}
+
 test_stale_selection_is_revalidated() {
   local home out
   home=$(make_home stale)
@@ -739,7 +959,7 @@ test_admission_reads_after_metadata_lock() {
     trap 'fm_lock_release "$lock"' EXIT
     FM_HOME="$home" FM_IDLE_REAP_ADMISSION=1 "$ROOT/bin/fm-teardown.sh" worker > "$home/teardown.out" 2>&1 &
     pid=$!
-    fm_test_wait_until 10 test -e "$home/state/.control-worker.lock" || { kill "$pid"; exit 1; }
+    fm_test_wait_until --while-alive "$pid" -- test -e "$home/state/.control-worker.lock" || { kill "$pid"; exit 1; }
     mkdir -p "$home/state/worker.inbox"
     printf 'instruction delivered while admission waits\n' > "$home/state/worker.inbox/007.msg"
     fm_lock_release "$lock"
@@ -797,32 +1017,53 @@ test_admission_rechecks_every_gate() {
   pass "automatic admission rechecks all selection gates for ships and scouts"
 }
 
-test_teardown_timeout_is_bounded() {
-  local home out start end fakebin
+# A teardown is stopped by silence, never by how long it takes. The silent one
+# below prints nothing and burns no CPU for far longer than its stall interval.
+test_silent_teardown_is_stopped_after_its_stall_interval() {
+  local home out pid
   home=$(make_home timeout)
+  : > "$STUB_LOG"
+  printf 'hang\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-slow scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-slow
+  out=$(FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-slow teardown-timeout "a silent teardown is stopped"
+  pid=$(sed -n '1s/|.*//p' "$STUB_LOG")
+  [ -n "$pid" ] || fail "the silent teardown never started"
+  ! kill -0 "$pid" 2>/dev/null || { kill -KILL "$pid" 2>/dev/null || true; fail "the silent teardown was left running"; }
+  assert_present "$home/state/.idle-reap/scout-slow.refused" "a proven hang is remembered"
+  assert_present "$home/state/scout-slow.meta" "a stopped teardown does not retire the task"
+  pass "a teardown that goes silent is stopped, reported, and remembered"
+}
+
+# The same sweep on a slow host. The stand-in teardown works for twelve seconds,
+# six times the stall interval, saying something every second; the cap this used
+# to run under is accelerated so it would have fired long before the end (the
+# `sleep 600` that the bash fallback of the old cap waited on becomes two seconds).
+# A teardown that is slow but working must complete and retire its task.
+test_slow_working_teardown_is_not_cut() {
+  local home out fakebin
+  home=$(make_home slow-working)
   fakebin=$(fm_fakebin "$home")
   cat > "$fakebin/sleep" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = 600 ]; then
-  exec /bin/sleep 1
+  exec /bin/sleep 2
 fi
 exec /bin/sleep "$@"
 SH
   chmod +x "$fakebin/sleep"
   : > "$STUB_LOG"
-  printf 'hang\n' > "$STUB_MODE_FILE"
-  mk_task "$home" scout-slow scout idle "done [at=$OLD]: report written"
-  scout_report "$home" scout-slow
-  start=$(date +%s)
-  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) || fail "reap failed: $out"
-  end=$(date +%s)
-  [ $((end - start)) -lt 20 ] || fail "a hung teardown was not cut at the accelerated bound"
-  expect_class "$out" scout-slow teardown-timeout "the real timeout runner cuts a hung teardown"
-  assert_present "$home/state/.idle-reap/scout-slow.refused" "a timeout is remembered"
-  assert_present "$home/state/scout-slow.meta" "a timeout does not retire the task"
-  pass "the fixed teardown timeout cuts a hung command and records its refusal"
+  printf 'slow\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-busy scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-busy
+  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) \
+    || fail "reap failed: $out"
+  expect_class "$out" scout-busy reaped "a slow, working teardown completes"
+  assert_absent "$home/state/.idle-reap/scout-busy.refused" "a working teardown is not remembered as refused"
+  assert_absent "$home/state/scout-busy.meta" "the completed teardown retired the task"
+  pass "a teardown that is slow but working is never cut and retires its task"
 }
-
 test_selection_matrix
 test_paused_reasons_survive_busy_and_steering_gates
 test_reap_asks_teardown_without_force
@@ -830,6 +1071,7 @@ test_budget_bounds_teardowns_per_pass
 test_refusal_is_remembered_and_retried_on_change
 test_real_teardown_refusal_preserves_the_task
 test_lease_refusal_is_transient
+test_unknown_no_mistakes_read_is_retried_not_parked
 test_project_lock_contention_is_skipped_and_retried
 test_project_lock_fresh_publication_is_skipped_not_refused
 test_project_lock_acquisition_error_is_not_skipped
@@ -837,40 +1079,35 @@ test_unknown_times_and_fixed_grace
 test_canonical_forge_markers
 test_semantic_idle_sources
 test_captain_holds
+test_project_freeze
+test_secondmate_parent_freeze
+test_grandchild_mate_root_freeze
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
-# A teardown that outlasts the sweep's limit after it reserved its slot keeps
-# its return-pending record. The timeout must then record no refusal memo, so
-# the very next sweep selects the closed task again instead of parking it.
+# A teardown that goes silent after it reserved its slot keeps its return-pending
+# record. The stop must then record no refusal memo, so the very next sweep selects
+# the closed task again instead of parking it.
 test_timeout_with_a_pending_return_is_retried_by_the_next_sweep() {
-  local home out fakebin
+  local home out
   home=$(make_home timeout-pending)
-  fakebin=$(fm_fakebin "$home")
-  cat > "$fakebin/sleep" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = 600 ]; then
-  exec /bin/sleep 1
-fi
-exec /bin/sleep "$@"
-SH
-  chmod +x "$fakebin/sleep"
   : > "$STUB_LOG"
   printf 'hang\n' > "$STUB_MODE_FILE"
   mk_task "$home" scout-pending scout idle "done [at=$OLD]: report written"
   scout_report "$home" scout-pending
   printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/scout-pending.teardown-return-pending"
-  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) \
+  out=$(FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) \
     || fail "reap failed: $out"
-  expect_class "$out" scout-pending teardown-timeout "the real timeout runner cuts the hung teardown"
-  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a timeout with a pending return records no refusal memo"
-  assert_present "$home/state/scout-pending.meta" "the timeout retired the task"
-  assert_present "$home/state/scout-pending.teardown-return-pending" "the timeout dropped the pending-return record"
+  expect_class "$out" scout-pending teardown-timeout "a silent teardown is stopped"
+  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a stop with a pending return records no refusal memo"
+  assert_present "$home/state/scout-pending.meta" "the stop retired the task"
+  assert_present "$home/state/scout-pending.teardown-return-pending" "the stop dropped the pending-return record"
   out=$(run_reap "$home" scan) || fail "scan failed: $out"
   expect_class "$out" scout-pending reap "the next sweep selects the closed task again"
-  pass "a timeout with a pending pool return leaves the task selectable by the next sweep"
+  pass "a stopped teardown with a pending pool return leaves the task selectable by the next sweep"
 }
-test_teardown_timeout_is_bounded
+test_silent_teardown_is_stopped_after_its_stall_interval
+test_slow_working_teardown_is_not_cut
 test_timeout_with_a_pending_return_is_retried_by_the_next_sweep
 test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock

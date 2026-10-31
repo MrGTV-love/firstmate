@@ -19,6 +19,9 @@ set -u
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh"
 TMP_ROOT=$(fm_test_tmproot fm-captain-hold)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
@@ -38,6 +41,7 @@ make_home() {  # <name>
 EOF
   fakebin=$(fm_fakebin "$home")
   fm_fake_exit0 "$fakebin" tmux treehouse no-mistakes gh gh-axi
+  fm_fake_ship_review_history "$fakebin"
   # Cleanup removes a task's own Docker objects, so without a stand-in it would
   # reach this host's real Docker daemon.
   fm_fake_docker "$fakebin"
@@ -90,9 +94,17 @@ tasks_in() {  # <home> <tasks-axi args...>
   (cd "$home" && tasks-axi "$@")
 }
 
+# A secondmate home must declare the owner of every hold it files, because its
+# parent channel carries both the captain's calls and the parent's own. These
+# suites exercise the captain-owned lifecycle, so a `hold` run inside a mate home
+# declares that owner here unless the caller passes one itself.
 run_captain() {  # <home> <command args...>
-  local home=$1
+  local home=$1 arg owner_given=0
   shift
+  if [ "${1-}" = hold ] && [ -e "$home/.fm-secondmate-home" ]; then
+    for arg in "$@"; do [ "$arg" != --owner ] || owner_given=1; done
+    [ "$owner_given" = 1 ] || set -- "$@" --owner captain
+  fi
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"
@@ -150,7 +162,7 @@ case "${1:-} ${2:-}" in
         printf 'MERGED\t%s\t%s\n' "${FM_TEST_MERGED_HEAD:-}" "${FM_TEST_MERGED_PR:-}"
         ;;
       *mergeStateStatus*)
-        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main"}'
+        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main","baseRefOid":"0000000000000000000000000000000000000000"}'
         ;;
       *headRefOid*) printf '%s\n' 1111111111111111111111111111111111111111 ;;
     esac
@@ -170,6 +182,9 @@ case "${1:-} ${2:-}" in
       *) printf '%s\n' '[]' ;;
     esac
     ;;
+  "api repos/"*"/compare/"*)
+    printf '%s\n' '{"behind_by":0,"base_commit":{"sha":"0000000000000000000000000000000000000000"},"merge_base_commit":{"sha":"0000000000000000000000000000000000000000"}}'
+    ;;
   "api repos/"*) printf '%s\n' '{"name":"main","protected":false}' ;;
 esac
 SH
@@ -188,6 +203,13 @@ SH
 run_pr_merge() {  # <home> <id> <url>
   local home=$1
   shift
+  # Yes-trigger independent PASS evidence must not bypass the separate hold guards.
+  printf 'VERDICT: PASS head=%s\n' 1111111111111111111111111111111111111111 > "$home/review.md"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" review \
+    --pr "$2" --head 1111111111111111111111111111111111111111 \
+    --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
+    --report "$home/review.md" >/dev/null || return
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" FM_TEST_GH_LOG="$home/gh.log" \
@@ -266,6 +288,7 @@ write_origin_meta() {  # <home> <id> [kind]
     "worktree=$home/projects/missing-$id" \
     "project=$home/projects/sample" \
     "harness=codex" \
+    "model=gpt-5.1-codex" \
     "kind=$kind" \
     "mode=$kind" \
     "spawn_gen=fixture-$id"
@@ -280,7 +303,7 @@ write_origin_meta() {  # <home> <id> [kind]
 # through bd directly where possible because the npm-published tasks-axi ships
 # the markdown backend only; the hold itself needs a beads-capable tasks-axi,
 # so that family probes once and skips itself with an explicit reason on
-# markdown-only installs, mirroring tests/fm-control-relaunch.test.sh.
+# markdown-only installs, mirroring tests/fm-control-relaunch-recovery.test.sh.
 
 # Build a fixture home whose configured backend is a scratch Beads graph.
 # Echoes "<home>|<graph-beads-dir>". The graph repo dir is named "fm" because
@@ -411,20 +434,8 @@ SH
 # Runs this suite's `tests` array, or only the named cases, then proves cleanup
 # left no process-event runner or watchdog behind.
 captain_hold_run_tests() {  # [case-name...]
-  local requested candidate selected selected_test
-  if [ "$#" -gt 0 ]; then
-    for requested in "$@"; do
-      selected=0
-      for candidate in "${tests[@]}"; do
-        [ "$requested" != "$candidate" ] || selected=1
-      done
-      [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
-    done
-    tests=("$@")
-  fi
-  for selected_test in "${tests[@]}"; do
-    "$selected_test" || exit "$?"
-  done
+  # shellcheck disable=SC2154 # Each suite assigns its tests array before calling this.
+  fm_test_run_cases "${tests[@]}" -- "$@"
 
   # Run the ordinary home-scoped cleanup before checking actual process state.
   # The watchdog may be asleep until its next owner check after a runner exits.

@@ -48,7 +48,7 @@
 # on their own for on-demand reads (fm-peek.sh, fm-crew-state.sh).
 
 FM_BACKEND_SCRIPT=${BASH_SOURCE[0]:-$0}
-FM_BACKEND_LIB_DIR="$(cd "$(dirname "$FM_BACKEND_SCRIPT")" && pwd)"
+FM_BACKEND_LIB_DIR="$(d=${FM_BACKEND_SCRIPT%/*}; [ "$d" != "$FM_BACKEND_SCRIPT" ] || d=.; cd "${d:-/}" && pwd)"
 unset FM_BACKEND_SCRIPT
 FM_BACKEND_DEFAULT_ROOT="$(cd "$FM_BACKEND_LIB_DIR/.." && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_DEFAULT_ROOT}}"
@@ -96,7 +96,10 @@ fm_backend_is_known() {  # <name>
 # tmux started inside a herdr pane, so $TMUX is checked first and wins over
 # HERDR_ENV=1 in that nested case. herdr injects HERDR_ENV=1 (plus
 # HERDR_SOCKET_PATH/HERDR_PANE_ID) into every process it manages a pane for;
-# HERDR_ENV=1 alone (no $TMUX) selects herdr. cmux injects CMUX_WORKSPACE_ID
+# HERDR_ENV=1 alone (no $TMUX) selects herdr. Firstmate's Claude launch boundary
+# replaces HERDR_ENV in that child with FM_HERDR_RUNTIME=1, a Firstmate-only
+# marker that selects the same backend.
+# Neither marker grants pane/lifecycle ownership. cmux injects CMUX_WORKSPACE_ID
 # (plus CMUX_SURFACE_ID/CMUX_SOCKET_PATH and the legacy CMUX_TAB_ID/
 # CMUX_PANEL_ID aliases) into every terminal surface it spawns - verified from
 # the shipped source (`TerminalSurface+StartupEnvironment.swift`'s
@@ -134,7 +137,7 @@ fm_backend_is_known() {  # <name>
 #      tmux, where the tmux server reparents to launchd and the chain never
 #      reaches cmux - which is fine, because $TMUX already won there.
 # Callers needing the winning signal read FM_BACKEND_DETECT_SIGNAL (set to
-# TMUX, HERDR_ENV, CMUX_WORKSPACE_ID, bundle-id, or ancestry) and
+# TMUX, HERDR_ENV, FM_HERDR_RUNTIME, CMUX_WORKSPACE_ID, bundle-id, or ancestry) and
 # FM_BACKEND_DETECTED after a direct (non-command-substitution) call.
 FM_BACKEND_CMUX_BUNDLE_ID="com.cmuxterm.app"
 
@@ -147,9 +150,10 @@ fm_backend_detect() {
     printf 'tmux'
     return 0
   fi
-  if [ "${HERDR_ENV:-}" = "1" ]; then
+  if [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; then
     FM_BACKEND_DETECTED=herdr
-    FM_BACKEND_DETECT_SIGNAL=HERDR_ENV
+    FM_BACKEND_DETECT_SIGNAL=FM_HERDR_RUNTIME
+    [ "${HERDR_ENV:-}" != 1 ] || FM_BACKEND_DETECT_SIGNAL=HERDR_ENV
     printf 'herdr'
     return 0
   fi
@@ -1024,8 +1028,10 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # reuses its strict husk classifier -
 # which consults `pane process-info` and the real process table even when
 # registration is absent, so a registration Herdr kept over a shell-only pane reads
-# `dead` here (issue #4115) - then maps a positively stopped session server to
-# `missing` only in this recovery-grade view. Zellij remains unverified because
+# `dead` here (issue #4115). A Herdr session whose stopped status is backed by
+# proven process and socket absence reads `missing`; a failed probe or an
+# unproven stop is `unreadable`. This read never starts a server. Zellij remains
+# unverified because
 # its secondmate ghost-tab and agent-process recovery path has not been
 # empirically validated. Orca and cmux do not support secondmate spawns.
 fm_backend_agent_state() {  # <backend> <target>

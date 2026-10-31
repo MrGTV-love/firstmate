@@ -40,19 +40,22 @@ The optional claude-bridge extension runs a nested executable literally named `c
 [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns session posture, worker-only memory scope, and the invariant that the captain's own configuration is never written.
 OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`; native rotation also applies to review processes launched with extensions disabled.
 Workers enable usage-aware selection without a generic percentage reserve or reset wait, and a later per-task overlay, `state/<id>.omp-fallback.yml`, supplies only the selected rule's exact model-and-effort fallback chain.
-Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's single Codex account; the schema, the tracked session overlay's Sol-to-DeepSeek-Flash chain, and supported cross-harness stand-ins belong to `docs/configuration.md`.
+Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's single Codex account; the schema and supported cross-harness stand-ins belong to `docs/configuration.md`, while [dsh routing](references/harness/dsh.md#routing) owns the replacement of omp for DeepSeek.
 
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
 A file that is both auto-discovered and named with `-e` loads twice, so the per-task busy extension lives in `state/` and is the only `-e` a secondmate launch names.
 The primary extensions stay auto-discovered and are not named again.
+A ship or scout worker in a task copy of this repository also auto-discovers them, so both skip their home work when `FM_TASK_ID` is set (`../../../.omp/extensions/lib/fm-task-worker.ts`): the copy never receives `state/.omp-live-model`, the two `-extension-loaded` markers, or `state/extensions/omp-primary-watch`, and the worker gets no home session-start digest.
+The worker keeps the watcher-arm seatbelt and the `session_stop` turn-end guard, whose own crew and scout exemption decides that case.
+`bin/fm-spawn.sh` exports `FM_TASK_ID` into every ship and scout pane and never into a primary or secondmate home.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration
 
 The omp primary follows the Pi extension-owned watcher model through `../../../docs/supervision-protocols/omp.md`: `.omp/extensions/fm-primary-omp-watch.ts` arms `bin/fm-watch-arm.sh --restart` through the `fm_watch_arm_omp` tool and owns every successor, and `.omp/extensions/fm-primary-turnend-guard.ts` answers omp's blocking `session_stop` hook by forcing one continuation when `../../../bin/fm-turnend-guard.sh` returns 2, bounded per turn by omp's `stop_hook_active` flag.
-The same file ports the `tool_call` seatbelts and delivers the session-start digest through `before_agent_start` on the Run tier; omp's `session_start` carries no reason, so the source is derived (first start `startup` or `resume` from the launch line, later in-process starts `clear`, `session_compact` as `compact`).
+The same file ports the `tool_call` watcher-arm seatbelt and delivers the session-start digest through `before_agent_start` on the Run tier; omp's `session_start` carries no reason, so the source is derived (first start `startup` or `resume` from the launch line, later in-process starts `clear`, `session_compact` as `compact`).
 omp has no asynchronous Stop-hook equivalent, so the Claude auto-arm model does not apply; `fm_supervision_model` classifies omp as `extension`, and `fm_omp_extension_owns_supervision` in `../../../bin/fm-wake-lib.sh` is the ownership proof that tolerates the extension's own watcher hand-off.
 The Pi supervision branch does not run on omp; without the supervision host every actionable wake is delivered to main, and in a home with `config/supervision-host` and no `config/supervision-host-off` the watch extension spawns the host instead of the arm, with Claude's print mode as its headless engine ([`supervision-host.md`](../../../docs/supervision-host.md)).
 Launch a primary with plain `omp` inside the home (`FM_OMP_HARNESS=omp omp` when starting from a Claude pane); `../../../bin/fm-session-start.sh` prints `OMP_WATCH_EXTENSION: not loaded` when the running session has not loaded both tracked supervision extensions.

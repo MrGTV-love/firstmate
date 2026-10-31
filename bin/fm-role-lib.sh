@@ -479,6 +479,15 @@ fm_role_inherit_payload() (
   printf 'maintainer %s\n' "$FM_ROLE_SCOPE" >"$3"
 )
 
+# fm_role_pub_deny_event: record the authority refusal as guard telemetry.
+# bin/fm-guard-event.sh always exits 0, and the fallback keeps a missing or
+# broken writer from changing the refusal's return code under set -e.
+fm_role_pub_deny_event() {
+  local dir
+  dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
+  "$dir/fm-guard-event.sh" upstream-publish-role deny --source-ok true 2>/dev/null || true
+}
+
 # fm_role_gate_self_publish <home> <config-dir> <project-dir> <code-root> [consent]
 # Evaluate whether this home may run a publication contract for a task on
 # firstmate's own repository. rc 0 authorized (FM_ROLE_PUB_AUTHORITY names the
@@ -528,6 +537,7 @@ fm_role_gate_self_publish() {
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-  FM_ROLE_PUB_DENIAL="this home runs as firstmate user/operator and holds no publication authority for $FM_ROLE_PUB_TARGET"
+  FM_ROLE_PUB_DENIAL="this home runs as firstmate user/operator and holds no publication authority for $FM_ROLE_PUB_TARGET; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in $config/firstmate-role, or one-task consent recorded at dispatch as --upstream-consent <host>/<owner>/<repo>"
+  fm_role_pub_deny_event
   return 1
 }

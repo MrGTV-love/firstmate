@@ -39,8 +39,9 @@
 # HERE, BY THE CAPTAIN'S MANDATE: this script never tokenizes, classifies, or
 # semantically validates them, records no clause fields, ids, or verbs, and keeps
 # no per-task merge-grant list. What stays mechanical is exactly what a script can
-# check without reading words: a merge green at its live head under this record's
-# lock, synchronous merges only, the spend cap, and the never-set.
+# check without reading words: a merge meeting bin/fm-pr-merge.sh's live-head
+# preconditions under this record's lock, synchronous merges only, the spend
+# cap, and the never-set.
 # HARD RULE: destructive, irreversible, and security-sensitive actions are never
 # pre-authorizable whatever the words say.
 #
@@ -125,7 +126,7 @@
 # fm_afk_contract_lock_hold, fm_afk_contract_lock_release) without running main.
 set -u
 
-FM_AFK_CONTRACT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FM_AFK_CONTRACT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_AFK_CONTRACT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 FM_AFK_CONTRACT_STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"

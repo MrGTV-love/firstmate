@@ -49,7 +49,7 @@
 #   fmx_meta_link_clear <meta> - remove the X-request link entirely
 # Callers must have FM_HOME set before calling fmx_load_config.
 
-_FM_X_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_FM_X_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 if ! command -v fm_backlog_atomic_transition >/dev/null 2>&1; then
   # shellcheck source=bin/fm-tasks-axi-lib.sh
   . "$_FM_X_LIB_DIR/fm-tasks-axi-lib.sh"

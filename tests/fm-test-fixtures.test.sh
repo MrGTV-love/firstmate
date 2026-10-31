@@ -3,7 +3,8 @@
 #
 # Cases call shared primitives directly or write stubs into a fakebin and exec
 # them as a test would. Assertions are on observable output, exit status, and
-# filesystem effects - never on helper source text. Migrated spawn suites cover
+# filesystem effects - never on helper source text, except the owner-requested
+# check that only tests/lib.sh reads FM_TEST_ONLY. Migrated spawn suites cover
 # fm_test_run_spawn through the real fm-spawn.sh; this file pins the shared
 # primitives and stubs those suites use.
 #
@@ -143,6 +144,27 @@ SH
   bash "$ROOT/tests/fm-gitignore-config.test.sh" > "$dir/gitignore.log" 2>&1 \
     || fail "standalone gitignore fixture inherited global config: $(cat "$dir/gitignore.log")"
   assert_host_config_still_governs global
+
+  # A launcher-injected hooks directory outranks repository-local config, so it
+  # would run the host's commit hooks against fixture content; the helper drops
+  # that one entry and keeps the launcher's other entries.
+  mkdir -p "$dir/failing-hooks"
+  printf '#!/bin/sh\nexit 1\n' > "$dir/failing-hooks/pre-commit"
+  chmod +x "$dir/failing-hooks/pre-commit"
+  export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$dir/failing-hooks" \
+    GIT_CONFIG_KEY_1=fixture.input GIT_CONFIG_VALUE_1=preserved
+  git init -q "$dir/hooks-armed"
+  if git -C "$dir/hooks-armed" -c user.name=test -c user.email=test@example.invalid \
+    commit -q --allow-empty -m armed > "$dir/hooks-armed.log" 2>&1; then
+    fail "the injected hooks directory did not run, so the case proves nothing"
+  fi
+  bash -eus -- "$ROOT/tests/lib.sh" "$dir/hooks-env" <<'SH' || exit 1
+. "$1"
+fm_git_init_commit "$2"
+[ "$(git -C "$2" log -1 --format=%s)" = initial ] || fail "injected hooks directory blocked a fixture commit"
+[ "$(git -C "$2" config --get fixture.input)" = preserved ] || fail "the launcher's other config entry was dropped"
+SH
+  unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 
   # The system layer is the shared helper's other half: one entry point settles
   # it, and the caller still signing proves the layer was genuinely armed.
@@ -327,8 +349,8 @@ SH
 # `git -C`, so fixture setup would commit, move refs, and register worktrees in
 # the caller's repository; GIT_INDEX_FILE and GIT_COMMON_DIR redirect the index
 # and refs the same way, and GIT_WORK_TREE breaks the setup outright. Each entry
-# point runs fm-teardown.test.sh's Git setup with each variable aimed in turn at
-# a disposable ambient clone, which must come through unchanged.
+# point runs the teardown suites' make_case Git setup with each variable aimed in
+# turn at a disposable ambient clone, which must come through unchanged.
 test_inherited_git_location_isolation() (
   local dir="$TMP_ROOT/git-location" before after var value helper rc
   mkdir -p "$dir/runner/bin" "$dir/runner/tests"
@@ -428,6 +450,133 @@ SH
   pass "fixture timing defaults off, preserves production evidence, and explicitly isolated samples survive re-sourcing"
 )
 
+# A throwaway test file that sources tests/lib.sh and selects cases the way the
+# real suites do, so the helper is exercised as a separate process with an exit
+# status, never read from source.
+write_selector_file() {  # <path> <env|positional|registered>
+  local path=$1 mode=$2
+  {
+    printf '#!/usr/bin/env bash\nset -u\n. "%s/tests/lib.sh"\n' "$ROOT"
+    cat <<'SH'
+test_alpha() { printf 'ran-alpha\n'; }
+test_beta() { printf 'ran-beta\n'; }
+test_returns_seven() { printf 'ran-returns-seven\n'; return 7; }
+test_calls_fail() { fail 'the case failed'; }
+test_unregistered() { printf 'ran-unregistered\n'; }
+test_leaks_errexit() { set +e; false; set -e; printf 'ran-leaks-errexit\n'; }
+helper_not_a_case() { printf 'ran-helper\n'; }
+SH
+    # shellcheck disable=SC2016 # The generated file expands these when it runs.
+    case "$mode" in
+      env) printf 'fm_test_only\ntest_alpha\ntest_beta\n' ;;
+      positional) printf 'if [ "$#" -gt 0 ]; then fm_test_run_cases -- "$@"; exit 0; fi\ntest_alpha\ntest_beta\n' ;;
+      registered) printf 'fm_test_before_case() { printf "before-%%s\\n" "$1"; }\ncases=(${FM_FIXTURE_CASES:-test_alpha test_beta})\nfm_test_run_cases "${cases[@]}" -- "$@"\n' ;;
+    esac
+  } >"$path"
+}
+
+test_single_case_selection() (
+  local dir="$TMP_ROOT/select" out err rc
+  mkdir -p "$dir"
+  write_selector_file "$dir/env.test.sh" env
+  write_selector_file "$dir/positional.test.sh" positional
+  write_selector_file "$dir/registered.test.sh" registered
+  run_file() {  # <env assignments...> -- <file> [args...]
+    local -a assignments=()
+    while [ "$1" != -- ]; do assignments+=("$1"); shift; done
+    shift
+    out=$(env "${assignments[@]}" bash "$@" 2>"$dir/err"); rc=$?
+    err=$(cat "$dir/err")
+  }
+
+  # An unknown name is refused, names the case, and runs nothing.
+  run_file FM_TEST_ONLY=test_renamed_away -- "$dir/env.test.sh"
+  [ "$rc" -eq 2 ] || fail "an unknown FM_TEST_ONLY case exited $rc, expected 2: $out $err"
+  case "$err" in *'Unknown test case: test_renamed_away'*) ;; *) fail "the refusal did not name the unknown case: $err" ;; esac
+  [ -z "$out" ] || fail "a refused selection still ran a case: $out"
+  run_file X=1 -- "$dir/positional.test.sh" test_alpha test_renamed_away
+  [ "$rc" -eq 2 ] || fail "an unknown positional case exited $rc, expected 2: $out $err"
+  [ -z "$out" ] || fail "a refused positional selection ran test_alpha before refusing: $out"
+  pass "an unknown case name is refused with a message naming it, exit 2, and no case runs"
+
+  # A name that is not a test_ function is never run as a command.
+  for name in helper_not_a_case rm test_ 'test_alpha;printf pwned' 'test alpha'; do
+    run_file "FM_TEST_ONLY=$name" -- "$dir/env.test.sh"
+    [ "$rc" -eq 2 ] || fail "FM_TEST_ONLY='$name' exited $rc, expected 2: $out $err"
+    [ -z "$out" ] || fail "FM_TEST_ONLY='$name' ran something: $out"
+  done
+  pass "a name that is not a defined test_ function is refused rather than executed"
+
+  # A known case runs alone and its own status is the file's status.
+  run_file FM_TEST_ONLY=test_beta -- "$dir/env.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = ran-beta ] || fail "a known passing case did not run alone and pass: rc=$rc out=$out"
+  run_file FM_TEST_ONLY=test_returns_seven -- "$dir/env.test.sh"
+  [ "$rc" -eq 7 ] || fail "a case returning 7 made the file exit $rc: $out"
+  run_file FM_TEST_ONLY=test_calls_fail -- "$dir/env.test.sh"
+  [ "$rc" -eq 1 ] || fail "a case calling fail made the file exit $rc: $out"
+  run_file FM_TEST_ONLY= -- "$dir/env.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = $'ran-alpha\nran-beta' ] || fail "an empty FM_TEST_ONLY did not run the whole file: rc=$rc out=$out"
+  pass "the selected case's own status is the file's status, and an empty selector runs everything"
+
+  # Positional selection without a registry runs the named test_ functions in the order given.
+  run_file X=1 -- "$dir/positional.test.sh" test_beta test_unregistered
+  [ "$rc" -eq 0 ] && [ "$out" = $'ran-beta\nran-unregistered' ] || fail "positional cases did not run in the order given: rc=$rc out=$out"
+  run_file X=1 -- "$dir/positional.test.sh" test_returns_seven test_alpha
+  [ "$rc" -eq 7 ] && [ "$out" = ran-returns-seven ] || fail "the first failing positional case did not end the file: rc=$rc out=$out"
+
+  # With a registry, only registered names are cases and they run in registration order.
+  run_file X=1 -- "$dir/registered.test.sh" test_beta test_alpha
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "registered cases did not run in registration order with the before hook: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "no request did not run every registered case: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh" test_beta
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "the before hook did not see the unselected earlier case: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh" test_unregistered
+  [ "$rc" -eq 2 ] && [ -z "$out" ] || fail "a defined but unregistered case was not refused: rc=$rc out=$out"
+  run_file FM_FIXTURE_CASES='test_alpha test_returns_seven test_beta' -- "$dir/registered.test.sh"
+  [ "$rc" -eq 7 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_returns_seven\nran-returns-seven' ] \
+    || fail "a registered case returning 7 did not end the full run: rc=$rc out=$out"
+  run_file FM_FIXTURE_CASES='test_leaks_errexit test_alpha' -- "$dir/registered.test.sh"
+  [ "$rc" -eq 1 ] && [ "$out" = $'before-test_leaks_errexit\nran-leaks-errexit' ] \
+    || fail "a case that turned errexit on did not end the full run before the next case: rc=$rc out=$out"
+  case "$err" in *'test_leaks_errexit changed errexit'*) ;; *) fail "the errexit refusal did not name the case: $err" ;; esac
+  run_file FM_TEST_ONLY=test_leaks_errexit -- "$dir/env.test.sh"
+  [ "$rc" -eq 1 ] || fail "a case run alone that turned errexit on exited $rc, expected 1: $out $err"
+  pass "a registry limits the cases, keeps registration order, runs the before hook for every registered case, and stops at the first failing case"
+  pass "a case that changes errexit fails the file in a full run and when run alone"
+)
+
+# fm_test_only in tests/lib.sh is the only reader of FM_TEST_ONLY: a file that
+# reads it itself can run an unknown name as a command or drop the case's exit
+# status. Every file under the tests directory is searched, so a new selector
+# needs no list entry. Prints file:line:text for each read outside lib.sh.
+selector_reads_outside_lib() {  # <tests-dir>
+  grep -rnIE '[$][{]?FM_TEST_ONLY([^A-Za-z0-9_]|$)' "$1" \
+    | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+    | awk -v lib="$1/lib.sh:" 'index($0, lib) != 1'
+}
+
+test_only_lib_reads_the_case_selector() (
+  local dir="$TMP_ROOT/selector-reads" found
+  mkdir -p "$dir/sub"
+  printf 'x=1\n"$%s"\n# "$%s"\n' FM_TEST_ONLY FM_TEST_ONLY >"$dir/sub/reads.sh"
+  # shellcheck disable=SC2016 # The fixture file holds the unexpanded read.
+  printf '[ -n "${%s:-}" ]\necho "$%s_AUTHOR"\n' FM_TEST_ONLY FM_TEST_ONLY >"$dir/other.test.sh"
+  printf 'fm_test_only() { "$%s"; }\n' FM_TEST_ONLY >"$dir/lib.sh"
+  found=$(selector_reads_outside_lib "$dir" | cut -d: -f1,2 | LC_ALL=C sort)
+  [ "$found" = "$dir/other.test.sh:1"$'\n'"$dir/sub/reads.sh:2" ] \
+    || fail "the selector check did not name exactly the two reads outside lib.sh: $found"
+  pass "the selector check names each read outside lib.sh by file and line, and skips comments, lib.sh and other variables"
+
+  found=$(selector_reads_outside_lib "$ROOT/tests")
+  [ -z "$found" ] || fail "these test files read FM_TEST_ONLY themselves; select cases through fm_test_only in tests/lib.sh:
+$found"
+  pass "no test file reads FM_TEST_ONLY outside fm_test_only in tests/lib.sh"
+)
+
 test_duration_fixture_isolation || fail "Fixture duration isolation"
 test_git_config_isolation || fail "Git fixture config isolation"
 test_inherited_git_location_isolation || fail "Git fixture location isolation"
@@ -439,3 +588,5 @@ test_fake_gh_and_gh_axi
 test_spawn_tmux_and_fakebin
 test_send_stubs_and_ssh
 test_spawn_home_layout
+test_single_case_selection || fail "Single-case selection"
+test_only_lib_reads_the_case_selector || fail "Single-case selector ownership"

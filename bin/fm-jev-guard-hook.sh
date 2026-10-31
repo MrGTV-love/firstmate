@@ -6,7 +6,7 @@
 # The adapter is TypeScript: bun runs it when installed, otherwise node with
 # type stripping. Missing or failed active runtimes return blocking exit 2 with
 # sanitized diagnostics; successful handler stdout retains its hook semantics.
-# Post-tool feedback remains advisory-only/no protection on this integration.
+# Non-pre-tool events return without feedback; this integration does not screen results.
 # docs/configuration.md "Jev guard" owns the contract.
 set -u
 [ "${8:-}" = FIRSTMATE_JEV_GUARD_V1 ] || exit 0

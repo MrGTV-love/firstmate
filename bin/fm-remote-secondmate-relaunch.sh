@@ -2,7 +2,7 @@
 # Relaunch a REMOTE secondmate onto a new harness, model, or effort, then
 # republish this parent's own route record to match what the host confirmed.
 #
-# Usage: fm-remote-secondmate-relaunch.sh <id> <harness> <model|default|-> <effort|default|->
+# Usage: fm-remote-secondmate-relaunch.sh <id> <harness> <model|default|-> <effort|default|-> [--captain-model-pin <model-id>]
 #
 # bin/fm-remote-secondmate-control.sh's relaunch verb runs entirely on the
 # secondmate's own host and can only rewrite that host's own endpoint record;
@@ -37,9 +37,18 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
-usage() { sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
-[ "$#" -eq 4 ] || usage
+CAPTAIN_MODEL_PIN=
+case "$#" in
+  4) ;;
+  6)
+    [ "$5" = --captain-model-pin ] || usage
+    CAPTAIN_MODEL_PIN=$6
+    [ -n "$CAPTAIN_MODEL_PIN" ] || die "--captain-model-pin requires a non-empty <model-id> value"
+    ;;
+  *) usage ;;
+esac
 ID=$1
 HARNESS=$2
 MODEL=$3
@@ -86,6 +95,7 @@ else
 fi
 
 RELAUNCH_ARGS=("$ID" "$HARNESS" "$MODEL" "$EFFORT")
+[ -z "$CAPTAIN_MODEL_PIN" ] || RELAUNCH_ARGS+=("--captain-model-pin=$CAPTAIN_MODEL_PIN")
 if [ "$(fm_compact_adviser_force_off)" = 1 ]; then
   RELAUNCH_ARGS+=(--compact-adviser-disable)
 fi

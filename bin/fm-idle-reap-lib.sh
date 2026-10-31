@@ -11,6 +11,10 @@ FM_IDLE_REAP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FM_IDLE_REAP_LIB_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$FM_IDLE_REAP_LIB_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-merge-prune-lib.sh
+. "$FM_IDLE_REAP_LIB_DIR/fm-merge-prune-lib.sh"
 
 fm_idle_reap_terminal_age() {
   local line=$1 evidence=$2 now=$3 at m newest
@@ -39,8 +43,56 @@ fm_idle_reap_refusal_stands() {
   IDLE_REAP_DETAIL=$reason
 }
 
+# FM_IDLE_REAP_MERGE_PRUNE=1 is set by bin/fm-merge-prune.sh, which asks about a
+# task the moment its merge is verified: the grace period is waived and an old
+# refusal memo is ignored (the prune keeps its own backoff). Every other gate
+# stands. A worker stopped with `fm-control.sh exit` (by the prune, or before the
+# merge) has no busy record and leaves state/<id>.control-exit; in this mode that
+# worker reads as stopped, not as unknown, only when its terminal pane positively
+# shows no live agent (fm_mp_pane_agent_gone: only shells are left in it, and at
+# most the one `treehouse get` that opened the slot's subshell). A pane that
+# cannot be read proves nothing. A worker that reads busy is never accepted.
+# Its last event must still be `done`, which the checks after the busy gate
+# require.
+fm_idle_reap_exited_by_control() {  # <state> <id>
+  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1
+  [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1
+  [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ] || return 1
+  fm_mp_pane_agent_gone "$1/$2.meta"
+}
+
+# A captain hold that declares this task's project frozen, in this home or in
+# any local home above a secondmate home, stops every automatic cleanup of it,
+# whether or not the task has a hold of its own. The answer is
+# bin/fm-captain-hold.sh frozen; an answer it cannot establish also stops
+# cleanup and names its reason. Sets the parked class and its reason and
+# returns 0 when the task is frozen or unsure, and returns 1 when nothing
+# freezes it.
+fm_idle_reap_frozen() {  # <home> <state> <data> <id>
+  local out rc=0 project last
+  out=$(FM_HOME="$1" FM_STATE_OVERRIDE="$2" FM_DATA_OVERRIDE="$3" \
+    "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" frozen "$4" 2>&1) || rc=$?
+  last=${out##*$'\n'}
+  case "$rc" in
+    0)
+      project=$(fm_meta_get "$2/$4.meta" project)
+      project=${project%/}
+      IDLE_REAP_DETAIL="frozen by captain hold $last: project ${project##*/} is frozen until the captain releases it"
+      ;;
+    1) return 1 ;;
+    *) IDLE_REAP_DETAIL="captain freeze unreadable: ${last#fm-captain-hold: }; cleanup ineligible" ;;
+  esac
+  IDLE_REAP_CLASS=parked
+  return 0
+}
+
 fm_idle_reap_classify() {
   local home=$1 state=$2 data=$3 id=$4 meta="$2/$4.meta" pr remote busy verb note status declared msg evidence open age now hold_rc=0
+  local grace=1800 memo_applies=1
+  if [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ]; then
+    grace=0
+    memo_applies=0
+  fi
   IDLE_REAP_CLASS=active
   IDLE_REAP_KIND=-
   IDLE_REAP_AGE=-
@@ -77,8 +129,12 @@ fm_idle_reap_classify() {
       return 0
     fi
     fm_epoch_seconds_to now
-    if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+    if [ "$memo_applies" = 1 ] \
+      && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
       IDLE_REAP_CLASS=refused
+      return 0
+    fi
+    if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
       return 0
     fi
     IDLE_REAP_CLASS=reap
@@ -99,7 +155,8 @@ fm_idle_reap_classify() {
       IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="$verb: $note"; return 0 ;;
   esac
   busy=$(fm_busy_classify_meta "$meta" "$id" "$state")
-  if [ "${busy%% *}" != idle ]; then
+  if [ "${busy%% *}" != idle ] \
+    && { [ "${busy%% *}" = busy ] || ! fm_idle_reap_exited_by_control "$state" "$id"; }; then
     IDLE_REAP_DETAIL="busy state $busy"
     return 0
   fi
@@ -130,7 +187,11 @@ fm_idle_reap_classify() {
     fi
     return 0
   fi
-  open=$(status_open_decisions "$status" "$IDLE_REAP_KIND")
+  if ! open=$(status_open_decisions "$status" "$IDLE_REAP_KIND"); then
+    IDLE_REAP_CLASS=parked
+    IDLE_REAP_DETAIL="status log unreadable past the read limits; cleanup ineligible"
+    return 0
+  fi
   if [ -n "$open" ]; then
     IDLE_REAP_CLASS=parked
     IDLE_REAP_DETAIL="open decision: ${open%%$'\n'*}"
@@ -161,13 +222,17 @@ fm_idle_reap_classify() {
   age=$(fm_idle_reap_terminal_age "$IDLE_REAP_LAST" "$evidence" "$now")
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   IDLE_REAP_AGE=$age
-  if [ "$age" -lt 1800 ]; then
+  if [ "$age" -lt "$grace" ]; then
     IDLE_REAP_CLASS=wait-grace
-    IDLE_REAP_DETAIL="finished ${age}s ago; grace is 1800s"
+    IDLE_REAP_DETAIL="finished ${age}s ago; grace is ${grace}s"
     return 0
   fi
-  if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+  if [ "$memo_applies" = 1 ] \
+    && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
     IDLE_REAP_CLASS=refused
+    return 0
+  fi
+  if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.

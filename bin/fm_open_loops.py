@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import signal
 import sqlite3
 import subprocess
@@ -19,6 +20,8 @@ import tempfile
 import time
 
 BIN = Path(__file__).resolve().parent
+PROGRESS_API = runpy.run_path(str(BIN / "fm-duration.py"))
+COMMUNICATE_PROGRESS = PROGRESS_API["communicate_progress"]
 GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
@@ -33,13 +36,28 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
-# Categories a captain decision can park: the same set a dependency wait may bind.
+RECEIPT_SECONDS = int(dt.timedelta(hours=4).total_seconds())  # policy: current-turn receipt answer bound
+RECORD_NAME = re.compile(r"[0-9]+[.]msg")
+REPLY_ID = re.compile(r"[0-9a-fA-F]{16}")  # bin/fm-pending-reply-lib.sh correlation id
+# A prerequisite carrying one of these overdue rows is stalled, missing or failed: it no longer carries a wait.
+PREREQUISITE_TROUBLE = ("stalled_worker", "missing_worker", "failed_task")
+ELAPSED_TIME = re.compile(r"\b\d+(?:[.]\d+)?[hms](?: ?\d+(?:[.]\d+)?[hms])*\b")
+# Categories a captain decision can park: the same set a question-bound dependency wait may bind.
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
+# A wait on a named live task may also bind a red PR whose worker is parked until that task lands.
+TASK_WAITABLE = CAPTAIN_PARKABLE + ("red_check",)
+# Only a PR row may wait on a named task by reason alone; other rows need a delivery naming them.
+REASON_WAITABLE = ("open_pr", "red_check")
+# Merge authority for a reviewed, green PR is AGENTS.md section 7's standing rule; the ledger only points at it.
+MERGE_ACTION_REVIEWED_PR = "merge through bin/fm-pr-merge.sh under AGENTS.md section 7"
+MERGE_ACTION_GREEN_PR = "route the green PR's review; merge it under AGENTS.md section 7"
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 STOP_STATES = {"done", "parked", "paused"}
+# fm-crew-state.sh verdicts of a live session; unknown covers a gone, dead or unreadable one.
+LIVE_STATES = {"working", "blocked"} | STOP_STATES
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
                        r"|\b(?-i:E[A-Z][A-Z0-9_]{2,})\b", re.I)
@@ -57,10 +75,6 @@ def is_local_origin(origin):
 
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.TimeoutExpired,
                  sqlite3.Error, json.JSONDecodeError)
-
-
-class CollectionDeadline(Exception):
-    pass
 
 
 class PrHeadMissing(Exception):
@@ -157,9 +171,9 @@ class Collector:
         self.ages.update(supplied)
         if any(type(v) is not int or v < 0 for v in self.ages.values()):
             raise ValueError("age limits must be non-negative integer seconds")
-        self.timeout = config.get("command_timeout_seconds", 60)
-        if type(self.timeout) is not int or not 1 <= self.timeout <= 300:
-            raise ValueError("command_timeout_seconds must be 1..300")
+        self.timeout = config.get("command_timeout_seconds", PROGRESS_API["NO_PROGRESS_LIMIT"])
+        if type(self.timeout) is not int or not 1 <= self.timeout <= PROGRESS_API["NO_PROGRESS_LIMIT"]:
+            raise ValueError("command_timeout_seconds must be 1..900 (no-progress seconds)")
 
     def process_table(self, pids=None):
         if pids is not None and not pids:
@@ -176,6 +190,22 @@ class Collector:
         return {int(pid): (int(parent), identity.strip())
                 for pid, parent, identity in (line.split(None, 2) for line in done.stdout.splitlines())}
 
+    def group_state(self, pgid):
+        """States of the collector-created command group's members, or None when unknown."""
+        done = subprocess.run(["ps", "-A", "-o", "pid=", "-o", "pgid=", "-o", "stat="],
+                              env=self.env, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
+        if done.returncode:
+            return None
+        members = []
+        for line in done.stdout.splitlines():
+            fields = line.split()
+            if len(fields) != 3 or not (fields[0].isdigit() and fields[1].isdigit()):
+                return None
+            if int(fields[1]) == pgid:
+                members.append(fields[2])
+        return members
+
     def signal_command_group(self, child, sig):
         if child.poll() is not None:
             return
@@ -184,11 +214,18 @@ class Collector:
         except ProcessLookupError:
             pass
         except PermissionError:
-            if child.poll() is None:
-                raise
+            # Darwin can refuse a group signal while the leader is becoming
+            # defunct. The signal is unnecessary only when the child has
+            # completed or the collector-created group holds no live member;
+            # live, unreadable, or unknown groups keep the refusal.
+            if child.poll() is not None:
+                return
+            members = self.group_state(child.pid)
+            if members is not None and all(state.startswith(("Z", "X")) for state in members):
+                return
+            raise
 
     def stop_command(self, child):
-        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
         descendants = {}
         try:
             try:
@@ -230,7 +267,6 @@ class Collector:
             child.wait()
             child.stdout.close()
             child.stderr.close()
-            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 
     def run(self, args, cwd=None, missing_ok=False, env=None):
         command = [str(a) for a in args]
@@ -238,8 +274,10 @@ class Collector:
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
-            stdout, stderr = child.communicate(timeout=self.timeout)
-        except (subprocess.TimeoutExpired, CollectionDeadline):
+            # Inner progress-owned reads keep their own bounds, so one hung
+            # lane is cut there and this source still answers.
+            stdout, stderr = COMMUNICATE_PROGRESS(child, self.timeout)
+        except BaseException:
             self.stop_command(child)
             raise
         if child.returncode == 75 and command[0] == str(GH_REST):
@@ -318,7 +356,8 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
-                        'status_own_open_decisions "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        'own=$(status_own_open_decisions "$2") || exit 1; '
+                        'printf "%s\\n" "$own" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
                         '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
                         'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
@@ -554,12 +593,12 @@ class Collector:
         since = max((s for s in stamps if s is not None and s <= self.now), default=None)
         if since is not None and self.now - since < self.ages["stalled_worker"]:
             return
-        pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
-        signatures = [line.strip() for line in pane.splitlines() if SIGNATURE.search(line)]
-        declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
+        pane = [re.sub(r"[0-9]+", "#", line.strip())
+                for line in self.run([BIN / "fm-peek.sh", task["id"], "80"]).splitlines()]
+        signatures = [line for line in pane if SIGNATURE.search(line)]
+        declaration = self.bash('. "$1"; last_status_line "$2" || :', BIN / "fm-status-event-lib.sh",
                                 self.state / (task["id"] + ".status")).strip()
-        waits = [line.strip() for line in pane.splitlines()
-                 if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
+        waits = [line for line in pane if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
         wait = (waits[-1] if waits else declaration)[:150]
         if re.fullmatch(r"(?:harness |agent )?busy[.!]?", declaration.split(":", 1)[-1].strip(), re.I) and not waits:
             wait = ""
@@ -567,12 +606,14 @@ class Collector:
             if task.get("project") and task.get("branch") else None
         active_step = self.pipeline_waits.get(pipeline_key)
         if active_step:
-            wait = f"pipeline step {str(active_step[0])[:100]}; step age {self.now - active_step[1]}s"
-        age = "unknown age" if since is None else f"{self.now - since}s without progress"
-        evidence = f"{wait or 'worker has not recorded its concrete wait'}; {age}"
+            wait = f"pipeline step {str(active_step[0])[:100]}; step started at {active_step[1]}"
+        # Elapsed time belongs in age_seconds, not in the evidence identity: time
+        # passing alone must not turn the same stalled obligation into changed work.
+        progress = "last progress unknown" if since is None else f"last progress at {since}"
+        evidence = f"{wait or 'worker has not recorded its concrete wait'}; {progress}"
         declared_at = re.search(r"\[at=([0-9]+)\]", declaration.split(":", 1)[0])
         if declaration and declared_at and int(declared_at[1]) <= self.now:
-            evidence += f"; declaration age {self.now - int(declared_at[1])}s"
+            evidence += f"; declaration at {declared_at[1]}"
         if signatures:
             evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
@@ -792,33 +833,61 @@ class Collector:
             statuses.setdefault(status["context"], status)  # newest first
         return list(newest.values()), list(statuses.values())
 
-    def review_pass(self, slug, url, sha, task):
-        for lane in self.review_lanes.get(slug.casefold(), []):
-            if task and lane == task["id"]:
-                continue  # a worker's own PASS is not an independent review
-            path = self.state / (lane + ".status")
-            if not path.exists():
-                continue
-            if path.is_symlink():
-                raise ValueError("review lane status must not be a symbolic link")
-            events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
-                               'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
-                               'then printf "%s\\n" "$line"; fi; done < "$2"',
-                               BIN / "fm-status-event-lib.sh", path)
-            # Exact URL tokens, not prefix matches on PR numbers.
-            lines = [line for line in events.splitlines()
-                     if any(match[0] == url for match in GITHUB_PR.finditer(line))]
-            if not lines:
-                continue
-            line = lines[-1]
-            if not re.search(r"\bPASS\b", line) or re.search(r"\b(?:FAIL|REJECTED)\b", line):
-                continue
-            if not re.search(r"(?<![0-9a-f])" + re.escape(sha) + r"(?![0-9a-f])", line):
-                continue
-            stamp = re.search(r"\[at=([0-9]+)\]", line.split(":", 1)[0])
-            if not stamp or int(stamp[1]) > self.now:
-                continue
-            return int(stamp[1]), lane
+    def review_pass(self, slug, pr, task):
+        """The record owner's verified independent-review evidence at this live head.
+
+        review_lanes is only a discovery hint: a repository absent from it is
+        not checked for review readiness, and the lane ids themselves supply no
+        verdict or model metadata. bin/fm-review-record.py is the sole
+        authority, asked once for the exact live head and consumed as one
+        atomic fm-review-verification.v1 object. A typed not-qualified answer is
+        ordinary absence of qualifying review; unreadable or corrupt history and
+        invalid input degrade coverage instead of reading as unreviewed. The
+        record owner derives authors from the owning task and the PR's live
+        base, so a PR no task owns is not checked.
+        """
+        if slug.casefold() not in self.review_lanes or task is None:
+            return None
+        url, sha, base = pr["html_url"], pr["head"]["sha"], pr["base"]["sha"]
+        script = ('"$1" verify --pr "$2" --head "$3" --task "$4" --base "$5" --review-only --json; '
+                  'rc=$?; printf "\\n__FM_REVIEW_EXIT=%s\\n" "$rc"; exit 0')
+        try:
+            out = self.bash(script, BIN / "fm-review-record.py", url, sha, task["id"], base)
+        except SOURCE_ERRORS as error:
+            self.degraded.append(f"review record for {url}: {str(error)[:160]}")
+            return None
+        lines = out.splitlines()
+        code = next((int(line.split("=", 1)[1]) for line in lines
+                     if line.startswith("__FM_REVIEW_EXIT=") and line.split("=", 1)[1].isdigit()), None)
+        payload = next((line for line in lines
+                        if line.strip() and not line.startswith("__FM_REVIEW_EXIT=")), "")
+        try:
+            evidence = json.loads(payload) if payload else None
+        except ValueError:
+            evidence = None
+        if code is None or not isinstance(evidence, dict) \
+                or evidence.get("schema") != "fm-review-verification.v1":
+            self.degraded.append(f"review record for {url}: the verifier did not return one typed fm-review-verification.v1 object")
+            return None
+        error = evidence.get("error") if isinstance(evidence.get("error"), dict) else {}
+        if evidence.get("ok") is True and evidence.get("basis") == "independent-review":
+            at, reader_model = evidence.get("at"), evidence.get("reader_model")
+            reader_family, groups = evidence.get("reader_family"), evidence.get("author_groups")
+            families = {author.get("family") for authors in groups.values()
+                        for author in authors} if isinstance(groups, dict) else set()
+            if type(at) is not int or at < 0 or not isinstance(reader_model, str) \
+                    or not isinstance(reader_family, str) or not families \
+                    or evidence.get("head") != sha:
+                self.degraded.append(f"review record for {url}: a success envelope is not this exact head's independent review evidence")
+                return None
+            if at > self.now:
+                return None
+            authors = "+".join(sorted(str(family) for family in families))
+            return at, reader_model, reader_family, authors
+        if evidence.get("ok") is False and error.get("kind") == "not-qualified":
+            return None
+        reason = error.get("message") or "no typed failure reason"
+        self.degraded.append(f"review record for {url}: {error.get('kind') or 'unexpected result'}: {str(reason)[:140]}")
         return None
 
     def required_checks_green(self, slug, pr, checks, statuses):
@@ -860,23 +929,28 @@ class Collector:
         checks, statuses = self.latest_checks(slug, sha)
         red = [c for c in checks if c.get("conclusion") in RED_CONCLUSIONS]
         red += [s for s in statuses if s["state"] in ("failure", "error")]
+        task_id = task["id"] if task else next((r["id"] for r in self.backlog
+                    if url == r.get("pr_url") or url in (r.get("links") or [])), None)
+        source = self.source("PR provenance " + url, self.task_source, task_id) if task_id else self.source_context()
+        provenance = dict(source, kind="pr", url=url, head=sha) if source is not None else None
         if red:
             since = min((epoch(c.get("completed_at") or c.get("updated_at") or c.get("created_at")) or self.now)
                         for c in red)
             self.add("red_check", url, "diagnose: code or test", since, worker,
-                     "; ".join(c.get("name") or c.get("context") or "check" for c in red))
+                     "; ".join(c.get("name") or c.get("context") or "check" for c in red), source=provenance)
             return
         pending = (not checks and not statuses) or any(c.get("status") != "completed" for c in checks) \
             or any(s["state"] == "pending" for s in statuses)
-        review = self.review_pass(slug, url, sha, task)
+        review = self.review_pass(slug, pr, task)
         green = not pending and all(c.get("conclusion") in ("success", "neutral", "skipped") for c in checks) \
             and all(s.get("state") == "success" for s in statuses)
         if review and green and not pr.get("draft") and self.required_checks_green(slug, pr, checks, statuses):
             finished = [epoch(c.get("completed_at")) for c in checks] \
                 + [epoch(s.get("updated_at") or s.get("created_at")) for s in statuses]
             since = max([review[0]] + [stamp for stamp in finished if stamp is not None])
-            self.add("review_pass_not_merged", url, "merge with existing authority or escalate for approval", since,
-                     evidence=f"independent review PASS by {review[1]} at live head {sha}; required checks green")
+            self.add("review_pass_not_merged", url, MERGE_ACTION_REVIEWED_PR, since,
+                     evidence=(f"independent review PASS by {review[1]} ({review[2]} reviewing {review[3]}) "
+                               f"at live head {sha}; required checks green"))
             return
         if pr.get("draft"):
             owner, action = worker, "finish the PR and mark it ready"
@@ -887,12 +961,8 @@ class Collector:
             teams = ["team:" + t["slug"] for t in pr.get("requested_teams", [])]
             owner, action = ",".join(people + teams), "complete the requested PR review"
         else:
-            owner, action = "firstmate", "route the green PR's review and obtain merge approval"
-        task_id = task["id"] if task else next((r["id"] for r in self.backlog
-                    if url == r.get("pr_url") or url in (r.get("links") or [])), None)
-        source = self.source("PR provenance " + url, self.task_source, task_id) if task_id else self.source_context()
-        self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner,
-                 source=dict(source, kind="pr", url=url, head=sha) if source is not None else None)
+            owner, action = "firstmate", MERGE_ACTION_GREEN_PR
+        self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner, source=provenance)
 
     def pr_rows(self, slug):
         pulls = self.forge(f"/repos/{slug}/pulls?state=open&per_page=100")
@@ -952,7 +1022,7 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('cat "$2" >/dev/null || exit 1; '
+                out = self.bash('[ -r "$2" ] || exit 1; '
                                 '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
@@ -1130,8 +1200,11 @@ class Collector:
                                          for actor, pending in handling["presentations"].items()}
             handling["presented_at"] = {actor: {ident: stamp for ident, stamp in stamps.items() if ident in published}
                                         for actor, stamps in handling.get("presented_at", {}).items()}
+            open_episodes = {row["id"] for row in report["rows"] if row.get("overdue") or row.get("stale")}
+            handling["episodes"] = {ident: episode for ident, episode in handling.get("episodes", {}).items()
+                                    if ident in open_episodes}
             for row in report["rows"]:
-                if handling["actions"].get(row["id"], {}).get("captain_visible"):
+                if captain_visible(handling["actions"].get(row["id"], {}), row, self.now):
                     row["captain_visible"] = True
         write_ledger(self.state, report)
         try:
@@ -1170,6 +1243,10 @@ def read_ledger(state):
                 type(handling.get("sequence")) is not int
                 or not isinstance(handling.get("actions"), dict) or not isinstance(handling.get("presentations"), dict)
                 or not isinstance(handling.get("presented_at", {}), dict)
+                or not isinstance(handling.get("episodes", {}), dict)
+                or any(not isinstance(v, dict) for v in handling.get("episodes", {}).values())
+                or not isinstance(handling.get("completed", {}), dict)
+                or any(type(v) is not int for v in handling.get("completed", {}).values())
                 or any(not isinstance(v, dict) for v in handling.get("presented_at", {}).values())
                 or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
                                                          *handling["presentations"].values()])):
@@ -1215,12 +1292,96 @@ def row_digest(row):
     # Preserve the original escalation/deferral receipt identity. A waiting receipt
     # separately compares its full collected source and authoritative dependency.
     fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
+    if row.get("category") == "stalled_worker" and isinstance(fields[-1], str):
+        fields[-1] = ELAPSED_TIME.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
     return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
 
 
 def parkable(row):
     """A firstmate-owned row a captain decision can park: the only rows an escalation may bind to a hold."""
     return row.get("category") in CAPTAIN_PARKABLE and row.get("owner") == "firstmate"
+
+
+def deferral_stands(action, row, now):
+    """A recorded deferral still answers its unchanged row; never a reviewed-green PR or a row needing follow-up."""
+    return action.get("kind") == "deferred" and row.get("category") != "review_pass_not_merged" \
+        and not action.get("requires_followup") and same_work(action, row, now) \
+        and action.get("recheck_epoch", 0) > now
+
+
+def captain_visible(action, row, now):
+    """The one owner of a row's captain visibility, read by the printed row and the stored row.
+
+    A row is captain-visible once a deferral mark was made, or once its one deferral has been used and no
+    longer stands. A further deferral on the unchanged row is refused even while the first stands, and that
+    refusal makes the mark, so a refused row never prints false. Both count only on the unchanged work the
+    action observed (same_work), so a changed row is new work with a fresh allowance.
+    """
+    return same_work(action, row, now) and (bool(action.get("captain_visible")) or (
+        action.get("deferrals", 0) >= 1 and not deferral_stands(action, row, now)))
+
+
+def overdue_since(row, now):
+    """When an overdue row, aged to now by overdue_rows, became overdue; now when its record cannot say."""
+    age, limit = row.get("age_seconds"), row.get("limit_seconds")
+    if type(age) is not int or type(limit) is not int or limit < 0 or age < limit:
+        return now
+    return now - age + limit
+
+
+def obligation_clock(row, now):
+    """When this row's obligation clock started: its age aged to now, taken from now; None when the record has no age."""
+    age = row.get("age_seconds")
+    return now - age if type(age) is int else None
+
+
+def clock_restarted(episode, row, now):
+    """The row's age clock restarted after the episode was stored, whatever its evidence text now says."""
+    clock = obligation_clock(row, now)
+    return clock is not None and type(episode.get("clock")) is int and clock > episode["clock"]
+
+
+def episode_record(row, now, start):
+    clock = obligation_clock(row, now)
+    return dict(digest=row_digest(row), start=start, **({} if clock is None else {"clock": clock}))
+
+
+def note_episode(controls, row, now):
+    """Open a row's overdue episode at the moment it became overdue, or now when its evidence materially changed.
+
+    The episode follows the row's obligation clock as well as its digest: when the clock restarted on unchanged
+    text, a new episode opens at the current overdue boundary, so a delivery from the earlier episode is refused.
+    """
+    episodes = controls.setdefault("episodes", {})
+    current = episodes.get(row["id"])
+    if not isinstance(current, dict) or current.get("digest") != row_digest(row):
+        episodes[row["id"]] = episode_record(row, now, now if isinstance(current, dict) else overdue_since(row, now))
+    elif clock_restarted(current, row, now):
+        episodes[row["id"]] = episode_record(row, now, overdue_since(row, now))
+    elif "clock" not in current and obligation_clock(row, now) is not None:
+        current["clock"] = obligation_clock(row, now)  # an episode stored before clocks were kept adopts its row's
+
+
+def episode_boundary(controls, row, actor, now):
+    """The earliest moment a steer can answer this row: the start of its current overdue episode.
+
+    Re-presenting the same unchanged row never moves it. A ledger written before episodes existed falls back to
+    the acting actor's latest presentation, or the earliest presentation by any actor.
+    """
+    episode = controls.get("episodes", {}).get(row["id"])
+    if isinstance(episode, dict) and episode.get("digest") == row_digest(row) and type(episode.get("start")) is int:
+        return overdue_since(row, now) if clock_restarted(episode, row, now) else episode["start"]
+    stamps = controls["presented_at"]
+    boundary = stamps.get(actor, {}).get(row["id"])
+    if boundary is None:
+        boundary = min((marked[row["id"]] for marked in stamps.values() if row["id"] in marked), default=now)
+    return boundary
+
+
+def answered_at(action):
+    """When an ordinary receipt's four hours began: a steer's own delivery, else the action."""
+    base = action.get("at_epoch", 0)
+    return min(base, action["sent_epoch"]) if action.get("kind") == "steered" and "sent_epoch" in action else base
 
 
 class WaitVerifier:
@@ -1232,10 +1393,14 @@ class WaitVerifier:
             raise ValueError("waiting requires a current ledger collected for the effective home and state directory")
         self.stale = bool(report.get("stale"))
         self.rows = {row["id"]: row for row in report["rows"]}
+        # The public gate's decision at this time: published ages advance to now, so a row that crossed its
+        # limit since the last collection is overdue here too.
+        self.overdue = {row["id"] for row in overdue_rows(report, now)}
         self.actions = report.get("handling", {}).get("actions", {})
         self.backlog = None
         self.backlog_error = None
         self.decisions = {}
+        self.unread = {}  # prerequisite task -> state, where its PR source gave no answer this pass
 
     def backlog_records(self):
         """This home's canonical backlog records, read once, or the first read's error when it is unavailable."""
@@ -1289,12 +1454,12 @@ class WaitVerifier:
         return None
 
     def hold_stands(self, action, row):
-        """An escalation bound to a captain hold stands until the row changes or that hold ends.
+        """An escalation bound to a captain hold waits on the captain until that hold ends.
 
-        Only the local backlog and the row's own digest decide it, so a quota-stale ledger does not end it.
+        Only the local backlog and the row decide it, so a quota-stale ledger does not end it.
         """
         hold = action.get("hold")
-        if not parkable(row) or action.get("digest") != row_digest(row) or not isinstance(hold, dict):
+        if not parkable(row) or not isinstance(hold, dict):
             return False
         try:
             return self.hold_marker(hold["task"]) == hold["marker"]
@@ -1342,13 +1507,113 @@ class WaitVerifier:
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
             status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                            'if crew_is_provably_working "$3"; then last_status_line "$2" || '
+                            '{ echo "prerequisite status is past the read limits and cannot be verified" >&2; exit 2; }; fi',
                             BIN, path, task).strip()
             if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")
             stat = path.stat()
             return dict(current, kind="task", status=fingerprint(status), stream=[stat.st_dev, stat.st_ino])
+        if kind == "task-live":
+            return self.live_task(task)
         raise ValueError("unsupported waiting source; recollect before binding it")
+
+    def live_task(self, task):
+        """A named prerequisite is live: assigned, a live fm-crew-state.sh verdict, unmerged, not stalled or failed.
+
+        A done task with no PR from any source (task_pr) has landed, since its report is its delivery; a done task
+        with a PR stays live until that PR's merge is recorded.
+
+        It binds the prerequisite's launch generation and status stream, not its latest status line or whether it
+        is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
+        standing; a finished or parked run's verdict can outlast its session. A replacement, a gone, dead or
+        unreadable endpoint with no run verdict, a failure, a merge or trouble ends it.
+
+        A PR source that gave no answer (a stalled or failed no-mistakes status read) is unknown, never a verdict:
+        a standing wait stays, the drain notes it, and the next pass reads again; only an answering read ends it.
+        """
+        c = self.collector
+        fields = c.read_fields(c.state / (task + ".meta"))
+        if fields.get("kind") not in ("ship", "scout") or not fields.get("spawn_gen"):
+            raise ValueError("prerequisite must be an assigned ship or scout with a launch generation")
+        path = c.state / (task + ".status")
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("prerequisite status is unavailable")
+        verdict = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; "$FM_CREW_STATE_BIN" "$2"',
+                         BIN, task).strip()
+        state = verdict.split(" ", 2)[1] if verdict.startswith("state: ") else ""
+        if state not in LIVE_STATES:
+            raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
+                             " follow up on it")
+        pr = self.task_pr(path, fields)
+        if pr is None:
+            self.unread[task] = state  # unknown, not a verdict: the wait stands and the read repeats next pass
+        else:
+            self.unread.pop(task, None)
+            if state == "done" and not pr:
+                raise ValueError("prerequisite task is done with no PR; its report is its delivery;"
+                                 " follow up on its result")
+            if pr and self.pr_merged(pr):
+                raise ValueError("prerequisite task's PR has merged; follow up on its result")
+        if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
+               and row["id"] in self.overdue and not row.get("informational") and not row.get("stale")
+               for row in self.rows.values()):
+            raise ValueError("prerequisite task is stalled, missing or failed; follow up on it")
+        stat = path.stat()
+        return dict(c.task_source(task), generation=fingerprint(fields["spawn_gen"]), kind="task-live",
+                    stream=[stat.st_dev, stat.st_ino])
+
+    def pr_merged(self, pr):
+        """This prerequisite PR has a merge recorded, on any provider bin/fm-pr-lib.sh's fm_pr_url_parse accepts.
+
+        A GitHub PR keeps the ledger's own marker read. Any other PR is read through the canonical marker
+        reader fm_pr_poll_merge_marker_matches, and a PR identity or marker area it cannot read fails closed:
+        it raises, so the wait is never admitted, kept or renewed on a PR whose landing cannot be checked.
+        A marker file that fails the canonical private-file validation (fm_pr_private_file_valid: regular,
+        not a symlink, mode 600, same device, one link) or is unreadable is such a case; a validated, readable
+        marker that does not name this PR continues the scan, and no marker at all means open.
+        """
+        if GITHUB_PR.fullmatch(pr):
+            return merge_marker(self.collector.state, pr)
+        try:
+            verdict = self.collector.bash(
+                '. "$1/fm-pr-lib.sh"; fm_pr_url_parse "$3" || { echo "prerequisite PR identity is unreadable" >&2; exit 3; }; '
+                'device=$(fm_pr_file_device "$2") || { echo "prerequisite merge records are unreadable" >&2; exit 3; }; '
+                'for marker in "$2"/*.pr-poll-merge-notified; do [ -e "$marker" ] || [ -L "$marker" ] || continue; '
+                'fm_pr_private_file_valid "$marker" 600 "$device" && [ -r "$marker" ] || '
+                '{ echo "prerequisite merge records are unreadable" >&2; exit 3; }; '
+                'fm_pr_poll_merge_marker_matches "$marker" "$device" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" '
+                '"$FM_PR_NUMBER" && { echo merged; exit 0; }; done; echo open',
+                BIN, self.collector.state, pr).strip()
+        except SOURCE_ERRORS as error:
+            raise ValueError("prerequisite PR landing cannot be read; " + str(error)[:120]) from error
+        return verdict == "merged"
+
+    def task_pr(self, path, fields):
+        """A task's PR: its recorded pr=, or for a ship the PR its done note names or its no-mistakes run records.
+
+        A done-note or run PR counts only when bin/fm-pr-lib.sh's fm_pr_url_parse accepts it, the shape the PR
+        registrar (bin/fm-pr-ready-reconcile.sh) needs, so a PR no merge can be recorded for never keeps a task live.
+        Returns "" when the sources answer that there is no PR, and None when the run read gave no answer.
+        """
+        if fields.get("pr"):
+            return fields["pr"]
+        if fields.get("kind") != "ship":
+            return ""
+        out = self.collector.bash(
+            '. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; . "$1/fm-pr-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
+            'pr() { fm_pr_url_parse "$1" 2>/dev/null && printf "%s\\n" "$FM_PR_URL"; }; '
+            'if line=$(last_status_line "$2") && [[ $line == done* ]]; then status_line_note "$line" note; '
+            'pr "$(fm_dod_pr_url_from_done_note "$note")" && exit 0; fi; '
+            '[ -n "$3" ] && [ -d "$3" ] && command -v no-mistakes >/dev/null 2>&1 || exit 0; '
+            'branch=$(git -C "$3" symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0; '
+            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || '
+            "{ [ \"$(fm_nm_strip_quotes \"$(fm_nm_field \"$out\" error)\")\" = \"repo not initialized (run 'no-mistakes init' first)\" ] "
+            '|| echo "?"; exit 0; }; '
+            '[ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" branch)")" = "$branch" ] || exit 0; '
+            'pr "$(fm_nm_strip_quotes "$(fm_nm_field "$out" pr)")" || :',
+            BIN, path, fields.get("worktree", ""), str(self.collector.timeout)).strip()
+        return None if out == "?" else out
 
     def verify_source(self, source):
         if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):
@@ -1359,7 +1624,7 @@ class WaitVerifier:
     def binding(self, row, prerequisite, task, evidence, boundary):
         if self.stale:
             raise ValueError("waiting requires a current ledger; this one is held stale until the quota window resets")
-        if row["category"] not in CAPTAIN_PARKABLE \
+        if row["category"] not in (TASK_WAITABLE if task and not prerequisite else CAPTAIN_PARKABLE) \
                 or row.get("stale") or row.get("owner") == "captain":
             raise ValueError("this obligation cannot have a standing dependency wait")
         source = row.get("source")
@@ -1383,6 +1648,15 @@ class WaitVerifier:
         if not task or task == source.get("task") or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
             raise ValueError("waiting requires a distinct assigned prerequisite task")
         c = self.collector
+        if not RECORD_NAME.fullmatch(evidence):
+            if row["category"] not in REASON_WAITABLE:
+                raise ValueError("only a PR row can wait on a task by reason; cite the prerequisite-task delivery"
+                                 " (NNN.msg) whose body names open-loop-row: " + row["id"])
+            # Free-text evidence is the reason for the wait; the prerequisite's own live state is the proof.
+            dep_source = self.current_source(dict(c.source_context(), kind="task-live", task=task))
+            if self.unread.get(task) == "done":
+                raise ValueError("prerequisite task is done and its PR source could not be read; try again next pass")
+            return dict(source=source, dependency=dep_source, reason=evidence)
         dep_source = self.current_source(dict(c.source_context(), kind="task", task=task))
         proof_row = dict(owner="worker:" + task, subject=task)
         inbox = c.state / (task + ".inbox")
@@ -1390,7 +1664,8 @@ class WaitVerifier:
             raise ValueError("prerequisite delivery namespace must not be redirected")
         sent = steer_record_epoch(c.state, proof_row, evidence)
         if sent is None or sent < boundary:
-            raise ValueError("waiting requires a new prerequisite-task delivery after presentation")
+            raise ValueError("waiting requires a prerequisite-task delivery sent after this row became overdue"
+                             " or its evidence last changed")
         proof = next((p for p in (inbox / evidence, inbox / "handled" / evidence) if p.is_file()), None)
         if proof is None or proof.is_symlink():
             raise ValueError("waiting delivery is unavailable")
@@ -1416,6 +1691,8 @@ class WaitVerifier:
                             and self.actions.get(prerequisite, {}).get("kind") != "waiting"
                             and dependency.get("source") == binding["dependency"]
                             and binding["digest"] == row_digest(dependency))
+            if binding["dependency"].get("kind") == "task-live":
+                return bool(binding.get("reason"))
             task, record = binding["dependency"]["task"], binding["delivery"]
             inbox = self.collector.state / (task + ".inbox")
             if not re.fullmatch(r"[0-9]+[.]msg", record) or inbox.is_symlink() \
@@ -1428,32 +1705,82 @@ class WaitVerifier:
             return False  # unreadable or changed evidence never buys standing acknowledgement
 
 
-def receipt_stands(action, row, now, waits=None):
-    """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
+def same_work(action, row, now):
+    """The action was recorded against this row's current evidence and age clock."""
+    age = row.get("age_seconds")
+    return action.get("digest") == row_digest(row) and not (
+        age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)))
+
+
+def receipt_covers(action, row, now, waits=None):
+    """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
+
+    A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
+    An escalation never stands: only a bound captain hold is proof it waits on the captain,
+    and the end of that hold is a change that needs firstmate's next action.
+    A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
+    including between that ledger's generation and the record time, is changed work too.
+    """
+    if not same_work(action, row, now) or row.get("category") == "review_pass_not_merged" \
+            or action.get("requires_followup"):
+        return False
     kind = action.get("kind")
-    if row.get("category") == "review_pass_not_merged":
+    if kind == "escalated":
+        if action.get("hold"):
+            return waits is not None and waits.hold_stands(action, row)
         return False
     if kind == "waiting":
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
+        return action.get("recheck_epoch", 0) > now and not captain_visible(action, row, now)
+    return kind in ("steered", "merged")
+
+
+def needs_no_action(action, row, now, waits=None):
+    """Change-gated eligibility: the last action covers the row, or is an escalation without proof it reached
+    the captain recorded on this unchanged work, which leaves the row in the periodic waiting list instead."""
+    return receipt_covers(action, row, now, waits) or (
+        action.get("kind") == "escalated" and not action.get("hold") and not action.get("unverified")
+        and not action.get("requires_followup") and row.get("category") != "review_pass_not_merged"
+        and same_work(action, row, now))
+
+
+def action_answers(action, row, required, now, waits):
+    """Reads preserve an answered presentation, not an expired or invalid receipt."""
+    if action.get("sequence", 0) <= required or action.get("requires_followup") \
+            or not same_work(action, row, now):
+        return False
+    kind = action.get("kind")
+    if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "escalated" and row.get("owner") == "captain":
-        return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
-    if kind == "escalated":
-        # A firstmate-owned row parked behind a live captain hold waits on the same single mover.
-        return waits is not None and waits.hold_stands(action, row)
-    return False
+    if kind == "waiting" or action.get("hold"):
+        return receipt_covers(action, row, now, waits)
+    return 0 <= now - answered_at(action) < RECEIPT_SECONDS
 
 
 def steer_record_epoch(state, row, record):
-    """When the row's task steering inbox (bin/fm-task-inbox-lib.sh) recorded this delivery, or None."""
-    if not re.fullmatch(r"[0-9]+[.]msg", record):
+    """When the row's task steering inbox (bin/fm-task-inbox-lib.sh) recorded this delivery, or None.
+
+    A remote secondmate's inbox lives on its own host, so the parent's delivery record for it is the confirmed
+    pending-reply correlation id (bin/fm-pending-reply-lib.sh): its delivered_epoch is the delivery time.
+    """
+    if not RECORD_NAME.fullmatch(record) and not REPLY_ID.fullmatch(record):
         return None
     owner = str(row.get("owner", ""))
-    tasks = [owner[len("worker:"):]] if owner.startswith("worker:") else []
+    source = row.get("source") if isinstance(row.get("source"), dict) else {}
+    tasks = [str(source.get("task", ""))]
+    if owner.startswith("worker:"):
+        tasks.append(owner[len("worker:"):])
     tasks.append(str(row.get("subject", "")).split(":", 1)[0])
     for task in tasks:
         if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            continue
+        if REPLY_ID.fullmatch(record):
+            path = state / "pending-replies" / record
+            if path.is_file() and not path.is_symlink():
+                fields = Collector.read_fields(path)
+                if fields.get("task_id") == task and fields.get("delivered_epoch", "").isdigit():
+                    return int(fields["delivered_epoch"])
             continue
         inbox = state / (task + ".inbox")
         for path in (inbox / record, inbox / "handled" / record):
@@ -1463,14 +1790,38 @@ def steer_record_epoch(state, row, record):
     return None
 
 
-def merge_recorded(state, row, url):
-    """The row's own PR has a merge recorded by bin/fm-merge-outcome-lib.sh (fm-pr-poll-merge-notified-v1)."""
+def merge_marker(state, url):
+    """This GitHub PR has a merge recorded by bin/fm-merge-outcome-lib.sh (fm-pr-poll-merge-notified-v1).
+
+    Any other URL is never merged here; WaitVerifier.pr_merged reads other providers' markers.
+    """
     match = GITHUB_PR.fullmatch(url)
-    if not match or url != row.get("subject"):
+    if not match:
         return False
     expected = ["fm-pr-poll-merge-notified-v1", "github", "github.com", match[1], match[2]]
     return any(marker.is_file() and not marker.is_symlink() and marker.read_text().splitlines() == expected
                for marker in state.glob("*.pr-poll-merge-notified"))
+
+
+def merge_recorded(state, row, url):
+    """The row's own PR has its merge recorded."""
+    return url == row.get("subject") and merge_marker(state, url)
+
+
+def render_digest(rows, actions, captain_waiting):
+    """One list for the existing periodic ledger wake, with no per-row notification churn."""
+    fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "status", "last_action"]
+    lines = ["WAITING OPEN WORK (periodic list for the captain):", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
+    for row in rows:
+        action = actions.get(row["id"], {})
+        status = action.get("kind")
+        if status == "escalated":
+            status = "escalated, waiting on the captain" if row["id"] in captain_waiting \
+                else "escalated, no proof it reached the captain"
+        last = {key: action.get(key) for key in ("kind", "evidence", "at_epoch")}
+        values = [row.get(field) for field in fields[:-2]] + [status, last]
+        lines.append("  " + ",".join(json.dumps(value, ensure_ascii=False) for value in values))
+    return "\n".join(lines)
 
 
 def render_overdue(rows):
@@ -1480,13 +1831,15 @@ def render_overdue(rows):
     return "\n".join(lines)
 
 
-def ledger_action(args, state, now):
+def ledger_action(args, state, now, batch=()):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
     try:
         report = read_ledger(state)
     except (OSError, ValueError) as error:
         if args.command == "action" or args.report:
             raise
+        if args.complete_actions:
+            return 0  # the acknowledgement check already printed the repair diagnostic
         print(f"error: open-loops ledger unreadable ({str(error)[:120]}); this drain is not gated on overdue rows."
               f" Repair: rm {state / 'open-loops.json'} (the next heartbeat rebuilds it)", file=sys.stderr)
         return 0
@@ -1495,6 +1848,8 @@ def ledger_action(args, state, now):
             raise ValueError("no published ledger; run bin/fm-open-loops.sh --heartbeat first")
         return 0
     if args.present_overdue and not overdue_rows(report, now):
+        return 0
+    if args.complete_actions and "handling" not in report:
         return 0
     controls = report.setdefault("handling", dict(sequence=0, presentations={}, presented_at={}, actions={}))
     stamps = controls.setdefault("presented_at", {})
@@ -1508,7 +1863,7 @@ def ledger_action(args, state, now):
     recorded = getattr(args, "kind", None)
     pending_waits = any(a.get("kind") == "waiting" or a.get("hold") for a in actions.values())
     parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id and parkable(by_id[args.row_id])
-    if recorded == "waiting" or pending_waits or parks:
+    if recorded == "waiting" or pending_waits or parks or getattr(args, "batch", None):
         try:
             waits = WaitVerifier(report, state, now)
         except SOURCE_ERRORS as error:
@@ -1519,37 +1874,64 @@ def ledger_action(args, state, now):
                 print(f"error: standing evidence unavailable ({waits_error}); its obligations need follow-up",
                       file=sys.stderr)
     for row in rows:
-        row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
+        row["captain_visible"] = captain_visible(actions.get(row["id"], {}), row, now)
     pending = controls["presentations"].setdefault(actor, {})
+    if args.digest:
+        listed = [row for row in rows if needs_no_action(actions.get(row["id"], {}), row, now, waits)]
+        if listed:
+            print(render_digest(listed, actions, {row["id"] for row in listed
+                                                  if receipt_covers(actions.get(row["id"], {}), row, now, waits)}))
+        return 0
     if args.present_overdue:
         needing, standing = [], []
+        completed = controls.get("completed", {}).get(actor, -1)
         for row in rows:
             ident = row["id"]
+            note_episode(controls, row, now)
             action = actions.get(ident, {})
-            if receipt_stands(action, row, now, waits):
+            current = ident in pending and pending[ident] >= completed
+            if needs_no_action(action, row, now, waits) \
+                    or current and action_answers(action, row, pending[ident], now, waits):
                 standing.append(row)
                 continue
             needing.append(row)
-            if ident not in pending or action.get("sequence", 0) > pending[ident]:
+            if not current or action.get("sequence", 0) > pending[ident]:
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
+        if waits is not None and waits.unread:
+            print("note: PR source unreadable this pass for " + ", ".join(sorted(waits.unread))
+                  + "; its standing wait is unchanged and the read repeats next pass", file=sys.stderr)
         if needing:
             print(render_overdue(needing))
-            if standing:
-                print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
+            if standing and args.include_standing:
+                print(render_overdue(standing).replace(
+                    "OVERDUE:", "STANDING (unchanged since its last action; no action needed):", 1))
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
                   " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
-                  " [--hold <captain-held-task-id>]")
+                  " [--hold <captain-held-task-id>]"
+                  " or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)")
+        return 0
+    if args.complete_actions:
+        # Only a successful wake acknowledgement closes this actor's handling turn.
+        # Receipts stay available to other actors and to later standing checks.
+        controls.setdefault("completed", {})[actor] = controls["sequence"]
+        write_ledger(state, report, receipt=True)
         return 0
     if args.check_actions:
+        def presentation_answered(ident):
+            # A reviewed green PR's action, or an escalation whose captain hold could not be verified,
+            # answers only the presentation it followed.
+            action = actions.get(ident, {})
+            if action.get("kind") == "waiting" or (action and not same_work(action, by_id[ident], now)):
+                return False
+            return action_answers(action, by_id[ident], pending[ident], now, waits)
         missing = [row for ident, row in by_id.items()
-                   if (ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
-                       or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now)))
-                   or (actions.get(ident, {}).get("kind") == "waiting"
-                       and not receipt_stands(actions[ident], row, now, waits))]
+                   if ident in pending
+                   and not needs_no_action(actions.get(ident, {}), row, now, waits)
+                   and not ((row.get("category") == "review_pass_not_merged"
+                             or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
@@ -1560,6 +1942,56 @@ def ledger_action(args, state, now):
         print("complete: " + str(report.get("complete", False)).lower())
         print(render_overdue(rows) if rows else "OVERDUE: none")
         return 0
+    if args.batch:
+        return record_batch(batch, state, now, report, waits, waits_error)
+    message = record_action(args, state, now, report, waits, waits_error)
+    print("action: " + json.dumps(args.row_id) + "\nkind: " + args.kind)
+    if message:
+        print("standing: " + message)
+    return 0
+
+
+def read_batch(path):
+    """The whole JSONL input as raw lines, read before any ledger lock so a slow producer never holds it."""
+    return (sys.stdin.buffer.read() if path == "-" else Path(path).read_bytes()).splitlines()
+
+
+def record_batch(lines, state, now, report, waits, waits_error):
+    """JSONL input; each row commits independently under one lock and one cached backlog read."""
+    defaults = dict(row_id=None, kind=None, evidence=None, recheck=None, hold=None,
+                    prerequisite=None, prerequisite_task=None)
+    results = []
+    for line, text in enumerate(lines, 1):
+        ident, kind = "", ""
+        try:
+            record = json.loads(text.decode())
+            if not isinstance(record, dict) or set(record) - set(defaults):
+                raise ValueError("batch row must be an action object with known fields only")
+            ident, kind = (value if isinstance(value, str) else ""
+                           for value in (record.get("row_id", ""), record.get("kind", "")))
+            if any(not isinstance(value, str) for value in record.values()):
+                raise ValueError("batch action fields must be strings")
+            if not ident or kind not in ("steered", "merged", "escalated", "deferred", "waiting"):
+                raise ValueError("row_id and a valid action kind are required")
+            if record.get("prerequisite") and record.get("prerequisite_task"):
+                raise ValueError("select only one prerequisite option")
+            args = argparse.Namespace(**(defaults | record))
+            message = record_action(args, state, now, report, waits, waits_error)
+            results.append((line, ident, kind, "recorded", message))
+        except SOURCE_ERRORS as error:
+            results.append((line, ident, kind, "refused", str(error)))
+    print(f"results[{len(results)}]{{line,id,kind,result,message}}:")
+    for result in results:
+        print("  " + ",".join(json.dumps(value) for value in result))
+    return int(any(result[3] == "refused" for result in results))
+
+
+def record_action(args, state, now, report, waits, waits_error):
+    """The single-row and batch forms use identical evidence validation and shared snapshot state."""
+    controls = report["handling"]
+    stamps, actions = controls["presented_at"], controls["actions"]
+    actor = os.environ.get("FM_SUPERVISION_ACTOR") or "main"
+    by_id = {row["id"]: row for row in overdue_rows(report, now)}
     if args.row_id not in by_id:
         raise ValueError("row is not currently overdue in the published ledger")
     ident = args.row_id
@@ -1569,16 +2001,17 @@ def ledger_action(args, state, now):
     if not args.evidence or not args.evidence.strip():
         raise ValueError("--evidence is required for every action")
     cited = old.get("cited", [])
+    sent = None
     if args.kind == "steered":
         sent = steer_record_epoch(state, by_id[ident], args.evidence)
         if sent is None:
-            raise ValueError("steered evidence must be a delivery record name (NNN.msg) in this row's task inbox")
-        boundary = stamps.get(actor, {}).get(ident)
-        if boundary is None:
-            boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
-        if sent < boundary or args.evidence in cited:
-            raise ValueError("steered evidence must be a new delivery sent after this row's presentation")
-        cited = cited + [args.evidence]
+            raise ValueError("steered evidence must be a delivery record name (NNN.msg) in this row's task inbox,"
+                             " or for a remote secondmate the delivered pending-reply correlation id")
+        if sent < episode_boundary(controls, by_id[ident], actor, now):
+            raise ValueError("steered evidence must be a new delivery sent after this row became overdue"
+                             " or its evidence last changed")
+        if now - sent >= RECEIPT_SECONDS:
+            raise ValueError("steered evidence is older than four hours; send a new delivery")
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
         raise ValueError("merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh")
     recheck = epoch(args.recheck)
@@ -1587,24 +2020,31 @@ def ledger_action(args, state, now):
     if args.kind == "waiting":
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("waiting requires --recheck at a future UTC time within 24 hours")
-        boundary = stamps.get(actor, {}).get(ident)
-        if boundary is None:
-            boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
-        binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence, boundary)
-        if args.prerequisite_task:
+        if waits is None:
+            raise ValueError("waiting evidence unavailable: " + waits_error)
+        binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence,
+                                episode_boundary(controls, by_id[ident], actor, now))
+        if binding.get("delivery"):
             delivery = f"waiting:{args.prerequisite_task}:{args.evidence}"
             if delivery in cited:
                 raise ValueError("waiting delivery has already been cited for this obligation")
             cited = cited + [delivery]
-        proof = fingerprint(binding)
-        if proof in wait_history:
-            raise ValueError("unchanged dependency wait cannot be renewed; follow up on its prerequisite")
-        wait_history = wait_history + [proof]
+        if "reason" not in binding:
+            # A live-task wait re-proves its prerequisite's liveness at every record and presentation, so only a
+            # wait resting on past evidence needs the renewal guard.
+            proof = fingerprint(binding)
+            if proof in wait_history:
+                raise ValueError("unchanged dependency wait cannot be renewed; follow up on its prerequisite")
+            wait_history = wait_history + [proof]
     elif args.prerequisite or args.prerequisite_task:
         raise ValueError("prerequisite options are only valid for waiting actions")
+    same = same_work(old, by_id[ident], now)
+    prior_deferrals = old.get("deferrals", 0) if same else 0
+    visible = bool(old.get("captain_visible")) and same
     if args.kind == "deferred":
-        if old.get("deferrals", 0):
+        if prior_deferrals:
             old["captain_visible"] = True
+            old["requires_followup"] = True
             actions[ident] = old
             for row in report["rows"]:
                 if row["id"] == ident:
@@ -1617,15 +2057,15 @@ def ledger_action(args, state, now):
                 if ident in marked:
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
-            raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
+            category = by_id[ident]["category"]
+            remedy = ("steer, merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
+                      else "steer, wait on a task through a delivery naming the row or escalate it"
+                      if category in TASK_WAITABLE else "steer, merge or escalate it")
+            raise ValueError("second deferral refused; row is captain-visible; " + remedy)
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck and args.kind != "waiting":
         raise ValueError("--recheck is only valid for deferred or waiting actions")
-    if args.kind == "deferred":
-        for marked in stamps.values():
-            if ident in marked:
-                marked[ident] = now
     hold, parked, unverified = None, False, ""
     if args.hold and args.kind != "escalated":
         raise ValueError("--hold is only valid for escalated actions")
@@ -1644,32 +2084,51 @@ def ledger_action(args, state, now):
             unverified = waits_error or "standing evidence unavailable"
     elif args.hold:
         raise ValueError("only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold")
+    if args.kind == "deferred":
+        for marked in stamps.values():
+            if ident in marked:
+                marked[ident] = now
+        controls.setdefault("episodes", {})[ident] = episode_record(by_id[ident], now, now)
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
-                         sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
-                         + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
+                         sequence=controls["sequence"], deferrals=prior_deferrals
+                         + int(args.kind == "deferred"), captain_visible=visible,
                          digest=row_digest(by_id[ident]), cited=cited)
+    if sent is not None:
+        actions[ident]["sent_epoch"] = sent
+    if by_id[ident].get("age_seconds") is not None:
+        actions[ident]["clock_start"] = max(now, report["generated_epoch"]) - by_id[ident]["age_seconds"]
     if wait_history:
         actions[ident]["waits"] = wait_history
     if binding is not None:
         actions[ident]["binding"] = binding
     if hold:
         actions[ident]["hold"] = hold
+    elif unverified:
+        actions[ident]["unverified"] = True
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
+    shown = captain_visible(actions[ident], by_id[ident], now)
+    for row in report["rows"]:
+        if row["id"] == ident:
+            if shown:
+                row["captain_visible"] = True
+            else:
+                row.pop("captain_visible", None)
     write_ledger(state, report, receipt=True)
-    print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
+    message = ""
     if parked:
         if hold:
-            print("standing: captain hold " + hold["task"] + "; stands until this row changes"
-                  " or that hold is answered or released")
+            message = ("captain hold " + hold["task"] + "; covers this row until it changes"
+                       " or that hold is answered, released, blocked or held again")
         elif unverified:
-            print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
-                  " the turn it followed (record it again once the backlog is readable)")
+            message = (f"no; the captain hold could not be verified ({unverified}), so this receipt answers only"
+                       " the turn it followed (record it again once the backlog is readable)")
         else:
-            print("standing: no; no task held for the captain was named, so this receipt answers only the turn it"
-                  " followed (name the hold with --hold TASK_ID)")
-    return 0
+            message = ("no; no task held for the captain was named, so this escalation has no hold binding:"
+                       " it is never listed as waiting on the captain, and while the row is unchanged it needs no"
+                       " new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)")
+    return message
 
 
 class CliParser(argparse.ArgumentParser):
@@ -1685,13 +2144,19 @@ def main():
     parser.add_argument("--check-in", metavar="TASK_ID", help="send one inbox check-in for an overdue silent report")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
+    parser.add_argument("--include-standing", action="store_true",
+                        help="include covered rows in a periodic overdue presentation")
     modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
     modes.add_argument("--report", action="store_true", help="report all overdue rows with current ages without collecting")
+    modes.add_argument("--complete-actions", action="store_true",
+                       help="close this actor's handling turn after successful wake acknowledgement")
+    modes.add_argument("--digest", action="store_true", help="list unchanged overdue work, its status and last action for the periodic captain list")
     commands = parser.add_subparsers(dest="command")
     action = commands.add_parser("action", help="record an action on a presented overdue row")
-    action.add_argument("row_id")
-    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred", "waiting"))
-    action.add_argument("--evidence", required=True, help="delivery id, PR URL, escalation, deferral or dependency reason")
+    action.add_argument("row_id", nargs="?")
+    action.add_argument("kind", nargs="?", choices=("steered", "merged", "escalated", "deferred", "waiting"))
+    action.add_argument("--batch", metavar="JSONL_FILE", help="one action object per line; - reads stdin")
+    action.add_argument("--evidence", help="delivery id, PR URL, escalation, deferral or dependency reason")
     action.add_argument("--recheck", help="future UTC ISO time (deferred or waiting)")
     action.add_argument("--hold", metavar="TASK_ID",
                         help="task held for the captain that this escalation waits on (escalated only)")
@@ -1699,8 +2164,19 @@ def main():
     dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
     dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
     args = parser.parse_args()
-    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report
-    if args.command == "action" and (args.present_overdue or args.check_actions or args.report):
+    if args.include_standing and not args.present_overdue:
+        parser.error("--include-standing requires --present-overdue")
+    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report \
+        or args.complete_actions or args.digest
+    if args.command == "action":
+        if args.batch:
+            if any(getattr(args, key) for key in ("row_id", "kind", "evidence", "recheck", "hold",
+                                                  "prerequisite", "prerequisite_task")):
+                parser.error("--batch cannot be combined with single-row action arguments")
+        elif not args.row_id or not args.kind or not args.evidence:
+            parser.error("action requires row_id, kind and --evidence, or --batch JSONL_FILE")
+    if args.command == "action" and (args.present_overdue or args.check_actions or args.report
+                                     or args.complete_actions or args.digest):
         parser.error("action cannot be combined with presentation, acknowledgement or report modes")
     if receipt_mode and (args.heartbeat or args.json or args.check_in):
         parser.error("receipt and report commands cannot collect or publish a heartbeat")
@@ -1709,6 +2185,7 @@ def main():
         return 1
     home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
     try:
+        batch = read_batch(args.batch) if args.command == "action" and args.batch else ()
         lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state").resolve()
         lock_dir.mkdir(parents=True, exist_ok=True)
         lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -1717,7 +2194,7 @@ def main():
             # Byte 0 excludes concurrent collections; byte 1 serializes only
             # atomic publication and receipts on the same existing lock file.
             fcntl.lockf(lock_fd, fcntl.LOCK_EX, 1, 1)
-            return ledger_action(args, lock_dir, now)
+            return ledger_action(args, lock_dir, now, batch)
         try:
             fcntl.lockf(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0), 1, 0)
         except (BlockingIOError, PermissionError):
@@ -1728,20 +2205,16 @@ def main():
         print("error: " + json.dumps(str(error)))
         return 1
 
-    def deadline(_signum, _frame):
-        raise CollectionDeadline("collection exceeded its deadline")
-    signal.signal(signal.SIGALRM, deadline)
-    signal.alarm(collector.timeout * 10)
+    # Source commands own no-progress detection. An overall alarm would kill
+    # a productive collection merely because several valid reads took time.
     try:
         collector.collect()
     except QuotaLow as low:
         collector.hold_last(str(low))
-    except (CollectionDeadline, *SOURCE_ERRORS) as error:
+    except SOURCE_ERRORS as error:
         collector.degraded.insert(0, "reconciler: " + str(error)[:160])
         collector.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                       None, evidence="; ".join(collector.degraded))
-    finally:
-        signal.alarm(0)
     try:
         if args.check_in:
             if collector.stale_reason:

@@ -8,9 +8,9 @@ The predicate lives in `bin/fm-turnend-guard.sh`.
 Primary scope lives in `bin/fm-primary-scope-lib.sh`, shared with the native session-start adapters in [`sessionstart-nudge.md`](sessionstart-nudge.md).
 Harness hook files adapt each enabled primary harness integration's turn-end mechanism to that shared predicate.
 
-Related Bash PreToolUse guards deny unsafe commands before execution rather than detecting a blind turn end afterward.
-Their separate owners are [`arm-pretool-check.md`](arm-pretool-check.md) and [`cd-guard.md`](cd-guard.md).
-Do not infer this guard's scope, loop safety, or compatibility tradeoffs for those guards.
+The Bash PreToolUse guard denies unsafe watcher-arm commands before execution rather than detecting a blind turn end afterward.
+Its separate owner is [`arm-pretool-check.md`](arm-pretool-check.md).
+Do not infer this guard's scope, loop safety, or compatibility tradeoffs for that guard.
 
 ## Find a topic
 
@@ -221,14 +221,14 @@ That is exactly what a long-poll home (`FM_POLL=300`) hit against the Claude Sto
 Two readers derive their default grace from the configured poll instead of a bare constant:
 
 - That hook.
-- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal).
+- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal for a holder that does not prove the lock's recorded identity).
 
 Both use `max(300, FM_POLL + 60)`.
 The default never drops below the historical 300-second floor for the common short-poll case, but grows with the poll cadence once that cadence would otherwise outrun it.
 `fm_poll_derived_grace` in `bin/fm-wake-lib.sh` is the single owner of that formula.
 
-That refusal has a ceiling.
-Once the live holder's beacon is stale past `FM_WATCHER_STALL_BOUND` (default three times the grace), the re-arm takes these steps:
+Beacon age alone never replaces or refuses a live holder that proves the lock's recorded identity: that holder is a slow cycle, which a fresh arm attaches to and a direct re-arm reports as already running.
+Only when `fm_progress_check` (`bin/fm-timeout-lib.sh`) proves that the holder's process tree and beacon made no progress for `FM_WATCHER_STALL_BOUND` (default three times the grace) does the re-arm take these steps:
 
 1. It re-verifies the holder against the lock's recorded identity.
 2. It retires the holder with TERM.
@@ -236,8 +236,8 @@ Once the live holder's beacon is stale past `FM_WATCHER_STALL_BOUND` (default th
 
 A watcher wedged mid-cycle can therefore no longer refuse every replacement indefinitely.
 `bin/fm-watch.sh`'s header owns the exact wording and the survives-TERM fallback.
-Below that bound a stale beacon alone does not end an attached arm's watch of a live, identity-matched holder; a changed lock can end it sooner.
-At the bound the arm reports a typed stalled-holder failure so its owner's retry can replace the holder.
+An attached arm keeps watching a live, identity-matched holder however old its beacon is, until the same proof; a changed lock can end it sooner.
+On that proof the arm reports a typed stalled-holder failure so its owner's retry can replace the holder.
 `fm_watcher_stall_bound` in `bin/fm-wake-lib.sh` owns the shared derivation; `bin/fm-watch-arm.sh`'s header owns the exact attached-arm close behavior.
 
 The auto-arm hook additionally exports its resolved `FM_GUARD_GRACE` when it forks `bin/fm-watch-arm.sh`.
@@ -265,6 +265,7 @@ Each enabled primary harness adapts its own turn-end mechanism to the shared gua
 | OpenCode | `session.idle` in `.opencode/plugins/fm-primary-turnend-guard.js` | Passive callback that schedules one follow-up |
 | Pi | `agent_settled` in `.pi/extensions/fm-primary-turnend-guard.ts` | Passive callback that schedules one follow-up |
 | omp | `session_stop` in `.omp/extensions/fm-primary-turnend-guard.ts` | Blocking hook that compels one continuation |
+| dsh | Durable `turn/end` callback in `.dsh/fm-primary.mjs` | Passive shared-guard check, tracked watcher repair, and one bounded native follow-up on failure |
 | Cursor | `stop` hook in `.cursor/hooks.json` | Cannot block, so it parks and returns at most one follow-up |
 | Grok | `Stop` hook in `.grok/hooks/fm-primary-turnend-guard.json` | Native blocking, or one legacy `grok --resume` fallback |
 
@@ -307,6 +308,15 @@ The registrations in detail:
   pi-code stamps it with Pi's session file under `/.pi/`, a path component a Claude transcript never carries.
   The auto-arm stand-down fails toward running, matching the guards above, so no payload, no `jq`, or no `transcript_path` still arms.
   The Claude-only [process-event tool-boundary notice](configuration.md#process-to-event-sources-stateprocevent) also stands down on Pi compatibility payloads; the other Claude-shaped hooks pi-code delivers keep running.
+
+### DSH native passive boundary
+
+The primary launch patch mounts `.dsh/fm-primary.mjs` through DSH's native Cordis composition; a bare `dsh-tui` does not automatically load it.
+Its durable `turn/end` callback invokes the same guard, and an unhealthy primary starts or attaches through the existing watcher singleton.
+A failed arm produces at most one native `agent.followup` until an external user message resets that episode's budget.
+Accepted watcher messages are not consumption evidence: the bridge waits for the delivered epoch/sequence rows to disappear through the ordinary acknowledgement before re-arming, so a pending row cannot spin duplicate turns.
+DSH cannot veto a completed turn through this event; the bounded follow-up is its strongest equivalent, not a blocking Stop hook.
+The [DSH supervision protocol](supervision-protocols/dsh.md) owns normal operation and recovery, and `tests/fm-dsh-primary-live-e2e.test.sh` exercises the actual native callbacks and terminal lifecycle.
 
 ### Claude and Codex blocking
 
@@ -599,7 +609,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - Pi logical-run latching.
 - Missing-`jq` behavior.
 - All five primary registrations.
-- Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion.
+- Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion, also under a Stop payload larger than the stdin pipe buffer.
 - Helper-tool exclusion and both authoritative Bash protections.
 - Grok native and legacy selection.
 - Typed field precedence.

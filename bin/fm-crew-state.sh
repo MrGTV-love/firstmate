@@ -17,10 +17,16 @@
 # mapping logic, and terminal passed-run PR detail from bounded evidence only,
 # with no heuristics and no LLM.
 # For a terminal passed no-mistakes run, a matching merge-poll retirement
-# receipt is local merged evidence; otherwise a 5s-bounded forge read is tried.
+# receipt is local merged evidence; otherwise one forge read is tried. Its bound
+# comes from this host's measured forge-read durations (fm_duration_timed, key
+# crew-state.forge-read, with a cold-start fallback of 5s), so a loaded host
+# stretches it instead of cutting a healthy read. fm_duration_timed reads its clock
+# with perl, so a host without perl runs the read under the same measured bound
+# (fm_duration_limit) through fm_run_timed and records no sample.
 # FM_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
 # An absent or unreadable PR identity yields an honest unknown, never an
-# optimistic merged claim.
+# optimistic merged claim, and so does a forge read that hit its bound: the PR
+# state is then reported unknown (forge read timed out; try again).
 # Output is one stable, parseable, token-tight line firstmate can read every
 # heartbeat:
 #
@@ -38,15 +44,21 @@
 #   model-stale: <model> on <harness> is older than <newer> in the <harness> catalog
 #       any harness: the launch was told, at spawn, that a newer model of the
 #       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).
+#       A trailing "(admitted by captain pin)" or "(admitted at launch)" marks a
+#       stale model the spawn gate let through (docs/configuration.md#model-freshness).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
-# A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup
-# has the full allowance) is never retried and ends the line with `run-store:
-# skipped (read budget exceeded)`. A cut first status read leaves the pane and
+# Each run-attribution lookup uses FM_CREW_STATE_NM_TIMEOUT as a no-output/no-CPU
+# interval (default 900 seconds), not a wall-clock deadline. Slow productive reads
+# finish and are used. A proven stalled lookup is never retried and ends the line
+# with `run-store: skipped (no output or CPU progress)`. A cut first status read leaves the pane and
 # status-log fallback below to answer. A cut overview, inventory, id-addressed
 # status or identity runs-list read reports an unknown run-step verdict. A cut
 # runs-list read after a bound run is skipped and the bare status answer stands;
 # a cut fallback runs-list leaves the pane and status-log fallback to answer.
+# After the first cut, no later no-mistakes read runs in that crew read: each
+# counts as cut without running (FM_NM_READ_STALLED in bin/fm-nm-run-lib.sh), so
+# a wedged daemon costs one interval and the fallbacks above still answer.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -67,11 +79,14 @@
 #      neither is the overview table's narrower status column)
 #      is authoritative REGARDLESS of head (fm_nm_run_is_executing in
 #      bin/fm-nm-run-lib.sh) as long as an explicit probe has not ANSWERED that
-#      the daemon is down (nm_daemon_answered_down): the pipeline rebases the
-#      branch and
-#      commits its fix rounds in its own checkout, so a live run's head
-#      routinely differs from the local head, and reading an older run that
-#      still matches the local head would report a working crew as failed - but
+#      the daemon is down (nm_daemon_answered_down): the rebase step
+#      integrates newer main into the branch, by merge where
+#      `rebase: strategy: merge` is set and otherwise by rewriting the submitted
+#      commits, CI merge-conflict repair can still rewrite its history, and fix
+#      rounds commit in the pipeline's own checkout, so a
+#      live run's head routinely differs from the local head, and reading an
+#      older run that still matches the local head would report a working crew
+#      as failed - but
 #      a record still saying `running` because the daemon died under it is
 #      evidence from a dead instrument, exactly as for a terminal record, and
 #      must not answer once the worktree has moved off the run head. Every
@@ -129,6 +144,15 @@
 #      also a passing outcome (publication or CI verification was
 #      automatically skipped, no-mistakes' own vocabulary), read as done but
 #      with that skip kept visible in the detail, unlike a clean passed.
+#      A passing run on a mode=no-mistakes task also needs the supported
+#      revision-bound evidence `no-mistakes axi status` exposes: the immutable
+#      verification-plan snapshot, its bytes still hashing to the recorded
+#      sha256, and the run head being the task's recorded pr_head or
+#      attributing to this copy's HEAD (fm_nm_evidence_problem in
+#      bin/fm-nm-run-lib.sh). Missing or
+#      mismatched evidence reads unknown with the exact reason; a coarse
+#      inventory word cannot supply it. That proves the plan and revision were
+#      accounted for, never that the reviewer graded every item correctly.
 #      EXCEPT: while
 #      the active step is ci, `axi status` alone cannot tell "still waiting on
 #      checks" from "checks green, waiting on merge" (see nm_ci_checks_state) -
@@ -224,6 +248,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 
@@ -234,8 +260,16 @@ ID=${1:-}
 # state read resolves the same task generation selected by that snapshot.
 META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
 LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
-NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
-case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
+# The daemon may be working outside this process tree. Allow its quiet reads
+# the same 15-minute inactivity policy as fm-duration.py, never a 10s wall kill.
+NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-$((15 * 60))}
+case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
+: "${FM_DOD_NM_STALL_SECS:=$NM_TIMEOUT}"
+# Shell-local: only this read-only consumer opts into the shared runner mode.
+FM_NM_READ_PROGRESS=1
+FM_NM_READ_STALLED=0
+# Answer the Python capability probe once here: every read runs in a subshell.
+fm_posix_python || true
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -253,8 +287,9 @@ LIVE_NOTE=''
 # Disclose a lookup the bounded runner cut (exit 124), once per read.
 nm_note_cut() {  # <exit-status>
   [ "$1" = 124 ] || return 0
+  FM_NM_READ_STALLED=1
   case "$LIVE_NOTE" in *"${SEP}run-store: skipped"*) return 0 ;; esac
-  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (read budget exceeded)"
+  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (no output or CPU progress)"
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -286,11 +321,12 @@ meta_value_to() {  # <output-variable> <key>
   record_value_to "$1" "$META" "$2"
 }
 
-WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
+WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT='' RUN_MODE=''
 meta_value_to WT worktree
 meta_value_to KIND kind
 meta_value_to HARNESS harness
 meta_value_to REMOTE_HOST remote_host
+meta_value_to RUN_MODE mode
 [ -n "$KIND" ] || KIND=ship
 
 # Live-model components for a local omp task. A secondmate publishes into its
@@ -346,11 +382,17 @@ fi
 # named-head reachability gate: that claim is blocked so a disposable copy is
 # not treated as finished-and-safe.
 emit_ship_status_done() {  # [extra-detail]
-  local extra=${1:-} reason
+  local extra=${1:-} reason rc=0
   meta_value_to META_MODE mode
   meta_value_to META_PROJECT project
-  if reason=$(fm_dod_accept_ship_done "$KIND" "$META_MODE" "$WT" "$META_PROJECT" "$LOG_LINE" "$STATE" "$ID" "$META"); then
+  reason=$(fm_dod_accept_ship_done "$KIND" "$META_MODE" "$WT" "$META_PROJECT" "$LOG_LINE" "$STATE" "$ID" "$META") || rc=$?
+  if [ "$rc" -eq 0 ]; then
     emit "done" status-log "$(status_line_note "$LOG_LINE")${extra:+${SEP}$extra}"
+  fi
+  # A run that did not answer is unknown, not a refusal: a finished ship must not
+  # read as blocked because its daemon was slow to reply.
+  if [ "$rc" -eq 2 ]; then
+    emit unknown status-log "$reason"
   fi
   emit blocked status-log "$reason"
 }
@@ -370,7 +412,11 @@ map_log_state() {  # <line>
   esac
 }
 
-LOG_LINE=$(status_current_line "$LOG" "$KIND")
+LOG_RC=0
+LOG_LINE=$(status_current_line "$LOG" "$KIND") || LOG_RC=$?
+# A log the status read limits refuse (bin/fm-status-cap-lib.sh) is unreadable, which is
+# not the same as empty: say so, naming the log, instead of answering from the pane alone.
+[ "$LOG_RC" -ne 2 ] || emit unknown status-log "status log ${LOG##*/} is past the status read limits and cannot be read"
 LOG_VERB=$(status_line_verb "$LOG_LINE")
 
 # --- remote secondmate: the true source is the remote endpoint ---------------
@@ -461,59 +507,69 @@ nm_field() {  # <key>
   fm_nm_field "$RUN_OUT" "$1"
 }
 
+# One forge read of a PR's state and merged flag, run as <inner-script> in its own
+# bash with fm-pr-lib.sh sourced as $1. The read is the one thing here that cannot
+# be watched for progress (a network call is quiet until it answers), so its bound
+# is the measured one for this host. Failing to answer in time is not a verdict on
+# the PR: FORGE_READ_TIMED_OUT lets the caller report unknown, try again.
+FORGE_READ_TIMED_OUT=0
+forge_read_record_bounded() {  # <inner-script> <args...>
+  local script=$1 record state merged rc=0
+  shift
+  FORGE_READ_TIMED_OUT=0
+  if command -v perl >/dev/null 2>&1; then
+    record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  else
+    record=$(fm_run_timed "$(fm_duration_limit crew-state.forge-read 5 2>/dev/null)" bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    ! fm_timed_out "$rc" || FORGE_READ_TIMED_OUT=1
+    return 1
+  fi
+  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
+  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
+  [ -n "$state" ] || return 1
+  [ "$merged" = true ] || [ "$merged" = false ] || return 1
+  FM_PR_RECORD_STATE=$state
+  FM_PR_RECORD_MERGED=$merged
+}
+
+# The unknown reading for a forge read that gave no answer: a read that hit its
+# bound says nothing about the PR, and says so.
+forge_read_unknown() {
+  if [ "$FORGE_READ_TIMED_OUT" = 1 ]; then
+    printf 'run passed: PR state unknown (forge read timed out; try again)'
+  else
+    printf 'run passed: PR state unknown (unreadable)'
+  fi
+}
+
 pr_read_record_bounded() {  # <owner> <repo> <number>
-  local record state merged
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     fm_pr_github_read_record "$2" "$3" "$4" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" "$3" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2" "$3"
 }
 
 host_pull_read_record_bounded() {  # <provider: gitlab|forgejo> <host> <path> <number>
-  local record state merged
   case "$1" in gitlab|forgejo) ;; *) return 1 ;; esac
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     "fm_pr_${2}_read_record" "$3" "$4" "$5" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" "$3" "$4" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2" "$3" "$4"
 }
 
 change_read_record_bounded() {  # <host> <number>
-  local record state merged
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     fm_pr_gerrit_read_record "$2" "$3" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2"
 }
 
 passed_pr_detail() {
@@ -554,7 +610,7 @@ passed_pr_detail() {
       owner=${path%%/*}
       repo=${path#*/}
       if ! pr_read_record_bounded "$owner" "$repo" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -570,7 +626,7 @@ passed_pr_detail() {
       ;;
     gitlab)
       if ! host_pull_read_record_bounded gitlab "$host" "$path" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -586,7 +642,7 @@ passed_pr_detail() {
       ;;
     forgejo)
       if ! host_pull_read_record_bounded forgejo "$host" "$path" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -604,7 +660,7 @@ passed_pr_detail() {
       ;;
     gerrit)
       if ! change_read_record_bounded "$host" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -848,7 +904,7 @@ nm_run_activity_is_recent() {
 # the run failed, although GitHub's own check state - the actual shippability
 # authority - is green and every substantive step completed.
 nm_failed_run_is_green_held_ci() {
-  local rows row rest step status saw_ci_failed
+  local rows row rest step status saw_ci_failed ci_state
   rows=$(nm_steps_rows)
   [ -n "$rows" ] || return 1
   saw_ci_failed=0
@@ -874,7 +930,8 @@ nm_failed_run_is_green_held_ci() {
 $rows
 EOF
   [ "$saw_ci_failed" = 1 ] || return 1
-  [ "$(nm_ci_checks_state)" = green ]
+  ci_state=$(nm_ci_checks_state) || nm_note_cut $?
+  [ "$ci_state" = green ]
 }
 
 # Apply the header's terminal-delivery safeguard. The earlier green log cannot
@@ -961,10 +1018,8 @@ nm_daemon_probe_down() {
 # record it would drop a working crew back to a possibly-stale status log every
 # time the probe merely ran slow - the crew would flap between working and
 # failed on probe latency alone. 124 is the bounded call's own did-not-answer
-# code (both the timeout and perl arms of fm_nm_run_bounded use it), and proves
-# nothing about the daemon. The no-timeout-tool return of 1 cannot reach here:
-# without a timeout tool the `axi status` read above is empty too, so this whole
-# block is skipped.
+# code for a proven no-progress read, and proves nothing about daemon death.
+# A slow productive probe finishes before this classification is made.
 nm_daemon_answered_down() {
   nm_daemon_probe
   [ "$NM_DAEMON_ANSWER" = down ]
@@ -980,6 +1035,7 @@ nm_daemon_probe() {
   local rc=0
   [ -n "$NM_DAEMON_ANSWER" ] && return 0
   fm_nm_run_checked "$WT" "$NM_TIMEOUT" daemon status >/dev/null || rc=$?
+  nm_note_cut "$rc"
   case "$rc" in
     0)   NM_DAEMON_ANSWER=up ;;
     124) NM_DAEMON_ANSWER=unanswered ;;
@@ -1034,12 +1090,14 @@ nm_effective_ci_step_status() {
 # ignores the line the same way, v1.32.2 through v1.79.0). Reading it as
 # not-ready held a green PR at working for as long as main kept advancing.
 nm_ci_checks_state() {
-  local run_id ci_log marker finished_run
+  local run_id ci_log marker finished_run rc=0
   run_id=$(strip_quotes "$(nm_field id)")
   [ -n "$run_id" ] || { printf 'unknown'; return; }
   # A finished run's ci log cannot change, so only that read is kept for good.
   fm_nm_run_is_active "$RUN_OUT" && finished_run='' || finished_run=$run_id
-  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || true
+  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || rc=$?
+  # This runs in its caller's command substitution, so the caller notes the cut.
+  [ "$rc" != 124 ] || { printf 'unknown'; return 124; }
   [ -n "$ci_log" ] || { printf 'unknown'; return; }
   marker=$(printf '%s\n' "$ci_log" \
     | grep -E 'CI checks passed|no CI checks reported - still monitoring|no CI checks reported yet|checks failed|issues detected|CI checks running' \
@@ -1272,7 +1330,16 @@ if [ "$HAVE_RUN" = 1 ]; then
     # supervisor through fm-classify-lib.sh's status_span_first_actionable.
     case "$COARSE_STATUS" in
       running) RUN_STATE=working; RUN_DETAIL="validating (background run)" ;;
-      completed) RUN_STATE="done";  RUN_DETAIL="run completed" ;;
+      completed)
+        if [ "$RUN_MODE" = no-mistakes ]; then
+          # The coarse ledger has no verification-plan snapshot. A passing
+          # no-mistakes run cannot be accounted for from an inventory word
+          # alone, so it stays explicitly unverified rather than done.
+          RUN_STATE=unknown
+          RUN_DETAIL="run completed without readable verification-plan evidence; review coverage unverified"
+        else
+          RUN_STATE="done";  RUN_DETAIL="run completed"
+        fi ;;
       failed)
         # The ledger row is terminal but the coarse path has no steps table
         # and no ci log, so the orphaned-monitor shape cannot be recognized
@@ -1357,7 +1424,7 @@ if [ "$HAVE_RUN" = 1 ]; then
         CI_STEP_STATUS=$(nm_effective_ci_step_status)
         case "$CI_STEP_STATUS" in
           running)
-            CI_LOG_STATE=$(nm_ci_checks_state)
+            CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
             if [ "$CI_LOG_STATE" = green ]; then
               RUN_STATE="done"
               RUN_DETAIL="checks green: PR ready for review (still monitoring for merge/close)"
@@ -1373,6 +1440,22 @@ if [ "$HAVE_RUN" = 1 ]; then
         esac
       fi
     fi
+    # A passing no-mistakes run is completion evidence, not a bare claim: the
+    # run must expose the immutable verification-plan snapshot that axi status
+    # renders for it, the snapshot bytes must still hash to the recorded sha256,
+    # and the run head must be the recorded pr_head or attribute to this copy's
+    # HEAD (fm_nm_evidence_problem). This proves the plan and revision were the
+    # ones accounted for; it never claims the reviewer graded the items
+    # correctly.
+    if [ "$RUN_STATE" = "done" ] && [ "$RUN_MODE" = no-mistakes ]; then
+      evidence_plan=$(fm_dod_nm_expected_plan "$STATE" "$ID")
+      evidence_head=''
+      meta_value_to evidence_head pr_head
+      if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan" "$evidence_head"); then
+        RUN_STATE=unknown
+        RUN_DETAIL="run evidence unverified: $reason"
+      fi
+    fi
   fi
 
   if [ "$RUN_STATE" = working ] && log_reports_ci_ready; then
@@ -1383,7 +1466,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     if [ "$RUN_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     elif [ "$CI_STEP_STATUS" = running ] && [ -z "$CI_LOG_STATE" ]; then
-      CI_LOG_STATE=$(nm_ci_checks_state)
+      CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
     elif [ "$CI_STEP_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     fi

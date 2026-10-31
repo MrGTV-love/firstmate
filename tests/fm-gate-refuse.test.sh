@@ -44,6 +44,10 @@ SEND="$ROOT/bin/fm-send.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 
 TMP=$(fm_test_tmproot fm-gate-refuse)
+# Keep guard telemetry inside the fixture root: a refusal must not write into
+# the checkout's own state directory while this suite runs.
+EVENTS="$TMP/guard-events.jsonl"
+export FM_GUARD_EVENT_LOG="$EVENTS"
 fm_git_identity fmtest fmtest@example.invalid
 
 # The env marker's exact stderr fragment (the primary signal).
@@ -107,9 +111,15 @@ run_guard_lib() {
 
 test_helper_env_marker_refuses() {
   local out rc
+  : > "$EVENTS"
   out=$(run_guard_lib "$NORMAL_CWD" set); rc=$?
   expect_code 3 "$rc" "helper: env marker must exit 3"
   assert_contains "$out" "$ENV_MSG" "helper: env-marker refusal message"
+  assert_contains "$out" 'bin/fm-lab-home.sh env' "helper: env-marker refusal must name the lab-home escape"
+  assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
+    "helper: env-marker refusal must state the real home is unavailable"
+  [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
+    || fail "helper: env-marker refusal must append exactly one deny event"
   pass "fm-gate-refuse-lib: refuses when NO_MISTAKES_GATE is set"
 }
 
@@ -123,11 +133,17 @@ test_helper_empty_env_marker_refuses() {
 
 test_helper_path_backstop_refuses() {
   local out rc
+  : > "$EVENTS"
   # Marker UNSET: only the git-common-dir backstop can fire here.
   out=$(run_guard_lib "$GATE_WT"); rc=$?
   expect_code 3 "$rc" "helper: gate worktree must exit 3 even with the marker unset"
   assert_contains "$out" "$PATH_MSG" "helper: path-backstop refusal message"
   assert_not_contains "$out" "$ENV_MSG" "helper: backstop must not be attributed to the env marker"
+  assert_contains "$out" 'bin/fm-lab-home.sh env' "helper: backstop refusal must name the lab-home escape"
+  assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
+    "helper: backstop refusal must state the real home is unavailable"
+  [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
+    || fail "helper: path-backstop refusal must append exactly one deny event"
   pass "fm-gate-refuse-lib: refuses from a gate worktree via git-common-dir (marker unset)"
 }
 
@@ -158,7 +174,7 @@ run_guard_lib_home() {
 }
 
 test_helper_lab_home_admits() {
-  local lab plain out rc
+  local lab plain out rc value name dir
   lab=$("$LABHOME" create "$TMP/lab-home") || fail "lab-home create failed"
   plain="$TMP/plain-home"; mkdir -p "$plain"
 
@@ -173,16 +189,48 @@ test_helper_lab_home_admits() {
   expect_code 3 "$rc" "helper: gate + unmarked home must still refuse"
   assert_contains "$out" "$ENV_MSG" "helper: unmarked-home refusal message"
 
-  # gate + marked lab + an FM_*_OVERRIDE -> refused: the allowance requires
-  # the stock layout so an override cannot split state onto the real fleet.
-  out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1 FM_STATE_OVERRIDE="$lab/state"); rc=$?
-  expect_code 3 "$rc" "helper: lab home driven through FM_STATE_OVERRIDE must refuse"
-  assert_contains "$out" "$ENV_MSG" "helper: override refusal message"
+  # Production Pi supplies the tracked root and the stock state/config paths.
+  out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 \
+    FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$lab/state" FM_CONFIG_OVERRIDE="$lab/config"); rc=$?
+  expect_code 0 "$rc" "helper: production branch paths in a marked lab must be permitted"
+
+  for name in FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE; do
+    for value in "$plain" "$lab/../plain-home" "$lab/state/.."; do
+      out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$value"); rc=$?
+      expect_code 3 "$rc" "helper: relocated or noncanonical $name must refuse"
+    done
+  done
+  for name in FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_UNKNOWN_OVERRIDE; do
+    out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$lab/data"); rc=$?
+    expect_code 3 "$rc" "helper: unsupported $name must refuse"
+  done
+  ln -s "$lab" "$TMP/lab-alias"
+  for value in "$TMP/lab-alias" "$lab/."; do
+    out=$(run_guard_lib_home "$GATE_WT" "$value" NO_MISTAKES_GATE=1 FM_ROOT_OVERRIDE="$ROOT"); rc=$?
+    expect_code 3 "$rc" "helper: noncanonical home must refuse"
+  done
+  for dir in state config data projects; do
+    mv "$lab/$dir" "$lab/$dir.saved"
+    ln -s "$plain" "$lab/$dir"
+    out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 FM_ROOT_OVERRIDE="$ROOT"); rc=$?
+    expect_code 3 "$rc" "helper: symlinked stock $dir must refuse"
+    rm "$lab/$dir"
+    mv "$lab/$dir.saved" "$lab/$dir"
+  done
+  mv "$lab/.fm-lab-home" "$lab/marker.saved"
+  ln -s "$lab/marker.saved" "$lab/.fm-lab-home"
+  out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1); rc=$?
+  expect_code 3 "$rc" "helper: symlinked lab identity must refuse"
+  rm "$lab/.fm-lab-home"
+  printf 'invalid lab identity\n' > "$lab/.fm-lab-home"
+  out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1); rc=$?
+  expect_code 3 "$rc" "helper: invalid lab identity must refuse"
+  mv "$lab/marker.saved" "$lab/.fm-lab-home"
 
   # no gate signal + lab home -> still a normal no-op.
   out=$(run_guard_lib_home "$NORMAL_CWD" "$lab"); rc=$?
   expect_code 0 "$rc" "helper: lab home outside a gate must not refuse"
-  pass "fm-gate-refuse-lib: marked lab home permitted in a gate; unmarked home or an override stay refused"
+  pass "fm-gate-refuse-lib: production lab paths permitted; relocated paths and invalid identities refused"
 }
 
 test_lab_home_private_tmux_socket_survives_deep_paths() {
@@ -274,6 +322,48 @@ test_lab_home_helper() {
   [ "$rc" -ne 0 ] || fail "lab-home: create on a dir holding a newline-named entry must refuse"
   assert_absent "$newline/.fm-lab-home" "lab-home: newline-entry create must not write the marker"
   pass "fm-lab-home: create mints marked stock homes only on fresh empty dirs; anything else is refused"
+}
+
+# env is the one-command form the refusal names: it mints a marked lab home,
+# exports it with its private socket directory, and prints the teardown line,
+# so a gate agent never composes mktemp, create, and a tmux mkdir by hand.
+# <tmpdir> may be a symlink (macOS /tmp and /var are); the exported home must
+# still be the canonical path the gate boundary admits.
+lab_home_env_provisions() {  # <tmpdir> <expected-real-parent> <label>
+  local tmpdir=$1 parent=$2 label=$3 out err lab socket rc teardown
+  out=$(TMPDIR="$tmpdir" "$LABHOME" env 2>"$TMP/env.err") || fail "lab-home $label: env must provision a lab: $(cat "$TMP/env.err")"
+  err=$(cat "$TMP/env.err")
+  assert_contains "$out" 'export FM_HOME=' "lab-home $label: env must export FM_HOME"
+  assert_contains "$out" 'export TMUX_TMPDIR=' "lab-home $label: env must export TMUX_TMPDIR"
+  assert_contains "$err" 'teardown' "lab-home $label: env must print the teardown line on stderr"
+  grep '^export ' "$TMP/env.err" > "$TMP/env.stderr-exports"
+  printf '%s\n' "$out" > "$TMP/env.exports"
+  # shellcheck source=/dev/null
+  ( . "$TMP/env.exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.paths" )
+  lab=$(sed -n '1p' "$TMP/env.paths")
+  socket=$(sed -n '2p' "$TMP/env.paths")
+  [ -f "$lab/.fm-lab-home" ] || fail "lab-home $label: env did not mint a marked lab home"
+  [ "$lab" = "$(cd -P -- "$lab" && pwd -P)" ] || fail "lab-home $label: env must export a canonical FM_HOME, got $lab"
+  case "$lab" in "$parent"/*) ;; *) fail "lab-home $label: env must mint under $parent, got $lab" ;; esac
+  [ -d "$socket" ] || fail "lab-home $label: env did not create the private tmux socket directory"
+  # shellcheck source=/dev/null
+  ( unset FM_HOME TMUX_TMPDIR; . "$TMP/env.stderr-exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.stderr-paths" )
+  [ "$(cat "$TMP/env.stderr-paths")" = "$(printf '%s\n%s' "$lab" "$socket")" ] \
+    || fail "lab-home $label: the stderr exports must restore the same FM_HOME and TMUX_TMPDIR in a fresh shell"
+  out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1); rc=$?
+  expect_code 0 "$rc" "lab-home $label: the home env mints must be permitted by the gate boundary"
+  teardown=$(sed -n 's/^fm-lab-home: teardown: //p' "$TMP/env.err")
+  (cd / && eval "$teardown") || fail "lab-home $label: the printed teardown line failed: $teardown"
+  [ ! -e "$socket" ] || fail "lab-home $label: teardown left the env socket directory behind"
+  [ ! -e "$lab" ] || fail "lab-home $label: teardown left the env lab home behind"
+}
+
+test_lab_home_env_provisions_the_gate_lab() {
+  lab_home_env_provisions "$TMP" "$TMP" plain
+  mkdir -p "$TMP/real-tmpdir"
+  ln -s "$TMP/real-tmpdir" "$TMP/linked-tmpdir"
+  lab_home_env_provisions "$TMP/linked-tmpdir" "$TMP/real-tmpdir" symlinked
+  pass "fm-lab-home: env provisions the marked lab home the gate boundary admits, even under a symlinked TMPDIR"
 }
 
 test_lab_home_refuses_work_tree() {
@@ -559,6 +649,7 @@ test_helper_path_backstop_refuses
 test_helper_normal_is_noop
 test_helper_lab_home_admits
 test_lab_home_helper
+test_lab_home_env_provisions_the_gate_lab
 test_lab_home_refuses_work_tree
 test_lab_home_private_tmux_socket_survives_deep_paths
 test_spawn_refuses_and_admits

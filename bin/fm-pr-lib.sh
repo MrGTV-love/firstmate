@@ -20,6 +20,9 @@
 # The receipt binds the terminal observation to the canonical registration and
 # lets a restart finish fixed-path removal without executing state-file bytes.
 
+# shellcheck source=bin/fm-file-identity-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-file-identity-lib.sh"
+
 # The kernel name, read once per process: the file-stat helpers below run on
 # every supervision cycle, and each used to start a uname process per call.
 # A function-only form follows because a runner started with exported functions
@@ -444,7 +447,7 @@ fm_pr_metadata_identity_parse() {
           fm_pr_head_valid "$value" || post_pr_invalid=1
         fi
         ;;
-      x_request=*|x_request_ts=*|x_followups=*|x_platform=*|x_reply_max_chars=*)
+      x_request=*|x_request_ts=*|x_followups=*|x_platform=*|x_reply_max_chars=*|egress=*)
         ;;
       *)
         [ "$seen_pr" -eq 0 ] || post_pr_invalid=1
@@ -786,9 +789,10 @@ fm_pr_poll_registration_device_shifted() {  # <state> <id> <template>
   check_identity=$(fm_pr_file_identity "$state/$id.check.sh") || return 1
   recorded_device=${FM_PR_REG_DATA_IDENTITY%%:*}
   [ "${FM_PR_REG_CHECK_IDENTITY%%:*}" = "$recorded_device" ] || return 1
-  [ "$recorded_device" != "$state_device" ] || return 1
-  [ "$data_identity" = "$state_device:${FM_PR_REG_DATA_IDENTITY#*:}" ] || return 1
-  [ "$check_identity" = "$state_device:${FM_PR_REG_CHECK_IDENTITY#*:}" ] || return 1
+  fm_file_identity_device_shifted "$FM_PR_REG_DATA_IDENTITY" "$data_identity" || return 1
+  fm_file_identity_device_shifted "$FM_PR_REG_CHECK_IDENTITY" "$check_identity" || return 1
+  [ "${data_identity%%:*}" = "$state_device" ] || return 1
+  [ "${check_identity%%:*}" = "$state_device" ] || return 1
   FM_PR_POLL_REARM_DATA_IDENTITY=$data_identity
   FM_PR_POLL_REARM_CHECK_IDENTITY=$check_identity
 }
@@ -1419,6 +1423,12 @@ fm_pr_poll_retirement_publish() {
   fm_pr_poll_retirement_receipt_valid "$state" "$id" || return 1
 }
 
+# The watcher's stop-episode marker for check <id>. Every disarm or retirement
+# removes it, so the check's next stop after a re-arm starts a new episode.
+fm_check_stop_episode_clear() {  # <state> <id>
+  rm -f -- "$1/$2.check-stopped"
+}
+
 fm_pr_poll_retirement_recover_one() {
   local state=$1 id=$2 template=$3 receipt state_device check data registration
   local receipt_hash receipt_identity
@@ -1441,6 +1451,7 @@ fm_pr_poll_retirement_recover_one() {
     fm_pr_poll_retirement_remove_exact "$check" "$state_device" \
       "$FM_PR_RETIRE_CHECK_IDENTITY" "$FM_PR_RETIRE_TEMPLATE_HASH" || return 1
   fi
+  fm_check_stop_episode_clear "$state" "$id" || return 1
   if [ -e "$registration" ] || [ -L "$registration" ]; then
     fm_pr_poll_retirement_remove_exact "$registration" "$state_device" \
       "$FM_PR_RETIRE_REG_IDENTITY" "$FM_PR_RETIRE_REG_HASH" || return 1

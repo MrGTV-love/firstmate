@@ -81,6 +81,10 @@ SH
 case "$*" in
   '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
   '-p 4242 -o args=') printf 'bash\n' ;;
+  '-p '*'-o lstart= -o command=')
+    # This lab owns no competing lock processes; give its fake process reader
+    # a stable identity without requiring host process-inspection privileges.
+    printf 'Mon Jan  1 00:00:00 2024 fixture-pid-%s\n' "$2" ;;
   *) exec /bin/ps "$@" ;;
 esac
 SH
@@ -179,6 +183,77 @@ else:
 PY
   pass "$harness destination-shell launch matches record without contaminating shell or bare resume"
 }
+
+test_claude_staged_native_hook_suppression() {
+  local mode kind command gen
+  for mode in normal raw secondmate; do
+    kind=ship
+    [ "$mode" != secondmate ] || kind=secondmate
+    make_case "claude-$mode" "$kind"
+    fm_test_fake_teamclaude "$FAKEBIN"
+    # This portable environment regression does not exercise nested macOS
+    # Seatbelt; its separate live guard owns OS-confinement evidence.
+    cat > "$FAKEBIN/uname" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != -s ] || { printf 'Linux\n'; exit 0; }
+exec /usr/bin/uname "$@"
+SH
+    chmod +x "$FAKEBIN/uname"
+    printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+    cat > "$FAKEBIN/claude" <<'SH'
+#!/usr/bin/env bash
+set -eu
+env > "$FM_TEST_RUNTIME_RESULT"
+. "$FM_TEST_RUNTIME_ROOT/bin/fm-backend.sh"
+. "$FM_TEST_RUNTIME_ROOT/bin/fm-supervisor-target-lib.sh"
+fm_backend_name > "$FM_TEST_RUNTIME_RESULT.backend"
+discover_supervisor_backend > "$FM_TEST_RUNTIME_RESULT.supervisor"
+discover_supervisor_target > "$FM_TEST_RUNTIME_RESULT.target"
+SH
+    cat > "$FAKEBIN/codex" <<'SH'
+#!/usr/bin/env bash
+env > "$FM_TEST_RUNTIME_RESULT.unrelated"
+SH
+    chmod +x "$FAKEBIN/claude" "$FAKEBIN/codex"
+    command=claude
+    [ "$mode" != raw ] || command='claude --model haiku'
+    FM_CLAUDE_START_POLLS=1 FM_CLAUDE_START_POLL_INTERVAL=0 run_spawn "$kind" "$command"
+    gen=$(grep '^spawn_gen=' "$HOME_DIR/state/$ID.meta" | cut -d= -f2-)
+    [ -n "$gen" ] || fail "$mode: launch must record an incarnation"
+    # Execute the real staged pane input, not the wrapper in isolation. The
+    # child has no backend config/override; the surrounding shell stays native.
+    mkdir -p "$CASE_DIR/pane-home"
+    # shellcheck disable=SC2016 # The destination shell must expand this code.
+    env -i HOME="$CASE_DIR/pane-home" FM_HOME="$WT_DIR" \
+      PATH="$FAKEBIN:$PATH" TERM=xterm HERDR_ENV=1 HERDR_PANE_ID=%9 \
+      HERDR_SESSION=fm-shell-test FM_TEST_RUNTIME_ROOT="$ROOT" \
+      FM_TEST_RUNTIME_RESULT="$CASE_DIR/runtime-result" \
+      "$BASH_BIN" --noprofile --norc -c '
+        . "$1"
+        [ "$HERDR_ENV" = 1 ] && [ "${FM_HERDR_RUNTIME-unset}" = unset ] || exit 97
+        [ "${FM_SPAWN_GEN-unset}" = unset ] || exit 98
+        codex
+      ' pane "$CASE_DIR/pane-input.sh" \
+      > "$CASE_DIR/runtime-output" 2> "$CASE_DIR/runtime-error" \
+      || fail "$mode: staged Claude launch failed: $(cat "$CASE_DIR/runtime-error")"
+    [ -s "$CASE_DIR/runtime-result" ] || fail "$mode: recording child did not run; pane output: $(cat "$CASE_DIR/runtime-output"); pane errors: $(cat "$CASE_DIR/runtime-error"); delivered input: $(cat "$CASE_DIR/pane-input.sh")"
+    ! grep -q '^HERDR_ENV=' "$CASE_DIR/runtime-result" || fail "$mode: native marker reached Claude"
+    grep -Fxq 'FM_HERDR_RUNTIME=1' "$CASE_DIR/runtime-result" || fail "$mode: runtime selection lost"
+    grep -Fxq 'HERDR_PANE_ID=%9' "$CASE_DIR/runtime-result" || fail "$mode: pane identity lost"
+    grep -Fxq "FM_SPAWN_GEN=$gen" "$CASE_DIR/runtime-result" || fail "$mode: launch incarnation lost"
+    grep -Fxq "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$CASE_DIR/runtime-result" || fail "$mode: TeamClaude proxy lost"
+    assert_equals herdr "$(cat "$CASE_DIR/runtime-result.backend")" "$mode: child backend"
+    assert_equals herdr "$(cat "$CASE_DIR/runtime-result.supervisor")" "$mode: supervisor backend"
+    assert_equals fm-shell-test:%9 "$(cat "$CASE_DIR/runtime-result.target")" "$mode: supervisor endpoint"
+    grep -Fxq 'HERDR_ENV=1' "$CASE_DIR/runtime-result.unrelated" || fail "$mode: unrelated worker native marker changed"
+    ! grep -Eq '^(FM_HERDR_RUNTIME|FM_SPAWN_GEN)=' "$CASE_DIR/runtime-result.unrelated" \
+      || fail "$mode: managed child state leaked into unrelated worker"
+    pass "staged $mode Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive"
+  done
+}
+
+fm_test_only
+test_claude_staged_native_hook_suppression
 
 if [ -n "$ZSH_BIN" ]; then
   make_case zsh-ship ship

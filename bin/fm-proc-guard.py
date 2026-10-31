@@ -538,7 +538,9 @@ def cmd_check(args):
             elif count > limit * WARN_PERCENT / 100.0:
                 report.update(status="WARNING", recommendation=(
                     "The user process count is high but forks still work; run the census "
-                    "to see what is piling up."))
+                    "to see what is piling up. Rerun bin/fm-proc-guard.py check --json to "
+                    "print the count, limit, and verdict, and run "
+                    "bin/fm-proc-guard.py census to write the census with the top offenders."))
             else:
                 report.update(status="OK", recommendation=(
                     "The user process count is within thresholds; the caller should continue unchanged."))

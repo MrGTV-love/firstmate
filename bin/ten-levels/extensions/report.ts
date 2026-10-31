@@ -8,44 +8,34 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
 import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
-import { BASH_THRESHOLDS, SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
 
 export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
 export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
 export const GUARD_MODEL = "jev-1.13.0";
 export const MAX_REQUEST_BYTES = 16_384;
-/** A payload over the ceiling is screened as overlapping pieces, each one a complete request that fits it. */
-export const MAX_CHUNKS = 16;
-/** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
-export const CHUNK_OVERLAP_BYTES = 1_024;
-/** Presentation only: these are the existing screening limits, not a new admission rule. */
-const SIZE_REFUSAL_HEAD = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
-  + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `;
-export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
-  + "Supported completing route for report writes: use the same write tool to split the report across separate files, each below 150,000 characters per write, and smaller again if encoded bytes still exceed the screening budget. Every write must fit and is screened completely. "
-  + "This is size-budget compliance only, not permission to split or reroute a prohibited action. For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
-/** A result cannot be split by the worker; the withheld output is the thing to shrink. */
-export const SIZE_RESULT_NOTICE = SIZE_REFUSAL_HEAD
-  + "human-only-exit: what authorized smaller read or command output gives the intended information within this budget?";
 /** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
 
-interface Budget { tryMs: number; tries: number; decisionMs: number; backoffMs: number; reserveWholeTry: boolean }
 // The per-try limit guards only against a judge that never answers; answered calls are far faster
 // (p99 535 ms over 15,640 calls, docs/configuration.md "Unreachable threshold").
-const WIDE_BUDGET: Budget = { tryMs: 90_000, tries: 3, decisionMs: 300_000, backoffMs: 1_000, reserveWholeTry: true };
-// omp 18.12.0 forwards the original output when its nonconfigurable 30-second tool_result deadline passes.
-// Its tool_call deadline (extensionHandlers.toolCallTimeoutMs) is raised past WIDE_BUDGET by .omp/fm-worker-overlay.yml.
-const OMP_RESULT_BUDGET: Budget = { tryMs: 12_000, tries: 2, decisionMs: 25_000, backoffMs: 500, reserveWholeTry: false };
-const budgetFor = (hook: GuardTerminal["hook"], host: "omp" | "claude"): Budget => host === "omp" && hook === "tool_result" ? OMP_RESULT_BUDGET : WIDE_BUDGET;
+const TRY_MS = 90_000;
+const TRIES = 3;
+const DECISION_MS = 300_000;
+const BACKOFF_MS = 1_000;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
-const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal; budget: Budget }>();
+/** The optional fm-friction.v1 writer (docs/configuration.md "Friction ledger"); every pre-tool refusal is mirrored under this guard id. */
+const FRICTION_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py");
+export const FRICTION_GUARD_ID = "FM-JEV-GUARD";
+// Optional telemetry only, so the writer is stopped at this bound and the refusal stands; never the decision budget.
+// measured: value=5000ms date=2026-10-26 host=linux-wsl2 margin=96x (writer p100 29 ms over 40 appends and 52 ms against a 2,041-line history at load 1.4; its own lock budget is 200 ms)
+const FRICTION_TIMEOUT_MS = 5_000;
+const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
   | "TypeError" | "Error" | "PrivacyWithheldError" | "CredentialUnavailableError" | "RequestTooLargeError"
-  | "AuditUnavailableError" | "InvalidToolInputError" | "UnsupportedToolResultError"
+  | "AuditUnavailableError" | "InvalidToolInputError"
   | "InactiveGuardError";
 
 export class GuardUnavailableError extends Error {
@@ -94,16 +84,18 @@ export interface GuardServiceContext {
   task: string;
   project?: string;
   noHelpers?: boolean;
-  host?: "omp" | "claude";
 }
 
 export interface GuardTerminal {
-  hook: "tool_call" | "tool_result";
-  tool: "bash" | "read" | "write" | "edit";
-  decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
-  enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
-    | "claude_advisory_only" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read";
+  hook: "tool_call";
+  tool: string;
+  decision: "allow" | "block" | "review" | "inactive";
+  enforcement: "pretool_allow" | "pretool_deny" | "inactive_no_protection";
+  branch: "policy" | "deterministic" | "device" | "outage" | "inactive" | "egress" | "coverage" | "confinement" | "github-write-op";
+  /** Policy owner only; not proof that launch-time OS confinement is active. */
+  confinement_owner?: "T5";
+  /** The tool's fixed egress class only; no outbound text or addresses. */
+  destination_class?: string;
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   error_type: GuardFailureType | null;
@@ -117,66 +109,32 @@ export interface GuardTerminal {
 
 export interface GuardService {
   readonly active: boolean;
-  readonly host: "omp" | "claude";
   decide(state: State, questions: Questions): Promise<SystemOneResult>;
-  /**
-   * The text of `state[field]` as the pieces to screen: itself when the whole request fits the ceiling, otherwise
-   * overlapping pieces that each fit it. Refuses before any egress when the payload cannot be covered completely.
-   */
-  plan(state: Record<string, unknown>, field: string, questions: Questions): string[];
   record(terminal: GuardTerminal): void;
 }
 
-export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>, hook: GuardTerminal["hook"], host: "omp" | "claude"): Promise<T> {
-  const budget = budgetFor(hook, host);
+export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), budget.decisionMs);
+  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), DECISION_MS);
   try {
-    return await budgets.run({ until: performance.now() + budget.decisionMs, signal: controller.signal, budget }, run, preflightTimeout);
+    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run, preflightTimeout);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** A budget that reserves a whole try keeps room for one; otherwise the next try shares whatever remains before the host deadline. */
+/** A retry starts only while the decision budget still has room for one whole try after its backoff. */
 function mayRetry(cause: unknown, backoff: number): boolean {
   const store = budgets.getStore();
   if (store?.signal.aborted) return false;
-  if (store && store.until - performance.now() < (store.budget.reserveWholeTry ? store.budget.tryMs : 1) + backoff) return false;
+  if (store && store.until - performance.now() < TRY_MS + backoff) return false;
   return RETRYABLE_FAILURES.has(failureType(cause));
-}
-
-/**
- * Cuts `text` into at most MAX_CHUNKS pieces whose JSON-escaped size is at most `room` bytes.
- * Each piece starts up to `overlap` escaped bytes before the previous one ended,
- * so every span of up to `overlap` minus one character's escape width lies whole inside some piece. Returns null when no complete cover fits.
- */
-export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP_BYTES): string[] | null {
-  if (room < 2 * overlap + 64 || text.length > MAX_CHUNKS * room) return null;
-  const points = Array.from(text);
-  const sizes = points.map((point) => Buffer.byteLength(JSON.stringify(point), "utf8") - 2);
-  const pieces: string[] = [];
-  let start = 0;
-  for (;;) {
-    let end = start;
-    let used = 0;
-    while (end < points.length && used + sizes[end] <= room) used += sizes[end++];
-    if (end === points.length) {
-      pieces.push(points.slice(start).join(""));
-      return pieces;
-    }
-    pieces.push(points.slice(start, end).join(""));
-    if (pieces.length >= MAX_CHUNKS) return null;
-    let back = 0;
-    start = end;
-    while (start > 0 && back + sizes[start - 1] <= overlap) back += sizes[--start];
-  }
 }
 
 function preflightTimeout(): number {
   const budget = budgets.getStore();
   budget?.signal.throwIfAborted();
-  const remaining = budget ? Math.ceil(budget.until - performance.now()) : OMP_RESULT_BUDGET.decisionMs;
+  const remaining = budget ? Math.ceil(budget.until - performance.now()) : DECISION_MS;
   if (remaining <= 0) throw new DOMException("Jev handler timed out.", "TimeoutError");
   return remaining;
 }
@@ -184,10 +142,13 @@ function preflightTimeout(): number {
 /** Each installation owns one canonical client; no credential enters its environment or argv. */
 export function createGuardService(context: GuardServiceContext): GuardService {
   const active = context.noHelpers !== true && context.project === "firstmate";
-  const host = context.host ?? "omp";
   let apiKey: string | undefined;
-  const clients = new Map<number, JevClient>();
-  const ledger = resolve(context.state, "jev-guard.jsonl");
+  let client: JevClient | undefined;
+  // Launch binds this scope inside its final environment. Valid task IDs are
+  // unchanged by encoding; a malformed context can never turn the filename
+  // into a path traversal. No shared-ledger grant is needed by a worker.
+  const ledger = resolve(context.state, process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1"
+    ? `${encodeURIComponent(context.task)}.jev-guard.jsonl` : "jev-guard.jsonl");
 
   function permitted(requestText: string): void {
     const timeout = preflightTimeout();
@@ -214,9 +175,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
 
   return {
     active,
-    host,
     async decide(state, questions) {
-      const budget = budgets.getStore()?.budget ?? budgetFor("tool_result", host);
       let requestStarted = false;
       let tries = 0;
       let started = 0;
@@ -230,21 +189,17 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         validateRequest(snapshot);
         permitted(requestText);
         apiKey ??= typesafeKey();
-        let client = clients.get(budget.tryMs);
-        if (!client) {
-          client = new JevClient({ provider: "typesafe", apiKey, model: GUARD_MODEL, timeoutMs: budget.tryMs,
-            baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
-          clients.set(budget.tryMs, client);
-        }
+        const judge = client ??= new JevClient({ provider: "typesafe", apiKey, model: GUARD_MODEL, timeoutMs: TRY_MS,
+          baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
         requestStarted = true;
         started = performance.now();
         for (;;) {
           tries++;
           try {
-            return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+            return await judge.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
           } catch (cause) {
-            const backoff = budget.backoffMs * tries;
-            if (tries >= budget.tries || !mayRetry(cause, backoff)) throw cause;
+            const backoff = BACKOFF_MS * tries;
+            if (tries >= TRIES || !mayRetry(cause, backoff)) throw cause;
             await sleep(backoff, undefined, { signal: budgets.getStore()?.signal });
           }
         }
@@ -253,19 +208,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         throw new GuardUnavailableError(failureType(cause), requestStarted, cause,
           requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started) } : undefined);
       }
-    },
-    plan(state, field, questions) {
-      const text = state[field];
-      if (typeof text !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-      if (text.length > MAX_CHUNKS * MAX_REQUEST_BYTES) throw new GuardUnavailableError("RequestTooLargeError");
-      const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
-      if (Buffer.byteLength(whole, "utf8") <= MAX_REQUEST_BYTES) return [text];
-      const frame = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: { ...state, [field]: "" }, questions }), "utf8");
-      const pieces = splitForRoom(text, MAX_REQUEST_BYTES - frame);
-      if (!pieces) throw new GuardUnavailableError("RequestTooLargeError");
-      // The never-send policy sees the whole payload before any piece leaves, so one clean piece is never sent beside a refused one.
-      permitted(whole);
-      return pieces;
     },
     record(terminal) {
       const result = terminal.result;
@@ -286,18 +228,11 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         // Keep the known subtotal without presenting it as the charge for the whole payload.
         reported_amount: sum(answered.flatMap((r) => r.meta.cost.source === "reported" && r.meta.cost.amount !== null ? [r.meta.cost.amount] : [])),
       };
-      // Question IDs and answer fields are allowlisted; provider extensions can contain input text.
-      const answers: Record<string, { type: "noul"; noul: number } | { type: "choice"; choice: string; confidence: number }> = {};
-      if (result) {
-        for (const key of ["effect", "destructive_intent", "kind", "contains_secret", "injection"]) {
-          const answer = result.answers[key];
-          if (answer?.type === "noul") answers[key] = { type: "noul", noul: answer.noul };
-          else if (answer?.type === "choice") answers[key] = { type: "choice", choice: answer.choice, confidence: answer.confidence };
-        }
-      }
+      // No guard question remains, so no answer field is allowlisted; provider extensions can contain input text.
+      const answers = {};
       const row = {
         kind: "terminal", at: Date.now(), task: context.task, policy_version: GUARD_POLICY_VERSION, outage_policy: OUTAGE_POLICY,
-        thresholds: { bash: BASH_THRESHOLDS, write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
+        thresholds: {},
         hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
         error_type: terminal.error_type, request_started: requestStarted,
         ...((terminal.tool === "write" || terminal.tool === "edit") && terminal.enforcement === "pretool_deny"
@@ -310,25 +245,28 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
+        ...(terminal.destination_class ? { destination_class: terminal.destination_class } : {}),
+        ...(terminal.confinement_owner ? { confinement_owner: terminal.confinement_owner } : {}),
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
       }
-      // Mirror only a named size refusal the guard actually enforced, never raw inputs or a second judgment.
-      // This optional bridge must not acquire the mandatory Jev audit's semantics.
-      if (active && terminal.error_type === "RequestTooLargeError"
-        && (terminal.enforcement === "pretool_deny" || terminal.enforcement === "omp_replace")) {
+      // Mirror every pre-tool refusal the audit row above recorded into the optional friction ledger,
+      // never raw inputs or a second judgment: the writer digests task and subject, and the rule is the
+      // row's own typed branch. This optional bridge must not acquire the mandatory audit's semantics;
+      // a writer failure prints the writer's payload-free diagnostic and the refusal stands unchanged.
+      if (terminal.enforcement === "pretool_deny") {
         try {
-          execFileSync("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py"),
-            "refusal", "FM-JEV-SIZE", "complete-screening-budget", `${terminal.hook}-${terminal.tool}`,
-            `${context.task}:${terminal.hook}:${terminal.tool}`, terminal.tool === "write" || terminal.tool === "edit" ? "machine" : "human-only",
+          execFileSync("python3", [FRICTION_WRITER, "refusal", FRICTION_GUARD_ID, terminal.branch, `${terminal.hook}-${terminal.tool}`,
+            `${context.task}:${terminal.hook}:${terminal.tool}`, "machine",
             context.task, fileURLToPath(import.meta.url)], {
-            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
+            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"],
+            timeout: Math.min(FRICTION_TIMEOUT_MS, preflightTimeout()), killSignal: "SIGKILL",
           });
         } catch {
-          console.error("fm-friction: size telemetry unavailable; guarded result unchanged; retry telemetry later with the same event identity");
+          console.error("fm-friction: refusal telemetry unavailable; guarded result unchanged; no event identity was recorded");
         }
       }
     },

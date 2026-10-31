@@ -22,21 +22,39 @@
 #   the launch agent PATH)             -> exit 1 before server start or takeover
 #   no server owns the session socket  -> exec `herdr server --session <s>`
 #                                          (foreground, launchd-supervised)
+#   a failed or unparseable status, or a stopped status whose server process
+#   and socket absence bin/backends/herdr-server-start.py --prove-absent
+#   cannot prove                       -> log why, wait, and re-check; never
+#                                          start a second server beside one
+#                                          that may still be alive
 #   the owner was born in the Aqua session (launchd or the Aqua remote-job
 #   worker)                            -> exit 0, leave it alone
 #   the owner was born anywhere else (an SSH remote attach, a shell over
-#   ssh/mosh, or a birth it cannot prove) -> `herdr server stop`, wait until the
-#                                          socket is released, then exec
+#   ssh/mosh, or a birth it cannot prove) -> `herdr server stop`, wait until
+#                                          absence is proven the same way, then exec
 #                                          `herdr server --session <s>` at once
 #                                          so the socket is rebound before a
 #                                          reconnecting SSH attach can start
 #                                          another foreign server
-#   the foreign server does not release the socket in time -> exit 1
+#   the foreign server does not release the socket -> keep waiting and
+#                                          re-checking, with no deadline, and
+#                                          never start while status fails or
+#                                          absence is unproven
+#   a different server comes up during the takeover (under the start lock, or
+#   a new socket owner)                -> re-run this ownership decision
+# Each exec first asks herdr-server-start.py --hold-for-exec for permission.
+# That helper takes the session's Firstmate start lock, the same lock every
+# other Firstmate starter holds, re-proves absence under it, and keeps holding
+# it in its own process until the exec'd server reports running or exits, so
+# this guard and an adapter start can never both launch. A server that came up
+# under the lock is not started again; the guard re-checks instead.
 # A takeover closes every pane in that session; the parent firstmate's
 # secondmate liveness sweep relaunches its mates into the Aqua-born server.
 # bin/fm-remote-herdr-owner-lib.sh owns the owner discovery and the birth
-# markers; FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
-# release wait in tenths of a second.
+# markers; after FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) tenths of
+# a second without a proven release, the guard logs one notice and keeps
+# waiting. The takeover re-check starts at 0.1s and doubles each pass up to 5s,
+# returning to 0.1s whenever the observed state changes.
 # Every socket-owner decision prints one line to stdout, which launchd routes
 # to the agent's log; prerequisite refusals print to stderr.
 set -u
@@ -60,53 +78,131 @@ STOP_WAIT_TENTHS=${FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS:-50}
 
 log() { printf 'fm-remote-herdr-guard: %s\n' "$*"; }
 
-herdr_status() { # prints the session's status JSON, empty when herdr fails
-  HERDR_SESSION="$SESSION" "$HERDR_BIN" status --json --session "$SESSION" 2>/dev/null || true
+herdr_status() { # prints the session's status JSON; fails when herdr fails
+  HERDR_SESSION="$SESSION" "$HERDR_BIN" status --json --session "$SESSION" 2>/dev/null
 }
 
-status_running() { # <status-json>
-  [ "$(printf '%s' "$1" | jq -r '.server.running // false' 2>/dev/null)" = true ]
+# read_state: sets STATUS and STATE to running, absent (a successful stopped
+# status plus proven server process and socket absence), or the reason neither
+# is proven.
+read_state() {
+  if ! STATUS=$(herdr_status); then
+    STATE='herdr status failed'
+    return 0
+  fi
+  case "$(printf '%s' "$STATUS" | jq -r '.server.running | if type == "boolean" then tostring else "unknown" end' 2>/dev/null)" in
+    true) STATE=running ;;
+    false)
+      if printf '%s' "$STATUS" | python3 "$SCRIPT_DIR/backends/herdr-server-start.py" \
+        --prove-absent "$SESSION" "$HERDR_BIN" >/dev/null 2>&1; then
+        STATE=absent
+      else
+        STATE='status says stopped but server process and socket absence is unproven'
+      fi
+      ;;
+    *) STATE='herdr status is unreadable' ;;
+  esac
+}
+
+WAIT_REASON=
+wait_note() { # <reason>
+  [ "$1" = "$WAIT_REASON" ] || log "session $SESSION: $1; waiting and re-checking rather than starting a second server"
+  WAIT_REASON=$1
 }
 
 start_server() {
-  log "starting the herdr server for session $SESSION inside this launch agent (pid $$)"
-  exec "$HERDR_BIN" server --session "$SESSION"
+  local verdict=
+  exec 3< <(printf '%s' "$STATUS" | python3 "$SCRIPT_DIR/backends/herdr-server-start.py" \
+    --hold-for-exec "$SESSION" "$HERDR_BIN" "$$")
+  IFS= read -r verdict <&3 || verdict=
+  exec 3<&-
+  case "$verdict" in
+    go)
+      log "starting the herdr server for session $SESSION inside this launch agent (pid $$)"
+      exec "$HERDR_BIN" server --session "$SESSION"
+      ;;
+    running)
+      log "session $SESSION came up under the start lock; not starting a second server"
+      return 0
+      ;;
+    *) log "the start lock refused to start session $SESSION; re-checking" ;;
+  esac
+  return 1
 }
 
-STATUS=$(herdr_status)
-if ! status_running "$STATUS"; then
-  log "no server owns session $SESSION"
-  start_server
-fi
+# owner_replaced: the session socket is positively owned by a pid other than
+# the OWNER this takeover stopped.
+owner_replaced() {
+  local current
+  current=$(fm_remote_herdr_socket_owner "$SOCKET") || return 1
+  [ -n "$current" ] && [ "$current" != "$OWNER" ]
+}
 
-SOCKET=$(printf '%s' "$STATUS" | jq -r '.server.socket // empty' 2>/dev/null)
-OWNER=$(fm_remote_herdr_socket_owner "$SOCKET"); OWNER_RC=$?
-if [ "$OWNER_RC" -eq 2 ]; then
-  log "session $SESSION is running but lsof does not resolve, so its server's birth cannot be proven"
-  BIRTH=unknown
-elif [ -z "$OWNER" ]; then
-  log "session $SESSION is running but no herdr process could be proven to own ${SOCKET:-its socket}"
-  BIRTH=unknown
-else
-  BIRTH=$(fm_remote_herdr_owner_birth "$OWNER")
-fi
-
-if fm_remote_herdr_birth_is_aqua "$BIRTH"; then
-  log "session $SESSION is served by pid $OWNER born in the Aqua login session ($BIRTH); nothing to do"
-  exit 0
-fi
-
-log "session $SESSION is served by ${OWNER:+pid }${OWNER:-an unproven process} born outside the Aqua login session ($BIRTH); its panes cannot reach the login keychain, taking the session over"
-HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/null 2>&1 \
-  || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
-i=0
-while [ "$i" -lt "$STOP_WAIT_TENTHS" ]; do
-  if ! status_running "$(herdr_status)"; then
-    log "session $SESSION released its socket after $i tenths of a second"
-    start_server
-  fi
-  sleep 0.1
-  i=$((i + 1))
+while :; do
+  read_state
+  case "$STATE" in
+    running) break ;;
+    absent)
+      log "no server owns session $SESSION"
+      start_server
+      sleep 1
+      continue
+      ;;
+  esac
+  wait_note "$STATE"
+  sleep 1
 done
-log "the foreign server for session $SESSION did not release its socket within $STOP_WAIT_TENTHS tenths of a second; exiting 1 so launchd retries"
-exit 1
+
+while :; do
+  SOCKET=$(printf '%s' "$STATUS" | jq -r '.server.socket // empty' 2>/dev/null)
+  OWNER=$(fm_remote_herdr_socket_owner "$SOCKET"); OWNER_RC=$?
+  if [ "$OWNER_RC" -eq 2 ]; then
+    log "session $SESSION is running but lsof does not resolve, so its server's birth cannot be proven"
+    BIRTH=unknown
+  elif [ -z "$OWNER" ]; then
+    log "session $SESSION is running but no herdr process could be proven to own ${SOCKET:-its socket}"
+    BIRTH=unknown
+  else
+    BIRTH=$(fm_remote_herdr_owner_birth "$OWNER")
+  fi
+
+  if fm_remote_herdr_birth_is_aqua "$BIRTH"; then
+    log "session $SESSION is served by pid $OWNER born in the Aqua login session ($BIRTH); nothing to do"
+    exit 0
+  fi
+
+  log "session $SESSION is served by ${OWNER:+pid }${OWNER:-an unproven process} born outside the Aqua login session ($BIRTH); its panes cannot reach the login keychain, taking the session over"
+  HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/null 2>&1 \
+    || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
+  i=0
+  FRESH=0
+  NOTICED=0
+  DELAY=1
+  PREVIOUS=
+  while :; do
+    read_state
+    [ "$STATE" = "$PREVIOUS" ] || DELAY=1
+    PREVIOUS=$STATE
+    case "$STATE" in
+      absent)
+        log "session $SESSION released its socket after $i tenths of a second"
+        if start_server; then FRESH=1; fi
+        ;;
+      running)
+        if [ "$FRESH" = 1 ] || owner_replaced; then
+          log "session $SESSION is now served by a server this takeover did not stop; re-running the ownership decision"
+          break
+        fi
+        ;;
+      *) wait_note "$STATE" ;;
+    esac
+    if [ "$NOTICED" = 0 ] && [ "$i" -ge "$STOP_WAIT_TENTHS" ]; then
+      log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
+      NOTICED=1
+    fi
+    sleep "$((DELAY / 10)).$((DELAY % 10))"
+    i=$((i + DELAY))
+    DELAY=$((DELAY * 2))
+    [ "$DELAY" -le 50 ] || DELAY=50
+  done
+done

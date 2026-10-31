@@ -2,10 +2,11 @@
 # Host-local lifecycle control for the remote secondmate home selected by fm-on.
 #
 # Usage:
-#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--compact-adviser-disable]
-#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--compact-adviser-disable]
+#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--captain-model-pin=<model-id>] [--compact-adviser-disable]
+#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--captain-model-pin=<model-id>] [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
+#   fm-remote-secondmate-control.sh stay <id>
 #   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
 #   fm-remote-secondmate-control.sh key <id> <key>
 #   fm-remote-secondmate-control.sh capture <id> [lines]
@@ -55,6 +56,10 @@
 # The optional --compact-adviser-disable carries the parent's normalized
 # emergency override across the transport's cleared environment, scoped to the
 # host-local spawn or control call. It never changes an already-alive session.
+# A successful launch prints its confirmed route and launch=spawned or
+# launch=already-running. The latter preserves the live agent even when its
+# profile differs from the request. Stay delegates to the ordinary local control
+# plane with this endpoint's private state directory; it never sends a raw key.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,6 +68,21 @@ TARGET_HOME=${FM_HOME:?FM_HOME is required}
 CONTROL_STATE="$TARGET_HOME/state/parent-route"
 CONTROL_DATA="$TARGET_HOME/data/.parent-route"
 REMOTE_HERDR_SESSION=fm-remote
+
+die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac; }
+
+# Sourcing fm-wake-lib.sh through the libraries below creates "$FM_HOME/state",
+# so recognize an already-retired home before loading them rather than
+# fabricating an unseeded home that every later retirement then refuses.
+# The accepted arguments match the retire dispatcher's.
+if [ "${1:-}" = retire ] && [ ! -e "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ]; then
+  case "$#:${3:-}" in
+    2:|3:|3:--force) validate_id "$2"; printf 'already-retired: %s\n' "$2"; exit 0 ;;
+    *) usage ;;
+  esac
+fi
 
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
@@ -75,13 +95,8 @@ REMOTE_HERDR_SESSION=fm-remote
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 
-die() { printf 'error: %s\n' "$1" >&2; exit 1; }
-usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac; }
-
-validate_home() { # <id> [allow-absent]
-  local id=$1 allow_absent=${2:-no} marker
-  if [ ! -e "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] && [ "$allow_absent" = yes ]; then return 2; fi
+validate_home() { # <id>
+  local id=$1 marker
   [ -d "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] || die "remote secondmate home is unavailable or unsafe"
   [ -f "$TARGET_HOME/.fm-secondmate-home" ] && [ ! -L "$TARGET_HOME/.fm-secondmate-home" ] \
     || die "remote home is not a seeded secondmate home"
@@ -166,13 +181,17 @@ cmd_route() {
 
 cmd_launch() {
   local id=$1 harness=$2 model=$3 effort=$4 selected_backend=$5 traceparent=
-  local current meta out herdr_session compact_disable=0 arg
+  local current meta out herdr_session compact_disable=0 arg captain_model_pin=
   shift 5
   for arg in "$@"; do
     case "$arg" in
     --compact-adviser-disable)
       [ "$compact_disable" = 0 ] || die "duplicate --compact-adviser-disable"
       compact_disable=1 ;;
+    --captain-model-pin=*)
+      [ -z "$captain_model_pin" ] || die "duplicate --captain-model-pin"
+      captain_model_pin=${arg#--captain-model-pin=}
+      [ -n "$captain_model_pin" ] || die "--captain-model-pin requires a non-empty <model-id> value" ;;
     --*) die "unknown launch option: $arg" ;;
     *)
       [ -z "$traceparent" ] || die "launch accepts only one traceparent"
@@ -203,6 +222,7 @@ cmd_launch() {
     case "$current" in
       alive)
         print_route "$id"
+        printf 'launch=already-running\n'
         return 0
         ;;
       dead)
@@ -221,6 +241,7 @@ cmd_launch() {
   [ "$model" = - ] || ARGS+=(--model "$model")
   [ "$effort" = - ] || ARGS+=(--effort "$effort")
   [ -z "$traceparent" ] || ARGS+=(--traceparent "$traceparent")
+  [ -z "$captain_model_pin" ] || ARGS+=(--captain-model-pin "$captain_model_pin")
   if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
@@ -234,6 +255,7 @@ cmd_launch() {
   [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
     || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"
   print_route "$id"
+  printf 'launch=spawned\n'
 }
 
 # Restart the second-mate agent this host runs, by executing the ORDINARY local
@@ -251,11 +273,20 @@ cmd_launch() {
 # explicitly clears an absent parent pin; `-` remains its compatibility spelling.
 cmd_relaunch() {
   local id=$1 harness=$2 model=$3 effort=$4
-  local compact_disable=0
-  if [ "$#" -eq 5 ]; then
-    [ "$5" = --compact-adviser-disable ] || die "unknown relaunch option: $5"
-    compact_disable=1
-  fi
+  local compact_disable=0 captain_model_pin='' arg
+  shift 4
+  for arg in "$@"; do
+    case "$arg" in
+    --compact-adviser-disable)
+      [ "$compact_disable" = 0 ] || die "duplicate --compact-adviser-disable"
+      compact_disable=1 ;;
+    --captain-model-pin=*)
+      [ -z "$captain_model_pin" ] || die "duplicate --captain-model-pin"
+      captain_model_pin=${arg#--captain-model-pin=}
+      [ -n "$captain_model_pin" ] || die "--captain-model-pin requires a non-empty <model-id> value" ;;
+    *) die "unknown relaunch option: $arg" ;;
+    esac
+  done
   local -a control_args
 
   validate_id "$id"
@@ -273,6 +304,7 @@ cmd_relaunch() {
   [ "$model" != - ] || model=default
   [ "$effort" != - ] || effort=default
   control_args=("$id" relaunch --harness "$harness" --model "$model" --effort "$effort")
+  [ -z "$captain_model_pin" ] || control_args+=(--captain-model-pin "$captain_model_pin")
   # The same launch-boundary facts cmd_launch establishes: the endpoint lives in
   # the dedicated fm-remote session, and the parent already owns both convergence
   # legs, so the host-local spawn must not re-sync or re-inherit against this
@@ -289,6 +321,19 @@ cmd_relaunch() {
   # values - is what makes that record correct even when relaunch resolved
   # "default" against a configured pin this call never saw.
   print_route "$id"
+}
+
+# The same local picker recognizer, task-attribution guard, generation-bound
+# marker cleanup, and alive-after-dismissal proof apply on the owning host.
+cmd_stay() {
+  local id=$1
+  validate_id "$id"
+  validate_home "$id"
+  remote_endpoint_require "$id"
+  HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
+    FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
+    FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
+    "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
 cmd_send() {
@@ -433,13 +478,9 @@ cmd_update() {
 }
 
 cmd_retire() {
-  local id=$1 force=${2:-} rc
+  local id=$1 force=${2:-}
   validate_id "$id"
-  validate_home "$id" yes || rc=$?
-  if [ "${rc:-0}" -eq 2 ]; then
-    printf 'already-retired: %s\n' "$id"
-    return 0
-  fi
+  validate_home "$id"
   [ -z "$force" ] || [ "$force" = --force ] || usage
   remote_endpoint_require "$id"
   FM_HOME="$TARGET_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$TARGET_HOME/state" \
@@ -458,10 +499,11 @@ cmd_retire() {
 }
 
 case "${1:-}" in
-  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 7 ] || usage; cmd_launch "$@" ;;
-  relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage; cmd_relaunch "$@" ;;
+  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 8 ] || usage; cmd_launch "$@" ;;
+  relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 6 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
+  stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
   send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;
   key) shift; [ "$#" -eq 2 ] || usage; cmd_key "$@" ;;
   capture) shift; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage; cmd_capture "$@" ;;

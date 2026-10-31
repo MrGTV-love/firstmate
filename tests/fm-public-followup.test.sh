@@ -1826,11 +1826,9 @@ test_first_register_succeeds_with_empty_lock_list_under_bash32() {
     || fail "could not retain the private request context"
 
   err=$(mktemp "$home/register-err.XXXXXX")
-  set +e
+  rc=0
   run_pf_sysbash "$home" register pf-empty-locks --relation rel-code \
-    --work-home main --work-id work-empty-locks --generation 1 >"$home/register.out" 2>"$err"
-  rc=$?
-  set -e
+    --work-home main --work-id work-empty-locks --generation 1 >"$home/register.out" 2>"$err" || rc=$?
   [ "$rc" -eq 0 ] || fail "first register under /bin/bash with an empty lock list failed (exit $rc): $(cat "$err" "$home/register.out")"
   grep -q 'unbound variable' "$err" \
     && fail "first register hit an unbound-variable crash under /bin/bash: $(cat "$err")"
@@ -3825,8 +3823,10 @@ test_rejection_wake_survives_a_poll_that_cannot_write() {
   assert_present "$home/state/public-followup/rejection-wakes/$event_id" \
     "a refusal must queue a wake"
 
+  # Bypass the env shebang: Rust env reopens closed standard descriptors on
+  # /dev/null, which would turn this failed-write fixture into a successful write.
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" "$POLL" >&- 2>/dev/null || true
+    FM_STATE_OVERRIDE="$home/state" bash "$POLL" >&- 2>/dev/null || true
   assert_present "$home/state/public-followup/rejection-wakes/$event_id" \
     "a wake whose line could not be written must stay queued"
   assert_contains "$(run_poll "$home")" "public-followup rejected $event_id" \
@@ -3940,10 +3940,7 @@ test_a_retained_refusal_repeats_its_wake_rather_than_a_new_one() {
 
 # CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2 empty-lock
 # register regression. The rest of this file is not a 3.2 snapshot suite.
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+fm_test_only
 
 test_ambient_tasks_axi_env_never_reaches_a_real_backlog
 test_outcome_text_is_bounded_without_corrupting_characters

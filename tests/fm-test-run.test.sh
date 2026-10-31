@@ -120,7 +120,7 @@ init_changed_fixture_repo() {
     fm-test-isolation-proof.test.sh \
     fm-test-run.test.sh \
     fm-test-fixtures.test.sh \
-    fm-cd-pretool-check.test.sh \
+    fm-arm-pretool-check.test.sh \
     fm-daemon.test.sh \
     fm-harness-adapter-instructions-live-e2e.test.sh \
     fm-harness-adapter-references.test.sh \
@@ -184,7 +184,7 @@ init_changed_fixture_repo() {
   # the file verbatim so the changed-file scan can find it, not expand here.
   printf '. "$ROOT/bin/shared-probe-lib.sh"\n' >"$repo/bin/fm-watch-probe.sh"
   printf '# .claude/settings.json\n# .pi/extensions/fm-primary-turnend-guard.ts\n' \
-    >>"$repo/tests/fm-cd-pretool-check.test.sh"
+    >>"$repo/tests/fm-arm-pretool-check.test.sh"
   printf '# .pi/extensions/fm-primary-pi-watch.ts\n' >>"$repo/tests/fm-pi-watch-extension.test.sh"
   mkdir -p \
     "$repo/.agents/skills/example" \
@@ -474,6 +474,396 @@ test_captain_hold_groups_share_helper_changed_selection() {
   pass "every captain-hold group is independently selectable and the shared helper selects all of them"
 }
 
+# A split suite is judged against the code, never against a hand-kept case
+# total. The harm a split can do is to lose or double a case while every
+# remaining assertion still passes. That harm has three shapes, and each is
+# derived from the files themselves: a case a group defines but does not
+# register never runs, a case a group registers but does not define cannot
+# run, and a case registered by two groups runs twice and hides a copy that
+# should have moved. A case defined twice in one file loses its first body, so
+# that is judged too. A group file missing from the list, or a stray script
+# that declares the same registry, is the same loss one level up. A total
+# added nothing to these and failed every PR that legitimately added a test;
+# a deliberate deletion removes the definition and the registration together,
+# which is a code-review fact rather than a split fault, so it passes.
+#
+# partition_problems <root> <array|array-nested|calls> <registry> <helper> <group>...
+# prints one line per problem and nothing for an exact cover. In array mode each
+# group file defines and registers its own cases in <registry>, and the two sets
+# must be equal. Array-nested mode is for a suite whose registered case also
+# calls smaller cases by name: a defined case that is not registered must then
+# be called as a command from another line of its file, because a case nothing
+# runs is the loss, while one a registered case runs is not. In both array
+# modes no case may be defined by two groups, because a forgotten copy that a
+# registered case still calls runs twice. Definitions inside a heredoc are
+# fixture text for another script, never cases; a heredoc opener whose
+# terminator never comes, or that opens again inside its own body, would hide
+# the cases after it, so it is a problem named by file and line. In calls mode the cases live in <helper> and each
+# listed script calls its share by bare name, optionally followed by
+# "|| exit $?"; the helper's definitions are then the inventory and every one
+# of them must be called by exactly one listed script.
+partition_registered() {
+  awk -v var="$2" '
+    $0 ~ ("^[[:space:]]*" var "=\\(\\)") { next }
+    $0 ~ ("^[[:space:]]*" var "\\+?=\\(") { inarr = 1; next }
+    inarr && /^[[:space:]]*\)[[:space:]]*$/ { inarr = 0; next }
+    inarr {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      if (line ~ /^test_[A-Za-z0-9_]+$/) print line
+    }
+  ' "$1" | LC_ALL=C sort
+}
+
+partition_called() {
+  sed -nE 's/^(test_[A-Za-z0-9_]+)([[:space:]]*\|\|[[:space:]]*exit[[:space:]]+\$\?)?[[:space:]]*$/\1/p' "$1" \
+    | LC_ALL=C sort
+}
+
+partition_defined() {
+  awk -v label="$2" '
+    function opener(tag) {
+      if (!match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/) || substr($0, RSTART - 1, 1) == "<") return ""
+      tag = substr($0, RSTART, RLENGTH)
+      gsub(/^<<-?[[:space:]]*["\047]?|["\047]$/, "", tag)
+      return tag
+    }
+    hd != "" {
+      line = $0
+      sub(/^\t+/, "", line)
+      if (line == hd) { hd = ""; next }
+      if (opener() == hd) printf "%s:%d: heredoc <<%s opens inside the <<%s heredoc from line %d, so the cases between are unjudged\n", label, NR, hd, hd, hdline
+      next
+    }
+    match($0, /^test_[A-Za-z0-9_]+\(\)/) { print substr($0, 1, RLENGTH - 2) }
+    (tag = opener()) != "" { hd = tag; hdline = NR }
+    END { if (hd != "") printf "%s:%d: heredoc <<%s never closes, so the rest of the file is unjudged\n", label, hdline, hd }
+  ' "$1" | LC_ALL=C sort
+}
+
+# partition_called_elsewhere <file> <case>: true when a non-comment line of the
+# file runs the case as a command, alone or with arguments.
+partition_called_elsewhere() {
+  grep -vE '^[[:space:]]*#' "$1" | grep -qE "(^|[;{(|&])[[:space:]]*$2([[:space:]]|[;)]|$)"
+}
+
+partition_problems() {
+  local root=$1 mode=$2 registry=$3 helper=$4 group file registered defined helper_defined seen='' all_defined='' dup name stray listed=''
+  shift 4
+  if [ "$mode" = calls ]; then
+    helper_defined=$(partition_defined "$root/tests/$helper" "tests/$helper")
+    printf '%s\n' "$helper_defined" | grep -vE '^(test_|$)' || true
+    helper_defined=$(printf '%s\n' "$helper_defined" | grep '^test_' || true)
+    for name in $(printf '%s\n' "$helper_defined" | uniq -d); do
+      printf 'tests/%s defines %s twice\n' "$helper" "$name"
+    done
+    helper_defined=$(printf '%s\n' "$helper_defined" | uniq)
+  fi
+  for group in "$@"; do
+    file=$root/tests/$group.test.sh
+    listed=$(printf '%s\n%s' "$listed" "$file")
+    if [ ! -f "$file" ]; then
+      printf 'missing group file: tests/%s.test.sh\n' "$group"
+      continue
+    fi
+    if [ "$mode" = calls ]; then
+      registered=$(partition_called "$file")
+      defined=$helper_defined
+    else
+      registered=$(partition_registered "$file" "$registry")
+      defined=$(partition_defined "$file" "tests/$group.test.sh")
+      printf '%s\n' "$defined" | grep -vE '^(test_|$)' || true
+      defined=$(printf '%s\n' "$defined" | grep '^test_' || true)
+      for name in $(printf '%s\n' "$defined" | uniq -d); do
+        printf 'tests/%s.test.sh defines %s twice\n' "$group" "$name"
+      done
+      defined=$(printf '%s\n' "$defined" | uniq)
+    fi
+    if [ -z "$registered" ]; then
+      printf 'tests/%s.test.sh registers no cases\n' "$group"
+      continue
+    fi
+    for name in $registered; do
+      printf '%s\n' "$defined" | grep -qx "$name" \
+        || printf 'tests/%s.test.sh registers %s but does not define it\n' "$group" "$name"
+    done
+    if [ "$mode" != calls ]; then
+      for name in $defined; do
+        printf '%s\n' "$registered" | grep -qx "$name" && continue
+        [ "$mode" = array-nested ] && partition_called_elsewhere "$file" "$name" && continue
+        printf 'tests/%s.test.sh defines %s but does not register it\n' "$group" "$name"
+      done
+      all_defined=$(printf '%s\n%s\n' "$all_defined" "$defined")
+    fi
+    seen=$(printf '%s\n%s\n' "$seen" "$registered")
+  done
+  seen=$(printf '%s\n' "$seen" | grep '^test_' | LC_ALL=C sort || true)
+  dup=$(printf '%s\n' "$seen" | uniq -d | tr '\n' ' ')
+  [ -z "$dup" ] || printf 'registered in more than one group: %s\n' "$dup"
+  dup=$(printf '%s\n' "$all_defined" | grep '^test_' | LC_ALL=C sort | uniq -d | tr '\n' ' ')
+  [ -z "$dup" ] || printf 'defined in more than one group: %s\n' "$dup"
+  if [ "$mode" = calls ]; then
+    for name in $helper_defined; do
+      printf '%s\n' "$seen" | grep -qx "$name" \
+        || printf 'tests/%s defines %s but no listed script calls it\n' "$helper" "$name"
+    done
+    stray=$(grep -lE "^[[:space:]]*(\\.|source)[[:space:]].*${helper//./\\.}" "$root"/tests/*.test.sh 2>/dev/null || true)
+  else
+    stray=$(grep -lE "^[[:space:]]*${registry}\\+?=\\(" "$root"/tests/*.test.sh 2>/dev/null || true)
+  fi
+  for file in $stray; do
+    case "$listed" in
+      *"$file"*) ;;
+      *) printf '%s uses the same suite but is not a listed group\n' "${file#"$root"/}" ;;
+    esac
+  done
+}
+
+assert_partition_exact() {
+  local label=$1 problems
+  shift
+  problems=$(partition_problems "$ROOT" "$@")
+  [ -z "$problems" ] \
+    || fail "the $label groups do not partition their suite: $(printf '%s' "$problems" | tr '\n' ';')"
+}
+
+# partition_fixture_group <root> <group> <registry> "<registered>" "<defined>"
+# writes one demo group file. The fixtures are built with printf, never a
+# heredoc, so no line of this file starts a registry declaration that the stray
+# group scan would mistake for a real suite.
+partition_fixture_group() {
+  local root=$1 group=$2 registry=$3 name file=$1/tests/$2.test.sh
+  mkdir -p "$root/tests"
+  { printf '%s=(\n' "$registry"; for name in $4; do printf '  %s\n' "$name"; done; printf ')\n'
+    for name in $5; do printf '%s() { :; }\n' "$name"; done; } > "$file"
+}
+
+# partition_fixture_calls <root> <script> "<called>" ["|| exit $?"]
+# writes a demo script that sources the demo helper and calls its share.
+partition_fixture_calls() {
+  local root=$1 script=$2 name file=$1/tests/$2.test.sh
+  mkdir -p "$root/tests"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  { printf '. "$(dirname "$0")/demo-helpers.sh"\n'
+    for name in $3; do printf '%s%s\n' "$name" "${4:+ $4}"; done; } > "$file"
+}
+
+# The partition checks must keep catching the harm they exist for and must stop
+# failing a PR that merely adds a test. Each case builds a two-group fixture.
+test_partition_checks_judge_loss_and_duplication() {
+  local root problems g1_reg='test_a test_b'
+  root=$(mktemp -d "${TMPDIR:-/tmp}/fm-partition.XXXXXX")
+  array_problems() { partition_problems "$root" array demo_test_cases '' demo-one demo-two; }
+  array_base() {
+    rm -rf "$root/tests"
+    partition_fixture_group "$root" demo-one demo_test_cases "$g1_reg" "$g1_reg"
+    partition_fixture_group "$root" demo-two demo_test_cases 'test_c' 'test_c'
+  }
+
+  array_base
+  [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "an exact cover was refused: $(array_problems)"; }
+
+  # Adding one registered and defined case anywhere is not a partition fault.
+  partition_fixture_group "$root" demo-two demo_test_cases 'test_c test_d' 'test_c test_d'
+  [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "adding a registered case was refused: $(array_problems)"; }
+
+  # Removing a case's definition and registration together is a deliberate
+  # deletion, which review sees; the partition check does not judge it.
+  partition_fixture_group "$root" demo-one demo_test_cases 'test_a' 'test_a'
+  [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "a deliberate deletion was refused: $(array_problems)"; }
+
+  # Moving a case between groups keeps the cover exact.
+  partition_fixture_group "$root" demo-one demo_test_cases 'test_a' 'test_a'
+  partition_fixture_group "$root" demo-two demo_test_cases 'test_b test_c' 'test_b test_c'
+  [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "moving a case between groups was refused: $(array_problems)"; }
+
+  array_base
+  partition_fixture_group "$root" demo-one demo_test_cases 'test_a' 'test_a test_b'
+  problems=$(array_problems)
+  assert_contains "$problems" "defines test_b but does not register it" "a defined but unregistered case must fail"
+
+  array_base
+  partition_fixture_group "$root" demo-one demo_test_cases 'test_a test_b test_ghost' 'test_a test_b'
+  problems=$(array_problems)
+  assert_contains "$problems" "registers test_ghost but does not define it" "a registered but undefined case must fail"
+
+  array_base
+  partition_fixture_group "$root" demo-two demo_test_cases 'test_b test_c' 'test_b test_c'
+  problems=$(array_problems)
+  assert_contains "$problems" "registered in more than one group: test_b" "a case registered in two groups must fail"
+
+  array_base
+  printf '%s\n' 'test_b() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh defines test_b twice" "a case defined twice in one file must fail"
+
+  array_base
+  rm "$root/tests/demo-two.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "missing group file: tests/demo-two.test.sh" "a missing group file must fail"
+
+  array_base
+  partition_fixture_group "$root" demo-three demo_test_cases 'test_z' 'test_z'
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-three.test.sh uses the same suite but is not a listed group" "an unlisted group must fail"
+
+  # A registered case may run smaller cases by name; only a case nothing runs
+  # is lost. Definitions inside a heredoc are fixture text, not cases.
+  nested_problems() { partition_problems "$root" array-nested demo_test_cases '' demo-one demo-two; }
+  array_base
+  printf '%s\n' 'test_a() { test_child; }' >> "$root/tests/demo-one.test.sh"
+  sed -i.bak 's/^test_a() { :; }$//' "$root/tests/demo-one.test.sh"
+  printf '%s\n' 'test_child() { :; }' >> "$root/tests/demo-one.test.sh"
+  [ -z "$(nested_problems)" ] || { rm -rf "$root"; fail "a case run by a registered case was refused: $(nested_problems)"; }
+  problems=$(array_problems)
+  assert_contains "$problems" "defines test_child but does not register it" "the strict mode must still require registration"
+  array_base
+  printf '%s\n' 'test_orphan() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(nested_problems)
+  assert_contains "$problems" "defines test_orphan but does not register it" "a case nothing runs must fail even in nested mode"
+  array_base
+  printf '%s\n' 'test_a() { echo "test_named"; }' 'test_named() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(nested_problems)
+  assert_contains "$problems" "defines test_named but does not register it" "a case only named in a string must fail in nested mode"
+  array_base
+  printf '%s\n' 'test_a() { test_child; }' 'test_child() { :; }' >> "$root/tests/demo-one.test.sh"
+  partition_fixture_group "$root" demo-two demo_test_cases 'test_c test_child' 'test_c test_child'
+  problems=$(nested_problems)
+  assert_contains "$problems" "defined in more than one group: test_child" "a copy left behind that a registered case still runs must fail"
+  array_base
+  printf '%s\n' "cat <<'SH'" 'test_fixture_only() { :; }' 'SH' >> "$root/tests/demo-one.test.sh"
+  [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "a definition inside a heredoc was counted as a case: $(array_problems)"; }
+
+  # A "<<WORD" in a comment or a string opens no heredoc, so a scan that treats
+  # it as one must fail closed rather than skip the cases after it.
+  array_base
+  printf '%s\n' '# feed it with <<EOF when needed' 'test_hidden() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh:7: heredoc <<EOF never closes" "a comment heredoc opener must not hide a case"
+  array_base
+  printf '%s\n' 'echo "use <<DONE here"' 'test_hidden() { :; }' >> "$root/tests/demo-two.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-two.test.sh:5: heredoc <<DONE never closes" "a string heredoc opener must not hide a case"
+  array_base
+  printf '%s\n' "# the stub is written with <<'SH' below" 'test_hidden() {' "  cat > f <<'SH'" 'x' 'SH' '}' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh:9: heredoc <<SH opens inside the <<SH heredoc from line 7" "a false opener closed by a later real heredoc must not hide a case"
+
+  calls_problems() { partition_problems "$root" calls '' demo-helpers.sh demo-one demo-two; }
+  calls_base() {
+    rm -rf "$root/tests"
+    mkdir -p "$root/tests"
+    { printf '%s() { :; }\n' test_a test_b test_c; } > "$root/tests/demo-helpers.sh"
+    partition_fixture_calls "$root" demo-one 'test_a test_b'
+    partition_fixture_calls "$root" demo-two 'test_c'
+  }
+
+  calls_base
+  [ -z "$(calls_problems)" ] || { rm -rf "$root"; fail "an exact call cover was refused: $(calls_problems)"; }
+
+  # A new helper case called by one script, and a call guarded by "|| exit $?".
+  printf '%s() { :; }\n' test_d >> "$root/tests/demo-helpers.sh"
+  partition_fixture_calls "$root" demo-two 'test_c test_d' '|| exit $?'
+  [ -z "$(calls_problems)" ] || { rm -rf "$root"; fail "adding a called helper case was refused: $(calls_problems)"; }
+
+  calls_base
+  printf '%s() { :; }\n' test_d >> "$root/tests/demo-helpers.sh"
+  problems=$(calls_problems)
+  assert_contains "$problems" "defines test_d but no listed script calls it" "a helper case no script calls must fail"
+
+  calls_base
+  partition_fixture_calls "$root" demo-one 'test_a test_b test_ghost'
+  problems=$(calls_problems)
+  assert_contains "$problems" "registers test_ghost but does not define it" "a call to an undefined case must fail"
+
+  calls_base
+  partition_fixture_calls "$root" demo-two 'test_c test_a'
+  problems=$(calls_problems)
+  assert_contains "$problems" "registered in more than one group: test_a" "a case called by two scripts must fail"
+
+  calls_base
+  printf '%s() { :; }\n' test_a >> "$root/tests/demo-helpers.sh"
+  problems=$(calls_problems)
+  assert_contains "$problems" "tests/demo-helpers.sh defines test_a twice" "a helper case defined twice must fail"
+
+  calls_base
+  printf '%s\n' '# see <<EOF' 'test_z() { :; }' >> "$root/tests/demo-helpers.sh"
+  problems=$(calls_problems)
+  assert_contains "$problems" "tests/demo-helpers.sh:4: heredoc <<EOF never closes" "a helper heredoc opener must not hide a case"
+
+  calls_base
+  partition_fixture_calls "$root" demo-three 'test_a'
+  problems=$(calls_problems)
+  assert_contains "$problems" "tests/demo-three.test.sh uses the same suite but is not a listed group" "an unlisted script sharing the helper must fail"
+
+  rm -rf "$root"
+  pass "the partition checks catch an unregistered, ghost, duplicated, or unlisted case and accept an added test"
+}
+
+# The three teardown groups partition one former suite: every case a group file
+# defines is registered by that file, and no case is registered by two groups.
+test_teardown_groups_register_each_case_once() {
+  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup
+  pass "the teardown groups are a duplicate-free cover, each case registered by the file that defines it"
+}
+
+# Each group must stay independently runnable and keep its lane coverage: the
+# shared helper change selects all three, and the pr-forge family still owns the
+# landing and cleanup paths the former single file carried.
+test_teardown_groups_share_helper_and_stay_selectable() {
+  local tmp repo listed listed_alone family script group helper lock_helper
+  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup)
+  helper=fm-teardown-helpers
+  helper=$helper.sh
+  lock_helper=git-lock-helpers
+  lock_helper=$lock_helper.sh
+  family=$("$RUNNER" --list --family pr-forge)
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$family" "tests/$script" "the pr-forge family must keep $script"
+    listed_alone=$("$RUNNER" --list "tests/$script")
+    [ "$listed_alone" = "tests/$script" ] || fail "$script must be independently selectable: $listed_alone"
+  done
+  tmp=$(fm_test_tmproot fm-test-run-teardown-selection)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for group in "${groups[@]}"; do
+    printf '#!/usr/bin/env bash\n# %s\n' "$helper" >"$repo/tests/$group.test.sh"
+    chmod +x "$repo/tests/$group.test.sh"
+  done
+  printf '# helpers\n# %s\n' "$lock_helper" >"$repo/tests/$helper"
+  printf '# lock helpers\n' >"$repo/tests/$lock_helper"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-selection-fixture
+  printf '\n' >>"$repo/tests/$helper"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the teardown helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$listed" "tests/$script" "the shared teardown helper change must select $script"
+  done
+  # The reference scan selects the consumer's whole family, and every teardown
+  # group is in pr-forge. So the helper change must land exactly on that family
+  # in this fixture - nothing outside it, nothing missing from it.
+  expected=$(cd "$repo" && bin/fm-test-run.sh --list --family pr-forge | LC_ALL=C sort)
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "the teardown helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-helper-change
+  printf '\n' >>"$repo/tests/$lock_helper"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the git lock helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$listed" "tests/$script" "the git lock helper change must select $script through the teardown helper"
+  done
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "the git lock helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
+  rm -rf "$tmp"
+  pass "every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them"
+}
+
 test_changed_task_copy_lib_selects_retained_and_secondmate() {
   local tmp repo listed path family expected
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-allocation.XXXXXX")
@@ -572,7 +962,7 @@ test_changed_dependency_selection_and_unmapped_failure() {
   printf '\n' >>"$repo/.pi/extensions/fm-primary-turnend-guard.ts"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-ask-user-authority.test.sh" "skill source selects pure contract coverage"
-  assert_contains "$listed" "tests/fm-cd-pretool-check.test.sh" "Claude and Pi source selects hook coverage"
+  assert_contains "$listed" "tests/fm-arm-pretool-check.test.sh" "Claude and Pi source selects hook coverage"
   assert_contains "$listed" "tests/fm-pi-watch-extension.test.sh" "Pi source selects watcher coverage"
   assert_contains "$listed" "tests/fm-pi-windows-shell-invocation.test.sh" \
     "turn-end extension selects native-Windows shell coverage"
@@ -722,10 +1112,8 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm timeout-lib-change
 
   printf '\n' >>"$repo/src/unmapped.ts"
-  set +e
-  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "unmapped changed source must fail with exit 2, got $rc"
   grep -Fq 'no changed-test mapping for source path: src/unmapped.ts' "$tmp/err" \
     || fail "unmapped changed source failure is not actionable: $(cat "$tmp/err")"
@@ -824,6 +1212,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     fm-status-event-lib.sh \
     fm-status-wake-lib.sh \
     fm-status-io-lib.sh \
+    fm-file-identity-lib.sh \
     fm-utc-lib.sh; do
     printf '\n' >>"$repo/bin/$owner"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
@@ -869,7 +1258,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
   done
   rm -rf "$tmp"
-  pass "all six status and UTC owner-only changes select consuming families and exact additional consumers"
+  pass "all status, identity, and UTC owner-only changes select consuming families and exact additional consumers"
 }
 
 # A direct test reference is per-script evidence. Widening it to the referencing
@@ -968,12 +1357,10 @@ SH
   git -C "$timeout_repo" add .
   git -C "$timeout_repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$timeout_repo/$timeout_script"
-  set +e
+  rc=0
   (cd "$timeout_repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/timeout-durations.jsonl" \
     bin/fm-test-run.sh --changed --base HEAD) \
-    >"$tmp/timeout.out" 2>"$tmp/timeout.err"
-  rc=$?
-  set -e
+    >"$tmp/timeout.out" 2>"$tmp/timeout.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "a script that stops making progress must fail the run, got $rc: $(cat "$tmp/timeout.out" "$tmp/timeout.err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
     || fail "single unproven changed script did not receive the automatic progress guard: $(cat "$tmp/timeout.out")"
@@ -1005,11 +1392,9 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "a delayed gate skip must still pass the run, got $rc: $(cat "$tmp/out" "$tmp/err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 .*gate_skip=true' "$tmp/out" \
     || fail "a gate skip printed after the guard's own lines was counted as a plain pass: $(cat "$tmp/out")"
@@ -1056,11 +1441,9 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/out" | head -n 2 | awk '{print $1}' | paste -sd, -)
   [ "$shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
     || fail "the fixture did not take the concurrent path: $shape"
@@ -1096,22 +1479,18 @@ fi
 exec "$REAL_STAT" "$@"
 SH
   chmod +x "$fakebin/uname" "$fakebin/stat"
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-cd-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
-  rc=$?
-  set -e
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1) || rc=$?
   expect_code 0 "$rc" "native-Windows POSIX-mode emulation"
   assert_contains "$out" "FM_TEST_SUMMARY total=2 failed=0" \
     "Windows mode emulation did not complete both parallel scripts"
 
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" FAKE_UNAME=CYGWIN_NT-10.0 \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-cd-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
-  rc=$?
-  set -e
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1) || rc=$?
   expect_code 1 "$rc" "Cygwin POSIX-mode enforcement"
   assert_contains "$out" "isolation failure: worker root mode is 755, expected 0700" \
     "Cygwin mode enforcement did not reject a non-0700 worker root"
@@ -1156,12 +1535,10 @@ PY
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
   : >"$tmp/run.log"
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" FM_DURATION_FILE="$tmp/durations.jsonl" \
     FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
-    bin/fm-test-run.sh --changed --base HEAD 2>&1)
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD 2>&1) || rc=$?
   expect_code 0 "$rc" "plain --changed on an emulated native Windows bash: $out"
   for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
     [ -e "$tmp/ran.$script" ] || fail "$script was not run on the emulated Windows host: $out"
@@ -1174,12 +1551,10 @@ PY
 
   rm -f "$tmp"/ran.*
   : >"$tmp/run.log"
-  set +e
+  rc=0
   out=$(cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
     FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
-    bin/fm-test-run.sh --changed --base HEAD 2>&1)
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD 2>&1) || rc=$?
   expect_code 1 "$rc" "plain --changed on a POSIX host keeps the progress runner: $out"
   assert_contains "$(cat "$tmp/run.log")" "run test.tests/fm-daemon.test.sh" \
     "a POSIX host did not send the changed script through the progress runner"
@@ -1201,9 +1576,9 @@ test_script_list_uses_bounded_automatic_concurrency() {
   repo="$tmp/repo"
   init_changed_fixture_repo "$repo"
   rm -f "$repo/bin/fm-timeout-lib.sh"
-  # fm-cd-pretool-check and fm-pr-merge are individually proven isolated;
+  # fm-arm-pretool-check and fm-pr-merge are individually proven isolated;
   # fm-backend-orca is not, so it must still land in the serial tail.
-  for script in fm-cd-pretool-check.test.sh fm-pr-merge.test.sh fm-backend-orca.test.sh; do
+  for script in fm-arm-pretool-check.test.sh fm-pr-merge.test.sh fm-backend-orca.test.sh; do
     cat >"$repo/tests/$script" <<'SH'
 #!/usr/bin/env bash
 sleep 1
@@ -1212,14 +1587,14 @@ SH
     chmod +x "$repo/tests/$script"
   done
 
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       --json "$tmp/parallel.json") >"$tmp/parallel.out" 2>"$tmp/parallel.err" \
     || fail "default script-list run failed: $(cat "$tmp/parallel.err")"
   parallel_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
   [ "$parallel_shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
     || fail "a plain script list did not use bounded concurrent scheduling: $parallel_shape"
 
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       --jobs 1 --json "$tmp/serial.json") >"$tmp/serial.out" 2>"$tmp/serial.err" \
     || fail "explicit serial script-list run failed: $(cat "$tmp/serial.err")"
   serial_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
@@ -1228,7 +1603,7 @@ SH
 
   # An unproven script in the list is scheduled around, never refused and never
   # run beside another script.
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       tests/fm-backend-orca.test.sh) >"$tmp/mixed.out" 2>"$tmp/mixed.err" \
     || fail "mixed proven/unproven script list failed: $(cat "$tmp/mixed.err")"
   mixed_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/mixed.out" | awk '{print $1}' | paste -sd, -)
@@ -1348,29 +1723,23 @@ fi
 exec "$REAL_GIT" "$@"
 SH
   chmod +x "$fake_bin/git"
-  set +e
+  rc=0
   (cd "$repo" && PATH="$fake_bin:$PATH" REAL_GIT="$real_git" SLOW_GIT_MARKER="$tmp/slow-git" \
     bin/fm-test-run.sh --changed --base HEAD --max-wall-ms 100) \
-    >"$tmp/slow-selection.out" 2>"$tmp/slow-selection.err"
-  rc=$?
-  set -e
+    >"$tmp/slow-selection.out" 2>"$tmp/slow-selection.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "an empty run past its budget must fail normally, got $rc"
   grep -Eq '^FM_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its summary"
   grep -Eq '^FM_TEST_BUDGET max_wall_ms=100 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its budget result"
   [ -e "$tmp/slow-git" ] || fail "the slow selection fixture did not run"
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --max-wall-ms nope) \
-    >"$tmp/bad-budget.out" 2>"$tmp/bad-budget.err"
-  rc=$?
-  set -e
+    >"$tmp/bad-budget.out" 2>"$tmp/bad-budget.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "malformed budget on an empty selection must be refused, got $rc"
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --per-script-timeout-secs nope) \
-    >"$tmp/bad-timeout.out" 2>"$tmp/bad-timeout.err"
-  rc=$?
-  set -e
+    >"$tmp/bad-timeout.out" 2>"$tmp/bad-timeout.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "malformed timeout on an empty selection must be refused, got $rc"
   rm -rf "$tmp"
   pass "empty changed selection emits deterministic text and JSON summaries"
@@ -1388,7 +1757,8 @@ echo "ok - fixture"
 exit 0
 SH
   chmod +x "$fixture"
-  "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
+  FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
     || { rm -rf "$tmp"; fail "runner should pass on a green fixture"; }
   begin_n=$(grep -c '^FM_TEST_BEGIN ' "$out" || true)
   end_n=$(grep -c '^FM_TEST_END ' "$out" || true)
@@ -1417,6 +1787,9 @@ assert doc["summary"]["total"] == 1
 assert doc["summary"]["failed"] == 0
 assert "duration_ms" in doc["scripts"][0]
 assert "family" in doc["scripts"][0]
+assert "cpu_ms" in doc["scripts"][0], "the artifact must carry the CPU field"
+cpu_ms = doc["scripts"][0]["cpu_ms"]
+assert isinstance(cpu_ms, int) and cpu_ms > 0, cpu_ms
 ' "$json" || { rm -rf "$tmp"; fail "JSON timing artifact missing required fields"; }
   rm -rf "$tmp"
   pass "timing markers and JSON artifact are valid"
@@ -1438,18 +1811,14 @@ echo "not ok - fail"
 exit 1
 SH
   chmod +x "$pass_f" "$fail_f"
-  set +e
-  "$RUNNER" "$pass_f" "$fail_f" >"$tmp/out.txt" 2>"$tmp/err.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" "$pass_f" "$fail_f" >"$tmp/out.txt" 2>"$tmp/err.txt" || rc=$?
   [ "$rc" -ne 0 ] || fail "aggregate exit must be non-zero when any script fails"
   grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out.txt" \
     || fail "summary should report total=2 failed=1: $(grep FM_TEST_SUMMARY "$tmp/out.txt")"
   # All-green stays 0.
-  set +e
-  "$RUNNER" "$pass_f" >"$tmp/out2.txt" 2>"$tmp/err2.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" "$pass_f" >"$tmp/out2.txt" 2>"$tmp/err2.txt" || rc=$?
   [ "$rc" -eq 0 ] || { rm -rf "$tmp"; fail "aggregate exit must be 0 when every script passes"; }
   rm -rf "$tmp"
   pass "aggregate exit reflects any script failure"
@@ -1685,10 +2054,8 @@ echo "skip: ${TEST_GATE_SKIP_TOKEN:-herdr not found}"
 exit 0
 SH
   chmod +x "$skip_f"
-  set +e
-  "$RUNNER" --fail-on-gate-skip 'herdr not found' "$skip_f" >"$out" 2>"$tmp/err.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --fail-on-gate-skip 'herdr not found' "$skip_f" >"$out" 2>"$tmp/err.txt" || rc=$?
   [ "$rc" -ne 0 ] || fail "fail-on-gate-skip must make herdr-not-found a hard failure"
   grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
     || fail "summary must report failed=1 under fail-on-gate-skip: $(grep FM_TEST_SUMMARY "$out")"
@@ -1707,11 +2074,9 @@ SH
         ;;
     esac
     for token in 'herdr not found' 'tasks-axi not found'; do
-      set +e
+      rc=0
       TEST_GATE_SKIP_TOKEN="$token" "$RUNNER" "${flags[@]}" --json "$tmp/timing.json" \
-        "$skip_f" >"$out" 2>"$tmp/err.txt"
-      rc=$?
-      set -e
+        "$skip_f" >"$out" 2>"$tmp/err.txt" || rc=$?
       [ "$rc" -ne 0 ] || fail "$form repeated flags must make $token a hard failure"
       grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
         || fail "$form repeated flags must report failed=1 for $token"
@@ -1861,6 +2226,95 @@ test_portable_parallel_lanes_stay_duration_balanced() {
   pass "portable parallel lanes are fully hinted and packed within 5% of each other"
 }
 
+test_portable_parallel_lanes_run_bounded_and_concurrently() {
+  local out jobs effective makespan budget
+  out=$("$RUNNER" --check-coverage)
+  jobs=$(printf '%s\n' "$out" | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  effective=$(printf '%s\n' "$out" | sed -n 's/.*parallel_effective_jobs=\([0-9]*\).*/\1/p')
+  makespan=$(printf '%s\n' "$out" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
+  budget=$(printf '%s\n' "$out" | sed -n 's/.*parallel_budget_ms=\([0-9]*\).*/\1/p')
+  [ -n "$jobs" ] && [ -n "$makespan" ] && [ -n "$budget" ] \
+    || fail "coverage guard must report parallel_jobs, parallel_makespan_ms, parallel_budget_ms: $out"
+  # These are the only CI jobs whose members run beside each other, so the model
+  # has to bound the makespan the concurrency produces, not the summed hints.
+  [ "$jobs" -gt 1 ] \
+    || fail "portable parallel lanes must run more than one script at a time, got $jobs"
+  [ "$jobs" -le 4 ] \
+    || fail "$jobs exceeds the recorded four-way isolation proof; re-prove the set before running wider"
+  [ -n "$effective" ] && [ "$effective" -ge 1 ] && [ "$effective" -le "$jobs" ] \
+    || fail "parallel_effective_jobs must be the bin count the model packed, between 1 and parallel_jobs=$jobs, got ${effective:-none}"
+  [ "$makespan" -gt 0 ] || fail "parallel_makespan_ms must be a positive modeled duration, got $makespan"
+  [ "$makespan" -le "$budget" ] \
+    || fail "modeled parallel makespan ${makespan}ms exceeds the ${budget}ms budget"
+
+  # The reported bin count must be the one the model actually packed: no
+  # partition can beat total/bins, so a makespan below that bound means the
+  # reported count and the packing disagree.
+  local work
+  work=$(printf '%s\n' "$out" | sed -n 's/.*parallel_max_ms=\([0-9]*\).*/\1/p')
+  [ -n "$work" ] || fail "coverage summary must carry parallel_max_ms: $out"
+  [ "$((makespan * effective))" -ge "$work" ] \
+    || fail "modeled makespan ${makespan}ms over ${work}ms of hinted work is below the ${effective}-bin lower bound, so the reported bin count is not the one packed"
+
+  # A wider job count must not widen the model, and a budget below it must refuse
+  # with the packed bin count in the message.
+  local tmp repo rc wide narrow out2
+  tmp=$(fm_test_tmproot fm-test-run-parallel-bound)
+  repo="$tmp/repo"
+  shard_fixture_init "$repo" 1
+  sed -i.bak 's/^PORTABLE_PARALLEL_JOBS=.*/PORTABLE_PARALLEL_JOBS=4/' "$repo/bin/fm-test-run.sh"
+  rc=0
+  out2=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the fixture coverage check failed: $out2"
+  wide=$(printf '%s\n' "$out2" | sed -n 's/.*parallel_effective_jobs=\([0-9]*\).*/\1/p')
+  [ "${wide:-none}" = "$effective" ] \
+    || fail "raising PORTABLE_PARALLEL_JOBS to 4 changed the modeled bins from $effective to ${wide:-none}; the clamp must hold the effective count"
+  narrow=$(printf '%s\n' "$out2" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
+  [ "${narrow:-none}" = "$makespan" ] \
+    || fail "raising PORTABLE_PARALLEL_JOBS to 4 changed the makespan from $makespan to ${narrow:-none}; the model must not assume perfect scaling"
+
+  sed -i.bak 's/^PORTABLE_PARALLEL_MAX_MSPAN_MS=.*/PORTABLE_PARALLEL_MAX_MSPAN_MS=1/' "$repo/bin/fm-test-run.sh"
+  rc=0
+  out2=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a budget below the modeled makespan must be refused"
+  printf '%s\n' "$out2" | grep -Fq "packed into ${effective} bins" \
+    || fail "the refusal must name the packed bin count: $out2"
+  pass "portable parallel lanes are bounded by a modeled makespan packed into the effective bin count"
+}
+
+# The makespan model packs a lane longest-first over its parallel hints, so the
+# concurrent run must start the lane's scripts in that same order. Run the real
+# lane at the modeled job count in a fixture checkout and compare the order the
+# runner dispatched them in against its own --list-scheduled output.
+test_portable_parallel_run_order_matches_list_scheduled() {
+  local tmp repo runner jobs lane script
+  tmp=$(fm_test_tmproot fm-test-run-parallel-order)
+  repo="$tmp/repo"
+  runner="$repo/bin/fm-test-run.sh"
+  jobs=$("$RUNNER" --check-coverage | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  [ -n "$jobs" ] || fail "coverage guard must report parallel_jobs"
+  mkdir -p "$repo/bin" "$repo/tests"
+  cp "$RUNNER" "$runner"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  for lane in portable-parallel-1 portable-parallel-2; do
+    while IFS= read -r script; do
+      printf '#!/usr/bin/env bash\necho "ok - %s"\n' "$script" >"$repo/$script"
+      chmod +x "$repo/$script"
+    done < <("$RUNNER" --list --lane "$lane")
+  done
+  for lane in portable-parallel-1 portable-parallel-2; do
+    "$runner" --list-scheduled --lane "$lane" >"$tmp/$lane.scheduled" \
+      || fail "--list-scheduled --lane $lane failed"
+    FM_TEST_KEY_SLOTS=0 "$runner" --lane "$lane" --jobs "$jobs" >"$tmp/$lane.out" 2>"$tmp/$lane.err" \
+      || { cat "$tmp/$lane.out" "$tmp/$lane.err"; fail "$lane must run at --jobs $jobs"; }
+    awk '$1 == "FM_TEST_BEGIN" { print $3 }' "$tmp/$lane.out" >"$tmp/$lane.started"
+    cmp -s "$tmp/$lane.scheduled" "$tmp/$lane.started" \
+      || fail "$lane at --jobs $jobs must start scripts in its --list-scheduled order"$'\n'"$(diff "$tmp/$lane.scheduled" "$tmp/$lane.started" || true)"
+  done
+  rm -rf "$tmp"
+  pass "portable parallel lanes start their scripts in the order the makespan model packs"
+}
+
 test_portable_serial_shards_partition_the_serial_lane() {
   local lanes count serial shard listed union dups shard_lane total cap
   lanes=$("$RUNNER" --list-lanes)
@@ -1908,7 +2362,7 @@ test_portable_serial_shards_partition_the_serial_lane() {
 }
 
 test_portable_serial_hint_coverage_is_reported_and_bounded() {
-  local out serial unhinted max budget
+  local out serial unhinted max budget indivisible
   # Shards are packed from measured duration hints, so an unmeasured script is
   # placed on a guess. Enough of them and the partition still looks balanced by
   # script count while one shard carries far more real work than another and
@@ -1935,33 +2389,76 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
   [ -n "$max" ] && [ -n "$budget" ] \
     || fail "coverage summary must carry serial packing and budget: $out"
+  indivisible=$(printf '%s\n' "$out" | sed -n 's/.*serial_indivisible_ms=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$indivisible" ] || fail "coverage summary must carry the indivisible-script floor: $out"
   [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
-  [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
-    || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
-  pass "coverage guard bounds the unmeasured share and serial packing within twenty minutes"
+  [ "$max" -gt 0 ] || fail "largest serial shard must be a positive duration, got $max"
+  # The target bounds packing, not an unsplittable suite: a shard may exceed it
+  # only when it holds one script alone, so the largest shard is then exactly the
+  # largest single script.
+  [ "$max" -le "$budget" ] || [ "$max" -eq "$indivisible" ] \
+    || fail "largest serial shard packs ${max}ms above the ${budget}ms target and is not the ${indivisible}ms largest script alone"
+  pass "coverage guard bounds the unmeasured share and bounds serial packing by the target or one script alone"
 }
 
 test_portable_serial_packing_budget_boundary() {
-  local tmp repo weight out rc
+  local tmp repo weight out rc base over
   tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
   repo="$tmp/repo"
 
-  for weight in 1200000 1200001; do
+  for weight in 1200000 1500000; do
     shard_fixture_init "$repo" "$weight"
     out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
-    if [ "$weight" -eq 1200000 ]; then
-      expect_code 0 "$rc" "packing exactly at the budget must be accepted"
-      assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
-      assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the budget"
-      assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
+    expect_code 0 "$rc" "a shard at or above the budget only through one indivisible script must be accepted"
+    assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
+    assert_contains "$out" "serial_max_ms=${weight}" "fixture did not pack the seeded script"
+    assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
+    assert_contains "$out" "serial_indivisible_ms=${weight}" "fixture did not report the indivisible floor"
+  done
+
+  # One shard holds the whole lane, so its sum is the seeded script plus the
+  # other members at their fixture weight. Read that base sum from the runner
+  # and seed the script so the shard sums to exactly the target, then one
+  # millisecond above it. The seeded script is the shard's largest, and the
+  # shard is still more than that script, so the packed edge is the target.
+  shard_fixture_init "$repo" 1
+  sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
+  out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) \
+    || fail "one-shard fixture must pass coverage before seeding: $out"
+  base=$(printf '%s\n' "$out" | sed -n 's/.*serial_max_ms=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$base" ] || fail "one-shard fixture did not report serial_max_ms: $out"
+  for over in 0 1; do
+    weight=$((1200000 - base + 1 + over))
+    shard_fixture_init "$repo" "$weight"
+    sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
+    out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
+    if [ "$over" -eq 0 ]; then
+      expect_code 0 "$rc" "a packed shard summing exactly to the target must be accepted"
+      assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the target"
     else
-      expect_code 1 "$rc" "packing one millisecond above the budget must be refused"
-      assert_contains "$out" "largest portable serial shard packs 1200001ms above the 1200000ms target" \
-        "over-budget refusal did not explain the modeled excess"
-      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
+      expect_code 1 "$rc" "a packed shard one millisecond above the target must be refused"
+      assert_contains "$out" "packs 1200001ms above the 1200000ms target and beyond its own largest script (${weight}ms)" \
+        "packed-shard refusal did not name the shard's own largest script"
+      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-target packing reported success"
     fi
   done
-  pass "serial packing accepts the exact budget and refuses one millisecond above it"
+
+  # Three shards: the 1500000 ms script fills one alone, two of the three
+  # 700000 ms scripts must share another, and that 1400000 ms shard is packing.
+  # The lane's larger single script elsewhere must not license it.
+  shard_fixture_init "$repo" 1500000
+  sed -i.bak \
+    -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=3/' \
+    -e 's/^tests\/fm-teardown\.test\.sh 1$/tests\/fm-teardown.test.sh 700000/' \
+    -e 's/^tests\/fm-watch-triage-waits\.test\.sh 1$/tests\/fm-watch-triage-waits.test.sh 700000/' \
+    -e 's/^tests\/fm-watcher-lock\.test\.sh 1$/tests\/fm-watcher-lock.test.sh 700000/' \
+    "$repo/bin/fm-test-run.sh"
+  out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
+  expect_code 1 "$rc" "a multi-script shard above the target must be refused beside a larger lone script"
+  assert_contains "$out" "packs 1400000ms above the 1200000ms target and beyond its own largest script (700000ms)" \
+    "packing refusal did not name the shard's own largest script"
+  assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
+  pass "serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above"
 }
 
 # The serial shard lists are computed again for every shard and for the whole
@@ -2048,10 +2545,8 @@ test_serial_shard_guard_holds_at_every_lane_size() {
   # 20 proves the result does not depend on one particular size.
   for count in 5 6 20; do
     shard_fixture_grow "$dir" "$count"
-    set +e
-    out=$(shard_fixture_guard "$dir")
-    rc=$?
-    set -e
+    rc=0
+    out=$(shard_fixture_guard "$dir") || rc=$?
     assert_not_contains "$out" "serial shards share scripts" \
       "$count extra scripts: the guard put one script in two serial shards"
     assert_not_contains "$out" "serial shards must equal" \
@@ -2088,13 +2583,11 @@ done
 exec "$REAL_SORT" "$@"
 SH
   chmod +x "$tmp/fakebin/sort"
-  set +e
+  rc=0
   env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
     HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
     "$dir/bin/fm-test-run.sh" --list --lane "$shard_lane" \
-    >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -ne 0 ] || fail "failed shard generation returned successful partial coverage"
   [ ! -s "$tmp/out" ] || fail "failed shard generation published a partial script list"
   rm -rf "$tmp"
@@ -2110,9 +2603,7 @@ test_coverage_guard_passes_with_extra_scripts() {
   # Drop the scripts that have no measured duration hint so the five new ones
   # stay inside the guard's unmeasured-share bound; the guard then has nothing
   # left to refuse except a shard conflict.
-  set +e
-  out=$(shard_fixture_guard "$dir")
-  set -e
+  out=$(shard_fixture_guard "$dir") || true
   unmeasured=$(printf '%s\n' "$out" | grep '^tests/.*\.test\.sh$' | grep -v 'zz-shard-dummy' || true)
   for script in $unmeasured; do
     rm -f "$dir/$script"
@@ -2139,10 +2630,8 @@ test_coverage_guard_still_refuses_a_true_duplicate() {
   ' "$dir/bin/fm-test-run.sh" >"$dir/bin/fm-test-run.sh.new"
   mv "$dir/bin/fm-test-run.sh.new" "$dir/bin/fm-test-run.sh"
   chmod +x "$dir/bin/fm-test-run.sh"
-  set +e
-  out=$(shard_fixture_guard "$dir")
-  rc=$?
-  set -e
+  rc=0
+  out=$(shard_fixture_guard "$dir") || rc=$?
   [ "$rc" -ne 0 ] || fail "coverage guard accepted a script that sits in two shards: $out"
   assert_contains "$out" "shards share scripts" "duplicate refusal names the shared scripts"
   assert_contains "$out" "$dup" "duplicate refusal names the duplicated script"
@@ -2158,27 +2647,21 @@ test_portable_serial_shard_lane_refusals() {
 
   # A lane built for a different shard count must refuse rather than run a
   # partial suite: this is what keeps a CI matrix from silently dropping tests.
-  set +e
-  "$RUNNER" --list --lane "portable-serial-1of${other}" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane "portable-serial-1of${other}" >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "mismatched shard count must refuse (exit 2), got $rc"
   [ ! -s "$tmp/out" ] || fail "mismatched shard count must not list tests"
   grep -Fq "configured for $count" "$tmp/err" \
     || fail "mismatch refusal must name the configured count: $(cat "$tmp/err")"
 
-  set +e
-  "$RUNNER" --list --lane "portable-serial-$((count + 1))of${count}" >"$tmp/out2" 2>"$tmp/err2"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane "portable-serial-$((count + 1))of${count}" >"$tmp/out2" 2>"$tmp/err2" || rc=$?
   [ "$rc" -eq 2 ] || fail "out-of-range shard index must refuse (exit 2), got $rc"
   grep -Fq "outside 1..$count" "$tmp/err2" \
     || fail "range refusal message missing: $(cat "$tmp/err2")"
 
-  set +e
-  "$RUNNER" --list --lane portable-serial-1 >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane portable-serial-1 >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "shard lane without a count must refuse (exit 2), got $rc"
   rm -rf "$tmp"
   pass "portable serial shard lanes refuse mismatched, out-of-range, and countless names"
@@ -2187,24 +2670,18 @@ test_portable_serial_shard_lane_refusals() {
 test_jobs_requires_proven_isolated() {
   local tmp rc shard_lane
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-jobs.XXXXXX")
-  set +e
-  "$RUNNER" --jobs 2 --lane portable-serial >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 --lane portable-serial >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs with portable-serial must refuse (exit 2), got $rc"
   grep -Fq 'portable serial lanes stay serial' "$tmp/err" \
     || fail "--jobs refusal message missing: $(cat "$tmp/err")"
-  set +e
-  "$RUNNER" --jobs 2 tests/fm-afk-inject-e2e.test.sh >"$tmp/out2" 2>"$tmp/err2"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 tests/fm-afk-inject-e2e.test.sh >"$tmp/out2" 2>"$tmp/err2" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs on a family with no recorded proof must refuse, got $rc"
   # Sharding across runners never relaxes the serial rule inside one shard.
   shard_lane=$("$RUNNER" --list-lanes | grep -m1 '^portable-serial-[0-9]*of[0-9]*$')
-  set +e
-  "$RUNNER" --jobs 2 --lane "$shard_lane" >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 --lane "$shard_lane" >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs with a portable serial shard must refuse, got $rc"
   grep -Fq 'portable serial lanes stay serial' "$tmp/err3" \
     || fail "shard --jobs refusal message missing: $(cat "$tmp/err3")"
@@ -2233,12 +2710,10 @@ printf '%s\n' "${0##*/}" >> "$ADMISSION_RESULTS"
 SH
     chmod +x "$repo/tests/$script"
   done
-  set +e
+  rc=0
   ADMISSION_RESULTS="$tmp/executed" bash "$repo/bin/fm-test-run.sh" --jobs 2 \
     tests/fm-supervision-events.test.sh tests/fm-session-lock-ancestry.test.sh \
-    >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "--jobs on a proven family must be admitted, got $rc: $(cat "$tmp/err") $(cat "$tmp/out")"
   grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/out" \
     || fail "the admitted concurrent run did not report both scripts green: $(cat "$tmp/out")"
@@ -2246,20 +2721,16 @@ SH
   [ "$executed" = $'fm-session-lock-ancestry.test.sh\nfm-supervision-events.test.sh' ] \
     || fail "admission must execute each selected script exactly once: $executed"
 
-  set +e
+  rc=0
   bash "$repo/bin/fm-test-run.sh" --jobs 5 tests/fm-session-lock-ancestry.test.sh \
-    >"$tmp/over-cap.out" 2>"$tmp/over-cap.err"
-  rc=$?
-  set -e
+    >"$tmp/over-cap.out" 2>"$tmp/over-cap.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "a family run above its proven four-worker cap must be refused, got $rc"
 
   external="$tmp/fm-session-lock-ancestry.test.sh"
   printf '#!/usr/bin/env bash\necho "ok - colliding external fixture"\n' >"$external"
   chmod +x "$external"
-  set +e
-  bash "$repo/bin/fm-test-run.sh" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err"
-  rc=$?
-  set -e
+  rc=0
+  bash "$repo/bin/fm-test-run.sh" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err" || rc=$?
   [ "$rc" -eq 2 ] \
     || fail "an external script colliding with a proven family member must be refused, got $rc"
   rm -rf "$tmp"
@@ -2285,34 +2756,28 @@ test_unmapped_new_test_never_inherits_family_concurrency() {
     chmod +x "$repo/tests/$script"
   done
 
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --jobs 2 \
     tests/fm-procevent.test.sh tests/fm-quota-choose.test.sh) \
-    >"$tmp/family.out" 2>"$tmp/family.err"
-  rc=$?
-  set -e
+    >"$tmp/family.out" 2>"$tmp/family.err" || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "two members of the proven residual family must be admitted, got $rc: $(cat "$tmp/family.err")"
   grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/family.out" \
     || fail "the admitted residual-family run did not report both scripts green: $(cat "$tmp/family.out")"
 
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --jobs 2 \
     tests/fm-procevent.test.sh tests/fm-zz-unmapped-fixture.test.sh) \
-    >"$tmp/unmapped.out" 2>"$tmp/unmapped.err"
-  rc=$?
-  set -e
+    >"$tmp/unmapped.out" 2>"$tmp/unmapped.err" || rc=$?
   [ "$rc" -eq 2 ] \
     || fail "an unclassified new test must not be admitted under --jobs, got $rc: $(cat "$tmp/unmapped.out")"
   grep -Fq 'fm-zz-unmapped-fixture.test.sh' "$tmp/unmapped.err" \
     || fail "the refusal did not name the unclassified script: $(cat "$tmp/unmapped.err")"
 
   # It is only concurrency that is refused: the same script still runs serially.
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh tests/fm-zz-unmapped-fixture.test.sh) \
-    >"$tmp/serial.out" 2>"$tmp/serial.err"
-  rc=$?
-  set -e
+    >"$tmp/serial.out" 2>"$tmp/serial.err" || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "an unclassified test must still run serially, got $rc: $(cat "$tmp/serial.err")"
   grep -Eq '^FM_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$tmp/serial.out" \
@@ -2341,10 +2806,8 @@ test_changed_shared_fixture_selects_its_readers() {
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixture-change
 
   printf '\n' >>"$repo/tests/unread-thing.sh"
-  set +e
-  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "an unread tests/ path must still fail with exit 2, got $rc"
   grep -Fq 'no changed-test mapping for source path: tests/unread-thing.sh' "$tmp/err" \
     || fail "the refusal did not name the unread tests/ path: $(cat "$tmp/err")"
@@ -2406,16 +2869,12 @@ test_changed_omp_composer_captures_select_their_consumers() {
 test_concurrent_runs_are_ordered_longest_first() {
   local tmp listed first
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-order.XXXXXX")
-  set +e
-  "$RUNNER" --jobs 2 --family watcher-wake-lock --list >"$tmp/serial" 2>&1
-  set -e
+  "$RUNNER" --jobs 2 --family watcher-wake-lock --list >"$tmp/serial" 2>&1 || true
   # The scheduler reorders the real run, so assert on the begin-marker order of
   # a real concurrent run over scripts whose hints differ by a wide margin.
-  set +e
   "$RUNNER" --jobs 2 \
     tests/fm-session-lock-ancestry.test.sh tests/fm-task-inbox.test.sh \
-    >"$tmp/out" 2>"$tmp/err"
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || true
   first=$(grep -m1 '^FM_TEST_BEGIN' "$tmp/out" | awk '{print $3}')
   [ "$first" = tests/fm-task-inbox.test.sh ] \
     || fail "concurrent run did not start the longest script first, started: $first"
@@ -2436,6 +2895,7 @@ test_per_script_timeout_bounds_a_hang() {
   cp "$RUNNER" "$runner"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-duration.py" "$repo/bin/fm-duration.py"
   grandchild_pid="$tmp/grandchild.pid"
   cat >"$repo/$hang" <<'SH'
 #!/usr/bin/env bash
@@ -2446,11 +2906,9 @@ SH
   chmod +x "$runner" "$repo/$hang"
 
   began=$(date +%s)
-  set +e
-  GRANDCHILD_PID="$grandchild_pid" \
-    "$runner" --per-script-timeout-secs 3 "$hang" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  GRANDCHILD_PID="$grandchild_pid" FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$runner" --per-script-timeout-secs 3 --json "$tmp/timing.json" "$hang" >"$tmp/out" 2>"$tmp/err" || rc=$?
   ended=$(date +%s)
 
   [ "$rc" -ne 0 ] || fail "a terminated script must fail the run: $(cat "$tmp/out")"
@@ -2463,6 +2921,12 @@ SH
   # The run still completes and accounts for the script, rather than dying.
   grep -Fq 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out" \
     || fail "the bounded run did not report a complete summary: $(cat "$tmp/out")"
+  python3 -c '
+import json, sys
+script = json.load(open(sys.argv[1]))["scripts"][0]
+assert script["exit"] == 124, script
+assert "cpu_ms" in script and script["cpu_ms"] is None, script
+' "$tmp/timing.json" || fail "a bounded script must carry a null cpu_ms: $(cat "$tmp/timing.json")"
   [ -s "$grandchild_pid" ] || fail "the hanging fixture did not record its grandchild"
   grandchild=$(cat "$grandchild_pid")
   waited=0
@@ -2476,10 +2940,8 @@ SH
   fi
 
   # 0 keeps the historical unbounded behavior, so no existing caller changes.
-  set +e
-  "$runner" --per-script-timeout-secs nope "$hang" >"$tmp/o2" 2>"$tmp/e2"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --per-script-timeout-secs nope "$hang" >"$tmp/o2" 2>"$tmp/e2" || rc=$?
   [ "$rc" -eq 2 ] || fail "--per-script-timeout-secs with a non-number must be refused, got $rc"
 
   rm -rf "$tmp"
@@ -2527,11 +2989,9 @@ kill -KILL "$$"
 SH
   chmod +x "$runner" "$repo/$leak"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_TEST_SKIP_ORPHAN_REAP=1 FM_LEAK_PIDFILE="$stub_pid_file" \
-    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err")
-  rc=$?
-  set -e
+    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err") || rc=$?
   [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
   [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
   IFS=$'\t' read -r stub _ < "$stub_pid_file"
@@ -2637,11 +3097,9 @@ SH
   git -C "$repo" add .
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$repo/$script"
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=5 FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "healthy progressing changed script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-watch-triage\.test\.sh exit=0 ' "$tmp/out" \
     || fail "the slow changed watcher script did not finish green: $(cat "$tmp/out")"
@@ -2666,19 +3124,15 @@ SH
   chmod +x "$runner" "$repo/$fast"
 
   # Comfortably inside budget: the run passes and states the budget it met.
-  set +e
-  "$runner" --max-wall-ms 60000 "$fast" >"$tmp/under" 2>"$tmp/under.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 60000 "$fast" >"$tmp/under" 2>"$tmp/under.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "a run inside its budget must pass, got $rc: $(cat "$tmp/under.err")"
   grep -Eq '^FM_TEST_BUDGET max_wall_ms=60000 duration_ms=[0-9]+$' "$tmp/under" \
     || fail "an inside-budget run did not report the budget: $(cat "$tmp/under")"
 
   # Same green script, budget it cannot meet: the run must FAIL.
-  set +e
-  "$runner" --max-wall-ms 500 "$fast" >"$tmp/over" 2>"$tmp/over.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 500 "$fast" >"$tmp/over" 2>"$tmp/over.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "an over-budget run must fail through the result path, got $rc"
   grep -Eq '^FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/over" \
     || fail "an over-budget run omitted its summary: $(cat "$tmp/over")"
@@ -2694,15 +3148,11 @@ SH
     || fail "budget verdict used a different duration than the summary: $(cat "$tmp/over")"
 
   # A malformed budget is refused rather than silently ignored.
-  set +e
-  "$runner" --max-wall-ms 0 "$fast" >"$tmp/bad" 2>"$tmp/bad.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 0 "$fast" >"$tmp/bad" 2>"$tmp/bad.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--max-wall-ms 0 must be refused (exit 2), got $rc"
-  set +e
-  "$runner" --max-wall-ms nope "$fast" >"$tmp/bad2" 2>"$tmp/bad2.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms nope "$fast" >"$tmp/bad2" 2>"$tmp/bad2.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--max-wall-ms with a non-number must be refused (exit 2), got $rc"
 
   rm -rf "$tmp"
@@ -2770,12 +3220,10 @@ touch "$SCHED_EVIDENCE/replacement-started"
 echo "ok - replacement fixture started before slow fixture finished"
 SH
   chmod +x "$runner" "$repo/$a" "$repo/$b" "$repo/$c" "$fake_bin/stat"
-  set +e
+  rc=0
   PATH="$fake_bin:$PATH" SCHED_EVIDENCE="$evidence" SCHED_WAIT_FOR_REPLACEMENT=1 \
     "$runner" --jobs 2 --json "$tmp/timing.json" \
-    "$a" "$b" "$c" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    "$a" "$b" "$c" >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || { cat "$tmp/out" "$tmp/err"; rm -rf "$tmp"; fail "jobs=2 must refill the first completed slot"; }
   begin_n=$(grep -c '^FM_TEST_BEGIN ' "$tmp/out" || true)
   end_n=$(grep -c '^FM_TEST_END ' "$tmp/out" || true)
@@ -2798,10 +3246,8 @@ echo "not ok - deliberate fail"
 exit 1
 SH
   chmod +x "$tmp/fail.test.sh"
-  set +e
-  "$runner" --jobs 2 "$a" "$tmp/fail.test.sh" >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --jobs 2 "$a" "$tmp/fail.test.sh" >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "jobs with non-proven fail fixture must refuse before run, got $rc"
 
   # Parallel failure propagation stays inside the private runner fixture.
@@ -2811,10 +3257,8 @@ echo "not ok - deliberate proven-set fail"
 exit 1
 SH
   chmod +x "$repo/$b"
-  set +e
-  SCHED_EVIDENCE="$evidence" "$runner" --jobs 2 "$a" "$b" >"$tmp/out4" 2>"$tmp/err4"
-  rc=$?
-  set -e
+  rc=0
+  SCHED_EVIDENCE="$evidence" "$runner" --jobs 2 "$a" "$b" >"$tmp/out4" 2>"$tmp/err4" || rc=$?
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "jobs aggregate must be non-zero when a proven worker fails"; }
   grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out4" \
     || { rm -rf "$tmp"; fail "jobs failure summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out4")"; }
@@ -2825,10 +3269,8 @@ echo "skip: herdr not found" >&2
 exit 0
 SH
   chmod +x "$repo/$d"
-  set +e
-  "$runner" --jobs 2 --fail-on-gate-skip 'herdr not found' "$d" >"$tmp/out5" 2>"$tmp/err5"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --jobs 2 --fail-on-gate-skip 'herdr not found' "$d" >"$tmp/out5" 2>"$tmp/err5" || rc=$?
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "parallel stderr gate skip must hard-fail"; }
   grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out5" \
     || { rm -rf "$tmp"; fail "parallel stderr hard-fail summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out5")"; }
@@ -2920,11 +3362,7 @@ assert len(doc["scripts"])==3
   pass "aggregate-json merges lane timing artifacts"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
-  "$FM_TEST_ONLY"
-  exit $?
-fi
+fm_test_only
 
 test_list_all_exact_suite_coverage
 test_family_selection
@@ -2938,6 +3376,9 @@ test_changed_dependency_selection_and_unmapped_failure
 test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
 test_captain_hold_groups_share_helper_changed_selection
+test_partition_checks_judge_loss_and_duplication
+test_teardown_groups_register_each_case_once
+test_teardown_groups_share_helper_and_stay_selectable
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings
@@ -2964,6 +3405,8 @@ test_list_scheduled_proven_isolated_uses_serial_weights
 test_list_scheduled_non_lane_selections_use_serial_weights
 test_portable_shard_union_and_coverage_guard
 test_portable_parallel_lanes_stay_duration_balanced
+test_portable_parallel_lanes_run_bounded_and_concurrently
+test_portable_parallel_run_order_matches_list_scheduled
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
 test_portable_serial_packing_budget_boundary
@@ -2986,3 +3429,66 @@ test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation
 test_herdr_ci_family_run_has_a_step_timeout
 test_aggregate_json
+
+# The three control-relaunch groups partition one former suite: every case a
+# group file defines is registered by that file or run as a command from another
+# line of it (the omp adoption cases), and no case is registered by two groups.
+test_control_relaunch_groups_partition_one_inventory() {
+  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends
+  pass "the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it"
+}
+
+# The watch-triage cases live in tests/fm-watch-triage-helpers.sh and are called
+# by tests/fm-watch-triage.test.sh and its four waits groups. Every case the
+# helper defines must be called by exactly one of those five scripts, and every
+# call must name a defined case, so a case moved between them is fine and a case
+# called by none (or twice) is not.
+test_watch_triage_waits_groups_partition_one_inventory() {
+  assert_partition_exact watch-triage calls '' fm-watch-triage-helpers.sh fm-watch-triage fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses fm-watch-triage-waits-away
+  pass "the watch-triage scripts call each helper-defined case exactly once"
+}
+
+# Every new group must stay independently runnable and keep its lane coverage.
+test_split_suites_stay_selectable_in_their_families() {
+  local watcher backend group script listed
+  local -a control_groups=(fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends)
+  local -a waits_groups=(fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses fm-watch-triage-waits-away)
+  watcher=$("$RUNNER" --list --family watcher-wake-lock)
+  backend=$("$RUNNER" --list --family backend-dispatch)
+  for group in "${waits_groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$watcher" "tests/$script" "the watcher-wake-lock family must keep $script"
+    listed=$("$RUNNER" --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+  done
+  for group in "${control_groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$backend" "tests/$script" "the backend-dispatch family must keep $script"
+    listed=$("$RUNNER" --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+  done
+  pass "every split group is independently selectable and keeps its lane family"
+}
+
+test_control_relaunch_groups_partition_one_inventory
+test_watch_triage_waits_groups_partition_one_inventory
+test_split_suites_stay_selectable_in_their_families
+
+# The three fm-pr-merge groups partition one former suite: every case a group
+# file defines is registered by that file, and no case is registered by two
+# groups.
+test_pr_merge_groups_partition_one_inventory() {
+  assert_partition_exact fm-pr-merge array pr_merge_test_cases '' fm-pr-merge fm-pr-merge-forges fm-pr-merge-checks
+  pass "the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it"
+}
+
+test_pr_merge_groups_partition_one_inventory
+
+# The four fm-lint groups partition one former suite: every case a group file
+# defines is registered by that file, and no case is registered by two groups.
+test_fm_lint_groups_partition_one_inventory() {
+  assert_partition_exact fm-lint array fm_lint_test_cases '' fm-lint fm-lint-policy fm-lint-slots fm-lint-report
+  pass "the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it"
+}
+
+test_fm_lint_groups_partition_one_inventory

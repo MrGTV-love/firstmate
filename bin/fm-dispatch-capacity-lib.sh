@@ -112,11 +112,11 @@ fm_dispatch_capacity() {
 FM_DISPATCH_VALID_FALLBACK_JQ='
   def valid_fallback:
     type == "array" and all(.[];
-      type == "object" and (.harness == "omp" or .harness == "claude") and
+      type == "object" and (.harness == "omp" or .harness == "dsh" or .harness == "claude") and
       (.model | type) == "string" and (.model | length) > 0 and
       (.effort == "low" or .effort == "medium" or .effort == "high" or .effort == "xhigh" or .effort == "max") and
       (if .harness == "claude" then .requires == "teamclaude" else (has("requires") | not) end));
-  def fallback_error: "fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles";
+  def fallback_error: "fallback must be an array of explicit OMP, dsh DeepSeek, or TeamClaude-required Claude profiles";
 '
 
 fm_dispatch_fallbacks() {
@@ -171,6 +171,13 @@ fm_dispatch_fallback_supported() {
       fm_omp_api_billing_route_check "$model" || return 1
       catalog=$(fm_run_timed 20 omp models --json 2>/dev/null </dev/null) || return 1
       jq -e --arg m "$model" 'any(.models[]?; .selector == $m)' <<<"$catalog" >/dev/null
+      ;;
+    dsh)
+      # DeepSeek is a cross-harness replacement, never an omp native chain.
+      # shellcheck source=bin/fm-dsh-lib.sh
+      . "$FM_DISPATCH_CAPACITY_DIR/fm-dsh-lib.sh"
+      python3 "$FM_DISPATCH_CAPACITY_DIR/fm-dsh.py" check dsh "$model" || return 1
+      fm_dsh_launch_check
       ;;
     claude)
       # This capability belongs to the supported TeamClaude launch owner, not

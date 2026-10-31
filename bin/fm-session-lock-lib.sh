@@ -20,20 +20,34 @@
 # decision, so this file delegates to it rather than widening the name match.
 _FM_SESSION_LOCK_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_FM_SESSION_LOCK_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_SESSION_LOCK_LIB_DIR=.
+_FM_SESSION_LOCK_PROC_INFO=$(cd "$_FM_SESSION_LOCK_LIB_DIR" && pwd)/fm-proc-info.py
+
+# One process fact for <pid>: comm, args or ppid. A confined worker's sandbox
+# refuses to run setuid ps (exit 126), so the fact then comes from
+# bin/fm-proc-info.py instead.
+fm_session_lock_proc() {  # <comm|args|ppid> <pid>
+  local status
+  ps -o "$1=" -p "$2" 2>/dev/null
+  status=$?
+  [ "$status" -eq 126 ] || return "$status"
+  python3 "$_FM_SESSION_LOCK_PROC_INFO" "$1" "$2" 2>/dev/null
+}
 # shellcheck source=bin/fm-cursor-lib.sh
 . "${_FM_SESSION_LOCK_LIB_DIR:-/}/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "${_FM_SESSION_LOCK_LIB_DIR:-/}/fm-dsh-lib.sh"
 unset _FM_SESSION_LOCK_LIB_DIR
 
 # Known harness command names; extend when a new adapter is verified. omp is
 # anchored exactly like pi: its process name is the bare word `omp` (verified,
 # omp 18.1.11), and a substring match would claim ompd or comp.
-FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$|^dsh$|^dsh-tui$'
 
 # The same harnesses as exact executable names. Keep in sync with
 # FM_HARNESS_RE. Used only for the stricter path evidence below, where the
 # loose regex would also match ordinary firstmate paths such as
 # bin/fm-claude-stop-autoarm.sh.
-FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
+FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp dsh dsh-tui)
 
 # Print the exact harness name carried by executable path $1 - its own basename
 # or any directory component - or return 1.
@@ -72,6 +86,7 @@ fm_harness_process_matches() {  # <comm> <args>
   local comm=$1 args=$2 base argv0 name
   FM_HARNESS_IS_CLAUDE=0
   base=$(basename -- "$comm")
+  fm_dsh_args_are_dsh "$args" && return 0
   if printf '%s' "$base" | grep -qE "$FM_HARNESS_RE"; then
     case "$base" in *claude*) FM_HARNESS_IS_CLAUDE=1 ;; esac
     return 0
@@ -119,8 +134,8 @@ fm_harness_process_matches() {  # <comm> <args>
 fm_harness_ancestry_pids() {
   local pid=$$ comm args extending=0 printed=0
   for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
-    comm=$(ps -o comm= -p "$pid" 2>/dev/null) || break
-    args=$(ps -o args= -p "$pid" 2>/dev/null)
+    comm=$(fm_session_lock_proc comm "$pid") || break
+    args=$(fm_session_lock_proc args "$pid")
     if fm_harness_process_matches "$comm" "$args"; then
       printf '%s\n' "$pid"
       printed=1
@@ -129,7 +144,7 @@ fm_harness_ancestry_pids() {
     elif [ "$extending" -eq 1 ]; then
       break
     fi
-    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    pid=$(fm_session_lock_proc ppid "$pid" | tr -d ' ')
     # Examine the top of the chain before stopping. Inside a PID namespace the
     # harness itself is pid 1, so stopping as soon as the next pid is 1 hides the
     # very process this walk exists to find. A host's real pid 1 (init, systemd,
@@ -167,8 +182,8 @@ EOF
 fm_harness_pid_alive() {
   local pid=$1 comm args
   kill -0 "$pid" 2>/dev/null || return 1
-  comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
-  args=$(ps -o args= -p "$pid" 2>/dev/null)
+  comm=$(fm_session_lock_proc comm "$pid") || return 1
+  args=$(fm_session_lock_proc args "$pid")
   fm_harness_process_matches "$comm" "$args"
 }
 
@@ -208,8 +223,8 @@ fm_session_lock_trusted_session_id() {  # [<ancestry-pids>]
   fi
   while IFS= read -r pid; do
     [ "$pid" = "$claude_pid" ] || continue
-    comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
-    args=$(ps -o args= -p "$pid" 2>/dev/null)
+    comm=$(fm_session_lock_proc comm "$pid") || return 1
+    args=$(fm_session_lock_proc args "$pid")
     fm_harness_process_matches "$comm" "$args" || return 1
     [ "$FM_HARNESS_IS_CLAUDE" -eq 1 ] || return 1
     printf '%s\n' "$id"
@@ -376,7 +391,7 @@ fm_session_lock_inspect() {  # <state>
     fi
     return 0
   fi
-  if ps -o comm= -p "$pid" >/dev/null 2>&1; then
+  if fm_session_lock_proc comm "$pid" >/dev/null; then
     FM_LOCK_INSPECT_STATE=unknown
     return 0
   fi

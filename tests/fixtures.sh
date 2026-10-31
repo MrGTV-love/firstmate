@@ -155,6 +155,18 @@ case "${1:-}" in
     exit 0
     ;;
   send-keys)
+    # The actual pre-admission provisioning command needs a shell result, even
+    # in fixture transport. Only its private staged script is executed here;
+    # harness launches retain the existing non-executing recorder below.
+    for a in "$@"; do
+      case "$a" in
+        "bash -- '"*"/.slot-provision."*"'")
+          staged=${a#"bash -- '"}
+          staged=${staged%"'"}
+          bash -- "$staged" </dev/null || exit 1
+          ;;
+      esac
+    done
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do
@@ -415,6 +427,39 @@ SH
 exit 0
 SH
   chmod +x "$fakebin/teamclaude" "$fakebin/claude"
+}
+
+# assert_launch_contains <launch-text> <expected> <msg>: the launch holds
+# <expected> as written or nested in one more single-quoted level, the form a
+# confined launch takes inside its sandbox-exec wrapper.
+assert_launch_contains() {
+  local quote="'" nested_quote="'\\''"
+  case "$1" in
+    *"$2"* | *"${2//$quote/$nested_quote}"*) ;;
+    *) fail "$3 (missing: '$2')" ;;
+  esac
+}
+
+# fm_test_claude_session_args <args-file> <task-meta>
+# Prints the arguments a fake claude recorded, one per line, without the
+# session id a confined launch carries. A launch whose metadata records
+# write_confinement=seatbelt-v1 must pass exactly one `--session-id <uuid>`,
+# and that uuid must be the claude_session_id the metadata records; an
+# unconfined launch must pass none. Prints nothing and fails otherwise.
+fm_test_claude_session_args() {
+  local args_file=$1 meta=$2 session
+  if grep -qx 'write_confinement=seatbelt-v1' "$meta"; then
+    session=$(grep '^claude_session_id=' "$meta" | tail -1 | cut -d= -f2-)
+    [ -n "$session" ] || return 1
+    awk -v session="$session" '
+      $0 == "--session-id" { if (seen++ || getline id <= 0 || id != session) bad = 1; next }
+      { kept[++n] = $0 }
+      END { if (bad || !seen) exit 1; for (i = 1; i <= n; i++) print kept[i] }
+    ' "$args_file"
+  else
+    ! grep -qx -- --session-id "$args_file" || return 1
+    cat "$args_file"
+  fi
 }
 
 # fm_test_teamclaude_launch_env <fakebin> <launch-command> <env-out>

@@ -5,6 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
+#        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -13,7 +14,9 @@
 # bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
+#                                         [--captain-model-pin <model-id>]
 #                                         [--reconcile-only] [--worktree <path>]
+#                                         [--owned-path <tracked-path>]...
 #                                         (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch --recover-launch
 # --recover-launch is Herdr-only inspection under the control lock.
@@ -23,6 +26,16 @@
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
+# --captain-model-pin is relaunch-only. A replacement model that a newer model of
+# its own family and tier has passed in the harness catalog is refused before
+# the running agent stops, unless it is the model the task already records or
+# the pin names it exactly; the pin is passed through to fm-spawn, and
+# docs/configuration.md#model-freshness owns the model freshness gate.
+# --owned-path is relaunch-only and passed through to fm-spawn, which accepts
+# it only to scope a governed task that has no recorded slot scope.
+# Before stopping the running agent, a governed relaunch also refuses an invalid
+# or missing scope and an assigned copy that cannot pass slot attestation, such
+# as one with uncommitted work; fm-spawn's own checks remain the final guard.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -45,7 +58,9 @@
 # Ship branch line), anchoring the copy it leaves, recording that copy as
 # prior_worktree= (or, when it is in a pool slot the task leaves entirely,
 # releasing the task's claim and recording it as released_worktree=), and
-# writing the note in the brief. It stops, starts,
+# writing the note in the brief. A ship whose recorded copy is gone refuses,
+# because relocation through relaunch --worktree is that copy's only recovery
+# route. It stops, starts,
 # deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
 # any pipeline run are untouched. A recorded GitHub PR is retained only when
 # the replacement's HEAD equals or descends from its recorded head and the
@@ -61,6 +76,41 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# under the task's control and metadata locks. The lock-owning main Firstmate
+# alone may run it: a worker, the supervision branch, or a session that does
+# not own the home lock is refused, as for authorize-continuation and
+# reassociate. It refuses, naming the missing proof, unless all of these hold:
+#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
+#   (2) the launch-proof owner resolves one foreground PID whose process name
+#       or argv[0] is omp;
+#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
+#       not inside another task's worktree that is as deep or deeper;
+#   (4) no other local task claims the pane;
+#   (5) the existing record has the same nonempty spawn_gen as the metadata,
+#       and the live PID does not carry a launch pin for another generation.
+# The preserved task_session_file (or the pane's omp session-file reference
+# when the field is absent) must identify the same persisted file as that
+# reference. Publication also needs a positively readable live environment
+# without a usable launch pin; a matching or different pin and unreadable
+# probing refuse before staging. A record that already names the live PID is
+# refused unchanged, including the extension's empty unproven mark and an
+# activation naming another file, even when Herdr still registers the task
+# file. A record naming another live omp process is that process's extension's
+# to maintain and is refused unchanged too. A recorded PID
+# that is gone, or that a process other than omp has since reused, does not
+# block repair. The repair writes version=1, the unchanged spawn_gen, the
+# live pid, task_session_file, and current_session_file, publishing by rename
+# only while the record still holds the bytes the proofs were gathered from.
+# It never unlocks a session, touches project files, starts or stops an agent,
+# or sends lifecycle input.
+# This widens lifecycle authorization: a repaired record can authorize a
+# restored omp without the launch environment pin, only while the launch-proof
+# owner can recheck all adoption proofs and the same live PID and session
+# file. Ordinary empty or invalid session records still refuse, and other
+# harnesses and backends keep their existing proof rules.
+# docs/agent-control.md "Repairing a restored omp session record" owns the
+# operator contract and the residual risk of an unpinned adopted process.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -191,8 +241,9 @@
 # are all refused - a lifecycle command delivered to the wrong endpoint is far
 # worse than a loud refusal.
 #
-# A remotely placed secondmate is refused by name: its agent runs on another
-# host, so no postcondition this plane verifies could be read for it here.
+# For a remotely placed secondmate, stay delegates to the owning host's local
+# control plane, which verifies the picker and live agent there. Other lifecycle
+# verbs refuse by placement because their postconditions cannot be read here.
 #
 # Runtime lifecycle boundaries (metadata-only authorization follows
 # docs/agent-control.md "Recovering an exited instruction owner"):
@@ -239,6 +290,8 @@ esac
 
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never
 # drive a crewmate's lifecycle (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -276,6 +329,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
@@ -284,6 +339,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "$SCRIPT_DIR/fm-dsh-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
@@ -400,11 +457,14 @@ EFFORT_SET=0
 NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
+CAPTAIN_MODEL_PIN=
+CAPTAIN_MODEL_PIN_SET=0
 RECONCILE_ONLY=0
 RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
+OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
 # --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
@@ -434,8 +494,10 @@ for control_arg in "$@"; do
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
+      captain-model-pin) CAPTAIN_MODEL_PIN=$control_arg; CAPTAIN_MODEL_PIN_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
+      owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -453,8 +515,12 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
+    --captain-model-pin) control_want_value=captain-model-pin ;;
+    --captain-model-pin=*) CAPTAIN_MODEL_PIN=${control_arg#--captain-model-pin=}; CAPTAIN_MODEL_PIN_SET=1 ;;
     --worktree) control_want_value=worktree ;;
     --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
+    --owned-path) control_want_value="owned-path" ;;
+    --owned-path=*) OWNED_PATHS+=("${control_arg#--owned-path=}") ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
     --note) control_want_value=note ;;
@@ -478,16 +544,18 @@ fi
 
 [ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
   || die "--also applies to 'reassociate' only"
+[ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
+  || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
 if [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
-    || die "--harness, --model, --effort, --claude-debug, --recover-launch, and --reconcile-only apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
+    || die "--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, and --reconcile-only apply to 'relaunch' only"
 elif [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
-    || die "--harness, --model, --effort, --note, --claude-debug, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only (reassociate also takes --worktree and --note)"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, --captain-model-pin, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only (reassociate also takes --worktree and --note)"
 fi
 if [ "$RECOVER_LAUNCH" = 1 ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
     || die "--recover-launch only inspects the recorded launch; it cannot be combined with replacement options, --reconcile-only, or --worktree"
 fi
 [ "$RELOCATE_SET" = 0 ] || [ -n "$RELOCATE_TO" ] || die "--worktree requires a value"
@@ -495,6 +563,7 @@ fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
+[ "$CAPTAIN_MODEL_PIN_SET" = 0 ] || [ -n "$CAPTAIN_MODEL_PIN" ] || die "--captain-model-pin requires a non-empty <model-id> value"
 case "$NEW_EFFORT" in
   ''|default|low|medium|high|xhigh|max|ultra) ;;
   *) die "--effort must be one of default, low, medium, high, xhigh, max, ultra" ;;
@@ -848,13 +917,17 @@ reassociate_check() {  # <record-index>
   fm_task_copy_same_repository "$new_wt" "$project" \
     || die "replacement copy $new_wt is not a checkout of task $ID's project repository ($project): it uses a different repository/ref store, even if it has the same origin; nothing was changed"
 
-  # The current copy. A path that no longer exists has no bytes or owner left
-  # to protect and is recorded as it was; anything else that exists but is not
-  # a directory cannot be proved preserved, so it refuses.
+  # The current copy. A scout's path that no longer exists has no bytes or
+  # owner left to protect and is recorded as it was; a ship's vanished copy is
+  # recovered only by relocation, whose lease proof this re-point does not run.
+  # Anything else that exists but is not a directory cannot be proved
+  # preserved, so it refuses.
   if [ -e "$old_wt" ] || [ -L "$old_wt" ]; then
     old_real=$(fm_task_copy_canonical_dir "$old_wt") \
       || die "task $ID's recorded copy $old_wt exists but is not a directory, so it cannot be proved preserved; nothing was changed"
   else
+    [ "$kind" != ship ] \
+      || die "task $ID's recorded copy $old_wt is gone; reassociation re-points a ship whose copy still exists, so recover a vanished copy by relocation instead: fm-control $ID relaunch --worktree <copy> --note <why>, which accepts only a pool slot the project's Treehouse lease allocated (docs/agent-control.md \"Relocating a task whose worktree is gone\"); nothing was changed"
     old_state=absent
   fi
   [ "$old_real" != "$new_wt" ] \
@@ -1320,9 +1393,16 @@ fi
 # `window=remote:<id>` can never match a local backend's required shape, so
 # nothing can be delivered to a wrong endpoint either way. What that refusal
 # cannot say is WHY, and "malformed metadata" is the wrong thing to tell an
-# operator about a correctly configured remote route. Name the placement
-# instead, using the same `remote_host` signal bin/fm-send.sh routes on.
+# operator about a correctly configured remote route. The stay verb delegates
+# its complete proof to the owning host; other verbs name the placement instead,
+# using the same `remote_host` signal bin/fm-send.sh routes on.
 if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
+  if [ "$VERB" = stay ] && [ "$(fm_meta_get "$META" kind)" = secondmate ]; then
+    # The host-local control plane owns every picker and agent postcondition.
+    # Never interpret a successful transport return as a local endpoint proof.
+    "$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-secondmate-control.sh stay "$ID"
+    exit $?
+  fi
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
 fi
 
@@ -1349,6 +1429,57 @@ if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
   fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
+if [ "$VERB" = adopt ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot adopt a session record"
+  fm_lease_forbid_branch "session record adoption (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "session record adoption requires the actual lock-owning main Firstmate"
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+    || die "adopt needs an existing readable session record with the metadata spawn_gen"
+  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  # The omp extension rewrites the record of the process it runs in, by rename
+  # and without these locks, so a record naming a live omp process is the
+  # extension's evidence to keep. A PID reused by any other process after a
+  # restart, another harness included, names no extension and does not block repair.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
+    | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  [ "$adoption_recorded_pid" != "$adoption_pid" ] \
+    || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
+    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
+    exit 1
+  fi
+  # Only a positively readable unpinned process cannot run the extension's
+  # pinned publication path, so its extension never rewrites the record meanwhile.
+  fm_launch_proof_pid_unpinned "$adoption_pid" \
+    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
+    || die "adopt needs a writable session-record directory"
+  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+    || die "adopt could not stage the session record; original record preserved"
+  # Refuse a changing foreground, session registration, generation, or task
+  # record rather than publishing a proof gathered for a different activation.
+  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  [ "$adoption_record" = "$adoption_recheck" ] \
+    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
+    || die "adopt could not publish the session record; original record preserved"
+  CONTROL_META_TMP=
+  printf 'adopted: %s\n' "$ID"
+  exit 0
 fi
 
 # --- shared helpers ---------------------------------------------------------
@@ -2154,6 +2285,13 @@ relaunch_rollback() {
   return 0
 }
 
+relaunch_pair_stage() {
+  [ -z "$RELAUNCH_PAIR_DIR" ] || return 0
+  RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR"
+}
+
 resolve_relaunch_profile() {
   PRIOR_HARNESS=$HARNESS
   PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
@@ -2210,13 +2348,43 @@ resolve_relaunch_profile() {
   if [ "$TARGET_HARNESS" = omp ]; then
     fm_control_omp_launch_check || return 1
   fi
+  if [ "$TARGET_HARNESS" = dsh ]; then
+    fm_dsh_launch_check '' "$KIND" || return 1
+  fi
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
+  local dsh_prior_kept=0 dsh_model
   if [ "$MODEL_SET" = 1 ]; then
     TARGET_MODEL=$NEW_MODEL
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$NEW_MODEL" != default ]; then
+      relaunch_pair_stage || return 1
+      dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$NEW_MODEL") || return 1
+      dsh_model=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$dsh_model") || return 1
+      if [ "$dsh_model" = "$PRIOR_MODEL" ]; then
+        dsh_prior_kept=1
+      fi
+    fi
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$PRIOR_MODEL" != default ] \
+       && { [ "$TARGET_MODEL" = default ] || [ "$EFFORT_SET" = 0 ]; }; then
+      dsh_model=$PRIOR_MODEL
+      if [ "$TARGET_MODEL" != default ]; then
+        relaunch_pair_stage || return 1
+        dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$TARGET_MODEL") || return 1
+        dsh_model=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$dsh_model") || return 1
+      fi
+      if [ "$EFFORT_SET" = 0 ] && { [ "$dsh_model" != "$PRIOR_MODEL" ] \
+         || [ "${CONFIG_EFFORT:-$PRIOR_EFFORT}" != "$PRIOR_EFFORT" ]; }; then
+        die "task $ID's bound dsh conversation runs model $PRIOR_MODEL at effort $PRIOR_EFFORT, but config/secondmate-harness names model ${CONFIG_MODEL:-(none)} at effort ${CONFIG_EFFORT:-(none)}; a plain relaunch would discard that conversation. Pass an explicit --model and --effort to start a fresh conversation on the configured profile. The running agent was not stopped"
+      fi
+      TARGET_MODEL=$PRIOR_MODEL
+      dsh_prior_kept=1
+    elif [ "$TARGET_HARNESS" = dsh ] && [ "$TARGET_MODEL" = default ]; then
+      TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
+        || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
+    fi
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
     TARGET_MODEL=$PRIOR_MODEL
   else
@@ -2224,6 +2392,8 @@ resolve_relaunch_profile() {
   fi
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT
+  elif [ "$dsh_prior_kept" = 1 ]; then
+    TARGET_EFFORT=$PRIOR_EFFORT
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_EFFORT=${CONFIG_EFFORT:-default}
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
@@ -2234,9 +2404,7 @@ resolve_relaunch_profile() {
   # A role reference, or a model the index has since retired, is resolved or
   # refused here, before the stop, exactly as the launch owner would.
   if [ "$TARGET_MODEL" != default ] || [ "$KIND" != secondmate ]; then
-    RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
-    FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
-      fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
+    relaunch_pair_stage || return 1
     if [ "$TARGET_MODEL" != default ]; then
       TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
         "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
@@ -2279,6 +2447,17 @@ resolve_relaunch_profile() {
   if [ "$TARGET_HARNESS" = omp ]; then
     fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
   fi
+  local dsh_route_model=$TARGET_MODEL
+  [ "$dsh_route_model" != default ] || dsh_route_model=
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$TARGET_HARNESS" "$dsh_route_model" || return 1
+  if [ "$TARGET_HARNESS" = dsh ]; then
+    dsh_model=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$TARGET_MODEL") || return 1
+    if [ "$dsh_model" != "$TARGET_MODEL" ]; then
+      relaunch_pair_stage || return 1
+      dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$dsh_model") || return 1
+    fi
+    TARGET_MODEL=$dsh_model
+  fi
   case "$(fm_meta_get "$META" omp_no_helpers)" in
     '') ;;
     on)
@@ -2313,6 +2492,26 @@ resolve_relaunch_profile() {
   if [ "$KIND" != secondmate ]; then
     fm_exclude_tools_check "$TARGET_HARNESS" 0 "$config" >/dev/null || return 1
   fi
+  # The launch owner's model freshness gate refuses a replacement model that a
+  # newer model of its own family and tier has passed, but only after the old
+  # agent has stopped. The same verdict is asked here, under the same worker
+  # account, so that refusal happens while nothing has changed yet. The model the
+  # task already records was admitted at launch, a captain pin naming the model
+  # admits it, and a newer model of another tier only warns.
+  if [ "$catalog_context" = selected ] && [ -n "$account_model" ] \
+     && [ "$TARGET_MODEL" != "$PRIOR_MODEL" ] && [ "$CAPTAIN_MODEL_PIN" != "$TARGET_MODEL" ]; then
+    local stale
+    stale=$(fm_worker_account_check_entry "$TARGET_WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" \
+      "$TARGET_HARNESS" "$TARGET_MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || stale=
+    case "$stale" in
+      ''|*' (other tier: '*')') ;;
+      *)
+        [ -z "$CAPTAIN_MODEL_PIN" ] \
+          || echo "error: --captain-model-pin '$CAPTAIN_MODEL_PIN' is not the requested model '$TARGET_MODEL'; a pin authorizes only that exact model" >&2
+        die "refusing to relaunch $ID onto a stale model - $stale; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin $TARGET_MODEL only when the captain explicitly asked for $TARGET_MODEL)"
+        ;;
+    esac
+  fi
 }
 
 # safe_checkpoint: prove, before anything is stopped, that the work a relaunch
@@ -2338,7 +2537,7 @@ safe_checkpoint() {
   else
     check_wt=$WT
   fi
-  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)"
+  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (for a ship of a Treehouse project, pass --worktree with a pool slot that 'treehouse get' allocates and that is checked out on the task's branch; if 'treehouse get' enters the recorded path itself, check the branch out there and relaunch without --worktree; a ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch, and a detailed procedure for that is follow-up work)"
   wt_real=$(cd "$check_wt" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $check_wt cannot be resolved"
   wt_top=$(git -C "$check_wt" rev-parse --show-toplevel 2>/dev/null) \
     || die "task $ID's recorded worktree $check_wt is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"
@@ -2439,8 +2638,9 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home
+  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
   local -a spawn_args
+  local owned_path
 
   require_state_verified_backend relaunch
   if [ "$RECOVER_LAUNCH" = 1 ]; then
@@ -2532,6 +2732,27 @@ do_relaunch() {
   require_live_task_attribution \
     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
+  slot_copy=$WT
+  [ "$RELOCATING" = 0 ] || slot_copy=$RELOCATE_DEST
+  slot_project=$(fm_meta_get "$META" project)
+  if [ "$KIND" != secondmate ] &&
+    { grep -q '^slot_manifest=' "$META" || fm_slot_required "$slot_project" "$slot_copy"; }; then
+    slot_governed=1
+  fi
+  if [ "${#OWNED_PATHS[@]}" -gt 0 ]; then
+    ! grep -q '^slot_owned_path=' "$META" \
+      || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
+    [ "$slot_governed" = 1 ] \
+      || die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+    fm_slot_require_scope "${OWNED_PATHS[@]}" \
+      || die "refused invalid --owned-path for $ID; the running agent was not stopped"
+  fi
+  if [ "$slot_governed" = 1 ]; then
+    [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
+      || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
+    fm_slot_check_copy "$slot_project" "$slot_copy" \
+      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+  fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
     [ -n "$secondmate_home" ] || secondmate_home=$WT
@@ -2563,7 +2784,9 @@ do_relaunch() {
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
   [ "$RELOCATING" = 0 ] || spawn_args+=(--worktree "$RELOCATE_DEST")
+  for owned_path in ${OWNED_PATHS[@]+"${OWNED_PATHS[@]}"}; do spawn_args+=(--owned-path "$owned_path"); done
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
+  [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] || spawn_args+=(--captain-model-pin "$CAPTAIN_MODEL_PIN")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ -z "$TARGET_DISPATCH_RULE" ] || spawn_args+=(--dispatch-rule "$TARGET_DISPATCH_RULE")
   [ -z "$TARGET_DISPATCH_ROUTE" ] || spawn_args+=(--dispatch-route "$TARGET_DISPATCH_ROUTE")
@@ -2617,7 +2840,8 @@ do_relaunch() {
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
-    printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+    fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}")" \
+      || echo "warning: could not record the model-matrix fallback note in $STATE/$ID.status (exit $?)" >&2
   fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

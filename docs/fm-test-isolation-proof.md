@@ -22,6 +22,9 @@ This record owns concurrent isolation evidence for the portable parallel candida
 
 ## Candidate set
 
+The historical summary and raw JSON above include one since-retired suite; the candidate and duration lists below omit it.
+The original count and wall duration remain historical measurements, not a new run of the retained suites.
+
 - `tests/fm-arm-pretool-check.test.sh`
 - `tests/fm-backend-herdr.test.sh`
 - `tests/fm-brief.test.sh`
@@ -31,13 +34,15 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-captain-hold-lifecycle.test.sh`
 - `tests/fm-captain-hold-reconcile.test.sh`
 - `tests/fm-captain-hold-sweep.test.sh`
-- `tests/fm-cd-pretool-check.test.sh`
 - `tests/fm-composer-ghost.test.sh`
 - `tests/fm-composer-lib.test.sh`
 - `tests/fm-crew-state.test.sh`
 - `tests/fm-ensure-agents-md.test.sh`
 - `tests/fm-grok-harness.test.sh`
 - `tests/fm-herdr-lab.test.sh`
+- `tests/fm-lint-policy.test.sh`
+- `tests/fm-lint-report.test.sh`
+- `tests/fm-lint-slots.test.sh`
 - `tests/fm-lint.test.sh`
 - `tests/fm-pi-primary-types.test.sh`
 - `tests/fm-pr-merge.test.sh`
@@ -61,6 +66,36 @@ All six captain-hold files and 21 other candidates exited 0 under four-way concu
 Two candidates did not exit 0 for reasons unrelated to concurrency: `tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on that host, and `tests/fm-pr-merge.test.sh` fails its `forgejo-merges` case on that host both alone and on an unmodified checkout.
 That run is therefore not a clean 29-path pass and does not replace the archived result; the six files share the former file's fixtures and temporary-root discipline, and a clean run on a host with the Pi prerequisite refreshes this record.
 
+## fm-pr-merge split re-check
+
+The fm-pr-merge split proposed `tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` for the portable set beside `tests/fm-pr-merge.test.sh`, so the 31-path proposal was run as a portable-pool proof.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --jobs 4 --json /tmp/fm-proof-r3/portable.json`, on macOS at a one-minute load average between 10 and 18 during the run
+- Result: failed. One run, 31 candidates, 2 failures, summary `FM_ISOLATION_SUMMARY total=31 failed=2 concurrency=4 duration_ms=1673911`, run `fm-isolation-1792891736623-61827`, artifact `fm_test_run_jobs_enabled=false`.
+
+The two failing candidates were not the new paths.
+`tests/fm-backend-herdr.test.sh` exited 1 in `fm_backend_herdr_container_ensure`: Herdr server startup refused with `socket absence is unknown: AF_UNIX path too long`, because the proof's worker root under this host's `TMPDIR` made the socket path longer than the Unix-socket limit.
+`tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on this host, which the harness counts as a failure.
+All three fm-pr-merge groups exited 0, at 302702 ms for `fm-pr-merge-checks`, 211479 ms for `fm-pr-merge-forges`, and 215970 ms for `fm-pr-merge`.
+Because the run is not a clean 31-path pass, the two new paths are not admitted: they are absent from the candidate set above, from `bin/fm-test-isolation-proof.sh --list`, and from the portable parallel lanes, and they run in the portable serial remainder while staying in the `pr-forge` family.
+A clean portable-pool run of the 31-path proposal on a host with `tsc` and a short enough `TMPDIR` is what admits them.
+
+## fm-lint split re-check
+
+The fm-lint split replaced `tests/fm-lint.test.sh` with four groups that share `tests/fm-lint-helpers.sh`: `tests/fm-lint.test.sh`, `tests/fm-lint-policy.test.sh`, `tests/fm-lint-slots.test.sh`, and `tests/fm-lint-report.test.sh`.
+The three new paths joined the candidate set above, `bin/fm-test-isolation-proof.sh --list`, the portable parallel lanes, and the `pure-contract-unit` family, which makes 32 candidates.
+
+- Date: 2026-10-25
+- Command: `bin/fm-test-isolation-proof.sh --jobs 4`, on macOS
+- Result: did not complete. Four-way candidate contention ran `tests/fm-captain-hold-archive.test.sh` to 4855 s before the harness timeout.
+
+The evidence gathered instead is one concurrent run of seven groups: the four fm-lint groups and the three fm-pr-merge groups, `tests/fm-pr-merge.test.sh`, `tests/fm-pr-merge-forges.test.sh`, and `tests/fm-pr-merge-checks.test.sh`.
+In that run every completed group exited 0 with no failing case, with the host prerequisites ShellCheck 0.11.0 and actionlint 1.7.12 installed.
+The earlier failures in that same run came from those prerequisites being missing, not from interference between groups.
+That run is not a portable-pool proof and does not replace the archived result.
+The portable parallel lanes are the confirmation for the three new paths, and a full portable-pool proof of the 32-path set on an equipped host remains outstanding.
+
 ## Durations
 
 | duration_ms | exit | worker | script |
@@ -71,7 +106,6 @@ That run is therefore not a clean 29-path pass and does not replace the archived
 | 27529 | 0 | 1 | `tests/fm-arm-pretool-check.test.sh` |
 | 20922 | 0 | 21 | `tests/fm-test-run.test.sh` |
 | 17558 | 0 | 8 | `tests/fm-crew-state.test.sh` |
-| 16582 | 0 | 5 | `tests/fm-cd-pretool-check.test.sh` |
 | 9766 | 0 | 12 | `tests/fm-lint.test.sh` |
 | 9562 | 0 | 11 | `tests/fm-herdr-lab.test.sh` |
 | 6768 | 0 | 10 | `tests/fm-grok-harness.test.sh` |
@@ -159,6 +193,7 @@ That is close to the family's ceiling rather than a scheduling loss: its longest
 The family's clock is two long scripts that do not contend: `fm-pr-check-security` (198.5s) and `fm-teardown` (194.1s) each own a worker for nearly the whole run, and `fm-pr-merge` (118.5s) plus `fm-x-mode` (79.4s) fill the other two.
 `bin/fm-test-isolation-proof.sh`'s own `--list-exclusions` keeps `fm-pr-check-security` and `fm-teardown` out of the mixed PORTABLE pool, where they would share a machine with unrelated lock and forge stress.
 Admitting them inside their own family is a different question and this proof answers it: the six members present on that date are safe with each other at four workers.
+The teardown file named above has since split into `fm-teardown`, `fm-teardown-pool`, and `fm-teardown-cleanup` ([portable shards](fm-test-portable-shards.md#teardown-groups)); this proof measured the combined script, and the 2026-10-22 proof below covers the three group files running concurrently with the family.
 
 `tests/fm-pr-state.test.sh` and `tests/fm-pr-reviewers.test.sh` joined this family after the date above, so that result does not cover them.
 `script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its then-current eight-member membership.
@@ -178,6 +213,35 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
+
+The teardown split added `fm-teardown-pool` and `fm-teardown-cleanup` to the family beside `fm-teardown`, so the family was re-proved at its then-current membership.
+
+- Date: 2026-10-22
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4`, in an Ubuntu 26.04 container
+- Result: one run, 13 candidates, 0 failures, summary `duration_ms=499534`, artifact `fm_test_run_jobs_enabled=true`.
+
+The three teardown groups ran in that proof at 426064 ms for `fm-teardown-cleanup`, 229022 ms for `fm-teardown-pool`, and 150181 ms for `fm-teardown`.
+Each worker got a private mode-0700 temporary root with ambient `FM_HOME` and `FM_*_OVERRIDE` cleared.
+
+The fm-pr-merge split added `fm-pr-merge-forges` and `fm-pr-merge-checks` to the family beside `fm-pr-merge`, so the family was re-run at its 15-member membership.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4 --json /tmp/fm-proof-prforge/proof.json`, on macOS at a one-minute load average near 22
+- Result: failed. One run, 15 candidates, 1 failure, summary `FM_ISOLATION_SUMMARY total=15 failed=1 concurrency=4 duration_ms=1357608`, run `fm-isolation-1792887876773-18918`, artifact `fm_test_run_jobs_enabled=false`.
+
+The failing candidate was `tests/fm-open-loops.test.sh` (exit 1, 333116 ms): its inactive-source probe timed out after two seconds, and the collector's `os.killpg` cleanup then raised `PermissionError: [Errno 1] Operation not permitted`.
+The three fm-pr-merge groups exited 0 in that run at 336995 ms for `fm-pr-merge-checks`, 229810 ms for `fm-pr-merge-forges`, and 236863 ms for `fm-pr-merge`, and the other eleven candidates also exited 0.
+That run is not a clean pass, so the family was run again.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4 --json /tmp/fm-proof-r3/prforge.json`, on macOS at a one-minute load average between 9 and 23 during the run
+- Result: passed. One run, 15 candidates, 0 failures, summary `FM_ISOLATION_SUMMARY total=15 failed=0 concurrency=4 duration_ms=1394355`, run `fm-isolation-1792890341539-10212`, artifact `fm_test_run_jobs_enabled=true`.
+
+`tests/fm-open-loops.test.sh` exited 0 in that run (757127 ms), and the three fm-pr-merge groups exited 0 at 350116 ms for `fm-pr-merge-checks`, 246981 ms for `fm-pr-merge-forges`, and 265749 ms for `fm-pr-merge`.
+This clean run covers the 15-member family, so `fm-pr-merge-forges` and `fm-pr-merge-checks` keep the family's four-worker admission.
+It does not admit them to the proven-isolated portable set; the [fm-pr-merge split re-check](#fm-pr-merge-split-re-check) owns that decision.
+`tests/fm-review-record.test.sh` joined this family after that date, so the fifteen-member result does not cover it.
+A 2026-10-27 fourteen-member run on the pre-split family passed with the new test, but the current seventeen-member family has not been re-proved, so the 2026-10-24 fifteen-member result remains the recorded admission for the members it measured.
 
 ### secondmate: admitted
 

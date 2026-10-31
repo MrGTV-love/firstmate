@@ -164,11 +164,15 @@ ack_stopped_cycle() {  # <state>
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  # The drain presented every overdue row; acknowledgement needs an action on each.
-  for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --report | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
-    FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" escalated --evidence 'test supervisor escalated' \
-      >/dev/null || return 1
-  done
+  # These isolated watcher fixtures defer newly presented work rather than inventing delivery proof.
+  if ! FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions >/dev/null; then
+    local recheck
+    recheck=$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc)+d.timedelta(hours=1)).isoformat())')
+    for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
+      FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" deferred --evidence 'isolated watcher fixture awaits its next cycle' \
+        --recheck "$recheck" >/dev/null || return 1
+    done
+  fi
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
@@ -248,7 +252,59 @@ test_unchanged_overdue_set_stays_quiet_then_new_row_wakes() {
   publish_ledger "$state" lost-launcher forgotten-guard
   wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a newly overdue row did not wake"; }
   grep -q '2 overdue' "$state/.wake-queue" || fail "new overdue row was not queued: $(cat "$state/.wake-queue")"
-  pass "an unchanged overdue set stays quiet and a new overdue row wakes again"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the new row wake"
+  jq '.rows[0].evidence = "worker resumed with a new status"' "$state/open-loops.json" > "$state/changed-ledger"
+  mv "$state/changed-ledger" "$state/open-loops.json"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed evidence with the same row ids did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  pass "unchanged evidence stays quiet; new rows and changed evidence wake immediately"
+}
+
+test_resurface_wake_is_periodic_and_separate_from_changes() {
+  local dir state fakebin out pid resurfaced before
+  dir=$(make_case ledger-resurface-split); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  resurfaced="$state/.open-loops-resurfaced"
+  publish_ledger "$state" lost-launcher
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "first overdue ledger did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  [ -e "$resurfaced" ] || fail "the first surfaced row did not start the resurface period"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the first wake"
+  set_mtime "$(( $(date +%s) - 1800 ))" "$resurfaced"
+  before=$(file_mtime "$resurfaced")
+  publish_ledger "$state" lost-launcher forgotten-guard
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a new row did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  ! grep -q 'open-loop-ledger-resurface' "$state/.wake-queue" || fail "a single new row queued the periodic list"
+  [ "$(file_mtime "$resurfaced")" = "$before" ] || fail "a change wake restamped the resurface cooldown"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the change wake"
+  set_mtime "$(( $(date +%s) - 3700 ))" "$resurfaced"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "the resurface interval passed without the periodic wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
+  ack_stopped_cycle "$state" || fail "could not acknowledge the resurface wake"
+  # Changes in the due cycle must not starve the periodic list.
+  set_mtime "$(( $(date +%s) - 3700 ))" "$resurfaced"
+  publish_ledger "$state" lost-launcher forgotten-guard resumed-worker
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed rows suppressed a due periodic wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
+  grep -q "$(printf '\tcheck\topen-loop-ledger\t')" "$state/.wake-queue" \
+    || fail "a due periodic wake suppressed the changed-row wake"
+  ack_stopped_cycle "$state" || fail "could not acknowledge simultaneous change and periodic wakes"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the periodic list repeated within its interval"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "the periodic list was queued twice in one interval"; }
+  reap "$pid"
+  pass "row changes wake without the periodic list; the resurface wake carries it once per interval"
 }
 
 test_ledger_without_overdue_rows_is_silent() {
@@ -430,7 +486,7 @@ test_retained_collector_survives_watcher_restart_without_overlap() {
   dir=$(make_case ledger-retained-collector)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-  cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
+  cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-duration.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
   cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
@@ -584,7 +640,7 @@ test_decimal_resurface_and_zero_defaults() (
       if [ "$kind" = overdue ]; then
         publish_ledger "$state" unchanged-obligation
         set_mtime "$now" "$state/open-loops.json"
-        marker="$state/.open-loops-surfaced"
+        marker="$state/.open-loops-resurfaced"
       else
         publish_ledger "$state"
         set_mtime "$((now - 600))" "$state/open-loops.json"
@@ -628,7 +684,7 @@ test_real_publication_rearms_stale_incidents_without_resetting_overdue() {
     dir=$(make_case "ledger-recovery-$second")
     state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
+    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-duration.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
@@ -692,7 +748,7 @@ test_fresh_observation_rearms_recovery_during_blocked_stale_append() {
     dir=$(make_case "ledger-blocked-recovery-$kind")
     state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     mkdir -p "$dir/collector-bin" "$dir/data" "$dir/config" "$dir/projects" "$dir/nm"
-    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
+    cp "$ROOT/bin/fm-open-loops.sh" "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-duration.py" "$ROOT/bin/fm-gh-rest.sh" "$dir/collector-bin/"
     cat > "$dir/collector-bin/fm-fleet-snapshot.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --home-input ] || exit 2
@@ -851,6 +907,7 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
 tests=(
   test_overdue_row_wakes_with_a_durable_row
   test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
+  test_resurface_wake_is_periodic_and_separate_from_changes
   test_ledger_without_overdue_rows_is_silent
   test_detached_helper_runs_and_a_blind_ledger_wakes
   test_missing_ledger_collects_with_large_interval_and_then_throttles
@@ -864,16 +921,4 @@ tests=(
   test_fresh_observation_rearms_recovery_during_blocked_stale_append
   test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery
 )
-if [ "$#" -gt 0 ]; then
-  for requested in "$@"; do
-    selected=0
-    for candidate in "${tests[@]}"; do
-      [ "$requested" != "$candidate" ] || selected=1
-    done
-    [ "$selected" -eq 1 ] || fail "unknown watcher ledger test: $requested"
-  done
-  tests=("$@")
-fi
-for selected_test in "${tests[@]}"; do
-  "$selected_test" || exit "$?"
-done
+fm_test_run_cases "${tests[@]}" -- "$@"

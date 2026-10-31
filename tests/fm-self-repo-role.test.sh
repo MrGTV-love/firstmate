@@ -31,6 +31,9 @@ BRIEF="$ROOT/bin/fm-brief.sh"
 SPAWN="$ROOT/bin/fm-spawn.sh"
 PROMOTE="$ROOT/bin/fm-promote.sh"
 TMP_ROOT=$(fm_test_tmproot fm-self-repo-role)
+# Keep guard telemetry inside the fixture root: a refusal must not write into
+# the checkout's own state directory while this suite runs.
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 export FM_BACKEND=tmux
 
 # The code root under test is this checkout, so self-repo detection reaches it
@@ -163,10 +166,15 @@ test_report_fails_closed_on_unsafe_input() {
 test_check_user_home_refused_on_self_repo() {
   local home out rc
   home=$(make_role_home check-user)
+  : > "$FM_GUARD_EVENT_LOG"
   out=$(run_role "$home" check "$ROOT"); rc=$?
   expect_code 1 "$rc" "a user/operator home must be refused a publishing contract on firstmate itself"
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_contains "$out" "no publication authority" "the refusal must name the missing grant"
+  assert_contains "$out" "config/firstmate-role" "the refusal must name where authority is granted"
+  assert_contains "$out" "--upstream-consent" "the refusal must name the one-task consent flag"
+  [ "$(grep -c '"guard":"upstream-publish-role".*"decision":"deny"' "$FM_GUARD_EVENT_LOG")" -eq 1 ] \
+    || fail "the refusal must append exactly one deny event"
   pass "fm-role.sh check: the default user/operator home cannot publish to firstmate upstream"
 }
 

@@ -10,6 +10,9 @@
 # [curl-exit-file] uses the fixed endpoint and five-second deadline, with no
 # retries. Prints only the HTTP code (000 on a transport failure), optionally
 # saving curl's transfer time and its exit status (28 is the deadline).
+# Under FM_TEST_SEAM=1 only, FM_TYPESAFE_TEST_ENDPOINT may replace the endpoint,
+# matching the seam the resolver's TypeScript client already honors; no
+# production setting selects another endpoint.
 # The private key is never exported or placed on argv.
 # fm_typesafe_permitted <request-json> <never-send-path> <scratch-file> checks
 # every request string against the existing dispatch-never-send policy.
@@ -57,9 +60,14 @@ fm_openrouter_key() {
 }
 
 fm_typesafe_post() {
-  local request=$1 response=$2 timing=${3:-} exit_file=${4:-} result rc=0 http
+  local request=$1 response=$2 timing=${3:-} exit_file=${4:-} result rc=0 http endpoint
+  endpoint=https://api.typesafe.ai/v1/systemone
+  if [ "${FM_TEST_SEAM:-0}" = 1 ] && [ -n "${FM_TYPESAFE_TEST_ENDPOINT:-}" ]; then
+    endpoint=$FM_TYPESAFE_TEST_ENDPOINT
+  fi
+  # measured: value=5 date=2026-10-17 host=Mac-Studio margin=1.0 (the fixed provider deadline the resolver documents; no retries)
   result=$(printf '%s' "$request" | curl -q -sS --max-time 5 -o "$response" -w '%{http_code} %{time_total}' \
-    -X POST https://api.typesafe.ai/v1/systemone -H 'Content-Type: application/json' \
+    -X POST "$endpoint" -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
     --data-binary @- 2>/dev/null) || rc=$?
   http=${result%% *}

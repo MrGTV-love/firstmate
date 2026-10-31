@@ -206,7 +206,7 @@ The detailed reconciliation and task chronology stay in the private audit report
 ### Per-task endpoint reads cannot truncate the digest
 
 A per-task backend endpoint liveness read that dies mid-read inside the digest process takes every later stage with it, and a parent wrapper that banners only the runtime-bound exit stays silent about the missing sections.
-The digest now runs each per-task endpoint read in its own bounded child (`FM_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose timeout or signal death becomes that task's own `endpoint: error` line, and the parent wrapper banners ANY nonzero digest-child exit, naming the stage and the abnormal exit status.
+The digest now runs each per-task endpoint read in its own bounded child (`FM_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose timeout becomes that task's own `endpoint: unknown` line and whose signal death becomes its `endpoint: error` line, and the parent wrapper banners ANY nonzero digest-child exit, naming the stage and the abnormal exit status.
 Verified on 2026-09-27 with the deterministic process-tree tests that reproduce both failure shapes with real processes and no harness:
 
 ```sh
@@ -225,9 +225,59 @@ These guarantees are process semantics, not vendor-emitted signals, so no live-h
 [`bin/fm-timeout-lib.sh`](../../bin/fm-timeout-lib.sh)'s header owns the shared Perl bound's process-group, signal, and owner-death contract.
 [`tests/fm-timeout-lib.test.sh`](../../tests/fm-timeout-lib.test.sh) exercises delayed child process-group creation through both `fm_run_timed` and `fm_nm_bounded`, TERM forwarding, and an outer deadline expiring before an inner bound with a TERM-resistant child and delayed inner cleanup.
 The nested-bound case checks that captured stdout closes promptly and the child is no longer running.
-[`tests/fm-crew-state.test.sh`](../../tests/fm-crew-state.test.sh)'s no-timeout case checks that the fake no-mistakes call actually ran and did not survive its bound before asserting the pane-state fallback.
+[`tests/fm-work-progress.test.sh`](../../tests/fm-work-progress.test.sh) exercises slow productive no-mistakes reads through the current crew-state consumer; the shared hard-bound mechanisms remain covered by `tests/fm-timeout-lib.test.sh` for their unchanged callers.
 
 [`tests/lib.sh`](../../tests/lib.sh) owns registered fixture identity checks, stopped-watcher resumption, cleanup ordering, and the default blocking-stub ceiling.
+
+### Productive-work limits
+
+Verified 2026-10-23 on macOS arm64 with Bash 3.2.57, Python 3.13.6, Perl 5.34.1 and Node 26.4.0, against the change as first submitted (commit c5ac4d161), before its rebase and review rounds:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-work-progress.test.sh
+bash tests/fm-backlog-read-bound.test.sh
+bash bin/fm-test-run.sh tests/fm-crew-state.test.sh
+bash bin/fm-test-run.sh tests/fm-duration.test.sh
+```
+
+These commands ran beneath the process-budget and duration owners.
+At that commit the progress suite reported `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0` with all eleven of its then cases passing.
+It exercises slow arm/omp/Claude readiness, a productive watcher with an old beacon followed by a real inactive-holder stop, atomic summary publication, authoritative crew and fleet reads, and collection beyond the retired overall alarm.
+It also removes Python from the child's PATH and proves both CPU-only descendant work and output-only work survive, while a genuinely inactive source is stopped without leaving a live descendant.
+The backlog suite finished with `# fm-backlog-read-bound.test.sh: all assertions passed`, covering slow row/inventory/held-call reads without poisoning the sweep, plus real no-progress recovery and refusal to spend an unreadable row as absence or inventory attestation.
+The complete crew-state suite also passed its unchanged Python-free and unavailable-SQLite diagnostics, and the duration-owner suite retained real statistics-import and ownership behavior.
+Progress-only execution therefore does not acquire a SQLite dependency just to observe a command.
+These are project-owned process and API-boundary guarantees, not refreshed vendor-rendering or backend-availability claims.
+The later review rounds changed the progress runner, crew-state reads, watcher ownership and adapter readiness and added cases to these suites; this record does not cover those changes, which rest on the suites' own current results.
+The [progress owner](../../bin/fm-duration.py), [shell execution owner](../../bin/fm-timeout-lib.sh), and [backlog owner](../../bin/fm-backlog-transition-lib.sh) define the current mechanics; incident chronology and before-change counterfactuals remain in private task evidence.
+
+### CPU accounting across child exit
+
+Recorded 2026-10-24 on macOS 27.0.1 arm64 with Bash 3.2.57, Python 3.13.6 and Perl 5.34.1:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-backlog-read-bound.test.sh
+# FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=111287
+bash bin/fm-test-run.sh tests/fm-work-progress.test.sh
+# FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=231962
+```
+
+The same suites passed together on Ubuntu 26.04.1 LTS aarch64, Linux 7.0.14-linuxkit, Bash 5.3.9 and Python 3.14.4, in a container with a two-CPU quota:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-backlog-read-bound.test.sh tests/fm-work-progress.test.sh
+# FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=214255
+```
+
+These recorded runs predate the later unavailable-ctypes blind path, the Darwin non-root per-member CPU fallback, the blind sample in every runner mode whenever no complete process-tree CPU sample exists (a failed native root read, ps and fm-proc-info.py both unavailable, or native imports that cannot load), which leaves the default run mode only its 6 hour absolute stop outside a cleanup (a cleanup that a forwarded signal or that stop began still follows the cleanup SIGKILL rule), the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
+
+The backlog fixture includes a short completion phase after its CPU worker is reaped, with the existing one-second inactivity interval unchanged.
+The progress suite observes a real shell before and after a complete CPU-producing child lifetime, verifies that the second observation does not prove inactivity, then verifies that subsequent real inactivity does.
+It also exercises runnable work whose exported CPU counter stays rounded to zero, alongside the existing sleeping-tree stop and descendant-cleanup cases, through both Python and Python-free execution.
+Through both runners on a simulated /proc-only host, it checks that a stable tree whose only growing CPU is waited-child CPU is kept and that a tree changing only its membership through short sleeping children is still stopped.
+It also checks that an unavailable ctypes module keeps productive work running with one blind-telemetry warning.
+Through both runners, on the default host sampler and on ps with /proc hidden, it checks that a timed-poll idle process is stopped with 124 and that a reaped four-second CPU burst followed by a short completion phase is kept.
+The [progress owner](../../bin/fm-duration.py) defines accounting and idle-proof semantics; these checks cover shared process behavior rather than vendor-rendered harness signals or backend availability.
 
 ## Semantic busy state
 
@@ -277,6 +327,52 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 | omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `FM_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `fm_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
+
+### Claude presentation-hold release, 2026-10-25 and 2026-10-26
+
+`bin/fm-claude-hold-release.sh` is registered for `UserPromptSubmit` and `StopFailure`.
+On 2026-10-25 the scratch probe ran through `bin/fm-teamclaude-launch.sh`, under `fm-proc-budget.sh`, with a fresh task-scoped `CLAUDE_CONFIG_DIR` on Claude Code 2.1.310.
+The launcher's own proxy check passed, so it did not refuse, but Claude did: through the launcher, `claude auth status` exited 1 reporting `"loggedIn": false`, and a one-line `claude -p --model haiku` exited 1 with `Not logged in · Please run /login` before sending any request.
+The TeamClaude proxy does not stand in for Claude's own sign-in, so a scratch config needs a credential, which the [worker account contract](../configuration.md) forbids copying, and the default store would have Claude itself write the real `~/.claude.json`.
+
+On 2026-10-26 the gate's test phase ran real Claude Code 2.1.310 (Haiku) primaries in throwaway lab homes started from the target tree (aeb99bd), with base 3b3fb14 as the counterfactual.
+Its lab driver scripts were not retained, so this record carries the observed output and states no replay command for the lab cases.
+
+| Case | Observed result |
+| --- | --- |
+| Stale hold, then a typed prompt | A hand-written hold was still present after 6 s idle and was gone 0.3 s after the prompt, before any `Stop`. |
+| Message typed while a turn streams | Claude queued the message (`Press up to edit queued messages`), and the hand-written hold was gone at the first poll about 1 s later; the turn finished with the hold still absent. |
+| Escape, then a new prompt | The hold was still present 4 s after Escape, so Escape fired no hook; it was gone within 0.2 s of the next prompt. |
+| Host close while main's open turn holds the rows, live watcher | The parked `Stop` firing recorded `outcome=refused` with the episode's `recovery_generation`, wrote no failure notice, and left the hold in place. |
+| Next `Stop` after that refusal | The firing recorded `outcome=rewake` for the same `recovery_generation`, and Claude received exactly one "presented to a turn that ended without acknowledging them" wake. |
+| Host close after main's drain, successor watcher killed (`kill -9`) | Base recorded `outcome=failed`, wrote `.claude-autoarm-failure-notified`, and Claude received the `auto-arm FAILED` notice; target recorded `outcome=rewake` with no failure notice. |
+
+After the one redelivery, the lab model never acknowledged its rows, and a `check: rearm-resurface` wake repeated about every 5 s.
+Base 3b3fb14 repeats the same wake for unacknowledged rows, so that loop predates this change.
+The first lab died when the test runner's orphan reaper took its exited owner process and was rebuilt with a long-lived owner.
+The first mid-turn attempt did not count, because the turn ended before the message was typed.
+An API-error turn end (`StopFailure`) was not produced, so that release stays untested live.
+A mid-turn `UserPromptSubmit` release costs at most a duplicate wake.
+
+The model-free proof runs the real hook scripts against a fake harness:
+
+```sh
+bash tests/fm-claude-stop-autoarm.test.sh
+bash tests/fm-supervision-host-hook.test.sh
+bash tests/fm-supervision-host.test.sh
+```
+
+On 2026-10-26 the five new `tests/fm-claude-stop-autoarm.test.sh` cases failed against base `bin/` and passed against target `bin/`.
+The first `tests/fm-supervision-host.test.sh` run failed once with `not ok - a handled away wake printed more than the first cycle's status to main`; the rerun passed with `exit=0`.
+
+### DSH native message identity, 2026-10-22
+
+The native `user/message` event carries `UserMessage` directly in `data`, including `data.id`; it does not use the wrapper carried by `assistant/message`.
+The DSH primary bridge uses that identity to distinguish its own consumed notifications and guard continuations from new external input.
+On Node 26.4.0, `nice -n 20 bash tests/fm-dsh-primary.test.sh` passed with native-shaped events and explicit consumption of synthetic messages before their next turn end.
+It exercised one continuation per failed episode, a fresh budget for a genuinely new user message, a bounded guard continuation for a consumed but unacknowledged wake, no duplicate accepted notification, acknowledgement before re-arm, delegated-child exclusion, ordinary process-group retirement, and native SIGKILL cleanup of a TERM-resistant descendant.
+The real `FM_DSH_PRIMARY_LIVE=1 nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh` then passed native startup, registered-check wake consumption, shared guard recovery, interrupt, exit, same-conversation resume and forced-native-death watcher cleanup (the queue-drain and cleanup checks fail only since the 2026-10-23 refresh in runtime verification) in a named Herdr lab, with `cleanup_exit=0`.
+[Runtime verification](runtime-backends.md#native-primary-and-secondmate-lifecycle) owns the detailed live record, commands and limits; the passive boundary cannot block a completed DSH turn.
 
 ### Claude mid-turn Lavish feedback, 2026-09-30
 
@@ -859,6 +955,12 @@ The live guards gave the same results in both trees:
 
 The Grok stop guard was last verified on 0.2.112 and has drifted from Grok 1.0.41 in both trees.
 
+The 2026-09-24 measurement predates the DSH primary, so its routing rests on `tests/fm-dsh-primary.test.sh` alone.
+On 2026-10-23, on Node 26.4.0, `nice -n 20 bin/fm-proc-budget.sh -- bash tests/fm-dsh-primary.test.sh` passed its host-mode cases.
+They run the plugin in an owner process shaped as `node <dir>/dsh-tui` that holds the home's lock, behind the real `bin/fm-dsh-primary.sh inspect` verdict; the arm, the host, session start, the turn-end guard and the queue read are stubs.
+The host's own primary detection named the primary `dsh`, because the plugin passes no pin.
+No DSH primary has run the host against a real engine.
+
 Deterministic entry points:
 
 ```sh
@@ -868,6 +970,7 @@ tests/fm-wake-queue.test.sh
 tests/fm-cursor-primary.test.sh
 tests/fm-pi-watch-extension.test.sh
 tests/fm-omp-harness.test.sh
+tests/fm-dsh-primary.test.sh
 tests/fm-watch-checkpoint.test.sh
 tests/fm-supervision-instructions.test.sh
 tests/fm-afk-launch.test.sh

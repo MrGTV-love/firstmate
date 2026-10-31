@@ -10,12 +10,18 @@
 # It reads the invoking environment and, on tmux, the effective session/global
 # environment. Existing panes can hold older values; the launch command sheds
 # both credential variables when billing has not been opted into.
+# An ambient refusal prints the exact `env -u` relaunch that clears it plus the
+# `--allow-api-key` opt-in; a tmux refusal prints the tmux unset command,
+# because `env -u` cannot clear a value the new window inherits from the server.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
 
 # fm_omp_api_billing_route_check <model>
 # Explicit openai/* and openrouter/* routes bill APIs, regardless of catalog
 # availability or model-index membership. Never resolve or call those models.
+# DeepSeek has moved to dsh-tui; bin/fm-dsh.py owns that match and refuses it
+# here too so raw omp model arguments and fallback capability checks cannot
+# retain the former adapter.
 fm_omp_api_billing_route_check() {
   local provider=${1%%/*}
   [ "${1#*/}" != "$1" ] || return 0
@@ -29,7 +35,11 @@ fm_omp_api_billing_route_check() {
       return 1
       ;;
   esac
-  return 0
+  command -v python3 >/dev/null 2>&1 || {
+    echo "error: cannot check omp model '$1' against the DeepSeek route: python3 is not on PATH" >&2
+    return 1
+  }
+  python3 "$(dirname "${BASH_SOURCE[0]}")/fm-dsh.py" check omp "$1"
 }
 
 # fm_omp_api_billing_config_diagnostics
@@ -41,8 +51,16 @@ fm_omp_api_billing_route_check() {
 # Neither omp Settings nor a provider is invoked; no config changes.
 # Missing config is silent; an existing unreadable config is diagnostic, not a
 # clean bill of health. Output is shared by bootstrap and remote doctor.
+# Approval records: docs/configuration.md "OMP fallback approvals" owns the
+# schema, scope and readers; this diagnostic only reads them.
 fm_omp_api_billing_config_diagnostics() {
   local agent_dir=${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}
+  local code_root=${FM_ROOT_OVERRIDE:-${FM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}
+  local config_dir=${FM_CONFIG_OVERRIDE:-${FM_HOME:-$code_root}/config}
+  local approvals="$config_dir/omp-approved-fallback-chains"
+  if [ ! -e "$approvals" ] && [ ! -L "$approvals" ]; then
+    approvals="$code_root/config/omp-approved-fallback-chains"
+  fi
   if [ -n "${OMP_PROFILE:-}" ]; then
     agent_dir="$HOME/.omp/profiles/$OMP_PROFILE/agent"
   fi
@@ -52,6 +70,30 @@ fm_omp_api_billing_config_diagnostics() {
     return 0
   }
   ruby -ryaml -e '
+approved = []
+approval_file = ARGV.fetch(1)
+if File.exist?(approval_file) || File.symlink?(approval_file)
+  begin
+    raise IOError unless File.file?(approval_file) && File.readable?(approval_file)
+    route = %r{(?:openai-codex|openrouter)/[A-Za-z0-9][A-Za-z0-9._:/-]*}
+    record = /\A(#{route}(?:[ \t]+#{route})*)[ \t]*\r?\n?\z/
+    invalid = false
+    File.foreach(approval_file, encoding: Encoding::BINARY).with_index(1) do |line, number|
+      next if line.strip.empty? || line.lstrip.start_with?("#")
+      match = record.match(line)
+      unless match
+        puts "cannot inspect omp approvals: omp-approved-fallback-chains line #{number} is invalid; see docs/configuration.md"
+        invalid = true
+        next
+      end
+      approved << match[1].split(/[ \t]+/)
+    end
+    approved.clear if invalid
+  rescue StandardError
+    approved.clear
+    puts "cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file"
+  end
+end
 begin
   config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
   config = {} if config.nil?
@@ -62,12 +104,14 @@ begin
   chains = retry_config.fetch("fallbackChains", {})
   raise TypeError unless chains.is_a?(Hash)
   findings = []
-  report = lambda do |field, value|
+  report = lambda do |field, value, approved_chain = false|
     next unless value.is_a?(String)
-    provider = value.partition("/").first.strip.downcase
-    if value.include?("/") && %w[openai openrouter].include?(provider)
-      findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
-    end
+    provider, _, model = value.partition("/")
+    provider = provider.strip.downcase
+    next unless value.include?("/") && %w[openai openrouter].include?(provider)
+    gpt = model.strip.match?(/(?:\A|\/)gpt/i) || model.strip.downcase.start_with?("openai/")
+    next if approved_chain && provider == "openrouter" && !gpt
+    findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
   end
   %w[default vision tiny].each do |role|
     value = roles[role]
@@ -76,14 +120,15 @@ begin
   end
   chains.each_with_index do |(key, targets), index|
     raise TypeError unless targets.is_a?(Array)
-    report.call("retry.fallbackChains key[#{index}]", key)
-    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target) }
+    approved_chain = approved.include?([key, *targets])
+    report.call("retry.fallbackChains key[#{index}]", key, approved_chain)
+    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target, approved_chain) }
   end
   puts findings
 rescue StandardError
   puts "cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration"
 end
-' "$agent_dir/config.yml" 2>/dev/null || echo "cannot inspect omp configuration: Ruby YAML check failed"
+' "$agent_dir/config.yml" "$approvals" 2>/dev/null || echo "cannot inspect omp configuration: Ruby YAML check failed"
 }
 
 # fm_api_key_guard_launch_env_config <config-dir>
@@ -145,7 +190,8 @@ fm_api_key_guard() {
       esac
     fi
     if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-      echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+      echo "error: $check_var is set and would reach the claude worker$route_text; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API" >&2
+      "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/fm-guard-event.sh" claude-api-billing deny --source-ok true 2>/dev/null || true
       return 1
     fi
   done

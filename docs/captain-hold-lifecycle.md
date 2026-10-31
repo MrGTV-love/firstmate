@@ -14,6 +14,7 @@ This document records the deterministic mechanism, structured surfaces, compatib
 | Why does cleanup of finished work leave a captain call open? | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | How does a keyed answer from chat or a board reach the call? | [Answer-time resolution](#answer-time-resolution) |
 | How is a call closed when it stopped being a question? | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
+| Who owns a call, and how is a call a captain ruling made moot released? | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | Why did a decision card disappear from the board? | [Card hygiene](#card-hygiene-a-landed-subject-is-not-a-live-call) |
 | Where does a hold appear in snapshots and Bearings? | [Structured read surfaces](#structured-read-surfaces) |
 | What does a `RECORD DIVERGENCE` section mean? | [Record divergence](#record-divergence) |
@@ -35,9 +36,12 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | --- | --- | --- |
 | `hold` | Creates or reuses a task and holds it for the captain. | [Creating a hold](#creating-a-hold-hold) |
 | `answer` | Records the captain's exact words and resolves the call. | [Answering a call](#answering-a-call-answer) |
+| `withdraw` | Releases a captain-kind hold that a recorded captain ruling made moot, without writing captain words. | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
 | `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
+| `freeze` | Declares the one project an open hold freezes. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
+| `frozen` | Read-only check of whether an open hold in this home or a local home above it freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
@@ -195,6 +199,49 @@ The refusal names the record and the validation reason, so the captain can repai
 Only `answer` with the captain's words or evidence-backed `reconcile close` resolves the call, by either closing the question or releasing the gated work.
 `bin/fm-backlog-transition-lib.sh` owns the transition and its record, and `bin/fm-captain-hold.sh --help` owns the predicate's contract.
 
+## A hold can freeze a project
+
+A captain who stops a whole project, not one task, files one hold that declares the project, so no automatic cleanup touches that project's finished work until the captain answers.
+The scope is declared, never inferred: it is a `Captain hold freezes project: <project>` line in the hold's header block, the lines under the hold-set stamp up to the first blank line.
+The hold's repo and the task-name prefix are never read.
+
+Declare it on a hold that is already open:
+
+```bash
+bin/fm-captain-hold.sh freeze <hold-task-id> --project <project>
+```
+
+A second `freeze` replaces the project.
+Rewriting the hold's origin keeps the line.
+An open hold is any captain-kind row that is not done, as `open` reads it.
+A freeze therefore outlives the hold's `--until` revisit date: a revisit date is not a release, `freeze` accepts that still-open call, and re-holding it keeps the line.
+The lapse of `--until` for ordinary holds is unchanged.
+A resolution record (`answer`, `withdraw`, or `reconcile close`) moves the old header under it, so re-holding released work starts a new lifecycle with no freeze.
+
+The read-only `frozen <task-id>` subcommand is the one owner of the question "is this task frozen by an open captain hold".
+It compares the project named by the task's `project=` metadata with the declaration on every open captain hold in this home's own backlog and, in a local secondmate home, in the backlog of every local home above it.
+
+| `frozen` exit | Meaning | What the idle reaper does |
+| --- | --- | --- |
+| 0 | An open captain hold declares the task's project; the hold's id is printed. | Parks the task with that reason and never offers it to teardown. |
+| 1 | No open hold declares it, or the task records no project. | Applies its other gates unchanged. |
+| 2 | The answer could not be established. | Parks the task, never reaps it. |
+
+[`bin/fm-idle-reap-lib.sh`](../bin/fm-idle-reap-lib.sh) asks `frozen` as the last gate before a reap verdict, for a finished task and for a task whose interrupted teardown left a return-pending record, so a task that another gate already keeps from teardown pays no backlog read.
+The scan, the locked teardown admission, and the merge-prune check share that classifier, so all three refuse a frozen task.
+A parked row carries the reason in the scan output and in `state/idle-sessions.report`.
+No refusal memo is written, because a memo would outlive the release; the first sweep after the answer finds the task eligible again.
+Only the automatic paths honor a freeze; a teardown the captain or firstmate runs by hand is unchanged.
+
+A local secondmate home also reads, read-only, the backlog of every local home above it.
+It walks the `.fm-secondmate-parent` bindings its [parent channel](secondmate-parent-channel.md) uses, with the same walk, bound, and cycle check that `fm_firstmate_root_home` in [`bin/fm-secondmate-parent-lib.sh`](../bin/fm-secondmate-parent-lib.sh) uses.
+So the captain's home declares a freeze once, for example on Main's `vernant-freeze-20261023`, and no mate or grandchild mate needs a mirror step.
+A binding, a parent home, or a backlog that cannot be read, a home on the walk that carries the secondmate marker but no binding, a cycle, or a chain past the bound is exit 2, and the parked row names the link that failed.
+
+Known limit, not covered: the walk stops at a remote binding, because a remote parent's records cannot be read from this host.
+A remote mate, and every local home below it, sees only the freezes of the local homes it reached; a freeze filed above the remote binding does not stop its reaper.
+That case is a follow-up.
+
 ## Answer-time resolution
 
 "A keyed answer resolves its matching captain-held task" is one capability with one owner.
@@ -228,7 +275,7 @@ An unbound source feeds nothing, so the path is opt-in per source.
 
 ### Channels that feed the intake
 
-Two channels feed that one intake today, and both are ordinary callers rather than special cases.
+Three channels feed that one intake today, and all are ordinary callers rather than special cases.
 
 `bin/fm-send.sh --resolve-key` is the chat channel:
 
@@ -247,7 +294,73 @@ Two channels feed that one intake today, and both are ordinary callers rather th
 It reads only rows tagged `choice` and relays a card's declared close mode.
 It can never let freeform captain prose forge a task id or a mode.
 
+`bin/fm_slack_watch.py` is the Slack channel:
+
+- It feeds the intake only while `slack-dm` is bound with `bin/fm-captain-hold.sh bind`.
+- It passes one allowlisted owner reply or reaction from a mirrored DM thread as one keyed line and carries no decision rule.
+- [`configuration.md`](configuration.md#slack-decision-plane-env) owns its configuration and mechanics.
+
 Trusted external process-event adapters intentionally expose no answer operation and cannot feed this authority-bearing intake; [`extension-bindings.md`](extension-bindings.md#trust-boundary) owns that boundary.
+
+## Decision owner and honest release
+
+A secondmate home's parent channel carries two kinds of call, and a hold with a single owner could not tell them apart.
+A mate that held a decision the main firstmate makes itself, such as an ask-user finding or a retry, filed it as a captain call.
+The only closes were the captain's words, which the captain never gave, and an evidence-backed `reconcile close`, which refuses unfinished worker-owned work.
+The merge gate then refused the task with no honest path forward.
+That happened on 2026-10-10 twice and again on 2026-10-28 for a Mac mini mate's ship task.
+On the retry the captain's words were that it should not have been a decision point and should have just been done.
+So a call the main firstmate owns, such as an ask-user finding, a retry, or a hygiene call, is never held.
+A decision Main owns goes to the parent as a keyed `needs-decision` status line, never as a captain hold; the home keeps working where it can, and Main's answer lets the work continue.
+`hold` is for captain calls only.
+
+### Owner recorded at filing
+
+`hold` writes the owner on a `Decision owner:` line directly beneath the hold-set stamp, inside the hold's header block (the lines under the stamp, up to the first blank line), and every later header write keeps it there beside the origin and freeze lines.
+The owner is a fact written at filing and is never inferred from the reason text.
+A main home needs no `--owner`, because no parent exists and the owner is the captain.
+A secondmate home must pass `--owner captain`, so a mate cannot file a call without saying it needs the captain's own words.
+Any other owner is refused, in either home, with a message that names the routing to Main.
+A hold filed before owners were recorded has no line.
+It reads as the captain's in a main home and as `unrecorded` in a secondmate home.
+
+### Withdrawing a call that a captain ruling made moot
+
+`withdraw` is the honest release for a captain-kind hold on an open work item whose question a recorded captain ruling has already settled.
+It never writes the captain's words and never completes unfinished work.
+It lifts the hold so an unfinished ship or scout work item resumes queued and unheld.
+Like `answer` without `--release`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its deliverable, so neither a moot question nor finished work returns as dispatchable work.
+It writes a `Resolution mode: withdrawn` record that names the ruling, the owner the hold was filed with, and the home role it ran from (derived, never typed).
+It also records the evidence file and the line `Not a captain answer.`, and it publishes a `resolved` line saying the call was withdrawn.
+The record carries a `Withdrawal evidence:` label instead of `Captain decision:`, so every reader that recognizes a captain answer skips it.
+Bearings and the divergence guard read only open captain-kind holds, so a withdrawn call leaves both.
+
+`withdraw` reads an open hold from its kind, never from tasks-axi's `held` bit, so a dated hold whose date has passed is still released by it.
+The investigation completion gate (`complete` and `verify`) accepts a newest `withdrawn` record, live or archived, as a durable state, because it is attributed and marked `Not a captain answer.`.
+`complete` lists an archived one under its own label, never as an answered call.
+An archived withdrawal is never a ruling for `withdraw`.
+A retried `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
+The retry keeps that record's evidence and ruling, even when it passes edited evidence or another ruling, and its `resolved` line closes the key the hold opened and names the recorded ruling.
+
+The one eligibility fact is `--ruling <id>`, a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
+An evidence-only close, a release, and another withdrawal are not rulings.
+The ruling must also name the withdrawn task id in its title, its hold reason (its question), or the text of its recorded captain answer.
+Origin, owner, and other metadata lines in its body never count, so a call filed with `--origin <task>` does not name that task by its origin alone.
+The answer text is the block under `Captain decision:` whose digest matches the record's own `Decision digest:`.
+A ruling that never names the hold is refused, and the refusal says what was missing.
+A name written only at withdraw time, such as in the evidence file, never counts, because it would let any closed ruling release any hold.
+The ruling's answer must also be recorded after this hold's current `Captain hold set:` stamp.
+That binds the ruling to one hold occurrence: a ruling made before the hold, including one an earlier withdrawal of the same task cited, is refused.
+A hold with no stamp cannot show that any ruling postdates it, so it is refused too.
+A legacy stamp that records only a date cannot order a ruling made the same day, so the ruling must be dated a later day.
+The basis works on any captain hold, including one recorded as the captain's or filed before owners were recorded, because the captain has already ruled on it.
+
+There is no weaker basis for `withdraw`.
+A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
+A captain-kind hold stays the captain's and is released only by his recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`).
+That includes a legacy hold filed before owners were recorded, which has no `Decision owner:` line and so cannot prove the decision was the parent's.
+The legacy set is closed and cannot grow: a secondmate home refuses every new hold that names no owner, through `bin/fm-captain-hold.sh hold` and the `bin/fm-decision-hold.sh` shim alike.
+The real hold behind PR 290 was filed before owners were recorded, so it stays the captain's.
 
 ## Reconcile: re-check reality, never a blind close
 
@@ -315,6 +428,7 @@ By default, each outcome requires both the pending board-created request and the
 
 `reconcile list` is the read-only enumeration of pending requests filed by board answers.
 A successful normal answer also retires any pending request, because an answered call has no remaining re-check obligation.
+`withdraw` retires it too, because it releases the captain-kind hold the request was filed against, and a stale request would otherwise let a later `reconcile close` pass for a new call on the same task.
 
 Every retirement is checked.
 If request removal fails after an answer, close, or note is already durable, the durable outcome stands, but the command fails and leaves the pending request visible for retry.
@@ -518,14 +632,16 @@ A markdown home keeps its legacy rows verbatim, so its resolution is unchanged.
 ### The `fm-decision-hold.sh` shim
 
 `bin/fm-decision-hold.sh` itself remains for one release as a thin command-mapping shim over `bin/fm-captain-hold.sh`.
-In-flight work briefed before the collapse therefore keeps working, and the shim's header owns the exact mapping.
+In-flight work briefed before the collapse therefore keeps working in a main home, and the shim's header owns the exact mapping.
+In a secondmate home a shim `hold` is refused unless it passes `--owner captain`, because the shim declares no owner for its caller.
 The shim recognizes an exact replay of a pre-collapse routed resolution by its historical answer digest and routed ids.
 It then finishes any still-recorded dependency-edge cleanup without rewriting the old decision text.
 
 ## Verification record
 
-The focused end-to-end regression suites are the six `tests/fm-captain-hold-*.test.sh` files, using only synthetic identities and decision text.
-The [captain-hold groups](fm-test-portable-shards.md#captain-hold-groups) table names the file that owns each area, and every case named below runs in exactly one of them.
+The focused end-to-end regression suites are the `tests/fm-captain-hold-*.test.sh` files, using only synthetic identities and decision text.
+The [captain-hold groups](fm-test-portable-shards.md#captain-hold-groups) table names the file that owns each of the six original areas, and every case named below runs in exactly one of them.
+`tests/fm-captain-hold-owner.test.sh` owns the decision-owner cases listed under "Decision owner coverage".
 Together they prove the behaviors below.
 The suites do not test the accepted merge-to-cleanup re-hold window or asynchronous queued-forge landing because those events occur after the locally serialized merge command has returned.
 
@@ -541,6 +657,14 @@ The suites do not test the accepted merge-to-cleanup re-hold window or asynchron
   The Gerrit answer-before-replay case uses ordinary cleanup of already-landed Git work, preserving the change URL rather than recording a forced ship discard as `dropped`.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
+
+### Project freeze
+
+- A hold that declares a project freezes only the tasks whose recorded project it names; a plain hold of the same repo, a same-prefix task of another project, a task with no recorded project, and a declaration quoted below the header block freeze nothing.
+- Rewriting the origin keeps the declaration, a second `freeze` replaces it, and an answer ends it even when the same task is held again.
+- A hold whose `--until` date has passed still freezes, accepts `freeze`, and keeps the declaration when it is held again.
+- An unreadable backlog is exit 2, never exit 1.
+- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, a secondmate home honors its parent's freeze and parks the task when the parent cannot be read, and a grandchild mate honors a freeze at the root, parks on an unreadable or missing middle link or a cycle, and is eligible again after the root releases it.
 
 ### Merges, releases, and unreadable holds
 
@@ -628,6 +752,27 @@ It proves:
 
 One case in that family needs no beads install and always runs.
 It uses a stubbed tasks-axi that fails any markdown file override, and proves the captain-hold hold, answer, and close mutations reach a beads-configured home without one.
+
+### Decision owner coverage
+
+The owner and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.sh`, and the merge gate cases in `tests/fm-pr-merge-checks.test.sh`:
+
+- A secondmate home refuses a hold with no owner, `--owner parent`, or an unknown owner, and a main home refuses `--owner parent`.
+- An open captain call in a secondmate home is never re-filed as the parent's, and the merge gate refuses a captain-owned hold and names `answer` and `withdraw`.
+- `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
+  A withdrawn question-shaped row is closed and is absent from `tasks-axi ready`, while a withdrawn work item stays queued and unheld.
+  After teardown retains a finished work item, `withdraw` closes it with its deliverable and `tasks-axi ready` does not list it, while unfinished work is only released.
+  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that does not name the hold, a ruling that names the task only by its origin, a ruling reused after the task was re-held, a ruling recorded the same day as a date-only hold-set stamp, and a missing evidence file.
+- `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
+- The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
+- A legacy secondmate hold with no owner on record, including a genuine captain call the parent relayed, stays held for the captain: `withdraw` without a ruling refuses it and `open` still reads it as an open captain call.
+- The retired `fm-decision-hold.sh` shim refuses a secondmate hold that names no owner or `--owner parent`, keeps `--owner captain`, and leaves a main home alone.
+- The completion gate accepts a withdrawal as durable, and a withdrawal retires the call's board reconcile request.
+- A `withdraw` retried after an injected failed release finishes it without a second record or channel key.
+  Retried with edited evidence, it resolves the key the hold opened; retried with another ruling, its `resolved` line and record both name the first ruling.
+- Recording the owner keeps a freeze in force for `frozen` and the idle reaper, and keeps the owner beside the origin.
+- The completion gate accepts a withdrawal whose row retention archived, and `complete` lists it apart from answered calls.
+- `withdraw` releases a dated hold whose date has passed.
 
 ### Reconcile coverage
 

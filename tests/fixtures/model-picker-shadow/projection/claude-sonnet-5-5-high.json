@@ -1,0 +1,140 @@
+{
+ "as_of": "2026-10-16T02:58:38Z",
+ "creator": "Anthropic",
+ "metrics": {
+  "aa-briefcase-analytical-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "Analytical Quality & Presentation Elo",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1883.71
+  },
+  "aa-briefcase-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Briefcase v1.1",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1637.1
+  },
+  "aa-lcr": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-LCR v1.1",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.78
+  },
+  "automationbench-aa": {
+   "derived": false,
+   "estimated": false,
+   "label": "AutomationBench-AA",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.5942923026067375
+  },
+  "costpertask": {
+   "derived": false,
+   "estimated": false,
+   "label": "Cost per Task",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": null,
+   "value": 0.88
+  },
+  "gdpval-aa-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "GDPval-AA v2.1",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1549.39
+  },
+  "inputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Input Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 2.0
+  },
+  "omniscience-accuracy": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Accuracy",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.5198333333333334
+  },
+  "omniscience-non-hallucination-rate": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Non-Hallucination Rate",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.3536966331135023
+  },
+  "outputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Output Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 10.0
+  },
+  "scicode": {
+   "derived": false,
+   "estimated": false,
+   "label": "SciCode",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.537037037037037
+  },
+  "terminal-bench-4-0": {
+   "derived": false,
+   "estimated": false,
+   "label": "Terminal-Bench 4.0",
+   "observed_at": "2026-10-16T02:58:38Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.439393939393939
+  }
+ },
+ "name": "Claude Sonnet 5.5 (High, Default Fallback)",
+ "slug": "claude-sonnet-5-5-high"
+}

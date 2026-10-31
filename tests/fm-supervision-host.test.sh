@@ -419,7 +419,9 @@ test_branch_outcomes_stay_unread_when_the_drain_cannot_print() {
   : > "$home/config/supervision-host"
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
-  FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" >&- 2>/dev/null' "$ROOT/bin/fm-wake-drain.sh" || true
+  # Invoke Bash directly: a Rust env in the script's shebang reopens a closed
+  # stdout on /dev/null before Bash starts, so that would not test write failure.
+  FM_HOME="$home" "$FAKE_CLAUDE" -c 'bash "$0" >&- 2>/dev/null' "$ROOT/bin/fm-wake-drain.sh" || true
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_contains "$drained" "[seq 1] demo: merged the docs fix" "a routine outcome a drain could not print must follow on the next drain"
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
@@ -736,6 +738,98 @@ test_off_written_while_parked_passes_the_next_attended_close_to_main() {
   pass "host: an off written while the host is parked sends the next attended close to main, naming the opt-out"
 }
 
+# The host has no successor readiness deadline: the arm owns startup no-progress
+# detection. The host runs from a bin whose arm wrapper changes only the
+# successor (the second arm the host starts); every other call is the real arm.
+host_bin_with_successor() {  # <home> <successor commands>
+  local bin="$1/host-bin" f
+  mkdir -p "$bin"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$bin/${f##*/}"; done
+  rm -f "$bin/fm-watch-arm.sh"
+  cat > "$bin/fm-watch-arm.sh" <<SH
+#!/usr/bin/env bash
+case " \$* " in *' --stop '*|*' --handling-delivered '*) exec "$ROOT/bin/fm-watch-arm.sh" "\$@" ;; esac
+n=\$(( \$(cat "\$FM_HOME/arm-calls" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "\$n" > "\$FM_HOME/arm-calls"
+if [ "\$n" -eq 2 ]; then
+  $2
+fi
+exec "$ROOT/bin/fm-watch-arm.sh" "\$@"
+SH
+  chmod +x "$bin/fm-watch-arm.sh"
+  printf '%s\n' "$bin/fm-supervision-host.sh"
+}
+
+# A successor that starts later than the readiness notice window (1 second here)
+# does not hold the close: it reaches main with a still-starting line, and the
+# successor is left running until it reports.
+test_slow_successor_does_not_hold_the_close() {
+  local home host pid
+  home=$(make_home slow-successor attended)
+  host=$(host_bin_with_successor "$home" 'sleep 5')
+  FM_SUPERVISION_HOST_READY_TIMEOUT=1 HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "slow successor: the host never started a watcher cycle"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 300 host_exited "$home" || fail "slow successor: the decision close did not reach main: $(cat "$home/state/.supervision-host.log")"
+  expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
+  [ "$(cat "$home/arm-calls")" = 2 ] || fail "slow successor: the host did not start exactly one successor"
+  assert_no_re 'successor-unverified' "$home/state/.supervision-host.log" "a slow successor must not be reported unverified"
+  assert_re '^supervision-host: the successor watcher cycle is still starting' "$home/host.out" "the close must say the successor is still starting"
+  wait_until 150 watcher_live "$home" || fail "slow successor: the host retired the still-starting successor: $(cat "$home/state/.supervision-host.log")"
+  pid=$(cat "$home/state/.watch.lock/pid")
+  sleep 1
+  kill -0 "$pid" 2>/dev/null || fail "slow successor: the successor watcher exited after the pass-through (pid $pid)"
+  pass "host: a successor slower than the readiness notice window does not hold the close and is left running"
+}
+
+# A successor still starting when its close goes out, which then fails after the
+# host has exited and cleaned up, still reaches firstmate: the arm appends its
+# own FAILED line to the durable wake queue, without being signalled.
+test_late_successor_failure_reaches_the_wake_queue() {
+  local home host late f queue
+  home=$(make_home late-successor attended)
+  late="$home/late-bin"
+  mkdir -p "$late"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$late/${f##*/}"; done
+  rm -f "$late/fm-watch-arm.sh" "$late/fm-watch.sh"
+  cp "$ROOT/bin/fm-watch-arm.sh" "$late/fm-watch-arm.sh"
+  printf '#!/usr/bin/env bash\nprintf "watcher: FAILED - fixture late startup failure\\n"\nexit 1\n' > "$late/fm-watch.sh"
+  chmod +x "$late/fm-watch-arm.sh" "$late/fm-watch.sh"
+  host=$(host_bin_with_successor "$home" "sleep 3; exec '$late/fm-watch-arm.sh' \"\$@\"")
+  FM_SUPERVISION_HOST_READY_TIMEOUT=1 HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "late successor: the host never started a watcher cycle"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 300 host_exited "$home" || fail "late successor: the decision close did not reach main: $(cat "$home/state/.supervision-host.log")"
+  assert_re '^supervision-host: the successor watcher cycle is still starting' "$home/host.out" "the close must say the successor is still starting"
+  assert_no_re 'fixture late startup failure' "$home/host.out" "the close must not wait for the successor's result"
+  queue="$home/state/.wake-queue"
+  wait_until 150 grep -qs 'fixture late startup failure' "$queue" \
+    || fail "late successor: its failure never reached the wake queue: $(cat "$queue" 2>/dev/null)"
+  assert_re 'watcher-successor-failed.*fixture late startup failure.*still starting when its wake went out' "$queue" \
+    "the queued failure must carry the successor's own FAILED line"
+  pass "host: a successor that fails after its still-starting close delivers its failure through the wake queue"
+}
+
+# A successor that reports its own startup failure ends the wait at once, even
+# while that arm process lingers; the close is delivered without another start.
+test_failed_successor_fails_fast() {
+  local home host started elapsed
+  home=$(make_home failed-successor attended)
+  host=$(host_bin_with_successor "$home" "printf 'watcher: FAILED - fixture startup failure\\n'; sleep 30; exit 1")
+  HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "failed successor: the host never started a watcher cycle"
+  started=$SECONDS
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 150 host_exited "$home" || fail "failed successor: the host waited on a failed successor: $(cat "$home/state/.supervision-host.log")"
+  elapsed=$((SECONDS - started))
+  [ "$elapsed" -lt 15 ] || fail "failed successor: the host took ${elapsed}s to see the reported failure"
+  expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
+  assert_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a failed successor must be reported unverified"
+  [ "$(cat "$home/arm-calls")" -eq 2 ] || fail "failed successor: the failed start delayed the close with another attempt"
+  assert_re '^signal: .*demo.status' "$home/host.out" "the close must still reach main"
+  pass "host: a successor that reports failure ends the readiness wait at once"
+}
+
 # The live failure this guards: a main-only pass-through used to exit without
 # a watcher, so nothing restarted short-lived listeners until the session
 # armed again. The close still reaches main unchanged, and the successor
@@ -791,22 +885,23 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
   pass "host: an attended close whose main session cannot be identified reaches main and runs no engine turn"
 }
 
-# The close is accepted attended as routine, then its task turns main-only (a
-# decision is recorded) while the successor starts: the turn meets the offer
-# rule again, so the close reaches main exactly as the arm printed it and no
-# engine turn runs on the stale offer.
-# Change the task immediately before the second offer computation, rather
-# than racing the successor startup. The first offer accepts the close; the
-# turn-boundary offer must see the new main-owned decision.
+# The close is accepted attended as routine, then its task turns main-only
+# while the successor starts: the turn meets the offer rule again, so the close
+# reaches main exactly as the arm printed it and no engine turn runs on the
+# stale offer.
+# Turn the second offer main-only, rather than racing the successor startup.
+# The first offer accepts the close; the turn-boundary offer must refuse it.
+# Quiet: a decision line written after the successor started is a new event
+# that successor closes on, so its liveness check would race that close.
 test_attended_close_that_turns_main_only_before_its_turn_passes_to_main() {
   local home
   home=$(make_home attended-turns-main-only attended)
-  turn_main_only_at_second_offer "$home"
+  turn_main_only_at_second_offer "$home" quiet
   start_host "$home"
   wait_until 150 watcher_live "$home" || fail "turns-main-only: the host never started a watcher cycle"
   append_status "$home" 'step one'
   wait_until 250 host_exited "$home" || fail "turns-main-only: the close did not reach main: $(cat "$home/state/.supervision-host.log")"
-  assert_grep 'which export format?' "$home/state/demo.status" "fixture: the decision was not recorded before the turn"
+  [ "$(cat "$home/offer-count" 2>/dev/null)" -ge 2 ] || fail "fixture: the close was not accepted before it turned main-only"
   expect_code 0 "$(cat "$home/host.rc")" "the close must exit 0"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must carry the watcher's reason line"
   assert_no_re '^supervision-host' "$home/host.out" "the close must reach main exactly as the arm printed it"
@@ -1070,6 +1165,34 @@ SH
   fourth="$home/engine-call.6"
   assert_re '^\[captain\] fourth ask, turn unreported$' "$fourth" "dialog of a turn that recorded no report must reach the next turn"
   pass "host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn"
+}
+
+# The host asks fm_pid_alive about processes it is stopping, and on Linux that
+# reads /proc/<pid>/stat after finding it readable. A process that exits between
+# the two leaves a stat file that cannot be opened or read; on bash 5 the state
+# variable then stays unset and, under the host's set -u, the host died with
+# exit 1 instead of handing the wake back. This case makes that state permanent
+# with a stat that passes the readability test and fails the read, once as a
+# directory (the read errors) and once as a socket (the open errors).
+test_liveness_probe_survives_a_process_that_exits_while_it_is_read() {
+  local root pid kind out
+  root="$TMP_ROOT/proc-exits-mid-read"
+  sleep 300 &
+  pid=$!
+  for kind in directory socket; do
+    mkdir -p "$root/$kind/$pid"
+    case "$kind" in
+      directory) mkdir "$root/$kind/$pid/stat" ;;
+      socket) perl -MIO::Socket::UNIX -e 'chdir $ARGV[0] or die "$!"; IO::Socket::UNIX->new(Local => "stat", Listen => 1) or die "$!"' \
+        "$root/$kind/$pid" || fail "fixture: could not create a socket stat file" ;;
+    esac
+    [ -r "$root/$kind/$pid/stat" ] || fail "fixture: the $kind stat file does not pass the readability test"
+    out=$(FM_PROC_ROOT_OVERRIDE="$root/$kind" bash -c 'set -u; . "$1"; fm_pid_alive "$2"; printf "%s\n" "$?"' _ "$ROOT/bin/fm-wake-lib.sh" "$pid" 2>&1)
+    [ "$out" = 0 ] || { kill "$pid" 2>/dev/null; fail "a live process whose stat cannot be read ($kind) must still answer alive, without an error: got: $out"; }
+  done
+  kill "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+  pass "host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller"
 }
 
 # The attended engine never judges without the captain's words: a mirror that
@@ -2128,6 +2251,9 @@ run_host_case test_quiet_record_without_its_daemon_is_a_present_captain
 run_host_case test_attended_main_only_close_passes_straight_to_main
 run_host_case test_off_written_while_parked_passes_the_next_attended_close_to_main
 run_host_case test_main_only_pass_through_leaves_the_successor_watcher_running
+run_host_case test_slow_successor_does_not_hold_the_close
+run_host_case test_failed_successor_fails_fast
+run_host_case test_late_successor_failure_reaches_the_wake_queue
 run_host_case test_attended_close_with_unidentified_main_session_passes_to_main
 run_host_case test_close_accepted_away_that_turns_attended_passes_to_main
 run_host_case test_attended_close_that_turns_main_only_before_its_turn_passes_to_main
@@ -2135,6 +2261,7 @@ run_host_case test_primary_without_a_verified_mirror_runs_away_only
 run_host_case test_attended_wake_carries_the_dialog_mirror
 run_host_case test_dialog_bearing_files_are_owner_only
 run_host_case test_undelivered_dialog_is_fed_again_on_the_next_turn
+run_host_case test_liveness_probe_survives_a_process_that_exits_while_it_is_read
 run_host_case test_attended_wake_with_an_unreadable_mirror_reaches_main
 run_host_case test_away_wake_is_handled_on_the_engine_and_never_reaches_main
 run_host_case test_away_turn_without_a_report_hands_the_wake_to_main

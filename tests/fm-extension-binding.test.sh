@@ -1395,7 +1395,7 @@ PRE_PROC_ROOT="$TMP_ROOT/pre-proc-root"
 mkdir -p "$PRE_PROC_ROOT/bin"
 for pre_proc_file in \
   fm-extension.mjs fm-extension-launch-barrier.mjs fm-extension.sh fm-procevent.sh fm-procevent-lib.sh \
-  fm-procevent-extension-capture.pl fm-procevent-lavish.sh fm-pr-lib.sh fm-wake-lib.sh fm-path-lib.sh; do
+  fm-procevent-extension-capture.pl fm-procevent-lavish.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-wake-lib.sh fm-path-lib.sh; do
   cp "$ROOT/bin/$pre_proc_file" "$PRE_PROC_ROOT/bin/$pre_proc_file"
 done
 chmod +x "$PRE_PROC_ROOT/bin"/fm-*.sh "$PRE_PROC_ROOT/bin/fm-extension.mjs" "$PRE_PROC_ROOT/bin/fm-extension-launch-barrier.mjs"
@@ -1417,14 +1417,22 @@ proc_shadow_owner=$(printf '%s\n' "$proc_shadow_registration" | sed -n 's/^owner
   fm_supervision_status "$H_PROC_SHADOW/state" 300
   [ "$FM_SUP_SOURCES" -eq 1 ]
 ) || fail "an extension registered as proc-guard was exempted from supervision"
-FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
-  "$PROCEVENT" reconcile | grep -q ' started=1 ' || fail "the shadow extension runner did not launch"
+# A cycle-count probe for the runner's owner guard (cmd_owner_watchdog in
+# bin/fm-procevent.sh), whose unit of work is one lease check: the exported sleep
+# adds each completed check to proc_shadow_checks, so the stale-lease stop must
+# land within a few checks instead of only a quiet interval.
+proc_shadow_checks="$TMP_ROOT/proc-shadow.guard-checks"
+(
+  fm_test_export_sleep_counter cmd_owner_watchdog
+  FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+    FM_TEST_SLEEP_COUNT="$proc_shadow_checks" "$PROCEVENT" reconcile | grep -q ' started=1 '
+) || fail "the shadow extension runner did not launch"
 wait_for_file "$proc_shadow_marker" || fail "the shadow extension runner never entered its poll"
-fm_test_wait_until 30 test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
+fm_test_wait_until --progress-file "$H_PROC_SHADOW/state/procevent/proc-guard.runner" -- test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
   || fail "the shadow extension runner recorded no listener"
 proc_shadow_runner=$(cat "$H_PROC_SHADOW/state/procevent/proc-guard.runner")
 # shellcheck disable=SC2016 # $1 expands in the child shell.
-fm_test_wait_until 30 bash -c '! kill -0 "$1" 2>/dev/null' _ "$proc_shadow_runner" \
+fm_test_wait_until --while-alive "$proc_shadow_runner" --cycles 10 "$proc_shadow_checks" -- bash -c '! kill -0 "$1" 2>/dev/null' _ "$proc_shadow_runner" \
   || fail "a stale home lease left an extension named proc listening"
 touch "$proc_shadow_release"
 proc_shadow_release=
@@ -1939,7 +1947,7 @@ mkdir -p "$H_REMOTE_CONTROL/data" "$H_REMOTE" "$REMOTE_ROOT/bin"
 printf 'fixture\n' > "$REMOTE_ROOT/AGENTS.md"
 for remote_file in \
   fm-extension.mjs fm-extension-launch-barrier.mjs fm-extension.sh fm-procevent.sh fm-procevent-lib.sh fm-procevent-extension-capture.pl fm-procevent-lavish.sh \
-  fm-pr-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh fm-remote-entrypoint.sh fm-remote-job-lib.sh \
+  fm-pr-lib.sh fm-file-identity-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh fm-remote-entrypoint.sh fm-remote-job-lib.sh \
   fm-remote-job-worker.sh; do
   cp "$ROOT/bin/$remote_file" "$REMOTE_ROOT/bin/$remote_file"
 done

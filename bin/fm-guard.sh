@@ -11,8 +11,10 @@
 # condition set) and that supervision is not healthy, prints a loud, clearly
 # delimited banner so the agent cannot skim past
 # it in the tool output of whatever it was doing - the one channel every harness
-# has. Supervision health is MODEL-AWARE (fm_watcher_supervision_verdict in
-# bin/fm-wake-lib.sh): under the Claude Stop auto-arm model the watcher runs only
+# has. Supervision health is MODEL-AWARE (fm_supervision_pull_liveness in
+# bin/fm-supervision-liveness-lib.sh, the shared owner of the predicate and its
+# reason vocabulary; it delegates the primitives to bin/fm-wake-lib.sh's
+# fm_watcher_supervision_verdict): under the Claude Stop auto-arm model the watcher runs only
 # between turns, so mid-turn a fresh beacon with no live watcher is healthy, and
 # a stale beacon is still healthy while fm_autoarm_midturn_healthy proves a
 # Claude auto-arm generation explains the gap; only a stale beacon with no such
@@ -74,6 +76,8 @@ STALE_BANNER_MARKER="$STATE/.guard-watcher-stale-banner"
 . "$SCRIPT_DIR/fm-tangle-lib.sh"
 # shellcheck source=bin/fm-supervision-lib.sh
 . "$SCRIPT_DIR/fm-supervision-lib.sh"
+# shellcheck source=bin/fm-supervision-liveness-lib.sh
+. "$SCRIPT_DIR/fm-supervision-liveness-lib.sh"
 # shellcheck source=bin/fm-lease-lib.sh
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 
@@ -176,18 +180,32 @@ if [ -n "$tangle_branch" ]; then
   } >&2
 fi
 
-# Compute supervision need and watcher-beacon freshness via the shared
-# grace-based predicate (bin/fm-supervision-lib.sh), which owns what needs
-# supervision.
-fm_supervision_status "$STATE" "$GRACE"
+# Compute the need counts through the shared grace-based predicate
+# (bin/fm-supervision-lib.sh), then ask the shared liveness owner for the
+# model-aware verdict this warning branches on
+# (bin/fm-supervision-liveness-lib.sh).
+fm_supervision_in_flight "$STATE" "$GRACE"
 in_flight=$FM_SUP_IN_FLIGHT
 sources=$FM_SUP_SOURCES
 checks=$FM_SUP_CHECKS
 needed=$FM_SUP_NEEDED
 beacon_desc=$FM_SUP_BEACON_DESC
-fm_watcher_supervision_verdict "$STATE" "$WATCH" "$GRACE" "$FM_HOME" "$FM_ROOT"
-watcher_healthy=$FM_WATCHER_VERDICT_OK
-watcher_down_reason=$FM_WATCHER_VERDICT_REASON
+watcher_healthy=false
+watcher_down_reason=stale-beacon
+if [ "$needed" = true ]; then
+  fm_supervision_pull_liveness "$STATE" "$GRACE" "$WATCH" "$FM_HOME" "$FM_ROOT"
+  if [ "$FM_SUP_LIVE" = live ]; then
+    watcher_healthy=true
+  else
+    # off and unknown both warn. The reason tokens no-watcher and stale-beacon
+    # keep this banner's existing wording; any other token (including
+    # unreadable) reads as the stale-beacon cause, the fail-loud direction.
+    case "$FM_SUP_REASON" in
+      no-watcher) watcher_down_reason=no-watcher ;;
+      *) watcher_down_reason=stale-beacon ;;
+    esac
+  fi
+fi
 if [ "$needed" = false ]; then
   # Leave the unhealthy state (nothing riding on the watcher): clear so a later
   # work or X-mode need + stale combination is a fresh episode even if the

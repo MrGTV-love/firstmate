@@ -23,7 +23,8 @@
 #   7. A ship reassociated into a copy nested in its own pool slot is retired by
 #      the real teardown once its work lands, and the slot is free for the next
 #      spawn. A later hop out of the pool proves and anchors that slot before
-#      releasing it, a vanished pool copy is released history, and a failed
+#      releasing it, a scout's vanished pool copy is released history while a ship's
+#      refuses and names relocation, and a failed
 #      staging write publishes nothing.
 #   8. Two or three records sharing a slot root retire finished ship/scout
 #      records without touching any copy, then reassociate parked unlanded
@@ -797,6 +798,13 @@ test_nested_replacement_blocks_slot_allocation() {
 # run_case_teardown <case-dir> <id>: the real bin/fm-teardown.sh against the
 # case home, with a treehouse that records each call and quiet endpoint and
 # forge tools.
+# assert_treehouse_unchanged <case-dir> <message>: Treehouse was at most read
+# through its pool-dir answer and status listing.
+assert_treehouse_unchanged() {
+  [ ! -e "$1/treehouse.log" ] || ! grep -Eqv '^(pool-dir|status --json)$' "$1/treehouse.log" \
+    || fail "$2: $(cat "$1/treehouse.log")"
+}
+
 run_case_teardown() {  # <case-dir> <id>
   local dir=$1 id=$2 tb="$1/teardown-bin" tool
   shift 2
@@ -812,7 +820,16 @@ SH
     chmod +x "$dir/code-root/bin/fm-fleet-sync.sh"
     cat > "$tb/treehouse" <<SH
 #!/usr/bin/env bash
+if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
+  [ ! -e "$dir/lease-path" ] || printf '      --lease-holder string   Optional label\n      --path string           Lease the worktree at this exact path\n'
+  exit 0
+fi
 printf '%s\n' "\$*" >> "$dir/treehouse.log"
+[ "\${1:-}" != status ] || [ ! -f "$dir/status.json" ] || cat "$dir/status.json"
+if [ "\${1:-} \${2:-}" = "lease --path" ] && [ -e "$dir/lease-path" ]; then
+  jq --arg path "\$3" --arg holder "\$5" '(.worktrees[] | select(.path == \$path)) |= (.leased = true | .lease_holder = \$holder)' \\
+    "$dir/pool/treehouse-state.json" > "$dir/pool/state.next" && mv "$dir/pool/state.next" "$dir/pool/treehouse-state.json"
+fi
 exit 0
 SH
     cat > "$tb/gh-axi" <<'SH'
@@ -1159,26 +1176,43 @@ test_released_enclosing_slot_is_proved_and_anchored() {
   pass "a hop out of the pool refuses an enclosing slot with uncommitted work and anchors its committed work before releasing it"
 }
 
-# A recorded copy that vanished from Treehouse's pool layout is a slot path,
-# not custody: it is recorded as history and its claim released, so it never
-# blocks the task Treehouse later hands that slot to.
+# A ship whose recorded copy vanished is recovered only by relocation, whose
+# lease proof a re-point does not run, so it refuses and changes nothing. A
+# scout's recorded copy that vanished from Treehouse's pool layout is a slot
+# path, not custody: it is recorded as history and its claim released, so it
+# never blocks the task Treehouse later hands that slot to.
 test_absent_pool_copy_is_released_not_preserved() {
-  local id=reassoc-absent-slot dir slot new out
-  dir=$(new_case absent-slot "$id")
-  slot=$(move_case_into_slot "$dir" "$id")
-  new="$dir/new"
-  add_copy "$dir" "$new" "fm/$id-v2"
-  git -C "$dir/proj" worktree remove --force "$slot"
-  [ ! -e "$slot" ] && [ -f "$dir/pool/1/.fm-slot-owner" ] || fail "absent-slot setup failed"
-  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "slot vanished") \
-    || fail "reassociating out of a vanished slot failed: $out"
-  assert_contains "$out" "prior_state=absent" "the vanished copy was not reported absent"
-  assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path is not history"
-  assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path became custody"
-  [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the vanished slot's claim was kept"
-  assert_contains "$(cat "$dir/home/data/$id/brief.md")" "It replaces $slot, whose pool slot was released for reuse." \
-    "the instructions did not record the released slot"
-  pass "a vanished pool copy is recorded as released history and its claim is dropped"
+  local id dir slot new out kind claim
+  for kind in ship scout; do
+    id="reassoc-absent-slot-$kind"
+    dir=$(new_case "absent-slot-$kind" "$id")
+    slot=$(move_case_into_slot "$dir" "$id")
+    if [ "$kind" = scout ]; then
+      sed -i.bak -e 's/^kind=ship$/kind=scout/' -e '/^branch=/d' "$dir/home/state/$id.meta"
+      rm -f "$dir/home/state/$id.meta.bak"
+    fi
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    git -C "$dir/proj" worktree remove --force "$slot"
+    [ ! -e "$slot" ] && [ -f "$dir/pool/1/.fm-slot-owner" ] || fail "absent-slot-$kind setup failed"
+    if [ "$kind" = ship ]; then
+      claim=$(cat "$dir/pool/1/.fm-slot-owner")
+      expect_refusal "$dir" "a ship whose recorded copy vanished must not be re-pointed" \
+        "fm-control $id relaunch --worktree <copy> --note <why>" 1 \
+        "$id" reassociate --worktree "$new" --note "slot vanished"
+      [ "$(cat "$dir/pool/1/.fm-slot-owner")" = "$claim" ] || fail "the refused ship reassociation changed the slot claim"
+      continue
+    fi
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "slot vanished") \
+      || fail "reassociating a scout out of a vanished slot failed: $out"
+    assert_contains "$out" "prior_state=absent" "the vanished copy was not reported absent"
+    assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path is not history"
+    assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path became custody"
+    [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the vanished slot's claim was kept"
+    assert_contains "$(cat "$dir/home/data/$id/brief.md")" "It replaces $slot, whose pool slot was released for reuse." \
+      "the instructions did not record the released slot"
+  done
+  pass "a ship whose copy vanished refuses reassociation and names relocation, and a scout's vanished pool copy is released history"
 }
 
 # A staging write that fails partway must refuse before anything is
@@ -1472,9 +1506,76 @@ test_unleased_shared_slot_gates_only_the_claimant() {
     git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
       || fail "$claimant claim: cleanup changed copy registrations"
     cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$claimant claim: cleanup changed Treehouse's lease state"
-    [ ! -e "$dir/treehouse.log" ] || fail "$claimant claim: cleanup touched Treehouse"
+    assert_treehouse_unchanged "$dir" "$claimant claim: cleanup touched Treehouse"
   done
   pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
+}
+
+# A shared slot in a superseded pool folder keeps its remaining record's copy, so
+# its claimant's record retires once the slot is leased by its exact path for
+# that record, never by name; without lease --path it refuses, naming the
+# treehouse build it needs. A claimant whose PR is not merged refuses and leaves
+# no new lease. A shared slot the current pool lists still refuses with its
+# lease remedy.
+test_superseded_shared_slot_retires_its_claimant() {
+  local id=shared-superseded shape dir slot out rc pr_state
+  for shape in current superseded superseded-unmerged superseded-no-path; do
+    dir=$(new_case "shared-superseded-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+    printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    if [ "$shape" = current ]; then
+      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$slot"
+    else
+      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$dir/current-pool/42/repo"
+    fi > "$dir/status.json"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/state/parked.meta" "$dir/parked-before"
+    cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    case "$shape" in superseded|superseded-unmerged) : > "$dir/lease-path" ;; esac
+    pr_state=MERGED
+    [ "$shape" != superseded-unmerged ] || pr_state=OPEN
+    rc=0
+    out=$(FM_SHARED_PR_STATE=$pr_state run_case_teardown "$dir" "$id") || rc=$?
+    case "$shape" in
+      superseded)
+        expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
+        [ ! -e "$dir/home/state/$id.meta" ] || fail 'superseded shared-slot cleanup left the finished record'
+        assert_equals "lease --path $slot --lease-holder parked" "$(grep -E '^lease ' "$dir/treehouse.log")" \
+          'the slot was not leased once, by its exact path, for the remaining record'
+        jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "parked"' "$dir/pool/treehouse-state.json" >/dev/null \
+          || fail "the old folder does not record the shared slot as leased: $(cat "$dir/pool/treehouse-state.json")"
+        ;;
+      superseded-unmerged)
+        expect_code 1 "$rc" "a superseded shared slot's claimant with an unmerged PR must refuse"$'\n'"$out"
+        assert_contains "$out" 'is not confirmed merged' 'the refusal did not name the unmerged PR'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+      superseded-no-path)
+        expect_code 1 "$rc" "a superseded shared slot must refuse without lease --path"$'\n'"$out"
+        assert_contains "$out" 'needs treehouse v3.1.7-fm or later (treehouse lease --path)' 'the refusal did not name the treehouse build it needs'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+      *)
+        expect_code 1 "$rc" "an unleased shared slot of the current pool must refuse its claimant"$'\n'"$out"
+        assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the refusal must name the lease remedy'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+    esac
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$shape: cleanup changed the parked record"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
+    ! grep -Eq '^return' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup returned a slot: $(cat "$dir/treehouse.log")"
+    if [ "$shape" != superseded ]; then
+      cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: cleanup changed Treehouse's lease state"
+      ! grep -Eq '^lease' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup leased a slot: $(cat "$dir/treehouse.log")"
+    fi
+  done
+  pass 'a superseded shared slot is leased by its exact path before its claimant retires, an unmerged claimant refuses with no new lease, it refuses without lease --path, and a current-pool one still refuses'
 }
 
 # The lease remedy names the remaining record that stays in the slot, never
@@ -1520,7 +1621,7 @@ test_unleased_shared_slot_names_the_remaining_lease_holder() {
     cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: refused cleanup changed its record"
     cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$shape: refused cleanup changed the claim"
     copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: refused cleanup changed slot bytes"
-    [ ! -e "$dir/treehouse.log" ] || fail "$shape: refused cleanup touched Treehouse"
+    assert_treehouse_unchanged "$dir" "$shape: refused cleanup touched Treehouse"
   done
   pass 'the unleased shared-slot remedy names the sole remaining root record and lists every candidate with its status among several'
 }
@@ -2265,9 +2366,9 @@ test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove() {
         joint_land "$na"
         out=$(run_case_teardown "$dir" "$ida") || fail "$shape: the first task's teardown failed: $out"
         add_copy "$dir" "$slot/.claude/worktrees/foreign" fm/foreign-copy
-        printf 'unlanded foreign work\n' > "$slot/.claude/worktrees/foreign/foreign.txt"
-        git -C "$slot/.claude/worktrees/foreign" add foreign.txt
-        git -C "$slot/.claude/worktrees/foreign" commit -qm "unlanded foreign commit"
+        # Uncommitted work keeps refusing the close; a copy held back only by
+        # unlanded commits is held instead (tests/fm-teardown-cleanup.test.sh).
+        printf 'unsaved foreign work\n' > "$slot/.claude/worktrees/foreign/foreign.txt"
         joint_land "$nb"
         who=$idb
         want="foreign copy $slot/.claude/worktrees/foreign stays in pool slot $slot"
@@ -2455,6 +2556,7 @@ test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
 test_unleased_shared_slot_gates_only_the_claimant
 test_unleased_shared_slot_names_the_remaining_lease_holder
+test_superseded_shared_slot_retires_its_claimant
 test_nested_shared_ship_keeps_own_copy_proof
 test_recorded_pr_reassociation_requires_contained_head
 test_shared_slot_cleanup_then_reassociate_preserves_all_copies

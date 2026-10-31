@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # fm-copy-sweep.sh - find, size and remove provably stale nested task copies, and
-# wake once when the bytes they hold pass a budget.
+# wake once when the bytes they hold pass a budget or when a nested copy sits
+# inside a live task's copy.
 #
 # Usage:
 #   fm-copy-sweep.sh                report every nested copy; change nothing
-#   fm-copy-sweep.sh --apply        also remove the REAPABLE-PROVEN copies
+#   fm-copy-sweep.sh --apply        also remove proven copies through their supported route
 #   fm-copy-sweep.sh check          the watcher's periodic entry (report only)
 #   fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
-#   fm-copy-sweep.sh disarm         remove that binding and the budget record
+#   fm-copy-sweep.sh disarm         remove that binding and the record (budgets and live copies)
 #   fm-copy-sweep.sh --help
 #
 # Hourly hygiene job, one line (bounded by the process budget, never forced):
@@ -27,12 +28,16 @@
 #                      is no worktree root of that clone, or its git or lock state
 #                      cannot be read. Never touched; `git worktree prune` and
 #                      the owner are the repair.
-#   HELD-LOCKED        a worktree lock holds it. Vernant's creation lock is never
-#                      released by anything but Vernant's closeout driver, so
-#                      --apply never removes such a copy and never unlocks. The
-#                      sweep only names its bytes in a wake; the teardown path
-#                      (bin/fm-teardown-nested-lib.sh) is what releases a locked
-#                      copy, through Vernant's closeout driver.
+#   HELD-LOCKED        a worktree lock or driver-retention receipt protects it.
+#                      A lock that is not Vernant's exact creation-lock format,
+#                      or whose launcher may still be alive, stays here, as does
+#                      a Vernant-locked copy whose clone has no closeout driver
+#                      or no usable interpreter for it: the closeout driver is
+#                      the only supported release and this sweep never unlocks
+#                      by hand. A REAPABLE-DRIVER copy whose driver plan refuses
+#                      it in --apply joins this class, with the driver's own
+#                      reason as its reason. A prior execute's receipt protects
+#                      even a copy the driver unlocked but could not remove.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -45,32 +50,180 @@
 #                      holds all of its copies.
 #   HELD-DIRTY         git status shows any change or untracked file, an
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
-#                      in progress, it holds an ignored file that exists
-#                      nowhere else (the teardown library's rule), or another
-#                      registered copy with an existing directory is inside it:
+#                      in progress, it is not locked and holds an ignored file
+#                      that exists nowhere else (the teardown library's rule; a
+#                      locked copy's are preserved before its release), its
+#                      clone's registered copies cannot be listed, or
+#                      another registered copy with an existing directory is
+#                      inside it:
 #                      a plain `git worktree remove` of the outer copy would
 #                      delete that inner copy and whatever it holds, and git
 #                      status cannot see it when `.claude/worktrees/` is ignored.
 #   HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
-#                      content is not already in the default branch.
+#                      content is not already in the default branch (a locked
+#                      copy has no such fallback; see REAPABLE-DRIVER).
+#   WAITING            it passes every REAPABLE-DRIVER proof, but its waiting
+#                      record (see below) holds a different fingerprint of its
+#                      preservable ignored content: that content is still
+#                      changing, so the copy is not idle. It gets no new preserve
+#                      and no driver call, and each run reports it with the reason,
+#                      until a run sees the same fingerprint as the run before.
+#   DEFERRED           --apply's otherwise qualifying locked copy after the
+#                      per-run locked release cap is reached, eligible next run.
 #   REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
+#   REAPABLE-DRIVER    a clean worktree root, no active record, no process
+#                      inside, every local commit reachable from HEAD contained
+#                      in a remote branch (the content-in-default fallback does
+#                      not apply to a locked copy), plus Vernant's exact
+#                      creation lock whose launcher pid is not running. A live
+#                      pid always holds the copy, including a recycled pid;
+#                      its start age and lock mtime are diagnostic only.
+#                      Only Vernant's closeout driver releases it, and --apply
+#                      first asks that driver for its plan.
+#   PENDING-DRIVER    report/check's name for that local-proof candidate:
+#                      the driver has not been asked, so removability is not
+#                      proved. Report/check never call the closeout driver.
 # The attended recorded-bundle exception in bin/fm-teardown.sh's header does
 # not apply here: a bundle-only copy remains HELD-UNPUSHED.
-# HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
-# `git worktree remove`, so calling it live or orphaned would mislead.
+# HELD-LOCKED distinguishes lock/release custody from ordinary live ownership:
+# a retained execute cannot be bypassed merely because the lock is now absent.
+# Independently of class and byte budgets, one HELD-LIVE-TASK report line names
+# every nested copy on disk strictly inside a ship/scout record's current or prior
+# copy, where that copy is the registering clone itself (a pool slot) or lies
+# inside it, with its absolute path, owning task, and age in seconds from the
+# lock mtime (source=lock) or, when unlocked, the directory mtime
+# (source=directory). A lock state that cannot be read, such as
+# a probe cut by `check`'s time bound, reads source=unknown and age=unknown, never
+# the directory of a copy that may be locked. A record's presence means it is
+# still in custody; teardown removes closed records. This check only reports,
+# including locked copies, and never releases anything. Only the report, a run
+# with no flag, prints the whole line. `check` and `--apply` put one bounded part
+# of it in their one aggregated wake, even below the byte budget: the count, five
+# copies in all (new copies first, then the oldest), and a pointer to the no-flag
+# run. A copy with no live owning record is left to the existing reap path.
 #
-# --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
-# each re-proved just before its own removal, by a plain `git worktree remove`
-# run from the parent clone. Never a force flag, never a recursive delete, never
-# an unlock, never a Treehouse call. A removal that fails leaves the copy and is
-# reported, and the run exits 1; it is not retried. Each removal appends one line
-# to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
-# in the same run is removed by the next run; a second run otherwise finds
-# nothing left to remove. Report mode (no flag) reads the size cache and writes
-# nothing; `check` writes only the size cache and the budget record.
+# --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
+# deepest path first. FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT (default 5; a positive
+# decimal integer, invalid or non-positive values become 5) caps the locked
+# release slots used per run. Once the driver's execute has run for a copy, that
+# copy uses one slot, unless afterwards the copy is provably untouched: still
+# present and registered, the same copy, holding the same creation-lock bytes.
+# Registration enumeration must succeed, even if a failed listing printed the copy.
+# So a full release uses a slot, and so does an execute that reports success but
+# leaves the copy present or registered, a failure after a partial release, an
+# archived-tree retention, or any outcome the sweep cannot prove untouched. A
+# refused plan, a failed preservation and a failed reproof run no execute and
+# use no slot, and neither does an execute refusal (such as
+# cleanup_skipped_live_or_unknown) after which the copy is provably untouched;
+# the walk goes on to the next copy. Once the slots are used, the remaining
+# qualifying locked copies are DEFERRED (per-run cap), never HELD, get no driver
+# call or preserve, and are eligible again on the next run.
+# Unlocked removal is unchanged. Review the first batch's records before running
+# the sweep unattended.
+#
+# This sweep is a fallback, not the systemic lock-lifecycle fix. That fix
+# belongs to Vernant, which owns the lock format, and is not built yet. Two
+# proposed Vernant follow-ups would replace this fallback: vernant-lock-lease
+# (the lock records its owner and a heartbeat, a dead owner expires it, and the
+# pool's own lifecycle reclaims the copy) and vernant-commits-remote-before-lock
+# (a copy's commits are on a remote before its lock is taken). Neither exists
+# today, so the sweep keeps every proof of its own, including the
+# every-commit-on-a-remote proof for a locked copy.
+# A process appearing between the last process scan and execute is covered only
+# by the closeout script's own liveness check; the sweep cannot close that race.
+# Every ownership, process, cleanliness and remote-content proof is re-read
+# after the driver plan and after preservation, immediately before execution;
+# HEAD and the complete lock's SHA-256 must still match what the plan saw, and
+# the copy's preservable ignored content must still match this run's preserve,
+# or the earlier preserve a run reused. A mismatch runs no execute, uses no slot
+# and takes the reproof-failure route.
+# An unlocked copy goes by a plain `git worktree remove` from the parent clone. A locked
+# one first gets the closeout driver's plan, run from that clone without
+# --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
+# 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
+# boolean true. A non-zero exit, an empty, malformed or verdictless answer, text
+# that only mentions allowed=true (a bare allowed=true included), any other
+# value, or a timeout holds the copy as HELD-LOCKED with the driver's own words
+# (its own "reason" first when the answer is one JSON document that has one, then
+# the first 600 characters, on one line), copies nothing, and is not a failure.
+# So does an allowed plan whose document reports ignored_payload_disposition=
+# archive_then_retain_tree: the driver archives a tree's unique ignored files and
+# then keeps the tree, so the sweep neither preserves them nor executes the driver.
+# The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
+# the owner's rule holds a copy whose plan does not answer. The plan runs as a
+# process group of its own and the timeout kills that whole group, so neither the
+# driver nor anything it started outlives the sweep. A copy whose plan allows it
+# has its ignored entries preserved by the teardown library's own preservation,
+# then released and removed by the driver as bin/fm-teardown.sh does it.
+# Preserved entries land in
+# data/copy-sweep/<run-stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
+# so a new copy at the same path and HEAD never replaces earlier preserved bytes.
+# Before executing the driver, a durable receipt under
+# data/copy-sweep/retained/<sha256 of the path> protects the copy from later
+# removal, even when the driver releases its lock but removal fails. Only a
+# successful, verified removal clears that receipt. A receipt records the lock's
+# SHA-256, the copy's path and the copy's identity (the inode and birth time of its
+# own .git file) and retains that same copy while its lock matches, or while it has
+# no lock (the driver may have released it); the sweep never clears one to retry a
+# copy, except as below for a refusal the driver names temporary. A receipt whose path is gone, whose path now holds a different copy, whose
+# copy now has a different lock, or that records no hash or identity is stale:
+# classification ignores it, report mode leaves it, and --apply removes it and
+# lists RECEIPT-CLEARED.
+# Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
+# the run exits 0 and later runs neither preserve nor execute that copy again.
+# Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
+# cleanup_skipped_live_or_unknown, which the driver names temporary, while the same
+# copy still holds exactly the lock bytes the plan saw, released nothing: the run
+# exits 1 with the driver's words, removes the receipt and discards the preserve
+# directory this run built, so the next run plans, preserves and executes that copy
+# again without adding a second preserve. Such a refusal after the lock changed or
+# went is a partial release and is retained like any other failure, with its
+# preserve. A proof that fails after preservation writes no receipt and discards
+# this run's preserve the same way, and only while the same copy still holds the
+# plan's lock bytes. Either way the preserve is discarded only while every
+# preserved file, symlink, FIFO and directory is still in the copy with the same
+# bytes or target; when any original is missing, different or cannot be compared, or the
+# copy's identity or lock changed, the preserve stays and is the copy's latest
+# preserve. Its fingerprint and the fingerprint of the copy's current preservable
+# ignored content (each the SHA-256 over the path, type and bytes or link target
+# of every file, symlink and FIFO; a socket, which preservation never copies, is
+# skipped) go to a waiting record under
+# data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. A content
+# check just before execute that finds a mismatch but keeps no preserve of this
+# run, as when only new content appeared, records the copy's current fingerprint
+# the same way, with the fingerprint of the latest preserve an earlier record
+# names. The copy is never held for it: each later run that finds a different content fingerprint
+# classes it WAITING and --apply records the new one, and the first run that finds
+# the same fingerprint as the run before plans and executes the copy as usual,
+# preserving it once only when that content differs from the latest preserve. A
+# successful removal clears the record; --apply silently removes a record whose
+# copy is gone or is a different copy. A preserve from an earlier run is never
+# removed or replaced.
+# Other execution failures exit 1, record the driver's text, and retain the copy.
+# Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
+# or Treehouse call. Only the preservation library cleans its own staging data;
+# the sweep removes only its own run's preserve, as above.
+# The sweep prints its own REFUSED line: preservation failure ends in a human-only
+# question, changed proofs identify what no longer holds, and an execution refusal
+# ends in the driver's own words. None names a completing
+# command, because the release id is no teardown task id and bin/fm-teardown.sh
+# would reject a command built from it. Each REMOVED line reports "copy X GiB,
+# preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
+# a size that was not measured shows "-" and "unmeasured"). A copy released
+# without a new preserve, because its content equals its latest preserve, shows
+# "preserved - GiB (preserved in an earlier run)" and an unmeasured net freed, and
+# its log line records preserved_kib=-. One final accounting
+# line says "copies=<original total> GiB=<original measured total> reaped=<n>
+# freed=<measured net GiB>"; a separate sizes line discloses unmeasured copies,
+# so GiB/freed are lower bounds when sizing was skipped.
+# Each removal appends one line to data/copy-sweep.log (append-only).
+# An outer copy whose inner copy was removed in the same run is removed by the
+# next run. Report mode reads the cache, receipts and waiting records and writes
+# nothing;
+# `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -101,6 +254,12 @@
 # memory; --apply raises the wake itself through the wake queue, `check` prints
 # the line and the watcher turns it into the same `check:` wake.
 #
+# The live-copy fact wakes once when a copy joins the named set, not once per poll,
+# and a copy leaving it is silent. state/copy-sweep.record keeps that set beside
+# the budget memory, so an unchanged set stays silent in `check` and `--apply`
+# while every report still prints it. A cut scan keeps a recorded path because
+# it cannot prove it gone.
+#
 # `arm` writes state/copy-sweep.check.sh and binds its bytes with
 # fm-check-register.sh, so the existing watcher runs `check` on its normal
 # FM_CHECK_INTERVAL cadence, at most once per `interval` seconds of scanning;
@@ -120,8 +279,9 @@
 # clears one), and it keeps the still-fresh cached sizes of the copies it never
 # reached. Each du runs under the time left and is cut when it cannot finish, and
 # `check` classifies only the copies it names in a wake (the rest read
-# UNCLASSIFIED). Every git and lsof call of those classifications runs under the
-# time left too, so a copy whose classification cannot finish reads UNCLASSIFIED.
+# UNCLASSIFIED). Every git, lsof, find, readlink and file read of those
+# classifications runs under the time left too, so a copy whose classification
+# cannot finish reads UNCLASSIFIED.
 # The bound holds to within the work of one clone. The hourly `--apply` run has
 # no time bound, is the only run certain to cover every clone, and warms the
 # cache for large copies.
@@ -158,6 +318,8 @@ MAX_LINE=1600
 . "$SCRIPT_DIR/fm-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-refuse-lib.sh
+. "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
 . "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
@@ -191,6 +353,19 @@ file_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
+}
+
+# The inode and birth time of the copy's own .git file, "<inode>:<birth>", or
+# failure when either cannot be read.
+copy_identity() {  # <copy>
+  local identity
+  if [ "$(uname)" = Darwin ]; then
+    identity=$(/usr/bin/stat -f %i:%B "$1/.git" 2>/dev/null) || return 1
+  else
+    identity=$(stat -c %i:%W "$1/.git" 2>/dev/null) || return 1
+  fi
+  [[ $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
+  printf '%s\n' "$identity"
 }
 
 gib_to_kib() {  # <GiB, may be decimal>
@@ -347,10 +522,39 @@ emit_clone() {  # <pool> <container> <clone>
   scan_clone "$1" "$2" "$3" </dev/null
 }
 
+# Read the same local task records as classification, once per run rather than
+# once per nested copy. Secondmate homes are not task copies.
+LIVE_TASK_COPIES=
+read_live_task_copies() {
+  local state_dir meta kind field path line
+  LIVE_TASK_COPIES=
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      scan_out_of_time && return
+      kind=$(fm_meta_get "$meta" kind)
+      case "${kind:-ship}" in ship|scout) ;; *) continue ;; esac
+      while IFS= read -r line; do
+        field=${line%% *}
+        case "$field" in worktree|prior_worktree) ;; *) continue ;; esac
+        path=$(fm_task_copy_canonical_dir "${line#* }") || continue
+        LIVE_TASK_COPIES="$LIVE_TASK_COPIES$path"$'\t'"${meta##*/}"$'\n'
+      done < <(fm_task_copy_record_paths "$meta")
+    done
+  done
+}
+
 enumerate_clones() {
   local state pool_dir path clone state_dir home entry top
+  local -a state_dirs
   CLONES=
   NOTES=
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  for entry in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
+    add_note "a local home was not read: $entry"
+  done
+  read_live_task_copies
+  state_dirs=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
   for state in "$TREEHOUSE_ROOT"/*/treehouse-state.json; do
     [ -f "$state" ] && [ ! -L "$state" ] || continue
     pool_dir=$(fm_task_copy_canonical_dir "${state%/*}") || continue
@@ -372,11 +576,7 @@ enumerate_clones() {
       emit_clone "$pool_dir" "$clone" "$clone"
     done <<< "$entry"
   done
-  fm_local_firstmate_state_dirs "$STATE" tolerant
-  for entry in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
-    add_note "a local home was not read: $entry"
-  done
-  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for state_dir in "${state_dirs[@]}"; do
     home=$(fm_task_copy_canonical_dir "${state_dir%/*}") || continue
     for path in "$home"/projects/*; do
       [ -d "$path" ] || continue
@@ -390,15 +590,10 @@ enumerate_clones() {
   done
 }
 
-# Prints the canonical path of every worktree <clone> has registered strictly
-# inside itself. A registered copy whose directory is gone keeps its raw path.
+# The registered worktrees strictly inside <clone>; bin/fm-task-copy-lib.sh owns
+# the enumeration.
 list_nested() {  # <clone>
-  local clone=$1 field path canon
-  while IFS= read -r -d '' field; do
-    case "$field" in 'worktree '*) path=${field#worktree } ;; *) continue ;; esac
-    canon=$(fm_task_copy_canonical_dir "$path") || canon=$path
-    case "$canon" in "$clone"/*) printf '%s\n' "$canon" ;; esac
-  done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null)
+  fm_task_copy_registered_nested "$1"
 }
 
 # --- bounded commands --------------------------------------------------------
@@ -421,15 +616,16 @@ run_before_deadline() {  # <command> [args...]
   fm_run_timed "$remaining" "$bin" "$@"
 }
 
-# While check classifies, every git and lsof call, including the ones the sourced
-# libraries make, runs under the time left.
-git() {
-  if [ "$CLASSIFY_BOUNDED" = 1 ]; then run_before_deadline git "$@"; else command git "$@"; fi
+# Runs an external command under the time left while check classifies.
+bounded() {  # <command> [args...]
+  if [ "$CLASSIFY_BOUNDED" = 1 ]; then run_before_deadline "$@"; else command "$@"; fi
 }
 
-lsof() {
-  if [ "$CLASSIFY_BOUNDED" = 1 ]; then run_before_deadline lsof "$@"; else command lsof "$@"; fi
-}
+# While check classifies, every git and lsof call, including the ones the sourced
+# libraries make, runs under the time left.
+git() { bounded git "$@"; }
+
+lsof() { bounded lsof "$@"; }
 
 # --- process table -----------------------------------------------------------
 
@@ -484,12 +680,203 @@ content_in_default() {  # <copy> <clone>
   [ "${merged_tree%%$'\n'*}" = "$default_tree" ]
 }
 
+# Read the whole lock, not just its first line. The launcher pid is what counts;
+# owner= is forensic text, as in Vernant's own parser. One terminal newline is
+# allowed; extra lines, NUL bytes or any other whitespace are not Vernant's.
+sweep_vernant_lock_pid() {  # <lock-file>
+  local reason pid
+  reason=$(cat "$1" && printf '.') || return 1
+  reason=${reason%.}
+  reason=${reason%$'\n'}
+  # Bash cannot retain NUL bytes. Compare the original file before accepting
+  # its parsed text, so binary bytes cannot disappear into a valid lock reason.
+  if ! cmp -s "$1" <(printf '%s' "$reason") \
+    && ! cmp -s "$1" <(printf '%s\n' "$reason"); then
+    return 1
+  fi
+  pid=$(teardown_vernant_lock_pid "$reason") || return 1
+  [[ $reason =~ ^vernant-session-active\ owner=[^[:space:]]+\ launcher=$pid$ ]] || return 1
+  printf '%s\n' "$pid"
+}
+
+# A durable receipt is written before execute: the driver can remove a lock
+# and then fail to remove its copy, or the sweep can stop while it runs. Never
+# let a later run reinterpret that partially completed release as an unlocked
+# copy that is safe to remove. Report mode only reads these receipts. A receipt
+# records the SHA-256 of the creation lock the driver was asked to release, the
+# copy's path and the copy's identity (see copy_identity).
+retained_receipt() {  # <copy>
+  local hash
+  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+}
+
+record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
+  local dest tmp
+  dest=$(retained_receipt "$1") || return 1
+  mkdir -p "${dest%/*}" || return 1
+  tmp=$(mktemp "${dest%/*}/.retained.XXXXXX") || return 1
+  if ! printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n%s\n' "$2" "$1" "$3" "$4" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+# True when a receipt no longer describes what is at its path: it records no lock
+# hash, path or copy identity (an older receipt), its path is gone, a different
+# copy is there, or the copy there has a different creation lock. The same copy
+# with no lock stays protected, because the driver may have released the lock and
+# then failed to remove the copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY.
+# A receipt or copy that cannot be read is not stale.
+RECEIPT_STALE_COPY=
+RECEIPT_STALE_WHY=
+receipt_is_stale() {  # <receipt>
+  local hash='' copy='' identity='' current actual rc=0
+  RECEIPT_STALE_COPY=
+  RECEIPT_STALE_WHY=
+  [ -r "$1" ] || return 1
+  { IFS= read -r hash && IFS= read -r copy && IFS= read -r identity; } < "$1" || true
+  case "$copy" in copy=/*) copy=${copy#copy=}; RECEIPT_STALE_COPY=$copy ;; *) copy= ;; esac
+  case "$hash" in lock-sha256=*) hash=${hash#lock-sha256=} ;; *) hash= ;; esac
+  case "$identity" in identity=*) identity=${identity#identity=} ;; *) identity= ;; esac
+  if [ -z "$copy" ] || ! [[ $hash =~ ^[0-9a-f]{64}$ ]] || ! [[ $identity =~ ^[0-9]+:[0-9]+$ ]]; then
+    RECEIPT_STALE_WHY="it records no lock hash, copy path and copy identity"
+    return 0
+  fi
+  if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
+    RECEIPT_STALE_WHY="its copy is gone"
+    return 0
+  fi
+  current=$(copy_identity "$copy") || return 1
+  if [ "$current" != "$identity" ]; then
+    RECEIPT_STALE_WHY="a different copy is now at its path"
+    return 0
+  fi
+  teardown_copy_lock_file "$copy" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" != "$hash" ] || return 1
+  RECEIPT_STALE_WHY="the copy there now has a different creation lock"
+}
+
+# A copy whose preserve stayed after a retryable refusal gets a waiting record:
+# its path, its identity, the fingerprint of its preservable ignored content as
+# the sweep last saw it, and the fingerprint of that latest preserve.
+waiting_record() {  # <copy>
+  local hash
+  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/waiting/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+}
+
+# Prints one SHA-256 over the path, type and bytes or link target of every file,
+# symlink and FIFO that `find <find-args>` lists from <root>, so a copy's
+# preservable ignored content and a preserve of it fingerprint alike. Directories
+# hold no bytes of their own, and a socket is skipped because preservation never
+# copies one. Fails when any of it cannot be read or check's time runs out.
+tree_fingerprint() {  # <root> <find-args>...
+  local root=$1 rel want out=''
+  shift
+  while IFS= read -r -d '' rel; do
+    case "$rel" in
+      ./*) ;;
+      0) continue ;;
+      *) return 1 ;;
+    esac
+    if [ -L "$root/$rel" ]; then
+      want=l$(bounded readlink "$root/$rel") || return 1
+    elif [ -p "$root/$rel" ]; then
+      want=p
+    elif [ -f "$root/$rel" ]; then
+      want=f$(set -o pipefail; bounded cat "$root/$rel" | teardown_ignored_sha256) || return 1
+    else
+      return 1
+    fi
+    out="$out$rel"$'\t'"$want"$'\n'
+  done < <(cd "$root" && bounded find "$@" ! -type d ! -type s -print0; printf '%s\0' "$?")
+  printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
+}
+
+# The fingerprint of every preservable ignored entry of <copy>.
+content_fingerprint() {  # <copy>
+  local entries entry paths=()
+  entries=$(teardown_preservable_ignored "$1") || return 1
+  while IFS= read -r entry; do
+    [ -z "$entry" ] || paths+=("./$entry")
+  done <<< "$entries"
+  if [ "${#paths[@]}" = 0 ]; then
+    printf '' | teardown_ignored_sha256
+    return
+  fi
+  tree_fingerprint "$1" "${paths[@]}"
+}
+
+# The fingerprint of preserve <dir>, without the library's metadata.
+preserve_fingerprint() {  # <dir>
+  tree_fingerprint "$1" . ! -path ./copy-path ! -path ./SHA256SUMS
+}
+
+record_waiting() {  # <copy> <identity> <fingerprint> <preserve-fingerprint>
+  local dest tmp
+  dest=$(waiting_record "$1") || return 1
+  mkdir -p "${dest%/*}" || return 1
+  tmp=$(mktemp "${dest%/*}/.waiting.XXXXXX") || return 1
+  if ! printf 'copy=%s\nidentity=%s\nfingerprint=%s\npreserved=%s\n' "$1" "$2" "$3" "$4" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+# Sets WAIT_FINGERPRINT and WAIT_PRESERVED (empty when unknown) from waiting
+# <record> when it names <copy> with <identity>; fails for any other record.
+WAIT_FINGERPRINT=
+WAIT_PRESERVED=
+read_waiting() {  # <record> <copy> <identity>
+  local copy='' identity='' fingerprint='' preserved=''
+  WAIT_FINGERPRINT=
+  WAIT_PRESERVED=
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  { IFS= read -r copy && IFS= read -r identity && IFS= read -r fingerprint && { IFS= read -r preserved || true; }; } < "$1" || return 1
+  [ "$copy" = "copy=$2" ] && [ "$identity" = "identity=$3" ] || return 1
+  fingerprint=${fingerprint#fingerprint=}
+  [[ $fingerprint =~ ^[0-9a-f]{64}$ ]] || return 1
+  WAIT_FINGERPRINT=$fingerprint
+  preserved=${preserved#preserved=}
+  [[ ! $preserved =~ ^[0-9a-f]{64}$ ]] || WAIT_PRESERVED=$preserved
+}
+
+# Returns 1 with WAIT_WHY set while the preservable ignored content of <copy>
+# differs from the fingerprint its waiting record holds; --apply then records the
+# new fingerprint, so the next run can see the content quiet. A copy with no
+# record for this same copy is quiet. Quiet content that equals the latest
+# preserve sets CONTENT_PRESERVED=1. Returns 2 when the content cannot be read.
+WAIT_WHY=
+CONTENT_PRESERVED=0
+content_quiet() {  # <copy>
+  local record identity now
+  WAIT_WHY=
+  CONTENT_PRESERVED=0
+  record=$(waiting_record "$1") || return 2
+  [ -e "$record" ] || [ -L "$record" ] || return 0
+  identity=$(copy_identity "$1") || return 2
+  read_waiting "$record" "$1" "$identity" || return 0
+  now=$(content_fingerprint "$1") || return 2
+  if [ "$now" = "$WAIT_FINGERPRINT" ]; then
+    [ "$now" != "$WAIT_PRESERVED" ] || CONTENT_PRESERVED=1
+    return 0
+  fi
+  WAIT_WHY="content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged"
+  if [ "$APPLY" = 1 ] && ! record_waiting "$1" "$identity" "$now" "$WAIT_PRESERVED"; then
+    WAIT_WHY="$WAIT_WHY; its new fingerprint could not be recorded"
+  fi
+  return 1
+}
+
 # Sets CLASS and REASON for <copy>, registered by <clone> of <pool> and
 # <container>. A clone under a Firstmate home other than this one is judged as
 # that home would judge it.
 classify() {  # <copy> <clone> <pool> <container>
-  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner
-  local home=$FM_HOME state=$STATE
+  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner nested
+  local home=$FM_HOME state=$STATE locked=0 launcher=
   CLASS=
   REASON=
   if [ "$pool" = - ] && ! [ "$container/state" -ef "$STATE" ]; then
@@ -517,17 +904,42 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="its HEAD cannot be resolved"
     return 0
   fi
+  pending=$(retained_receipt "$copy") || {
+    CLASS=HELD-LOCKED
+    REASON="its previous driver disposition cannot be checked"
+    return 0
+  }
+  if { [ -e "$pending" ] || [ -L "$pending" ]; } && ! receipt_is_stale "$pending"; then
+    CLASS=HELD-LOCKED
+    REASON="driver retained this copy: $(sed -n '4,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    return 0
+  fi
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
     0)
       CLASS=HELD-LOCKED
       REASON="worktree lock: ${TEARDOWN_FOREIGN_LOCK:-no reason given}"
-      if pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK") \
-        && ! teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
-        REASON="$REASON (launcher $pid is gone; only Vernant's closeout driver releases it)"
+      if ! pid=$(sweep_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK_FILE"); then
+        REASON="$REASON (not the supported Vernant creation-lock format)"
+        return 0
       fi
-      return 0
+      # The sweep never releases a lock naming a running pid, even when its
+      # start is newer than the lock. Teardown's recycled-pid policy is broader.
+      if ps -p "$pid" -o pid= >/dev/null 2>&1; then
+        REASON="$REASON (launcher $pid is alive; start age=$(teardown_pid_age_secs "$pid" || printf unknown)s; lock mtime=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE" || printf unknown))"
+        return 0
+      fi
+      REASON="$REASON (launcher $pid is gone; only Vernant's closeout driver releases it)"
+      if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
+        || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
+        REASON="$REASON; closeout driver or interpreter unavailable"
+        return 0
+      fi
+      launcher=$pid
+      locked=1
+      CLASS=
+      REASON=
       ;;
     1) ;;
     *)
@@ -591,14 +1003,21 @@ classify() {  # <copy> <clone> <pool> <container>
       return 0
     fi
   done
+  # A locked copy's ignored entries are preserved by its driver release, so only
+  # an unlocked copy is held for them; an unreadable list holds either kind.
   if ! unique=$(teardown_preservable_ignored "$copy"); then
     CLASS=ORPHAN-NO-RECORD
     REASON="its ignored files cannot be listed, so none is ruled out"
     return 0
   fi
-  if [ -n "$unique" ]; then
+  if [ "$locked" != 1 ] && [ -n "$unique" ]; then
     CLASS=HELD-DIRTY
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
+    return 0
+  fi
+  if ! nested=$(list_nested "$clone"); then
+    CLASS=HELD-DIRTY
+    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out"
     return 0
   fi
   while IFS= read -r inner; do
@@ -607,15 +1026,44 @@ classify() {  # <copy> <clone> <pool> <container>
     CLASS=HELD-DIRTY
     REASON="another registered copy is inside it: $inner"
     return 0
-  done < <(list_nested "$clone")
+  done <<< "$nested"
   if ! count=$(git -C "$copy" rev-list --count HEAD --not --remotes 2>/dev/null); then
     CLASS=HELD-UNPUSHED
     REASON="its HEAD cannot be compared with the remotes"
     return 0
   fi
   if [ "$count" = 0 ]; then
-    CLASS=REAPABLE-PROVEN
-    REASON="clean, no process, no record, HEAD contained in a remote branch"
+    if [ "$locked" = 1 ]; then
+      rc=0
+      content_quiet "$copy" || rc=$?
+      case "$rc" in
+        1)
+          CLASS=WAITING
+          REASON=$WAIT_WHY
+          return 0
+          ;;
+        2)
+          CLASS=ORPHAN-NO-RECORD
+          REASON="its preservable ignored content cannot be read"
+          return 0
+          ;;
+      esac
+      CLASS=REAPABLE-DRIVER
+      REASON="clean, no process, no record, HEAD contained in a remote branch, Vernant launcher $launcher is gone"
+      if [ "$APPLY" != 1 ]; then
+        CLASS=PENDING-DRIVER
+        REASON="$REASON; driver verdict not checked in report mode, not yet proven removable"
+      fi
+    else
+      CLASS=REAPABLE-PROVEN
+      REASON="clean, no process, no record, HEAD contained in a remote branch"
+    fi
+  elif [ "$locked" = 1 ]; then
+    # A locked copy is released only when every local commit is on a remote.
+    # The content-in-default fallback stays an unlocked-copy rule: a bundle is
+    # the recovery for its commits, not a landed proof for a lock release.
+    CLASS=HELD-UNPUSHED
+    REASON="$count commit(s) are on no remote; a locked copy is released only when every local commit is on a remote"
   elif content_in_default "$copy" "$clone"; then
     CLASS=REAPABLE-PROVEN
     REASON="clean, no process, no record, content already in the default branch"
@@ -640,10 +1088,35 @@ cache_lookup() {  # <copy> <mtime> -> "<measured-at><TAB><KiB>" when fresh
     END { exit !found }' "$SIZE_CACHE"
 }
 
+# Sets SIZE_KIB to the KiB under <path>, or empty when du did not finish or
+# printed no size. A cut du marks the scan cut.
+du_kib() {  # <path>
+  local out rc=0
+  SIZE_KIB=
+  out=$(run_before_deadline nice -n 20 du -sk -- "$1" 2>/dev/null) || rc=$?
+  if fm_timed_out "$rc"; then
+    SCAN_CUT=1
+    return 0
+  fi
+  out=${out%%[[:space:]]*}
+  case "$out" in ''|*[!0-9]*) return 0 ;; esac
+  SIZE_KIB=$out
+}
+
+# Sets SIZE_KIB to the size of the directory <dir> in KiB: 0 when it does not
+# exist, empty when it was not measured.
+measure_dir() {  # <dir>
+  SIZE_KIB=0
+  [ -d "$1" ] || return 0
+  SIZE_KIB=
+  [ "$SIZING" = 1 ] || return 0
+  du_kib "$1"
+}
+
 # Sets SIZE_KIB to the copy's size in KiB, or empty when it was not measured.
 # One du at a time; a deadline stops new measurements, never one in flight.
 measure_copy() {  # <copy>
-  local copy=$1 mtime out kib hit rc measured=$CACHE_NOW
+  local copy=$1 mtime hit measured=$CACHE_NOW
   SIZE_KIB=
   if [ ! -d "$copy" ]; then
     SIZE_KIB=0
@@ -661,16 +1134,9 @@ measure_copy() {  # <copy>
   [ "$SIZING" = 1 ] || return 0
   # The watcher kills a check that outlives its bound and keeps nothing, so a
   # measurement that cannot finish inside the time left is cut, not awaited.
-  rc=0
-  out=$(run_before_deadline nice -n 20 du -sk -- "$copy" 2>/dev/null) || rc=$?
-  if fm_timed_out "$rc"; then
-    SCAN_CUT=1
-    return 0
-  fi
-  kib=${out%%[[:space:]]*}
-  case "$kib" in ''|*[!0-9]*) return 0 ;; esac
-  SIZE_KIB=$kib
-  CACHE_NEW="$CACHE_NEW$copy"$'\t'"$mtime"$'\t'"$measured"$'\t'"$kib"$'\n'
+  du_kib "$copy"
+  [ -n "$SIZE_KIB" ] || return 0
+  CACHE_NEW="$CACHE_NEW$copy"$'\t'"$mtime"$'\t'"$measured"$'\t'"$SIZE_KIB"$'\n'
 }
 
 # --- the scan ----------------------------------------------------------------
@@ -705,11 +1171,50 @@ net_sizes() {
     }'
 }
 
+# One "age-in-seconds<TAB>copy<TAB>task<TAB>age<TAB>source" line per live copy,
+# the first field -1 when the age is unknown.
+LIVE_NESTED_ROWS=
+LIVE_NESTED_COUNT=0
+LIVE_NESTED_FACT_NEW=0
+LIVE_RECORD_NEW=
+
+# A named fact, independent of the removal classifier (locks take precedence
+# there). The enclosing clone is already proved by list_nested; only custody
+# comes from records, never from a process-table guess or a directory walker.
+# The age is the lock's when the copy is locked and the directory's when it is
+# not; a lock state the probe could not read leaves source and age unknown
+# rather than naming the directory of a copy that may be locked.
+record_live_nested_copy() {  # <copy> <clone>
+  local copy=$1 clone=$2 owner stamp='' secs=-1 age=unknown source=unknown rc=0
+  [ -d "$copy" ] || return 0
+  owner=$(printf '%s' "$LIVE_TASK_COPIES" | awk -F '\t' -v c="$copy" -v root="$clone" '
+    ($1 == root || index($1, root "/") == 1) && index(c, $1 "/") == 1 { print $2; exit }')
+  [ -n "$owner" ] || return 0
+  teardown_copy_lock_file "$copy" || rc=$?
+  case "$rc" in
+    0) stamp=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || stamp=; source=lock ;;
+    1) stamp=$(file_mtime "$copy") || stamp=; source=directory ;;
+  esac
+  case "$stamp" in
+    ''|*[!0-9]*) ;;
+    *) secs=$((CACHE_NOW - stamp)); [ "$secs" -ge 0 ] || secs=0; age=${secs}s ;;
+  esac
+  LIVE_NESTED_COUNT=$((LIVE_NESTED_COUNT + 1))
+  LIVE_NESTED_ROWS="$LIVE_NESTED_ROWS$secs"$'\t'"$copy"$'\t'"${owner%.meta}"$'\t'"$age"$'\t'"$source"$'\n'
+}
+
 scan_clone() {  # <pool> <container> <clone>
-  local pool=$1 container=$2 clone=$3 copy
+  local pool=$1 container=$2 clone=$3 copy nested
+  if ! nested=$(list_nested "$clone"); then
+    add_note "clone $clone was not read: its registered worktrees cannot be listed"
+    return 0
+  fi
   # A dedicated descriptor keeps every command inside the loop off its input.
   while IFS= read -r copy <&4; do
     [ -n "$copy" ] || continue
+    CLASSIFY_BOUNDED=1
+    record_live_nested_copy "$copy" "$clone"
+    CLASSIFY_BOUNDED=0
     if [ "$SCAN_MODE" = check ]; then
       CLASS=UNCLASSIFIED
       REASON="check does not classify; run bin/fm-copy-sweep.sh for the class"
@@ -718,7 +1223,7 @@ scan_clone() {  # <pool> <container> <clone>
     fi
     measure_copy "$copy"
     ROWS="$ROWS$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
-  done 4< <(list_nested "$clone" | LC_ALL=C sort -u)
+  done 4< <(printf '%s\n' "$nested" | LC_ALL=C sort -u)
 }
 
 scan() {  # <mode>
@@ -727,6 +1232,9 @@ scan() {  # <mode>
   SCAN_CUT=0
   SCAN_MODE=$1
   ROWS=
+  LIVE_NESTED_ROWS=
+  LIVE_NESTED_COUNT=0
+  LIVE_NESTED_FACT_NEW=0
   # check measures every copy but classifies only the ones it names in a wake,
   # so its time goes to the sizes the budget needs.
   [ "$1" = check ] || scan_processes
@@ -739,51 +1247,481 @@ scan() {  # <mode>
 REMOVAL_REPORT=
 REMOVED_COUNT=0
 FAILED_COUNT=0
+FREED_KIB=0
+FREED_UNMEASURED=0
 
-log_removal() {  # <copy> <clone> <head> <branch> <kib> <proof>
+log_removal() {  # <copy> <clone> <head> <branch> <kib> <preserved-kib> <proof>
   mkdir -p "$DATA_DIR" 2>/dev/null || return 1
-  printf '%s\tremoved\t%s\tclone=%s\thead=%s\tbranch=%s\tkib=%s\tproof=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4" "$5" "$6" >> "$REMOVAL_LOG"
+  printf '%s\tremoved\t%s\tclone=%s\thead=%s\tbranch=%s\tkib=%s\tpreserved_kib=%s\tproof=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4" "$5" "$6" "$7" >> "$REMOVAL_LOG"
 }
 
-# Removes the REAPABLE-PROVEN copies, one at a time, deepest path first, each
-# proved again just before its own removal. Plain `git worktree remove` run from
-# the registering clone: it refuses a dirty or locked copy by itself, and a
-# refusal leaves the copy and is reported, never retried harder.
+# <KiB> as GiB, or "-" when it was not measured.
+gib_or_dash() {  # <KiB or ->
+  case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
+}
+
+# True only when <driver output> carries a real positive verdict: it is exactly
+# one JSON document whose top-level "allowed" key is the boolean true. Text that
+# merely mentions allowed=true, a bare allowed=true, a false or non-boolean
+# value, no verdict, an empty or malformed answer, and more than one document
+# are not permission.
+plan_verdict_allows() {  # <driver output>
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
+}
+
+# The driver's own reason as "<reason>: " when its whole answer is one JSON
+# document with a non-empty string "reason", otherwise nothing. The driver prints
+# its keys sorted, so a long answer can cut off before its reason; this puts the
+# reason first. It is display text only and never grants or refuses anything.
+driver_reason_prefix() {  # <driver output>
+  local reason
+  reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object" and (.reason | type == "string") and .reason != "") then .[0].reason else empty end' 2>/dev/null) || return 0
+  [ -z "$reason" ] || printf '%s: ' "$(fm_refuse_text "${reason:0:600}")"
+}
+
+# True when the plan's one JSON document reports the driver's retain rule for a
+# tree that holds unique ignored files: the driver archives them and then keeps
+# the tree, so a release of it can never succeed.
+plan_verdict_retains_tree() {  # <driver output>
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .ignored_payload_disposition == "archive_then_retain_tree")' >/dev/null 2>&1
+}
+
+# The plan's process group, while one runs. Killing the whole group is the only
+# way the driver and what it started stop with the sweep, so every exit path of
+# the plan, and the sweep's own signal traps, go through stop_plan.
+PLAN_PID=
+stop_plan() {
+  [ -z "$PLAN_PID" ] || kill -s KILL -- "-$PLAN_PID" 2>/dev/null
+  PLAN_PID=
+}
+
+# Asks Vernant's closeout driver, in plan mode, whether it would release <copy>,
+# before ignored payload is copied or hashed. The copy stays unless the driver exits 0
+# AND states allowed=true; a non-zero exit, silence, an unparsable verdict, or
+# no answer within the plan timeout (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by
+# default) all keep it, with PLAN_WHY holding the driver's own words. The plan
+# runs as the leader of its own process group, and the timeout kills that whole
+# group, so the driver and anything it started never outlive the sweep.
+PLAN_WHY=
+driver_plan_allows() {  # <clone> <copy>
+  local dir rc=0 limit ticks=0 timed_out=0 pid
+  limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
+  case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
+  limit=$((10#$limit))
+  [ "$limit" -ge 1 ] || limit=120
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-sweep-plan.XXXXXX") || {
+    PLAN_WHY="its closeout driver could not be planned (no temporary directory)"
+    return 1
+  }
+  set -m
+  (
+    local r=0
+    teardown_run_closeout "$1" "$2" plan "$dir/verdict" || r=$?
+    printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
+    printf '%s' "$r" > "$dir/rc"
+  ) </dev/null &
+  pid=$!
+  PLAN_PID=$pid
+  set +m
+  while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt $((limit * 10)) ]; do
+    sleep 0.1
+    ticks=$((ticks + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    timed_out=1
+  fi
+  stop_plan
+  wait "$pid" 2>/dev/null
+  rc=$(cat "$dir/rc" 2>/dev/null) || rc=1
+  TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
+  TEARDOWN_CLOSEOUT_STDOUT=$(cat "$dir/verdict" 2>/dev/null) || TEARDOWN_CLOSEOUT_STDOUT=
+  rm -f "$dir/out" "$dir/rc" "$dir/verdict"
+  rmdir "$dir" 2>/dev/null
+  if [ "$timed_out" = 1 ]; then
+    PLAN_WHY="its closeout driver did not answer within ${limit}s"
+    return 1
+  fi
+  PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
+  PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")${PLAN_WHY:0:600}"
+  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
+    PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
+    return 1
+  fi
+  if plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT"; then
+    PLAN_WHY="its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: $PLAN_WHY"
+    return 1
+  fi
+}
+
+# A driver plan and preservation can take time. Re-read every ownership,
+# liveness and content proof, and bind execution to exactly the HEAD and lock
+# bytes the plan saw. A changed valid Vernant lock is still a changed owner.
+release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha256>
+  local actual_head actual_lock
+  scan_processes
+  classify "$2" "$1" "$3" "$4"
+  if [ "$CLASS" != REAPABLE-DRIVER ]; then
+    echo "REFUSED: $2 is no longer proven after its plan: $CLASS, $REASON" >&2
+    return 1
+  fi
+  actual_head=$(git -C "$2" rev-parse HEAD 2>/dev/null) || return 1
+  actual_lock=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  if [ "$actual_head" != "$5" ] || [ "$actual_lock" != "$6" ]; then
+    echo "REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released." >&2
+    return 1
+  fi
+}
+
+# True when the driver's execute refusal is one the driver itself names
+# temporary: exit 3, and its whole answer is one JSON document refusing with
+# reason cleanup_lease_conflict or cleanup_skipped_live_or_unknown.
+execute_refusal_is_temporary() {  # <exit>
+  [ "$1" = 3 ] || return 1
+  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+}
+
+# True when <copy> is still the same copy and still holds exactly <lock-sha256>,
+# so nothing was released and its ignored originals are still in it. A changed
+# or absent lock is a partial release.
+copy_still_holds() {  # <copy> <identity> <lock-sha256>
+  local actual rc=0
+  actual=$(copy_identity "$1") || return 1
+  [ "$actual" = "$2" ] || return 1
+  teardown_copy_lock_file "$1" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" = "$3" ]
+}
+
+# True when every directory, file, symlink and FIFO in preserve <dir> is still at
+# the same path in <copy>, with the same bytes or link target; a socket holds no
+# bytes and is skipped. An original that is missing, different or cannot be
+# compared returns 1.
+preserve_still_in_copy() {  # <dir> <copy>
+  local rel status='' want have
+  while IFS= read -r -d '' rel; do
+    case "$rel" in
+      ./*|.) ;;
+      *) status=$rel; continue ;;
+    esac
+    if [ -L "$1/$rel" ]; then
+      [ -L "$2/$rel" ] || return 1
+      want=$(readlink "$1/$rel") && have=$(readlink "$2/$rel") || return 1
+      [ "$want" = "$have" ] || return 1
+    elif [ -d "$1/$rel" ]; then
+      [ -d "$2/$rel" ] && [ ! -L "$2/$rel" ] || return 1
+    elif [ -f "$1/$rel" ]; then
+      [ -f "$2/$rel" ] && [ ! -L "$2/$rel" ] && cmp -s "$1/$rel" "$2/$rel" || return 1
+    elif [ -p "$1/$rel" ]; then
+      [ -p "$2/$rel" ] && [ ! -L "$2/$rel" ] || return 1
+    elif [ ! -S "$1/$rel" ]; then
+      return 1
+    fi
+  done < <(cd "$1" && find . ! -path ./copy-path ! -path ./SHA256SUMS -print0; printf '%s\0' "$?")
+  [ "$status" = 0 ]
+}
+
+# The preserve directory this run built for <copy> under <release-id>.
+run_preserve_dir() {  # <copy> <release-id>
+  local key
+  key=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/nested-copy-preserved/%s\n' "$DATA_DIR" "$2" "$key"
+}
+
+# Removes the preserve directory this run built for <copy> under <release-id>,
+# and its parents once empty, only while copy_still_holds proves nothing was
+# released and preserve_still_in_copy proves every preserved original is still in
+# the copy unchanged; a run that built none has nothing to discard. A preserve
+# from any other run is never touched. On refusal DISCARD_WHY says which check
+# refused.
+DISCARD_WHY=
+discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
+  local dir
+  DISCARD_WHY="its path could not be hashed"
+  dir=$(run_preserve_dir "$1" "$4") || return 1
+  [ -e "$dir" ] || [ -L "$dir" ] || return 0
+  DISCARD_WHY="the copy's identity or creation-lock bytes changed"
+  copy_still_holds "$1" "$2" "$3" || return 1
+  DISCARD_WHY="it is not a plain directory"
+  [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
+  DISCARD_WHY="not every preserved original is still unchanged in the copy"
+  preserve_still_in_copy "$dir" "$1" || return 1
+  DISCARD_WHY="it could not be removed"
+  rm -rf -- "$dir" || return 1
+  rmdir "${dir%/*}" "$DATA_DIR/$4" 2>/dev/null || true
+}
+
+# After a retryable refusal, discards this run's preserve as discard_run_preserve
+# allows. A preserve that has to stay is now the latest preserve: the copy's
+# current fingerprint and that preserve's are recorded, so later runs hold the
+# copy WAITING while its content keeps changing and preserve again only content
+# that differs from it. Sets RETRY_PRESERVE to what happened, and returns 0 only
+# when no preserve from this run is kept.
+RETRY_PRESERVE=
+retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
+  local now dir preserved=''
+  RETRY_PRESERVE="no preserve from this run is kept"
+  discard_run_preserve "$1" "$2" "$3" "$4" && return 0
+  RETRY_PRESERVE="this run's preserve stays, because $DISCARD_WHY; later runs wait while the copy's content keeps changing and preserve again only content that differs from it"
+  if dir=$(run_preserve_dir "$1" "$4") && [ -d "$dir" ] && [ ! -L "$dir" ]; then
+    preserved=$(preserve_fingerprint "$dir") || preserved=
+  fi
+  if ! now=$(content_fingerprint "$1") || ! record_waiting "$1" "$2" "$now" "$preserved"; then
+    RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
+  fi
+  return 1
+}
+
+# Preserves the ignored entries of a REAPABLE-DRIVER copy, unless the classify of
+# its first proof found its quiet content equal to its latest preserve
+# (CONTENT_PRESERVED), then releases and removes it through Vernant's own closeout
+# driver, which is the only supported release for its creation lock. The
+# preservation lands under this sweep's data directory in <release-id>, keyed by
+# run stamp and HEAD; the preservation helper keys each copy by its path. Retained outcomes are never preserved again.
+# The library owns preservation and the driver run; the sweep prints its own
+# REFUSED line on stderr, because the library's envelope names a teardown command
+# built from the release id, which is no task id. Returns 2 when it stopped
+# before the driver's execute ran.
+teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved want now dir
+  shown=$(fm_refuse_text "$copy")
+  release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 2
+  preserved=$CONTENT_PRESERVED
+  want=$WAIT_PRESERVED
+  if ! identity=$(copy_identity "$copy"); then
+    echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
+    return 2
+  fi
+  if [ "$preserved" != 1 ]; then
+    DATA=$DATA_DIR
+    ID=$3
+    teardown_preserve_ignored "$copy" || rc=$?
+    DATA=$saved_data
+    ID=$saved_id
+  fi
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preserved; it was not removed. human-only-exit: Which owner-approved storage or disposition preserves them? The next sweep run tries again; no removal or forced cleanup is authorized." >&2
+    return 2
+  fi
+  if ! release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7"; then
+    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    echo "$RETRY_PRESERVE; the next sweep run plans it again." >&2
+    return 2
+  fi
+  if [ "$preserved" != 1 ]; then
+    want=
+    if dir=$(run_preserve_dir "$copy" "$3"); then
+      if [ -e "$dir" ] || [ -L "$dir" ]; then
+        want=$(preserve_fingerprint "$dir") || want=
+      else
+        want=$(printf '' | teardown_ignored_sha256) || want=
+      fi
+    fi
+  fi
+  if [ -z "$want" ] || ! now=$(content_fingerprint "$copy") || [ "$now" != "$want" ]; then
+    if retry_after_preserve "$copy" "$identity" "$7" "$3" && [ -n "$now" ]; then
+      read_waiting "$(waiting_record "$copy")" "$copy" "$identity" || true
+      record_waiting "$copy" "$identity" "$now" "$WAIT_PRESERVED" \
+        || RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
+    fi
+    echo "REFUSED: the preservable ignored content of $shown changed after it was preserved, or could not be compared with its preserve; it was not released. $RETRY_PRESERVE; the next sweep run plans it again." >&2
+    return 2
+  fi
+  if ! copy_still_holds "$copy" "$identity" "$7" \
+    || ! record_driver_retention "$copy" "$7" "$identity" "driver release incomplete; the copy remains protected even if its lock was released"; then
+    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    echo "REFUSED: cannot record the driver release of $shown; it was not executed. $RETRY_PRESERVE; the next sweep run plans it again." >&2
+    return 2
+  fi
+  rc=0
+  teardown_run_closeout "$clone" "$copy" || rc=$?
+  if [ "$rc" != 0 ]; then
+    words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
+    if execute_refusal_is_temporary "$rc" && copy_still_holds "$copy" "$identity" "$7"; then
+      retry_after_preserve "$copy" "$identity" "$7" "$3"
+      if rm -f -- "$(retained_receipt "$copy")"; then
+        echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again." >&2
+        return 1
+      fi
+    fi
+    record_driver_retention "$copy" "$7" "$identity" "exit $rc: $words" || true
+    echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2
+    if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_STDOUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
+      return 3
+    fi
+    return 1
+  fi
+}
+
+# Removes each stale driver-retention receipt and lists it. Only a receipt that
+# receipt_is_stale proves no longer describes its path is removed. Also removes,
+# without listing, each waiting record whose copy is gone or is a different copy.
+clear_stale_receipts() {
+  local receipt copy identity
+  for receipt in "$DATA_DIR/$CHECK_ID/retained"/*; do
+    [ -e "$receipt" ] || [ -L "$receipt" ] || continue
+    receipt_is_stale "$receipt" || continue
+    if rm -f -- "$receipt"; then
+      REMOVAL_REPORT="${REMOVAL_REPORT}RECEIPT-CLEARED"$'\t'"${RECEIPT_STALE_COPY:-$receipt}"$'\t'"stale driver-retention receipt removed: $RECEIPT_STALE_WHY"$'\n'
+    else
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"${RECEIPT_STALE_COPY:-$receipt}"$'\t'"its stale driver-retention receipt could not be removed"$'\n'
+    fi
+  done
+  for receipt in "$DATA_DIR/$CHECK_ID/waiting"/*; do
+    [ -e "$receipt" ] || [ -L "$receipt" ] || continue
+    copy=$(sed -n '1s/^copy=//p' "$receipt" 2>/dev/null) || continue
+    if [ -n "$copy" ] && { [ -e "$copy" ] || [ -L "$copy" ]; }; then
+      identity=$(copy_identity "$copy") || continue
+      ! read_waiting "$receipt" "$copy" "$identity" || continue
+    fi
+    rm -f -- "$receipt" 2>/dev/null || true
+  done
+}
+
+# Removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time, deepest
+# path first, each proved again just before its own removal. An unlocked copy
+# goes by plain `git worktree remove` run from the registering clone: it refuses
+# a dirty or locked copy by itself. A driver-releasable copy goes through
+# Vernant's closeout driver, planned first: a copy the plan refuses is held with
+# the driver's reason and nothing is copied. A failure after the plan was allowed
+# leaves the copy and is reported, never retried harder.
 apply_removals() {
-  local line container pool clone copy kib head branch err gone=
+  local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
+  local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc
+  driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
+  case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
+  driver_limit=$((10#$driver_limit))
+  [ "$driver_limit" -ge 1 ] || driver_limit=5
+  stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
+  read -r SCANNED_COUNT SCANNED_KIB SCANNED_UNMEASURED <<< "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++; if ($6 == "-") u++; else k += $6 } END { printf "%d %.0f %d\n", n, k, u }')"
   REMOVAL_REPORT=
   REMOVED_COUNT=0
   FAILED_COUNT=0
+  FREED_KIB=0
+  FREED_UNMEASURED=0
+  clear_stale_receipts
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
-    if [ "$CLASS" != REAPABLE-PROVEN ]; then
-      REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"no longer proven: $CLASS, $REASON"$'\n'
-      continue
-    fi
+    case "$CLASS" in
+      REAPABLE-PROVEN) ;;
+      REAPABLE-DRIVER) ;;
+      *)
+        REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"no longer proven: $CLASS, $REASON"$'\n'
+        continue
+        ;;
+    esac
     head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
-    if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
+    preserve_dir=
+    earlier=0
+    if [ "$CLASS" = REAPABLE-DRIVER ]; then
+      if [ "$driver_slots" -ge "$driver_limit" ]; then
+        deferred="$deferred$copy"$'\n'
+        continue
+      fi
+      earlier=$CONTENT_PRESERVED
+      # The copy is Vernant-locked with a launcher pid that is not running. Its
+      # driver is the only supported release: it unlocks and removes, after the
+      # teardown library preserved every ignored entry it holds.
+      lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || {
+        held="$held$copy"$'\t'"its creation-lock bytes could not be hashed"$'\n'
+        continue
+      }
+      if ! driver_plan_allows "$clone" "$copy"; then
+        held="$held$copy"$'\t'"$PLAN_WHY"$'\n'
+        continue
+      fi
+      release_id="$CHECK_ID/$stamp-$head"
+      preserve_dir=$(run_preserve_dir "$copy" "$release_id") || {
+        held="$held$copy"$'\t'"its preservation identity could not be hashed"$'\n'
+        continue
+      }
+      release_rc=0
+      identity=$(copy_identity "$copy") || identity=
+      err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
+      if [ "$release_rc" != 2 ]; then
+        enumeration_rc=0
+        registered=$(list_nested "$clone") || enumeration_rc=$?
+        if ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
+          && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
+          driver_slots=$((driver_slots + 1))
+        fi
+      fi
+      if [ "$release_rc" = 3 ]; then
+        held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
+        REMOVAL_REPORT="${REMOVAL_REPORT}KEPT"$'\t'"$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
+        continue
+      fi
+      if [ "$release_rc" != 0 ]; then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"the copy was left: $(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
+        continue
+      fi
+    else
+      if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
+        continue
+      fi
+    fi
+    if ! registered=$(list_nested "$clone"); then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared"$'\n'
       continue
     fi
-    if [ -e "$copy" ] || [ -L "$copy" ] || list_nested "$clone" | grep -qxF "$copy"; then
+    if [ -e "$copy" ] || [ -L "$copy" ] || grep -qxF "$copy" <<< "$registered"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after git worktree remove"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'
       continue
     fi
+    receipt=$(retained_receipt "$copy") || receipt=
+    if [ -n "$receipt" ] && ! rm -f -- "$receipt"; then
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"removed but its retention receipt could not be cleared"$'\n'
+    fi
+    receipt=$(waiting_record "$copy") && rm -f -- "$receipt" 2>/dev/null
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
-    REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12} (${REASON})"$'\n'
-    log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$REASON" \
+    preserved=0
+    if [ "$earlier" = 1 ]; then
+      preserved=-
+    elif [ -n "$preserve_dir" ]; then
+      measure_dir "$preserve_dir"
+      preserved=${SIZE_KIB:--}
+    fi
+    if [[ $kib =~ ^[0-9]+$ && $preserved =~ ^[0-9]+$ ]]; then
+      net=$((kib - preserved))
+      [ "$net" -ge 0 ] || net=0
+      FREED_KIB=$((FREED_KIB + net))
+      freed="net freed $(kib_to_gib "$net") GiB"
+    else
+      FREED_UNMEASURED=$((FREED_UNMEASURED + 1))
+      freed="net freed - GiB, unmeasured"
+    fi
+    if [ "$earlier" = 1 ]; then
+      freed="copy $(gib_or_dash "$kib") GiB, preserved - GiB (preserved in an earlier run), $freed"
+    else
+      freed="copy $(gib_or_dash "$kib") GiB, preserved $(gib_or_dash "$preserved") GiB, $freed"
+    fi
+    REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12}, $freed (${REASON})"$'\n'
+    log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$preserved" "$REASON" \
       || { FAILED_COUNT=$((FAILED_COUNT + 1)); REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it was removed but $REMOVAL_LOG could not be appended"$'\n'; }
-  done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
+  done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN" || $5 == "REAPABLE-DRIVER"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
   if [ -n "$gone" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
+  fi
+  if [ -n "$deferred" ]; then
+    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " locked release slots used; eligible next run" } { print }')
+  fi
+  if [ -n "$held" ]; then
+    COPIES=$(printf '%s\n' "$COPIES" | HELD=$held awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["HELD"], h, "\n"); for (i = 1; i <= n; i++) if (h[i] != "") { split(h[i], kv, "\t"); why[kv[1]] = kv[2] } } $4 in why { $5 = "HELD-LOCKED"; $7 = why[$4] } { print }')
   fi
 }
 
@@ -899,6 +1837,24 @@ evaluate_skip() {  # <now>
   WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on $SKIP_RUNS_NOW runs in a row"
 }
 
+# One wake when a copy joins the live copy set, never one per poll. A copy stays
+# named in the report while it exists, and its record entry survives a cut scan,
+# which cannot prove it gone.
+evaluate_live_fact() {
+  local path
+  LIVE_NESTED_FACT_NEW=0
+  LIVE_RECORD_NEW=$(printf '%s' "$LIVE_NESTED_ROWS" | awk -F '\t' 'NF { print $2 }' | LC_ALL=C sort -u)
+  if [ "$SCAN_CUT" = 1 ] && [ -n "$REC_LIVE" ]; then
+    LIVE_RECORD_NEW=$(printf '%s\n%s\n' "$REC_LIVE" "$LIVE_RECORD_NEW" | sed '/^$/d' | LC_ALL=C sort -u)
+  fi
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    printf '%s' "$REC_LIVE" | grep -qxF "$path" && continue
+    LIVE_NESTED_FACT_NEW=1
+    return 0
+  done <<< "$LIVE_RECORD_NEW"
+}
+
 # --- the record and the cache ------------------------------------------------
 
 REC_LAST_SCAN=
@@ -907,6 +1863,7 @@ REC_ERROR=
 REC_SKIP_RUNS=
 REC_SKIP_AT=
 REC_SKIP_LINE=
+REC_LIVE=
 
 record_usable() {
   local line
@@ -922,6 +1879,7 @@ read_record() {
   REC_SKIP_RUNS=
   REC_SKIP_AT=
   REC_SKIP_LINE=
+  REC_LIVE=
   record_usable || return 0
   REC_LAST_SCAN=$(awk -F '\t' '$1 == "last_scan" { print $2; exit }' "$RECORD")
   REC_OVER=$(awk -F '\t' '$1 == "over" { print $2 }' "$RECORD")
@@ -929,6 +1887,7 @@ read_record() {
   REC_SKIP_RUNS=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
   REC_SKIP_AT=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
   REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $4; exit }' "$RECORD")
+  REC_LIVE=$(awk -F '\t' '$1 == "live" { print $2 }' "$RECORD")
 }
 
 write_atomic() {  # <destination> <content>
@@ -960,6 +1919,10 @@ write_record() {  # <last-scan> <error>
       content="$content"$'over\t'"$key"$'\n'
     fi
   done <<< "$REC_OVER"
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    content="$content"$'live\t'"$key"$'\n'
+  done <<< "$LIVE_RECORD_NEW"
   [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_COUNTED_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"
@@ -978,13 +1941,50 @@ write_cache() {
   write_atomic "$SIZE_CACHE" "$CACHE_NEW$keep"
 }
 
+# "<copy> (task=<id> age=<age> source=<source>)" per live copy, "; " joined, for
+# the first <limit> rows on stdin.
+live_nested_entries() {  # <limit>
+  awk -F '\t' -v limit="$1" '
+    NF { if (++n > limit) exit; printf "%s%s (task=%s age=%s source=%s)", sep, $2, $3, $4, $5; sep = "; " }'
+}
+
+# The full report line: every live copy, in scan order.
+live_nested_report() {
+  [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
+  printf 'HELD-LIVE-TASK nested copies=%s: %s' "$LIVE_NESTED_COUNT" \
+    "$(printf '%s' "$LIVE_NESTED_ROWS" | live_nested_entries "$LIVE_NESTED_COUNT")"
+}
+
+# The wake's part of it: the count, a few copies (those the record has not named
+# yet first, then the oldest), and where the rest is.
+LIVE_WAKE_COPIES=5
+live_nested_wake() {
+  local shown=$LIVE_NESTED_COUNT
+  [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
+  [ "$shown" -le "$LIVE_WAKE_COPIES" ] || shown=$LIVE_WAKE_COPIES
+  printf 'HELD-LIVE-TASK nested copies=%s, %s shown (new first, then oldest): %s; run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line' \
+    "$LIVE_NESTED_COUNT" "$shown" \
+    "$(printf '%s' "$LIVE_NESTED_ROWS" | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 \
+      | RECORDED="$REC_LIVE" awk -F '\t' '
+          BEGIN { n = split(ENVIRON["RECORDED"], r, "\n"); for (i = 1; i <= n; i++) if (r[i] != "") known[r[i]] = 1 }
+          NF { if ($2 in known) old[++o] = $0; else print }
+          END { for (i = 1; i <= o; i++) print old[i] }' \
+      | live_nested_entries "$shown")"
+}
+
 # Raises the one wake. `check` prints the line for the watcher to turn into a
-# wake; every other mode appends the same `check:` wake itself.
+# wake; every other mode appends the same `check:` wake itself. Budget details
+# retain their cap; the live-copy fact stays one bounded part of the same line.
 raise_wake() {  # <mode>
-  local line
-  [ -n "$WAKE_PARTS" ] || return 0
-  fm_cap_line_var "copy-sweep: $WAKE_PARTS" "$MAX_LINE"
-  line=$FM_LINE_CAP_LINE
+  local line='copy-sweep:'
+  [ -n "$WAKE_PARTS" ] || { [ "$LIVE_NESTED_COUNT" -gt 0 ] && [ "$LIVE_NESTED_FACT_NEW" = 1 ]; } || return 0
+  if [ -n "$WAKE_PARTS" ]; then
+    fm_cap_line_var "copy-sweep: $WAKE_PARTS" "$MAX_LINE"
+    line=$FM_LINE_CAP_LINE
+  fi
+  if [ "$LIVE_NESTED_COUNT" -gt 0 ] && [ "$LIVE_NESTED_FACT_NEW" = 1 ]; then
+    line="$line $(live_nested_wake)"
+  fi
   if [ "$1" = check ]; then
     printf '%s\n' "$line"
   else
@@ -1001,6 +2001,9 @@ print_report() {  # <mode>
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { c[$1] = 1 } END { n = 0; for (k in c) n++; print n }')" \
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++ } END { print n + 0 }')"
   [ -z "$SKIP_LINE" ] || printf 'copy-sweep: %s\n' "$SKIP_LINE"
+  if [ "$1" = report ] && [ "$LIVE_NESTED_COUNT" -gt 0 ]; then
+    printf 'copy-sweep: %s\n' "$(live_nested_report)"
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy class kib reason <<< "$line"
@@ -1016,7 +2019,7 @@ print_report() {  # <mode>
     printf 'note: %s\n' "$line"
   done <<< "$NOTES"
   [ "$SCAN_CUT" != 1 ] || printf 'note: the scan stopped at its time bound; unmeasured copies show ? GiB\n'
-  for class in REAPABLE-PROVEN HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
+  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER WAITING DEFERRED HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
@@ -1024,6 +2027,10 @@ print_report() {  # <mode>
     [ -n "$line" ] || continue
     printf '%s\n' "$line"
   done <<< "$BUDGET_REPORT"
+  if [ "$1" = apply ]; then
+    printf 'sizes: %s scanned copies unmeasured, %s removed copies unmeasured\n' "$SCANNED_UNMEASURED" "$FREED_UNMEASURED"
+    printf 'copies=%s GiB=%s reaped=%s freed=%s\n' "$SCANNED_COUNT" "$(kib_to_gib "$SCANNED_KIB")" "$REMOVED_COUNT" "$(kib_to_gib "$FREED_KIB")"
+  fi
 }
 
 # --- arm and disarm ----------------------------------------------------------
@@ -1110,6 +2117,7 @@ arm() {
 
 disarm() {
   rm -f -- "$CHECK_SHIM" "$CHECK_TRUST" "$RECORD"
+  fm_check_stop_episode_clear "$STATE" "$CHECK_ID"
   printf 'disarmed: state/%s.check.sh\n' "$CHECK_ID"
 }
 
@@ -1133,6 +2141,7 @@ run_sweep() {  # report|apply|check
         SKIP_LINE=$REC_SKIP_LINE
         SKIP_RUNS_NOW=$REC_SKIP_RUNS
         SKIP_COUNTED_NOW=$REC_SKIP_AT
+        LIVE_RECORD_NEW=$REC_LIVE
         write_record "$REC_LAST_SCAN" "$CONFIG_ERROR" || true
       fi
       return 0
@@ -1145,8 +2154,8 @@ run_sweep() {  # report|apply|check
       return 0
     fi
     LOCK_HELD=1
-    trap 'release_lock' EXIT
-    trap 'release_lock; exit 1' HUP INT TERM
+    trap 'stop_plan; release_lock' EXIT
+    trap 'stop_plan; release_lock; exit 1' HUP INT TERM
   fi
   read_record
   now=$(now_epoch)
@@ -1170,6 +2179,7 @@ run_sweep() {  # report|apply|check
   APPLY=0
   [ "$mode" != apply ] || APPLY=1
   scan "$mode"
+  [ "$mode" = report ] || evaluate_live_fact
   REMOVAL_REPORT=
   if [ "$mode" = apply ]; then
     apply_removals
@@ -1180,7 +2190,7 @@ run_sweep() {  # report|apply|check
   if [ "$mode" != report ]; then
     write_cache || { echo "fm-copy-sweep: could not write $SIZE_CACHE" >&2; rc=1; }
     if ! raise_wake "$mode"; then
-      echo "fm-copy-sweep: could not raise the budget wake; the record was left so the next run raises it" >&2
+      echo "fm-copy-sweep: could not raise the notification; the record was left so the next run raises it" >&2
       return 1
     fi
     if [ "$SCAN_CUT" = 1 ]; then

@@ -57,6 +57,12 @@ fill_task_subsections() {  # <file> <intent> <spec>
   content=$(cat "$file")
   content=${content//'{TASK}'/$intent}
   content=${content//'{FIRSTMATE_SPEC}'/$spec}
+  # The scaffold's exclusion list is required at dispatch, so these fixtures
+  # answer it the way a task with no exclusions does.
+  content=$(printf '%s\n' "$content" | awk '
+    { print }
+    $0 == "### Out of scope" { print "None." }
+  ')
   printf '%s\n' "$content" > "$file"
 }
 
@@ -92,9 +98,10 @@ add_dod_file_line() {  # <brief> <path>
 
 fill_whole_dod() {  # <file>
   local token
-  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+  for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
     fill_dod_placeholder "$1" "$token" "Filled for the test."
   done
+  fill_dod_placeholder "$1" '{DOD_MANDATORY_ITEMS}' "$(fm_test_dod_item M1)"
 }
 
 # A ship or scout spawn refuses a leftover task Definition of Done placeholder,
@@ -159,14 +166,18 @@ test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_position
   IFS='|' read -r home proj fakebin <<EOF
 $rec
 EOF
-  quote="Edge/negative: a brief that still holds {DOD_HARD_GATES} is refused, as is one ending {DOD_CAPABILITY}."
+  quote="A brief that still holds {DOD_HARD_GATES} is refused, as is one ending {DOD_CAPABILITY}."
 
   id=dod-heading
   FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
   brief="$home/data/$id/brief.md"
   fill_task_subsections "$brief" "Fix the thing." "Keep it small."
   fill_dod_placeholder "$brief" '{DOD_CAPABILITY}' "The thing works."
-  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' $'## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\nSource: the intent.'
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "## M1 The thing works
+$(fm_test_dod_item C1)
+
+## M2 It stays working
+$(fm_test_dod_item C2)"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "### Supporting items still holds {DOD_SUPPORTING_ITEMS}" "a ## heading inside the mandatory items hid a later placeholder"
   fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
@@ -181,7 +192,7 @@ EOF
   fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
   fill_dod_placeholder "$brief" '{DOD_HARD_GATES}' "None."
   fill_dod_placeholder "$brief" '{DOD_HONESTY_RULE}' "Report only what ran."
-  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "$quote"
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "$(fm_test_dod_item C1 "Edge/negative=$quote")"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a finished section that quotes a placeholder mid-sentence was refused"
   assert_present "$home/data/$id/launch-brief.md" "a finished section that quotes a placeholder did not get past the check"
@@ -192,10 +203,10 @@ EOF
   fill_task_subsections "$brief" "Fix the thing." "Keep it small."
   criteria="$home/data/$id/criteria.md"
   add_dod_file_line "$brief" "$criteria"
-  printf '## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\n\n{DOD_HARD_GATES}\n' > "$criteria"
+  printf '## M1 The thing works\n%s\n\n## M2 It stays working\n\n{DOD_HARD_GATES}\n' "$(fm_test_dod_item C1)" > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "$criteria: ### Hard gates still holds {DOD_HARD_GATES}" "a ## heading in a DoD file hid a later placeholder"
-  printf '## M1 The thing works\n%s\n' "$quote" > "$criteria"
+  printf '## M1 The thing works\n%s\n' "$(fm_test_dod_item C1 "Edge/negative=$quote")" > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a DoD file that quotes a placeholder mid-sentence was refused"
   assert_present "$home/data/$id/launch-brief.md" "a DoD file that quotes a placeholder did not get past the check"
@@ -257,7 +268,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "DoD file $criteria is empty" "an empty DoD file was not refused"
 
-  printf 'Mandatory: the thing works.\n' > "$criteria"
+  fm_test_dod_item C1 > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a finished DoD file was refused though the brief's own placeholders remain"
   assert_present "$home/data/$id/launch-brief.md" "a finished DoD file did not get past the check"
@@ -929,6 +940,17 @@ EOF
     "empty Task subsections were not rejected semantically"
   assert_absent "$home/state/$id.meta" "empty-subsection spawn wrote task metadata"
 
+  id=delivery-heading-only-spec
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
+    || fail "heading-only-spec brief should scaffold"
+  fill_brief_subsections "$home/data/$id/brief.md" "Fix the badge." ""
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn of a spec holding only the scaffold subheading should exit non-zero"
+  assert_contains "$out" "must contain nonempty ## Captain's intent and ## Firstmate spec" \
+    "a scaffold subheading alone counted as Firstmate spec content"
+  assert_absent "$home/state/$id.meta" "heading-only-spec spawn wrote task metadata"
+
   id=promote-unfilled-e1
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
@@ -1083,6 +1105,190 @@ EOF
     "legacy promotion copied the scout Setup section into Firstmate spec"
   pass "fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled"
 }
+
+test_fresh_spawn_requires_a_concrete_ask() {
+  local rec home proj fakebin kind id body out rc n=0
+  local args=()
+  rec=$(make_home concrete-ask)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    for body in '' $'### Context\n<!-- report pointer only -->' '/tmp/report.md' 'See report.md.' 'src/app/login.py' 'docs/plan.html' 'report.csv' $'```text\n \n```' $'~~~\n\t\n~~~' 'https://example.test/report' '[report](https://example.test/report)'; do
+      n=$((n + 1))
+      id="ask-$kind-$n"
+      write_brief "$home" "$id" direct-PR
+      cat > "$home/data/$id/brief.md" <<EOF
+# Task
+## Captain's intent
+$body
+## Firstmate spec
+Keep the investigation bounded.
+EOF
+      if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      [ "$rc" -ne 0 ] || fail "$kind: empty/pointer-only intent was admitted"
+      if [ -n "$body" ]; then
+        assert_contains "$out" 'has no concrete ask' "$kind: wrong refusal for pointer/comment-only intent"
+      fi
+      assert_contains "$out" 'write the requested change or investigation and the substance' 'refusal omitted the accepted proof'
+      assert_contains "$out" 'rerun fm-spawn.sh to complete dispatch' 'refusal omitted the completing action'
+      assert_absent "$home/data/$id/launch-brief.md" 'refused ask was handed to a worker'
+      assert_absent "$home/state/$id.meta" 'refused ask created task state'
+    done
+    id="ask-$kind-good"
+    write_brief "$home" "$id" direct-PR
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+<!-- Context is optional. --> Fix the badge after refresh using https://example.test/report.
+See report.md.
+## Firstmate spec
+Keep unrelated redesign out of scope.
+EOF
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_not_contains "$out" 'has no concrete ask' 'substantive ask plus reference was refused'
+    assert_present "$home/data/$id/launch-brief.md" 'substantive ask never reached launch rendering'
+    assert_grep "$ROOT/docs/review-rubric.md" "$home/data/$id/launch-brief.md" 'independent readers did not receive the single rubric owner'
+    assert_grep 'Every factual claim in a PR body must be backed by a record' "$home/data/$id/launch-brief.md" 'independent readers did not receive the rendered rubric text'
+  done
+  # A marked pointer cannot be rescued by unmarked Firstmate build substance.
+  id=ask-legacy-pointer
+  write_brief "$home" "$id" direct-PR
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+[captain] See report.md.
+Firstmate build instructions are not a substitute for the captain's ask.
+EOF
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" 'has no concrete ask' 'legacy build prose rescued a pointer-only ask'
+  assert_absent "$home/data/$id/launch-brief.md" 'legacy pointer-only ask reached a worker'
+  pass 'fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks'
+}
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion() {
+  local rec home proj fakebin id brief kind out rc
+  local args=()
+  rec=$(make_home spec-placeholder)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout promotion; do
+    id="spec-placeholder-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode direct-PR --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_task_subsections "$brief" 'Fix the badge.' '{FIRSTMATE_SPEC}'
+    fill_whole_dod "$brief"
+    if [ "$kind" = promotion ]; then
+      printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1); rc=$?
+      assert_grep 'kind=scout' "$home/state/$id.meta" 'unfinished spec changed promotion state'
+      assert_absent "$home/data/$id/ship-instructions.md" 'unfinished spec published ship instructions'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      assert_absent "$home/data/$id/launch-brief.md" 'unfinished spec reached a worker'
+    fi
+    [ "$rc" -ne 0 ] || fail "$kind: unfinished spec was admitted"
+    assert_contains "$out" '## Firstmate spec still holds {FIRSTMATE_SPEC}' "$kind: scaffold heading hid the placeholder"
+    fill_task_subsections "$brief" 'Fix the badge.' $'Keep the renderer.\n```text\n{FIRSTMATE_SPEC}\n```'
+    if [ "$kind" = promotion ]; then
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1) \
+        || fail "finished promotion failed: $out"
+      assert_grep 'kind=ship' "$home/state/$id.meta" 'finished promotion did not change state'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+      assert_present "$home/data/$id/launch-brief.md" 'a fenced placeholder example prevented launch rendering'
+    fi
+  done
+  pass 'scaffold headings cannot hide active spec placeholders; fenced examples remain valid'
+}
+
+test_spawn_accepts_crlf_and_refuses_nul_briefs() {
+  local rec home proj fakebin kind id brief out body
+  local args=()
+  rec=$(make_home brief-bytes)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    id="brief-bytes-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode no-mistakes --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_brief_subsections "$brief" 'Fix the badge using https://example.test/report.' 'Keep the renderer.'
+    awk '{ printf "%s\r\n", $0 }' "$brief" > "$brief.crlf"
+    mv "$brief.crlf" "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_present "$home/data/$id/launch-brief.md" "$kind: complete CRLF ask failed admission: $out"
+    assert_not_contains "$out" 'mismatch' "$kind: CRLF changed the delivery contract"
+    if [ "$kind" = ship ]; then
+      body=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/$id/launch-brief.md")
+      assert_contains "$body" 'Fix the badge using https://example.test/report.' 'CRLF lost authorized intent'
+      assert_not_contains "$body" 'Keep the renderer.' 'CRLF mixed specification into authorized intent'
+    fi
+    rm "$home/data/$id/launch-brief.md"
+    printf '\000' >> "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_contains "$out" "malformed input $brief: NUL bytes" "$kind: NUL brief was silently normalized"
+    assert_absent "$home/data/$id/launch-brief.md" "$kind: NUL brief reached a worker"
+  done
+  pass 'complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly'
+}
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion
+test_spawn_accepts_crlf_and_refuses_nul_briefs
+
+test_fresh_spawn_requires_a_concrete_ask
+
+# A promoted scout's plan is built by the command the ship instructions hand the
+# worker. Scout-time criteria stay visible but must not read as ship criteria.
+test_promoted_plan_labels_scout_criteria() {
+  local rec home proj fakebin id=promote-plan instructions command plan
+  rec=$(make_home promote-plan)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+  mkdir -p "$home/data/$id"
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Find why the guard blocks large writes.
+## Firstmate spec
+Measure the guard on recorded sessions.
+Out of scope: changing guard code.
+# Definition of done
+## Definition Of Done (task)
+The report names the blocking threshold.
+## How You're Graded
+EOF
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off >/dev/null 2>&1 \
+    || fail 'promotion to no-mistakes failed'
+  instructions="$home/data/$id/ship-instructions.md"
+  command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$instructions")
+  [ -n "$command" ] || fail 'promoted instructions carry no plan-build command'
+  bash -c "$command" || fail 'promoted plan-build command failed'
+  plan="$home/data/$id/verification-plan.md"
+  assert_grep 'The report names the blocking threshold.' "$plan" 'promoted plan dropped the scout DoD'
+  assert_grep 'Out of scope: changing guard code.' "$plan" 'promoted plan dropped the scout exclusions'
+  assert_grep '## Task Definition Of Done (scout-time context)' "$plan" 'scout DoD read as ship criteria'
+  assert_grep '## Out-of-scope list (scout-time context)' "$plan" 'scout exclusions read as ship exclusions'
+  assert_grep 'the promoted ship intent governs' "$plan" 'promoted plan did not say which intent governs'
+  pass 'fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent'
+}
+
+test_promoted_plan_labels_scout_criteria
 
 # Exercise the serialized input a worker is told to pass to no-mistakes, not
 # just the presence of words somewhere in its much larger launch brief.
@@ -1915,4 +2121,212 @@ test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_position
 test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check
 test_project_mode_resolves_branch_prefix
+# A scout on its own non-fm branch in a governed project whose provisioner
+# refuses, after running any extra fixture Python line.
+# Echoes "<home>|<project-dir>|<slot>".
+promotion_refusal_fixture() {  # <name> <id> [<provisioner-python-line>]
+  local name=$1 id=$2 extra=${3:-} rec home proj fakebin slot
+  rec=$(make_home "$name")
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/$name/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  {
+    printf 'import json\nimport subprocess\nimport sys\n%s\n' "$extra"
+    cat <<'PY'
+print(json.dumps({"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}))
+sys.exit(2)
+PY
+  } > "$proj/scripts/git-stability/provision_existing_slot.py"
+  git -C "$proj" add scripts
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
+  printf '%s\n' "$home|$proj|$slot"
+}
+
+run_promotion() {  # <home> <id>
+  FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" FM_DATA_OVERRIDE="$1/data" FM_CONFIG_OVERRIDE="$1/config" \
+    bash "$PROMOTE" "$2" --mode local-only --yolo off 2>&1
+}
+
+test_governed_promotion_preserves_scout_on_refusal() {
+  local rec home proj id=promote-slot-refused slot meta brief out status original_branch original_head advanced
+  rec=$(promotion_refusal_fixture promote-slot-refused "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  original_branch=$(git -C "$slot" branch --show-current)
+  original_head=$(git -C "$slot" rev-parse HEAD)
+  out=$(run_promotion "$home" "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion admitted a refused slot'
+  assert_contains "$out" 'manifest_live_owner' 'promotion lost the actual governed refusal'
+  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
+  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'refused promotion changed the scout checkout'
+  [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$original_head" ] || fail 'refused promotion moved the scout branch'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion left its own task branch behind'
+  assert_absent "$home/data/$id/ship-instructions.md" 'refused promotion published ship instructions'
+  assert_absent "$slot/.claude/worktrees" 'refused promotion created nested isolation'
+  printf 'scout work\n' > "$slot/scout-work.txt"
+  git -C "$slot" add scout-work.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'scout advances after refusal'
+  advanced=$(git -C "$slot" rev-parse HEAD)
+  out=$(run_promotion "$home" "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail 'retried promotion admitted a refused slot'
+  assert_not_contains "$out" "is not at the assigned copy's HEAD" 'retry was blocked by the earlier refused promotion'
+  assert_contains "$out" 'manifest_live_owner' 'retry did not reach the project owner'
+  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'retry changed the scout checkout'
+  [ "$(git -C "$slot" rev-parse "refs/heads/$original_branch")" = "$advanced" ] || fail 'retry lost the advanced scout work'
+  [ "$(cat "$slot/scout-work.txt")" = 'scout work' ] || fail 'retry lost the scout content'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused retry left its own task branch behind'
+  pass 'governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner'
+}
+
+# Only the alias this refused call created is removed: a task branch that
+# already existed, or that gained work while the project owner ran, survives.
+test_refused_promotion_preserves_other_task_branches() {
+  local rec home proj id=promote-slot-existing slot out head moved
+  rec=$(promotion_refusal_fixture promote-slot-existing "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  head=$(git -C "$slot" rev-parse HEAD)
+  git -C "$slot" branch "fm/$id"
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'pre-existing task branch case lost the refusal'
+  [ "$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id")" = "$head" ] || fail 'refused promotion deleted a pre-existing task branch'
+
+  id=promote-slot-moved
+  rec=$(promotion_refusal_fixture promote-slot-moved "$id" \
+    'subprocess.run(["git", "-C", sys.argv[sys.argv.index("--worktree-path") + 1], "-c", "user.name=Tests", "-c", "user.email=tests@example.invalid", "commit", "-q", "--allow-empty", "-m", "work on the task branch"], check=True)')
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  head=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: fm/$id moved from" 'moved task branch was not reported as preserved'
+  moved=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id") || fail 'refused promotion deleted a task branch that gained work'
+  [ "$moved" != "$head" ] && [ "$(git -C "$slot" rev-parse "$moved^")" = "$head" ] || fail 'moved task branch lost its work'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$head" ] || fail 'refused promotion did not restore the scout checkout'
+  pass 'refused promotion preserves a pre-existing task branch and one that gained work'
+}
+
+# A legacy scout works at a detached HEAD. Its refused promotion removes only
+# the alias it created, so the scout's later detached work never blocks a retry.
+test_refused_detached_promotion_retries_after_scout_advances() {
+  local rec home proj id=promote-slot-detached slot out original advanced
+  rec=$(promotion_refusal_fixture promote-slot-detached "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  git -C "$slot" checkout -q --detach
+  git -C "$slot" branch -D -q scout-retained
+  original=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused detached slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'detached promotion lost the actual governed refusal'
+  assert_not_contains "$out" 'preserving task branch' 'detached rollback did not prove its own alias unused'
+  ! git -C "$slot" symbolic-ref -q HEAD >/dev/null || fail 'refused promotion left the detached scout on a branch'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$original" ] || fail 'refused promotion moved the detached scout'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused detached promotion left its own task branch behind'
+  printf 'detached scout work\n' > "$slot/scout-work.txt"
+  git -C "$slot" add scout-work.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'detached scout advances after refusal'
+  advanced=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'retried detached promotion admitted a refused slot'; fi
+  assert_not_contains "$out" "is not at the assigned copy's HEAD" 'detached retry was blocked by the earlier refused promotion'
+  assert_contains "$out" 'manifest_live_owner' 'detached retry did not reach the project owner'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$advanced" ] || fail 'detached retry lost the advanced scout work'
+  [ "$(git -C "$slot" rev-parse "$advanced^")" = "$original" ] || fail 'detached retry lost the original scout commit'
+  [ "$(cat "$slot/scout-work.txt")" = 'detached scout work' ] || fail 'detached retry lost the scout content'
+  pass 'refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner'
+}
+
+# A project that declared the alias in a PASS manifest has used it, even when
+# Firstmate then rejects the returned identity: the alias and manifest stay.
+test_refused_promotion_preserves_project_declared_branch() {
+  local rec home proj id=promote-slot-declared slot out manifest
+  rec=$(promotion_refusal_fixture promote-slot-declared "$id" "$(cat <<'PY'
+import os
+arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+record = dict(worktree_path=os.path.realpath(arg("--worktree-path")), owner_id=arg("--owner-id"), branch=arg("--branch"),
+              base_sha=arg("--base-sha"), owned_paths=[value.rstrip("/") for flag, value in zip(sys.argv, sys.argv[1:]) if flag == "--owned-path"],
+              lifecycle_state="worktree_active")
+open(os.environ["FM_TEST_SLOT_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
+print(json.dumps(dict(state="PASS", manifest_path=os.environ["FM_TEST_SLOT_RECORD"], **record)))
+sys.exit(0)
+PY
+)")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  manifest="$TMP_ROOT/promote-slot-declared/manifest.json"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts/\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
+  if out=$(FM_TEST_SLOT_RECORD="$manifest" run_promotion "$home" "$id"); then fail 'promotion admitted a mismatched declaration'; fi
+  assert_contains "$out" 'provisioner identity mismatch: owned_paths' 'declared mismatch lost its attestation refusal'
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: the project report may declare it" \
+    'project-declared alias was not reported as preserved'
+  git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion deleted a project-declared task branch'
+  assert_grep "\"branch\": \"fm/$id\"" "$manifest" 'refused promotion changed the project manifest'
+  [ "$(git -C "$slot" branch --show-current)" = scout-retained ] || fail 'refused promotion did not restore the scout checkout'
+  pass 'refused promotion preserves a task branch the project declared before attestation refused it'
+}
+
+# Recorded scope is Firstmate's own frozen contract: a caller's --owned-path is
+# refused before the project owner runs or the record is rewritten.
+test_promotion_refuses_recorded_scope_override() {
+  local rec home proj fakebin id="promote-scope-override-$$" slot meta brief out status
+  rec=$(make_home promote-scope-override)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/promote-scope-override/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  cat > "$proj/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import os
+from pathlib import Path
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text("called", encoding="utf-8")
+raise SystemExit(2)
+PY
+  git -C "$proj" add scripts
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$meta"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  out=$(FM_TEST_PROVISION_CALLED="$TMP_ROOT/promote-scope-override/called" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" bash "$PROMOTE" "$id" --mode local-only --yolo off --owned-path README.md 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion replaced recorded scope'
+  assert_contains "$out" 'cannot override it' 'promotion scope override refusal reason missing'
+  assert_absent "$TMP_ROOT/promote-scope-override/called" 'scope override reached the project owner'
+  cmp -s "$meta" "$meta.before" || fail 'scope override changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'scope override changed the scout contract'
+  assert_absent "$home/data/$id/ship-instructions.md" 'scope override published ship instructions'
+  pass 'promotion refuses to override recorded slot scope before provisioning or rewriting the record'
+}
+
+test_governed_promotion_preserves_scout_on_refusal
+test_refused_promotion_preserves_other_task_branches
+test_refused_detached_promotion_retries_after_scout_advances
+test_refused_promotion_preserves_project_declared_branch
+test_promotion_refuses_recorded_scope_override
+
 echo "# all fm-task-delivery tests passed"

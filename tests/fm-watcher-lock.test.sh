@@ -199,11 +199,11 @@ test_live_stale_watch_lock_is_actionable() {
   pass "live watcher lock with stale heartbeat is actionable"
 }
 
-watcher_check_timeout_case() {
-  local fallback=$1 timeout=$2 runtime=$3 setup=$4 expected=$5
+watcher_check_inactivity_case() {
+  local timeout=$1 runtime=$2 setup=$3 expected=$4
   local dir state fakebin pid i real_mktemp
   real_mktemp=$(command -v mktemp)
-  dir=$(make_case "check-timeout-$fallback-$timeout-$setup-$expected")
+  dir=$(make_case "check-inactivity-$timeout-$setup-$expected")
   state="$dir/state"
   fakebin="$dir/fakebin"
   cat > "$state/timeout.check.sh" <<'SH'
@@ -232,7 +232,7 @@ SH
   fi
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_CHECK_TIMEOUT="$timeout" FM_CHECK_FORCE_FALLBACK="$fallback" \
+    FM_CHECK_TIMEOUT="$timeout" \
     FM_TEST_CHECK_RUNTIME="$runtime" FM_TEST_CHECK_SETUP="$setup" \
     FM_TEST_REAL_MKTEMP="$real_mktemp" \
     "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
@@ -248,16 +248,16 @@ SH
     sleep 0.1
   done
   stop_seed_watcher "$pid" "$dir/watch.err"
-  [ -e "$state/check-started" ] || fail "timeout $timeout never launched (fallback $fallback): $(cat "$dir/watch.err")"
-  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep (fallback $fallback): $(cat "$dir/watch.err")"
+  [ -e "$state/check-started" ] || fail "timeout $timeout never launched: $(cat "$dir/watch.err")"
+  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep: $(cat "$dir/watch.err")"
   if [ "$setup" -gt 0 ]; then
     [ -e "$state/output-setup-started" ] && [ -e "$state/output-setup-finished" ] \
       || fail "slow check-output setup was not exercised"
   fi
   if [ "$expected" = complete ]; then
-    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (fallback $fallback, setup $setup)"
+    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$dir/watch.out" >/dev/null \
-      || fail "timeout $timeout lost actual watcher output (fallback $fallback, setup $setup)"
+      || fail "timeout $timeout lost actual watcher output (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$state/.wake-queue" >/dev/null \
       || fail "timeout $timeout did not queue check output"
   else
@@ -267,15 +267,406 @@ SH
   fi
 }
 
-test_check_timeout_configuration_and_launch_allowance() {
-  local fallback
-  for fallback in 0 1; do
-    watcher_check_timeout_case "$fallback" 08 0.5 0 complete
-    watcher_check_timeout_case "$fallback" 010 9.2 0 complete
-    watcher_check_timeout_case "$fallback" 2 1 4 complete
-    watcher_check_timeout_case "$fallback" 2 4 0 expired
+test_check_inactivity_configuration_and_launch_allowance() {
+  watcher_check_inactivity_case 08 0.5 0 complete
+  watcher_check_inactivity_case 010 9.2 0 complete
+  watcher_check_inactivity_case 2 1 4 complete
+  watcher_check_inactivity_case 2 30 0 expired
+  pass 'decimal inactivity intervals preserve launch allowance and stop a silent check'
+}
+
+test_check_progress_survives_fivefold_slowdown() {
+  local dir state factor pid
+  for factor in 1 5; do
+    dir=$(make_case "progress-$factor")
+    state="$dir/state"
+    cat > "$state/progress.check.sh" <<'SH'
+#!/usr/bin/env bash
+for ((step=0; step<10; step++)); do
+  printf 'working %s\n' "$step" >&2
+  sleep "$FM_TEST_DELAY"
+done
+touch "$FM_STATE_OVERRIDE/check-finished"
+printf 'check-completed\n'
+SH
+    chmod 0700 "$state/progress.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" progress >/dev/null || fail 'registration failed'
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+      FM_TEST_DELAY="0.$factor" "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    while is_live_non_zombie "$pid"; do
+      grep -F 'check-completed' "$dir/watch.out" >/dev/null && break
+      [ ! -e "$state/.last-check" ] || [ -e "$state/check-finished" ] || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -e "$state/check-finished" ] || fail "${factor}x progressing check was killed"
+    grep -F 'check-completed' "$dir/watch.out" >/dev/null || fail 'check output was lost'
+    grep -F 'check-completed' "$state/.wake-queue" >/dev/null || fail 'check wake was lost'
+    ! grep -F 'working ' "$dir/watch.out" >/dev/null || fail 'stderr telemetry became check news'
   done
-  pass "decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers"
+  pass 'authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound'
+}
+
+test_check_sigkill_owner_cleans_progressing_tree() {
+  local dir state pid child launcher descendant leaked=0
+  dir=$(make_case check-sigkill-owner)
+  state="$dir/state"
+  cat > "$state/owner.check.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+sleep 300 &
+printf '%s\n' "$!" > "$FM_STATE_OVERRIDE/descendant-pid"
+printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/launcher-pid"
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-pid"
+while :; do printf 'working\n' >&2; sleep 0.1; done
+SH
+  chmod 0700 "$state/owner.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" owner >/dev/null || fail 'registration failed'
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  while is_live_non_zombie "$pid" && [ ! -s "$state/check-pid" ]; do sleep 0.1; done
+  [ -s "$state/check-pid" ] || fail "check never started: $(cat "$dir/watch.err")"
+  IFS= read -r child < "$state/check-pid"
+  IFS= read -r launcher < "$state/launcher-pid"
+  IFS= read -r descendant < "$state/descendant-pid"
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null || true
+  # Wait for the cleanup owner, not a guessed deadline. On the old direct-exec
+  # path the launcher is the now-dead watcher, exposing the leak immediately.
+  while is_live_non_zombie "$launcher"; do sleep 0.1; done
+  is_live_non_zombie "$child" && leaked=1
+  is_live_non_zombie "$descendant" && leaked=1
+  if [ "$leaked" = 1 ]; then
+    kill -KILL "$child" "$descendant" 2>/dev/null || true
+    fail 'SIGKILL watcher left a progressing TERM-resistant check or descendant alive'
+  fi
+  pass 'SIGKILL owner loss independently cleans a progressing TERM-resistant check tree'
+}
+
+test_check_absolute_limit_stops_endless_progress_as_unknown() {
+  local dir state pid endless mode i
+  for mode in spin spam; do
+    dir=$(make_case "check-absolute-$mode")
+    state="$dir/state"
+    {
+      printf '#!/usr/bin/env bash\n'
+      # shellcheck disable=SC2016 # The generated check expands its own PID and state.
+      printf 'printf "%%s\\n" "$$" > "$FM_STATE_OVERRIDE/endless-pid"\n'
+      if [ "$mode" = spin ]; then
+        printf 'while :; do :; done\n'
+      else
+        printf 'while :; do printf "retrying\\n" >&2; sleep 0.1; done\n'
+      fi
+    } > "$state/a-$mode.check.sh"
+    printf '#!/usr/bin/env bash\nprintf "after-ran\\n"\n' > "$state/b-after.check.sh"
+    chmod 0700 "$state/a-$mode.check.sh" "$state/b-after.check.sh"
+    for i in "a-$mode" b-after; do
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" "$i" >/dev/null \
+        || fail "registration of $i failed"
+    done
+    # FM_DURATION_ABSOLUTE_SECS is fm-duration.py's own test seam for its 6 hour extreme.
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_ABSOLUTE_SECS=8 \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=30 \
+      "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -s "$state/endless-pid" ] || fail "$mode check never started: $(cat "$dir/watch.err")"
+    IFS= read -r endless < "$state/endless-pid"
+    if is_live_non_zombie "$endless"; then
+      kill -KILL "$endless" 2>/dev/null || true
+      fail "$mode check outlived the absolute limit"
+    fi
+    [ -e "$state/.last-check" ] || fail "$mode check blocked the rest of the sweep: $(cat "$dir/watch.err")"
+    grep -F "check a-$mode stopped after" "$state/.watch-triage.log" 2>/dev/null \
+      | grep -F '(absolute limit); result unknown, retry next pass' >/dev/null \
+      || fail "$mode stop did not name the check and its runtime: $(cat "$state/.watch-triage.log" 2>/dev/null)"
+    grep -F "check: $state/b-after.check.sh: after-ran" "$state/.wake-queue" >/dev/null \
+      || fail "the check after a stopped $mode check did not run"
+    awk -F '\t' -v c="$state/a-$mode.check.sh" '$4 == c && index($5, "result unknown, retry next pass") { found = 1 }
+      $4 == c && !index($5, "result unknown, retry next pass") { bad = 1 } END { exit !(found && !bad) }' \
+      "$state/.wake-queue" || fail "a stopped $mode check did not wake as unknown, or produced a verdict"
+  done
+  pass 'a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues'
+}
+
+test_stopped_check_wakes_once_per_episode() {
+  local dir state pid i run notices
+  dir=$(make_case check-stop-episode)
+  state="$dir/state"
+  arm_flaky() {
+    # shellcheck disable=SC2016 # The generated check expands its own state.
+    printf '#!/usr/bin/env bash\n[ ! -e "$FM_STATE_OVERRIDE/hang" ] || sleep 30\nexit 0\n' > "$state/a-flaky.check.sh"
+    chmod 0700 "$state/a-flaky.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" a-flaky >/dev/null \
+      || fail 'registration of a-flaky failed'
+  }
+  arm_flaky
+  for run in stop repeat complete again reregistered rearmed; do
+    case "$run" in complete) rm -f "$state/hang" ;; *) : > "$state/hang" ;; esac
+    case "$run" in
+      reregistered) arm_flaky ;;
+      rearmed)
+        FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-unregister.sh" a-flaky >/dev/null \
+          || fail 'disarming a-flaky failed'
+        arm_flaky
+        ;;
+    esac
+    rm -f "$state/.last-check"
+    : > "$state/.wake-queue"
+    # Each later run is the successor started after the previous run's wake.
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_WATCH_HANDLING_SUCCESSOR="$([ "$run" = stop ] && echo 0 || echo 1)" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=1 \
+      "$WATCH" > "$dir/watch-$run.out" 2> "$dir/watch-$run.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch-$run.err"
+    [ -e "$state/.last-check" ] || fail "$run sweep never finished: $(cat "$dir/watch-$run.err")"
+    notices=$(awk -F '\t' -v c="$state/a-flaky.check.sh" \
+      '$4 == c && index($5, "check a-flaky stopped after") && index($5, "result unknown, retry next pass") { n++ } END { print n + 0 }' \
+      "$state/.wake-queue")
+    case "$run" in
+      stop|again|rearmed) [ "$notices" = 1 ] || fail "the $run stop gave $notices unknown wakes, not one" ;;
+      *) [ "$notices" = 0 ] || fail "the $run sweep gave $notices unknown wakes, not none" ;;
+    esac
+  done
+  pass 'a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one'
+}
+
+test_check_runs_without_posix_python() {
+  local dir state fakebin
+  dir=$(make_case check-no-posix-python)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  # A python3 that is no POSIX interpreter, like a native Windows one on Git Bash.
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/python3"
+  chmod +x "$fakebin/python3"
+  printf '#!/usr/bin/env bash\nprintf "check-ran\\n"\n' > "$state/plain-check.sh"
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_check_capture plain "$STATE/plain-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-ran ] || exit 22
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a check did not run without a POSIX python3: $(cat "$dir/capture.err")"
+  pass 'without a POSIX python3 a check still runs and returns its result'
+}
+
+test_check_owner_loss_terms_a_detached_child() {
+  local dir fifo pid grandchild i
+  dir=$(make_case check-owner-term)
+  fifo="$dir/owner"
+  mkfifo "$fifo"
+  # A child in its own session, the way fm_run_progress starts a read, under a
+  # parent that stays alive in the check's group.
+  cat > "$dir/grandchild.sh" <<'SH'
+#!/usr/bin/env bash
+trap 'printf term > "$FM_TEST_DIR/termed"; exit 0' TERM
+printf '%s\n' "$$" > "$FM_TEST_DIR/grandchild.pid"
+while :; do sleep 0.1; done
+SH
+  chmod +x "$dir/grandchild.sh"
+  # shellcheck disable=SC2016 # The generated check expands its own test directory.
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'exec python3 -c "import subprocess, sys, time; subprocess.Popen([sys.argv[1]], start_new_session=True); time.sleep(60)" "$FM_TEST_DIR/grandchild.sh"' \
+    > "$dir/check.sh"
+  FM_TEST_DIR="$dir" python3 "$ROOT/bin/fm-check-run.py" 3 -- bash "$dir/check.sh" 3< "$fifo" &
+  pid=$!
+  exec 4> "$fifo"
+  for ((i = 0; i < 300; i++)); do
+    [ ! -s "$dir/grandchild.pid" ] || break
+    sleep 0.1
+  done
+  [ -s "$dir/grandchild.pid" ] || { exec 4>&-; wait "$pid"; fail 'the detached child never started'; }
+  IFS= read -r grandchild < "$dir/grandchild.pid"
+  exec 4>&-
+  wait "$pid" || true
+  if kill -0 "$grandchild" 2>/dev/null; then
+    kill -KILL "$grandchild" 2>/dev/null || true
+    fail 'owner loss left the check'"'"'s detached child running'
+  fi
+  [ -e "$dir/termed" ] || fail 'the detached child was killed without a TERM first'
+  pass 'owner loss sends a check'"'"'s detached child TERM before any KILL'
+}
+
+test_stopped_check_tree_is_gone_when_stop_returns() {
+  local dir state
+  dir=$(make_case check-stop-term-ignoring)
+  state="$dir/state"
+  # Every member ignores TERM, so only the launcher's own TERM-then-KILL
+  # cleanup ends them; the detached child is reachable only through it.
+  cat > "$state/detached.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/detached-pid"
+exec sleep 600
+SH
+  chmod +x "$state/detached.sh"
+  cat > "$state/stubborn-check.sh" <<'SH'
+#!/usr/bin/env bash
+exec python3 -c 'import os, signal, subprocess, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+subprocess.Popen([sys.argv[1]], start_new_session=True)
+open(sys.argv[2], "w").write("%d\n" % os.getpid())
+time.sleep(600)' "$FM_STATE_OVERRIDE/detached.sh" "$FM_STATE_OVERRIDE/check-pid"
+SH
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      live() {
+        kill -0 "$1" 2>/dev/null || return 1
+        case "$(ps -p "$1" -o stat= 2>/dev/null)" in Z*) return 1 ;; esac
+      }
+      watcher_beat force
+      CHECK_TIMEOUT=2
+      run_check_capture stubborn "$STATE/stubborn-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+      IFS= read -r check_pid < "$STATE/check-pid" || exit 23
+      IFS= read -r detached_pid < "$STATE/detached-pid" || exit 24
+      ! live "$check_pid" || { kill -KILL "$check_pid" "$detached_pid" 2>/dev/null; exit 25; }
+      ! live "$detached_pid" || { kill -KILL "$detached_pid" 2>/dev/null; exit 26; }
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a stopped check reported cleanup while its TERM-ignoring tree lived (exit $?): $(cat "$dir/capture.err")"
+  pass 'a stopped check returns only after its TERM-ignoring tree, detached child included, is gone'
+}
+
+test_check_stderr_capture_keeps_a_capped_tail() {
+  local dir state
+  dir=$(make_case check-stderr-cap)
+  state="$dir/state"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      CHECK_STDERR_CAP_BYTES=4096
+      CHECK_STDERR_TAIL_BYTES=1024
+      seen_tick() { cp "$FM_CHECK_OUTPUT.stderr" "$STATE/stderr-seen" 2>/dev/null || true; }
+      FM_CAPTURE_OWNER=1 FM_CAPTURE_TICK=seen_tick run_owned_capture 10 0 discard bash -c '\''head -c 100000 /dev/zero | tr "\\0" x >&2; printf "\\nTAIL-MARK\\n" >&2; sleep 3; printf check-finished'\'' || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
+      size=$(wc -c < "$STATE/stderr-seen") || exit 23
+      [ "$size" -le 4096 ] || exit 24
+      grep -F TAIL-MARK "$STATE/stderr-seen" >/dev/null || exit 25
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "private stderr capture was not capped to its tail: $(cat "$dir/capture.err")"
+  pass 'private check stderr is capped and keeps its newest tail'
+}
+
+test_check_wait_has_no_per_tick_processes() {
+  local dir state fakebin
+  dir=$(make_case check-wait-processes)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+[ "$PPID" != "$FM_TEST_WAIT_PID" ] || printf '%s\n' "$*" >> "$FM_TEST_WAIT_LAUNCHES"
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  cat > "$state/controller-check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/controller-child-pid"
+sleep 60
+printf must-not-complete
+SH
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_TEST_WAIT_LAUNCHES="$dir/poll-launches" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      export FM_TEST_WAIT_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_owned_capture 10 0 discard bash -c "sleep 4; printf check-finished; exit 7" || exit 21
+      [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
+      [ "$FM_CHECK_STATUS" = 7 ] || exit 23
+      [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 24
+      deadline_started=$SECONDS
+      run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 25
+      deadline_elapsed=$((SECONDS - deadline_started))
+      [ "$deadline_elapsed" -ge 3 ] || exit 35
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 26
+      IFS= read -r stopped_pid < "$STATE/stopped-pid"
+      ! kill -0 "$stopped_pid" 2>/dev/null || exit 27
+      run_owned_capture 10 0 discard bash -c '\''sleep 60 & printf "%s\\n" "$!" > "$FM_STATE_OVERRIDE/descendant-pid"; printf leader-finished'\'' || exit 28
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = leader-finished ] || exit 29
+      IFS= read -r descendant_pid < "$STATE/descendant-pid"
+      ! kill -0 "$descendant_pid" 2>/dev/null || exit 30
+      [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 31
+      CHECK_TIMEOUT=2
+      run_check_capture controller "$STATE/controller-check.sh" || exit 32
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
+      IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
+      ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "bounded check lost output/status or launched poll sleeps: $(cat "$dir/capture.err" "$dir/poll-launches" 2>/dev/null)"
+  pass "bounded check returns output and failure status without launching per-tick sleep processes"
+}
+
+test_group_cleanup_without_perl_uses_one_sleep_per_wait() {
+  local dir state fakebin nopath tool
+  dir=$(make_case group-cleanup-no-perl)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  nopath="$dir/nopath"
+  mkdir -p "$nopath"
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+[ "$PPID" != "$FM_TEST_WAIT_PID" ] || printf '%s\n' "$*" >> "$FM_TEST_WAIT_LAUNCHES"
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  for tool in bash cat chmod date mkdir mkfifo mktemp mv ps rm stat touch tr uname; do
+    ln -s "$(command -v "$tool")" "$nopath/$tool"
+  done
+  cp "$fakebin/sleep" "$nopath/sleep"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_TEST_WAIT_LAUNCHES="$dir/wait-launches" \
+    bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      export FM_TEST_WAIT_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      PATH=$2
+      ! command -v perl >/dev/null 2>&1 || exit 20
+      run_owned_capture 10 0 discard bash -c '\''(trap "" TERM; exec /bin/sleep 60) & printf "%s\\n" "$!" > "$FM_STATE_OVERRIDE/descendant-pid"; printf leader-finished'\'' || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = leader-finished ] || exit 22
+      IFS= read -r descendant_pid < "$STATE/descendant-pid"
+      ! kill -0 "$descendant_pid" 2>/dev/null || exit 23
+      IFS= read -r first_wait < "$FM_TEST_WAIT_LAUNCHES" || exit 24
+      [ "$first_wait" = 0.20 ] || exit 25
+      launches=0
+      while IFS= read -r wait_bound; do
+        launches=$((launches + 1))
+        case "$wait_bound" in 0.20 | 1.00) ;; *) exit 26 ;; esac
+      done < "$FM_TEST_WAIT_LAUNCHES"
+      [ "$launches" -le 2 ] || exit 27
+      : > "$FM_TEST_WAIT_LAUNCHES"
+      run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 28
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 29
+      IFS= read -r stopped_pid < "$STATE/stopped-pid"
+      ! kill -0 "$stopped_pid" 2>/dev/null || exit 30
+      IFS= read -r first_wait < "$FM_TEST_WAIT_LAUNCHES" || exit 31
+      [ "$first_wait" = 0.20 ] || exit 32
+    ' _ "$WATCH" "$nopath" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "group cleanup without perl lost its bound or launched poll sleeps (status $?): $(cat "$dir/capture.err" "$dir/wait-launches" 2>/dev/null)"
+  pass "group cleanup without perl stops a TERM-ignoring descendant with one sleep per bounded wait"
 }
 
 test_slow_check_beats_but_stopped_poll_goes_stale() {
@@ -335,10 +726,11 @@ SH
 }
 
 test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
-  # A live holder whose beacon is stale past the ordinary grace is refused, but
-  # a beacon stale past the hard bound evicts that holder (identity-verified
-  # TERM) and the arm starts in its place - the deadlock where every re-arm
-  # died against a live-but-stalled watcher while nothing polled the home.
+  # An identity-matched live holder whose beacon is old is a slow cycle and is
+  # kept, until its process tree and beacon are proven to make no progress for
+  # the hard bound; then it is evicted (identity-verified TERM) and the arm starts
+  # in its place - the deadlock where every re-arm died against a live-but-stalled
+  # watcher while nothing polled the home.
   local dir state fakebin out err status holder identity pid i lock_pid
   dir=$(make_case live-stalled-lock)
   state="$dir/state"
@@ -353,14 +745,17 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
-  # Beacon decades old: past the grace, but a bound beyond it -> still refused.
+  # Beacon decades old, but no progress proven for the bound: the first sample
+  # proves nothing, so the holder keeps running and the contender stands down.
   touch -t 200001010000 "$state/.last-watcher-beat"
   status=0
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_WATCHER_STALL_BOUND=9999999999 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
-  [ "$status" -ne 0 ] || fail "watcher replaced a holder whose beacon was under the hard bound"
-  grep -F 'heartbeat is stale' "$err" >/dev/null || fail "under-bound stale holder lost its refusal"
-  is_live_non_zombie "$holder" || fail "under-bound stale holder was signalled"
-  # Same holder and beacon, a bound it is past -> evicted and replaced.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_WATCHER_STALL_BOUND=3 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
+  expect_code 0 "$status" "a contender must stand down for a holder not proven stalled"
+  grep -F "watcher: already running pid $holder" "$out" >/dev/null || fail "unproven stale holder was not kept as running: $(cat "$out" "$err")"
+  is_live_non_zombie "$holder" || fail "unproven stale holder was signalled"
+  # Same holder, still no CPU or beacon progress once the bound has passed since
+  # that sample -> proven stalled, evicted and replaced.
+  sleep 3
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_WATCHER_STALL_BOUND=3 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" &
   pid=$!
   i=0
@@ -379,16 +774,16 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   # the acquire/echo gap.
   i=0
   while [ "$i" -lt 100 ]; do
-    grep -E "^watcher: replaced stalled pid $holder \(beacon [0-9]+s past hard bound 3s\)\$" "$out" >/dev/null && break
+    grep -E "^watcher: replaced stalled pid $holder \(no CPU or beacon progress for 3s; beacon [0-9]+s\)\$" "$out" >/dev/null && break
     sleep 0.1
     i=$((i + 1))
   done
-  grep -E "^watcher: replaced stalled pid $holder \(beacon [0-9]+s past hard bound 3s\)\$" "$out" >/dev/null \
+  grep -E "^watcher: replaced stalled pid $holder \(no CPU or beacon progress for 3s; beacon [0-9]+s\)\$" "$out" >/dev/null \
     || fail "watcher did not report the replacement: $(cat "$out" "$err")"
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
-  pass "live watcher lock with a beacon past the hard bound is replaced, under it is still refused"
+  pass "live watcher lock proven stalled for the hard bound is replaced; an unproven old beacon is kept"
 }
 
 test_guard_warnings() {
@@ -521,7 +916,7 @@ test_lock_steals_dead_pid_lock() {
 # Start a process that claims each given link lock, then SIGKILL it so every
 # claim is left behind with a dead owner - an acquirer TERMed mid-steal.
 leave_dead_link_locks() {  # <state> <lock>...
-  local state=$1 holder i last
+  local state=$1 holder i last lock
   shift
   last=${!#}
   FM_STATE_OVERRIDE="$state" bash -c '
@@ -539,6 +934,10 @@ leave_dead_link_locks() {  # <state> <lock>...
   [ -s "$last/pid" ] || fail "dead link-lock owner did not publish its pid"
   kill -KILL "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
+  # The KILL can land while the last claim rewrites its pid, leaving it empty,
+  # which reads as a fresh mid-acquire owner; a loaded shard can also reuse the
+  # killed PID. Record a verified-dead PID in every claim.
+  for lock do printf '%s\n' "$(dead_pid)" > "$lock/pid"; done
 }
 
 test_lock_reclaims_dead_steal_owner_without_nested_markers() {
@@ -661,9 +1060,6 @@ test_lock_steal_reap_cannot_remove_successor() {
   fakebin="$dir/fakebin"
   out="$dir/competitor"
   leave_dead_link_locks "$state" "$steal"
-  # The killed fixture owner may have its PID reused during a loaded serial
-  # shard. Pin a verified-dead PID so the race exercises reaping, not liveness.
-  printf '%s\n' "$(dead_pid)" > "$steal/pid"
   cat > "$fakebin/rm" <<'SH'
 #!/usr/bin/env bash
 last=
@@ -1503,23 +1899,48 @@ SH
 }
 
 test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
-  local dir state fakebin armout armpid watcher_pid i status
+  local dir state fakebin armout armpid watcher_pid i status real_touch
   dir=$(make_case stopped-watcher)
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  real_touch=$(command -v touch)
+  # SIGSTOP of the watcher alone cannot stop an already-forked touch child.
+  # Stop from that child after its write, before the parent can fork another,
+  # so no in-flight beacon write can undo the test's subsequent backdate.
+  cat > "$fakebin/touch" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 1 ] && [ "$1" = "$FM_STATE_OVERRIDE/.last-watcher-beat" ]; then
+  IFS= read -r holder < "$FM_STATE_OVERRIDE/.watch.lock/pid" || exit 1
+  if [ "$PPID" = "$holder" ] && [ ! -e "$FM_STATE_OVERRIDE/beacon-writer-stopped" ]; then
+    "$FM_TEST_REAL_TOUCH" "$@" || exit "$?"
+    kill -STOP "$PPID" || exit 1
+    printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/beacon-writer-stopped"
+    exit 0
+  fi
+fi
+exec "$FM_TEST_REAL_TOUCH" "$@"
+SH
+  chmod +x "$fakebin/touch"
+  PATH="$fakebin:$PATH" FM_TEST_REAL_TOUCH="$real_touch" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
-    grep -qF 'watcher: started pid=' "$armout" 2>/dev/null && break
+    if grep -qF 'watcher: started pid=' "$armout" 2>/dev/null \
+      && [ -s "$state/beacon-writer-stopped" ]; then
+      break
+    fi
     sleep 0.1
     i=$((i + 1))
   done
   watcher_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
   grep -qF "watcher: started pid=$watcher_pid" "$armout" || fail "load counterfactual watcher did not start"
+  [ "$(cat "$state/beacon-writer-stopped" 2>/dev/null || true)" = "$watcher_pid" ] \
+    || fail "watcher was not stopped after its beacon write completed"
 
   kill -STOP "$watcher_pid" 2>/dev/null || fail "could not SIGSTOP watcher"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir" \
+    || fail "stopped watcher with a fresh beacon was not classified healthy"
   touch -t 200001010000 "$state/.last-watcher-beat"
   FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_alive "$2"' _ "$LIB" "$watcher_pid" \
     || fail "SIGSTOP watcher was not classified as a live pid"
@@ -1726,11 +2147,1210 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+test_lock_alarm_crosses_threshold_during_capture() {
+  local dir
+  dir=$(make_case lock-alarm-during-capture)
+  mkdir -p "$dir/config"
+  : > "$dir/config/fleet-ledger"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "capture contention starved a crossing-threshold lock alarm"
+import json, os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".fleet-ledger.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+watcher = None
+out, err = home / "watch.out", home / "watch.err"
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    status = state / "task.status"
+    status.write_text("working: capture pending through contention\n")
+    # Suppress only the unrelated status wake, not the ledger's pending offset.
+    subprocess.run(["bash", "-c", '. "$1"; fm_wake_status_mark_current "$2" "$3"', "_", str(lib), str(state), str(status)], env=env, check=True)
+    with out.open("w") as stdout, err.open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    beats = set()
+    for _ in range(400):
+        # Before the fix, the real capture registers a waiting acquisition.
+        # After the fix, refusal leaves the observer advancing through polls.
+        waiting = False
+        for receipt in state.glob(".lock-monitor.wait.*"):
+            try: fields = receipt.read_text().splitlines()
+            except FileNotFoundError: continue
+            waiting |= len(fields) >= 2 and fields[1] == str(lock)
+        beat = state / ".last-watcher-beat"
+        if beat.exists(): beats.add(beat.stat().st_mtime_ns)
+        if waiting or len(beats) >= 4: break
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("neither capture contention nor advancing observer was observed")
+    assert not (state / ".task.fleet-ledger-offset").exists(), "busy capture consumed pending status"
+    assert not (state / "fleet-ledger.jsonl").exists(), "busy capture wrote without the lock"
+    assert "check: long-held lock:" not in out.read_text(), "fresh owner alarmed before crossing"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    for _ in range(400):
+        reason = out.read_text()
+        if "check: long-held lock:" in reason and str(lock) in reason: break
+        assert watcher.poll() is None, reason + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("no alarm after a fresh live ledger owner crossed the threshold")
+    assert f"owner={holder.pid}" in reason, reason
+    assert holder.poll() is None and (lock / "pid").read_text().strip() == str(holder.pid), "alarm changed the live owner"
+    deferred = subprocess.run(["bash", str(root / "bin/fm-fleet-ledger.sh"), "capture", "--try-lock"], env=env, capture_output=True, text=True)
+    assert deferred.returncode == 75 and not deferred.stdout and not deferred.stderr, deferred
+    assert watcher.wait(timeout=30) == 0
+    holder.stdin.write("release\n"); holder.stdin.flush()
+    assert holder.wait(timeout=30) == 0
+    subprocess.run(["bash", str(root / "bin/fm-fleet-ledger.sh"), "capture", "--try-lock"], env=env, check=True)
+    rows = [json.loads(line) for line in (state / "fleet-ledger.jsonl").read_text().splitlines()]
+    assert [(r["event"], r["task"], r["state"], r["text"]) for r in rows] == [("task.status", "task", "working", " capture pending through contention")], rows
+finally:
+    if holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        try: watcher.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(watcher.pid, signal.SIGKILL)
+            watcher.wait()
+PY
+  pass "a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture"
+}
 
+test_watcher_skips_own_singleton_locks() {
+  local dir
+  dir=$(make_case lock-alarm-singletons)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "watcher alarmed on a healthy singleton lock"
+import os, pathlib, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+out, err = home / "watch.out", home / "watch.err"
+daemon = subprocess.Popen(["sleep", "300"])
+watcher = None
+def beats(count):
+    seen = set()
+    for _ in range(600):
+        beat = state / ".last-watcher-beat"
+        if beat.exists(): seen.add(beat.stat().st_mtime_ns)
+        if len(seen) >= count: return
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    raise AssertionError("watcher polls did not advance")
+try:
+    singleton = state / ".supervise-daemon.lock"; singleton.mkdir()
+    (singleton / "pid").write_text(f"{daemon.pid}\n")
+    with out.open("w") as stdout, err.open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    beats(2)
+    old = time.time() - 301
+    os.utime(state / ".watch.lock" / "pid", (old, old))
+    os.utime(singleton / "pid", (old, old))
+    beats(4)
+    assert "long-held" not in out.read_text(), out.read_text()
+    # A control lock past the same limit still alarms on that very watcher.
+    control = state / ".fleet-ledger.lock"; control.mkdir()
+    (control / "pid").write_text(f"{daemon.pid}\n")
+    os.utime(control / "pid", (old, old))
+    assert watcher.wait(timeout=60) == 0, err.read_text()
+    reason = out.read_text()
+    assert f"lock={control}" in reason or f"lock={control.resolve()}" in reason, reason
+    queued = (state / ".wake-queue").read_text()
+    assert "long-held" in queued and ".watch.lock" not in queued and ".supervise-daemon.lock" not in queued, queued
+finally:
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        try: watcher.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(watcher.pid, signal.SIGKILL)
+            watcher.wait()
+    daemon.kill(); daemon.wait()
+PY
+  pass "a watcher past the alarm limit stays silent about its own and the daemon's singleton locks"
+}
+
+test_lock_alarm_while_queue_append_waits() {
+  local dir
+  dir=$(make_case lock-alarm-queue-wait)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a blocked queue append starved the long-held lock alarm"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="1", FM_HEARTBEAT_MAX="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+out, err = home / "watch.out", home / "watch.err"
+watcher = holder = None
+try:
+    with out.open("w") as stdout, err.open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    seen = set()
+    for _ in range(600):
+        beat = state / ".last-watcher-beat"
+        if beat.exists(): seen.add(beat.stat().st_mtime_ns)
+        if len(seen) >= 2: break
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("watcher did not reach its poll loop")
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    # Away mode makes the next heartbeat append to the held queue.
+    (state / ".afk").write_text("away\n")
+    for _ in range(600):
+        waiting = False
+        for receipt in state.glob(".lock-monitor.wait.*"):
+            try: fields = receipt.read_text().splitlines()
+            except FileNotFoundError: continue
+            waiting |= len(fields) >= 2 and fields[0] == str(watcher.pid) and fields[1] == str(state.resolve() / lock.name)
+        if waiting: break
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("watcher never waited on the held queue lock: " + out.read_text() + err.read_text())
+    assert "long-held" not in out.read_text(), "fresh queue owner alarmed"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    assert watcher.wait(timeout=60) == 0, err.read_text()
+    reason = out.read_text()
+    assert "check: long-held lock:" in reason and f"owner={holder.pid}" in reason and "queue=unavailable" in reason, reason
+    assert holder.poll() is None and (lock / "pid").read_text().strip() == str(holder.pid), "alarm changed the live queue owner"
+    queue = state / ".wake-queue"
+    assert not queue.exists() or "heartbeat" not in queue.read_text(), "append bypassed the held lock"
+finally:
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        try: watcher.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(watcher.pid, signal.SIGKILL)
+            watcher.wait()
+PY
+  pass "a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock"
+}
+
+test_alarm_spills_consumed_append_for_next_watcher() {
+  local dir
+  dir=$(make_case lock-alarm-spill)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm exit lost a consumed source's wake"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+holder = watcher = None
+try:
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    # The x-poll shape: the source records its event as offered before the
+    # watcher appends the wake, so a lost append can never be re-offered.
+    source = '. "$1"; FM_LOCK_WAIT_TICK=watch_lock_wait_tick; : > "$STATE/offered"; fm_wake_append check x-mention-1 "check: x mention 1" || exit 1; wake "check: x mention 1"'
+    first = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh")], env=env, capture_output=True, text=True, timeout=60)
+    assert first.returncode == 0, first
+    assert "check: long-held lock:" in first.stdout and "x mention 1" not in first.stdout, first
+    assert (state / "offered").exists()
+    spills = sorted(state.glob(".wake-spill.[0-9]*"))
+    assert len(spills) == 1 and spills[0].read_text().splitlines() == ["check", "x-mention-1", "check: x mention 1"], spills
+    queue = state / ".wake-queue"
+    assert not queue.exists() or "x-mention-1" not in queue.read_text(), "append bypassed the held lock"
+    holder.stdin.write("release\n"); holder.stdin.flush()
+    assert holder.wait(timeout=30) == 0
+    with (home / "watch.out").open("w") as stdout, (home / "watch.err").open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    assert (home / "watch.out").read_text().strip(), "next watcher did not wake Main"
+    assert not list(state.glob(".wake-spill.[0-9]*")), "replayed spill was retained"
+    subprocess.run(["bash", "-c", '. "$1"; fm_wake_append check newer "check: newer"', "_", str(lib)], env=env, check=True, timeout=30)
+    keys = [line.split("\t")[3] for line in queue.read_text().splitlines()]
+    assert keys == ["x-mention-1", "newer"], keys
+finally:
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        watcher.wait(timeout=30)
+PY
+  pass "an alarm exit spills a consumed source's pending wake and the next watcher queues it first"
+}
+
+test_alarm_after_queue_frees_appends_before_after_output() {
+  local dir
+  dir=$(make_case lock-alarm-freed-queue)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm wake ran after-output work before the pending append landed"
+import os, pathlib, select, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+release = home / "release"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+fixture = state / ".fleet-ledger.lock"; fixture.mkdir()
+(fixture / "pid").write_text(f"{os.getpid()}\n")
+old = time.time() - 301
+os.utime(fixture / "pid", (old, old))
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; until [ -e "$3" ]; do sleep 0.05; done; fm_lock_release "$2"; IFS= read -r _', "_", str(lib), str(lock), str(release)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    # The queue lock frees while the alarm check runs, so the alarm is queued
+    # and its ordinary wake reaches the after-output step-commit callback.
+    source = """
+. "$1"
+release=$2
+eval "$(declare -f fm_lock_monitor_check | sed '1s/fm_lock_monitor_check/observed_fm_lock_monitor_check/')"
+fm_lock_monitor_check() {
+  : > "$release"
+  while [ -e "$STATE/.wake-queue.lock" ] || [ -L "$STATE/.wake-queue.lock" ]; do sleep 0.05; done
+  observed_fm_lock_monitor_check "$@"
+}
+step_commit_probe() {
+  if grep -F x-mention-2 "$STATE/.wake-queue" >/dev/null 2>&1; then echo landed; else echo missing; fi > "$STATE/step-commit"
+}
+FM_WAKE_AFTER_OUTPUT_ACTION=step_commit_probe
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
+fm_wake_append check x-mention-2 "check: x mention 2" || exit 1
+wake "check: x mention 2"
+"""
+    run = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh"), str(release)], env=env, capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run
+    assert "check: long-held lock:" in run.stdout and fixture.name in run.stdout, run
+    assert (state / "step-commit").read_text().strip() == "landed", "step commit ran without the pending append"
+    keys = [line.split("\t")[3] for line in (state / ".wake-queue").read_text().splitlines()]
+    assert keys.count("x-mention-2") == 1, keys
+    assert not list(state.glob(".wake-spill.[0-9]*")), "a landed append was also spilled"
+finally:
+    release.touch()
+    if holder.poll() is None:
+        holder.stdin.write("done\n"); holder.stdin.flush()
+        holder.wait(timeout=30)
+PY
+  pass "a queue lock freed during the alarm check lands the pending append before after-output work"
+}
+
+test_wake_spill_replay_waits_for_held_queue() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "spill replay under a held queue lock lost or reordered rows"
+import os, pathlib, select, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+with tempfile.TemporaryDirectory(prefix="fm-wake-spill-") as d:
+    state = pathlib.Path(d)
+    lock = state / ".wake-queue.lock"
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", lib, str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    replay = None
+    try:
+        assert select.select([holder.stdout], [], [], 30)[0]
+        assert holder.stdout.readline().strip() == "ready"
+        settle = '. "$1"; FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD="check: $2"; fm_wake_pending_settle'
+        for key in ("spilled-1", "spilled-2"):
+            subprocess.run(["bash", "-c", settle, "_", lib, key], env=env, check=True, timeout=30)
+        spills = sorted(state.glob(".wake-spill.[0-9]*"))
+        assert [p.read_text().splitlines()[1] for p in spills] == ["spilled-1", "spilled-2"], spills
+        replay = subprocess.Popen(["bash", "-c", '. "$1"; fm_wake_spill_replay', "_", lib], env=env)
+        time.sleep(1.5)
+        assert replay.poll() is None, "replay gave up behind a live holder"
+        assert sorted(state.glob(".wake-spill.[0-9]*")) == spills, "replay removed spill files without the lock"
+        queue = state / ".wake-queue"
+        assert not queue.exists() or not queue.read_text(), "replay appended without the lock"
+        holder.stdin.write("release\n"); holder.stdin.flush()
+        assert holder.wait(timeout=30) == 0
+        assert replay.wait(timeout=30) == 0
+        subprocess.run(["bash", "-c", '. "$1"; fm_wake_append check newer "check: newer"', "_", lib], env=env, check=True, timeout=30)
+        keys = [line.split("\t")[3] for line in queue.read_text().splitlines()]
+        assert keys == ["spilled-1", "spilled-2", "newer"], keys
+        assert not list(state.glob(".wake-spill.[0-9]*")), "replayed spill files remained"
+    finally:
+        if holder.poll() is None:
+            holder.stdin.write("release\n"); holder.stdin.flush()
+            holder.wait(timeout=30)
+        if replay is not None and replay.poll() is None:
+            replay.terminate(); replay.wait(timeout=30)
+PY
+  pass "spilled rows wait for a held queue lock, then replay in order ahead of newer rows"
+}
+
+test_alarm_freed_queue_keeps_producer_order() {
+  local dir
+  dir=$(make_case lock-alarm-freed-order)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm row overtook the pending append it interrupted"
+import os, pathlib, select, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+release = home / "release"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+fixture = state / ".fleet-ledger.lock"; fixture.mkdir()
+(fixture / "pid").write_text(f"{os.getpid()}\n")
+old = time.time() - 301
+os.utime(fixture / "pid", (old, old))
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; until [ -e "$3" ]; do sleep 0.05; done; fm_lock_release "$2"; IFS= read -r _', "_", str(lib), str(lock), str(release)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    source = """
+. "$1"
+release=$2
+eval "$(declare -f fm_lock_monitor_check | sed '1s/fm_lock_monitor_check/observed_fm_lock_monitor_check/')"
+fm_lock_monitor_check() {
+  : > "$release"
+  while [ -e "$STATE/.wake-queue.lock" ] || [ -L "$STATE/.wake-queue.lock" ]; do sleep 0.05; done
+  observed_fm_lock_monitor_check "$@"
+}
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
+fm_wake_append check x-mention-4 "check: x mention 4" || exit 1
+wake "check: x mention 4"
+"""
+    run = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh"), str(release)], env=env, capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0 and "check: long-held lock:" in run.stdout, run
+    drained = subprocess.run([str(root / "bin/fm-wake-drain.sh")], env=env, capture_output=True, text=True, timeout=60)
+    rows = [line for line in drained.stdout.splitlines() if "\tx-mention-4\t" in line or "\tlong-held-lock-" in line]
+    assert len(rows) == 2 and "\tx-mention-4\t" in rows[0], (rows, drained.stdout)
+finally:
+    release.touch()
+    if holder.poll() is None:
+        holder.stdin.write("done\n"); holder.stdin.flush()
+        holder.wait(timeout=30)
+PY
+  pass "the drain presents a pending append ahead of the alarm that interrupted its wait"
+}
+
+test_alarm_observation_failure_keeps_waiting_append() {
+  local dir
+  dir=$(make_case lock-alarm-observation-failure)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an observation failure inside a queue wait lost the pending append"
+import os, pathlib, select, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+# A file where the diagnostic index directory belongs makes every check fail.
+(state / ".lock-monitor").write_text("not a directory\n")
+release = home / "release"
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; until [ -e "$3" ]; do sleep 0.05; done; fm_lock_release "$2"', "_", str(lib), str(lock), str(release)], env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    source = '. "$1"; FM_LOCK_WAIT_TICK=watch_lock_wait_tick; : > "$STATE/offered"; fm_wake_append check x-mention-3 "check: x mention 3" || exit 1; wake "check: x mention 3"'
+    out, err = home / "source.out", home / "source.err"
+    with out.open("w") as stdout, err.open("w") as stderr:
+        source_run = subprocess.Popen(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, text=True)
+    # Release only after the injected observation failure ran inside the wait.
+    for _ in range(600):
+        if "long-held lock observation failed" in err.read_text(): break
+        assert source_run.poll() is None, err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("queue wait never ran the failing observation")
+    release.touch()
+    source_run.wait(timeout=60)
+    run = subprocess.CompletedProcess(source_run.args, source_run.returncode, out.read_text(), err.read_text())
+    assert run.returncode == 0 and "check: x mention 3" in run.stdout, run
+    assert "long-held lock observation failed" in run.stderr, run
+    keys = [line.split("\t")[3] for line in (state / ".wake-queue").read_text().splitlines()]
+    assert keys == ["x-mention-3"], keys
+finally:
+    release.touch()
+    holder.wait(timeout=30)
+PY
+  pass "a failed lock observation inside a queue wait keeps waiting and lands the pending append"
+}
+
+test_startup_queue_wait_alarm_releases_with_downtime() {
+  local dir
+  dir=$(make_case lock-alarm-startup-wait)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a delivered startup alarm left the watcher lock without downtime"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+watcher = None
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    with (home / "watch.out").open("w") as stdout, (home / "watch.err").open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    # Startup recovery waits on the fresh queue owner before the poll loop.
+    for _ in range(600):
+        waiting = False
+        for receipt in state.glob(".lock-monitor.wait.*"):
+            try: fields = receipt.read_text().splitlines()
+            except FileNotFoundError: continue
+            waiting |= len(fields) >= 2 and fields[0] == str(watcher.pid) and fields[1] == str(state.resolve() / lock.name)
+        if waiting: break
+        assert watcher.poll() is None, (home / "watch.out").read_text() + (home / "watch.err").read_text()
+        time.sleep(.1)
+    else: raise AssertionError("watcher startup never waited on the queue lock")
+    assert not (state / ".last-watcher-beat").exists(), "watcher reached its poll loop before the startup wait"
+    assert not (state / ".watcher-down").exists(), "downtime existed before the alarm"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    assert "check: long-held lock:" in (home / "watch.out").read_text()
+    assert not (state / ".watch.lock").exists() and not (state / ".watch.lock").is_symlink(), "delivered startup alarm retained the watcher lock"
+    assert (state / ".watcher-down").exists(), "delivered startup alarm did not publish downtime"
+    assert holder.poll() is None and (lock / "pid").read_text().strip() == str(holder.pid), "alarm changed the live queue owner"
+finally:
+    if holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        watcher.wait(timeout=30)
+PY
+  pass "an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock"
+}
+
+test_lock_alarm_project_and_control_limits() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "project or control lock alarm limits failed"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+dead = subprocess.Popen(["true"]); dead.wait()
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    state = subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip()
+    if state.startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
+cases = [
+    (".treehouse-project-abc.lock", os.getpid(), 2246, False),
+    (".treehouse-project-abc.lock", os.getpid(), 301, False),
+    (".fm-lease-command-task-1.lock", os.getpid(), 301, False),
+    (".fm-lease-command-task-1.lock", zombie.pid, 5, True),
+    (".treehouse-project-abc.lock", dead.pid, 5, True),
+    (".treehouse-project-abc.lock", zombie.pid, 5, True),
+    (".control-task-1.lock", os.getpid(), 5, False),
+    (".control-task-1.lock", os.getpid(), 1347601, False),
+    (".control-task-1.lock", dead.pid, 5, True),
+    (".control-task-1.lock", zombie.pid, 5, True),
+]
+try:
+    for name, pid, age, alarms in cases:
+        with tempfile.TemporaryDirectory(prefix="fm-lock-limits-") as d:
+            lock = pathlib.Path(d, name); lock.mkdir()
+            (lock / "pid").write_text(f"{pid}\n")
+            old = time.time() - age
+            os.utime(lock / "pid", (old, old))
+            env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+            with (blocked_waiter(lock, lib, env) if alarms else contextlib.nullcontext()):
+                subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check && fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
+            queue = pathlib.Path(d, ".wake-queue")
+            rows = queue.read_text().splitlines() if queue.exists() else []
+            assert len(rows) == (1 if alarms else 0), (name, pid, age, rows)
+            if alarms:
+                assert f"owner={pid}" in rows[0], rows
+                assert pid != zombie.pid or "state=Z" in rows[0], rows
+            assert (lock / "pid").read_text().strip() == str(pid), "alarm changed the owner"
+finally:
+    zombie.wait()
+PY
+  pass "only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter"
+}
+
+test_pid_alive_reads_proc_state_without_ps() {
+  local dir
+  dir=$(make_case pid-alive-proc)
+  mkdir -p "$dir/proc/$$"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/proc" bash -c '
+    . "$1"
+    stat=$2/proc/$3/stat calls=$2/ps-calls
+    ps() { printf x >> "$calls"; return 1; }
+    printf "%s (odd) name) Z 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 10
+    printf "%s (odd) name) S 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 11
+    [ ! -e "$calls" ] || exit 12
+    rm -f "$stat"
+    fm_pid_alive "$3" || exit 13
+    [ -s "$calls" ] || exit 14
+  ' _ "$LIB" "$dir" "$$" || fail "fm_pid_alive did not classify /proc state without ps (rc=$?)"
+  pass "a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict"
+}
+
+test_pid_alive_reads_multiline_proc_comm() {
+  local dir
+  dir=$(make_case pid-alive-multiline-proc)
+  mkdir -p "$dir/proc/$$"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/proc" bash -c '
+    . "$1"
+    stat=$2/proc/$3/stat calls=$2/ps-calls
+    ps() { printf x >> "$calls"; return 1; }
+    printf "%s (worker) S 1\nname) Z 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 10
+    printf "%s (worker) Z 1\nname) S 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 11
+    printf "%s (worker)\nname) Z 1 2 3" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 12
+    : > "$stat"
+    fm_pid_alive "$3" || exit 13
+    printf "%s (unterminated\nname" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 14
+    [ ! -e "$calls" ] || exit 15
+  ' _ "$LIB" "$dir" "$$" || fail "fm_pid_alive misclassified a multiline /proc comm (rc=$?)"
+  pass "multiline /proc comm uses the state after the last closing parenthesis and keeps unreadable state alive"
+}
+
+test_dead_owner_alarm_names_its_trigger() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not name its proven verdict"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+reaped = subprocess.Popen(["true"]); reaped.wait()
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+check = '. "$1"; fm_lock_monitor_check'
+unreadable_ps = '. "$1"; fixture_owner_pid=$2; ps() { case " $* " in *" $fixture_owner_pid "*) return 1 ;; esac; command ps "$@"; }; fm_lock_monitor_check'
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
+def observe(name, pid, age, code, waiter=False):
+    with tempfile.TemporaryDirectory(prefix="fm-dead-owner-") as d:
+        lock = pathlib.Path(d, name); lock.mkdir()
+        (lock / "pid").write_text(f"{pid}\n")
+        old = time.time() - age
+        os.utime(lock / "pid", (old, old))
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_PROC_ROOT_OVERRIDE=os.path.join(d, "missing-proc"))
+        with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
+            for _ in range(2 if waiter else 1):
+                subprocess.run(["bash", "-c", code, "_", lib, str(pid)], env=env, check=True, timeout=30)
+        queue = pathlib.Path(d, ".wake-queue")
+        return queue.read_text().splitlines() if queue.exists() else []
+try:
+    rows = observe(".control-task-3.lock", reaped.pid, 5, check, waiter=True)
+    assert len(rows) == 1 and f"owner={reaped.pid} state=dead " in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
+    rows = observe(".control-task-3.lock", zombie.pid, 5, check, waiter=True)
+    assert len(rows) == 1 and " state=Z" in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
+    # Unreadable ps keeps a live owner alive: no dead-owner verdict at all.
+    assert observe(".control-task-3.lock", os.getpid(), 5, unreadable_ps, waiter=True) == [], "unreadable ps reported a live owner dead"
+    # A measured lock past its age limit keeps its age text; ps failure stays unknown.
+    rows = observe(".fleet-ledger.lock", os.getpid(), 301, unreadable_ps)
+    assert len(rows) == 1 and " state=unknown " in rows[0] and "trigger=" not in rows[0], rows
+finally:
+    zombie.wait()
+PY
+  pass "dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death"
+}
+
+test_dead_owner_alarm_requires_blocked_waiter() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not follow its blocked-waiter rule"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+dead = subprocess.Popen(["true"]); dead.wait()
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
+try:
+    for pid, waiter in ((dead.pid, False), (zombie.pid, True)):
+        with tempfile.TemporaryDirectory(prefix="fm-dead-owner-waiter-") as d:
+            lock = pathlib.Path(d, ".secondmate-liveness-sm1.lock"); lock.mkdir()
+            (lock / "pid").write_text(f"{pid}\n")
+            env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+            with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
+                subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check; fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
+                assert (lock / "pid").read_text().strip() == str(pid), "the observer reclaimed the lock"
+            queue = pathlib.Path(d, ".wake-queue")
+            rows = queue.read_text().splitlines() if queue.exists() else []
+            if waiter:
+                assert len(rows) == 1 and " state=Z" in rows[0] and " waiters=1 " in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
+            else:
+                assert rows == [], f"an abandoned lock with no waiter woke Main: {rows}"
+finally:
+    zombie.wait()
+PY
+  pass "a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms"
+}
+
+test_dead_owner_alarm_needs_two_checks() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not require two consecutive blocked checks"
+import os, pathlib, select, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
+check = ["bash", "-c", '. "$1"; fm_lock_monitor_check', "_", lib]
+def rows(d):
+    queue = pathlib.Path(d, ".wake-queue")
+    return queue.read_text().splitlines() if queue.exists() else []
+def held(lock, env):
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; exec sleep 300', "_", lib, str(lock)], env=env, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0] and holder.stdout.readline().strip() == "ready", "holder did not acquire"
+    return holder
+# (a) The owner dies while a waiter is blocked, then the waiter reclaims
+# before the next check: one blocked observation never wakes Main.
+with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    lock = pathlib.Path(d, ".control-task-a.lock")
+    owner = held(lock, env)
+    steal = held(pathlib.Path(str(lock) + ".steal"), env)
+    waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo got; exec sleep 300', "_", lib, str(lock)], env=env, stdout=subprocess.PIPE, text=True)
+    try:
+        for _ in range(400):
+            if any(r.read_text().splitlines()[:1] == [str(waiter.pid)] for r in pathlib.Path(d).glob(".lock-monitor.wait.*") if r.exists()): break
+            time.sleep(.05)
+        else: raise AssertionError("waiter never registered")
+        owner.kill(); owner.wait()
+        subprocess.run(check, env=env, check=True, timeout=30)
+        assert rows(d) == [], "the first blocked observation woke Main"
+        steal.kill(); steal.wait()
+        assert select.select([waiter.stdout], [], [], 30)[0] and waiter.stdout.readline().strip() == "got", "waiter did not reclaim"
+        subprocess.run(check, env=env, check=True, timeout=30)
+        subprocess.run(check, env=env, check=True, timeout=30)
+        assert rows(d) == [], f"a reclaimed lock woke Main: {rows(d)}"
+    finally:
+        for p in (owner, steal, waiter):
+            if p.poll() is None: p.kill(); p.wait()
+# (b) A zombie owner keeps blocking a live waiter: silent on the first check,
+# one wake on the second, nothing more for the same episode.
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+dead = subprocess.Popen(["true"]); dead.wait()
+try:
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-b.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{zombie.pid}\n")
+        with blocked_waiter(lock, lib, env):
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert rows(d) == [], "the first blocked observation woke Main"
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert len(rows(d)) == 1 and " state=Z" in rows(d)[0] and rows(d)[0].endswith(" trigger=dead-owner"), rows(d)
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert len(rows(d)) == 1, "the same episode woke Main twice"
+    # (c) An owner record that changes after the waiter count is revalidated
+    # before publication, so a replaced owner never publishes the old verdict.
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-c.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{dead.pid}\n")
+        replaced = """. "$1"; fixture_lock=$2 fixture_waiter=$3 fixture_live=$4
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
+fm_lock_monitor_check
+fm_pid_alive() { [ "$1" != "$fixture_waiter" ] || printf '%s\\n' "$fixture_live" > "$fixture_lock/pid"; observed_fm_pid_alive "$1"; }
+fm_lock_monitor_check"""
+        with blocked_waiter(lock, lib, env) as waiter:
+            subprocess.run(["bash", "-c", replaced, "_", lib, str(lock), str(waiter.pid), str(os.getpid())], env=env, check=True, timeout=30)
+        assert rows(d) == [], f"a replaced owner published the old dead verdict: {rows(d)}"
+    # (d) An in-place handoff from dead owner A to live owner B keeps the pid
+    # file's inode and mtime. The dead verdict for A must not admit B, so B,
+    # dying later, still needs two dead observations of its own.
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-d.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{dead.pid}\n")
+        successor = subprocess.Popen(["sleep", "300"])
+        handoff = """. "$1"; fixture_lock=$2 fixture_old=$3 fixture_new=$4 fixture_ref=$5
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
+fm_pid_alive() {
+  if [ "$1" = "$fixture_old" ]; then
+    touch -r "$fixture_lock/pid" "$fixture_ref"
+    printf '%s\\n' "$fixture_new" > "$fixture_lock/pid"
+    touch -r "$fixture_ref" "$fixture_lock/pid"
+    return 1
+  fi
+  observed_fm_pid_alive "$1"
+}
+fm_lock_monitor_check"""
+        try:
+            with blocked_waiter(lock, lib, env):
+                inode = (lock / "pid").stat().st_ino
+                subprocess.run(["bash", "-c", handoff, "_", lib, str(lock), str(dead.pid), str(successor.pid), os.path.join(d, "mtime-ref")], env=env, check=True, timeout=30)
+                assert (lock / "pid").read_text().strip() == str(successor.pid) and (lock / "pid").stat().st_ino == inode, "handoff was not in place"
+                successor.kill(); successor.wait()
+                subprocess.run(check, env=env, check=True, timeout=30)
+                assert rows(d) == [], f"one dead observation of the successor woke Main: {rows(d)}"
+                subprocess.run(check, env=env, check=True, timeout=30)
+                assert len(rows(d)) == 1 and f"owner={successor.pid} " in rows(d)[0], rows(d)
+        finally:
+            if successor.poll() is None: successor.kill(); successor.wait()
+finally:
+    zombie.wait()
+PY
+  pass "a dead owner alarms only after two consecutive blocked checks, revalidated before publication"
+}
+
+test_alarm_runs_during_watcher_down_waits() {
+  local dir
+  dir=$(make_case lock-alarm-watcher-down-wait)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a stuck recovery-marker holder starved the long-held lock alarm"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+marker = state / ".watcher-down.lock"
+queue_lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+watch = root / "bin/fm-watch.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+def hold(lock):
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; exec sleep 300', "_", str(lib), str(lock)], env=env, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0] and holder.stdout.readline().strip() == "ready", "holder did not acquire"
+    return holder
+def blocked_on(pid, lock, timeout=60):
+    target = str(state.resolve() / lock.name)
+    for _ in range(timeout * 10):
+        for receipt in state.glob(".lock-monitor.wait.*"):
+            try: fields = receipt.read_text().splitlines()
+            except FileNotFoundError: continue
+            if len(fields) >= 2 and fields[0] == str(pid) and fields[1] == target: return
+        time.sleep(.1)
+    raise AssertionError(f"pid {pid} never waited on {lock.name}")
+def age(lock):
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+def owner(lock):
+    return (lock / "pid").read_text().strip()
+def keys():
+    queue = state / ".wake-queue"
+    return [line.split("\t")[3] for line in queue.read_text().splitlines()] if queue.exists() else []
+def release(*procs):
+    for p in procs:
+        if p is not None and p.poll() is None:
+            p.kill(); p.wait()
+# Startup: reopen-announced holds the queue lock and waits on the marker lock.
+holder = hold(marker); watcher = None
+try:
+    with (home / "watch.out").open("w") as out, (home / "watch.err").open("w") as err:
+        watcher = subprocess.Popen(["bash", str(watch)], env=env, stdout=out, stderr=err, start_new_session=True)
+    blocked_on(watcher.pid, marker)
+    assert owner(queue_lock) == str(watcher.pid), "startup did not hold the queue lock while waiting"
+    age(marker)
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    reason = (home / "watch.out").read_text()
+    assert "check: long-held lock:" in reason and ".watcher-down.lock" in reason and f"owner={holder.pid} " in reason and "queue=unavailable" in reason, reason
+    assert holder.poll() is None and owner(marker) == str(holder.pid), "the alarm changed the marker owner"
+    assert owner(queue_lock) == str(watcher.pid), "the alarm reclaimed the queue lock it held"
+finally:
+    release(holder)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM); watcher.wait(timeout=30)
+subprocess.run(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" && fm_lock_release "$2"', "_", str(lib), str(queue_lock)], env=env, check=True, timeout=30)
+for f in state.glob(".lock-monitor.hold.*"): f.unlink()
+# Append: the watcher's own append holds the queue lock and waits on the
+# marker lock with its row in flight; the alarm spills that row, keeps it out
+# of the queue, and the next append queues it first, exactly once.
+holder = hold(marker)
+try:
+    age(marker)
+    source = '. "$1"; printf "%s\\n" "$$" > "$STATE/appender.pid"; FM_LOCK_WAIT_TICK=watch_lock_wait_tick; : > "$STATE/offered"; fm_wake_append check x-mention-5 "check: x mention 5" || exit 1; wake "check: x mention 5"'
+    run = subprocess.run(["bash", "-c", source, "_", str(watch)], env=env, capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0 and ".watcher-down.lock" in run.stdout and "x mention 5" not in run.stdout, run
+    spills = sorted(state.glob(".wake-spill.[0-9]*"))
+    assert [p.read_text().splitlines()[1] for p in spills] == ["x-mention-5"], spills
+    assert "x-mention-5" not in keys(), "the in-flight row bypassed the marker lock"
+    assert owner(queue_lock) == (state / "appender.pid").read_text().strip(), "the alarm reclaimed the queue lock the append held"
+    assert holder.poll() is None and owner(marker) == str(holder.pid), "the alarm changed the marker owner"
+finally:
+    release(holder)
+subprocess.run(["bash", "-c", '. "$1"; fm_wake_append check newer "check: newer"', "_", str(lib)], env=env, check=True, timeout=30)
+assert keys().count("x-mention-5") == 1 and keys().index("x-mention-5") < keys().index("newer"), keys()
+assert not list(state.glob(".wake-spill.[0-9]*")), "replayed spill was retained"
+PY
+  pass "every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row"
+}
+
+test_exit_cleanup_wait_never_delivers_second_wake() {
+  local dir
+  dir=$(make_case lock-alarm-exit-cleanup)
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an exit-cleanup lock wait delivered a second wake"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+marker = state / ".watcher-down.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="1", FM_HEARTBEAT_MAX="1",
+           FM_WATCHER_CLEANUP_LOCK_BOUND="5",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+def hold(lock):
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; IFS= read -r _; fm_lock_release "$2"', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0] and holder.stdout.readline().strip() == "ready", f"{lock.name} holder did not acquire"
+    return holder
+def release(holder):
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+# After its output, wake retries the delivery lock for 0.4s; holding it keeps
+# the delivered watcher there long enough to stop it before EXIT cleanup.
+delivery = hold(state / ".watch-deliveries.lock")
+aged = state / ".fleet-ledger.lock"; aged.mkdir()
+(aged / "pid").write_text(f"{os.getpid()}\n")
+(state / ".afk").write_text("away\n")
+watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=subprocess.PIPE, stderr=open(home / "watch.err", "w"), start_new_session=True)
+marker_holder = None
+try:
+    assert select.select([watcher.stdout], [], [], 60)[0], (home / "watch.err").read_text()
+    first = watcher.stdout.readline().decode().strip()
+    os.killpg(watcher.pid, signal.SIGSTOP)
+    assert first == "heartbeat", first
+    assert (state / ".watch.lock").exists() or (state / ".watch.lock").is_symlink(), "cleanup ran before the watcher was stopped"
+    marker_holder = hold(marker)
+    old = time.time() - 301
+    os.utime(aged / "pid", (old, old))
+    os.killpg(watcher.pid, signal.SIGCONT)
+    target = str(state.resolve() / marker.name)
+    for _ in range(600):
+        if any(p.read_text().splitlines()[:2] == [str(watcher.pid), target] for p in state.glob(".lock-monitor.wait.*") if p.exists()): break
+        assert watcher.poll() is None, (home / "watch.err").read_text()
+        time.sleep(.05)
+    else: raise AssertionError("exit cleanup never waited on the recovery marker")
+    # Past the 1s poll tick and inside the 5s cleanup bound.
+    time.sleep(2.5)
+    release(marker_holder)
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    rest = watcher.stdout.read().decode().splitlines()
+    assert rest == [], f"exit cleanup delivered another reason: {rest}"
+    assert not (state / ".watch.lock").exists() and not (state / ".watch.lock").is_symlink(), "cleanup did not release the watcher lock"
+    assert (state / ".watcher-down").exists(), "cleanup did not publish downtime"
+finally:
+    release(marker_holder); release(delivery)
+    if watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGCONT)
+        os.killpg(watcher.pid, signal.SIGTERM); watcher.wait(timeout=30)
+PY
+  pass "exit cleanup's bounded recovery-marker wait never delivers a second wake"
+}
+
+test_long_held_lock_alarm() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
+import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
+with tempfile.TemporaryDirectory(prefix="fm-lock-alarm-") as d:
+    lib = sys.argv[1]
+    state = pathlib.Path(d, "state"); state.mkdir()
+    lock = state / ".fleet-ledger.lock"; lock.mkdir()
+    (lock / "pid").write_text(str(os.getpid()) + "\n")
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=str(state))
+    check = ["bash", "-c", '. "$1"; fm_lock_monitor_check', "_", lib]
+    subprocess.run(check, env=env, check=True)
+    queue = state / ".wake-queue"
+    assert not queue.exists(), "fresh lock raised an alarm"
+    # A watcher can adopt the published lock before the holder publishes its
+    # own receipt. Both references describe one ownership episode, not two.
+    subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_register "$2" "$2"', "_", lib, str(lock)], env=env, check=True)
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    waiters = [subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"; fm_lock_release "$2"', "_", lib, str(lock)], env=env) for _ in range(2)]
+    try:
+        for _ in range(200):
+            receipts = list(state.glob(".lock-monitor.wait.*"))
+            if len(receipts) == 2 and all(len(p.read_text().splitlines()) == 3 for p in receipts): break
+            time.sleep(.05)
+        else: raise AssertionError("waiters did not register")
+        subprocess.run(check, env=env, check=True)
+        subprocess.run(check, env=env, check=True)
+        rows = queue.read_text().splitlines()
+        assert len(rows) == 1, rows
+        reason = rows[0].split("\t", 4)[4]
+        for field in [f"lock={lock}", f"owner={os.getpid()}", "state=", f"parent={os.getppid()}", "parent_command=", "age=", "waiters=2"]:
+            assert field in reason, (field, reason)
+        assert all(p.poll() is None for p in waiters), "alarm stopped a waiter"
+        assert (lock / "pid").read_text().strip() == str(os.getpid()), "alarm reclaimed the owner"
+    finally:
+        for p in waiters: p.terminate()
+        for p in waiters: p.wait(timeout=10)
+    shutil.rmtree(lock)
+    subprocess.run(check, env=env, check=True)  # absence retires the episode
+    lock.mkdir(); (lock / "pid").write_text(str(os.getpid()) + "\n")
+    os.utime(lock / "pid", (old, old))
+    subprocess.run(check, env=env, check=True)
+    assert len(queue.read_text().splitlines()) == 2, "new episode was suppressed"
+    # The check must not wait on, or reclaim, the lock it is reporting, even
+    # when that lock protects the usual wake queue itself.
+    queue_lock = state / ".wake-queue.lock"; queue_lock.mkdir()
+    (queue_lock / "pid").write_text(str(os.getpid()) + "\n")
+    os.utime(queue_lock / "pid", (old, old))
+    emergency = ["bash", "-c", '. "$1"; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"; fm_lock_monitor_delivered 0', "_", lib]
+    first = subprocess.check_output(emergency, env=env, text=True, timeout=30)
+    assert f"lock={queue_lock}" in first and "queue=unavailable receipt=" in first, first
+    assert not subprocess.check_output(emergency, env=env, text=True, timeout=30).strip(), "emitted emergency repeated"
+    dead = subprocess.Popen(["true"]); dead.wait()
+    (queue_lock / "pid").write_text(str(dead.pid) + "\n")
+    os.utime(queue_lock / "pid", (old, old))
+    output = subprocess.check_output(emergency, env=env, text=True, timeout=30)
+    assert f"owner={dead.pid} state=dead " in output, output
+    assert (queue_lock / "pid").read_text().strip() == str(dead.pid), "alarm reclaimed a dead owner"
+    assert len(queue.read_text().splitlines()) == 2, "emergency bypass altered the blocked queue"
+PY
+  pass "fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue"
+}
+
+test_lock_alarm_discovers_foreign_owners() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "foreign-owner alarm discovery failed"
+import os, pathlib, select, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+for scenario in ("foreign-index", "external-waiter"):
+    with tempfile.TemporaryDirectory(prefix="fm-lock-discovery-") as d:
+        base = pathlib.Path(d)
+        a, b = base / "a", base / "b"
+        a.mkdir(); b.mkdir()
+        lock = (b if scenario == "foreign-index" else base) / ".fleet-ledger.lock"
+        env_a = dict(os.environ, FM_HOME=str(a), FM_STATE_OVERRIDE=str(a))
+        env_b = dict(os.environ, FM_HOME=str(b), FM_STATE_OVERRIDE=str(b))
+        owner = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "owner-a", lib, str(lock)], env=env_a, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        waiter = None
+        try:
+            assert select.select([owner.stdout], [], [], 30)[0], "owner did not acquire"
+            assert owner.stdout.readline().strip() == "ready"
+            if scenario == "external-waiter":
+                waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT', "waiter-b", lib, str(lock)], env=env_b)
+                for _ in range(300):
+                    if list(b.glob(".lock-monitor.wait.*")): break
+                    time.sleep(.05)
+                else: raise AssertionError("external waiter did not register")
+            check = '. "$1"; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"'
+            fresh = subprocess.run(["bash", "-c", check, "observer-b", lib], env=env_b, text=True, capture_output=True, check=True)
+            assert not fresh.stdout.strip() and not (b / ".wake-queue").exists(), fresh
+            foreign_index = {p.name: p.read_bytes() for p in a.glob(".lock-monitor*") if p.is_file()}
+            owner_record = (lock / "monitor-record").read_bytes()
+            old = time.time() - 301
+            os.utime(lock / "pid", (old, old))
+            observed = subprocess.run(["bash", "-c", check + '; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"', "observer-b", lib], env=env_b, text=True, capture_output=True, check=True)
+            lines = observed.stdout.splitlines()
+            assert len(lines) == 2 and lines[1] == "", observed
+            reason = lines[0]
+            assert "check: long-held lock:" in reason and str(lock) in reason and f"owner={owner.pid}" in reason, reason
+            assert f"waiters={1 if waiter else 0}" in reason, reason
+            assert len((b / ".wake-queue").read_text().splitlines()) == 1, "duplicate episode wake"
+            assert owner.poll() is None and (lock / "pid").read_text().strip() == str(owner.pid), "observer changed ownership"
+            assert (lock / "monitor-record").read_bytes() == owner_record, "observer rewrote foreign owner metadata"
+            assert {p.name: p.read_bytes() for p in a.glob(".lock-monitor*") if p.is_file()} == foreign_index, "observer changed the foreign index"
+            assert waiter is None or waiter.poll() is None, "observer acquired a live held lock"
+        finally:
+            if owner.poll() is None:
+                owner.stdin.write("release\n"); owner.stdin.flush()
+                owner.wait(timeout=30)
+            if waiter is not None: waiter.wait(timeout=30)
+PY
+  pass "local observation covers foreign-indexed state locks and never-owned external locks without touching the foreign index"
+}
+
+test_lock_monitor_prunes_finished_waiters() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "finished waiter diagnostic cleanup failed"
+import os, pathlib, select, subprocess, sys, tempfile
+lib = sys.argv[1]
+with tempfile.TemporaryDirectory(prefix="fm-finished-waiter-") as d:
+    state = pathlib.Path(d)
+    lock = state / ".held.lock"
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    owner = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "receipt-owner", lib, str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        assert select.select([owner.stdout], [], [], 30)[0]
+        assert owner.stdout.readline().strip() == "ready"
+        refused = subprocess.run(["bash", "-c", '. "$1"; fm_lock_acquire_wait_bounded "$2" 1', "refused-waiter", lib, str(lock)], env=env)
+        assert refused.returncode == 124, refused
+        checked = subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"', "observer", lib], env=env, text=True, capture_output=True, check=True)
+        assert not checked.stdout.strip(), checked
+        leftovers = list(state.glob(".lock-monitor.wait.*"))
+        assert not leftovers, f"finished waiters retained: {leftovers}"
+        assert owner.poll() is None and (lock / "pid").read_text().strip() == str(owner.pid)
+        owner.stdin.write("release\n"); owner.stdin.flush()
+        assert owner.wait(timeout=30) == 0
+    finally:
+        if owner.poll() is None:
+            owner.stdin.write("release\n"); owner.stdin.flush()
+            owner.wait(timeout=30)
+PY
+  pass "a timed-out waiter is pruned without alarming on or changing the fresh live owner"
+}
+
+test_lock_receipts_retire_with_release() {
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "lock receipt retirement failed"
+import os, pathlib, subprocess, sys, tempfile
+with tempfile.TemporaryDirectory(prefix="fm-lock-receipts-") as d:
+    lib = sys.argv[1]
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    held = '. "$1"; fm_lock_acquire_wait "$2" || exit 1; cat "$2/monitor-record"'
+    lock = d + "/.fixture.lock"
+    receipt = pathlib.Path(subprocess.check_output(["bash", "-c", held, "_", lib, lock], env=env, text=True, timeout=30).strip())
+    assert receipt.read_text().splitlines()[0] == str(pathlib.Path(d).resolve() / ".fixture.lock"), receipt.read_text()
+    subprocess.run(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" && fm_lock_release "$2"; [ ! -e "$2" ]', "_", lib, lock], env=env, check=True, timeout=30)
+    assert not list(pathlib.Path(d).glob(".lock-monitor.hold.*")), "released receipt leaked"
+    # Away-contract acquisition has function-local STATE; its EXIT release
+    # happens after that scope ends. The receipt must still retire.
+    scoped = '''
+set -u
+unset STATE
+take() {
+  local STATE=$2
+  . "$1"
+  fm_lock_acquire_wait "$STATE/.scoped.lock"
+}
+take "$1" "$2" || exit 1
+[ -z "${STATE+x}" ] || exit 2
+trap 'fm_lock_release "$2/.after-scope.lock"; fm_lock_release "$2/.scoped.lock"' EXIT
+fm_lock_acquire_wait "$2/.after-scope.lock" || exit 3
+'''
+    holder = subprocess.Popen(["bash", "-c", scoped, "scoped-holder", lib, d], env=env)
+    assert holder.wait(timeout=30) == 0, "receipt bookkeeping depended on expired STATE scope"
+    assert not pathlib.Path(d, ".scoped.lock").is_symlink()
+    assert not list(pathlib.Path(d).glob(".scoped.lock.owner.*")), "scoped owner metadata leaked"
+    assert not list(pathlib.Path(d).glob(".lock-monitor.hold.*")), "scoped diagnostic receipt leaked"
+PY
+  pass "released locks retire their diagnostic receipts across scoped owners without hold telemetry"
+}
+
+test_zombie_owner_is_reclaimed() {
+  # Keep the parent alive without waitpid until the second process finishes.
+  # This proves SIGKILL bypasses EXIT cleanup and kill -0 still sees the zombie;
+  # it does not identify the source of the historical incident's signal.
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "zombie lock owner was not reclaimed"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+with tempfile.TemporaryDirectory(prefix="fm-zombie-lock-") as d:
+    lib = sys.argv[1]
+    lock, ready = d + "/.fleet-ledger.lock", d + "/ready"
+    env = dict(os.environ, FM_STATE_OVERRIDE=d, FM_HOME=d)
+    pid = os.fork()
+    if pid == 0:
+        os.execvpe("bash", ["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; : > "$3"; while :; do read -r -t 1 _ || :; done', "_", lib, lock, ready], env)
+    try:
+        for _ in range(200):
+            if pathlib.Path(ready).exists(): break
+            time.sleep(.05)
+        else: raise AssertionError("holder did not acquire")
+        os.kill(pid, signal.SIGKILL)
+        for _ in range(200):
+            state = subprocess.check_output(["ps", "-o", "stat=", "-p", str(pid)], text=True).strip()
+            if state.startswith("Z"): break
+            time.sleep(.05)
+        else: raise AssertionError("parent did not retain a zombie")
+        os.kill(pid, 0)
+        assert pathlib.Path(lock, "pid").read_text().strip() == str(pid)
+        code = '. "$1"; for ((i=0;i<20;i++)); do if fm_lock_try_acquire "$2"; then [ "$FM_LOCK_RECOVERED_PID" = "$3" ] || exit 2; fm_lock_release "$2"; exit 0; fi; sleep .1; done; exit 1'
+        subprocess.run(["bash", "-c", code, "_", lib, lock, str(pid)], env=env, check=True, timeout=30)
+        # The parent still has not reaped it, so success cannot be due to exit.
+        assert subprocess.check_output(["ps", "-o", "stat=", "-p", str(pid)], text=True).strip().startswith("Z")
+    finally:
+        try: os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        os.waitpid(pid, 0)
+PY
+  pass "an unreaped SIGKILLed owner is reclaimed without killing its parent"
+}
+
+test_unreadable_ps_never_reclaims_live_owner() {
+  local dir
+  dir=$(make_case lock-unreadable-ps)
+  mkdir "$dir/state/.fixture.lock"
+  printf '%s\n' "$$" > "$dir/state/.fixture.lock/pid"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/missing-proc" bash -c '
+    . "$1"
+    for mode in failure empty; do
+      ps() { if [ "$mode" = failure ]; then printf "Z\\n"; return 1; fi; return 0; }
+      fm_pid_alive "$3" || exit 10
+      if fm_lock_try_acquire "$2"; then exit 11; fi
+      [ "$(cat "$2/pid")" = "$3" ] || exit 12
+    done
+  ' _ "$LIB" "$dir/state/.fixture.lock" "$$" || fail "unreadable ps displaced a live owner"
+  pass "failed and empty ps results retain live lock ownership"
+}
+
+test_lock_wait_breadcrumb() {
+  local dir other
+  dir=$(make_case lock-wait-breadcrumb)
+  sleep 300 & other=$!
+  mkdir "$dir/state/.fixture.lock"
+  printf '%s\n' "$$" > "$dir/state/.fixture.lock/pid"
+  # shellcheck disable=SC2094 # Intentionally inspect stderr already emitted by this still-waiting process.
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '
+    . "$1"
+    ticks=0 lock=$2 other=$3 err=$4
+    sleep() {
+      ticks=$((ticks + 1))
+      # Advance the shell clock, not the production threshold. Each attempt
+      # still exercises the real lock refusal against a different live PID.
+      case "$ticks" in
+        3) [ ! -s "$err" ] || exit 21 ;;
+        4) [ "$(wc -l < "$err")" -eq 1 ] || exit 22 ;;
+        5) [ "$(wc -l < "$err")" -eq 1 ] || exit 23; printf "%s\\n" "$other" > "$lock/pid" ;;
+        6) [ "$(wc -l < "$err")" -eq 2 ] || exit 24 ;;
+        7) [ "$(wc -l < "$err")" -eq 2 ] || exit 25; rm -rf "$lock" ;;
+      esac
+      SECONDS=$((SECONDS + 20))
+    }
+    fm_lock_acquire_wait "$lock" || exit 26
+    [ "$ticks" -eq 7 ] || exit 27
+    fm_lock_release "$lock"
+  ' _ "$LIB" "$dir/state/.fixture.lock" "$other" "$dir/wait.err" 2> "$dir/wait.err"
+  local rc=$?
+  kill "$other" 2>/dev/null || true; wait "$other" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "wait breadcrumb timing/repetition failed (rc=$rc): $(cat "$dir/wait.err")"
+  grep -F "lock=$dir/state/.fixture.lock owner=$$ state=" "$dir/wait.err" >/dev/null || fail "first owner missing"
+  grep -F "owner=$other state=" "$dir/wait.err" >/dev/null || fail "successor owner missing"
+  grep -E 'since=[0-9]+' "$dir/wait.err" >/dev/null || fail "wait start missing"
+  pass "waiter warns after 60s once per owner and continues to acquire"
+}
+
+fm_test_only
+
+test_lock_alarm_crosses_threshold_during_capture
+test_watcher_skips_own_singleton_locks
+test_lock_alarm_while_queue_append_waits
+test_alarm_spills_consumed_append_for_next_watcher
+test_alarm_after_queue_frees_appends_before_after_output
+test_wake_spill_replay_waits_for_held_queue
+test_alarm_freed_queue_keeps_producer_order
+test_alarm_observation_failure_keeps_waiting_append
+test_alarm_runs_during_watcher_down_waits
+test_exit_cleanup_wait_never_delivers_second_wake
+test_startup_queue_wait_alarm_releases_with_downtime
+test_lock_alarm_project_and_control_limits
+test_pid_alive_reads_proc_state_without_ps
+test_pid_alive_reads_multiline_proc_comm
+test_dead_owner_alarm_names_its_trigger
+test_dead_owner_alarm_requires_blocked_waiter
+test_dead_owner_alarm_needs_two_checks
+test_long_held_lock_alarm
+test_lock_alarm_discovers_foreign_owners
+test_lock_monitor_prunes_finished_waiters
+test_lock_receipts_retire_with_release
+test_zombie_owner_is_reclaimed
+test_unreadable_ps_never_reclaims_live_owner
+test_lock_wait_breadcrumb
 test_wait_deadline_reaps_a_stopped_child
 test_singleton_start
 test_pid_identity_is_locale_invariant
@@ -1740,8 +3360,18 @@ test_msys_pid_identity_uses_proc
 test_stale_watch_lock_reclaimed
 test_stale_watch_reclaim_publishes_before_clear
 test_live_stale_watch_lock_is_actionable
+test_check_wait_has_no_per_tick_processes
+test_group_cleanup_without_perl_uses_one_sleep_per_wait
 test_slow_check_beats_but_stopped_poll_goes_stale
-test_check_timeout_configuration_and_launch_allowance
+test_check_inactivity_configuration_and_launch_allowance
+test_check_progress_survives_fivefold_slowdown
+test_check_sigkill_owner_cleans_progressing_tree
+test_check_absolute_limit_stops_endless_progress_as_unknown
+test_stopped_check_wakes_once_per_episode
+test_check_runs_without_posix_python
+test_check_owner_loss_terms_a_detached_child
+test_stopped_check_tree_is_gone_when_stop_returns
+test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

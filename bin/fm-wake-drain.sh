@@ -6,9 +6,10 @@
 # newer branch outcome, OPEN DECISIONS, captain-call record divergence, and on
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
-# Overdue open-work rows (OVERDUE, STANDING) are presented first, and
-# acknowledgement refuses while a presented row lacks an action receipt;
-# docs/configuration.md "Open-work ledger" owns that gate.
+# Overdue open-work rows that need an action (OVERDUE) are presented first; only an
+# open-loop-ledger-resurface drain adds covered rows (STANDING) and the WAITING OPEN WORK
+# list. Acknowledgement refuses while a row this actor presented still needs an action;
+# docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -883,15 +884,23 @@ if [ "$REEMIT" = true ]; then
   fi
 fi
 # The same ledger receipt boundary applies to main, the supervision-host's
-# branch actor, and secondmate homes. Never consume a wake before its overdue
-# obligations have an action recorded after presentation.
+# branch actor, and secondmate homes. New, changed, or no-longer-covered overdue
+# obligations require an action; covered rows remain visible through the
+# periodic digest.
+# The away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk exists)
+# records no action and acknowledges only the wakes it handled; the obligation
+# stays gated in the ledger for firstmate's own acknowledgement.
 OVERDUE_SECTION=
-if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
-  if [ -n "$ACK_THROUGH" ]; then
-    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
-  else
-    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
+present_open_work() {
+  if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
+    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue "$@") || return 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
+  fi
+  return 0
+}
+if [ -n "$ACK_THROUGH" ] && { [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; }; then
+  if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
   fi
 fi
 rotate_scratch_locked
@@ -998,6 +1007,12 @@ if [ -n "$ACK_THROUGH" ]; then
   else
     consume_actor_rows_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
   fi
+  # A partial acknowledgement is still the same handling turn. Keep its receipts
+  # until every presented row is consumed, before another drain can take the lock.
+  if [ "$RECOVERY_ACK_MOVED" = false ] && [ "$PRESENTED_MAX" -le "$ACK_THROUGH" ] \
+    && { [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; }; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --complete-actions || exit 1
+  fi
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false
   if [ "$ACK_REMOVED" -eq 0 ] && [ "$PRESENTED_MAX" -gt "$ACK_THROUGH" ]; then
@@ -1026,6 +1041,7 @@ if [ -n "$ACK_THROUGH" ]; then
 fi
 
 if [ ! -s "$FM_WAKE_QUEUE" ]; then
+  present_open_work || exit 1
   : > "$FM_WAKE_QUEUE"
   fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
   RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
@@ -1066,6 +1082,7 @@ if [ "$ACTOR" = main ]; then
   fi
   claim_main_rows_locked || exit 1
   if [ ! -s "$MAIN_ROWS_FILE" ]; then
+    present_open_work || exit 1
     # Every remaining row is reserved by the live branch grant, which presents
     # and acknowledges them itself. Say so rather than exiting silently: a
     # drain that prints nothing while the queue is visibly non-empty reads as a
@@ -1078,6 +1095,7 @@ if [ "$ACTOR" = main ]; then
     assert_watcher_liveness
     exit "$BRANCH_OUTCOMES_RC"
   fi
+  fm_wake_main_presentation_hold 2>/dev/null || true
 fi
 
 fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
@@ -1116,6 +1134,16 @@ awk -F '\t' -v seqs="$ACTOR_ROWS_FILE" '
 RAW_ROWS=$(fm_wake_print_deduped "$DRAIN_VIEW_TMP") || exit "$?"
 rm -f -- "$DRAIN_VIEW_TMP" || exit 1
 DRAIN_VIEW_TMP=
+LEDGER_RESURFACE=false
+if printf '%s\n' "$RAW_ROWS" | awk -F '\t' '
+  $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
+  END { exit !found }
+'; then
+  LEDGER_RESURFACE=true
+  present_open_work --include-standing || exit 1
+else
+  present_open_work || exit 1
+fi
 ACK_THROUGH=$(printf '%s\n' "$RAW_ROWS" | awk -F '\t' '$2 ~ /^[0-9]+$/ && $2 > max { max=$2 } END { print max + 0 }') || exit 1
 case "${FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
   0) ;;
@@ -1124,6 +1152,11 @@ case "${FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
 esac
 if [ -n "$RAW_ROWS" ]; then
   printf '%s\n' "$RAW_ROWS" || exit "$?"
+fi
+# Only a periodic resurface wake this actor owns carries the full waiting list;
+# a change wake presents only the OVERDUE rows that still need an action.
+if [ "$LEDGER_RESURFACE" = true ]; then
+  "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1
 fi
 fm_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
 RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN

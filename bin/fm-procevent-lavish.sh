@@ -351,6 +351,8 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-scratch-lib.sh
+. "$SCRIPT_DIR/fm-scratch-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-procevent-lib.sh
@@ -899,7 +901,7 @@ held_page_strays() {  # <artifact>
   local artifact=$1 id state own pid pgid lstart ppid plstart command strays=0 kept=0
   id=$(cmd_source_id "$artifact" 2>/dev/null) || return 1
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
-  own=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  own=$(fm_procevent_proc pgid "$$" | tr -d ' ')
   [ -n "$own" ] || return 1
   poller_prune "$(fm_procevent_registry_dir "$state")" "$id"
   while IFS=$'\t' read -r pid pgid lstart ppid plstart command; do
@@ -934,10 +936,10 @@ cmd_poll() {
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   delay=$(poll_retry_delay) || exit 1
   cap=$(start_retry_cap) || exit 1
-  response=$(mktemp "${TMPDIR:-/tmp}/fm-lavish-poll.XXXXXX") || die "cannot stage the poll response"
+  response=$(fm_scratch_new f fm-lavish-poll) || die "cannot stage the poll response"
   ledger=$(poller_record "$artifact") || ledger=
-  printf -v cleanup_command 'rm -f -- %q' "$response"
-  [ -z "$ledger" ] || printf -v cleanup_command '%s %q' "$cleanup_command" "$ledger"
+  printf -v cleanup_command 'fm_scratch_release %q' "$response"
+  [ -z "$ledger" ] || printf -v cleanup_command '%s; rm -f -- %q' "$cleanup_command" "$ledger"
   # shellcheck disable=SC2064 # $cleanup_command must expand now, while the staged path is still set.
   trap "$cleanup_command" EXIT
   # Retirement stops this listener by signalling its process group, and bash runs
@@ -1558,8 +1560,8 @@ poller_record() {  # <artifact>
   id=$(cmd_source_id "$1" 2>/dev/null) || return 1
   reg=$(fm_procevent_registry_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")
   [ -d "$reg" ] || return 1
-  lstart=$(LC_ALL=C ps -o lstart= -p "$$" 2>/dev/null | awk '{ $1 = $1; print }')
-  pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  lstart=$(fm_procevent_proc lstart "$$")
+  pgid=$(fm_procevent_proc pgid "$$" | tr -d ' ')
   [ -n "$lstart" ] && [ -n "$pgid" ] || return 1
   rec="$reg/$id.$$.poller"
   tmp=$(umask 077; mktemp "$reg/.poller.XXXXXX") || return 1
@@ -1575,22 +1577,22 @@ poller_record() {  # <artifact>
 # at another time. The records are listed before the process snapshot is taken,
 # so a record's live writer is always in that snapshot.
 poller_prune() {  # <registry-dir> [<source-id>]
-  local records=()
+  local records=() table
   if [ -n "${2-}" ]; then
     records=("$1/$2".*.poller)
   else
     records=("$1"/*.poller)
   fi
-  LC_ALL=C perl -e '
+  # An unreadable table proves nothing about any record, so none is dropped.
+  table=$(fm_procevent_proc table pid,lstart) || return 0
+  printf '%s\n' "$table" | LC_ALL=C perl -e '
     use strict; use warnings;
     my %start;
-    open my $ps, "-|", "ps", "-axo", "pid=,lstart=" or exit 1;
-    while (my $line = <$ps>) {
+    while (my $line = <STDIN>) {
       my ($pid, $lstart) = $line =~ /\A\s*(\d+)\s+(.*?)\s*\z/ or next;
       $lstart =~ s/\s+/ /g;
       $start{$pid} = $lstart;
     }
-    close $ps or exit 1;
     for my $rec (@ARGV) {
       next if -l $rec || !-f _;
       open my $in, "<", $rec or next;
@@ -1616,7 +1618,7 @@ poller_recorded() {  # <registry-dir> <source-id> <pid> <lstart>
 # every process whose command is a Lavish poll; parent-lstart is "-" when the
 # parent is not visible.
 orphan_poll_processes() {
-  LC_ALL=C ps -axo pid=,ppid=,pgid=,lstart=,command= 2>/dev/null | perl -e '
+  fm_procevent_proc table pid,ppid,pgid,lstart,command | LC_ALL=C perl -e '
     use strict; use warnings;
     my (%start, @polls);
     while (my $line = <STDIN>) {

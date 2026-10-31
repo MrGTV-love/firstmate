@@ -222,6 +222,14 @@ test_backend_detect_precedence() {
     || fail "fm_backend_detect should succeed when HERDR_ENV=1"
   [ "$out" = herdr ] || fail "fm_backend_detect should report herdr for HERDR_ENV=1 alone, got '$out'"
 
+  out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; FM_HERDR_RUNTIME=1 fm_backend_detect) \
+    || fail 'runtime-only Herdr marker must survive HERDR_ENV removal'
+  assert_equals herdr "$out" 'runtime-only marker selects Herdr'
+  out=$(unset HERDR_ENV CMUX_WORKSPACE_ID; TMUX='fake,1,0' FM_HERDR_RUNTIME=1 fm_backend_detect)
+  assert_equals tmux "$out" 'nested tmux still outranks inherited runtime-only Herdr marker'
+  out=$(unset TMUX HERDR_ENV; FM_BACKEND=tmux FM_HERDR_RUNTIME=1 fm_backend_name)
+  assert_equals tmux "$out" 'explicit backend still outranks runtime-only Herdr detection'
+
   out=$(unset HERDR_ENV CMUX_WORKSPACE_ID; TMUX='fake,1,0' fm_backend_detect) \
     || fail "fm_backend_detect should succeed when \$TMUX is set"
   [ "$out" = tmux ] || fail "fm_backend_detect should report tmux for \$TMUX alone, got '$out'"
@@ -1204,10 +1212,7 @@ test_spawn_autodetect_nesting_resolves_tmux_silently() {
   pass "fm-spawn.sh: auto-detect resolves nested tmux-in-herdr to tmux and stays silent end to end"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+fm_test_only
 
 backend_base_ref >/dev/null
 

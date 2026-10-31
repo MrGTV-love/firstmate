@@ -43,6 +43,26 @@ case "${1:-}" in
   capture-pane) printf 'idle\n> \n' ;;
 esac
 SH
+  cat > "$fake/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "axi status" ] || exit 2
+if [ -n "${FM_FAKE_NM_HANG:-}" ]; then
+  printf '%s\n' "$PWD" >> "$FM_FAKE_NM_HANG"
+  exec sleep 60
+fi
+if [ -n "${FM_FAKE_NM_BURN_SECS:-}" ]; then
+  end=$((SECONDS + FM_FAKE_NM_BURN_SECS))
+  while [ "$SECONDS" -lt "$end" ]; do :; done
+fi
+id=$(basename "$PWD")
+home=$(dirname "$(dirname "$PWD")")
+plan="$home/data/$id/verification-plan.md"
+[ -f "$plan" ] || exit 1
+head=$(git rev-parse HEAD 2>/dev/null) || exit 1
+sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+printf 'run:\n  id: "INACTIVE"\n  branch: fixture\n  status: completed\n  head_sha: %s\n  verification_plan:\n    path: %s\n    sha256: %s\n    source_path: %s\n    captured_at: %s\noutcome: passed\n' \
+  "$head" "$plan" "$sha" "$plan" "$(date +%s)"
+SH
   local tool
   for tool in gh gh-axi curl; do
     cat > "$fake/$tool" <<'SH'
@@ -93,6 +113,8 @@ write_child() { # <home> <id> <status> [spawn-gen]
     'harness=codex' 'kind=ship' 'mode=no-mistakes' 'yolo=off' \
     "spawn_gen=$spawn_gen" 'pr=https://example.test/owner/repo/pull/1' \
     "pr_head=$sha"
+  mkdir -p "$home/data/$id"
+  printf 'inactive fixture verification plan\n' > "$home/data/$id/verification-plan.md"
   printf '%s\n' "$status" > "$home/state/$id.status"
   : > "$home/state/$id.turn-ended"
   age "$home/state/$id.meta" "$home/state/$id.status" "$home/state/$id.turn-ended"
@@ -114,12 +136,12 @@ run_reconcile() { # <home> [--startup]
 
 # The teardown-side entry point: deliver one child's terminal ledger line for a
 # caller holding its meta lock.
-run_report() { # <home> <child>
-  local home=$1 child=$2
+run_report() { # <home> <child> [--force]
+  local home=$1 child=$2 option=${3:-}
   PATH="$WORLD/fakebin:$PATH" FM_ROOT_OVERRIDE="$WORLD/root" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child"
+    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child" ${option:+"$option"}
 }
 
 wake_count() { # <home> <key prefix>
@@ -155,6 +177,35 @@ prime_seen() { # <state> <status|turn-ended>
 }
 
 reap() { kill "$1" 2>/dev/null || true; wait "$1" 2>/dev/null || true; }
+
+# A live holder of <lock-path> in <home> until <release-file> appears (or 120 s
+# pass), announced by <ready-file>; the caller reaps it.
+hold_lock() { # <home> <lock-path> <ready-file> <release-file>
+  FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_acquire_wait "$2"
+    : > "$3"
+    i=0
+    while [ ! -e "$4" ] && [ "$i" -lt 2400 ]; do sleep 0.05; i=$((i + 1)); done
+    fm_lock_release "$2"
+  ' _ "$ROOT" "$2" "$3" "$4" &
+}
+
+wait_for_file() { # <path>
+  local i=0
+  while [ "$i" -lt 100 ] && [ ! -e "$1" ]; do sleep 0.05; i=$((i + 1)); done
+  [ -e "$1" ]
+}
+
+meta_lock_of() { # <home> <id>
+  FM_STATE_OVERRIDE="$1/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_meta_lock_path "$2"' \
+    _ "$ROOT" "$1/state/$2.meta"
+}
+
+wake_lock_of() { # <home>
+  FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" bash -c '. "$1/bin/fm-wake-lib.sh"; printf "%s\n" "$FM_WAKE_QUEUE_LOCK"' \
+    _ "$ROOT"
+}
 
 # The main retains a terminal presentation receipt until the corresponding wake
 # is handled and acknowledged.
@@ -633,46 +684,129 @@ test_report_subcommand_delivers_and_refuses() {
   pass "report delivers a child's final line, owes nothing twice, and refuses only an unwritable channel"
 }
 
-# Teardown calls report while holding the child's metadata lock. A concurrent
-# scan may hold the scan lock while waiting for that metadata lock, so report
-# must not wait for the scan lock in the opposite order.
-test_report_avoids_scan_meta_lock_inversion() {
-  local holder scan_pid report_pid i completed=0
-  make_world report-lock-order; bind_secondmate local
-  write_child "$MATE" child 'done: final word'
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
-    . "$1/bin/fm-wake-lib.sh"
-    lock=$(fm_meta_lock_path "$FM_STATE_OVERRIDE/child.meta")
-    fm_lock_acquire_wait "$lock"
-    : > "$2/meta-held"
-    while [ ! -e "$2/release-meta" ]; do sleep 0.05; done
-    fm_lock_release "$lock"
-  ' _ "$ROOT" "$WORLD" &
-  holder=$!
-  i=0
-  while [ "$i" -lt 40 ] && [ ! -e "$WORLD/meta-held" ]; do sleep 0.05; i=$((i + 1)); done
-  [ -e "$WORLD/meta-held" ] || { reap "$holder"; fail "metadata lock holder did not start"; }
+# A ship done: whose gate read goes silent has an unknown acceptance, which is
+# neither "accepted" nor "nothing owed". Without --force the report keeps it
+# owed, so teardown keeps the child's records and asks for a rerun; the captain's
+# forced teardown delivers it, marked unknown, never in the accepted form.
+test_report_keeps_unknown_done_owed_unless_forced() {
+  local rc key line
+  make_world report-unknown; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  rc=0
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child || rc=$?
+  [ "$rc" -eq 75 ] || fail "report did not ask for a retry (75) for a done: with an unknown acceptance: rc=$rc"
+  [ -s "$WORLD/nm-calls" ] || fail "the gate never asked the no-mistakes daemon"
+  ! grep -q 'child-outcome-child' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "an unknown acceptance was delivered without --force: $(cat "$MAIN/state/mate.status")"
+  [ "$(outcome_count "$MATE" reported)" = 0 ] || fail "an unknown acceptance was recorded as delivered"
 
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" --startup &
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child --force \
+    || fail "a forced report did not go on past the unknown acceptance"
+  key=$(reported_outcome_key "$MATE" child 'done') || fail "forced report receipt key missing"
+  line="done [key=$key]: child child done (acceptance unknown: no-mistakes read stalled): PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
+  sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$line" \
+    || fail "forced report did not deliver the outcome marked unknown: $(cat "$MAIN/state/mate.status")"
+  ! grep -Fq "child child done: PR" "$MAIN/state/mate.status" \
+    || fail "forced report delivered the unknown outcome as accepted"
+  pass "an unknown done: acceptance stays owed without --force and is delivered marked unknown with it"
+}
+
+# The unknown acceptance belongs to the pending receipt, not to one invocation:
+# a forced report whose parent write fails leaves a pending delivery, and the
+# plain retry after the binding is repaired (the daemon still silent) must
+# publish the same unknown-qualified line, never the ordinary accepted form.
+test_pending_unknown_acceptance_survives_a_failed_delivery_and_retry() {
+  local key line
+  make_world report-unknown-retry; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  cp "$MATE/.fm-secondmate-parent" "$WORLD/parent-binding"
+  printf 'schema=fm-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.fm-secondmate-parent"
+  if FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child --force; then
+    fail "a forced report claimed delivery through an unusable parent binding"
+  fi
+  [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "the failed forced delivery did not leave a pending receipt"
+  [ -s "$WORLD/nm-calls" ] || fail "the gate never asked the no-mistakes daemon"
+  cp "$WORLD/parent-binding" "$MATE/.fm-secondmate-parent"
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child \
+    || fail "the plain retry did not deliver the pending outcome"
+  key=$(reported_outcome_key "$MATE" child 'done') || fail "the retry receipt key is missing"
+  line="done [key=$key]: child child done (acceptance unknown: no-mistakes read stalled): PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
+  sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$line" \
+    || fail "the retry lost the unknown-acceptance qualifier: $(cat "$MAIN/state/mate.status")"
+  ! grep -Fq "child child done: PR" "$MAIN/state/mate.status" \
+    || fail "the retry published the unknown outcome as accepted"
+  pass "a pending unknown acceptance keeps its qualifier through a failed delivery and a plain retry"
+}
+
+# A silent daemon must not hold the secondmate's poll for one stall interval per
+# waiting child, and must not get the whole scan killed either: at the default
+# scan budget the first gate read is judged by its own silence interval inside
+# the live scan, the rest of that scan's reads are unknown at once, the children
+# after them are still delivered, and no child's lock is left behind.
+test_scan_pays_one_stall_interval_for_silent_gate_reads() {
+  local id scan_pid lock_a i
+  make_world scan-unknown; bind_secondmate local
+  for id in a b c; do
+    write_child "$MATE" "$id" "done: PR https://example.test/owner/repo/pull/1 checks green"
+  done
+  write_child "$MATE" z 'failed: build broke'
+  lock_a=$(FM_STATE_OVERRIDE="$MATE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_meta_lock_path "$2"' \
+    _ "$ROOT" "$MATE/state/a.meta")
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=12 \
+    FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" &
   scan_pid=$!
   i=0
-  while [ "$i" -lt 40 ] && [ ! -e "$MATE/state/.inactive-outcome-reconcile.lock" ]; do
-    sleep 0.05
-    i=$((i + 1))
+  while [ "$i" -lt 100 ] && [ ! -s "$WORLD/nm-calls" ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$WORLD/nm-calls" ] || { reap "$scan_pid"; fail "the scan never asked the daemon"; }
+  { [ -e "$lock_a" ] || [ -L "$lock_a" ]; } || { reap "$scan_pid"; fail "the waiting gate read did not hold child a's lock"; }
+  wait "$scan_pid" || fail "scan failed over silent gate reads"
+  [ "$(wc -l < "$WORLD/nm-calls" | tr -d ' ')" = 1 ] \
+    || fail "the scan waited on the silent daemon once per child: $(cat "$WORLD/nm-calls")"
+  grep -q 'child-outcome-z-failed' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "the child after the silent reads was not reached: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
+  ! grep -q 'child-outcome-[abc]-' "$MAIN/state/mate.status" \
+    || fail "a done: with an unknown acceptance was delivered by the scan"
+  for id in a b c z; do
+    lock_a=$(FM_STATE_OVERRIDE="$MATE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_meta_lock_path "$2"' \
+      _ "$ROOT" "$MATE/state/$id.meta")
+    { [ ! -e "$lock_a" ] && [ ! -L "$lock_a" ]; } || fail "child $id's metadata lock was left behind by the scan"
   done
-  [ -e "$MATE/state/.inactive-outcome-reconcile.lock" ] \
-    || { : > "$WORLD/release-meta"; reap "$holder"; reap "$scan_pid"; fail "scan lock holder did not start"; }
+  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" || fail "scan failed once the daemon answered"
+  for id in a b c; do
+    grep -q "child-outcome-$id-done" "$MAIN/state/mate.status" \
+      || fail "child $id's done: was not delivered once the daemon answered: $(cat "$MAIN/state/mate.status")"
+  done
+  pass "silent gate reads cost a scan one stall interval and hold no child lock past it"
+}
 
-  (run_report "$MATE" child && : > "$WORLD/report-complete") &
-  report_pid=$!
-  i=0
-  while [ "$i" -lt 40 ] && [ ! -e "$WORLD/report-complete" ]; do sleep 0.05; i=$((i + 1)); done
-  [ -e "$WORLD/report-complete" ] && completed=1
-  : > "$WORLD/release-meta"
+# On a loaded host the gate read can take longer than the scan budget while it
+# keeps working. At the default budget it must finish and deliver in that poll,
+# not be killed on every poll and never deliver.
+test_scan_slow_working_gate_read_is_not_cut() {
+  make_world scan-slow; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  FM_FAKE_NM_BURN_SECS=13 FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" \
+    || fail "scan failed over a slow, working gate read"
+  grep -q 'child-outcome-child-done' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "a slow but working gate read was cut before it delivered: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
+  pass "a gate read slower than the scan budget that keeps working delivers in the same poll"
+}
+
+# Teardown calls report while holding the child's metadata lock, and a scan may
+# hold the scan lock at that moment, so report must never wait for the scan lock.
+test_report_avoids_scan_meta_lock_inversion() {
+  local holder
+  make_world report-lock-order; bind_secondmate local
+  write_child "$MATE" child 'done: final word'
+  hold_lock "$MATE" "$MATE/state/.inactive-outcome-reconcile.lock" "$WORLD/scan-held" "$WORLD/release-scan"
+  holder=$!
+  wait_for_file "$WORLD/scan-held" || { reap "$holder"; fail "scan lock holder did not start"; }
+  run_report "$MATE" child || { : > "$WORLD/release-scan"; reap "$holder"; fail "report failed while the scan lock was held"; }
+  kill -0 "$holder" 2>/dev/null || fail "report waited for the scan lock"
+  : > "$WORLD/release-scan"
   reap "$holder"
-  reap "$report_pid"
-  reap "$scan_pid"
-  [ "$completed" -eq 1 ] || fail "report deadlocked behind a scan waiting for the caller's metadata lock"
+  grep -q 'child-outcome-child-done' "$MAIN/state/mate.status" \
+    || fail "report did not deliver while the scan lock was held"
   pass "report preserves teardown's metadata-before-scan lock order"
 }
 
@@ -948,29 +1082,148 @@ SH
   pass "stalled state reads are bounded without starving later children"
 }
 
-test_full_scan_budget_includes_wake_lock_wait() {
-  local holder started elapsed i
+# A wake-queue lock wait looks like work to the scan's silence backstop, so the
+# scan bounds it by its budget: a held wake lock costs one poll that budget, the
+# record stays durable, and the next scan queues it once the lock is free.
+test_scan_gives_up_on_a_held_wake_lock() {
+  local holder
   make_world wake-lock; write_child "$MAIN" child 'done: green'
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" bash -c '
-    . "$1/bin/fm-wake-lib.sh"
-    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
-    : > "$2"
-    sleep 30
-  ' _ "$ROOT" "$WORLD/lock-ready" &
+  hold_lock "$MAIN" "$(wake_lock_of "$MAIN")" "$WORLD/lock-ready" "$WORLD/lock-release"
   holder=$!
-  i=0
-  while [ "$i" -lt 30 ] && [ ! -e "$WORLD/lock-ready" ]; do sleep 0.1; i=$((i + 1)); done
-  [ -e "$WORLD/lock-ready" ] || fail "wake lock holder did not start"
-
-  started=$(date +%s)
+  wait_for_file "$WORLD/lock-ready" || { reap "$holder"; fail "wake lock holder did not start"; }
   FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
-  elapsed=$(( $(date +%s) - started ))
+  kill -0 "$holder" 2>/dev/null || fail "the scan waited for the held wake lock instead of giving up for this poll"
+  : > "$WORLD/lock-release"
   reap "$holder"
-  # The unbounded wake-lock wait is ended by the process-group backstop, which
-  # fires one second after the budget; the bound proves the scan cannot ride
-  # the 30-second lock hold.
-  [ "$elapsed" -le 4 ] || fail "wake lock wait exceeded aggregate scan budget (${elapsed}s)"
-  pass "aggregate scan budget includes durable wake operations"
+  ! grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the presentation was queued while the wake lock was held"
+  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the next scan did not queue the outcome once the wake lock was free"
+  pass "a held wake lock costs a scan its budget, and the next scan queues the outcome"
+}
+
+# A due child whose metadata lock is held (its teardown, which reports the
+# outcome itself) must not hold the poll: the scan skips it, handles the others,
+# and visits it on a later scan.
+test_scan_skips_a_child_whose_lock_is_held() {
+  local holder
+  make_world held-child
+  write_child "$MAIN" a 'done: first'
+  write_child "$MAIN" b 'done: second'
+  hold_lock "$MAIN" "$(meta_lock_of "$MAIN" a)" "$WORLD/a-held" "$WORLD/a-release"
+  holder=$!
+  wait_for_file "$WORLD/a-held" || { reap "$holder"; fail "child lock holder did not start"; }
+  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  kill -0 "$holder" 2>/dev/null || fail "the scan waited for a child's held metadata lock"
+  : > "$WORLD/a-release"
+  reap "$holder"
+  grep -Fq 'child=b state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the scan did not handle the child after the held one"
+  ! grep -Fq 'child=a state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the scan handled a child whose metadata lock was held"
+  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  grep -Fq 'child=a state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the skipped child was not handled once its lock was free"
+  pass "a scan skips a child whose lock is held and handles it on a later scan"
+}
+
+# A child whose metadata lock stays held (a long teardown) must not starve the
+# children after it: the cursor moves past it, so when the budget cuts a scan at
+# a slow later child, a later scan goes on to the child after that one. Where a
+# whole-second deadline falls is the host's business, so the case judges only
+# whether c is reached within a few scans while a stays held.
+test_held_child_does_not_starve_later_children() {
+  local holder scans=0
+  make_world held-starve
+  write_child "$MAIN" a 'done: first'
+  write_child "$MAIN" b 'done: second'
+  write_child "$MAIN" c 'done: third'
+  cat > "$WORLD/fakebin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+[ "$1" != b ] || sleep 30
+printf 'state: done · source: fake\n'
+SH
+  chmod +x "$WORLD/fakebin/fm-crew-state.sh"
+  hold_lock "$MAIN" "$(meta_lock_of "$MAIN" a)" "$WORLD/a-held" "$WORLD/a-release"
+  holder=$!
+  wait_for_file "$WORLD/a-held" || { reap "$holder"; fail "child lock holder did not start"; }
+  while [ "$scans" -lt 5 ] && ! grep -Fq 'child=c state=done' "$MAIN/state/.wake-queue" 2>/dev/null; do
+    FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+    scans=$((scans + 1))
+  done
+  kill -0 "$holder" 2>/dev/null || fail "the child lock holder ended before the later scans ran"
+  : > "$WORLD/a-release"
+  reap "$holder"
+  grep -Fq 'child=c state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "a held child starved the children after it"
+  ! grep -Fq 'child=a state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the scan handled a child whose metadata lock was held"
+  pass "a held child does not starve the children after it"
+}
+
+# A --startup scan behind a watcher scan that holds the scan lock waits at most
+# the scan budget, then returns and leaves its pass to the next cadence scan, so
+# the session start's other deferred work keeps its share of the stage budget.
+test_startup_scan_gives_up_behind_a_held_scan_lock() {
+  local holder rc=0
+  make_world startup-bounded; write_child "$MAIN" child 'done: green'
+  hold_lock "$MAIN" "$MAIN/state/.inactive-outcome-reconcile.lock" "$WORLD/scan-held" "$WORLD/release-scan"
+  holder=$!
+  wait_for_file "$WORLD/scan-held" || { reap "$holder"; fail "scan lock holder did not start"; }
+  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup || rc=$?
+  kill -0 "$holder" 2>/dev/null || fail "the startup scan waited past its budget for the held scan lock"
+  : > "$WORLD/release-scan"
+  reap "$holder"
+  [ "$rc" -eq 0 ] || fail "a startup scan behind a held scan lock failed instead of leaving its pass: rc=$rc"
+  ! grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "a startup scan behind a held scan lock still ran its pass"
+  pass "a startup scan behind a held scan lock returns within its budget"
+}
+
+# The session-start --startup scan is the forced pass: it waits for a watcher
+# scan's lock (at most FM_INACTIVE_RECONCILE_BUDGET_SECS) instead of dropping.
+test_startup_scan_waits_for_a_watcher_scan() {
+  local holder
+  make_world startup-wait; write_child "$MAIN" child 'done: green'
+  hold_lock "$MAIN" "$MAIN/state/.inactive-outcome-reconcile.lock" "$WORLD/scan-held" "$WORLD/release-scan"
+  holder=$!
+  wait_for_file "$WORLD/scan-held" || { reap "$holder"; fail "scan lock holder did not start"; }
+  ( sleep 2; : > "$WORLD/release-scan" ) &
+  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  if kill -0 "$holder" 2>/dev/null; then
+    : > "$WORLD/release-scan"
+    reap "$holder"
+    fail "the startup scan dropped its pass while a watcher scan held the lock"
+  fi
+  reap "$holder"
+  wait 2>/dev/null || true
+  grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the startup scan did not run its pass once the watcher scan let go"
+  pass "a startup scan waits for a watcher scan and then runs its pass"
+}
+
+# A scan that finds another scan holding the scan lock does nothing this poll
+# instead of waiting behind it.
+test_scan_does_nothing_while_another_scan_holds_the_lock() {
+  local holder rc=0
+  make_world held-scan; bind_secondmate local
+  write_child "$MATE" child 'done: final word'
+  hold_lock "$MATE" "$MATE/state/.inactive-outcome-reconcile.lock" "$WORLD/scan-held" "$WORLD/release-scan"
+  holder=$!
+  wait_for_file "$WORLD/scan-held" || { reap "$holder"; fail "scan lock holder did not start"; }
+  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" || rc=$?
+  kill -0 "$holder" 2>/dev/null || fail "the scan waited for the held scan lock"
+  : > "$WORLD/release-scan"
+  reap "$holder"
+  [ "$rc" -eq 0 ] || fail "a scan behind a held scan lock failed instead of skipping this poll: rc=$rc"
+  ! grep -q 'child-outcome-' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "a scan behind a held scan lock still delivered"
+  [ ! -e "$MATE/state/.inactive-outcome-reconcile" ] || fail "a scan behind a held scan lock moved the scan marker"
+  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  grep -q 'child-outcome-child-done' "$MAIN/state/mate.status" \
+    || fail "the next scan did not deliver once the scan lock was free"
+  pass "a scan does nothing while another scan holds the scan lock"
 }
 
 # A secondmate home seeded without its parent binding cannot report ANY terminal
@@ -1063,6 +1316,10 @@ test_long_terminal_lines_have_distinct_receipts
 test_secondmate_partial_ledger_line_waits_for_newline
 test_secondmate_remote_route_ledger_delivery
 test_report_subcommand_delivers_and_refuses
+test_report_keeps_unknown_done_owed_unless_forced
+test_pending_unknown_acceptance_survives_a_failed_delivery_and_retry
+test_scan_pays_one_stall_interval_for_silent_gate_reads
+test_scan_slow_working_gate_read_is_not_cut
 test_pending_ledger_done_is_delivered_after_worktree_removal
 test_report_avoids_scan_meta_lock_inversion
 test_local_secondmate_rejects_relative_parent_home
@@ -1077,7 +1334,12 @@ test_nonterminal_and_captain_held_states_do_not_report
 test_watcher_hook_and_idle_secondmate_exemption
 test_watcher_poll_delivers_child_ledger_line_to_parent
 test_stalled_state_read_is_bounded_and_scan_progresses
-test_full_scan_budget_includes_wake_lock_wait
+test_scan_gives_up_on_a_held_wake_lock
+test_scan_skips_a_child_whose_lock_is_held
+test_scan_does_nothing_while_another_scan_holds_the_lock
+test_held_child_does_not_starve_later_children
+test_startup_scan_waits_for_a_watcher_scan
+test_startup_scan_gives_up_behind_a_held_scan_lock
 test_notice_recovery_does_not_duplicate_wake
 test_missing_parent_binding_names_itself
 test_reconciliation_never_calls_forge

@@ -19,18 +19,115 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-turnend-guard)
 fm_git_identity fmtest fmtest@example.invalid
 
-REQUIRED_REASON='watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn'
+# The Claude repair line now carries the home's expanded Stop auto-arm command;
+# REQUIRED_REASON is its stable leading instruction, and the exact expanded path
+# is asserted separately by test_repair_line_names_the_exact_arm_commands.
+REQUIRED_REASON='watcher supervision needs Stop-owned automatic recovery'
 AWAY_REQUIRED_REASON='Away mode owns watcher supervision'
 
-# REQUIRED_REASON is the CLAUDE repair line, so the cases asserting it need
-# detect_own to answer claude. CLAUDECODE=1 alone no longer pins that - a
-# structural ancestor of a different harness outranks a marker - so those
-# invocations also blind the ancestry walk. Only per-pid comm/args/ppid queries
-# are answered here; watcher liveness still reaches the real ps.
+# REQUIRED_REASON is the leading instruction of the CLAUDE repair line, so the
+# cases asserting it need detect_own to answer claude. CLAUDECODE=1 alone no
+# longer pins that - a structural ancestor of a different harness outranks a
+# marker - so those invocations also blind the ancestry walk. Only per-pid
+# comm/args/ppid queries are answered here; watcher liveness still reaches the
+# real ps.
 BLIND_BIN=$(fm_fakebin "$TMP_ROOT/blind-ancestry")
 fm_fake_blind_ancestry "$BLIND_BIN"
 
 # --- PREDICATE: bin/fm-supervision-lib.sh -----------------------------------
+
+test_hook_emits_one_deny_event_per_blocked_stop() {
+  local dir log status lines
+  dir=$(make_primary_dir "$TMP_ROOT/hook-guard-event-deny")
+  : > "$dir/state/task1.meta"
+  log="$dir/events.jsonl"
+  printf '{"stop_hook_active":false}' \
+    | FM_HOME="$dir" FM_GUARD_EVENT_LOG="$log" bash "$dir/bin/fm-turnend-guard.sh" 2>/dev/null
+  status=$?
+  expect_code 2 "$status" "the instrumented block must still exit 2"
+  lines=$(awk 'END { print NR + 0 }' "$log")
+  [ "$lines" -eq 1 ] || fail "one blocked stop must append exactly one event row, got $lines"
+  assert_contains "$(cat "$log")" '"guard":"turnend-supervision-block"' "deny row lost the guard id"
+  assert_contains "$(cat "$log")" '"decision":"deny"' "blocked stop did not record a deny"
+  assert_contains "$(cat "$log")" '"repeat":1' "the first blocked stop must record attempt 1"
+  printf '{"stop_hook_active":false}' \
+    | FM_HOME="$dir" FM_GUARD_EVENT_LOG="$log" bash "$dir/bin/fm-turnend-guard.sh" 2>/dev/null
+  status=$?
+  expect_code 2 "$status" "the second instrumented block must still exit 2"
+  lines=$(awk 'END { print NR + 0 }' "$log")
+  [ "$lines" -eq 2 ] || fail "each blocked stop must append its own deny row, got $lines rows"
+  pass "fm-turnend-guard: exactly one deny event per blocked stop"
+}
+
+test_hook_claude_mode_emits_allow_after_an_unhealthy_episode() {
+  local dir log pid identity status lines
+  dir=$(make_primary_dir "$TMP_ROOT/hook-guard-event-allow")
+  : > "$dir/state/task1.meta"
+  log="$dir/events.jsonl"
+  sleep 60 &
+  pid=$!
+  identity=$(watcher_identity "$dir" "$pid") || {
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "could not identify the recovery watcher"
+  }
+  # A stop that is supervised from the very start of the episode is not a
+  # recovery: it must allow and emit nothing at all.
+  record_watcher_lock "$dir" "$pid" "$identity"
+  touch "$dir/state/.last-watcher-beat"
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+    | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
+      bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
+  status=$?
+  expect_code 0 "$status" "a healthy stop from the start of an episode must allow"
+  if [ -e "$log" ]; then
+    lines=$(awk 'END { print NR + 0 }' "$log")
+    [ "$lines" -eq 0 ] || fail "a healthy stop from the start emitted $lines event row(s)"
+  fi
+  # Now drop supervision: the same session blocks and opens the episode.
+  rm -rf "$dir/state/.watch.lock"
+  rm -f "$dir/state/.last-watcher-beat"
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+    | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
+      bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
+  status=$?
+  expect_code 2 "$status" "the first unhealthy Claude stop must block and open the episode"
+  # Recovery: the same live watcher is restored, so this stop is an allow after
+  # an unhealthy episode and must carry cleared-by continue.
+  record_watcher_lock "$dir" "$pid" "$identity"
+  touch "$dir/state/.last-watcher-beat"
+  printf '{"stop_hook_active":false,"session_id":"sess-claude-mode"}' \
+    | CLAUDECODE=1 FM_HOME="$dir" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 FM_GUARD_EVENT_LOG="$log" \
+      bash "$dir/bin/fm-turnend-guard.sh" --claude 2>/dev/null
+  status=$?
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$status" "a recovered stop must allow"
+  assert_contains "$(cat "$log")" '"decision":"allow"' "the recovery stop recorded no allow"
+  assert_contains "$(cat "$log")" '"cleared_by":"continue"' "the recovery allow lost its cleared-by token"
+  pass "fm-turnend-guard: a recovery allow carries cleared-by continue and a healthy start emits nothing"
+}
+
+test_repair_line_names_the_exact_arm_commands() {
+  local home render out
+  home="$TMP_ROOT/repair-line-home"
+  mkdir -p "$home/state" "$home/config"
+  render="$ROOT/bin/fm-supervision-instructions.sh"
+  out=$(FM_HOME="$home" "$render" --harness claude --repair-line)
+  assert_contains "$out" "$ROOT/bin/fm-claude-stop-autoarm.sh" \
+    "the Claude repair line must name this home's exact Stop auto-arm command"
+  assert_contains "$out" "second manual cycle is wrong" \
+    "the Claude repair line must say the Stop auto-arm owns continuity"
+  assert_not_contains "$out" "inspect the hook registration" \
+    "the Claude repair line is still a pointer"
+  out=$(FM_HOME="$home" "$render" --harness cursor --repair-line)
+  assert_contains "$out" "$ROOT/bin/fm-watch-arm.sh" \
+    "the Cursor repair line must name the park command the stop-hook park itself runs"
+  assert_contains "$out" "stop-hook park" "the Cursor repair line lost its park ownership"
+  assert_not_contains "$out" "inspect the hook registration" \
+    "the Cursor repair line is still a pointer"
+  pass "fm-supervision-instructions: Claude and Cursor repair lines carry the exact arm commands"
+}
 
 test_predicate_healthy_no_inflight() {
   local state="$TMP_ROOT/pred-empty/state"
@@ -203,6 +300,91 @@ test_predicate_relay_shim_is_not_a_custom_check() {
   pass "fm_supervision_status: the relay shim is not counted as a registered custom check"
 }
 
+# --- SHARED LIVENESS LIBRARY: bin/fm-supervision-liveness-lib.sh ------------
+#
+# The library is the single owner of the liveness predicate every supervision
+# guard branches on. Each case calls it in a subshell with its own state and
+# model, so the sourced globals never leak into the test process. <source-state>
+# exists only because bin/fm-wake-lib.sh creates its state dir on load; the
+# probe state can therefore be a path that does not exist.
+
+liveness_verdict() {  # <dir> <probe-state> <source-state> [model]
+  local dir=$1 probe=$2 source_state=$3 model=${4:-persistent}
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$source_state" FM_SUPERVISION_MODEL="$model" \
+    bash -c '
+      . "$1/bin/fm-supervision-lib.sh"
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-supervision-liveness-lib.sh"
+      fm_supervision_liveness "$2" 300
+      printf "%s %s\n" "$FM_SUP_LIVE" "$FM_SUP_REASON"
+    ' _ "$dir" "$probe"
+}
+
+test_liveness_off_for_stale_beacon_without_lock_owner() {
+  local dir out
+  dir=$(make_primary_dir "$TMP_ROOT/liveness-stale")
+  : > "$dir/state/task1.meta"
+  touch -t 202001010000 "$dir/state/.last-watcher-beat"
+  out=$(liveness_verdict "$dir" "$dir/state" "$dir/state")
+  assert_equals "off stale-beacon" "$out" "a stale beacon with no lock owner must read off, not allow"
+  pass "fm-supervision-liveness-lib: off for a stale beacon with no lock owner"
+}
+
+test_liveness_live_for_fresh_beacon_with_live_owner() {
+  local dir pid identity out
+  dir=$(make_primary_dir "$TMP_ROOT/liveness-live")
+  : > "$dir/state/task1.meta"
+  sleep 60 &
+  pid=$!
+  identity=$(watcher_identity "$dir" "$pid") || {
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "could not identify the live liveness watcher"
+  }
+  record_watcher_lock "$dir" "$pid" "$identity"
+  touch "$dir/state/.last-watcher-beat"
+  out=$(liveness_verdict "$dir" "$dir/state" "$dir/state")
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  assert_equals "live watcher" "$out" "a fresh beacon with a live identity-matched owner must read live"
+  pass "fm-supervision-liveness-lib: live for a fresh beacon with a live lock owner"
+}
+
+test_liveness_off_for_fresh_beacon_without_lock_owner() {
+  local dir out
+  dir=$(make_primary_dir "$TMP_ROOT/liveness-fresh-no-owner")
+  : > "$dir/state/task1.meta"
+  touch "$dir/state/.last-watcher-beat"
+  out=$(liveness_verdict "$dir" "$dir/state" "$dir/state")
+  assert_equals "off no-watcher" "$out" "a leftover beacon alone must never satisfy the lock-owner check"
+  pass "fm-supervision-liveness-lib: off for a fresh beacon with no live lock owner"
+}
+
+test_liveness_unknown_for_unreadable_state_dir() {
+  local dir out
+  dir=$(make_primary_dir "$TMP_ROOT/liveness-unknown")
+  out=$(liveness_verdict "$dir" "$dir/no-such-state" "$dir/state")
+  assert_equals "unknown unreadable" "$out" "an unreadable state dir must read unknown, never an empty home"
+  pass "fm-supervision-liveness-lib: unknown for an unreadable state directory"
+}
+
+test_liveness_away_daemon_owns_between_watcher_cycles() {
+  local dir pid out
+  dir=$(make_away_home_between_cycles "$TMP_ROOT/liveness-away-daemon")
+  sleep 60 &
+  pid=$!
+  record_daemon_lock "$dir" "$pid" || {
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "could not identify the live away-mode daemon"
+  }
+  out=$(liveness_verdict "$dir" "$dir/state" "$dir/state")
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  assert_equals "live away-daemon" "$out" "a live identity-matched away daemon with a fresh beacon is the away-mode owner proof"
+  pass "fm-supervision-liveness-lib: the away/quiet-daemon ownership proof lives in the shared predicate"
+}
+
 # --- HOOK: bin/fm-turnend-guard.sh ------------------------------------------
 #
 # Each scenario gets its own directory carrying a copy of the two guard scripts
@@ -219,13 +401,19 @@ install_guard_scripts() {
   cp "$ROOT/bin/fm-harness.sh" "$dir/bin/fm-harness.sh"
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
+  cp "$ROOT/bin/fm-supervision-liveness-lib.sh" "$dir/bin/fm-supervision-liveness-lib.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
+  cp "$ROOT/bin/fm-guard-event.sh" "$dir/bin/fm-guard-event.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
+  # Launch probe sibling of fm-cursor-lib.sh; keep it next to the copy so a
+  # fixture that ever verifies an executable does not source a missing file.
+  cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-dsh-lib.sh" "$dir/bin/fm-dsh-lib.sh"
   mkdir -p "$dir/docs"
   cp -R "$ROOT/docs/supervision-protocols" "$dir/docs/supervision-protocols"
   chmod +x "$dir/bin/fm-turnend-guard.sh" "$dir/bin/fm-turnend-guard-grok.sh" "$dir/bin/fm-operational-input.sh" "$dir/bin/fm-supervision-instructions.sh" "$dir/bin/fm-harness.sh"
@@ -610,7 +798,7 @@ test_hook_loop_guard_allows_retry() {
 # exactly like the main primary. This was the guard's proven blind spot: the
 # .fm-secondmate-home marker used to early-exit here, so an overnight secondmate
 # could end a turn with an unsupervised child and sit blind. Removing that marker
-# check makes the guard fire, mirroring the cd-guard.
+# check makes the guard fire.
 test_hook_blocks_in_secondmate_own_home() {
   local dir out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate")
@@ -994,10 +1182,10 @@ const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const contracts = {
   'fm-sessionstart-run.sh': ['SessionStart'],
   'fm-arm-pretool-check.sh': ['PreToolUse'],
-  'fm-cd-pretool-check.sh': ['PreToolUse'],
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
+  'fm-claude-hold-release.sh': ['UserPromptSubmit', 'StopFailure'],
   'fm-procevent-posttool-check.sh': ['PostToolUse'],
 };
 const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
@@ -1024,9 +1212,10 @@ function reset(home, target, ordinary = false) {
   fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
   fs.mkdirSync(path.join(home, 'state'));
   fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
-  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
+  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-claude-hold-release.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
+  if (target === 'fm-claude-hold-release.sh') fs.writeFileSync(statePath(home, '.main-eligible-rows.held'), '1 1 1\n');
   if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
   if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, 'task1.meta'), '');
@@ -1066,12 +1255,30 @@ function invoke(registration, home, context, payload) {
   });
   if (context === 'legacy') env.GROK_AGENT = '1';
   if (context === 'session-metadata') env.GROK_SESSION_ID = 'native-session-metadata';
-  const result = spawnSync('/bin/bash', ['-c', registration.command], {
-    cwd: home, env, input: JSON.stringify(payload), encoding: 'utf8', timeout: 15000,
-  });
-  assert.ifError(result.error);
-  assert.equal(result.signal, null, `${registration.target} did not settle`);
-  return result;
+  const label = `${registration.event}/${registration.target}/home=${home}/context=${context}/command=${registration.command}`;
+  let result;
+  try {
+    // Inert hooks exit without reading stdin, and a pipe write to an exited child fails with EPIPE
+    // on a loaded host, so the payload is a file the child may leave unread.
+    const stdinPath = path.join(home, 'pane-home', 'hook-input.json');
+    fs.writeFileSync(stdinPath, JSON.stringify(payload));
+    const stdinFd = fs.openSync(stdinPath, 'r');
+    try {
+      result = spawnSync('/bin/bash', ['-c', registration.command], {
+        cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+      });
+    } finally {
+      fs.closeSync(stdinFd);
+    }
+    assert.ifError(result.error);
+    assert.equal(result.signal, null, `${label}: did not settle`);
+    return result;
+  } catch (error) {
+    const output = result ? JSON.stringify({
+      status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr,
+    }) : 'child did not start';
+    throw new Error(`${label}: ${error.message}\n${output}`, { cause: error });
+  }
 }
 function silent(result, label) {
   assert.equal(result.status, 0, `${label}: ${result.stderr}`);
@@ -1092,7 +1299,6 @@ function payloadFor(registration, tool = 'Bash', ordinary = false) {
     last_assistant_message: 'The fleet is being watched.', tool_name: tool,
     tool_input: tool === 'Read' ? { file_path: 'README.md' } : { command: 'cat README.md' } };
   if (!ordinary && registration.target === 'fm-arm-pretool-check.sh') payload.tool_input.command = 'bin/fm-watch-arm.sh &';
-  if (!ordinary && registration.target === 'fm-cd-pretool-check.sh') payload.tool_input.command = 'cd projects/example';
   return payload;
 }
 if (mode === 'contexts') {
@@ -1120,7 +1326,6 @@ if (mode === 'contexts') {
                 assert.ok(result.stdout.includes('bin/fm-session-start.sh'), `${label}: no startup instruction`);
                 break;
               case 'fm-arm-pretool-check.sh':
-              case 'fm-cd-pretool-check.sh':
                 deny(result, label);
                 break;
               case 'fm-host-mirror.sh':
@@ -1139,6 +1344,10 @@ if (mode === 'contexts') {
                 assert.ok(result.stderr.includes('watcher auto-arm FAILED'), `${label}: no bounded arm failure`);
                 assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
                 assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
+                break;
+              case 'fm-claude-hold-release.sh':
+                silent(result, label);
+                assert.ok(!fs.existsSync(statePath(home, '.main-eligible-rows.held')), `${label}: the ended turn's hold survived`);
                 break;
               case 'fm-procevent-posttool-check.sh': {
                 assert.equal(result.status, 0, label);
@@ -1192,11 +1401,25 @@ if (mode === 'contexts') {
         }
       }
     }
-    if (['fm-arm-pretool-check.sh', 'fm-cd-pretool-check.sh', 'fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(registration.target)) {
+    if (['fm-arm-pretool-check.sh', 'fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(registration.target)) {
       reset(primary, registration.target, true);
       const before = snapshot(primary);
       silent(invoke(registration, primary, 'native', payloadFor(registration, 'Bash', true)), `${registration.target}/ordinary`);
       assert.deepEqual(snapshot(primary), before, `${registration.target}: ordinary hook changed state`);
+    }
+  }
+} else if (mode === 'large-exclusions') {
+  const registration = registrations.find(r => r.target === 'fm-turnend-guard.sh');
+  // Larger than the stdin pipe buffer: an excluded hook exits without reading it.
+  const payload = { ...payloadFor(registration), prompt: 'x'.repeat(1024 * 1024) };
+  for (const home of [primary, task]) {
+    for (const context of ['modern', 'legacy']) {
+      reset(home, registration.target);
+      const before = snapshot(home);
+      const label = `${registration.event}/${registration.target}/${home}/${context}/large-payload`;
+      silent(invoke(registration, home, context, payload), label);
+      assert.deepEqual(snapshot(home), before, `${label}: excluded hook changed state`);
+      console.log(`large-payload Grok exclusion: ${label}`);
     }
   }
 } else if (mode === 'tools') {
@@ -1218,15 +1441,13 @@ if (mode === 'contexts') {
       const payload = payloadFor(registration, tool, true);
       if (command !== null) payload.tool_input.command = command;
       const result = invoke(registration, primary, 'native', payload);
-      const expectedDeny = command === 'bin/fm-watch-arm.sh &' && registration.target === 'fm-arm-pretool-check.sh'
-        || command === 'cd projects/example' && registration.target === 'fm-cd-pretool-check.sh';
+      const expectedDeny = command === 'bin/fm-watch-arm.sh &' && registration.target === 'fm-arm-pretool-check.sh';
       if (expectedDeny) {
         deny(result, `${registration.target}/${command}`);
         deniers.push(registration.target);
       } else silent(result, `${registration.target}/${command}`);
     }
-    assert.deepEqual(deniers, command === null || command === 'cat README.md' ? []
-      : [command === 'cd projects/example' ? 'fm-cd-pretool-check.sh' : 'fm-arm-pretool-check.sh'],
+    assert.deepEqual(deniers, command === 'bin/fm-watch-arm.sh &' ? ['fm-arm-pretool-check.sh'] : [],
       `${tool}/${command}: missing, duplicated, or crossed Bash authorization`);
   }
 } else assert.fail(`unknown config consumer mode: ${mode}`);
@@ -1238,9 +1459,14 @@ test_tracked_claude_entries_inert_under_grok() {
   pass "tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion"
 }
 
+test_claude_large_payload_grok_exclusions() {
+  claude_config_hook_behavior large-exclusions
+  pass "tracked Claude fm-turnend-guard.sh Stop hook: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions"
+}
+
 test_claude_helper_tools_are_not_intercepted() {
   claude_config_hook_behavior tools
-  pass "Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained"
+  pass "Claude tools: helpers excluded, exact Bash/Read surface, watcher-arm denial retained and directory changes allowed"
 }
 
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root() {
@@ -1481,6 +1707,107 @@ EOF
   pass ".pi primary extension: delivery failure resets the logical-run latch"
 }
 
+# A Pi command started from inside the live session, such as the `pi --help`
+# capability probe, auto-loads this extension too and passes the ancestor walk
+# in lockOwnership. Its pid dies at once, so the marker must stay on the live
+# session above it, while a dead or foreign marker pid is still replaced.
+test_pi_extension_keeps_marker_of_live_ancestor_session() {
+  local repo home ext marker_case out status
+  repo="$TMP_ROOT/pi-marker-guard-root"
+  home="$TMP_ROOT/pi-marker-guard-home"
+  ext="$repo/.pi/extensions/fm-primary-turnend-guard.ts"
+  mkdir -p "$repo/.pi/extensions/lib" "$repo/bin" "$home/state"
+  cp "$ROOT/.pi/extensions/fm-primary-turnend-guard.ts" "$ext"
+  cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$repo/.pi/extensions/lib/fm-operational-input.ts"
+  cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/fm-operational-input.sh"
+  for marker_case in nested dead foreign fresh; do
+    rm -f "$home/state/.pi-turnend-extension-loaded"
+    out=$(PLUGIN="$ext" FM_HOME="$home" MARKER_CASE="$marker_case" node --input-type=module 2>&1 <<'EOF'
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const marker = `${process.env.FM_HOME}/state/.pi-turnend-extension-loaded`;
+const version = `sha256:${createHash("sha256").update(readFileSync(process.env.PLUGIN)).digest("hex")}`;
+// The lock names the parent of this process: a live strict ancestor, exactly where
+// the real session sits above a nested `pi --help`.
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+
+const handlers = new Map();
+const pi = {
+  on(event, handler) {
+    handlers.set(event, handler);
+  },
+  async sendUserMessage() {},
+};
+async function load() {
+  const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+  mod.default(pi);
+}
+function expectBoundToThisProcess(label) {
+  const content = readFileSync(marker, "utf8");
+  if (content !== `${version}\n${process.pid}\n`) {
+    throw new Error(`${label}: marker was not bound to this process: ${JSON.stringify(content)}`);
+  }
+}
+function pidAlive(pid) {
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+switch (process.env.MARKER_CASE) {
+  case "nested": {
+    const before = `${version}\n${process.ppid}\n`;
+    writeFileSync(marker, before);
+    await load();
+    // "reload" exercises the session_start write path without a startup digest.
+    await handlers.get("session_start")?.({ type: "session_start", reason: "reload" }, {});
+    const after = readFileSync(marker, "utf8");
+    if (after !== before) throw new Error(`nested load replaced the marker of the live session: ${JSON.stringify(after)}`);
+    break;
+  }
+  case "dead": {
+    const dead = spawnSync(process.execPath, ["-e", "0"], { stdio: "ignore" }).pid;
+    if (!dead || pidAlive(dead)) throw new Error(`could not produce a dead pid (got ${dead})`);
+    writeFileSync(marker, `${version}\n${dead}\n`);
+    await load();
+    expectBoundToThisProcess("marker on a dead pid");
+    break;
+  }
+  case "foreign": {
+    const foreign = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    try {
+      writeFileSync(marker, `${version}\n${foreign.pid}\n`);
+      await load();
+      expectBoundToThisProcess("marker on a live non-ancestor pid");
+    } finally {
+      foreign.kill("SIGTERM");
+    }
+    break;
+  }
+  case "fresh": {
+    if (existsSync(marker)) throw new Error("fresh case started with a marker present");
+    await load();
+    expectBoundToThisProcess("fresh load");
+    break;
+  }
+  default:
+    throw new Error(`unknown marker case: ${process.env.MARKER_CASE}`);
+}
+EOF
+)
+    status=$?
+    [ "$status" = 0 ] || fail "Pi turn-end marker guard failed for the '$marker_case' case (exit $status): $out"
+    [ -z "$out" ] || fail "Pi turn-end marker guard '$marker_case' case printed output: $out"
+  done
+  pass ".pi primary extension: a nested load keeps the live session's turn-end marker"
+}
+
 # --- --claude cooperative mode -----------------------------------------------
 # In --claude mode the guard ignores stop_hook_active (Claude marks every stop
 # after ANY stop-hook continuation true, including asyncRewake rewake turns) and
@@ -1517,12 +1844,18 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-stop-autoarm.sh"
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
+  cp "$ROOT/bin/fm-supervision-liveness-lib.sh" "$dir/bin/fm-supervision-liveness-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
+  cp "$ROOT/bin/fm-guard-event.sh" "$dir/bin/fm-guard-event.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
   cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
+  # Launch probe sibling of fm-cursor-lib.sh; keep it next to the copy so a
+  # fixture that ever verifies an executable does not source a missing file.
+  cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-dsh-lib.sh" "$dir/bin/fm-dsh-lib.sh"
   cp "$ROOT/bin/fm-lock.sh" "$dir/bin/fm-lock.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh"
@@ -1798,12 +2131,13 @@ test_hook_claude_mode_blocks_on_stuck_arming_claim() {
 }
 
 # The generation model's ownership proof: a live open ledger claim (two-line
-# entry, identity-matched owner, watcher still beating) owns recovery with no
-# lock held at all.
+# entry, identity-matched owner descending from the session-lock pid, watcher
+# still beating) owns recovery with no owner lock held at all.
 test_hook_claude_mode_allows_on_open_generation_claim() {
   local dir out status pid identity
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-open-generation")
   : > "$dir/state/task1.meta"
+  printf '%s\n' "$$" > "$dir/state/.lock"
   sleep 60 &
   pid=$!
   identity=$(fm_test_pid_identity "$pid") || fail "could not compute a claim pid-identity"
@@ -2577,6 +2911,17 @@ test_predicate_registered_check_survives_rebinding_drift
 test_predicate_unregistered_check_needs_nothing
 test_predicate_task_pr_poll_is_not_a_custom_check
 test_predicate_relay_shim_is_not_a_custom_check
+# The shared-library, telemetry, and repair-line cases run before the
+# harness-extension cases: several extension cases need a Node build with
+# TypeScript support, which a plain test runner may not have.
+test_liveness_off_for_stale_beacon_without_lock_owner
+test_liveness_live_for_fresh_beacon_with_live_owner
+test_liveness_off_for_fresh_beacon_without_lock_owner
+test_liveness_unknown_for_unreadable_state_dir
+test_liveness_away_daemon_owns_between_watcher_cycles
+test_hook_emits_one_deny_event_per_blocked_stop
+test_hook_claude_mode_emits_allow_after_an_unhealthy_episode
+test_repair_line_names_the_exact_arm_commands
 test_hook_silent_when_no_work_in_flight
 test_hook_blocks_when_fresh_beacon_has_no_live_lock
 test_hook_blocks_source_only_home
@@ -2612,6 +2957,7 @@ test_grok_adapter_native_true_allows_without_resume
 test_grok_adapter_snake_case_native_and_camel_precedence
 test_grok_adapter_invalid_inputs_start_neither_path
 test_grok_adapter_missing_jq_and_no_supervision_allow
+test_claude_large_payload_grok_exclusions
 test_tracked_claude_entries_inert_under_grok
 test_claude_helper_tools_are_not_intercepted
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root
@@ -2619,6 +2965,7 @@ test_codex_hook_ignores_nested_git_root_guard
 test_opencode_plugin_anchors_guard_to_worktree
 test_pi_extension_injects_once_per_logical_agent_run
 test_pi_extension_retries_after_followup_delivery_failure
+test_pi_extension_keeps_marker_of_live_ancestor_session
 test_hook_claude_mode_reblocks_stop_hook_active_when_unhealthy
 test_hook_claude_mode_reblocks_x_mode_without_tasks
 test_hook_claude_mode_allows_when_autoarm_owner_alive

@@ -26,7 +26,7 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
+| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, dsh primary launcher, Cursor |
 | Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
@@ -43,6 +43,7 @@ Codex's interactive TUI has no tracked session-open, compaction, or re-emit chan
 | Grok | Nudge | [Grok](#grok) |
 | Cursor | Run | [Cursor](#cursor) |
 | omp | Run | [omp](#omp) |
+| dsh primary launcher | Run | [DSH](#dsh) |
 | Cursor compaction | Uncovered | [Cursor compaction](#cursor-compaction) |
 
 ### Why the run tier exists
@@ -147,18 +148,21 @@ Some digest work remains local but unbounded:
 
 So the whole digest still runs as one bounded child, default 120s via `FM_SESSION_START_TIMEOUT`.
 
-Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
-So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.
+Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by this host's measured read duration with `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default) as the cold-start floor.
+So a read that does not answer in time becomes that task's own `endpoint: unknown` line (not a verdict that the endpoint is dead), a read that dies becomes `endpoint: error`, and the digest continues.
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
 
 [`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns reconciliation's conditional bulk-read fast path and per-worker metadata and lifecycle lock handling.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
-Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/fm-backlog-transition-lib.sh`.
-The first bound hit latches the sweep.
+Each of those reads stops only after an interval with no output and no process-tree CPU, through `bin/fm-backlog-transition-lib.sh`.
+At session start that interval is a third of the time left in the digest's own `FM_SESSION_START_TIMEOUT` bound when bootstrap starts (an `FM_BACKLOG_ROW_TIMEOUT_SECS` value stays an upper limit), so a wedged backend is cut by the read's own no-progress bound and the rest of the digest still prints; a productive read longer than that is still cut by the session-start bound itself.
+Outside session start the interval is `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 900s).
+Only a proven no-progress stop latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 
-`tests/fm-backlog-read-bound.test.sh` exercises hanging reads through hold, inventory verification (including migrated-prefix resolution), reconcile-request intake, and session start. It checks bounded completion, rejection without task creation or inventory attestation, and suppression of further backend reads after a timeout; diagnostic word order is not part of those CLI contracts.
+`tests/fm-backlog-read-bound.test.sh` exercises productive slow row/inventory reads and captain-held calls, plus genuinely inactive reads through hold, inventory verification (including migrated-prefix resolution), reconcile-request intake, and session start.
+It checks that productive work finishes without poisoning later reads, while true inactivity still prevents task creation or inventory attestation and suppresses further reads of the hung backend; diagnostic word order is not part of those CLI contracts.
 
 When timeout, gtimeout, and perl are unavailable, the shared timeout owner falls back to a pure-Bash process-group watchdog.
 So no supported host runs the digest unbounded.
@@ -371,6 +375,20 @@ So the source is derived following the Cursor precedent:
 
 A later in-process `clear` re-emits only when this lock owner completed a full startup.
 `before_agent_start` message delivery was verified to reach model context on 18.1.11.
+
+### DSH
+
+`bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
+The launch passes its opening prompt or secondmate brief to `dsh-tui` positionally.
+The installed DSH (the `dsh` CLI's own agent runtime) awaits the `agent/created` callback, which invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry, before it publishes the session; no turn starts, and a spawn's start proof cannot pass, until the digest is ready.
+The plugin's awaited `agent/pre-step` waterfall then enters the digest ahead of the opening prompt in the first step, and would hold that step for the digest under a runtime that did not await the callback; DSH's own checkpoint runs first in that waterfall, so an open turn is durable during such a hold.
+A failed or empty startup is recorded in `state/.dsh-primary-events.jsonl` and enters that step as the supervision-failure notice instead of the digest.
+The launch input entering that step is the adapter's own, so that notice spends the failure episode's one follow-up; only a later user-sourced message reopens it, never DSH's own runtime-context, skill-catalog, time-context or instruction messages.
+If that first step is cancelled or fails before it starts (while DSH assembles the system prompt after claiming, while held, when a downstream pre-step throws, or after the waterfall returns), DSH drops the step's claimed batch without restoring it (a non-user cancel also clears the inbox; an Escape keeps it), so the adapter records each claim through `agent/inbox/claimed` while the digest is outstanding, keeps the digest and the launch input until one of them is logged, and a turn that ends first hands them, once, to the next step's input.
+Top-level same-process session replacements use the shared `clear` source and inject the digest into the running session; delegated children never receive the primary digest or take over the watcher.
+A fresh process resuming a conversation takes the helm again through the same idempotent startup owner.
+Bare `dsh-tui` launches do not discover this plugin, and automatic in-place compaction has no separate tracked re-emit callback.
+The [DSH protocol](supervision-protocols/dsh.md) owns watcher continuity and recovery.
 
 ### Cursor compaction
 

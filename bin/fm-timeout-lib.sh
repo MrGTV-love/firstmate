@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# fm-timeout-lib.sh - the single owner of bounded command execution.
+# fm-timeout-lib.sh - the single owner of bounded and owner-bound execution.
+#
+#   fm_exec_owned <grace-seconds> <command> [args...]
+#       Replaces the shell with an owner-bound Perl watchdog, with no deadline.
+#       TERM, INT, HUP and owner death terminate the command process group,
+#       escalating to KILL after the positive grace. FM_EXEC_TIMED_OWNER_PID
+#       selects the owner; otherwise the calling shell's parent owns it.
+#       Requires Perl: timeout/gtimeout cannot enforce owner-death cleanup.
 #
 # Sourced, never executed. Provides one hard-bound runner so no caller has to
 # re-derive the coreutils/BSD/perl selection, and so every bounded call in this
@@ -85,6 +92,241 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
+# The sourced word names the file literally so fm-lint-cache.pl can resolve
+# it; a whole path held in a variable makes every caller uncacheable.
+_fm_timeout_dir=${BASH_SOURCE[0]%/*}
+[ "$_fm_timeout_dir" != "${BASH_SOURCE[0]}" ] || _fm_timeout_dir=.
+_fm_timeout_dir=${_fm_timeout_dir:-/}
+# shellcheck source=bin/fm-scratch-lib.sh
+[ ! -f "$_fm_timeout_dir/fm-scratch-lib.sh" ] || . "$_fm_timeout_dir/fm-scratch-lib.sh"
+unset _fm_timeout_dir
+
+# fm_run_progress <no-progress-seconds> <command...>: keep slow work running
+# while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
+# bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
+# runner; the Perl-core fallback preserves Python-optional shell readers with
+# the same CPU/output rule. Both forward signals, clean up the owned command
+# group and write no duration records. A nested call keeps its own bound, so a
+# hung inner read is stopped by its own owner and the outer work continues.
+fm_run_progress() {
+  local seconds=$1 helper
+  shift
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  if fm_posix_python; then
+    python3 "$helper" keep-going "$seconds" -- "$@"
+  elif command -v perl >/dev/null 2>&1; then
+    fm_run_perl_progress "$seconds" "$@"
+  else
+    printf 'fm_run_progress: Python 3 or Perl is required to observe command progress\n' >&2
+    return 127
+  fi
+}
+
+# fm_progress_quiet_secs: the repo-wide quiet interval for work that has no
+# better-known one, printed in whole seconds. It is the same policy value
+# bin/fm-duration.py applies to every operational runner (its header owns the
+# 15 minutes and the FM_DURATION_NO_PROGRESS_SECS override), so a caller that
+# only needs "stop it when it goes silent" names no number of its own.
+fm_progress_quiet_secs() {
+  local secs=${FM_DURATION_NO_PROGRESS_SECS:-}
+  case "$secs" in ''|*[!0-9]*|0*) secs=900 ;; esac
+  printf '%s\n' "$secs"
+}
+
+# fm_posix_python: 0 when python3 is a POSIX interpreter able to run
+# fm-duration.py's process-group runners. A native Windows python3 on a Git Bash
+# PATH is not, so callers fall back instead of failing every read. The answer is
+# kept for the rest of this shell.
+fm_posix_python() {
+  if [ -z "${_FM_POSIX_PYTHON:-}" ]; then
+    _FM_POSIX_PYTHON=0
+    if command -v python3 >/dev/null 2>&1 \
+      && python3 -c 'import os, sys; sys.exit(os.name != "posix")' >/dev/null 2>&1; then
+      _FM_POSIX_PYTHON=1
+    fi
+  fi
+  [ "$_FM_POSIX_PYTHON" = 1 ]
+}
+
+# fm_progress_check <record> <pid> <no-progress-seconds> [path...]: fm-duration.py
+# progress-check, the identity-bound proof that pid's process tree and the paths
+# made no progress for the interval (124 only then). Without a POSIX python3
+# nothing can be proven, so it never returns 124 and writes one
+# cpu_telemetry_unavailable line per shell instead of failing each call.
+fm_progress_check() {
+  local helper
+  if ! fm_posix_python; then
+    if [ "${_FM_PROGRESS_CHECK_WARNED:-0}" != 1 ]; then
+      _FM_PROGRESS_CHECK_WARNED=1
+      printf 'cpu_telemetry_unavailable: no POSIX python3 can check process progress here; hung work cannot be proven, so nothing is stopped for inactivity\n' >&2
+    fi
+    return 0
+  fi
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  python3 "$helper" progress-check "$@"
+}
+
+# Preserve the existing Python-optional shell readers. Perl core modules relay
+# both streams and sample the same identity-bound /proc-or-ps CPU facts as
+# fm-duration.py, without its native Darwin CPU reader; a changed ps tree stands
+# in for waited-child CPU that ps omits. The bound is inactivity only, including
+# TERM cleanup; while no sample is available one warning names the platform and
+# nothing is stopped for inactivity. Parent death and signals clean up the owned
+# command group.
+fm_run_perl_progress() {
+  local owner=${BASHPID:-$$}
+  # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
+  perl -MPOSIX=WNOHANG -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -MIO::Select -MIO::Handle -e '
+    my ($owner, $idle) = (shift, shift);
+    die "inactivity must be positive\n" unless $idle =~ /^\d+(?:[.]\d+)?$/ && $idle > 0;
+    my $parent = getppid();
+    my ($pending, $stopping, $exit_code) = (0, 0, 0);
+    $SIG{TERM} = sub { $pending ||= 143 };
+    $SIG{INT} = sub { $pending ||= 130 };
+    $SIG{HUP} = sub { $pending ||= 129 };
+    $SIG{PIPE} = sub { $pending ||= 143 };
+    setpgrp(0, 0) or die "setpgrp: $!";
+    pipe(my $out_r, my $out_w) or die "pipe: $!";
+    pipe(my $err_r, my $err_w) or die "pipe: $!";
+    my $pid = fork;
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(TERM INT HUP);
+      setpgrp(0, 0);
+      close $out_r; close $err_r;
+      open STDOUT, ">&", $out_w or die "stdout: $!";
+      open STDERR, ">&", $err_w or die "stderr: $!";
+      close $out_w; close $err_w;
+      exec @ARGV;
+      exit 127;
+    }
+    setpgrp($pid, $pid);
+    close $out_w; close $err_w;
+    STDOUT->autoflush(1); STDERR->autoflush(1);
+    my $streams = IO::Select->new($out_r, $err_r);
+    my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
+    my (%observed, $last_cpu, $blind, $warned, $active, $last_tree);
+    my $last_progress = clock_gettime(CLOCK_MONOTONIC);
+    my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
+    # A read that ends within one cadence never pays for a ps sample; start
+    # time is already the progress baseline.
+    my $next_sample = $last_progress + $cadence;
+    my $proc = $ENV{FM_PROC_ROOT_OVERRIDE} || "/proc";
+    my $ticks = eval { POSIX::sysconf(POSIX::_SC_CLK_TCK()) } || 100;
+    my $cpu = sub {
+      my (%children, %times, $from_ps);
+      # A Linux-compatible /proc (Git Bash/MSYS too, whose ps rejects these
+      # -o fields) is chosen by capability. Include waited-child CPU so work
+      # cannot vanish when a child is reaped between samples.
+      if (-r "$proc/$pid/stat" && opendir my $dir, $proc) {
+        for my $child (grep { /^\d+$/ } readdir $dir) {
+          open my $stat, "<", "$proc/$child/stat" or next;
+          my $line = <$stat>;
+          next unless defined $line && (my $at = rindex $line, ")") >= 0;
+          my @field = split " ", substr($line, $at + 1);
+          next unless @field >= 20 && $field[1] =~ /^\d+$/;
+          push @{$children{$field[1]}}, $child;
+          $times{$child} = [($field[11] + $field[12] + $field[13] + $field[14]) / $ticks,
+                            "proc $field[19]", $field[0] eq "R"];
+        }
+        closedir $dir;
+      } else {
+        $from_ps = 1;
+        local $ENV{LC_ALL} = "C";
+        open my $ps, "-|", "ps", "-S", "-axo", "pid=,ppid=,time=,stat=,lstart=" or return;
+        while (my $line = <$ps>) {
+          my ($child, $parent, $clock, $state, $identity) = split " ", $line, 5;
+          next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
+          chomp $identity;
+          my $seconds = 0;
+          $seconds = $1 * 86400 if $clock =~ s/^(\d+)-//;
+          my $part = 0;
+          $part = $part * 60 + $_ for split /:/, $clock;
+          push @{$children{$parent}}, $child;
+          $times{$child} = [$seconds + $part, $identity, $state =~ /^R/];
+        }
+        close $ps or return;
+      }
+      $active = 0;
+      my @members;
+      my @todo = ($pid);
+      while (@todo) {
+        my $child = pop @todo;
+        if (exists $times{$child}) {
+          my ($seconds, $identity, $running) = @{$times{$child}};
+          $active ||= $running;
+          my $key = "$child:$identity";
+          push @members, $key;
+          $observed{$key} = $seconds if !exists $observed{$key} || $seconds > $observed{$key};
+        }
+        push @todo, @{$children{$child} || []};
+      }
+      # ps may omit waited-child CPU on Darwin. A changed tree is not a
+      # consecutive idle observation, even when its last CPU burst was missed.
+      if ($from_ps) {
+        my $tree = join "\\n", sort @members;
+        $active ||= defined $last_tree && $tree ne $last_tree;
+        $last_tree = $tree;
+      }
+      my $total = 0;
+      $total += $_ for values %observed;
+      return $total;
+    };
+    my $relay = sub {
+      my $stream = shift;
+      my $count = sysread($stream, my $buffer, 65536);
+      if (defined $count && $count > 0) {
+        print {$sink{fileno($stream)}} $buffer;
+        $last_progress = clock_gettime(CLOCK_MONOTONIC);
+      } elsif (defined $count) {
+        $streams->remove($stream); close $stream;
+      } elsif (!$!{EINTR}) {
+        $pending ||= 1;
+      }
+    };
+    while (1) {
+      my $done = waitpid $pid, WNOHANG;
+      my $status = $?;
+      if ($done == $pid) {
+        kill "KILL", -$pid if $stopping;
+        while (my @ready = $streams->can_read(0)) { $relay->($_) for @ready; }
+        exit($stopping ? $exit_code : (($status & 127) ? 128 + ($status & 127) : $status >> 8));
+      }
+      exit 127 if $done == -1;
+      $pending ||= 143 if getppid() != $parent || !kill(0, $owner);
+      if ($pending) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          $stopping = 1; $exit_code = $pending;
+          $last_progress = clock_gettime(CLOCK_MONOTONIC);
+          kill "TERM", -$pid;
+        }
+        $pending = 0;
+      }
+      if ($streams->count) { $relay->($_) for $streams->can_read($cadence); }
+      else { select undef, undef, undef, $cadence; }
+      my $now = clock_gettime(CLOCK_MONOTONIC);
+      if ($now >= $next_sample) {
+        my $sample = $cpu->();
+        $blind = !defined $sample;
+        if ($blind && !$warned++) {
+          print STDERR "cpu_telemetry_unavailable: neither /proc/<pid>/stat nor ps can sample process CPU on $^O; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled\n";
+        }
+        $last_progress = $now if defined $sample && ($active || !defined $last_cpu || $sample > $last_cpu);
+        $last_cpu = $sample if defined $sample;
+        $next_sample = $now + $cadence;
+      }
+      if ($now - $last_progress >= $idle && ($stopping || !$blind)) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          print STDERR "no_progress: command made no output or CPU progress\n";
+          $pending = 124;
+        }
+      }
+    }
+  ' "$owner" "$@"
+}
+
 fm_timeout_mechanism() {
   if [ "${FM_TIMEOUT_MECHANISM_OVERRIDE:-}" = bash ]; then
     printf 'bash\n'
@@ -115,26 +357,34 @@ fm_timeout_free_fd() {
 # fm_timeout_open_status <prefix>: make a status file, open a write and a read
 # descriptor on it, and unlink it at once. The numbers go to FM_TIMEOUT_WFD and
 # FM_TIMEOUT_RFD. Nothing named stays on disk, so a caller that dies by TERM,
-# INT, HUP or KILL while waiting leaves no file behind. The one remaining gap is
-# a KILL between mktemp and the unlink.
+# INT or HUP while waiting leaves no file behind. A KILL between the file's
+# creation and its unlink leaves an empty file in the prefix's scratch
+# container (fm-scratch-lib.sh), which the next call with the same prefix
+# removes once it sees the dead owner.
 fm_timeout_open_status() {
   local status_file wfd rfd
+  local -a fm_timeout_status_release=(fm_scratch_release)
   FM_TIMEOUT_WFD=
   FM_TIMEOUT_RFD=
-  status_file=$(mktemp "${TMPDIR:-/tmp}/$1.XXXXXX" 2>/dev/null) || return 1
+  if declare -F fm_scratch_new >/dev/null; then
+    status_file=$(fm_scratch_new f "$1" 2>/dev/null) || return 1
+  else
+    status_file=$(mktemp "${TMPDIR:-/tmp}/$1.XXXXXX" 2>/dev/null) || return 1
+    fm_timeout_status_release=(rm -f --)
+  fi
   wfd=$(fm_timeout_free_fd 20) || wfd=
   rfd=
   [ -z "$wfd" ] || rfd=$(fm_timeout_free_fd $((wfd + 1))) || rfd=
   if [ -z "$wfd" ] || [ -z "$rfd" ]; then
-    rm -f "$status_file" 2>/dev/null || true
+    "${fm_timeout_status_release[@]}" "$status_file"
     return 1
   fi
   if ! { eval "exec $wfd>\"\$status_file\" $rfd<\"\$status_file\""; } 2>/dev/null; then
     eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
-    rm -f "$status_file" 2>/dev/null || true
+    "${fm_timeout_status_release[@]}" "$status_file"
     return 1
   fi
-  rm -f "$status_file" 2>/dev/null || true
+  "${fm_timeout_status_release[@]}" "$status_file"
   FM_TIMEOUT_WFD=$wfd
   FM_TIMEOUT_RFD=$rfd
 }
@@ -326,7 +576,7 @@ fm_timed_out() {  # <status>
 # which keeps the bound off perl's platform-dependent syscall-restart signal
 # semantics and off the drift of counting sleep intervals.
 fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
-  local seconds=${1:-} grace=${2:-} value owner
+  local seconds=${1:-} grace=${2:-} value
   for value in "$seconds" "$grace"; do
     case "$value" in
       '' | 0* | *[!0-9]*)
@@ -340,6 +590,24 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
     echo "fm_exec_timed: usage: fm_exec_timed <positive-seconds> <positive-grace-seconds> <command> [args...]" >&2
     exit 125
   fi
+  _fm_exec_watchdog "$seconds" "$grace" "$@"
+}
+
+# Continuous children need owner-death cleanup, not an invented deadline.
+# Only the Perl watchdog can enforce that contract; timeout fallbacks cannot.
+fm_exec_owned() {  # <grace-seconds> <command...>
+  local grace=${1:-}
+  case "$grace" in
+    ''|0*|*[!0-9]*) echo 'fm_exec_owned: usage: fm_exec_owned <positive-grace-seconds> <command> [args...]' >&2; exit 125 ;;
+  esac
+  shift
+  [ "$#" -gt 0 ] || { echo 'fm_exec_owned: a command is required' >&2; exit 125; }
+  _fm_exec_watchdog 0 "$grace" "$@"
+}
+
+_fm_exec_watchdog() {  # <seconds-or-zero-for-owned> <grace> <command...>
+  local seconds=$1 grace=$2 owner
+  shift 2
   owner=${FM_EXEC_TIMED_OWNER_PID:-$$}
   unset FM_EXEC_TIMED_OWNER_PID
   if command -v perl >/dev/null 2>&1; then
@@ -367,7 +635,7 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
       setpgid($child, $child);
       $pid = $child;
       kill $pending, -$pid if $pending;
-      my $deadline = time + $bound;
+      my $deadline = $bound > 0 ? time + $bound : undef;
       sub finish {
         my $status = shift;
         kill "KILL", -$pid if $kill_at;
@@ -384,7 +652,7 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
             waitpid $pid, 0;
             finish($?);
           }
-        } elsif (time >= $deadline) {
+        } elsif (defined($deadline) && time >= $deadline) {
           $timed_out = 1;
           $kill_at = time + $grace;
           kill "TERM", -$pid;
@@ -395,6 +663,9 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
         select undef, undef, undef, 0.05;
       }
     ' -- "$seconds" "$grace" "$owner" "$PPID" "$@"
+  elif [ "$seconds" -eq 0 ]; then
+    echo 'fm_exec_owned: perl is required to enforce owner-death cleanup' >&2
+    exit 127
   elif command -v timeout >/dev/null 2>&1; then
     exec timeout -k "$grace" "$seconds" "$@"
   elif command -v gtimeout >/dev/null 2>&1; then

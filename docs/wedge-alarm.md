@@ -1,9 +1,17 @@
-# Away-mode injection wedge alarm
+# Supervision alarm channels
 
 The away-mode sub-supervisor (`bin/fm-supervise-daemon.sh`) buffers escalations and injects them into Firstmate's own pane.
 When injection cannot confirm a submit past `FM_MAX_DEFER_SECS`, `inject_wedge_alarm` raises a loud, rate-limited alarm so the stall never stays invisible.
+Its title remains `firstmate: away-mode escalations WEDGED`.
 The active alert is pane-independent because a tmux status-line flash has no cross-backend equivalent and cannot reach an unattended captain reliably.
 The durable marker and tmux flash remain as additional signals.
+
+The [out-of-session watchdog](watchdog.md) uses the same channels with the title `firstmate supervision is down (<verdict>)`.
+Its summary counts the recovery checks that did not restore supervision and classifies only the latest attempt.
+Stopping a live watcher or running a configured resume command is a recovery action, so an attempt that ran one is a failed recovery.
+An attempt with neither action available is a no-op, and the summary names the missing route, such as no live watcher to stop and no `config/watchdog-resume`.
+No-ops still contribute to the existing alarm threshold; the wording does not delay the alarm.
+The watchdog script's header owns the attempt sequence and state records.
 
 ## Channels
 
@@ -19,13 +27,13 @@ It lists channel directives, one per non-empty, non-comment line, and every list
 - `command:<cmd>` runs `<cmd>` through `sh -c` with the alarm summary as `$1` and on stdin, allowing delivery to a phone or pager service.
 
 An absent `config/wedge-alarm` behaves as `auto`, which is default-on on macOS.
-This is deliberate because the alarm fires only after a genuine max-defer wedge and is rate-limited to at most once per max-defer window.
+This is deliberate because both senders require a persistent supervision problem and rate-limit their alerts; the daemon owns max-defer wedge timing and the watchdog header owns recovery-check timing.
 
 Each channel is best-effort.
 A missing binary or non-zero exit logs a warning and continues to the next channel without crashing the daemon loop.
 Every invocation is process-group bounded by `FM_WEDGE_ALARM_TIMEOUT_SECS`, which defaults to 10 seconds, including `command:`, `osascript`, `herdr`, and the test seam.
 On timeout or daemon shutdown, the notifier process group is terminated and the next configured channel may run.
-AppleScript receives the summary as an argv item rather than interpolated source, so summary text cannot alter the script.
+AppleScript receives the summary and title as argv items rather than interpolated source, so neither can alter the script.
 See [`examples/wedge-alarm`](examples/wedge-alarm) for a copyable config.
 
 ## Test safety
@@ -36,4 +44,5 @@ When the daemon is sourced as a library, that seam defaults to `discard`, so a t
 Production leaves the seam unset and uses the configured real channels.
 
 `tests/fm-daemon.test.sh` covers directive parsing, rate limiting, timeout and process-group cleanup, argv-safe dispatch, channel fallback, and safe `command:` summary delivery.
+`tests/fm-watchdog-check.test.sh` captures watchdog and away-mode titles through the notifier seam and verifies the failed-recovery and no-op wording without changing watchdog alarm timing.
 [`verification/supervision.md`](verification/supervision.md#wedge-alarm-channels) records the bounded manual macOS and Herdr channel proof.

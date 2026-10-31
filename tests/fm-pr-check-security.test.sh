@@ -17,6 +17,9 @@ WATCH="$ROOT/bin/fm-watch.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 REGISTER="$ROOT/bin/fm-check-register.sh"
 TMP_ROOT=$(fm_test_tmproot fm-pr-check-security)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 fm_git_identity fmtest fmtest@example.invalid
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)
@@ -131,6 +134,7 @@ make_case() {
   git -C "$dir/wt" init -q
   git -C "$dir/wt" commit -q --allow-empty -m init
   git -C "$dir/wt" update-ref refs/remotes/origin/main "$(git -C "$dir/wt" rev-parse HEAD)"
+  fm_fake_ship_review_history "$fakebin"
   cat > "$fake_root/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'guard\n' >> "$FM_TEST_GUARD_LOG"
@@ -157,7 +161,7 @@ case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
       *mergeStateStatus*)
-        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\"}"
+        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\",\"baseRefOid\":\"0000000000000000000000000000000000000000\"}"
         exit 0
         ;;
       *" --json isDraft "*)
@@ -190,6 +194,9 @@ case " $* " in
     ;;
   *" api --paginate repos/"*"/rules/branches/"*)
     printf '%s\n' '[]'
+    ;;
+  *" api repos/"*"/compare/"*)
+    printf '%s\n' '{"behind_by":0,"base_commit":{"sha":"0000000000000000000000000000000000000000"},"merge_base_commit":{"sha":"0000000000000000000000000000000000000000"}}'
     ;;
   *" api repos/"*"/branches/"*)
     printf '%s\n' '{"name":"main","protected":false}'
@@ -265,8 +272,14 @@ SH
 [ "${FM_TEST_NM_FAIL:-0}" = 0 ] || exit 1
 head=$(git rev-parse HEAD 2>/dev/null) || exit 1
 pipeline=${FM_TEST_NM_PIPELINE_HEAD:-$head}
-printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\noutcome: %s\n' \
-  "$pipeline" "${FM_TEST_NM_OUTCOME-passed}"
+task=${FM_TEST_NM_TASK_ID:-task-a}
+plan_dir="${FM_HOME:-$(dirname "$(pwd)")/home}/data/$task"
+mkdir -p "$plan_dir" || exit 1
+plan="$plan_dir/verification-plan.md"
+[ -f "$plan" ] || printf 'fixture verification plan\n' > "$plan"
+plan_sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\n  verification_plan:\n    path: %s\n    sha256: %s\n    source_path: %s\n    captured_at: %s\noutcome: %s\n' \
+  "$pipeline" "$plan" "$plan_sha" "$plan" "$(date +%s)" "${FM_TEST_NM_OUTCOME-passed}"
 printf 'branch_sync:\n  state: %s\n  local:\n    head: %s\n  pipeline:\n    current_head: %s\n' \
   "${FM_TEST_NM_SYNC_STATE:-synchronized}" "$head" "$pipeline"
 if [ -n "${FM_TEST_NM_NEXT_ACTION:-}" ]; then
@@ -291,6 +304,7 @@ write_task_meta() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     "kind=ship" \
+    "model=gpt-5.1-codex" \
     "mode=no-mistakes"
 }
 
@@ -303,15 +317,17 @@ write_poll_meta() {
   fm_write_meta "$state/$id.meta" \
     "window=fm-$id" \
     "worktree=$case_dir/wt" \
+    "model=gpt-5.1-codex" \
     "$@" \
     "pr=$url"
 }
 
 
 run_check_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -319,10 +335,26 @@ run_check_entry() {
     "$PR_CHECK" "$@"
 }
 
+seed_merge_review() {
+  local dir=$1 url=$2
+  printf 'VERDICT: PASS head=%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" > "$dir/review.md"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
+    --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
+    --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
+    --report "$dir/review.md"
+}
+
 run_merge_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
+  # Valid merge fixtures satisfy the separate independent-review prerequisite;
+  # malformed-input fixtures still reach the merge entrypoint's own parser.
+  if [ "$#" -ge 2 ] && (fm_pr_task_id_valid "$1" && fm_pr_url_parse "$2"); then
+    seed_merge_review "$dir" "$2" >/dev/null || fail "valid merge fixture could not record its review"
+  fi
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -754,7 +786,7 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   dir=$(make_case direct-pr-unpushed)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
   git -C "$dir/wt" commit -q --allow-empty -m 'fix only in the copy'
   later=$(git -C "$dir/wt" rev-parse HEAD)
@@ -775,7 +807,7 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   dir=$(make_case multi-pr-registration)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   printf 'done [at=1]: PR %s checks green\ndone [at=2]: PR %s checks green\n' \
     https://github.com/o/r/pull/3 https://github.com/o/r/pull/4 > "$dir/home/state/task-a.status"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
@@ -985,6 +1017,7 @@ SH
       "worktree=$dir/wt" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     cat > "$dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -1159,6 +1192,31 @@ test_static_poll_contract() {
   [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll"
   [ "$(grep -c '^check: .*: merged$' "$dir/watch.out")" -eq 1 ] || fail "watcher did not convert merged output into exactly one wake"
   pass "static poll is silent except for one merged line and remains watcher-bounded"
+}
+
+# A merge that happens elsewhere reaches the watcher through the merge poll. The
+# poll's outcome arms the pool-copy prune (bin/fm-merge-prune.sh); the watcher
+# does not run it inside the lock it holds. The tick is off here so nothing
+# attempts a teardown against the fixture.
+test_watcher_merged_poll_arms_the_pool_copy_prune() {
+  local dir rc
+  dir=$(make_case merge-prune-poll-arms)
+  write_task_meta "$dir"
+  write_poll_meta "$dir/home/state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$dir/home/state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare authenticated watcher poll"
+  fm_pr_poll_publish_prepared || fail "could not publish authenticated watcher poll"
+  rm -f "$dir/home/state/.last-check"
+  set +e
+  FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=0 FM_TEST_GH_STATE=MERGED \
+    run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll: $(cat "$dir/watch.err")"
+  [ -f "$dir/home/state/task-a.merge-prune" ] || fail "the merged poll did not arm the pool-copy prune"
+  grep -qx 'pr=https://github.com/o/r/pull/1' "$dir/home/state/task-a.merge-prune" \
+    || fail "the armed record does not name the merged PR: $(cat "$dir/home/state/task-a.merge-prune")"
+  pass "a merge seen by the poll arms the pool-copy prune without running it under the poll's lock"
 }
 
 test_atomic_interruption_leaves_no_partial_artifact() {
@@ -1472,13 +1530,32 @@ test_bootstrap_leaves_unauthenticated_checks() {
   pass "bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics"
 }
 
-test_custom_snapshot_cleanup_on_signal() {
-  local dir state child_pid_file pid child_pid i rc
-  dir=$(make_case custom-snapshot-signal)
+custom_snapshot_signal_case() {  # <responsive|stopped>
+  local mode=$1 dir state child_pid_file launcher_pid_file pid child_pid launcher_pid check_pgid i rc
+  local active_check_grace=0 watcher_margin=10 test_margin=20 allowances launcher_cleanup guardian_grace
+  local stop_polls launcher_command group_states host
+  host=$(uname)
+  # In tenths of a second, from their one definitions. Custom captures use
+  # FM_ACTIVE_CHECK_GRACE=0. The watcher waits that grace, the launcher's own
+  # cleanup (TERM_SECONDS + LEFTOVER_GRACE) and its 1 s margin before it KILLs
+  # a stopped launcher; the guardian then gives TERM-resistant work
+  # TERM_SECONDS. The 2 s test margin covers interpreter starts and scheduling.
+  # This is a bound on requested shutdown, never on normally progressing work.
+  # Each tenth is ten 0.01 s polls, the unit the watcher's launcher wait
+  # counts, so host load stretches this wait as much as the watcher's.
+  allowances=$(python3 -c 'import math, runpy, sys
+proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
+print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 10), math.ceil(proc["TERM_SECONDS"] * 10))' \
+    "$ROOT/bin/fm-proc-info.py" "$ROOT/bin/fm-proc-budget-tree.py") || fail "cannot read cleanup allowances"
+  read -r launcher_cleanup guardian_grace <<< "$allowances"
+  stop_polls=$((active_check_grace * 10 + launcher_cleanup + watcher_margin + guardian_grace + test_margin))
+  dir=$(make_case "custom-snapshot-signal-$mode")
   state="$dir/home/state"
   child_pid_file="$dir/custom-child.pid"
-  # shellcheck disable=SC2016  # The generated child expands $$ when it runs.
+  launcher_pid_file="$dir/custom-launcher.pid"
+  # shellcheck disable=SC2016  # The generated child expands its own process IDs.
   printf '%s\n' '#!/usr/bin/env bash' 'trap "" TERM' \
+    'printf "%s\n" "$PPID" > "$FM_TEST_CUSTOM_LAUNCHER_PID"' \
     'printf "%s\n" "$$" > "$FM_TEST_CUSTOM_CHILD_PID"' 'while :; do sleep 1; done' \
     > "$state/custom.check.sh"
   chmod 0700 "$state/custom.check.sh"
@@ -1496,6 +1573,7 @@ SH
 
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=0 FM_CHECK_INTERVAL=0 \
     FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
+    FM_TEST_CUSTOM_LAUNCHER_PID="$launcher_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
@@ -1511,98 +1589,121 @@ SH
   find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "watcher did not create the custom check snapshot"
   child_pid=$(cat "$child_pid_file")
+  launcher_pid=$(cat "$launcher_pid_file")
+  if [ "$host" = Darwin ]; then
+    launcher_command=$(python3 "$ROOT/bin/fm-proc-info.py" args "$launcher_pid")
+    check_pgid=$(python3 "$ROOT/bin/fm-proc-info.py" pgid "$child_pid")
+  else
+    launcher_command=$(ps -p "$launcher_pid" -o command=)
+    check_pgid=$(ps -p "$child_pid" -o pgid= | tr -d '[:space:]')
+  fi
+  case "$launcher_command" in
+    *fm-check-run.py*) ;;
+    *) fail "custom check parent is not its owned launcher" ;;
+  esac
+  if [ "$mode" = stopped ]; then
+    kill -STOP "$launcher_pid" || fail "could not stop owned launcher"
+  fi
   kill -TERM "$pid" 2>/dev/null || fail "could not signal watcher during custom check"
   i=0
-  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 100 ]; do
-    sleep 0.02
+  while { process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+      || process_is_live_non_zombie "$child_pid"; } && [ "$i" -lt "$stop_polls" ]; do
+    perl -e 'select undef, undef, undef, 0.01 for 1 .. 10'
     i=$((i + 1))
   done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+  if process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
+    || process_is_live_non_zombie "$child_pid"; then
+    # Fault-injection failure must not leave a stopped launcher or check behind.
+    kill -KILL "$launcher_pid" "$pid" 2>/dev/null || true
+    kill -KILL -- "-$check_pgid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    fail "signaled watcher did not exit promptly"
+    fail "signaled watcher did not exit within cleanup grace plus margin ($mode launcher)"
   fi
   rc=0
   wait "$pid" || rc=$?
   [ "$rc" -ne 0 ] || fail "signaled watcher exited successfully"
-  ! kill -0 "$child_pid" 2>/dev/null || fail "signaled watcher left the custom check child running"
+  ! process_is_live_non_zombie "$launcher_pid" || fail "signaled watcher left its launcher running"
+  ! process_is_live_non_zombie "$child_pid" || fail "signaled watcher left the custom check child running"
+  # Orphan zombies are already dead; no live member of the check's group may
+  # remain, including its independent guardian and TERM-resistant descendants.
+  if [ "$host" = Darwin ]; then
+    group_states=$(python3 "$ROOT/bin/fm-proc-info.py" table pgid,stat) || fail "cannot read check-group state"
+  else
+    group_states=$(ps -ax -o pgid=,stat=) || fail "cannot read check-group state"
+  fi
+  ! printf '%s\n' "$group_states" | awk -v group="$check_pgid" \
+    '$1 == group && $2 !~ /^Z/ { live=1 } END { exit !live }' \
+    || fail "signaled watcher left a live check-group member"
   ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private custom check snapshot"
   ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
     || fail "signaled watcher left a private check output file"
   [ ! -e "$state/.watch.lock/pid" ] || fail "signaled watcher left its singleton lock"
-  pass "watcher signals promptly stop custom checks and clean private state"
+  pass "a signaled watcher stops its custom check and cleans private state ($mode launcher)"
+}
+
+test_custom_snapshot_cleanup_on_signal() {
+  custom_snapshot_signal_case responsive
+}
+
+test_custom_snapshot_cleanup_with_stopped_launcher() {
+  custom_snapshot_signal_case stopped
 }
 
 test_returned_custom_check_descendants_are_drained() {
-  local backend dir state fakebin ready direct_done child_pid_file child_pid check rc force_fallback
-  for backend in installed-timeout fallback-timeout; do
-    dir=$(make_case "returned-custom-descendant-$backend")
-    state="$dir/home/state"
-    fakebin="$dir/fakebin"
-    ready="$dir/descendant-ready"
-    direct_done="$dir/direct-check-done"
-    child_pid_file="$dir/descendant.pid"
-    # The descendant ignores TERM and never exits on its own while this case's
-    # directory exists, so its absence can only mean the watcher drained it.
-    cat > "$state/custom.check.sh" <<'SH'
+  local dir state fakebin ready direct_done child_pid_file child_pid check rc
+  dir=$(make_case returned-custom-descendant)
+  state="$dir/home/state"
+  fakebin="$dir/fakebin"
+  ready="$dir/descendant-ready"
+  direct_done="$dir/direct-check-done"
+  child_pid_file="$dir/descendant.pid"
+  # The descendant ignores TERM and never exits on its own while this case's
+  # directory exists, so its absence can only mean the watcher drained it.
+  cat > "$state/custom.check.sh" <<'SH'
 #!/usr/bin/env bash
 perl -e '$SIG{TERM}="IGNORE"; open my $ready, ">", $ENV{FM_TEST_DESCENDANT_READY} or die $!; print {$ready} "ready\n"; close $ready; select undef, undef, undef, 0.2 while -d $ENV{FM_TEST_DESCENDANT_HOLD}' &
 printf '%s\n' "$!" > "$FM_TEST_DESCENDANT_PID"
 while [ ! -s "$FM_TEST_DESCENDANT_READY" ]; do sleep 0.01; done
 : > "$FM_TEST_DIRECT_DONE"
 SH
-    # The watcher runs this check next in the same cycle, only after it has
-    # finished with the returned one, so its wake both records whether the
-    # descendant outlived that drain and stops the watcher.
-    cat > "$state/z-drain-witness.check.sh" <<'SH'
+  # The watcher runs this check next in the same cycle, only after it has
+  # finished with the returned one, so its wake both records whether the
+  # descendant outlived that drain and stops the watcher.
+  cat > "$state/z-drain-witness.check.sh" <<'SH'
 #!/usr/bin/env bash
 case "$(ps -o stat= -p "$(cat "$FM_TEST_DESCENDANT_PID")" 2>/dev/null)" in
   ''|Z*) printf 'descendant drained\n' ;;
   *) printf 'descendant alive\n' ;;
 esac
 SH
-    for check in custom z-drain-witness; do
-      chmod 0700 "$state/$check.check.sh"
-      FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
-        || fail "could not register $backend returned-descendant $check check"
-    done
-    if [ "$backend" = installed-timeout ]; then
-      cat > "$fakebin/timeout" <<'SH'
-#!/usr/bin/env bash
-shift
-exec "$@"
-SH
-      chmod 0700 "$fakebin/timeout"
-      force_fallback=0
-    else
-      rm -f "$fakebin/timeout" "$fakebin/gtimeout"
-      force_fallback=1
-    fi
-
-    rc=0
-    FM_TEST_CHECK_TIMEOUT=10 FM_CHECK_FORCE_FALLBACK="$force_fallback" \
-      FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
-      FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
-      run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
-    child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
-    if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
-      kill -KILL "$child_pid" 2>/dev/null || true
-      fail "$backend watcher left a returned check descendant alive"
-    fi
-    [ "$rc" -eq 0 ] \
-      || fail "$backend watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
-    [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
-      || fail "$backend watcher did not complete the direct custom check"
-    grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
-      || fail "$backend watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
-    ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private custom check snapshot"
-    ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
-      || fail "$backend watcher left a private check output file"
-    [ ! -e "$state/.watch.lock/pid" ] || fail "$backend watcher left its singleton lock"
+  for check in custom z-drain-witness; do
+    chmod 0700 "$state/$check.check.sh"
+    FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
+      || fail "could not register returned-descendant $check check"
   done
-  pass "returned custom check descendants are drained on installed and fallback timeout paths"
+  rc=0
+  FM_TEST_CHECK_TIMEOUT=10 \
+    FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
+    FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
+    run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
+  child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
+  if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
+    kill -KILL "$child_pid" 2>/dev/null || true
+    fail "watcher left a returned check descendant alive"
+  fi
+  [ "$rc" -eq 0 ] \
+    || fail "watcher did not stop after the direct check returned (rc=$rc): $(cat "$dir/watch.err")"
+  [ -s "$ready" ] && [ -n "$child_pid" ] && [ -e "$direct_done" ] \
+    || fail "watcher did not complete the direct custom check"
+  grep -qxF "check: $state/z-drain-witness.check.sh: descendant drained" "$dir/watch.out" \
+    || fail "watcher moved past a returned check before draining its descendant: $(cat "$dir/watch.out")"
+  ! find "$state" -maxdepth 1 -name '.fm-custom-check.*' -print | grep . >/dev/null \
+    || fail "watcher left a private custom check snapshot"
+  ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
+    || fail "watcher left a private check output file"
+  [ ! -e "$state/.watch.lock/pid" ] || fail "watcher left its singleton lock"
+  pass "returned custom check descendants are drained before the next check runs"
 }
 
 test_teardown_removes_poll_artifacts() {
@@ -1615,6 +1716,7 @@ test_teardown_removes_poll_artifacts() {
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only'
   printf 'check\n' > "$dir/home/state/task-a.check.sh"
   printf 'data\n' > "$dir/home/state/task-a.pr-poll"
@@ -1643,6 +1745,7 @@ SH
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'pr=https://github.com/o/r/pull/18'
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/18
@@ -1672,6 +1775,7 @@ SH
       "worktree=$dir/missing-worktree" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
       counterpart=pr-poll
@@ -1968,6 +2072,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
   : > "$dir/gerrit-axi.log"
   set +e
   out=$(FM_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 \
+    FM_TEST_NM_TASK_ID=task-published \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/fm-timeout-lib.sh"; . "$1/bin/fm-dod-lib.sh"
       fm_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4" "$5" task-published "$6"' \
@@ -3303,6 +3408,7 @@ test_teardown_cannot_race_authority_consumption() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'yolo=on'
   write_away_record "$dir"
@@ -3352,6 +3458,7 @@ test_authority_retirement_preserves_replacement() {
   run_check_entry "$dir" task-a "$url_a" >/dev/null 2> "$dir/seed.err" \
     || fail "replacement: could not arm the original poll"
   queue_merge "$dir" "$url_a"
+  seed_merge_review "$dir" "$url_b" >/dev/null || fail "replacement review could not be recorded"
   # The replacement runs inside the watcher, whose environment names the real
   # firstmate root, so restore the fixture root every other arming here uses.
   cat > "$dir/replace-authority.sh" <<SH
@@ -3736,6 +3843,8 @@ SH
   pass "device re-record publication waits without rewriting its registration"
 }
 
+fm_test_only
+
 test_parser_matrix
 test_gitlab_merge_watch
 test_forgejo_merge_watch
@@ -3772,6 +3881,7 @@ test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
+test_watcher_merged_poll_arms_the_pool_copy_prune
 test_atomic_interruption_leaves_no_partial_artifact
 test_concurrent_watcher_sees_only_complete_publication
 test_poll_publication_refuses_unsafe_destinations
@@ -3783,5 +3893,6 @@ test_device_rerecord_serializes_rerecord
 test_postrename_poll_validation_revokes_and_retries
 test_bootstrap_leaves_unauthenticated_checks
 test_custom_snapshot_cleanup_on_signal
+test_custom_snapshot_cleanup_with_stopped_launcher
 test_returned_custom_check_descendants_are_drained
 test_teardown_removes_poll_artifacts

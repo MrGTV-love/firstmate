@@ -169,7 +169,7 @@ build_packed_prunable() {
 
 plant_packed_refs_lock() { : > "$1/.git/packed-refs.lock"; }
 
-# lsof shims mirror tests/fm-teardown.test.sh: no-holder (provably free), a live
+# lsof shims mirror tests/fm-teardown-helpers.sh: no-holder (provably free), a live
 # holder, and an lsof error. Written into a per-home fakebin/ prepended to PATH.
 lsof_no_holder() {
   cat > "$1/lsof" <<'SH'
@@ -595,10 +595,10 @@ test_idle_cwd_in_clone_dir_does_not_block_recovery() {
   # A pool-slot pane shell sits in a linked worktree of the same clone.
   (cd "$linked" && exec bash -c 'read -r _ <&9') &
   linked_idle=$!
-  # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
-  fm_test_wait_until 20 lsof -a -p "$idle" -d cwd -- "$clone" >/dev/null \
+  # Observe the real cwd owners rather than cap how long scheduling takes.
+  fm_test_wait_until --while-alive "$idle" -- lsof -a -p "$idle" -d cwd -- "$clone" >/dev/null \
     || fail "idle process did not enter clone cwd"
-  fm_test_wait_until 20 lsof -a -p "$linked_idle" -d cwd -- "$linked" >/dev/null \
+  fm_test_wait_until --while-alive "$linked_idle" -- lsof -a -p "$linked_idle" -d cwd -- "$linked" >/dev/null \
     || fail "idle process did not enter linked worktree cwd"
   # The real lock has no open descriptor, but the real directory has a holder.
   if lsof -- "$clone/.git/packed-refs.lock" >/dev/null 2>&1; then

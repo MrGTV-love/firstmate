@@ -78,6 +78,18 @@
 #   stale: <window> (steering-inbox busy bookkeeping unwritable: ...)
 #                          steering-inbox recovery; bin/fm-task-inbox-lib.sh owns
 #                          delivery-attempt, busy-deferral, and unavailable-endpoint policy
+#   check: long-held lock: lock=<path> owner=<pid> state=<stat> parent=<pid>
+#                          parent_command=<command> age=<seconds>s waiters=<n>
+#                          [trigger=dead-owner]
+#                          a fleet-ledger, watcher-down or wake-queue hold
+#                          exceeded 300s; or, with
+#                          trigger=dead-owner, any other lock's owner is a
+#                          zombie (state Z) or gone (state=dead) while a live
+#                          waiter stays blocked on it across two consecutive
+#                          checks, at any age
+#                          (fm_lock_monitor_check);
+#                          once per ownership episode, observation only
+#                          (bin/fm-wake-lib.sh owns the diagnostic receipts)
 #   check: <script>: <out> authenticated check output, always actionable
 #   check: process-event result captured: <keys>
 #                          a durably captured process-to-event result is queued
@@ -102,6 +114,14 @@
 #   check: rejected unauthenticated PR poll retirement receipts: <paths>
 #                          invalid pending retirements were preserved without
 #                          running a check or removing poll artifacts
+#   check: status-log-over-cap: file=<name> size=<bytes> (cap <bytes>) growth=<bytes/s> writer=<pid cmd|none>; <action>
+#                          a status log or per-task sidecar passed the size cap
+#                          (docs/configuration.md "Status log size bounds"); one
+#                          wake per growth step of one cap, raised within one poll
+#                          of the growth being seen, naming the writer lsof found.
+#                          Each writer holding it open for writing is stopped
+#                          with SIGSTOP; nothing is deleted or rewritten.
+#                          bin/fm-status-cap-guard.sh owns the investigation
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
@@ -153,12 +173,16 @@
 # For normal supervision, resume the session-start primary-harness protocol
 # after each printed reason. Direct duplicate invocations of this script still
 # no-op through the watcher singleton lock. A live holder whose beacon is stale
-# past the grace (FM_WATCHER_STALE_GRACE, default max(300, FM_POLL+60)) is
-# refused with "lock held by live pid ... but heartbeat is stale"; one stale past
-# the hard bound FM_WATCHER_STALL_BOUND (default 3x that grace) is instead
-# evicted with TERM after its recorded identity is re-verified, and this arm
-# starts in its place, printing "watcher: replaced stalled pid <N> (...)". A
-# holder that survives TERM keeps the refusal and the nonzero exit.
+# past the grace (FM_WATCHER_STALE_GRACE, default max(300, FM_POLL+60)) is not
+# evicted for its age: one that still proves the lock's recorded identity is a
+# slow cycle and keeps running ("watcher: already running pid <N>"), unless
+# fm_progress_check (bin/fm-timeout-lib.sh) proves its process tree and beacon
+# made no progress for the hard bound FM_WATCHER_STALL_BOUND (default 3x that
+# grace). Only that proven stall is evicted with TERM, after its identity is
+# re-verified, and this arm starts in its place, printing "watcher: replaced
+# stalled pid <N> (...)". A holder that is not identity-matched is refused with
+# "lock held by live pid ... but heartbeat is stale", and so is a proven-stalled
+# holder that survives TERM: both keep the refusal and the nonzero exit.
 # Once per poll the watcher also checks that its home (when it existed at
 # start), its state directory, and its own bin directory still exist; when one
 # is gone it logs "watcher: exiting - <what> no longer exists: <path>" to stderr
@@ -209,6 +233,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-merge-authority-lib.sh"
 # shellcheck source=bin/fm-x-lib.sh
 . "$SCRIPT_DIR/fm-x-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+command -v fm_progress_check >/dev/null 2>&1 || . "$SCRIPT_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-check-lib.sh
 . "$SCRIPT_DIR/fm-check-lib.sh"
 # Parent-owned secondmate missed-report guards: durable pending-reply
@@ -244,6 +270,8 @@ WATCH_HOME_EXISTED=0
 # and wakes (session_end_relaunch_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 
 session_end_relaunch_tick() {
   fm_session_end_relaunch_scan "$STATE" "$WATCHER_STALE_GRACE" || return 1
@@ -300,7 +328,7 @@ WATCHER_DOWNTIME_MARKER="$STATE/.watcher-down"
 # watcher mid-cycle. Detect the platform once and pick the right form.
 # On Darwin, call /usr/bin/stat rather than PATH-resolved stat so GNU coreutils
 # cannot shadow the BSD `-f` syntax.
-if [ "$(uname)" = Darwin ]; then
+if [ "$_FM_UNAME" = Darwin ]; then
   stat_mtime() { /usr/bin/stat -f %m "$1" 2>/dev/null; }        # epoch seconds of mtime
 else
   stat_mtime() { stat -c %Y "$1" 2>/dev/null; }
@@ -319,12 +347,11 @@ POLL=${FM_POLL:-$(fm_watch_poll_seconds "$FM_HOME" "$CONFIG")}
 # can keep a blocked or stopped poll loop looking healthy. The terminal wait
 # can still age the beacon by POLL; fm_poll_derived_grace owns its allowance.
 WATCHER_STALE_GRACE=${FM_WATCHER_STALE_GRACE:-${FM_GUARD_GRACE:-$(fm_poll_derived_grace "$POLL")}}
-# Hard bound on a live holder's beacon age. Under it a re-arm refuses and asks
-# for inspection (the grace above); at or past it the re-arm evicts the holder
-# instead, because a watcher whose beacon has stalled that long is not polling
-# and nothing else would ever replace it (evict_stalled_holder below).
-# fm_watcher_stall_bound (bin/fm-wake-lib.sh) owns the derivation, shared with
-# the arm that follows this watcher.
+# The no-progress interval that must be proven before a live, identity-matched
+# holder with an old beacon is evicted (evict_stalled_holder below): an old
+# beacon alone is a slow cycle, not a stall. fm_watcher_stall_bound
+# (bin/fm-wake-lib.sh) owns the derivation, shared with the arm that follows
+# this watcher.
 WATCHER_STALL_BOUND=$(fm_watcher_stall_bound "$POLL")
 BEAT_INTERVAL=$((WATCHER_STALE_GRACE / 3))
 [ "$BEAT_INTERVAL" -le 15 ] || BEAT_INTERVAL=15
@@ -343,11 +370,36 @@ watcher_beat() {
 HEARTBEAT=${FM_HEARTBEAT:-600}        # base seconds between heartbeat scans
 HEARTBEAT_MAX=${FM_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
 CHECK_INTERVAL=${FM_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
+# Harm: a silent, CPU-idle check blocks the sweep. Only a consecutive
+# no-progress proof permits stopping it; slow work has no wall-clock cap.
+# FM_CHECK_TIMEOUT is that no-progress minimum, not a run-time allowance.
+CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-}
 case "$CHECK_TIMEOUT" in
-  *[!0-9]*) ;;
-  *) CHECK_TIMEOUT=$((10#$CHECK_TIMEOUT)) ;;
+  ''|*[!0-9]*) unset FM_CHECK_TIMEOUT ;;
+  *) CHECK_TIMEOUT=$((10#$CHECK_TIMEOUT))
+     if [ "$CHECK_TIMEOUT" -gt 0 ]; then FM_CHECK_TIMEOUT=$CHECK_TIMEOUT; else unset FM_CHECK_TIMEOUT; fi ;;
 esac
+CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
+# Harm: checks run inline in this loop, so one that keeps progressing forever
+# (a CPU spin, or a retry loop writing stderr) starves every later watcher duty.
+# A progressing check stops only at fm-duration.py's absolute extreme (6 hours
+# wall clock, FM_DURATION_ABSOLUTE_SECS), read from its one definition. Expiry
+# means unknown, retry next pass, never a result.
+CAPTURE_ABSOLUTE=$(python3 -c 'import runpy, sys
+d = runpy.run_path(sys.argv[1])
+print(d["positive_override"]("FM_DURATION_ABSOLUTE_SECS", d["ABSOLUTE_LIMIT"]))' \
+  "$SCRIPT_DIR/fm-duration.py" 2>/dev/null) || CAPTURE_ABSOLUTE=
+# A stopped check launcher (bin/fm-check-run.py) first runs its own cleanup:
+# the portable sweep's LEFTOVER_GRACE off Darwin, then its guardian's
+# TERM_SECONDS. Both are read from their one definition, in hundredths.
+CHECK_LAUNCHER_CLEANUP_HUNDREDTHS=$(python3 -c 'import math, runpy, sys
+proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
+print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 100))' \
+  "$SCRIPT_DIR/fm-proc-info.py" "$SCRIPT_DIR/fm-proc-budget-tree.py" 2>/dev/null) || CHECK_LAUNCHER_CLEANUP_HUNDREDTHS=0
+# Harm: a check that keeps writing stderr grows its private progress file
+# without bound. Past the cap only the newest tail is kept.
+CHECK_STDERR_CAP_BYTES=1048576
+CHECK_STDERR_TAIL_BYTES=65536
 HOME_SUMMARY_INTERVAL=${FM_HOME_SUMMARY_INTERVAL:-300}
 case "$HOME_SUMMARY_INTERVAL" in
   ''|*[!0-9]*|0) HOME_SUMMARY_INTERVAL=300 ;;
@@ -375,6 +427,14 @@ case "$IDLE_REAP_INTERVAL" in
 esac
 IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
 IDLE_REAP_NEXT=
+# Pruning a merged task's pool copy (bin/fm-merge-prune.sh); 0 stops the sweep.
+MERGE_PRUNE_BIN=${FM_MERGE_PRUNE_BIN:-$SCRIPT_DIR/fm-merge-prune.sh}
+MERGE_PRUNE_INTERVAL=${FM_MERGE_PRUNE_INTERVAL:-60}
+case "$MERGE_PRUNE_INTERVAL" in
+  ''|*[!0-9]*) MERGE_PRUNE_INTERVAL=60 ;;
+  *) MERGE_PRUNE_INTERVAL=$((10#$MERGE_PRUNE_INTERVAL)) ;;
+esac
+MERGE_PRUNE_LAUNCHED=0
 # The TypeSafe account-health probe is one tiny request at this cadence;
 # docs/configuration.md "TypeSafe account health" owns the contract.
 TYPESAFE_HEALTH_INTERVAL=${FM_TYPESAFE_HEALTH_INTERVAL:-600}
@@ -615,12 +675,14 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # Runs for secondmates too: their pane-staleness exemption is about quiet panes
 # being healthy, while an unacknowledged instruction can still be a stuck steer.
 inbox_steer_check() {  # <window> <task>
-  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state
+  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state own_open
   action=$(fm_task_inbox_due_action "$STATE" "$task") || return 0
   verb=${action%% *}
   [ "$verb" != quiet ] || return 0
-  if [ "$verb" = retry ] && [ -n "$(status_own_open_decisions "$STATE/$task.status")" ]; then
-    return 0
+  if [ "$verb" = retry ]; then
+    own_open=''
+    status_own_open_decisions "$STATE/$task.status" own_open status_cap_span_tick || return 0
+    [ -z "$own_open" ] || return 0
   fi
   rec=${action#* }
   count=
@@ -1290,16 +1352,29 @@ resurface_absorbed() {  # <window> <throttle-marker> <age> <reason> [scope] [min
 # counter is left alone: it is neither advanced (this is not an escalation) nor
 # reset (a later genuine escalation must still carry the demand-deep-inspection
 # history it had already earned).
-wedge_defer_writing() {  # <window> <since-file> <triage-label> <idle-age>
-  local win=$1 since_file=$2 label=$3 age=$4 key wsf wage
+#
+# The same deferral also answers a probe that could not look (<evidence> unknown:
+# crew_worktree_written_since returned 2 because its walk went silent, a hung
+# mount). That is neither a write nor the absence of one, so it must not be read
+# as the wedge it would otherwise escalate: the idle timer restarts, the next
+# window probes again, and the same chain marker still re-surfaces the pane once
+# per PAUSE_RESURFACE_SECS, worded as an unreadable worktree instead of a wedge.
+wedge_defer_writing() {  # <window> <since-file> <triage-label> <idle-age> [writing|unknown]
+  local win=$1 since_file=$2 label=$3 age=$4 evidence=${5:-writing} key wsf wage reason note
   key=$(window_key "$win")
   wsf="$STATE/.writing-since-$key"
   [ -e "$wsf" ] || date +%s > "$wsf"
   wage=$(age_of "$wsf")
   date +%s > "$since_file"
-  resurface_absorbed "$win" "$STATE/.writing-resurfaced-$key" "$wage" \
-    "stale: $win (idle ${age}s, writing its worktree for ${wage}s, rechecked on a long cadence not a wedge; confirm the writes are real progress)"
-  triage_log "absorbed $label (worktree written since the idle window opened, idle ${age}s): $win"
+  if [ "$evidence" = unknown ]; then
+    reason="stale: $win (idle ${age}s, worktree write probe could not finish for ${wage}s, unknown not a wedge verdict, rechecked on a long cadence; confirm the worktree is readable)"
+    note="the worktree write probe did not finish"
+  else
+    reason="stale: $win (idle ${age}s, writing its worktree for ${wage}s, rechecked on a long cadence not a wedge; confirm the writes are real progress)"
+    note="worktree written since the idle window opened"
+  fi
+  resurface_absorbed "$win" "$STATE/.writing-resurfaced-$key" "$wage" "$reason"
+  triage_log "absorbed $label ($note, idle ${age}s): $win"
 }
 
 # One wait record, carrying every field a recheck needs to be correct. Emitting
@@ -1616,7 +1691,7 @@ wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-h
 # already own on their existing bounded cadences and only a pane that would
 # otherwise alarm pays for a backend read.
 wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-file> <task> <pane-hash>
-  local win=$1 since_file=$2 label=$3 escalation_file=$4 task=$5 hash=$6 since age n reason evidence
+  local win=$1 since_file=$2 label=$3 escalation_file=$4 task=$5 hash=$6 since age n reason evidence probe
   since=$(cat "$since_file" 2>/dev/null || true)
   case "$since" in
     ''|*[!0-9]*)
@@ -1634,11 +1709,19 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
            wedge_defer_wait "$win" "$since_file" "$label" "$age" "$evidence"; then
           return 0
         fi
-        if crew_worktree_written_since "$task" "$STATE" "$since_file"; then
+        probe=0
+        crew_worktree_written_since "$task" "$STATE" "$since_file" || probe=$?
+        if [ "$probe" -eq 0 ]; then
           wedge_defer_writing "$win" "$since_file" "$label" "$age"
           return 0
         fi
         if wedge_dead_record "$win" "$since_file" "$label" "$age" "$hash" "$task"; then
+          return 0
+        fi
+        # A probe that could not look (2) proves nothing about the crew, so it
+        # defers like a write does instead of escalating a wedge it never saw.
+        if [ "$probe" -eq 2 ]; then
+          wedge_defer_writing "$win" "$since_file" "$label" "$age" unknown
           return 0
         fi
         n=$(( $(cat "$escalation_file" 2>/dev/null || echo 0) + 1 ))
@@ -2092,11 +2175,13 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 # when the only bytes it grew past the classified offset are this home's own
 # bookkeeping appends; fm_wake_signal_seen_current (bin/fm-wake-lib.sh) owns that
 # rule and every other signature change still reads as unreported.
-# Pure read: prints one "<seen-file>\t<sig>\t<file>" line per changed file.
-# The caller records reported state only after surfacing or intentional absorption,
+# Prints one "<seen-file>\t<sig>\t<file>" line per changed file. Each status log's
+# markers first pass through status_presentation_marker_adopt_device (the only
+# write here), which owns the device-only remount rule.
+# The caller records new reported state only after surfacing or intentional absorption,
 # and commits a status classification position only after a successful span read.
 scan_signals() {
-  local f sig sf exclude
+  local f sig sf hb exclude task
   # A remote mate's own parent channel is not a self-home task status log; the
   # home-shape-aware exclusion and its precedent live in
   # status_scan_parent_channel_exclude (fm-classify-lib.sh).
@@ -2110,7 +2195,13 @@ scan_signals() {
     [ -n "$sig" ] || continue
     fm_wake_signal_seen_path_to sf "$STATE" "$f"
     case "$f" in
-      *.status) fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue ;;
+      *.status)
+        status_presentation_marker_adopt_device "$sf" "$f" "$sig" || true
+        task=${f##*/}; task=${task%.status}
+        status_heartbeat_seen_marker_path_to hb "$STATE" "$task"
+        status_presentation_marker_adopt_device "$hb" "$f" "$sig" || true
+        fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue
+        ;;
       *) [ "$sig" = "$(cat "$sf" 2>/dev/null)" ] && continue ;;
     esac
     printf '%s\t%s\t%s\n' "$sf" "$sig" "$f"
@@ -2187,63 +2278,148 @@ procevent_surface_queued() {
   wake "$reason"
 }
 
+# Without a POSIX python3 there is no owner bridge: the check runs directly, as
+# fm_progress_check degrades, rather than not at all.
 run_check_process() {
   local c=$1
   shift
-  if [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v timeout >/dev/null 2>&1; then
-    exec timeout "$CHECK_TIMEOUT" bash "$c" "$@"
-  elif [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v gtimeout >/dev/null 2>&1; then
-    exec gtimeout "$CHECK_TIMEOUT" bash "$c" "$@"
-  else
-    # Both sides setpgrp (unowned case) so a child slow to be scheduled on a loaded host
-    # still has its group before the bound fires; see fm_timeout_perl_bound.
-    # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
-    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } setpgrp($pid, $pid) unless $owned; my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${FM_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
+  if ! fm_posix_python; then
+    eval "exec $FM_CHECK_OWNER_FD<&-"
+    exec bash "$c" "$@"
   fi
+  exec python3 "$SCRIPT_DIR/fm-check-run.py" "$FM_CHECK_OWNER_FD" -- bash "$c" "$@"
 }
 
 run_check() {
-  ( run_check_process "$@" ) 2>/dev/null || true
+  run_check_capture "$(basename "$1" .check.sh)" "$@" || return $?
+  printf '%s' "$FM_CHECK_RESULT"
 }
 
 FM_ACTIVE_CHECK_PID=
 FM_ACTIVE_CHECK_PGID=
 FM_ACTIVE_CHECK_GRACE=0
+FM_ACTIVE_CHECK_OWNED=
 FM_CHECK_OUTPUT=
 FM_CHECK_RESULT=
 FM_CHECK_STATUS=0
+FM_CHECK_STOPPED=
+FM_CHECK_STOP_NOTICE=
 FM_CHECK_SIGNAL_PENDING=
+FM_CHECK_WAIT_FD=
+FM_CHECK_WAIT_WRITER=
+FM_CHECK_WAIT_FIFO=
+FM_CHECK_OWNER_FD=
+FM_CHECK_OWNER_WRITER=
 
 fm_check_output_cleanup() {
-  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT"
+  if [ -n "$FM_CHECK_OWNER_WRITER" ]; then
+    eval "exec $FM_CHECK_OWNER_WRITER>&-"
+    FM_CHECK_OWNER_WRITER=
+  fi
+  if [ -n "$FM_CHECK_OWNER_FD" ]; then
+    eval "exec $FM_CHECK_OWNER_FD<&-"
+    FM_CHECK_OWNER_FD=
+  fi
+  if [ -n "$FM_CHECK_WAIT_FD" ]; then
+    eval "exec $FM_CHECK_WAIT_FD<&-"
+    FM_CHECK_WAIT_FD=
+  fi
+  if [ -n "$FM_CHECK_WAIT_WRITER" ]; then
+    eval "exec $FM_CHECK_WAIT_WRITER>&-"
+    FM_CHECK_WAIT_WRITER=
+  fi
+  [ -z "$FM_CHECK_WAIT_FIFO" ] || rm -f -- "$FM_CHECK_WAIT_FIFO"
+  FM_CHECK_WAIT_FIFO=
+  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.progress" \
+    "$FM_CHECK_OUTPUT.stderr" "$FM_CHECK_OUTPUT.stderr.tail"
   FM_CHECK_OUTPUT=
 }
 
+# Bash 3.2 has neither wait -n nor fractional read timeouts. EOF on a private
+# pipe wakes the main shell as soon as the check closes its inherited writer.
+# Open read/write first so neither side can block at open, then keep a separate
+# reader for the parent. Unlink immediately so interrupted waits leave no FIFO.
+fm_check_wait_open() {
+  _fm_wake_require_timeout
+  FM_CHECK_WAIT_WRITER=$(fm_timeout_free_fd 20) || return 1
+  FM_CHECK_WAIT_FD=$(fm_timeout_free_fd $((FM_CHECK_WAIT_WRITER + 1))) || return 1
+  FM_CHECK_WAIT_FIFO="$FM_CHECK_OUTPUT.wait"
+  mkfifo -m 600 "$FM_CHECK_WAIT_FIFO" || return 1
+  eval "exec $FM_CHECK_WAIT_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_WAIT_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
+  rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
+  FM_CHECK_WAIT_FIFO=
+  if [ "${FM_CAPTURE_OWNER:-}" = 1 ]; then
+    FM_CHECK_OWNER_WRITER=$(fm_timeout_free_fd $((FM_CHECK_WAIT_FD + 1))) || return 1
+    FM_CHECK_OWNER_FD=$(fm_timeout_free_fd $((FM_CHECK_OWNER_WRITER + 1))) || return 1
+    FM_CHECK_WAIT_FIFO="$FM_CHECK_OUTPUT.owner"
+    mkfifo -m 600 "$FM_CHECK_WAIT_FIFO" || return 1
+    eval "exec $FM_CHECK_OWNER_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_OWNER_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
+    rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
+    FM_CHECK_WAIT_FIFO=
+  fi
+}
+
+# Keep the existing hundredth-second stop bounds, but spend one process for the
+# entire wait rather than launching sleep on every poll. Perl is optional when
+# timeout or gtimeout bounds the check, so a host without it waits out the same
+# bound with a single sleep.
+fm_check_group_wait() {  # <pgid> <polls>
+  local hundredths=$(($2 % 100))
+  kill -0 -- "-$1" 2>/dev/null || return 0
+  if command -v perl >/dev/null 2>&1; then
+    perl -e 'my ($group, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, -$group); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+  else
+    [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
+    sleep "$(($2 / 100)).$hundredths"
+  fi
+}
+
+# A stop-requested launcher may itself be stopped or unable to service TERM.
+# Wait longer than its own worst-case cleanup, so a responsive launcher always
+# exits only after its guardian has cleaned the check; only an unresponsive one
+# reaches the caller's KILL, after which its guardian still sees owner EOF.
+# The bound counts 0.01 s polls, never fewer than its nominal hundredths: a
+# loaded host stretches each poll's sleep, so load only lengthens the wait.
+fm_check_pid_wait() {  # <pid> <hundredths>
+  local hundredths=$(($2 % 100))
+  kill -0 "$1" 2>/dev/null || return 0
+  if command -v perl >/dev/null 2>&1; then
+    perl -e 'my ($pid, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, $pid); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+  else
+    [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
+    sleep "$(($2 / 100)).$hundredths"
+  fi
+}
+
 fm_active_check_stop() {
-  local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-} i
+  local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-}
   local stop_polls=$((FM_ACTIVE_CHECK_GRACE * 100 + 20))
   [ -n "$pid" ] || [ -n "$pgid" ] || return 0
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
-  i=0
-  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt "$stop_polls" ]; do
-    sleep 0.01
-    i=$((i + 1))
-  done
+  if [ -n "$FM_ACTIVE_CHECK_OWNED" ] && [ -n "$pid" ]; then
+    # Harm: a stopped or wedged launcher would hold every stop, including
+    # watcher shutdown, forever. Bound: the grace, the launcher's own cleanup
+    # allowance, and a 1 s margin for its interpreter, process-table reads and
+    # signal delivery outside those timed waits. Expiry KILLs the launcher.
+    # Residual: off Darwin only the launcher's own sweep reaches a descendant
+    # in a new session, so a TERM-ignoring one can outlive an unresponsive
+    # launcher; the guardian's KILL still cleans the check group.
+    fm_check_pid_wait "$pid" "$((FM_ACTIVE_CHECK_GRACE * 100 + CHECK_LAUNCHER_CLEANUP_HUNDREDTHS + 100))" || true
+  else
+    [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
+  fi
   [ -z "$pgid" ] || kill -KILL -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -KILL "$pid" 2>/dev/null || true
   [ -z "$pid" ] || wait "$pid" 2>/dev/null || true
-  i=0
-  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt 100 ]; do
-    sleep 0.01
-    i=$((i + 1))
-  done
+  [ -z "$pgid" ] || fm_check_group_wait "$pgid" 100 || return 1
   if [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null; then
     return 1
   fi
   FM_ACTIVE_CHECK_PID=
   FM_ACTIVE_CHECK_PGID=
   FM_ACTIVE_CHECK_GRACE=0
+  FM_ACTIVE_CHECK_OWNED=
 }
 
 # Stop-signal dispositions, installed with the EXIT trap below. HUP and TERM
@@ -2263,19 +2439,70 @@ watcher_stop_signals() {
 }
 
 # Capture a check without blocking bash inside a command substitution, so the
-# poll shell keeps publishing progress while it waits on the bounded check.
-run_check_capture() {
-  FM_CHECK_OWNED_GROUP=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
+# poll shell keeps publishing its beacon while observing check progress.
+# fm-check-run.py connects a watcher-only pipe to the process-budget guardian:
+# owner EOF or launcher death cleans the tree even when SIGKILL bypasses EXIT.
+# A stopped check has no result for this pass: one triage line names it. The
+# first stop of an episode also sets FM_CHECK_STOP_NOTICE, which the sweep
+# raises as that check's wake, so a check that keeps being stopped still reaches
+# firstmate once. state/<id>.check-stopped marks the episode; the check's next
+# completed run ends it, every disarm or retirement removes it
+# (fm_check_stop_episode_clear), and a routine re-arm keeps it.
+run_check_capture() {  # <check-id> <check> [args...]
+  local name=$1 started episode notice
+  shift
+  FM_CHECK_STOP_NOTICE=
+  episode="$STATE/$name.check-stopped"
+  started=$SECONDS
+  FM_CAPTURE_OWNER=1 FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
+  if [ -n "$FM_CHECK_STOPPED" ]; then
+    notice="check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
+    triage_log "$notice"
+    FM_CHECK_RESULT=
+    if [ ! -e "$episode" ]; then
+      : 2>/dev/null > "$episode" || true
+      FM_CHECK_STOP_NOTICE=$notice
+    fi
+  else
+    rm -f -- "$episode"
+  fi
 }
 
+fm_check_stderr_cap() {  # <file>
+  local size
+  [ -s "$1" ] || return 0
+  size=$(wc -c < "$1" 2>/dev/null) || return 0
+  size=${size//[!0-9]/}
+  [ -n "$size" ] && [ "$size" -gt "$CHECK_STDERR_CAP_BYTES" ] || return 0
+  (umask 077; tail -c "$CHECK_STDERR_TAIL_BYTES" "$1" > "$1.tail") && cat "$1.tail" > "$1"
+  rm -f -- "$1.tail"
+}
+
+# With FM_CAPTURE_PROGRESS=1 the timeout is an inactivity bound, not a
+# wall-clock one: from the second liveness tick, fm_progress_check samples the
+# capture's process tree, and only a tree with no CPU progress for the timeout
+# is stopped as stalled (124). Without a POSIX python3 nothing is proven stalled.
+# FM_CAPTURE_OWNER=1 marks a watcher check: it gets the owner pipe, keeps its
+# stderr in a capped private file that also counts as progress, and still stops
+# at CAPTURE_ABSOLUTE while progressing. FM_CHECK_STOPPED names why a capture
+# was stopped.
 run_owned_capture() {
-  local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started
+  local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
+  local progress_rc stop_reason progress_sampled='' owned=${FM_CAPTURE_OWNER:-} bridged=''
+  local -a progress_paths=()
   shift 3
+  [ -z "$owned" ] || ! fm_posix_python || bridged=1
   fm_check_output_cleanup
   FM_CHECK_RESULT=
   FM_CHECK_STATUS=0
+  FM_CHECK_STOPPED=
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
+  if [ -n "$owned" ] && [ "$capture_stderr" = discard ]; then
+    (umask 077; : > "$FM_CHECK_OUTPUT.stderr") || { fm_check_output_cleanup; return 1; }
+    progress_paths=("$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.stderr")
+  fi
+  fm_check_wait_open || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
   # Defer stop signals only until the check's process group is recorded for
   # watcher_cleanup. Keep command substitutions out of this window: bash 5.2
@@ -2284,7 +2511,13 @@ run_owned_capture() {
   set -m
   check_started=$SECONDS
   (
-    if [ "$capture_stderr" = discard ]; then
+    eval "exec $FM_CHECK_WAIT_FD<&-"
+    # Only the watcher retains this writer. SIGKILL therefore gives the shared
+    # guardian an independent owner-loss signal even when EXIT cannot run.
+    [ -z "$FM_CHECK_OWNER_WRITER" ] || eval "exec $FM_CHECK_OWNER_WRITER>&-"
+    if [ "${#progress_paths[@]}" -gt 0 ]; then
+      "$@" 2>> "$FM_CHECK_OUTPUT.stderr"
+    elif [ "$capture_stderr" = discard ]; then
       "$@" 2>/dev/null
     else
       "$@" 2>&1
@@ -2293,7 +2526,10 @@ run_owned_capture() {
   FM_ACTIVE_CHECK_PID=$!
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
   FM_ACTIVE_CHECK_GRACE=$capture_grace
+  FM_ACTIVE_CHECK_OWNED=$bridged
   set +m
+  eval "exec $FM_CHECK_WAIT_WRITER>&-"
+  FM_CHECK_WAIT_WRITER=
   watcher_stop_signals
   [ -z "$FM_CHECK_SIGNAL_PENDING" ] || exit 1
   pgid=$(ps -o pgid= -p "$FM_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
@@ -2302,16 +2538,42 @@ run_owned_capture() {
     fm_check_output_cleanup
     return 1
   fi
-  # Also enforce the deadline here in case the check's timeout controller stops
-  # responding. Poll briefly; watcher_beat throttles its own writes.
+  # Sample progress (or enforce the explicit deadline for non-progress callers).
+  # EOF wakes read immediately. A descendant may retain its writer after the
+  # leader exits, so also recheck that leader once per second using a timed
+  # read, without spawning a timer on each tick.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
-    if [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
+    [ -z "${FM_CAPTURE_TICK:-}" ] || "$FM_CAPTURE_TICK"
+    [ "${#progress_paths[@]}" -eq 0 ] || fm_check_stderr_cap "$FM_CHECK_OUTPUT.stderr"
+    stop_reason='no progress'
+    if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
+      progress_rc=0
+      [ -z "$progress_sampled" ] \
+        || fm_progress_check "$FM_CHECK_OUTPUT.progress" "$FM_ACTIVE_CHECK_PID" "$capture_timeout" \
+          ${progress_paths[@]+"${progress_paths[@]}"} \
+        || progress_rc=$?
+      progress_sampled=1
+      if [ "$progress_rc" != 124 ] && [ -n "$owned" ] && [ -n "$CAPTURE_ABSOLUTE" ] \
+        && [ "$((SECONDS - check_started))" -gt "$CAPTURE_ABSOLUTE" ]; then
+        progress_rc=124
+        stop_reason='absolute limit'
+      fi
+    elif [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
+      progress_rc=124
+      stop_reason=deadline
+    else
+      progress_rc=0
+    fi
+    if [ "$progress_rc" = 124 ]; then
       FM_CHECK_STATUS=124
+      FM_CHECK_STOPPED=$stop_reason
       fm_active_check_stop || return 1
       break
     fi
-    sleep 0.1
+    # shellcheck disable=SC2034 # Only EOF or the timeout matters, not pipe contents.
+    # measured: value=1 date=2026-10-21 host=Mac-Studio.local margin=1 - the Bash 3.2 FIFO probe times out at 1s without starting a timer process. This is a liveness poll, not a check deadline.
+    IFS= read -r -t 1 -u "$FM_CHECK_WAIT_FD" completion || true
   done
   if [ -n "$FM_ACTIVE_CHECK_PID" ]; then
     wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || FM_CHECK_STATUS=$?
@@ -2366,6 +2628,62 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
   return "$rc"
 }
 
+# Status reclassification uses the same owned capture as checks, bounded by
+# inactivity rather than total time: a read that keeps making CPU progress runs
+# to completion however long it takes, and only one with no progress for
+# WATCHER_STALL_BOUND is stalled. Meanwhile the main poll shell refreshes its
+# beacon through run_owned_capture, including a slow span reader or decision
+# fold, and runs the optional <tick-command> (status_cap_span_tick) in its own
+# shell, so a writer that passes the cap during a long read is stopped and woken
+# for within a poll. A failed/stalled read remains unclassified and surfaces
+# conservatively instead of committing a partial endpoint.
+watcher_status_span_output() {
+  local span_record='' span_needs=0 span_rc
+  status_span_first_actionable_record "$1" "$2" span_record span_needs
+  span_rc=$?
+  printf '%s\n%s\n.' "$span_needs" "$span_record"
+  return "$span_rc"
+}
+
+FM_STATUS_CAPTURE_SCRATCH=
+watcher_status_span_cleanup() {
+  [ -z "$FM_STATUS_CAPTURE_SCRATCH" ] || rm -f -- "$FM_STATUS_CAPTURE_SCRATCH"
+  FM_STATUS_CAPTURE_SCRATCH=
+}
+
+# True when <offset> is at or past the end of <file> (or the file is absent):
+# the span read has nothing to read, so it needs no owned capture.
+watcher_status_span_idle() {  # <file> <offset>
+  local idle_size
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  _fm_status_file_size "$1" idle_size || return 1
+  case "$idle_size:$2" in *[!0-9:]*|:*|*:) return 1 ;; esac
+  [ "$2" -ge "$idle_size" ]
+}
+
+watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out] [tick-command]
+  local span_capture span_rc
+  printf -v "$3" '%s' ''
+  [ -z "${4-}" ] || printf -v "$4" '%s' 0
+  if watcher_status_span_idle "$1" "$2"; then
+    status_span_first_actionable_record "$1" "$2" "$3" "${4-}"
+    return
+  fi
+  FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
+  FM_CAPTURE_TICK=${5-} FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
+    || { watcher_status_span_cleanup; return 2; }
+  span_rc=$FM_CHECK_STATUS
+  watcher_status_span_cleanup
+  case "$span_rc" in 0|1) ;; *) return 2 ;; esac
+  span_capture=$FM_CHECK_RESULT
+  case "$span_capture" in *$'\n.') ;; *) return 2 ;; esac
+  span_capture=${span_capture%$'\n.'}
+  case "$span_capture" in *$'\n'*) ;; *) return 2 ;; esac
+  printf -v "$3" '%s' "${span_capture#*$'\n'}"
+  [ -z "${4-}" ] || printf -v "$4" '%s' "${span_capture%%$'\n'*}"
+  return "$span_rc"
+}
+
 # 0 when any signaled status file carries a captain-relevant event in the bytes
 # appended since this watcher last classified it. The start offset is the
 # classified-position field in that file's .seen-* marker, and fm-status-wake-lib.sh's
@@ -2394,8 +2712,8 @@ signal_files_actionable() {  # <status-file> ...
     watcher_beat
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
-    status_span_first_actionable_record "$f" \
-      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision
+    watcher_status_span "$f" \
+      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
@@ -2443,9 +2761,10 @@ EOF
 # surfaced to firstmate (.hb-surfaced-<task>). It walks every log rather than only
 # those whose LAST line looks captain-relevant, because the event this backstop
 # most needs to catch is precisely one a later routine append has already moved
-# past. Pure detect, no side effects: the caller enqueues first, then marks
-# surfaced. Because every captain-relevant signal/stale already marks itself
-# surfaced when it wakes firstmate, this normally finds nothing and the heartbeat
+# past. Apart from the device-only marker adoption (status_presentation_marker_adopt_device),
+# detection leaves progress unchanged: the caller enqueues first, then marks surfaced.
+# Because every captain-relevant signal/stale already marks itself surfaced when
+# it wakes firstmate, this normally finds nothing and the heartbeat
 # is absorbed; it surfaces only an event the per-wake path absorbed by mistake -
 # the fail-safe backstop.
 heartbeat_scan_finds_actionable() {
@@ -2459,12 +2778,14 @@ heartbeat_scan_finds_actionable() {
     watcher_beat
     [ "$f" = "$exclude" ] && continue
     task=$(basename "$f"); task="${task%.status}"
-    record=$(status_span_first_actionable_record "$f" "$(hb_surfaced_offset "$task")")
+    status_heartbeat_seen_marker_path_to marker "$STATE" "$task"
+    status_presentation_marker_adopt_device "$marker" "$f" || true
+    record=''
+    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record '' status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
       sig=$(status_observed_signature "$f")
-      marker=$(_hb_surfaced_path "$task")
       status_presentation_marker_reported_matches "$marker" "$sig" && continue
       FM_HEARTBEAT_SURFACE_ENDPOINTS="${FM_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"ERROR"$'\t'"${sig}"$'\n'
       found=0
@@ -2555,6 +2876,223 @@ event_wait_or_sleep() {
   esac
 }
 
+lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures keep waiting
+  if ! fm_lock_monitor_check "$@"; then
+    echo "watcher: long-held lock observation failed" >&2
+    [ "$#" -eq 0 ] || return 0
+    exit 1
+  fi
+  [ -n "$FM_LOCK_MONITOR_REASON" ] || return 0
+  if [ "$FM_LOCK_MONITOR_UNQUEUED" = 1 ]; then
+    # A jammed queue must not prevent reporting the jam. Preserve the
+    # independent receipt until output succeeds, without signal-phase work
+    # that itself needs the queue lock.
+    FM_WAKE_BEFORE_OUTPUT_ACTION='' FM_WAKE_AFTER_OUTPUT_ACTION='' \
+      FM_WAKE_POST_OUTPUT_ACTION=fm_lock_monitor_delivered wake "$FM_LOCK_MONITOR_REASON"
+  else
+    wake "$FM_LOCK_MONITOR_REASON"
+  fi
+}
+
+# FM_LOCK_WAIT_TICK hook: while this watcher process waits on any lock (the
+# wake queue, the recovery marker, or any other), run the long-held lock alarm
+# once per poll interval and keep waiting; it never re-enters itself. Before any
+# alarm row is published, a pending append is made durable (appended now, or
+# spilled for the next locked append to replay first, never reclaiming a queue
+# lock this watcher already holds); if neither succeeds, or observation fails,
+# the wait goes on. Both EXIT cleanups clear the hook first, so their bounded
+# waits never deliver a second wake.
+WATCH_LOCK_WAIT_TICKED=0
+WATCH_LOCK_WAIT_TICKING=0
+watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+  [ "$3" = "$$" ] && [ "$WATCH_LOCK_WAIT_TICKING" = 0 ] || return 0
+  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_LOCK_WAIT_TICKED)) -ge "$POLL" ] || return 0
+  WATCH_LOCK_WAIT_TICKED=$SECONDS
+  WATCH_LOCK_WAIT_TICKING=1
+  lock_alarm_tick fm_wake_pending_settle
+  WATCH_LOCK_WAIT_TICKING=0
+  return 0
+}
+
+# Ready-PR registration belongs with housekeeping repairs, not the backed-off
+# heartbeat: a missed supervisor command must not keep capacity occupied. The
+# helper owns the scan and refusal memory; detach forge reads like the existing
+# repair sweeps so a slow forge cannot stall supervision. The pass is stopped only
+# when it goes silent (no output and no process-tree CPU progress) for the stall
+# interval below (fm_run_progress), never for taking long: a pass over many ships
+# on a loaded host is healthy work that a wall-clock cap would cut mid-registration.
+# Like the other detached sweeps it outlives a watcher that exits on a wake; a hung
+# forge call dies with its pass and the persisted admission cursor lets the next
+# tick start after that record.
+PR_READY_RECONCILE_PID=
+PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
+# Seconds of silence that stop one pass; the helper reads the same setting for each of its own reads.
+case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
+pr_ready_reconcile_tick() {
+  if [ -n "$PR_READY_RECONCILE_PID" ]; then
+    kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
+    wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
+  fi
+  ( fm_run_progress "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_PR_READY_RECONCILE_TIMEOUT="$PR_READY_RECONCILE_TIMEOUT" \
+    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
+  PR_READY_RECONCILE_PID=$!
+}
+
+# A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
+# writer outside the sanctioned append is running away. Detection costs one stat
+# per poll (fm_status_cap_unalerted); only a file due an alert reaches the guard
+# (bin/fm-status-cap-guard.sh), which names the writer and contains it. A file is
+# due when it first passes the cap and again each time it has grown by more than
+# one cap since its marker, so a resumed writer is caught again and an unchanged
+# file never wakes twice. The wake is queued before the marker is written, so a
+# failed append is retried on the next poll instead of being lost. It runs at the top
+# of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
+# after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
+# signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
+# just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
+# Inside the wake it raised (STATUS_CAP_WAKING) it still stops and queues a file that is newly due,
+# but raises no second wake and leaves the files that wake already reported (STATUS_CAP_ALERTED).
+STATUS_CAP_TICK_AT=0
+STATUS_CAP_WAKING=0
+STATUS_CAP_ALERTED=
+STATUS_CAP_SLICE=1
+case "$POLL" in
+  ''|*[!0-9]*) ;;
+  *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
+esac
+# The growth rate a contained-only tick hands to the watcher's own next tick: one small
+# file per watcher process, holding at most one `<identity>\t<path>\t<rate>\t<time>` line
+# per file over the cap, replaced (never appended to), removed when that tick reads it
+# and when the watcher exits.
+status_cap_handoff_path() {
+  printf '%s/.status-cap-handoff.%s' "$STATE" "${WATCHER_PID:-$$}"
+}
+
+# Merge the due rows (R), the held rates (H) and a scan's records (N), each on stdin with
+# its tag. <mode> hold prints the handoff lines; splice prints the scan's records with the
+# held rate in place of the scan's own. Only due files are kept. Of a held rate and a
+# newer one for the same file, the higher measured rate wins: a later scan of a writer
+# that was already stopped measures about zero, so the higher is the pre-stop rate.
+status_cap_handoff_merge() {  # <hold|splice> <time>
+  awk -F'\t' -v OFS='\t' -v mode="$1" -v now="$2" '
+    function grown(text) { return match(text, /growth=[^ ]* bytes\/s/) ? substr(text, RSTART + 7, RLENGTH - 15) : "" }
+    function higher(a, b) { return a ~ /^[0-9]+$/ && (b !~ /^[0-9]+$/ || a + 0 > b + 0) }
+    $1 == "R" { due[$3 SUBSEP $4] = 1; next }
+    $1 == "H" && ($2 SUBSEP $3) in due { rate[$2 SUBSEP $3] = $4; at[$2 SUBSEP $3] = $5; next }
+    $1 == "N" && $3 != "" {
+      k = $2 SUBSEP $3; r = grown($5)
+      if (mode == "hold") {
+        if (!(k in rate) || higher(r, rate[k])) { rate[k] = r; at[k] = now }
+        next
+      }
+      text = $5
+      if ((k in rate) && higher(rate[k], r)) sub(/growth=[^ ]* bytes\/s/, "growth=" rate[k] " bytes/s (measured at " at[k] ")", text)
+      print $2, $3, $4, text
+    }
+    END {
+      if (mode != "hold") exit
+      for (k in rate) { split(k, p, SUBSEP); print p[1], p[2], rate[k], at[k] }
+    }'
+}
+
+status_cap_tick() {
+  local rows records reason='' ident path size text keys='' key handoff held=''
+  STATUS_CAP_TICK_AT=$SECONDS
+  rows=$(fm_status_cap_unalerted "$STATE") || return 0
+  handoff=$(status_cap_handoff_path)
+  # The watcher's own tick reads and clears the handoff first, so a held rate never
+  # outlives its file's place in the due list.
+  if [ "$BASH_SUBSHELL" -eq 0 ] && [ -f "$handoff" ]; then
+    held=$(cat "$handoff")
+    rm -f "$handoff"
+  fi
+  [ -n "$rows" ] || return 0
+  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
+  [ -n "$records" ] || return 0
+  # In a subshell (a status read the watcher captures with $(...)) a wake would print
+  # into the capture and end only that subshell. There the tick only contains: the
+  # scan stops a writer over the cap, nothing is queued or marked, and the growth
+  # rate it measured before the stop goes to the handoff file. The watcher's own next
+  # tick scans the file again, keeps its own writer and action, puts the held rate in
+  # place of the near-zero one a stopped writer now shows, queues it and wakes.
+  if [ "$BASH_SUBSHELL" -ne 0 ]; then
+    if ! {
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      [ ! -f "$handoff" ] || awk '{ print "H\t" $0 }' "$handoff"
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge hold "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$handoff.tmp" \
+      || ! mv -f "$handoff.tmp" "$handoff"; then
+      rm -f "$handoff.tmp"
+    fi
+    return 0
+  fi
+  if [ -n "$held" ]; then
+    records=$({
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      printf '%s\n' "$held" | awk '{ print "H\t" $0 }'
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge splice '')
+  fi
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    reason="${reason:+$reason ; }${text#check: }"
+    keys="$keys$ident:$path:$size "
+  done <<EOF
+$records
+EOF
+  [ -n "$reason" ] || return 0
+  reason="check: $reason"
+  key="status-log-over-cap-$(printf '%s' "$keys" | cksum | awk '{print $1}')"
+  fm_wake_append check "$key" "$reason" || exit 1
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
+    STATUS_CAP_ALERTED="$STATUS_CAP_ALERTED$path"$'\n'
+  done <<EOF
+$records
+EOF
+  [ "$STATUS_CAP_WAKING" -eq 0 ] || return 0
+  # wake() flushes the pending signals before it prints, and the status signal of a
+  # runaway log is pending: without this the flush would linger one more full grace and
+  # the supervisor would hear of a stop that has already happened a grace late.
+  SIGNAL_PHASE_NO_LINGER=1
+  STATUS_CAP_WAKING=1
+  wake "$reason"
+  STATUS_CAP_WAKING=0
+  STATUS_CAP_ALERTED=
+}
+
+# The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
+# this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
+# runaway writer that starts during it would otherwise run unchecked until the loop ends.
+# It looks at the size cap when a poll has passed since the last look. In the watcher's own
+# shell a stop here exits the watcher with the over-cap wake; in a command substitution
+# (the status-event library's scans) it only stops the writer and hands its growth rate on, and
+# the wake follows at the watcher's next tick (status_cap_tick). The stale loop ticks in
+# its own shell at each window, so a captured read ticks only when it alone outlasts a poll.
+# The signal and heartbeat walks run in an owned capture, and the watcher's shell ticks
+# while it waits on them (watcher_status_span).
+# It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
+# because the stop appends a row under that same lock.
+status_cap_span_tick() {
+  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || return 0
+  [ $((SECONDS - STATUS_CAP_TICK_AT)) -lt "$STATUS_CAP_SLICE" ] || status_cap_tick
+  return 0
+}
+# shellcheck disable=SC2034 # Consumed by handle_push_transition in the separately linted transition owner.
+FM_STATUS_SPAN_TICK=status_cap_span_tick
+# The stale loop and the declared-wait checks read a lane's latest event and declared
+# wait for every window on every poll. When the tail of a log holds no event, those
+# reads widen to the log's history; here that is never more than the last tail window
+# (_fm_status_event_scan_start, bin/fm-status-event-lib.sh). One read goes further: the
+# declared-wait identity walk of an episode still open at the window's start reads back
+# to its first line, up to the read limit (cap plus reserve) from the log's end, so a log
+# at the cap holding one such wait is read whole once. Its cache (state/.<id>.wait-identity)
+# then lets each later poll classify only the bytes appended since.
+# shellcheck disable=SC2034 # Read by the status-event library sourced above.
+FM_STATUS_EVENT_SCAN_TAIL=1
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -2580,21 +3118,28 @@ if ! fm_procevent_launch_confirm_seconds >/dev/null; then
   exit 1
 fi
 
-# evict_stalled_holder <pid>: retire a live lock holder whose beacon stalled past
-# WATCHER_STALL_BOUND. The pid is signalled only while it still proves the
-# lock's own recorded identity (fm_watcher_lock_matches_pid: this home, this
-# script, and the starttime+cmdline proof the lock carries), so a recycled pid
-# is never touched; TERM only, never KILL, and never a name or pattern match.
-# Succeeds only once the holder has exited within the bounded wait.
+# evict_stalled_holder <pid>: retire a live lock holder proven to make no CPU or
+# beacon progress for WATCHER_STALL_BOUND (fm_progress_check; a first, failed or
+# uncertain sample proves nothing). The pid is signalled only while it still
+# proves the lock's own recorded identity (fm_watcher_lock_matches_pid: this
+# home, this script, and the starttime+cmdline proof the lock carries), checked
+# again right before the signal, so a recycled pid is never touched; TERM only,
+# never KILL, and never a name or pattern match. Returns 0 once the holder has
+# exited within the bounded wait, 1 when it was not signalled (unmatched or not
+# proven stalled), and 2 when it was proven stalled and signalled but survived.
 evict_stalled_holder() {
-  local pid=$1 i=0
+  local pid=$1 i=0 progress_rc=0
+  fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
+  fm_progress_check "$STATE/.watchdog-progress" "$pid" "$WATCHER_STALL_BOUND" "$BEAT" || progress_rc=$?
+  [ "$progress_rc" -eq 124 ] || return 1
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   kill -TERM "$pid" 2>/dev/null || return 1
   while [ "$i" -lt 50 ] && fm_pid_alive "$pid"; do
     sleep 0.1
     i=$((i + 1))
   done
-  ! fm_pid_alive "$pid"
+  fm_pid_alive "$pid" && return 2
+  return 0
 }
 
 EVICTED_PID=
@@ -2608,11 +3153,21 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
         # One eviction per arm: the retry re-reads the lock and beacon, so a
         # holder that exited leaves a dead-pid lock the normal reclaim takes,
         # and a rival arm that won first reads as a fresh running watcher.
-        if [ -z "$EVICTED_PID" ] && [ "$beat_age" -ge "$WATCHER_STALL_BOUND" ] \
-          && evict_stalled_holder "$FM_LOCK_HELD_PID"; then
+        evict_rc=1
+        if [ -z "$EVICTED_PID" ]; then
+          evict_stalled_holder "$FM_LOCK_HELD_PID"
+          evict_rc=$?
+        fi
+        if [ "$evict_rc" -eq 0 ]; then
           EVICTED_PID=$FM_LOCK_HELD_PID
           EVICTED_BEAT_AGE=$beat_age
           continue
+        fi
+        # An identity-matched holder not proven stalled is a slow cycle.
+        if [ -z "$EVICTED_PID" ] && [ "$evict_rc" -eq 1 ] \
+          && fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$FM_LOCK_HELD_PID" "$FM_HOME"; then
+          echo "watcher: already running pid $FM_LOCK_HELD_PID"
+          exit 0
         fi
         echo "watcher: lock held by live pid $FM_LOCK_HELD_PID but heartbeat is stale for ${beat_age}s (>${WATCHER_STALE_GRACE}s); inspect or stop that watcher before re-arming." >&2
         exit 1
@@ -2627,8 +3182,15 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
   fi
   exit 0
 done
+# Startup alarms precede recovery's own queue locks, so an already aged queue
+# owner can be reported without first waiting behind that same owner. Until
+# watcher_cleanup is installed, only a delivered wake closes like an ordinary
+# watcher; startup failures retain the lock as stale evidence for the next arm.
+trap 'FM_LOCK_WAIT_TICK=; [ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
+lock_alarm_tick
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
 if [ -n "$EVICTED_PID" ]; then
-  echo "watcher: replaced stalled pid $EVICTED_PID (beacon ${EVICTED_BEAT_AGE}s past hard bound ${WATCHER_STALL_BOUND}s)"
+  echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
 fi
 WATCHER_RECOVERY_PENDING=0
 if [ -n "${FM_LOCK_RECOVERED_PID:-}" ]; then
@@ -2649,6 +3211,10 @@ if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   WATCHER_RECOVERY_PENDING=0
 elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
+fi
+if ! fm_wake_spill_replay; then
+  echo "watcher: spilled wakes could not be replayed; retaining them and stale lock evidence" >&2
+  exit 1
 fi
 # Side-band ledger publication, detached from the poll loop.
 #
@@ -2756,6 +3322,31 @@ idle_reap_tick() {
   IDLE_REAP_PID=$!
 }
 
+# Merged-task copy pruning, detached and single-flight like the sweep above. A
+# record in state/*.merge-prune is armed by the merge paths; while one exists the
+# sweep is started at most once per FM_MERGE_PRUNE_INTERVAL and decides for
+# itself which records are due. The sweep only ever asks bin/fm-teardown.sh (and
+# its proofs in bin/fm-merge-prune-lib.sh), so a skipped or missed tick loses
+# nothing.
+MERGE_PRUNE_PID=
+merge_prune_tick() {
+  local now
+  [ "$MERGE_PRUNE_INTERVAL" -gt 0 ] || return 0
+  compgen -G "$STATE/*.merge-prune" >/dev/null || return 0
+  fm_epoch_seconds_to now
+  [ $((now - MERGE_PRUNE_LAUNCHED)) -ge "$MERGE_PRUNE_INTERVAL" ] || return 0
+  if [ -n "$MERGE_PRUNE_PID" ]; then
+    if kill -0 "$MERGE_PRUNE_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$MERGE_PRUNE_PID" 2>/dev/null || true
+    MERGE_PRUNE_PID=
+  fi
+  MERGE_PRUNE_LAUNCHED=$now
+  FM_HOME="$FM_HOME" "$MERGE_PRUNE_BIN" sweep </dev/null >/dev/null 2>&1 &
+  MERGE_PRUNE_PID=$!
+}
+
 # The account-health probe is detached and single-flight like the sweeps above: it
 # can wait on the network for its five-second deadline, and a missed tick loses
 # nothing because the helper's state file, not this timer, dedupes the captain's
@@ -2830,9 +3421,11 @@ lavish_auto_retire_tick() {
   LAVISH_AUTO_RETIRE_PID=$!
 }
 
-# Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
-# wakes firstmate at once; an unchanged overdue set repeats only every
-# OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
+# Surface the ledger so overdue work cannot be dropped silently. A new or changed
+# overdue row wakes firstmate at once as open-loop-ledger; the periodic waiting list
+# is its own open-loop-ledger-resurface wake every OPEN_LOOPS_RESURFACE seconds,
+# whose marker only that wake restamps; a ledger the helper stopped publishing is
+# its own wake.
 # The durable row is appended before wake() exits, and firstmate's acknowledgement clears it.
 open_loops_stale_wake() {  # <ledger-path>
   local marker="$STATE/.open-loops-stale-surfaced" reason
@@ -2844,6 +3437,7 @@ open_loops_stale_wake() {  # <ledger-path>
 }
 open_loops_surface() {
   local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue reason
+  local resurfaced="$STATE/.open-loops-resurfaced"
   if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
     [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] || open_loops_stale_wake "$ledger"
   else
@@ -2861,24 +3455,33 @@ open_loops_surface() {
         and (.complete | type) == "boolean" and (.rows | type) == "array"
         and all(.rows[]; type == "object" and (.id | type) == "string"
           and (.id | length) > 0 and (.overdue | type) == "boolean")
-      then [.rows[] | select(.overdue) | .id] | sort | .[]
+      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]]
+        | sort | .[] | @json
       else error("invalid open-loop ledger") end
   ' "$ledger" 2>/dev/null) || return 0
   if [ -f "$ledger" ] && [ ! -L "$ledger" ] \
     && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
     rm -f "$STATE/.open-loops-stale-surfaced"
   fi
-  [ -n "$ids" ] || { rm -f "$marker"; return 0; }
+  [ -n "$ids" ] || { rm -f "$marker" "$resurfaced"; return 0; }
   digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
   previous=$(cat "$marker" 2>/dev/null || true)
-  if [ "$previous" = "$digest" ] && [ "$(age_of "$marker")" -lt "$OPEN_LOOPS_RESURFACE" ]; then
-    return 0
-  fi
   overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
-  reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
-  fm_wake_append check open-loop-ledger "$reason" || exit 1
-  printf '%s\n' "$digest" > "$marker"
-  wake "$reason"
+  reason=
+  if [ "$previous" != "$digest" ]; then
+    reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+    fm_wake_append check open-loop-ledger "$reason" || exit 1
+    printf '%s\n' "$digest" > "$marker"
+    [ -e "$resurfaced" ] || date '+%s' > "$resurfaced"
+  fi
+  # A changed row must not postpone a due periodic list. Publish both durable
+  # records before wake() exits; only the periodic record restamps its timer.
+  if [ ! -e "$resurfaced" ] || [ "$(age_of "$resurfaced")" -ge "$OPEN_LOOPS_RESURFACE" ]; then
+    reason="check: open-loop-ledger-resurface ($overdue overdue assigned obligations; periodic waiting list)"
+    fm_wake_append check open-loop-ledger-resurface "$reason" || exit 1
+    date '+%s' > "$resurfaced"
+  fi
+  [ -z "$reason" ] || wake "$reason"
 }
 
 # One reconcile pass can wait on a single shared launch-confirmation window of up
@@ -2938,6 +3541,14 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  # A stop that lands inside `read -t` runs this cleanup inside that read, whose
+  # timeout must not end it while it waits for a check launcher to finish. Bash
+  # 5 checks the read's deadline at every signal check and jumps back into the
+  # read, abandoning this cleanup and the stop; any new read builtin disarms
+  # that deadline. Bash 3.2 delivers it as SIGALRM instead.
+  read -r _ < /dev/null || true
+  trap '' ALRM
+  FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
@@ -2950,7 +3561,9 @@ watcher_cleanup() {
   fm_active_check_stop || cleanup_status=1
   fm_check_output_cleanup
   fm_capture_output_cleanup
+  watcher_status_span_cleanup
   fm_custom_check_snapshot_cleanup
+  rm -f "$(status_cap_handoff_path)" "$(status_cap_handoff_path).tmp"
   if [ "$owns_lock" -eq 1 ] \
     && ! fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
       downtime "$CLEANUP_LOCK_BOUND"; then
@@ -3034,6 +3647,7 @@ SIGNAL_PHASE_FIRST=0
 PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
+SIGNAL_PHASE_NO_LINGER=0
 SIGNAL_PHASE_QUEUED_REASON=
 SIGNAL_PHASE_LATE_MARKER="$STATE/.watch-late-signals"
 
@@ -3111,6 +3725,12 @@ signal_phase_note_queued() {
 }
 
 watch_before_wake() {
+  # A wake from a tick inside an owned capture's wait ends that capture first, so the
+  # flush below and the exit never nest a capture in it or leave its group running.
+  fm_active_check_stop || exit 1
+  fm_check_output_cleanup
+  watcher_status_span_cleanup
+  [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ] || status_cap_tick
   case "$1" in
     signal:*) ;;
     *) signal_phase_flush ;;
@@ -3154,6 +3774,7 @@ prelude_phase() {
   fi
   watcher_beat
   idle_reap_tick
+  merge_prune_tick
   typesafe_health_tick
   lavish_auto_retire_tick
 
@@ -3250,6 +3871,10 @@ prelude_phase() {
   if prelude_step_begin 10 && [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=
+    for stopped in "$STATE"/*.check-stopped; do
+      [ -e "$stopped" ] || continue
+      [ -e "${stopped%-stopped}.sh" ] || rm -f -- "$stopped"
+    done
     for c in "$STATE"/*.check.sh; do
       signal_phase_flush
       [ -e "$c" ] || continue
@@ -3258,7 +3883,7 @@ prelude_phase() {
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
-          FM_HOME="$FM_HOME" run_check_capture "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
+          FM_HOME="$FM_HOME" run_check_capture x-watch "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
           out=$FM_CHECK_RESULT
         else
           rejected_checks="$rejected_checks $c"
@@ -3282,12 +3907,12 @@ prelude_phase() {
             triage_log "PR poll for $id changed before its validated check; skipping the stale snapshot"
             continue
           fi
-          run_check_capture "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
+          run_check_capture "$id" "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
             "$provider" "$url" "$host" "$path" "$number" || exit 1
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          run_check_capture "$custom_snapshot" || exit 1
+          run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -3296,6 +3921,7 @@ prelude_phase() {
           continue
         fi
       fi
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || out=$FM_CHECK_STOP_NOTICE
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=
@@ -3350,6 +3976,10 @@ EOF
           fi
           retire_merged_pr_poll "$id"
           pr_poll_control_release || exit 1
+          # Arm only: this loop just held the task control lock that teardown
+          # takes, so the detached sweep makes the attempt on a later tick.
+          FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+            "$MERGE_PRUNE_BIN" arm "$id" </dev/null >/dev/null 2>&1 || true
           if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
@@ -3382,6 +4012,33 @@ EOF
   watcher_beat
 }
 
+# Sleep the signal grace in slices of one poll and look at the status size cap after
+# each. A runaway writer is the likeliest reason this linger starts: its first append
+# is the signal, the log is still under the cap when the loop-top check runs, and the
+# wake the linger ends in exits this watcher before another loop top. One sleep of the
+# whole grace (30 s) would leave the writer unchecked for twice the one-poll bound the
+# docs state, about 21 GB at the 0.7 GB/s of 2026-10-18. A fractional or zero poll or
+# grace sleeps once and looks once, which is the same check after the whole grace.
+signal_grace_linger() {
+  local left=$SIGNAL_GRACE slice=$POLL
+  case "$left" in
+    ''|*[!0-9]*) sleep "$SIGNAL_GRACE"; status_cap_tick; return 0 ;;
+    *) left=$((10#$left)) ;;
+  esac
+  case "$slice" in
+    ''|*[!0-9]*) slice=$left ;;
+    *) slice=$((10#$slice)) ;;
+  esac
+  [ "$slice" -gt 0 ] || slice=$left
+  while :; do
+    [ "$slice" -le "$left" ] || slice=$left
+    sleep "$slice"
+    left=$((left - slice))
+    status_cap_tick
+    [ "$left" -gt 0 ] || return 0
+  done
+}
+
 signal_phase() {
   local reason pending files sf sig f file_reason surface_end surface_ident signal_actionable signal_commit_error
   local signal_append=fm_wake_append
@@ -3392,15 +4049,20 @@ signal_phase() {
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
   # costs a full firstmate turn each. The re-scan also picks up a newer
-  # signature for an already-pending file (last write wins below).
+  # signature for an already-pending file. The merge below keeps one row per
+  # file and the second scan's newer signature wins
+  # (test_signal_rescan_deduplicates_pending).
   # The linger never runs while this watcher holds the wake-queue lock: every
   # queue writer and drain would wait out the grace, so that flush only
   # re-scans the race window (procevent_surface_queued flushes before locking;
   # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
-    pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
+    [ "$signal_append" = fm_wake_append_locked ] || [ "$SIGNAL_PHASE_NO_LINGER" -eq 1 ] || signal_grace_linger
+    pending=$(printf '%s\n%s\n' "$pending" "$(scan_signals)" | LC_ALL=C awk -F '\t' '
+      NF == 3 { if (!($3 in row)) order[++n] = $3; row[$3] = $0 }
+      END { for (i = 1; i <= n; i++) print row[order[i]] }
+    ')
     # The final coalesced signal set is the watcher-carried status-change
     # trigger for this home's published summary. Start it before either
     # surfacing or absorbing the signal, but never wait on it: see
@@ -3578,8 +4240,18 @@ while :; do
   fi
 
   watcher_beat force
+  # Start the bounded repair before a ready-status notification can exit this
+  # cycle; it must not require the supervisor to re-arm us before registering.
+  pr_ready_reconcile_tick
+  lock_alarm_tick
 
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+  # A runaway writer makes every status signal fire first, and the fleet-ledger
+  # capture below reads status logs, so the over-cap check runs ahead of both: it is
+  # one stat when nothing is over the cap, and the stop it makes must not wait behind
+  # a slow reader or the deferral further down.
+  status_cap_tick
+
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture --try-lock || true
   watcher_beat
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
@@ -3614,6 +4286,7 @@ while :; do
   # crossed turn bound already handed to the away-mode daemon).
   while IFS= read -r w; do
     watcher_beat
+    status_cap_span_tick
     kind=$(window_kind "$w")
     task=$(window_to_task "$w" "$STATE")
     # Steering-inbox loss detection runs before the secondmate stale
@@ -3713,7 +4386,8 @@ while :; do
               rm -f "$ssf"
               clear_write_tracking "$key"
               stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
-              stale_record=$(status_span_first_actionable_record "$stale_status" 0)
+              stale_record=''
+              status_span_first_actionable_record "$stale_status" 0 stale_record '' status_cap_span_tick
               case $? in
                 0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
                 *) stale_end=''; stale_ident='' ;;

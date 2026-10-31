@@ -1,0 +1,6 @@
+{
+  "discovery": {
+    "includeOmp": true,
+    "includeDsh": true
+  }
+}

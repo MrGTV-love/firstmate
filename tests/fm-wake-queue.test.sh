@@ -2250,11 +2250,9 @@ exec "$FM_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
 
-  set +e
+  rc=0
   PATH="$fakebin:$PATH" FM_TEST_REAL_MV="$real_mv" FM_TEST_PUBLISH_MARKER="$state/.watcher-down" \
-    append_wake "$state" signal task.status "signal: publish failure"
-  rc=$?
-  set -e
+    append_wake "$state" signal task.status "signal: publish failure" || rc=$?
   [ "$rc" -ne 0 ] || fail "recovery publication failure allowed wake append to succeed"
   [ "$(cat "$state/.watcher-down")" = 'pending:handling:existing' ] \
     || fail "failed atomic publication erased existing recovery evidence"
@@ -2621,12 +2619,10 @@ exec "$FM_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
 
-  set +e
+  rc=0
   PATH="$fakebin:$PATH" FM_TEST_REAL_MV="$real_mv" FM_TEST_ACK_MARKER="$state/.watcher-down" \
     FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through 0 --recovery-generation "$generation" \
-      > "$dir/drain.out" 2> "$dir/drain.err"
-  rc=$?
-  set -e
+      > "$dir/drain.out" 2> "$dir/drain.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "recovery acknowledgement failure was reported as success"
   grep -F 'recovery episode could not be retired safely' "$dir/drain.err" >/dev/null \
     || fail "recovery acknowledgement failure had no explicit diagnostic"
@@ -2667,10 +2663,8 @@ test_interruption_before_and_after_raw_commit() {
   done
   [ "$i" -lt 100 ] || { kill "$pid" 2>/dev/null || true; fail "pre-commit drain never entered its serialized read boundary"; }
   kill -TERM "$pid" 2>/dev/null || fail "could not interrupt drain before raw commitment"
-  set +e
-  wait "$pid"
-  rc=$?
-  set -e
+  rc=0
+  wait "$pid" || rc=$?
   [ "$rc" -ne 0 ] || fail "pre-commit interruption unexpectedly succeeded"
   FM_STATE_OVERRIDE="$state" "$DRAIN" > "$replay_out" 2> "$dir/replay.err" || fail "restored pre-commit wake did not drain"
   count=$(awk -F '\t' 'NF == 5 { count++ } END { print count + 0 }' "$replay_out")
@@ -2688,9 +2682,7 @@ test_interruption_before_and_after_raw_commit() {
   [ -s "$state/.wake-queue" ] \
     || { kill "$pid" 2>/dev/null || true; fail "post-commit drain consumed its raw row before handling acknowledgement"; }
   kill -TERM "$pid" 2>/dev/null || fail "could not interrupt drain after raw presentation"
-  set +e
-  wait "$pid"
-  set -e
+  wait "$pid" || true
   FM_STATE_OVERRIDE="$state" "$DRAIN" > "$empty_out" 2> "$dir/after-replay.err" \
     || fail "drain after post-presentation interruption failed"
   count=$(awk -F '\t' 'NF == 5 { count++ } END { print count + 0 }' "$empty_out")
@@ -3062,6 +3054,39 @@ lock_wait_pid_is_live() {  # <pid>: running, not a zombie awaiting its parent
   case "$stat" in Z*) return 1 ;; esac
 }
 
+# Diagnostic registration runs after the parent check; it must never recreate a
+# state directory that vanished in between and turn that wait into a success.
+test_lock_wait_diagnostics_never_recreate_a_vanished_parent() {
+  local dir state lock other rc=0
+  dir=$(make_case lock-wait-parent-vanishes)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  sleep 300 &
+  other=$!
+  if ! mkdir "$lock" || ! printf '%s\n' "$other" > "$lock/pid"; then
+    kill "$other"
+    fail "could not seed the held lock"
+  fi
+  # Harm: a runaway tree. Observable: the tree's own member count. Expiry: the
+  # tree is stopped and the wrapper exits 98. The ceiling of 64 is unchanged.
+  # shellcheck disable=SC2016 # Expanded by the child shell, not this one.
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-proc-budget.sh" --own-procs 64 -- bash -c '
+    . "$1"
+    state_dir=$2
+    eval "$(declare -f _fm_lock_monitor_state_to | sed "1s/_fm_lock_monitor_state_to/observed_state_to/")"
+    _fm_lock_monitor_state_to() {
+      [ ! -d "$state_dir" ] || mv "$state_dir" "$state_dir.gone"
+      observed_state_to "$@"
+    }
+    fm_lock_acquire_wait "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$lock" || rc=$?
+  kill "$other" 2>/dev/null || true
+  wait "$other" 2>/dev/null || true
+  [ "$rc" -ne 0 ] || fail "the wait succeeded in a recreated state directory"
+  [ ! -e "$state" ] || fail "lock-wait diagnostics recreated the vanished state directory"
+  pass "lock-wait diagnostics never recreate a vanished state directory"
+}
+
 test_lock_wait_ends_when_the_lock_directory_is_gone() {
   local dir state lock waiter_pid i rc
   dir=$(make_case lock-wait-parent-gone)
@@ -3237,12 +3262,131 @@ SH
   pass "bounded acquire hands ownership to the waiting caller after contention"
 }
 
+# Release the live holder only after the final refused attempt has captured it.
+# The bounded acquire must classify that refusal, not a later PID-file read.
+test_bounded_lock_deadline_holder_release() {
+  local dir state lock holder_pid i rc
+  dir=$(make_case bounded-lock-deadline-holder-release)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2" || exit 10
+    printf "ready\n" > "$3"
+    ticks=0
+    while [ ! -e "$4" ] && [ "$ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      ticks=$((ticks + 1))
+    done
+    [ -e "$4" ] || exit 11
+    fm_lock_release "$2"
+    printf "released\n" > "$5"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" \
+    "$dir/release-holder" "$dir/holder.released" &
+  holder_pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/holder.ready" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/holder.ready" ] \
+    || { kill "$holder_pid" 2>/dev/null || true; fail "deadline fixture holder never acquired its lock"; }
+
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    release_holder=$3 holder_released=$4 refused_holder=$5
+    eval "_fm_test_real_$(declare -f fm_lock_try_acquire)"
+    attempts=0
+    fm_lock_try_acquire() {
+      local refusal ticks=0
+      attempts=$((attempts + 1))
+      _fm_test_real_fm_lock_try_acquire "$@" && return 0
+      refusal=$?
+      if [ "$attempts" -eq 2 ]; then
+        printf "%s\n" "$FM_LOCK_HELD_PID" > "$refused_holder"
+        : > "$release_holder"
+        while [ ! -s "$holder_released" ] && [ "$ticks" -lt 200 ]; do
+          sleep 0.05
+          ticks=$((ticks + 1))
+        done
+        [ -s "$holder_released" ] || exit 12
+      fi
+      return "$refusal"
+    }
+    rc=0
+    fm_lock_acquire_wait_bounded "$2" 1 || rc=$?
+    printf "%s %s %s\n" "$rc" "${FM_LOCK_HELD_PID:-}" "$attempts" > "$6"
+    [ "$rc" -ne 0 ] || fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/release-holder" \
+    "$dir/holder.released" "$dir/refused-holder" "$dir/waiter.result" \
+    > "$dir/waiter.out" 2> "$dir/waiter.err" || rc=$?
+  : > "$dir/release-holder"
+  wait "$holder_pid" || fail "deadline fixture holder did not release cleanly"
+  [ "$rc" -eq 0 ] || fail "deadline fixture waiter failed: $(cat "$dir/waiter.err")"
+  [ "$(cat "$dir/refused-holder")" = "$holder_pid" ] \
+    || fail "deadline fixture did not observe the live holder at its final refusal"
+  [ "$(cat "$dir/waiter.result")" = "124 $holder_pid 2" ] \
+    || fail "holder release changed deadline contention into an acquisition error: $(cat "$dir/waiter.result")"
+  [ ! -e "$lock" ] && [ ! -L "$lock" ] || fail "deadline fixture left its lock behind"
+  pass "bounded deadline preserves contention when the observed holder releases"
+}
+
+# An unreclaimable regular-file steal mutex is an acquisition error even when
+# the primary lock contains a dead PID and the bounded helper hits its deadline.
+test_bounded_lock_malformed_steal_reports_acquire_failure() {
+  local dir state lock dead_pid rc
+  dir=$(make_case bounded-lock-malformed-steal)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  bash -c 'exit 0' &
+  dead_pid=$!
+  wait "$dead_pid" || fail "could not prepare a dead primary lock owner"
+  mkdir "$lock"
+  printf '%s\n' "$dead_pid" > "$lock/pid"
+  : > "$lock.steal"
+
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    rc=0
+    fm_lock_acquire_wait_bounded "$2" 1 || rc=$?
+    printf "%s %s\n" "$rc" "$FM_LOCK_BUSY" > "$3"
+    [ "$rc" -ne 0 ] || fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/result" || rc=$?
+  [ "$rc" -eq 0 ] || fail "malformed steal fixture shell failed"
+  [ "$(cat "$dir/result")" = '1 0' ] \
+    || fail "malformed steal mutex was reported as contention: $(cat "$dir/result")"
+  [ -f "$lock.steal" ] && [ ! -L "$lock.steal" ] \
+    || fail "bounded acquire replaced the malformed steal mutex"
+  [ "$(cat "$lock/pid")" = "$dead_pid" ] \
+    || fail "bounded acquire changed the primary owner despite its malformed mutex"
+  pass "a malformed steal mutex reports acquisition error instead of contention"
+}
+
+drain_elapsed_ms() {  # <state> <out> <err>; elapsed wall time of one bounded drain
+  local started ended rc=0
+  started=$(perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000')
+  FM_STATE_OVERRIDE="$1" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 "$DRAIN" > "$2" 2> "$3" || rc=$?
+  ended=$(perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000')
+  DRAIN_ELAPSED_MS=$((ended - started))
+  return "$rc"
+}
+
+# Decision 007: a drain behind a live holder may exceed an identical
+# no-holder control drain by at most its 1s lock deadline plus this margin for
+# the bounded helper's process start and handoff, so host start-up cost is not
+# mistaken for lock waiting.
+DRAIN_DEADLINE_MARGIN_MS=1500
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
 test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   local dir state status queue_out queue_err first_out first_err second_out second_err replay_out replay_err
-  local queue_holder presentation_holder ack_holder i start elapsed rc advisory_count ack_count
+  local queue_holder presentation_holder ack_holder i elapsed rc advisory_count ack_count
+  local control control_ms held_ms
   dir=$(make_case presentation-lock-deadline)
   state="$dir/state"
   status="$state/task.status"
@@ -3259,6 +3403,14 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   append_wake "$state" signal task.status "signal: $status" \
     || fail "could not seed the presentation-deadline wake"
 
+  control=$(make_case presentation-lock-deadline-queue-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || fail "could not seed the queue control drain"
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || fail "queue control drain failed"
+  control_ms=$DRAIN_ELAPSED_MS
+
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fm_lock_acquire_wait "$2"
@@ -3274,13 +3426,14 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/queue.ready" ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue holder never acquired its lock"; }
 
-  start=$(date +%s)
-  FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
-    "$DRAIN" > "$queue_out" 2> "$queue_err" \
+  drain_elapsed_ms "$state" "$queue_out" "$queue_err" \
     || { kill "$queue_holder" 2>/dev/null || true; fail "bounded queue presentation drain failed"; }
-  elapsed=$(( $(date +%s) - start ))
-  [ "$elapsed" -le 4 ] \
-    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain for ${elapsed}s"; }
+  held_ms=$DRAIN_ELAPSED_MS
+  kill -0 "$queue_holder" 2>/dev/null \
+    || fail "queue presentation returned only after its live holder exited"
+  [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
+  printf 'drain timing: queue held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
   advisory_count=$(grep -Fc \
     "WAKE DRAIN SKIPPED: queue lock remains held by live pid $queue_holder" \
     "$queue_out" || true)
@@ -3299,6 +3452,14 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   kill "$queue_holder" 2>/dev/null || true
   wait "$queue_holder" 2>/dev/null || true
 
+  control=$(make_case presentation-lock-deadline-presentation-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || fail "could not seed the presentation control drain"
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || fail "presentation control drain failed"
+  control_ms=$DRAIN_ELAPSED_MS
+
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fm_lock_acquire_wait "$2"
@@ -3314,26 +3475,33 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/presentation.ready" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation holder never acquired its lock"; }
 
-  # Assert helper silence at its own boundary, not against the drain's valid
-  # supervision alarms for the still-unacknowledged wake.
+  # Assert helper silence separately from the drain's valid supervision alarms.
   rc=0
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
+    wait_started=$SECONDS
     fm_lock_acquire_wait_bounded "$2" 1
-  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.status-presentation-lock" \
+    rc=$?
+    printf "%s\n" "$((SECONDS - wait_started))" > "$3"
+    exit "$rc"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.status-presentation-lock" "$dir/wait.elapsed" \
     > "$dir/presentation-helper.out" 2> "$dir/presentation-helper.err" || rc=$?
+  elapsed=$(cat "$dir/wait.elapsed")
+  [ "$elapsed" -le 4 ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded lock acquire delayed for ${elapsed}s"; }
   [ "$rc" -eq 124 ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation helper did not report its deadline (rc=$rc)"; }
   [ ! -s "$dir/presentation-helper.err" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline leaked helper-process diagnostics"; }
 
-  start=$(date +%s)
-  FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
-    "$DRAIN" > "$first_out" 2> "$first_err" \
+  drain_elapsed_ms "$state" "$first_out" "$first_err" \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation drain failed"; }
-  elapsed=$(( $(date +%s) - start ))
-  [ "$elapsed" -le 4 ] \
-    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain for ${elapsed}s"; }
+  held_ms=$DRAIN_ELAPSED_MS
+  kill -0 "$presentation_holder" 2>/dev/null \
+    || fail "status presentation returned only after its live holder exited"
+  [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
+  printf 'drain timing: presentation held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
   advisory_count=$(grep -Fc \
     "STATUS PRESENTATION SKIPPED: lock remains held by live pid $presentation_holder" \
     "$first_out" || true)
@@ -3804,12 +3972,17 @@ test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
 }
 
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
-  local dir state pid
+  local dir state pid i
   dir=$(make_secondmate_liveness_case liveness-quiet)
   state="$dir/state"
 
   # A live endpoint probes every cadence and never acts.
   run_liveness_leg "$dir" alive FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
+  i=0
+  while [ "$i" -lt 300 ] && [ ! -e "$state/.secondmate-liveness-tick" ] && is_live_non_zombie "$pid"; do
+    sleep 0.1
+    i=$((i + 1))
+  done
   sleep 4
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
@@ -3863,7 +4036,7 @@ test_secondmate_liveness_tick_cadence_gates_the_probe() {
 }
 
 test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
-  local dir state pid ledger now
+  local dir state pid ledger now i
   dir=$(make_secondmate_liveness_case liveness-bound)
   state="$dir/state"
   ledger="$state/.secondmate-relaunch-sm1"
@@ -3900,7 +4073,13 @@ test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
   drain_liveness_wakes "$dir"
   rm -f "$state/.secondmate-liveness-tick"
   run_liveness_leg "$dir" rearm FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
-  sleep 4
+  i=0
+  while [ "$i" -lt 300 ] && is_live_non_zombie "$pid" \
+    && { [ -e "$state/.secondmate-relaunch-bound-sm1" ] \
+      || [ "$(awk -F '\t' '$2 == "rearmed"' "$ledger" | wc -l | tr -d ' ')" -lt 1 ]; }; do
+    sleep 0.1
+    i=$((i + 1))
+  done
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against a live rearmed mate: $(cat "$dir/watch-rearm.out" "$dir/watch-rearm.err")"
   kill_liveness_leg "$pid"
@@ -4106,11 +4285,7 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
-  "$FM_TEST_ONLY"
-  exit $?
-fi
+fm_test_only
 
 test_queued_preserves_rows_and_state_until_acknowledgement
 test_queued_empty_and_missing_state_succeed_without_writes
@@ -4121,8 +4296,11 @@ test_self_held_lock_reclaims_instead_of_deadlocking
 test_unremovable_self_held_lock_refuses_without_waiting
 test_unreclaimable_dead_lock_refuses_without_waiting
 test_lock_wait_ends_when_the_lock_directory_is_gone
+test_lock_wait_diagnostics_never_recreate_a_vanished_parent
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
+test_bounded_lock_deadline_holder_release
+test_bounded_lock_malformed_steal_reports_acquire_failure
 test_live_presentation_holder_is_deadlined_without_weakening_ack
 test_malformed_presentation_lock_reports_acquire_failure
 test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once

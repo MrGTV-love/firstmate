@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Classifier, status-signal, delivery, and heartbeat wake-triage regressions.
-# The stale/wait and escalation cases run separately in fm-watch-triage-waits.
+# The stale/wait and escalation cases run separately in fm-watch-triage-waits,
+# fm-watch-triage-waits-declared, fm-watch-triage-waits-pauses, and
+# fm-watch-triage-waits-away.
 set -u
 
 # shellcheck source=tests/fm-watch-triage-helpers.sh
@@ -22,7 +24,7 @@ test_crew_absorb_class_classifier
 test_crew_worktree_written_since_classifier
 test_empty_write_prune_widens_the_probe
 test_empty_write_prune_from_the_environment_widens_the_probe
-test_worktree_write_probe_is_wall_clock_bounded
+test_worktree_write_probe_stops_on_silence_not_on_time
 test_signal_crew_provably_working_classifier
 test_secondmate_status_routine_absorbed_routed_surfaced_classifier
 test_wait_poll_cycle_ignores_slow_check_beats
@@ -59,6 +61,16 @@ test_folded_worker_decision_without_home_append_still_wakes
 test_separate_self_announced_answers_after_fold_wake_once
 test_self_announced_close_after_fold_still_surfaces_folded_worker_failure
 test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines
+test_status_device_shift_does_not_resignal || exit $?
+test_status_identity_replacement_still_signals || exit $?
+test_status_device_shift_lagging_log_reads_only_new_bytes || exit $?
+test_status_device_shift_keeps_owned_appends || exit $?
+test_status_marker_adoption_follows_each_field_device || exit $?
+test_signal_rescan_deduplicates_pending || exit $?
+test_long_status_scan_keeps_beacon_fresh || exit $?
+test_progressing_status_read_outlives_stall_bound || exit $?
+test_idle_status_read_is_stalled || exit $?
+test_vanished_status_log_is_a_quiet_empty_span || exit $?
 test_actionable_signal_surfaced
 test_done_and_keyed_lines_surface_between_and_during_cycles
 test_signal_not_held_behind_a_blocked_check

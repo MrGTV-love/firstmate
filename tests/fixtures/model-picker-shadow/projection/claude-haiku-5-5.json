@@ -1,0 +1,140 @@
+{
+ "as_of": "2026-10-16T02:58:26Z",
+ "creator": "Anthropic",
+ "metrics": {
+  "aa-briefcase-analytical-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "Analytical Quality & Presentation Elo",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1906.06
+  },
+  "aa-briefcase-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Briefcase v1.1",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1578.13
+  },
+  "aa-lcr": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-LCR v1.1",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.826666666666667
+  },
+  "automationbench-aa": {
+   "derived": false,
+   "estimated": false,
+   "label": "AutomationBench-AA",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.35411015132783624
+  },
+  "costpertask": {
+   "derived": false,
+   "estimated": false,
+   "label": "Cost per Task",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": null,
+   "value": 0.21
+  },
+  "gdpval-aa-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "GDPval-AA v2.1",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1618.33
+  },
+  "inputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Input Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 0.1
+  },
+  "omniscience-accuracy": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Accuracy",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.36383333333333334
+  },
+  "omniscience-non-hallucination-rate": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Non-Hallucination Rate",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.5957558291852241
+  },
+  "outputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Output Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 0.5
+  },
+  "scicode": {
+   "derived": false,
+   "estimated": false,
+   "label": "SciCode",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.549768518518518
+  },
+  "terminal-bench-4-0": {
+   "derived": false,
+   "estimated": false,
+   "label": "Terminal-Bench 4.0",
+   "observed_at": "2026-10-16T02:58:26Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.328282828282828
+  }
+ },
+ "name": "Claude Haiku 5.5 (Max)",
+ "slug": "claude-haiku-5-5"
+}

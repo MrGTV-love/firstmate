@@ -6,19 +6,15 @@
 // sourcing, or running any byte of the submitted command.
 //
 // This file is the sole owner of firstmate's shell command classification.
-// The tokenizer and command-position analysis (Lexer, splitProgram,
-// commandPosition) are exported so the sibling cd-guard policy
-// (bin/fm-cd-command-policy.mjs) reuses the same proven parser instead of
-// duplicating shell lexing; see docs/cd-guard.md. The watcher-arm decision
-// procedure below stays private to this file. The CLI entry point at the bottom
-// runs only when this module is invoked directly, never on import.
+// The tokenizer and command-position analysis are exported; the watcher-arm
+// decision procedure stays private. The CLI runs only on direct invocation.
 
 import path from "node:path";
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REASONS = {
-  "watcher-background": "a protected watcher command cannot run in an asynchronous shell list or through nohup/disown",
+  "watcher-background": "a protected watcher command cannot run in an asynchronous shell list or through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line",
   "watcher-pipeline": "a protected watcher command must not participate in a pipeline",
   "watcher-redirection": "a protected watcher command must not use shell redirection",
   "watcher-bundled": "a protected watcher command must be the sole final command after approved setup nodes",
@@ -984,7 +980,7 @@ function deny(code) {
 }
 
 // Run the CLI only when invoked directly (node fm-arm-command-policy.mjs ...),
-// never when imported by a sibling policy such as bin/fm-cd-command-policy.mjs.
+// never when imported as a module.
 function invokedDirectly() {
   const entry = process.argv[1];
   if (!entry) return false;

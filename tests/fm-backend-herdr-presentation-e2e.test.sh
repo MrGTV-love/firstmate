@@ -14,6 +14,12 @@ HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; cleanup_all; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
+assert_order_is() {  # <expected> <actual> <case-name>
+  local expected=$1 actual=$2 case_name=$3
+  [ "$actual" = "$expected" ] \
+    || fail "$case_name"$'\nexpected:\n'"$expected"$'\nactual:\n'"$actual"
+}
+
 if [ "${1:-}" != --sandbox-only ]; then
   command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
 fi
@@ -38,6 +44,9 @@ fm_test_drop_file() {
 FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
 mkdir -p "$FIXTURE_ROOT"
 cp -R "$ROOT/bin" "$FIXTURE_ROOT/bin"
+# Worker launch roles render the code root's shared review rubric.
+mkdir -p "$FIXTURE_ROOT/docs"
+cp "$ROOT/docs/review-rubric.md" "$FIXTURE_ROOT/docs/review-rubric.md"
 git -C "$FIXTURE_ROOT" init -q
 # The self-repository publication gate needs a readable code-root history to
 # prove the unrelated fixture projects are not firstmate's own repository.
@@ -74,15 +83,21 @@ export ACTIVE_SEEDED_CONTROL POST_CREATE_ABORT_CONTROL TMP_ROOT
 cat > "$FAKEBIN/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-{
-  first=1
-  for arg in "$@"; do
-    [ "$first" -eq 0 ] && printf '\t'
-    printf '%s' "$arg"
-    first=0
-  done
-  printf '\n'
-} >> "$HERDR_CALL_LOG"
+# One append syscall per complete record: the other spawn can log read-only
+# probes while this spawn holds the presentation lock. Per-argument printf
+# calls interleave and can erase a workspace.create from the ordering oracle.
+python3 - "$HERDR_CALL_LOG" "$@" <<'PY' || exit 1
+import os
+import sys
+
+record = ("\t".join(sys.argv[2:]) + "\n").encode()
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_APPEND)
+try:
+    if os.write(fd, record) != len(record):
+        raise OSError("incomplete Herdr call-log record")
+finally:
+    os.close(fd)
+PY
 args=("$@")
 last_index=$((${#args[@]} - 1))
 flag_index=$((last_index - 1))
@@ -477,6 +492,31 @@ $description
 
 ## Firstmate spec
 Verify projected workspace behavior for $id.
+
+## Definition Of Done (task)
+Capability in plain words: The isolated Herdr fixture $id exhibits its scenario's expected workspace presentation and lifecycle behavior.
+
+### Mandatory items
+- M1 Source: $description
+  Expected: $id reaches the spawn, flat fallback, refusal, teardown, or recovery outcome specified by its owning test case.
+  Verify: run tests/fm-backend-herdr-presentation-e2e.test.sh through bin/fm-test-run.sh and satisfy every applicable existing assertion.
+  Edge/negative: failed operations and lock contention preserve the asserted exact endpoint ownership and captain focus.
+  Evidence place: the runner output and the fixture's stdout, stderr, Herdr call log, move log, and focus audit under $TMP_ROOT.
+  Authority: grader.
+
+### Supporting items
+None.
+
+### Hard gates
+Use only the guarded named isolated Herdr lab session.
+Keep every worktree allocation under $TMP_ROOT; never mutate the shared worktree pool or the default Herdr session.
+Retain every existing assertion and isolation guard.
+
+### Honesty rule
+Report only observed outcomes and recorded evidence; a skipped or unexecuted assertion is not a pass.
+
+## How You're Graded
+The owning E2E test's existing assertions determine pass or fail; every mandatory item and hard gate must pass.
 EOF
 }
 
@@ -883,21 +923,22 @@ ORDER_LIST=$(lab workspace list) || fail "could not inspect concurrent presentat
 CREATED_LABELS=$(projection_labels_from_log "$PROJECTION_ORDER_START")
 EXPECTED_LABELS=$(printf 'firstmate\n%s\n%s\n2ndmate-alpha\n2ndmate-bravo' "$PROJECTED_LABEL" "$CREATED_LABELS")
 ACTUAL_LABELS=$(printf '%s' "$ORDER_LIST" | jq -r '.result.workspaces[].label')
-[ "$ACTUAL_LABELS" = "$EXPECTED_LABELS" ] || fail "workspace order was not firstmate, stable primary block, secondmates: $ACTUAL_LABELS"
+assert_order_is "$EXPECTED_LABELS" "$ACTUAL_LABELS" \
+  "workspace order was not firstmate, stable primary block, secondmates"
 PRIMARY_IDS=$(printf '%s' "$ORDER_LIST" | jq -r '
   .result.workspaces[]
   | select((.label | startswith("└ ")) or (.label | startswith("firstmate/")))
   | .workspace_id
 ')
 MOVE_TARGETS=$(cut -f2 "$MOVE_CALL_LOG")
-[ "$MOVE_TARGETS" = "$PRIMARY_IDS" ] \
-  || fail "workspace.move targeted something other than each exact current projected-create id"
+assert_order_is "$PRIMARY_IDS" "$MOVE_TARGETS" \
+  "workspace.move targeted something other than each exact current projected-create id"
 MOVE_INDEXES=$(cut -f3 "$MOVE_CALL_LOG")
-[ "$MOVE_INDEXES" = $'1\n2\n3' ] \
-  || fail "concurrent primary workers did not append stably to the contiguous block: $MOVE_INDEXES"
+assert_order_is $'1\n2\n3' "$MOVE_INDEXES" \
+  "concurrent primary workers did not append stably to the contiguous block"
 SECOND_ORDER_AFTER=$(printf '%s' "$ORDER_LIST" | jq -r '.result.workspaces[] | select(.label | startswith("2ndmate-")) | .workspace_id')
-[ "$SECOND_ORDER_AFTER" = "$SECOND_ORDER_BEFORE" ] \
-  || fail "primary workspace ordering changed secondmate relative order"
+assert_order_is "$SECOND_ORDER_BEFORE" "$SECOND_ORDER_AFTER" \
+  "primary workspace ordering changed secondmate relative order"
 [ "$(lab workspace get "$SECOND_TWO_WSID" | jq -r '.result.workspace.focused')" = true ] \
   || fail "concurrent primary workspace ordering stole focus"
 assert_no_ordering_lifecycle_calls_since "$PROJECTION_ORDER_START" "successful presentation ordering"
@@ -926,8 +967,9 @@ remember_meta_worktree "$ORDER_FAIL_META" >/dev/null
 ORDER_FAIL_WSID=$(grep '^herdr_workspace_id=' "$ORDER_FAIL_META" | cut -d= -f2-)
 ORDER_FAIL_PANE=$(grep '^herdr_pane_id=' "$ORDER_FAIL_META" | cut -d= -f2-)
 FAIL_LIST=$(lab workspace list) || fail "could not inspect the move-failure fallback"
-[ "$(printf '%s' "$FAIL_LIST" | jq -r '.result.workspaces[-1].workspace_id')" = "$ORDER_FAIL_WSID" ] \
-  || fail "workspace.move failure did not leave the safe worker in Herdr's default appended order"
+FAIL_LAST_WSID=$(printf '%s' "$FAIL_LIST" | jq -r '.result.workspaces[-1].workspace_id')
+assert_order_is "$ORDER_FAIL_WSID" "$FAIL_LAST_WSID" \
+  "workspace.move failure did not leave the safe worker in Herdr's default appended order"
 lab pane get "$ORDER_FAIL_PANE" >/dev/null 2>&1 \
   || fail "workspace.move failure cleaned up the safely-created task pane"
 FAIL_CLOSED_PANES=$(sed -n "$((FAIL_START + 1)),\$p" "$HERDR_CALL_LOG" | awk -F '\t' '$1 == "pane" && $2 == "close" { print $3 }')
@@ -966,7 +1008,7 @@ ABORT_SEQUENCE=$(sed -n "$((ABORT_FOCUS_START + 1)),\$p" "$FOCUS_AUDIT_LOG" | aw
 ')
 case "$ABORT_SEQUENCE" in
   $'create-a\nclose-a\ncreate-b\nclose-b'|$'create-b\nclose-b\ncreate-a\nclose-a') ;;
-  *) fail "concurrent post-create abort cleanup interleaved outside the presentation lock: $ABORT_SEQUENCE" ;;
+  *) fail "concurrent post-create abort cleanup interleaved outside the presentation lock"$'\nexpected one of:\ncreate-a\nclose-a\ncreate-b\nclose-b\n--or--\ncreate-b\nclose-b\ncreate-a\nclose-a\nactual:\n'"$ABORT_SEQUENCE" ;;
 esac
 ABORT_UNRESTORED=$(sed -n "$((ABORT_FOCUS_START + 1)),\$p" "$FOCUS_AUDIT_LOG" | awk -F '\t' -v a="$ABORT_A_PANE" -v b="$ABORT_B_PANE" '
   ($1 == "workspace-create" || $1 == "tab-create" || $1 == "workspace-move" || ($1 == "pane-close" && $4 != a && $4 != b)) && $2 != $3 { print }
@@ -1040,11 +1082,11 @@ for ROUND in 1 2 3; do
   WAVE_LABELS=$(projection_labels_from_log "$WAVE_LOG_START")
   WAVE_EXPECTED=$(printf 'firstmate\n%s\n2ndmate-alpha\n2ndmate-bravo' "$WAVE_LABELS")
   WAVE_ACTUAL=$(lab workspace list | jq -r '.result.workspaces[] | select(.label == "firstmate" or (.label | startswith("└ ")) or (.label | startswith("2ndmate-"))) | .label')
-  [ "$WAVE_ACTUAL" = "$WAVE_EXPECTED" ] \
-    || fail "focus wave $ROUND lost stable contiguous ordering: $WAVE_ACTUAL"
+  assert_order_is "$WAVE_EXPECTED" "$WAVE_ACTUAL" \
+    "focus wave $ROUND lost stable contiguous ordering"
   WAVE_SECOND_ORDER=$(lab workspace list | jq -r '.result.workspaces[] | select(.label | startswith("2ndmate-")) | .workspace_id')
-  [ "$WAVE_SECOND_ORDER" = "$SECOND_ORDER_BEFORE" ] \
-    || fail "focus wave $ROUND changed secondmate relative order"
+  assert_order_is "$SECOND_ORDER_BEFORE" "$WAVE_SECOND_ORDER" \
+    "focus wave $ROUND changed secondmate relative order"
 
   teardown_task "focus-$ROUND-a" "$HOME_DIR" > "$TMP_ROOT/focus-$ROUND-a-teardown.out" 2> "$TMP_ROOT/focus-$ROUND-a-teardown.err" &
   WAVE_A_TEARDOWN_PID=$!
@@ -1056,8 +1098,8 @@ for ROUND in 1 2 3; do
   finish_concurrent_teardown "focus-$ROUND-b" "$WAVE_B_TEARDOWN_STATUS" "$TMP_ROOT/focus-$ROUND-b-teardown.out" "$TMP_ROOT/focus-$ROUND-b-teardown.err"
   assert_focus_is "$CAPTAIN_FOCUS" "focus wave $ROUND concurrent teardowns"
   WAVE_REMAINING=$(lab workspace list | jq -r '.result.workspaces[].label')
-  [ "$WAVE_REMAINING" = $'firstmate\n2ndmate-alpha\n2ndmate-bravo' ] \
-    || fail "focus wave $ROUND cleanup left a projected workspace behind: $WAVE_REMAINING"
+  assert_order_is $'firstmate\n2ndmate-alpha\n2ndmate-bravo' "$WAVE_REMAINING" \
+    "focus wave $ROUND cleanup left a projected workspace behind"
 done
 pass "real Herdr lab: three repeated concurrent create/order/cleanup waves have zero active workspace or tab drift"
 
@@ -1190,8 +1232,8 @@ MULTI_EXPECTED=$(printf '%s\n' \
   firstmate "$P1_LABEL" "$P2_LABEL" \
   2ndmate-alpha "$A1_LABEL" "$A2_LABEL" \
   2ndmate-bravo "$B1_LABEL" "$B2_LABEL")
-[ "$MULTI_LABELS" = "$MULTI_EXPECTED" ] \
-  || fail "multi-home topology was not owning-parent grouped: $MULTI_LABELS"
+assert_order_is "$MULTI_EXPECTED" "$MULTI_LABELS" \
+  "multi-home topology was not owning-parent grouped"
 pass "real Herdr lab: primary and two secondmate homes each own a top-level contiguous child block"
 
 # Concurrent cross-home wave under the one session lock.
@@ -1221,7 +1263,7 @@ printf '%s' "$CROSS_LIST" | jq -e '
   | ([.result.workspaces[].label] | index("2ndmate-bravo")) as $b
   | $fm != null and $a != null and $b != null
   and $fm < $a and $a < $b
-' >/dev/null 2>&1 || fail "cross-home concurrent wave reordered parents"
+' >/dev/null 2>&1 || fail "cross-home concurrent wave reordered parents"$'\nexpected relative parent order:\nfirstmate\n2ndmate-alpha\n2ndmate-bravo\nactual workspace order:\n'"$(printf '%s' "$CROSS_LIST" | jq -r '.result.workspaces[].label')"
 PCW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$HOME_DIR/state/pcw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
 ACW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_A/state/acw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
 BCW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_B/state/bcw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
@@ -1646,6 +1688,24 @@ assert_no_projection_mutation_since "$START" "agent-free duplicate-token recover
 lab workspace get "$DUP1_WSID" >/dev/null 2>&1 || fail "duplicate-token recovery removed the first quarantined workspace"
 lab workspace get "$DUP2_WSID" >/dev/null 2>&1 || fail "duplicate-token recovery removed the second quarantined workspace"
 
+# Herdr drops a registration whose pane runs no agent process, so the live
+# duplicate is a real agent-named foreground process plus its registration.
+# The stand-in is a renamed Python interpreter, not a renamed sleep: a
+# multicall coreutils (uutils on Ubuntu 26.04) picks its applet from argv[0],
+# so a sleep linked as `codex` exits at once and the pane stays a shell.
+DUP_AGENT_DIR="$TMP_ROOT/duplicate-agent"
+mkdir -p "$DUP_AGENT_DIR"
+DUP_PYTHON_BIN=$(python3 -c 'import sys; print(sys.executable)') || fail "python3 not found"
+ln -s "$DUP_PYTHON_BIN" "$DUP_AGENT_DIR/codex" || fail "could not name the duplicate agent stand-in"
+lab pane run "$DUP1_PANE" "'$DUP_AGENT_DIR/codex' -c 'import time; time.sleep(600)'" >/dev/null \
+  || fail "could not start the duplicate-live-agent risk fixture"
+DUP_AGENT_STATE=
+for _ in $(seq 1 100); do
+  DUP_AGENT_STATE=$(fm_backend_herdr_pane_process_state "$HERDR_LAB_SESSION" "$DUP1_PANE")
+  [ "$DUP_AGENT_STATE" != agent ] || break
+  sleep 0.1
+done
+[ "$DUP_AGENT_STATE" = agent ] || fail "the duplicate pane never ran its agent stand-in (state: $DUP_AGENT_STATE)"
 lab pane report-agent "$DUP1_PANE" --source fm-projection-e2e --agent test-agent --state idle >/dev/null \
   || fail "could not register the duplicate-live-agent risk fixture"
 START=$(log_line_count)

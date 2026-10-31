@@ -8,8 +8,12 @@
 # report, decision, or PR the ask refers to, without added speaker labels or
 # direct address) and `{FIRSTMATE_SPEC}`
 # under `## Firstmate spec` (build instructions, which are never the captain's
-# intent). bin/fm-dod-lib.sh owns the no-mistakes `--intent` contract those
-# subsections feed; bin/fm-spawn.sh refuses leftover placeholders and a
+# intent). Its nested `### Out of scope` heading is scaffolded empty for Firstmate
+# to fill with the task's exclusion list, and it must be filled even when the
+# answer is `None`: bin/fm-spawn.sh refuses a dispatch that leaves it blank,
+# because independent review reads that list as the task's stated boundary.
+# bin/fm-dod-lib.sh owns the separate verification plan and unchanged --intent
+# contract those subsections feed; bin/fm-spawn.sh refuses leftover placeholders and a
 # `## Captain's intent` line opening with a Captain label or address. Secondmate
 # charters still use a single `{TASK}` charter fill. Ship and scout briefs also
 # end with the task-specific `## Definition Of Done (task)` placeholders and the
@@ -114,6 +118,13 @@
 # disagrees, so an adjusted brief and the recorded task metadata cannot drift
 # apart.
 # Ship briefs begin with a worktree-isolation assertion before the branch step.
+# The branch step also forbids a second tree inside the pool slot: Vernant's
+# scripts/git-stability/start_task_worktree.py would nest a locked copy under
+# the slot that no one owns the release of (bin/fm-teardown-nested-lib.sh and
+# bin/fm-copy-sweep.sh only clean up after it). A Vernant rule or guard that
+# demands a manifest or a second worktree becomes one blocked status line that
+# names the single firstmate route question and slot-manifest key, not a tree
+# the lane creates.
 # Both crewmate scaffolds carry one shared rule against administering the
 # infrastructure every lane shares - the no-mistakes daemon and the worktree pool
 # their own slot came from - so ship and scout cannot drift apart. A secondmate
@@ -457,11 +468,14 @@ shell_quote() {
 }
 
 STATUS_FILE=$(shell_quote "$STATE/$ID.status")
-# The worker's status command: the plain append always carries the line, then
-# the opt-in fleet ledger (docs/fleet-ledger.md) records it at once, costing one
-# file test when the flag is absent. A host without that flag, such as a remote
-# second mate's, runs only the append; the watcher capture is the backstop.
-STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" >> $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$FM_ROOT/bin/fm-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
+# The worker's status command: the sanctioned capped append always carries the
+# line (bin/fm-status-append.sh owns the size bound, and
+# docs/configuration.md "Status log size bounds" the reason), then the opt-in fleet
+# ledger (docs/fleet-ledger.md) records it at once, costing one file test when the
+# flag is absent. A host without that flag, such as a remote second mate's, runs only
+# the append; the watcher capture is the backstop. A refused append (exit 75) skips
+# the ledger and says why on stderr.
+STATUS_APPEND="$(shell_quote "$FM_ROOT/bin/fm-status-append.sh") $STATUS_FILE \"{state} [at=<epoch>]: {one short line}\" && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$FM_ROOT/bin/fm-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
 INBOX_DIR=$(shell_quote "$STATE/$ID.inbox")
 
 # The receive-and-ack half of the steering-inbox contract, included in every
@@ -557,6 +571,8 @@ Nobody reads this chat: the captain and the main firstmate see only what is appe
 That file is your parent channel, and in this home it IS the captain: every sentence you would say to the captain, and every outcome the local AGENTS.md tells a firstmate to bring to the captain, is one appended line there, never chat.
 Your own machinery publishes the durable facts about your crew's work for you (\`bin/fm-parent-channel-lib.sh\`): a child's terminal done or failed line with its note and PR on every supervision poll, a PR-ready line when you register a PR, a task you hold for the captain and its answer, a merge, and a child's final line at cleanup all reach the parent channel from the scripts that record them, whether or not you append anything.
 What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
+A call the main firstmate owns is never held: append it as a \`needs-decision\` line for the main firstmate and keep working where you can, and the work continues on its answer.
+\`bin/fm-captain-hold.sh hold\` is only for a call that needs the captain's own words, and here it must say so with \`--owner captain\`; only the captain's words release it.
 
 # Requests from the main firstmate
 You are a firstmate in your own home, so an incoming message reaches you in your own chat.
@@ -565,7 +581,7 @@ A request relayed to you by the main firstmate is tagged with a leading \`$FM_FR
 When a message carries that marker, do the work, then respond via the STATUS/ESCALATION path below, never only in this chat: the main firstmate does not read your chat, so a chat-only reply is lost.
 Marked requests also carry a privacy-safe \`corr=<id>\` token after the marker; include that exact token in your parent status reply (or in the status pointer to a detailed doc) so the parent can correlate the answer.
 Optional helper: \`bin/fm-secondmate-report.sh <verb> <corr_id> <note>\` appends that correlated line to the parent channel itself - do not pass a status path, and do not write a hand path under this home.
-A plain \`echo\` that includes the same \`corr=<id>\` on this parent channel is equally valid; do not depend on the helper being present.
+If the helper is missing, append the same correlated line with \`$FM_ROOT/bin/fm-status-append.sh\`; never hand-write a \`printf\` or a loop into a status file, because an unbounded append can fill the disk.
 For a terse result, a status line is the whole answer.
 For a detailed answer (an investigation, a plan, an audit), write it to a doc under your home's \`data/\` and append a status line that points to that doc - the scout-report pattern - so the main firstmate is woken and can read it.
 Before treating an investigation or visual review as complete, load \`captain-hold-lifecycle\` from this home's \`.agents/skills/\` and pass its shared completion gate.
@@ -609,6 +625,9 @@ exit 0
 fi
 
 REPO=${POS[1]}
+# Store one location fact, never a second caller-supplied project id. The
+# resolver validates this location against the registry before routing.
+DISPATCH_PROJECT=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" scaffold "$FM_HOME" "${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}" "$REPO") || exit 1
 
 if [ "$HERDR_LAB" -eq 1 ]; then
 HERDR_LAB_HELPER=$(shell_quote "$FM_ROOT/bin/fm-herdr-lab.sh")
@@ -655,6 +674,8 @@ IFS= read -r -d '' TASK_SECTION <<'EOF' || true
 
 ## Firstmate spec
 {FIRSTMATE_SPEC}
+
+### Out of scope
 EOF
 TASK_SECTION=${TASK_SECTION%$'\n'}
 
@@ -683,6 +704,7 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
      get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
      backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
      that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
+   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
    If you genuinely need a second checkout, another slot, or the daemon touched, append
    `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
 EOF
@@ -692,7 +714,7 @@ SHARED_INFRA_RULE=${SHARED_INFRA_RULE%$'\n'}
 # The kernel counts the user's whole process table, so one runaway scratch tree
 # starves every lane; bin/fm-proc-budget.sh owns the budget, this is the one
 # line that reaches ad-hoc scripts no runner wraps.
-SHARED_PROC_BUDGET_RULE="9. Run any shim, lab, or measurement script through \`$(shell_quote "$FM_ROOT/bin/fm-proc-budget.sh") -- <command...>\`: a runaway process tree then stops at its own limit instead of starving every lane of fork."
+SHARED_PROC_BUDGET_RULE="9. Run any shim, lab, or measurement script through \`$(shell_quote "$FM_ROOT/bin/fm-proc-budget.sh") -- <command...>\`: a runaway process tree then stops at its own limit instead of starving every lane of fork. When the task requires a memory stop, use \`$(shell_quote "$FM_ROOT/bin/fm-proc-budget.sh") --memory-kib <limit-in-KiB> -- <command...>\` (see the wrapper header for supported hosts and failure statuses)."
 
 if [ -n "$BASE_BRANCH" ]; then
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean copy of its base branch.
@@ -744,6 +766,8 @@ else
   LAVISH_LINE='Lavish is unavailable (lavish-axi is missing or below its supported version floor), so deliver your findings as a text report without Lavish, even for a visual deliverable.'
 fi
 cat > "$BRIEF" <<EOF
+$DISPATCH_PROJECT
+
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
 
 $TASK_SECTION
@@ -795,7 +819,7 @@ If your findings reveal work that should ship (e.g. you reproduced a bug and the
 $DOD_TASK
 EOF
 append_brief_include
-echo "scaffolded: $BRIEF (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)"
+echo "scaffolded: $BRIEF (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
 exit 0
 fi
 
@@ -818,9 +842,11 @@ case "$MODE" in
     ;;
 esac
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
-DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
+DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT" "$BRIEF") || exit 1
 
 cat > "$BRIEF" <<EOF
+$DISPATCH_PROJECT
+
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
 
 $TASK_SECTION
@@ -834,7 +860,9 @@ $SETUP_BASE
 The path check is authoritative: \`git rev-parse --git-dir\` and \`git rev-parse --git-common-dir\` can help inspect the repo, but they do not prove you are outside the primary checkout.
 If the top-level path is the primary checkout or not the worktree you were launched in, STOP - do not branch or commit here - append \`blocked [at=<epoch>]: launched in primary checkout, not an isolated worktree\` to the status file and stop.
 
-1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`$SETUP2
+1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with \`scripts/git-stability/start_task_worktree.py\` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a lifecycle manifest, or reports \`manifest_exists\` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: \`blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?\` and stop. Never run start_task_worktree.py from this slot.$SETUP2
 
 # Rules
 $RULE1
@@ -880,9 +908,9 @@ $DOD_TASK
 EOF
 append_brief_include
 if [ "$FORGE" = none ]; then
-  echo "scaffolded: $BRIEF (ship, mode=$MODE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
 elif [ "$FORGE" = gerrit ]; then
-  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE shape=$SHAPE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE shape=$SHAPE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
 else
-  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
 fi

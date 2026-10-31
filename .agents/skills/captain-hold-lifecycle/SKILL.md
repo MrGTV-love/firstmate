@@ -27,14 +27,18 @@ A completed investigation and an ended visual review use this same owner and com
 Run the command in the originating work's authoritative `FM_HOME`; secondmate-owned work registers in that secondmate home's backlog, and a question already held anywhere is never re-registered as a second row.
 Do not close a captain-held task merely because the originating investigation completed, its report was archived, its visual review ended, or its task was torn down.
 Holding the work item the question gates is safe for exactly that reason: cleanup keeps such a row open with the finished work's deliverable recorded and returns it to the queue, so it still reads as the captain's own call.
-Only `answer` with the captain's words or an evidence-backed `reconcile close` may resolve it.
+Only `answer` with the captain's words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling may resolve it.
+
+A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
+A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
+A captain-owned hold is released only by the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it.
 
 Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
 When verified evidence establishes that all answers were already recorded elsewhere or the premise is moot, use the evidence-only reconciliation path rather than inventing new captain words.
 A merge approval uses that existing release path because approval permits the merge to proceed; cleanup closes the work only after it lands and records what shipped.
 Closing a held row at merge approval instead records completion before landing, so the backlog claims completion before the work actually ships.
-When the answer changes what a task must build, follow `AGENTS.md` section 7's mid-task ask rule to preserve the captain's words in the brief and steer the worker.
-When the captain says "later", that is an answer too: re-hold with `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --until <date>` so the item leaves the live Captain's Call and resurfaces on its date, instead of leaving a live-looking card or fabricating a closure.
+When the answer changes what a task must build, follow `worker-steering`'s mid-task ask rule to preserve the captain's words in the brief and steer the worker.
+When the captain says "later", that is an answer too: re-hold with `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --until <date>` (adding `--owner captain` in a secondmate home) so the item leaves the live Captain's Call and resurfaces on its date, instead of leaving a live-looking card or fabricating a closure.
 "A keyed answer resolves its matching captain-held task" is one capability with one owner, `bin/fm-captain-hold.sh answers`, and every channel that carries a captain answer feeds it the same task id and answer; a channel never maps keys to tasks, records a decision, or resolves anything itself.
 Chat already feeds it through `bin/fm-send.sh --resolve-key`, and a captured-answer source feeds it once bound with `bin/fm-captain-hold.sh bind <source-id>`; bind before arming the source, and key each structured question by the held task's id.
 An unbound source and a key that names no captain-held task both simply feed nothing: the answer is still captured and firstmate is still woken, and closing falls back to the direct command above.
@@ -58,7 +62,10 @@ Bearings reads the resulting structured state and must never compensate by scrap
 A captain call can be written down twice - as the keyed status decision the fold reads, and as the backlog task held for the captain - and those two records can disagree without either surface saying so.
 `bin/fm-captain-hold.sh diverged` reports that contradiction and the wake drain prints it as `RECORD DIVERGENCE`; it closes nothing, because a captain call closed wrongly leaves review entirely, which is worse than the noise.
 Read such a line as "these two records disagree", never as "the captain ruled and someone forgot to file it": a call can dissolve because its premise was false, or turn out to have been a question of fact rather than the captain's to answer.
-Reconcile it with what actually happened - `answer` when the captain's own words exist to record, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
+Reconcile it with what actually happened - `answer` when the captain's own words exist to record, `withdraw` when a recorded captain ruling made it moot, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
+`withdraw` needs a ruling whose own records (title, hold reason, or recorded answer) name the withdrawn task; it records the ruling and why as a non-captain resolution, never as the captain's words, and leaves unfinished work open while it closes a question-shaped row or finished work that teardown retained.
+A call's delivery to a mate's parent channel is true of a genuine captain call too, so delivery never frees a hold.
+A hold filed before owners were recorded has no owner on record and stays the captain's: only his recorded words or a recorded captain ruling release it.
 The absence of a routed work item is not a divergence and the guard never requires one: when the decision IS the deliverable there is nothing to route.
 
 ## Operating sequence

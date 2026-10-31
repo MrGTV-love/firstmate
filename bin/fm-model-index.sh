@@ -87,7 +87,7 @@ jq -se '
   all(.roles | to_entries[];
     (.key | token) and (.value | type == "object" and length > 0) and
     all(.value | to_entries[];
-      (.key | IN("claude","codex","omp","pi","pi-signed","opencode","cursor","agy","grok","kimi","gemini","muse","rovo","devin")) and
+      (.key | IN("claude","codex","omp","dsh","pi","pi-signed","opencode","cursor","agy","grok","kimi","gemini","muse","rovo","devin")) and
       (.value | type == "object" and ((keys - ["model","stand_in"]) | length == 0)) and (.value.model | token) and
       (.value | (has("stand_in") | not) or (.stand_in | token)))))
 ' "$TMP/index.json" >/dev/null 2>&1 || die "malformed index: $INDEX"

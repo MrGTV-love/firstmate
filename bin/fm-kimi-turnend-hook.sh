@@ -134,7 +134,13 @@ def locate_region(data: bytes):
     if normal_count + owned_count == 0 and end_count == 0 and identifier_count == 0:
         return None
     if normal_count + owned_count != 1 or end_count != 1 or identifier_count != 2:
-        refuse("config.toml has partial, duplicated, or altered Firstmate region markers.")
+        refuse(
+            "config.toml has partial, duplicated, or altered Firstmate region markers "
+            f"at {CONFIG}; the file must hold exactly one "
+            "'# BEGIN FIRSTMATE KIMI TURN-END HOOK' line and exactly one "
+            "'# END FIRSTMATE KIMI TURN-END HOOK' line. Repair that marker pair by "
+            "hand, then run bin/fm-kimi-turnend-hook.sh install."
+        )
     marker = BEGIN_OWNS_NEWLINE if owned_count else BEGIN
     marker_at = data.find(marker)
     if marker_at != 0 and data[marker_at - 1 : marker_at] != b"\n":

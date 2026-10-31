@@ -195,6 +195,64 @@ tracked() { cat "$FM_TEST_TRACKED" 2>/dev/null; }
 lock_owner() { cat "$STATE_ROOT/worker.lock/pid" 2>/dev/null; }
 launch_count() { grep -c "^$1 " "$LAUNCH_LOG" 2>/dev/null || true; }
 
+# --- a subshell owns its repair lock even without BASHPID (stock macOS Bash) ---
+
+cat > "$TMP_ROOT/subshell-lock.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+. "$1"
+lock=$2
+mode=$3
+[ "$mode" != without-bashpid ] || unset BASHPID
+holder=
+cleanup_holder() {
+  [ -z "$holder" ] || kill -KILL "$holder" 2>/dev/null || true
+  [ -z "$holder" ] || wait "$holder" 2>/dev/null || true
+}
+trap cleanup_holder EXIT
+(
+  fm_remote_job_reload_lock_acquire "$lock" || exit 1
+  : > "$lock.ready"
+  while [ "$SECONDS" -lt 30 ]; do sleep 0.05; done
+) &
+holder=$!
+for _ in $(seq 1 200); do
+  [ -e "$lock.ready" ] && break
+  sleep 0.05
+done
+[ -e "$lock.ready" ] || { printf 'holder never acquired lock\n' >&2; exit 1; }
+owner="${lock%/*}/$(readlink "$lock")"
+recorded=$(cat "$owner/pid")
+[ "$recorded" = "$holder" ] && [ "$recorded" != "$$" ] || {
+  printf 'wrong subshell holder: recorded=%s actual=%s parent=%s\n' "$recorded" "$holder" "$$" >&2
+  exit 1
+}
+fm_remote_job_recorded_owner_alive "$owner" || { printf 'live holder not recognized\n' >&2; exit 1; }
+kill -KILL "$holder"
+wait "$holder" 2>/dev/null || true
+holder=
+# The parent is still alive; reclaim must key off the dead subshell, not $$.
+fm_remote_job_recorded_owner_alive "$owner" && { printf 'dead holder still recognized\n' >&2; exit 1; }
+fm_remote_job_reload_lock_acquire "$lock" || exit 1
+[ "$(cat "$FM_REMOTE_JOB_RELOAD_OWNER/pid")" = "$$" ] || exit 1
+fm_remote_job_reload_lock_release "$lock" || exit 1
+[ ! -e "$owner" ] || { printf 'dead holder record survived reclaim\n' >&2; exit 1; }
+printf 'subshell holder identity and dead-holder reclaim passed (%s; Bash %s)\n' "$mode" "$BASH_VERSION"
+SH
+shells=(/bin/bash)
+[ "$(type -P bash)" = /bin/bash ] || shells+=("$(type -P bash)")
+for shell in "${shells[@]}"; do
+  modes=(native)
+  # shellcheck disable=SC2016 # Probe the child interpreter, not this test shell.
+  "$shell" -c '[ -n "${BASHPID:-}" ]' && modes+=(without-bashpid)
+  for mode in "${modes[@]}"; do
+    "$shell" "$TMP_ROOT/subshell-lock.sh" "$ROOT/bin/fm-remote-job-lib.sh" "$TMP_ROOT/subshell-$mode.lock" "$mode" \
+      || fail "subshell lock-holder regression ($shell, $mode; real Bash 3.2 on macOS, missing BASHPID emulated elsewhere)"
+    rm -f "$TMP_ROOT/subshell-$mode.lock.ready"
+  done
+done
+pass 'subshell repair-lock ownership and reclamation work on real Bash 3.2 or without BASHPID, and native Bash'
+
 # --- a crashed predecessor's fresh heartbeat cannot ready its replacement ----
 
 fm_remote_job_prepare_state "$ACCOUNT_HOME" || fail 'could not prepare remote job state'
