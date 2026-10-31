@@ -567,9 +567,83 @@ teardown_bundle_record() {
   TEARDOWN_BUNDLE_RECORD_TIPS="${recorded[*]}"
 }
 
-# The captain's land-or-drop question for commits only a bundle holds.
-teardown_bundle_hold_reason() {  # <bundle> <tips>
-  printf 'Land or drop the unlanded commits of %s: tips %s are preserved only in bundle %s, not landed.' "$ID" "$2" "$1"
+# The captain's land-or-drop question for commits only a bundle holds. It names
+# the copy's unlanded tips apart from the record's advertised tips, since the
+# bundle may also advertise tips that are already landed.
+teardown_bundle_hold_reason() {  # <bundle> <unlanded-tips> <recorded-tips>
+  printf 'Land or drop the unlanded commits of %s, tips %s: they are preserved in bundle %s, whose record lists advertised tips %s; an advertised tip may already be landed.' \
+    "$ID" "$2" "$1" "$3"
+}
+
+# Prints the id of an open task held for the captain whose hold reason names
+# <bundle> and every <tip>. Returns 1 when none does, and 2 when the held rows
+# cannot be read completely.
+teardown_bundle_captain_call() {  # <bundle> <tip>...
+  local listed
+  listed=$(fm_backlog_row_list "$DATA" --state held --fields hold_kind,hold_reason 2>/dev/null) || return 2
+  printf '%s\n' "$listed" | fm_hold_reason_decode_stream toon | perl -MJSON::PP -e '
+    use strict;
+    use warnings;
+    my ($bundle, @tips) = @ARGV;
+    my $json = JSON::PP->new->allow_nonref;
+    my (@names, $count, $declared, $match);
+    my $parsed = 0;
+    while (my $line = <STDIN>) {
+      chomp $line;
+      if ($line =~ /^count: (\d+)$/) { $count = $1; next; }
+      if ($line =~ /^tasks\[(\d+)\]\{([^}]*)\}:$/) { $declared = $1; @names = split /,/, $2; next; }
+      if ($line !~ /^  (.*)$/) { @names = (); next; }
+      next unless @names;
+      my @fields = $1 =~ /("(?:[^"\\]|\\.)*"|[^,]+)/g;
+      exit 2 unless @fields == @names;
+      $parsed++;
+      my %row;
+      @row{@names} = map { /^"/ ? $json->decode($_) : $_ } @fields;
+      next if ($row{state} // "") eq "done" || ($row{hold_kind} // "") ne "captain";
+      my $reason = $row{hold_reason} // "";
+      next if index($reason, $bundle) < 0 || grep { index($reason, $_) < 0 } @tips;
+      $match //= $row{id};
+    }
+    exit 2 unless defined $count && $parsed == $count && (!defined $declared || $declared == $parsed);
+    exit 1 unless defined $match;
+    print "$match\n";
+  ' "$@"
+}
+
+# The bundle route requires the captain's land-or-drop call to be filed: this
+# task's row is held for the captain, and an open captain-held task's reason
+# names the bundle and every recorded tip. Teardown never files it.
+teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-tips>
+  local call rc=0 reason held=0
+  [ "${TEARDOWN_BACKLOG_TRANSITION:-close}" != retain ] || held=1
+  # shellcheck disable=SC2086 # Recorded tips are full hex object names.
+  call=$(teardown_bundle_captain_call "$1" $3) || rc=$?
+  if [ "$rc" = 0 ] && [ "$held" = 1 ]; then
+    echo "teardown: the captain's land-or-drop call for bundle $1 is held on task $call" >&2
+    return 0
+  fi
+  if [ "$rc" -ge 2 ]; then
+    teardown_bundle_refuse "$1: the captain's held calls cannot be read completely"
+    return 1
+  fi
+  reason=$(teardown_bundle_hold_reason "$1" "$2" "$3")
+  if [ "$held" = 1 ]; then
+    teardown_bundle_refuse "$1: task $ID is held for the captain on another question, and no open captain-held task's hold reason names the bundle and every recorded tip"
+    {
+      printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "Land or drop the bundle-preserved commits of $ID" \
+        --origin "$ID" --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  else
+    teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
+    {
+      printf 'Hold it for the captain, then retry ordinary teardown:'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  fi
+  return 1
 }
 
 # The record is exactly one line, so re-bundling replaces it. <ref> itself must
@@ -642,6 +716,7 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
     fi
   fi
   if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
+    teardown_bundle_require_captain_call "$bundle" "$(printf '%s' "$required" | paste -sd ' ' -)" "$tips" || return 1
     echo "teardown: preserved unlanded commits in bundle $bundle sha256=$hash tips=$tips" >&2
     TEARDOWN_BUNDLE_ACCEPTED=$bundle
     return 0

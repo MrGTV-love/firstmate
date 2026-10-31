@@ -102,17 +102,23 @@
 # cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
-# Those commits still go to the captain to land or drop. Before it takes the
-# control lock, an attended teardown whose copy holds locally-only commits that
-# the record claims holds the open backlog row for the captain through
-# bin/fm-captain-hold.sh hold, with a reason naming each recorded tip and the
-# bundle path; a row already held for the captain keeps its own question. The
-# row then takes the captain-held retention described above, recording
+# Those commits still go to the captain to land or drop, so the bundle route
+# also requires the captain's call to be filed already: this task's backlog row
+# must be held for the captain, and an open captain-held task in this home
+# (this row, or a separate one when this row is held on another question) must
+# have a hold reason that names the bundle path and every recorded tip in full.
+# Teardown only reads held rows; it never creates or changes a hold. Without
+# that call it refuses and prints the exact bin/fm-captain-hold.sh hold command,
+# whose reason names the copy's unlanded tips apart from the bundle's recorded
+# advertised tips, since an advertised tip may already be landed. Work that the
+# ordinary landing proof accepts never reaches this requirement. The held row
+# then takes the captain-held retention described above, recording
 # "Deliverable of the finished work: preserved in bundle <bundle path>, not
-# landed", never a PR or "local main". A bundle close for a row that is not
-# held refuses and prints the hold command. A later proof that changes the
-# close's links restages the pending close. bin/fm-landed-lib.sh keeps a row
-# closed on that note out of Recently Landed without marking it a drop.
+# landed", never a PR or "local main". A later proof that changes the close's
+# links restages the pending close. The captain's answer closes the row with no
+# note, and its captain hold kind keeps it out of Recently Landed; a replay
+# that finds the hold already released closes it on the bundle note, which
+# bin/fm-landed-lib.sh keeps out of Recently Landed without marking it a drop.
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute durable bundle path OUTSIDE every copy, pool, state directory and scratch root,
@@ -124,6 +130,9 @@
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
+# then file the captain's call with the command a refusal prints, for example
+#   bin/fm-captain-hold.sh hold "$task" --owner captain \
+#     --reason "Land or drop the unlanded commits of $task: preserved in bundle $bundle, recorded tips $tips."
 # Keep the bundle and record until the preserved commits are no longer needed;
 # data/<task> survives cleanup. Restore into a new repository with
 # git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
@@ -780,6 +789,7 @@ for _teardown_source in \
   fm-path-lib.sh \
   fm-refuse-lib.sh \
   fm-teardown-nested-lib.sh \
+  fm-hold-reason-lib.sh \
   fm-lease-lib.sh
 do
   teardown_require_source "$SCRIPT_DIR/$_teardown_source"
@@ -853,6 +863,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
 . "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
+# shellcheck source=bin/fm-hold-reason-lib.sh
+. "$SCRIPT_DIR/fm-hold-reason-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
 # the two Pi supervision actors; refuse while the OTHER actor holds this
 # task's live lease (contract: bin/fm-lease-lib.sh; no-op in homes without
@@ -1244,35 +1256,6 @@ teardown_release_locks() {
   fm_lease_guard_release || true
   return "$status"
 }
-# A copy whose locally-only commits its recorded bundle claims still leaves the
-# captain a land-or-drop call for them, though the bundle lets the copy go.
-# Hold its open row for that call here, before the control lock, because
-# bin/fm-captain-hold.sh takes that lock itself; inside the lock the held row
-# then takes the captain-held retention instead of a close. An existing captain
-# hold is left as it is, and a later refusal keeps the hold, since the commits
-# are still unlanded.
-teardown_hold_bundle_preserved_row() {
-  local own tip reason
-  [ "$FORCE" != --force ] && [ -z "$DROP_FILE" ] || return 0
-  [ "${TEARDOWN_LOCK_KIND:-}" = ship ] && [ -d "${TEARDOWN_LOCK_WT:-}" ] || return 0
-  [ "$(fm_meta_get "$META" cleanup_recovery)" != orca ] || return 0
-  teardown_bundle_attended && teardown_bundle_record || return 0
-  own=$(printf 'HEAD\n' | teardown_bundle_tips "$TEARDOWN_LOCK_WT") && [ -n "$own" ] || return 0
-  for tip in $own; do
-    case " $TEARDOWN_BUNDLE_RECORD_TIPS " in *" $tip "*) ;; *) return 0 ;; esac
-  done
-  fm_backlog_transition_applies "$CONFIG" "$DATA" ship && fm_backlog_row_probe "$DATA" "$ID" || return 0
-  [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" != captain ] || return 0
-  fm_refuse_if_gate_agent
-  reason=$(teardown_bundle_hold_reason "$TEARDOWN_BUNDLE_RECORD_PATH" "$TEARDOWN_BUNDLE_RECORD_TIPS")
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
-      "$SCRIPT_DIR/fm-captain-hold.sh" hold "$ID" --owner captain --reason "$reason" >/dev/null; then
-    echo "error: task $ID's unlanded commits are preserved only in bundle $TEARDOWN_BUNDLE_RECORD_PATH, but its backlog row could not be held for the captain's land-or-drop call; nothing was changed" >&2
-    exit 1
-  fi
-  echo "teardown: held $ID for the captain: $reason" >&2
-}
-teardown_hold_bundle_preserved_row
 trap teardown_release_locks EXIT
 fm_lock_try_acquire "$CONTROL_LOCK" || {
   echo "error: another lifecycle action is already running for task $ID; nothing was changed" >&2
@@ -3358,17 +3341,6 @@ require_worktree_teardown_safety() {
   exit 1
 }
 
-# A close on a bundle owes the captain the land-or-drop call, so it must be the
-# captain-held retention that the hold placed before the control lock selects,
-# never a close. Checked wherever the close is staged.
-teardown_require_bundle_close_held() {
-  case "${BACKLOG_DONE_ARGS[1]-}" in "preserved in bundle "*) ;; *) return 0 ;; esac
-  [ "$BACKLOG_TRANSITION" != retain ] || return 0
-  echo "REFUSED: task $ID's unlanded commits are preserved only in bundle $TEARDOWN_BUNDLE_PROOF, but its backlog row is not held for the captain's land-or-drop call; its task record stays in place." >&2
-  echo "Hold the row with bin/fm-captain-hold.sh hold $ID --owner captain --reason '$(teardown_bundle_hold_reason "$TEARDOWN_BUNDLE_PROOF" "$TEARDOWN_BUNDLE_RECORD_TIPS")', then retry ordinary teardown." >&2
-  exit 1
-}
-
 # A later proof can admit the removal by another route than the one the staged
 # close records: a reassigned slot's proof, or a bundle recheck of a HEAD that
 # moved after its landing proof. Restage the pending backlog close whenever its
@@ -3383,7 +3355,6 @@ teardown_restage_backlog_close() {
     exit 1
   fi
   [ "$(printf '%s\n' "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}")" != "$staged" ] || return 0
-  teardown_require_bundle_close_held
   if ! fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" \
      || ! fm_backlog_close_marker_stage "$stage" "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
        "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
@@ -6252,7 +6223,6 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID is not replayable; refusing destructive teardown" >&2
     exit 1
   }
-  teardown_require_bundle_close_held
   BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
   if ! fm_backlog_record_parent_authorized "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE" \
      || { { [ -e "$BACKLOG_CLOSE_MARKER" ] || [ -L "$BACKLOG_CLOSE_MARKER" ]; } \
