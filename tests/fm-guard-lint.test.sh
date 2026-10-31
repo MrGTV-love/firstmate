@@ -425,15 +425,36 @@ subprocess.run([EVENT_WRITER, 'allowed-direct', 'allow'])
 subprocess.run(['other-command', 'not-an-event', 'deny'])
 # record('comment', 'deny')
 example = "record('string', 'deny')"
+
+def emit():
+    record('function-fixture', 'deny')
+
+def ordinary(record):
+    record('parameter-data', 'deny')
+    def nested():
+        record('closure-data', 'deny')
+    return nested
+
+def locally_bound():
+    record = lambda *args: None
+    record('local-data', 'deny')
+
+def locally_imported():
+    from unrelated import record
+    record('imported-data', 'deny')
+
+shadowed_lambda = lambda record: record('lambda-data', 'deny')
+shadowed_comprehension = [record('comprehension-data', 'deny') for record in callbacks]
 PY
 assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
-[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 3 ] \
-  || fail "only conditional, keyword and direct deny calls may be sites: $(site_ids "$SIG")"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 4 ] \
+  || fail "only conditional, keyword, direct and unshadowed function deny calls may be sites: $(site_ids "$SIG")"
 mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
   {"file":"bin/a.py","match":"record(guard="},
-  {"file":"bin/a.py","match":"subprocess.run(["}]'
-assert_mapped "Python event sites can be mapped without counting forwarding or allow calls" "$SIG" 3
+  {"file":"bin/a.py","match":"subprocess.run(["},
+  {"file":"bin/a.py","match":"record('\''function-fixture'\''"}]'
+assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 4
 
 SIG=$(fixture sig_python_unbound_record)
 cat >"$SIG/bin/a.py" <<'PY'

@@ -23,6 +23,7 @@ import json
 import os
 import re
 import subprocess
+import symtable
 import sys
 
 DEFAULT_DIRS = ('bin', '.claude', '.codex', '.cursor', '.dsh', '.grok', '.omp', '.opencode', '.pi')
@@ -291,7 +292,9 @@ def python_event_lines(lines):
     functions named record. Never execute the scanned module.
     """
     try:
-        tree = ast.parse('\n'.join(lines))
+        source = '\n'.join(lines)
+        tree = ast.parse(source)
+        module_table = symtable.symtable(source, '<guard-scan>', 'exec')
     except SyntaxError:
         return set()  # Other signatures still scan incomplete or older Python syntax.
     bindings = {node.targets[0].id: node.value for node in tree.body
@@ -335,10 +338,44 @@ def python_event_lines(lines):
             if isinstance(decision, ast.Name) and decision.id in parameters:
                 wrappers[function.name] = (parameters.index(decision.id), decision.id)
                 forwarded.add(node.lineno)
+    # A matching spelling is not enough: a parameter, local import or closure
+    # can bind record to ordinary data even beside the real module wrapper.
+    tables = {}
+
+    def collect_tables(table):
+        tables.setdefault((table.get_lineno(), table.get_name()), []).append(table)
+        for child in table.get_children():
+            collect_tables(child)
+
+    collect_tables(module_table)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    expression_scopes = {ast.Lambda: 'lambda', ast.ListComp: 'listcomp',
+                         ast.SetComp: 'setcomp', ast.DictComp: 'dictcomp',
+                         ast.GeneratorExp: 'genexpr'}
+
+    def module_wrapper(node):
+        scope = parents.get(node)
+        table = module_table
+        while scope is not None:
+            name = (scope.name if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                    else expression_scopes.get(type(scope)))
+            if name is not None:
+                candidates = tables.get((scope.lineno, name), [])
+                if len(candidates) != 1:
+                    return False  # Ambiguous same-line scopes are not proven wrapper calls.
+                table = candidates[0]
+                break
+            scope = parents.get(scope)
+        try:
+            return table.lookup(node.func.id).is_global()
+        except KeyError:
+            return False
+
     sites = set()
     for node in ast.walk(tree):
         decision = event_decision(node)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in wrappers:
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in wrappers and module_wrapper(node)):
             index, name = wrappers[node.func.id]
             decision = (node.args[index] if len(node.args) > index else
                         next((kw.value for kw in node.keywords if kw.arg == name), None))
