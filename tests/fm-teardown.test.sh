@@ -3174,7 +3174,7 @@ test_bundle_close_note_is_not_removal_authority() {
   make_bundle_copy_case bundle-note-only
   case_dir=$NESTED_CASE
   seed_backlog_in_flight "$case_dir"
-  tasks-axi done task-x1 --note "preserved in bundle $BUNDLE_PATH, not landed" \
+  tasks-axi 'done' task-x1 --note "preserved in bundle $BUNDLE_PATH, not landed" \
     --file "$case_dir/data/backlog.md" >/dev/null || fail 'cannot record the bookkeeping note'
   rm "$case_dir/data/task-x1/preservation-bundles.tsv"
   rc=0
