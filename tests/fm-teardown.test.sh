@@ -3310,7 +3310,7 @@ test_bundle_route_requires_the_captains_call() {
       -e 's/^File the land-or-drop call as its row, then retry ordinary teardown: //p' "$case_dir/stderr")
     [ -n "$command" ] || fail "bundle-call-$shape: no hold command printed: $(cat "$case_dir/stderr")"
     if [ "$shape" = absent ]; then
-      [[ "$command" == 'bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --owner captain --reason '* ]] \
+      [[ "$command" == 'bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason '* ]] \
         || fail "bundle-call-$shape: the command is not the single hold-with-title form: $command"
       [[ "$command" != *'&&'* && "$command" != *fm-tasks-axi.sh* ]] \
         || fail "bundle-call-$shape: the command chains another step: $command"
@@ -3338,6 +3338,8 @@ test_bundle_route_requires_the_captains_call() {
       || fail "bundle-call-$shape: the call $id did not stay open and held"
     tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
       || fail "bundle-call-$shape: the work row did not stay held"
+    [ "$shape" != absent ] || tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  repo: *project$' \
+      || fail "bundle-call-$shape: the filed call row lost the ship's project: $(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md")"
     [ "$shape" != other-question ] || assert_grep 'Merge PR 7 now?' "$case_dir/backlog.decoded" \
       "bundle-call-$shape: the row's own question was replaced"
   done

@@ -618,6 +618,7 @@ teardown_bundle_captain_call() {  # <bundle> <tip>...
 # row cannot be held; neither prints a command that could not pass.
 teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-tips>
   local call rc=0 reason held=0 title
+  local -a repo=()
   if [ "${TEARDOWN_BACKLOG_APPLIES:-0}" != 1 ]; then
     teardown_bundle_refuse "$1: no backlog row can hold the captain's land-or-drop call in this home"
     return 1
@@ -655,10 +656,11 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
       printf '\n'
     } >&2
   elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+    [ -z "${PROJ:-}" ] || repo=(--repo "${PROJ##*/}")
     teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
     {
       printf 'File the land-or-drop call as its row, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" --owner captain --reason "$reason"
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason"
       printf '\n'
     } >&2
   else
