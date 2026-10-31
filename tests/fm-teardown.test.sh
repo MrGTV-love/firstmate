@@ -3307,11 +3307,13 @@ test_bundle_route_requires_the_captains_call() {
     cmp -s "$case_dir/backlog.before" "$case_dir/data/backlog.md" || fail "bundle-call-$shape: teardown changed the backlog"
     command=$(sed -n -e 's/^Hold it for the captain, then retry ordinary teardown: //p' \
       -e 's/^File the land-or-drop call as its own task, then retry ordinary teardown: //p' \
-      -e 's/^Add its row and hold it for the captain, then retry ordinary teardown: //p' "$case_dir/stderr")
+      -e 's/^File the land-or-drop call as its row, then retry ordinary teardown: //p' "$case_dir/stderr")
     [ -n "$command" ] || fail "bundle-call-$shape: no hold command printed: $(cat "$case_dir/stderr")"
     if [ "$shape" = absent ]; then
-      [[ "$command" == "bin/fm-tasks-axi.sh add task-x1 "*" && bin/fm-captain-hold.sh hold task-x1 "* ]] \
-        || fail "bundle-call-$shape: the command does not add then hold the row: $command"
+      [[ "$command" == 'bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --owner captain --reason '* ]] \
+        || fail "bundle-call-$shape: the command is not the single hold-with-title form: $command"
+      [[ "$command" != *'&&'* && "$command" != *fm-tasks-axi.sh* ]] \
+        || fail "bundle-call-$shape: the command chains another step: $command"
     else
       [[ "$command" == "bin/fm-captain-hold.sh hold $id "* ]] || fail "bundle-call-$shape: the command holds the wrong task: $command"
     fi

@@ -109,7 +109,7 @@
 # have a hold reason that names the bundle path and every recorded tip in full.
 # Teardown only reads held rows; it never creates or changes a hold. Without
 # that call it refuses and prints the exact bin/fm-captain-hold.sh hold command
-# (preceded by bin/fm-tasks-axi.sh add when the task has no row), whose reason
+# (with --title when the task has no row, so it files a captain-kind row), whose reason
 # names the copy's unlanded tips apart from the bundle's recorded advertised
 # tips, since an advertised tip may already be landed. A home whose backlog
 # transition does not apply (Orca cleanup recovery or a manual backlog) has no
