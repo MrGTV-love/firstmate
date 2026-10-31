@@ -134,3 +134,283 @@ assert (report["reason"] is None) == (report["status"] == "OK"), report
 assert isinstance(report["top_processes"], list), report
 PY
 echo "ok - fm-mem-guard.sh wrapper --json --check exits 0 with a pass verdict"
+
+# Exercise the real shell entrypoint, append-only records, and existing wake
+# queue with native-command fixtures. Existing work is a real live child.
+python3 - "$SCRIPT_DIR/../bin/fm-mem-guard.sh" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+wrapper = str(Path(sys.argv[1]).resolve())
+gib = 1024 ** 3
+if sys.platform == "darwin":
+    with tempfile.TemporaryDirectory(prefix="fm-memory-ownership-") as temp:
+        fleet_home = (Path(temp)/"home").resolve()
+        outside = (Path(temp)/"home-unrelated").resolve()
+        fleet_home.mkdir(); outside.mkdir()
+        clean = dict(os.environ)
+        for key in ("FM_TASK_ID", "FM_TASK_INBOX", "FM_MEMORY_FLEET_ROOT"):
+            clean.pop(key,None)
+        children = []
+        try:
+            for cwd, extra in ((fleet_home,{}),(outside,{}),
+                    (outside,{"FM_TASK_ID":"owned", "FM_TASK_INBOX":str(fleet_home/"state/owned.inbox")})):
+                children.append(subprocess.Popen([sys.executable,"-c","import time; time.sleep(120)"],
+                                                cwd=cwd,env={**clean,**extra}))
+            result = subprocess.run([sys.executable,str(Path(wrapper).with_name("fm-proc-info.py")),"memory"],
+                                    capture_output=True,text=True,check=True,
+                                    env={**clean,"FM_MEMORY_FLEET_ROOT":str(fleet_home)})
+            by_pid = {row["pid"]:row for row in json.loads(result.stdout)}
+            assert [by_pid[child.pid]["fleet"] for child in children] == [True,False,True], by_pid
+            assert all("cwd" not in by_pid[child.pid] for child in children)
+            print("ok - actual native census independently attributes kernel home cwd and paired markers without claiming a sibling-prefix process")
+        finally:
+            for child in children:
+                child.terminate(); child.wait()
+else:
+    print("skip - native kernel fleet attribution requires macOS; portable alarm/ancestry fixtures still run")
+with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
+    home = Path(temp)
+    fixture = home / "native"
+    fixture.mkdir()
+    env = {**os.environ, "FM_HOME":str(home), "FM_ROOT_OVERRIDE":"",
+           "FM_STATE_OVERRIDE":"", "FM_MEMORY_FIXTURE_DIR":str(fixture)}
+    state = home / "state"
+    daemon = {"pid":101, "ppid":1, "comm":"xprotectd", "started":"start-101",
+              "rss_bytes":gib, "fleet":False, "run":None}
+    fleet = {"pid":201, "ppid":1, "comm":"node", "started":"start-201",
+             "rss_bytes":6*gib, "fleet":True, "run":None}
+    child = {"pid":202, "ppid":201, "comm":"python3", "started":"start-202",
+             "rss_bytes":5*gib, "fleet":False, "run":None}
+
+    def facts(pressure=1, rss=None, total=32*gib, available=8*gib):
+        (fixture / "sysctl").write_text(f"{total}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
+        (fixture / "vm_stat").write_text(
+            "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+            "Pages free: 1000.\nPages speculative: 100.\n"
+            f"Anonymous pages: 1048576.\nFile-backed pages: {available//16384 - 1100}.\n"
+            "Pages purgeable: 100.\nPages occupied by compressor: 32768.\n")
+        rows = [dict(daemon), dict(fleet), dict(child)] if rss is None else rss
+        (fixture / "processes.json").write_text(json.dumps(rows))
+
+    def call(mode, *args, code=0, environ=None):
+        result = subprocess.run(["bash",wrapper,mode,*args],capture_output=True,text=True,env=environ or env)
+        assert result.returncode == code, (mode,result.returncode,result.stdout,result.stderr)
+        return json.loads(result.stdout) if result.stdout else None
+
+    def queue(where=state):
+        path = where / ".wake-queue"
+        return path.read_text() if path.exists() else ""
+
+    def rows(key, where=state):
+        return queue(where).count(f"\t{key}\t")
+
+    facts()
+    report = call("baseline",code=75)
+    assert any("at least two probe readings" in r and "has 0" in r for r in report["reasons"]), report
+    assert not (state / ".memory-baseline.json").exists()
+    report = call("admit")
+    assert report["admission"] == "admit" and report["baseline"] is None
+    assert "no baseline" in report["calibration"] and "no calibration" in report["headroom_calibration"], report
+    assert report["headroom"] is None and report["available_bytes"] == 8*gib and queue() == ""
+    call("probe")
+    call("probe")
+    assert rows("memory-health-uncalibrated") == 1 and "admission is unaffected" in queue()
+    # A confined worker's admission cannot read other users' RSS, so its lower
+    # maximum must neither fake spread nor lower the episode floor.
+    facts(rss=[{**daemon,"rss_bytes":gib//4},dict(fleet),dict(child)])
+    call("admit")
+    call("sample")
+    facts()
+    report = call("baseline",code=75)
+    assert any("varies" in r and "all 2" in r for r in report["reasons"]), report
+    assert not (state / ".memory-baseline.json").exists()
+    facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
+    call("probe")
+    facts()
+    baseline = call("baseline")["baseline"]
+    assert baseline["non_fleet_max_bytes"] == gib and baseline["smallest_reading_max_bytes"] == gib//2, baseline
+    assert baseline["samples"] == 3 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
+    report = call("admit")
+    assert report["anonymous_bytes"] == 16*gib and report["compressor_bytes"] == gib//2
+    assert report["unused_bytes"] == 1100*16384 and report["swap_used_bytes"] > 0
+    assert report["alarms"] == [] and report["calibration"] is None  # equality does not alarm
+    original = (state / ".memory-baseline.json").read_bytes()
+    call("baseline",code=75)
+    assert (state / ".memory-baseline.json").read_bytes() == original
+    print("ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs varying root probe readings, ignores confined admission samples and never silently grows")
+
+    worker = subprocess.Popen(["sleep","120"])
+    try:
+        ran = home / "new-run"
+        # This represents the actual new-run entrypoint; its work must not start
+        # on pressure, while an already running process must remain alive.
+        launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
+        call("run",*launch)
+        assert ran.exists()
+        ran.unlink()
+        facts(pressure=2)
+        call("run",*launch,code=75)
+        assert not ran.exists() and worker.poll() is None
+        facts(pressure=4)
+        call("admit",code=75)
+        facts(pressure=0)
+        report = call("admit",code=75)
+        assert any("unexpected native pressure level 0" in e for e in report["errors"]), report
+        assert worker.poll() is None
+        print("ok - real run-start exec admits healthy work, refuses pressure 2/4 and an unreadable level with 75 and preserves existing work")
+    finally:
+        worker.terminate()
+        worker.wait()
+
+    facts()
+    call("probe")
+    before = rows("memory-health")
+    facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
+    report = call("probe")
+    assert len(report["alarms"]) == 1 and report["alarms"][0]["pid"] == 101
+    assert rows("memory-health") == before+1
+    assert "xprotectd PID 101" in queue() and "across 3 healthy readings" in queue()
+    assert "restarting any system daemon requires" in queue()
+    facts(rss=[{**daemon,"pid":102,"started":"start-102","rss_bytes":gib+2},dict(fleet),dict(child)])
+    call("probe")
+    facts(rss=[{**daemon,"rss_bytes":gib*3//4},dict(fleet),dict(child)])
+    assert call("probe")["alarm_hold"] == ["xprotectd"]
+    facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
+    call("probe")
+    assert rows("memory-health") == before+1
+    facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
+    call("probe")
+    facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
+    call("probe")
+    assert rows("memory-health") == before+2
+    print("ok - a named non-fleet outlier wakes once per episode, held until it falls to the low end of measured healthy variation; fleet children never masquerade as leaks")
+
+    facts()
+    (fixture / "vm_stat").unlink()
+    report = call("admit",code=75)
+    assert report["errors"] and "anonymous_bytes" not in report and report["admission"] == "defer"
+    assert report["calibration"] == "not judged: this reading has errors", report
+    uncalibrated = rows("memory-health-uncalibrated")
+    call("probe")
+    assert "admission measurements are unavailable (memory:" in queue()
+    assert rows("memory-health-uncalibrated") == uncalibrated
+    facts()
+    (fixture / "processes.json").write_text('[{"pid":101,"rss_bytes":"unknown"}]')
+    report = call("admit",code=75)
+    assert any("processes:" in e for e in report["errors"])
+    facts()
+    (state / ".memory-baseline.json").write_text('{"invalid":true}')
+    report = call("admit")
+    assert "unusable" in report["calibration"] and report["admission"] == "admit"
+    (state / ".memory-baseline.json").write_text(json.dumps({**baseline, "smallest_reading_max_bytes":gib}))
+    report = call("admit")
+    assert "no spread" in report["calibration"] and report["alarms"] == []
+    (state / ".memory-baseline.json").write_text(json.dumps({**baseline, "host":"other-host"}))
+    report = call("admit")
+    assert "not host" in report["calibration"] and report["admission"] == "admit"
+    replaced = call("baseline")["baseline"]
+    assert replaced["host"] == report["host"] and replaced["samples"] > baseline["samples"]
+    records = [json.loads(line) for line in (state / "memory-readings.jsonl").read_text().splitlines()]
+    assert all(row["fixture"] == str(fixture) for row in records)
+    assert any(row["source"] == "probe" and row["alarms"] for row in records)
+    print("ok - unreadable facts fail closed and judge no calibration; an unusable or other-host baseline only reports calibration and is replaced; every observation is parseable JSONL")
+
+    # A local secondmate home (and any confined worker in it) records only its
+    # own admission readings and reads the root's baseline; the root alone probes.
+    sub = home / "secondmate"
+    (sub / "state").mkdir(parents=True)
+    (sub / ".fm-secondmate-parent").write_text(f"schema=fm-secondmate-parent.v1\nroute=local\nparent_home={home}\n")
+    sub_env = {**env, "FM_HOME":str(sub)}
+    root_queue, root_readings = queue(), (state / "memory-readings.jsonl").read_bytes()
+    facts(rss=[{**daemon,"rss_bytes":2*gib},dict(fleet),dict(child)])
+    report = call("admit",environ=sub_env)
+    assert report["baseline"]["host"] == replaced["host"] and report["alarms"][0]["pid"] == 101
+    assert call("probe",environ=sub_env) is None
+    assert queue() == root_queue and (state / "memory-readings.jsonl").read_bytes() == root_readings
+    assert sorted(path.name for path in (sub / "state").iterdir()) == ["memory-readings.jsonl"]
+    assert json.loads((sub / "state/memory-readings.jsonl").read_text())["source"] == "admit"
+    print("ok - a secondmate home records only its own admission reading; periodic probes and alarms belong to the root home")
+
+    # Run records come from real run trees: a task's paired-marker process with
+    # its unattributed descendants, and a no-mistakes run's worktree process.
+    calib = home / "calib"
+    (calib / "state").mkdir(parents=True)
+    calib_env = {**env, "FM_HOME":str(calib)}
+    def run_rows(child_rss):
+        return [dict(daemon),
+                {"pid":401, "ppid":1, "comm":"omp", "started":"s401", "rss_bytes":2*gib, "fleet":True, "run":"task:a"},
+                {"pid":402, "ppid":401, "comm":"bash", "started":"s402", "rss_bytes":child_rss, "fleet":False, "run":None},
+                {"pid":501, "ppid":1, "comm":"claude", "started":"s501", "rss_bytes":gib, "fleet":True, "run":"no-mistakes:repo/r1"}]
+    facts(rss=run_rows(gib), available=20*gib)
+    report = call("probe",environ=calib_env)
+    assert report["runs"] == {"task:a":{"rss_bytes":3*gib,"processes":2,"unreadable":0},
+                              "no-mistakes:repo/r1":{"rss_bytes":gib,"processes":1,"unreadable":0}}, report["runs"]
+    assert "at least two readings" in report["headroom_calibration"] and "pressure 2" in report["headroom_calibration"]
+    facts(rss=run_rows(None), available=20*gib)
+    call("probe",environ=calib_env)
+    facts(rss=run_rows(gib*3//2), available=20*gib)
+    report = call("probe",environ=calib_env)
+    assert "at least two readings" not in report["headroom_calibration"], report
+    facts(pressure=2, rss=run_rows(gib), available=6*gib)
+    report = call("probe",environ=calib_env)
+    assert report["headroom"] == {"run_peak_bytes":gib*7//2, "run":"task:a", "run_samples":4,
+                                  "run_incomplete_samples":1, "runs_measured":2,
+                                  "headroom_bytes":6*gib, "pressured_samples":1}, report["headroom"]
+    record = json.loads((calib / "state/.memory-calibration.json").read_text())
+    assert record["runs"]["task:a"]["first_seen"] < record["runs"]["task:a"]["last_seen"]
+    assert record["runs"]["task:a"]["max_gap_seconds"] > 0 and record["pressured"]["highest_level"] == 2
+    facts(rss=run_rows(gib), available=gib)
+    report = call("admit",environ=calib_env)
+    assert report["reasons"] == [] and report["headroom"]["headroom_bytes"] == 6*gib, report
+    print("ok - probes record each run's resident-tree peak, samples, span, gaps and omissions; the derived peak and margin are shown but never refuse normal-pressure work")
+
+    # Studio fixture from JetsamEvent-2026-10-27-113941.ips (sha256
+    # 907ef8e738586a5434f9884c3f928dcadc8c075711de979db5bc75614684d8f7),
+    # 16384-byte pages. Recorded there: xprotectd 2910176 resident pages; all
+    # listed processes 6586830; the terminal coalition holding the 12 runs
+    # 701024; wired 450714; compressor 440477; 7912 low-swap kills; and
+    # memoryStatus.memoryPages free 4488434, fileBacked 1306749, purgeable
+    # 73987, anonymous 1831731 and speculative 181265. The report does not say
+    # when memoryPages was taken relative to the kills, and those counters give
+    # about 89.6 GiB available by this code's formula, so this fixture does not
+    # use them. It does not record RAM size (128 GiB is from the incident
+    # report), a native pressure level, process parents, run identity, or any
+    # run's peak. So this fixture splits that coalition evenly into 12 runs,
+    # ESTIMATES available memory before the kills as RAM minus all listed
+    # resident, wired and compressor pages (shared pages make that a lower
+    # bound), and represents the kills as level-4 readings. The estimate is not
+    # the report's own available-memory reading, and nothing here is recorded
+    # whole-run telemetry, a calibrated refusal, or live target-host proof.
+    page = 16384
+    studio = home / "studio"
+    (studio / "state").mkdir(parents=True)
+    studio_env = {**env, "FM_HOME":str(studio)}
+    run_bytes = 701024*page//12
+    available = (128*gib//page - 6586830 - 450714 - 440477)*page
+    runs = [{"pid":300+n, "ppid":1, "comm":"no-mistakes", "started":f"start-{300+n}",
+             "rss_bytes":run_bytes, "fleet":True, "run":f"no-mistakes:studio/run-{n}"} for n in range(12)]
+    def studio_facts(pressure=1):
+        facts(pressure=pressure, total=128*gib, available=available,
+              rss=[{**daemon,"rss_bytes":2910176*page}] + [dict(row) for row in runs])
+    studio_facts(pressure=4)
+    call("probe",environ=studio_env)
+    call("probe",environ=studio_env)
+    studio_facts()
+    ran = home / "studio-run"
+    launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
+    report = call("admit",environ=studio_env)
+    assert report["headroom"]["run_peak_bytes"] == run_bytes and report["headroom"]["headroom_bytes"] == available
+    assert report["reasons"] == [], report
+    call("run",*launch,environ=studio_env)
+    assert ran.exists()
+    ran.unlink()
+    studio_facts(pressure=2)
+    call("run",*launch,code=75,environ=studio_env)
+    assert not ran.exists()
+    print("ok - estimated 113941 Studio shape: the margin is recorded and shown but a normal-pressure 13th start is admitted; pressure 2 still refuses")
+PY

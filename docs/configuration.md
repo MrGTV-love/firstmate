@@ -2230,6 +2230,38 @@ When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record,
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 
+## Host memory admission
+
+On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
+Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
+Every fresh spawn, including a new secondmate, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
+An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
+
+Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin, but neither refuses work yet.
+They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
+The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
+These are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+No exhaustion experiment or stress run is needed or recommended; the records come from real work.
+
+The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.
+A reading with unreadable facts judges neither the baseline nor the headroom record, so a transient read failure is reported only as unavailable measurements.
+Only the root local home's watcher runs the periodic probe and publishes memory alarms; every home, including a confined worker's secondmate home, records its own admission readings in its own state and writes no other home's state.
+Before running `baseline` from the root home, let its watcher record readings over a known-healthy representative workload.
+The command derives the alarm boundary only from those root probe readings, never from admission, run-start, `sample` or `baseline` readings, because a confined worker's admission cannot read other users' resident sizes and its lower maximum would fake spread and lower the episode floor; it records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings, or readings whose largest non-fleet resident size never varies, it names that missing input instead of writing a baseline, so the alarm waits for real spread.
+An alarm starts when a non-fleet process exceeds the largest non-fleet resident size observed across those readings, and the episode lasts until that process is at or below the smallest per-reading maximum, the low end of the same measured variation, so a process moving around the boundary wakes once.
+The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+A matching baseline is never silently replaced as usage grows; an invalid baseline, one whose readings show no spread, or one recorded for a different host name or RAM size, is unusable for alarms and is replaced by the next `baseline`.
+The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
+The records contain process identity, run identity and resident size, not process arguments, environment contents or working directories.
+
+Generated worker instructions select the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
+Reattachment and gate responses remain direct so pressure cannot strand running validation.
+This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
+The watcher presents each queued memory row once, naming non-fleet outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
+No memory observation stops existing work or restarts a process.
+Linux retains the existing diagnostic interface; native admission is currently macOS-only.
+
 ## Nested task copy sweep (config/copy-budget)
 
 A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.

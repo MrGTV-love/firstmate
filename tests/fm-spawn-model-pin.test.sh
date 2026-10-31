@@ -337,6 +337,34 @@ test_secondmate_respawn_onto_another_stale_model_is_refused() {
   pass "a secondmate respawn onto a different stale model is still refused and leaves the record unchanged"
 }
 
+# Test 11: host memory admission refuses a NEW secondmate under native pressure,
+# but the respawn of one this home already records is recovery, not new work.
+test_memory_pressure_refuses_a_new_secondmate_but_not_its_respawn() {
+  local out status native
+  make_secondmate_case sm-memory sm-memory-a1
+  native="$CASE_DIR/native"
+  mkdir -p "$native"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  printf '34359738368\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_secondmate_spawn "$CASE_SM" --captain-model-pin "$STALE_MODEL" 2>&1)
+  status=$?
+  [ "$status" -eq 75 ] || fail "native pressure must defer a new secondmate with 75 (got $status)"$'\n'"$out"
+  [ ! -e "$CASE_HOME/state/sm-memory-a1.meta" ] || fail "a deferred secondmate must leave no task record"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_secondmate_spawn "$CASE_SM" --captain-model-pin "$STALE_MODEL" 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "a new secondmate must launch at normal pressure"$'\n'"$out"
+  printf '34359738368\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" run_secondmate_spawn 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "native pressure must not refuse the respawn of a recorded secondmate"$'\n'"$out"
+  [ -s "$CASE_LAUNCH_LOG" ] || fail "the respawn under pressure must reach the pane"
+  pass "native memory pressure defers a new secondmate but never its recovery respawn"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_stale_model_refused_without_pin
@@ -349,3 +377,4 @@ test_relaunch_of_a_model_that_aged_is_not_refused
 test_relaunch_to_another_stale_model_is_still_refused
 test_secondmate_respawn_of_its_recorded_model_is_not_refused
 test_secondmate_respawn_onto_another_stale_model_is_refused
+test_memory_pressure_refuses_a_new_secondmate_but_not_its_respawn

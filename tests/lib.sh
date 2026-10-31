@@ -68,6 +68,13 @@ export FM_MODEL_FRESHNESS=0
 FM_REVIEW_AGENT_SELECT_BIN=$(command -v true)
 export FM_REVIEW_AGENT_SELECT_BIN
 
+# Admission and periodic host observations must not depend on the developer's
+# current workload or write a real home's memory readings. Memory-specific
+# regressions explicitly select the real guard against native-reading fixtures.
+FM_MEMORY_GUARD_BIN=$(command -v true)
+export FM_MEMORY_GUARD_BIN
+unset FM_MEMORY_FIXTURE_DIR
+
 # Stubbed commands are not production timing evidence. Never inherit an
 # operational home's ledger into fixtures; timing-specific cases explicitly
 # select an isolated file after sourcing this helper.
