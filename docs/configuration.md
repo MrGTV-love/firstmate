@@ -112,6 +112,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
+- The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
 
