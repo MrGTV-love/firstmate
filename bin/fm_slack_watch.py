@@ -363,7 +363,7 @@ class Watch:
             self.state['scope_notice'] = flag
             self.commit()
 
-    def card_payload(self, row, card, text_only=False):
+    def card_payload(self, row, card, text_only=False, reactions=True):
         lines = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
         body = parse_fields(lines)
@@ -374,6 +374,7 @@ class Watch:
         parts.update(reason)
         evidence = reason.get('Evidence') or card.get('pr_url') or card.get('report_path') or body.get('Evidence', '')
         usable, missing = self.scope_state()
+        usable = usable and reactions
         fields = [('Task: ', row['id'])]
         structured = any(key != 'Evidence' for key in reason) or any(
             key in body for key in ('Decision sought', 'Brief', 'Alternatives'))
@@ -410,7 +411,7 @@ class Watch:
             footer = ['Type your answer in this thread.']
         if options:
             footer.append('If you both tap and type: disagreement records neither answer.')
-        if not usable:
+        if missing:
             footer.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
         text = '\n'.join([prefix + value for prefix, value in fields] + footer)
         if len(text) <= CARD_LIMIT:
@@ -636,7 +637,8 @@ class Watch:
             text_only = bool(card) and not fresh(generated, identity)
             if text_only:
                 card = {}
-            text, options, usable = self.card_payload(row, card, text_only)
+            text, options, usable = self.card_payload(
+                row, card, text_only, reactions=record.get('reactions', False) if record else True)
             self.scope_notice()
             digest = hashlib.sha256(text.encode()).hexdigest()
             if record and (record.get('options') != options or record.get('text_digest') == digest):

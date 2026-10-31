@@ -3515,6 +3515,7 @@ Only replies inside the card's thread map to that decision; messages typed in th
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
 A persisted text digest avoids repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
+Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
 A changed option set is never applied to an existing card and requires a new hold lifecycle.
 Each mirror pass, including the mirror inside a poll, shares a write budget of `FM_SLACK_POLL_MAX_ANSWERS` across new cards and edits; deferred writes wait for the next pass.
 Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.

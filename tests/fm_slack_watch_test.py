@@ -28,6 +28,7 @@ Usage:
   fm_slack_watch_test.py react <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py unreact <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py set-state <state.json> <field> <value>
+  fm_slack_watch_test.py set-scopes <transcript.json> <comma-separated-scopes>
   fm_slack_watch_test.py journal-line <state.json> <line>
   fm_slack_watch_test.py fail-call <replay-state.json> <method[:ts]> <status> [times]
   fm_slack_watch_test.py clear-fail <replay-state.json> <method[:ts]>
@@ -261,6 +262,8 @@ def main(argv):
         edit(argv[1], lambda data: data.setdefault('outbox', []).append(argv[2]))
     elif command == 'set-state':
         edit(argv[1], lambda data: data.__setitem__(argv[2], argv[3]))
+    elif command == 'set-scopes':
+        edit(argv[1], lambda data: data.__setitem__('scopes', argv[2].split(',')))
     elif command == 'fail-call':
         rule = {'status': int(argv[3])}
         if len(argv) > 4:

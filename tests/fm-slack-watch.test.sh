@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X47.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X48.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1661,5 +1661,35 @@ poll card-payload >/dev/null
 assert_eq "$(outbound_count chat.update "$old_ts")" 0 "X47 replaced card was edited"
 assert_eq "$(python3 "$HELPER" root-count "$(replay_file)" no-options)" 2 "X47 new lifecycle did not get its own card"
 printf 'ok - X47\n'
+
+# X48: granting scopes and re-arming cannot advertise taps that an old thread ignores.
+new_home card-payload
+bind
+cp "$FIX/card-payload/transcript.json" "$TMP/scope-upgrade.json"
+python3 "$HELPER" set-scopes "$TMP/scope-upgrade.json" 'chat:write,im:write,im:history'
+"$ROOT/bin/fm-slack-mirror.sh" --replay "$TMP/scope-upgrade.json" >/dev/null
+ts=$(thread_field with-options ts)
+assert_eq "$(thread_field with-options reactions)" False "X48 initial thread unexpectedly accepted taps"
+python3 "$HELPER" set-scopes "$TMP/scope-upgrade.json" 'chat:write,im:write,im:history,reactions:read,reactions:write,users:read'
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$TMP/scope-upgrade.json" >/dev/null
+sent=$(outbound_count chat.postMessage)
+"$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/scope-upgrade.json" >/dev/null
+card=$(python3 "$HELPER" card-text "$(replay_file)" with-options)
+assert_not_contains "$card" '[Tt]ap .*reaction' "X48 old text-only thread advertised newly available taps"
+assert_not_contains "$card" 'Missing reaction scope:' "X48 obsolete missing-scope warning survived re-arm"
+assert_eq "$(outbound_count chat.update "$ts")" 1 "X48 footer did not refresh on its existing root"
+assert_eq "$(outbound_count chat.postMessage)" "$sent" "X48 scope upgrade posted another card"
+assert_eq "$(thread_field with-options ts)" "$ts" "X48 scope upgrade replaced the thread"
+assert_eq "$(thread_field with-options reactions)" False "X48 scope upgrade changed recorded capability"
+assert_eq "$(python3 "$HELPER" reaction-count "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" "$ts")" 0 "X48 refresh seeded new reactions"
+python3 "$HELPER" react "$(replay_file)" "$ts" two U0TESTOWNER
+out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/scope-upgrade.json")
+assert_eq "$(closed_count "$out")" 0 "X48 old text-only thread accepted a new tap"
+assert_open with-options 0 "X48 tap closed the text-only call"
+reply_to "$ts" 900.000099 2
+out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/scope-upgrade.json")
+assert_contains "$out" 'closed: with-options' "X48 advertised typed answer did not close the call"
+assert_eq "$(answer_line with-options)" wait "X48 typed option no longer mapped to its value"
+printf 'ok - X48\n'
 
 printf 'ok - all Slack watch checks\n'

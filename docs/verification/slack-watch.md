@@ -243,7 +243,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
-## X44..X47 - current-card refresh
+## X44..X48 - current-card refresh
 
 The in-place edit contract is owned by [Slack decision plane](../configuration.md#slack-decision-plane-env).
 These replay cases use the public mirror and poll commands with disposable task homes; they do not inspect the real DM.
@@ -257,6 +257,7 @@ No live Slack check was performed for this change.
 - X45 checks that changing the option set leaves the original text and answer bindings unchanged and posts nothing.
 - X46 checks pre-digest layout migration in place with a one-write poll budget, followed by an unchanged restart and no new cards.
 - X47 checks that retired and replaced threads are never edited and that only a genuinely new hold lifecycle creates another card.
+- X48 checks a card created without reaction scopes, then re-armed after those scopes are granted: the same root loses its obsolete scope warning but never advertises unsupported taps or changes its recorded capability; a tap leaves the call open and typing its option number still records the expected value.
 
 ## X1..X43 - review-round regressions
 
