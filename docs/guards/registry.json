@@ -582,7 +582,13 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [],
+      "exemptions": [
+        {
+          "case": "a verified bundle holds the copy's unlanded commits",
+          "derivation": "the recorded bundle passes digest, git bundle verify, advertised-tip and isolated fsck --strict restore proofs in attended teardown, so removing the copy discards no commit",
+          "demotion": "captain-held land-or-drop call naming the bundle and every recorded tip"
+        }
+      ],
       "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
@@ -590,7 +596,8 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4}
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14}
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",
