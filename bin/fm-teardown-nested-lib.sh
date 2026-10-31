@@ -612,9 +612,17 @@ teardown_bundle_captain_call() {  # <bundle> <tip>...
 
 # The bundle route requires the captain's land-or-drop call to be filed: this
 # task's row is held for the captain, and an open captain-held task's reason
-# names the bundle and every recorded tip. Teardown never files it.
+# names the bundle and every recorded tip. Teardown never files it. A home whose
+# backlog transition does not apply (Orca cleanup recovery or a manual backlog)
+# has no row that can hold the call, so the route refuses there, and a closed
+# row cannot be held; neither prints a command that could not pass.
 teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-tips>
-  local call rc=0 reason held=0
+  local call rc=0 reason held=0 title
+  local -a repo=()
+  if [ "${TEARDOWN_BACKLOG_APPLIES:-0}" != 1 ]; then
+    teardown_bundle_refuse "$1: no backlog row can hold the captain's land-or-drop call in this home"
+    return 1
+  fi
   [ "${TEARDOWN_BACKLOG_TRANSITION:-close}" != retain ] || held=1
   # shellcheck disable=SC2086 # Recorded tips are full hex object names.
   call=$(teardown_bundle_captain_call "$1" $3) || rc=$?
@@ -627,21 +635,38 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     return 1
   fi
   reason=$(teardown_bundle_hold_reason "$1" "$2" "$3")
+  title="Land or drop the bundle-preserved commits of $ID"
   if [ "$held" = 1 ]; then
     teardown_bundle_refuse "$1: task $ID is held for the captain on another question, and no open captain-held task's hold reason names the bundle and every recorded tip"
     {
       printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
-      printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "Land or drop the bundle-preserved commits of $ID" \
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "$title" \
         --origin "$ID" --owner captain --reason "$reason"
       printf '\n'
     } >&2
-  else
+  elif fm_backlog_row_probe "$DATA" "$ID"; then
+    if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
+      teardown_bundle_refuse "$1: task $ID's backlog row is closed, so it cannot hold the captain's land-or-drop call"
+      return 1
+    fi
     teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
     {
       printf 'Hold it for the captain, then retry ordinary teardown:'
       printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
       printf '\n'
     } >&2
+  elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+    [ -z "${PROJ:-}" ] || repo=(--repo "${PROJ##*/}")
+    teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
+    {
+      printf 'Add its row and hold it for the captain, then retry ordinary teardown:'
+      printf ' %q' bin/fm-tasks-axi.sh add "$ID" "$title" --kind ship ${repo[@]+"${repo[@]}"}
+      printf ' &&'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  else
+    teardown_bundle_refuse "$1: task $ID's backlog row cannot be read"
   fi
   return 1
 }

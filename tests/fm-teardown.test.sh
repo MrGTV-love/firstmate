@@ -3277,7 +3277,7 @@ test_bundle_kept_ship_records_no_landing_in_the_ledger() {
 # and the call is a separate held task.
 test_bundle_route_requires_the_captains_call() {
   local shape case_dir rc command head tips tip id
-  for shape in unheld other-question; do
+  for shape in unheld other-question absent; do
     make_bundle_copy_case "bundle-call-$shape"
     case_dir=$NESTED_CASE
     head=$(git -C "$NESTED_COPY" rev-parse HEAD)
@@ -3292,6 +3292,10 @@ test_bundle_route_requires_the_captains_call() {
           || fail 'cannot hold the row on another question'
         id=task-x1-bundle
         ;;
+      absent)
+        printf '%s\n' '# Backlog' '' '## In flight' '' '## Queued' '' '## Done' > "$case_dir/data/backlog.md"
+        id=task-x1
+        ;;
     esac
     cp "$case_dir/data/backlog.md" "$case_dir/backlog.before"
     rc=0
@@ -3302,9 +3306,15 @@ test_bundle_route_requires_the_captains_call() {
     assert_present "$case_dir/state/task-x1.meta" "bundle-call-$shape: task record was removed"
     cmp -s "$case_dir/backlog.before" "$case_dir/data/backlog.md" || fail "bundle-call-$shape: teardown changed the backlog"
     command=$(sed -n -e 's/^Hold it for the captain, then retry ordinary teardown: //p' \
-      -e 's/^File the land-or-drop call as its own task, then retry ordinary teardown: //p' "$case_dir/stderr")
+      -e 's/^File the land-or-drop call as its own task, then retry ordinary teardown: //p' \
+      -e 's/^Add its row and hold it for the captain, then retry ordinary teardown: //p' "$case_dir/stderr")
     [ -n "$command" ] || fail "bundle-call-$shape: no hold command printed: $(cat "$case_dir/stderr")"
-    [[ "$command" == "bin/fm-captain-hold.sh hold $id "* ]] || fail "bundle-call-$shape: the command holds the wrong task: $command"
+    if [ "$shape" = absent ]; then
+      [[ "$command" == "bin/fm-tasks-axi.sh add task-x1 "*" && bin/fm-captain-hold.sh hold task-x1 "* ]] \
+        || fail "bundle-call-$shape: the command does not add then hold the row: $command"
+    else
+      [[ "$command" == "bin/fm-captain-hold.sh hold $id "* ]] || fail "bundle-call-$shape: the command holds the wrong task: $command"
+    fi
     (
       cd "$ROOT"
       export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
@@ -3330,6 +3340,32 @@ test_bundle_route_requires_the_captains_call() {
       "bundle-call-$shape: the row's own question was replaced"
   done
   pass 'the bundle route refuses until the captain'"'"'s land-or-drop call is held, prints the command that files it, and passes once it is'
+}
+
+# A home whose backlog transition does not apply has no row that can hold the
+# captain's call: the bundle route refuses there and prints no command that
+# could not pass.
+test_bundle_route_refuses_where_no_row_can_hold_the_call() {
+  local shape case_dir rc
+  for shape in manual orca; do
+    make_bundle_copy_case "bundle-no-row-$shape"
+    case_dir=$NESTED_CASE
+    case "$shape" in
+      manual) printf 'manual\n' > "$case_dir/config/backlog-backend" ;;
+      orca) printf 'cleanup_recovery=orca\n' >> "$case_dir/state/task-x1.meta" ;;
+    esac
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "bundle-no-row-$shape: the bundle route must refuse: $(cat "$case_dir/stderr")"
+    assert_grep "no backlog row can hold the captain's land-or-drop call in this home" "$case_dir/stderr" \
+      "bundle-no-row-$shape: the refusal does not name the missing row"
+    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-no-row-$shape: original refusal changed"
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-$shape: a hold command that cannot pass was printed"
+    assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-$shape: an add command that cannot pass was printed"
+    assert_present "$NESTED_COPY/work.txt" "bundle-no-row-$shape: copy was removed"
+    assert_present "$case_dir/state/task-x1.meta" "bundle-no-row-$shape: task record was removed"
+  done
+  pass 'the bundle route refuses in a manual-backlog home and an Orca cleanup recovery, printing no command that cannot pass'
 }
 
 # Work the ordinary landing proof accepts never needs the captain's call, even
@@ -3656,6 +3692,7 @@ test_bundle_close_note_is_not_removal_authority
 test_bundle_kept_ship_keeps_its_row_held_for_the_captain
 test_bundle_kept_ship_records_no_landing_in_the_ledger
 test_bundle_route_requires_the_captains_call
+test_bundle_route_refuses_where_no_row_can_hold_the_call
 test_landed_work_never_needs_the_captains_call
 test_bundle_hint_needs_unlanded_tips
 test_bundle_needs_the_copys_own_unlanded_tip

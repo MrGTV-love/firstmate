@@ -108,9 +108,13 @@
 # (this row, or a separate one when this row is held on another question) must
 # have a hold reason that names the bundle path and every recorded tip in full.
 # Teardown only reads held rows; it never creates or changes a hold. Without
-# that call it refuses and prints the exact bin/fm-captain-hold.sh hold command,
-# whose reason names the copy's unlanded tips apart from the bundle's recorded
-# advertised tips, since an advertised tip may already be landed. Work that the
+# that call it refuses and prints the exact bin/fm-captain-hold.sh hold command
+# (preceded by bin/fm-tasks-axi.sh add when the task has no row), whose reason
+# names the copy's unlanded tips apart from the bundle's recorded advertised
+# tips, since an advertised tip may already be landed. A home whose backlog
+# transition does not apply (Orca cleanup recovery or a manual backlog) has no
+# row that can hold the call, and a closed row cannot be held, so the route
+# refuses there with that predicate and no command. Work that the
 # ordinary landing proof accepts never reaches this requirement. The held row
 # then takes the captain-held retention described above, recording
 # "Deliverable of the finished work: preserved in bundle <bundle path>, not
