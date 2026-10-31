@@ -29,15 +29,17 @@
 # Merged PRs and reported scouts remain distinct.
 #
 # A row closed by a captain's drop carries the fixed note "dropped" and is never
-# a delivery, whatever other links it retains. A ship row closed because only a
-# verified bundle holds its commits carries the note "preserved in bundle
-# <path>, not landed" and no artifact; bin/fm-fleet-snapshot.sh marks it
-# captain_drop too, so it is never listed as landed either. That mark needs a
-# Done row with no PR or report and the note as its last body line. Restarting
-# the row through bin/fm-backlog-transition-lib.sh retires the note to
-# "Historical preserved in bundle ...", as it retires "dropped", so a restarted
-# row is not marked while it runs, nor once it is closed again with a PR, a
-# report, another note or no flag.
+# a delivery, whatever other links it retains. A ship row whose commits only a
+# verified bundle holds is not a drop either: teardown keeps it open and held
+# for the captain's land-or-drop call, and a row that call or a replay closes on
+# that bundle carries the note "preserved in bundle <path>, not landed" and no
+# artifact. bundle_not_landed keeps such a row out of Recently Landed without
+# marking it captain_drop, so nothing reads it as the captain's decision. The
+# check needs a Done row with no PR or report and the note as its last body
+# line. Restarting the row through bin/fm-backlog-transition-lib.sh retires the
+# note to "Historical preserved in bundle ...", as it retires "dropped", so a
+# row closed again with a PR, a report, another note or no flag is judged on
+# that close.
 # The backlog-selection compatibility fallback keeps a structured Done row
 # whose three parsed artifact fields are absent when it does not retain
 # hold-kind captain.
@@ -65,8 +67,13 @@ FM_LANDED_JQ_DEFS='
   # compatibility fallback and renders as shipped work with an empty artifact.
   # Pinned by tests/fm-captain-hold-cleanup.test.sh on "released, retained, or
   # rejected deliveries were misclassified".
+  def bundle_not_landed:
+    .state == "done"
+    and (((.body_lines // [])[-1] // "") | startswith("preserved in bundle /") and endswith(", not landed"))
+    and (.pr_url // null) == null and (.report_path // null) == null;
   def landed_delivery:
     (.captain_drop // false) == false
+    and (bundle_not_landed | not)
     and (scout_report
     or (.kind != "scout"
       and .kind != "captain"
@@ -81,6 +88,7 @@ FM_LANDED_JQ_DEFS='
   def landed_record:
     .state == "done" and .structured
     and (.captain_drop // false) == false
+    and (bundle_not_landed | not)
     and (landed_delivery
       or (.kind != "scout"
         and .kind != "captain"

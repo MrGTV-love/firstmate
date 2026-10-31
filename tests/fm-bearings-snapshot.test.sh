@@ -1877,9 +1877,10 @@ EOF
 }
 
 # A ship closed because only a verified bundle holds its commits records the
-# note bin/fm-teardown.sh writes. It is explicitly not landed, so neither the
-# fleet snapshot nor Recently Landed may present it as shipped work, while a
-# real delivery closed the same way tasks-axi records it still is listed.
+# note bin/fm-teardown.sh retains for the captain's call. It is explicitly not
+# landed, so Recently Landed may not present it as shipped work, and it is not
+# the captain's drop either, while a real delivery closed the same way tasks-axi
+# records it still is listed.
 test_landed_excludes_rows_preserved_only_in_a_bundle() {
   local home fakebin json fleet_json main_backlog bundle_note
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the bundle-preserved row regression"
@@ -1910,10 +1911,10 @@ test_landed_excludes_rows_preserved_only_in_a_bundle() {
     FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --json) || fail "Fleet snapshot failed for the bundle-preserved rows"
   printf '%s' "$fleet_json" | jq -e '
-    (.backlog.records | any(.id == "bundle-kept" and .state == "done" and .captain_drop == true))
-      and (.backlog.records | any(.id == "bundle-kept-local" and .state == "done" and .captain_drop == true))
+    (.backlog.records | any(.id == "bundle-kept" and .state == "done" and .captain_drop == false))
+      and (.backlog.records | any(.id == "bundle-kept-local" and .state == "done" and .captain_drop == false))
       and (.backlog.records | any(.id == "real-local" and .captain_drop == false))
-  ' >/dev/null || fail "the snapshot did not classify bundle-preserved rows apart from deliveries: $fleet_json"
+  ' >/dev/null || fail "the snapshot marked bundle-preserved rows as the captain's drop: $fleet_json"
   json=$(run "$home" "$fakebin" --json --all-landed) || fail "Bearings failed for bundle-preserved rows"
   printf '%s' "$json" | jq -e '.landed | any(.id == "bundle-kept") | not' >/dev/null \
     || fail "a bundle-preserved ship was listed as landed: $json"
@@ -1925,8 +1926,8 @@ test_landed_excludes_rows_preserved_only_in_a_bundle() {
   pass "landed excludes rows closed on a bundle alone while real deliveries stay"
 }
 
-# The bundle note is only a drop-like marker while it is the last word on a Done
-# row. Restarting the work retires it, and a later real delivery of the same row
+# The bundle note keeps a row out of Recently Landed only while it is the last
+# word on a Done row. Restarting the work retires it, and a later real delivery of the same row
 # is listed, as a restarted drop's "dropped" note is retired by tasks-axi.
 test_restarted_bundle_preserved_row_is_not_a_drop() {
   local home fakebin json fleet_json main_backlog bundle_note

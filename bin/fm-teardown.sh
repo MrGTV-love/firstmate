@@ -102,9 +102,17 @@
 # cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
-# A ship kept only by its bundle closes its backlog item with the note
-# "preserved in bundle <bundle path>, not landed", never a PR or "local main";
-# bin/fm-landed-lib.sh keeps such a row out of Recently Landed.
+# Those commits still go to the captain to land or drop. Before it takes the
+# control lock, an attended teardown whose copy holds locally-only commits that
+# the record claims holds the open backlog row for the captain through
+# bin/fm-captain-hold.sh hold, with a reason naming each recorded tip and the
+# bundle path; a row already held for the captain keeps its own question. The
+# row then takes the captain-held retention described above, recording
+# "Deliverable of the finished work: preserved in bundle <bundle path>, not
+# landed", never a PR or "local main". A bundle close for a row that is not
+# held refuses and prints the hold command. A later proof that changes the
+# close's links restages the pending close. bin/fm-landed-lib.sh keeps a row
+# closed on that note out of Recently Landed without marking it a drop.
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute durable bundle path OUTSIDE every copy, pool, state directory and scratch root,
@@ -1236,6 +1244,35 @@ teardown_release_locks() {
   fm_lease_guard_release || true
   return "$status"
 }
+# A copy whose locally-only commits its recorded bundle claims still leaves the
+# captain a land-or-drop call for them, though the bundle lets the copy go.
+# Hold its open row for that call here, before the control lock, because
+# bin/fm-captain-hold.sh takes that lock itself; inside the lock the held row
+# then takes the captain-held retention instead of a close. An existing captain
+# hold is left as it is, and a later refusal keeps the hold, since the commits
+# are still unlanded.
+teardown_hold_bundle_preserved_row() {
+  local own tip reason
+  [ "$FORCE" != --force ] && [ -z "$DROP_FILE" ] || return 0
+  [ "${TEARDOWN_LOCK_KIND:-}" = ship ] && [ -d "${TEARDOWN_LOCK_WT:-}" ] || return 0
+  [ "$(fm_meta_get "$META" cleanup_recovery)" != orca ] || return 0
+  teardown_bundle_attended && teardown_bundle_record || return 0
+  own=$(printf 'HEAD\n' | teardown_bundle_tips "$TEARDOWN_LOCK_WT") && [ -n "$own" ] || return 0
+  for tip in $own; do
+    case " $TEARDOWN_BUNDLE_RECORD_TIPS " in *" $tip "*) ;; *) return 0 ;; esac
+  done
+  fm_backlog_transition_applies "$CONFIG" "$DATA" ship && fm_backlog_row_probe "$DATA" "$ID" || return 0
+  [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" != captain ] || return 0
+  fm_refuse_if_gate_agent
+  reason=$(teardown_bundle_hold_reason "$TEARDOWN_BUNDLE_RECORD_PATH" "$TEARDOWN_BUNDLE_RECORD_TIPS")
+  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+      "$SCRIPT_DIR/fm-captain-hold.sh" hold "$ID" --owner captain --reason "$reason" >/dev/null; then
+    echo "error: task $ID's unlanded commits are preserved only in bundle $TEARDOWN_BUNDLE_RECORD_PATH, but its backlog row could not be held for the captain's land-or-drop call; nothing was changed" >&2
+    exit 1
+  fi
+  echo "teardown: held $ID for the captain: $reason" >&2
+}
+teardown_hold_bundle_preserved_row
 trap teardown_release_locks EXIT
 fm_lock_try_acquire "$CONTROL_LOCK" || {
   echo "error: another lifecycle action is already running for task $ID; nothing was changed" >&2
@@ -2656,7 +2693,10 @@ work_is_landed() {
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
     # Bundle proofs are local, so re-read them even under final project custody.
-    work_is_landed_bundle "$branch" "$dir" "$head" && return 0
+    if work_is_landed_bundle "$branch" "$dir" "$head"; then
+      teardown_restage_backlog_close
+      return 0
+    fi
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
     TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
@@ -3318,17 +3358,33 @@ require_worktree_teardown_safety() {
   exit 1
 }
 
-# A slot found reassigned only at a later recheck was admitted by an owned-mode
-# proof. Repeat the proof in reassigned mode; when it settles on the recorded
-# PR, restage the pending backlog close so a local-only ship does not keep its
-# owned-mode local-main note.
-teardown_reprove_reassigned_slot() {
-  local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
-  teardown_release_project_lock || exit 1
-  require_worktree_teardown_safety
-  [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 1 ] || return 0
-  if ! backlog_done_args \
-     || ! fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" \
+# A close on a bundle owes the captain the land-or-drop call, so it must be the
+# captain-held retention that the hold placed before the control lock selects,
+# never a close. Checked wherever the close is staged.
+teardown_require_bundle_close_held() {
+  case "${BACKLOG_DONE_ARGS[1]-}" in "preserved in bundle "*) ;; *) return 0 ;; esac
+  [ "$BACKLOG_TRANSITION" != retain ] || return 0
+  echo "REFUSED: task $ID's unlanded commits are preserved only in bundle $TEARDOWN_BUNDLE_PROOF, but its backlog row is not held for the captain's land-or-drop call; its task record stays in place." >&2
+  echo "Hold the row with bin/fm-captain-hold.sh hold $ID --owner captain --reason '$(teardown_bundle_hold_reason "$TEARDOWN_BUNDLE_PROOF" "$TEARDOWN_BUNDLE_RECORD_TIPS")', then retry ordinary teardown." >&2
+  exit 1
+}
+
+# A later proof can admit the removal by another route than the one the staged
+# close records: a reassigned slot's proof, or a bundle recheck of a HEAD that
+# moved after its landing proof. Restage the pending backlog close whenever its
+# completion links change, so the row records the proof that admitted removal.
+teardown_restage_backlog_close() {
+  local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}" staged
+  [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ] || return 0
+  [ -n "$BACKLOG_CLOSE_STAGE" ] || [ "${BACKLOG_CLOSED:-0}" = 1 ] || return 0
+  staged=$(printf '%s\n' "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}")
+  if ! backlog_done_args; then
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID is not replayable; retaining every durable task record" >&2
+    exit 1
+  fi
+  [ "$(printf '%s\n' "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}")" != "$staged" ] || return 0
+  teardown_require_bundle_close_held
+  if ! fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" \
      || ! fm_backlog_close_marker_stage "$stage" "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
        "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
        "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}" \
@@ -3338,6 +3394,16 @@ teardown_reprove_reassigned_slot() {
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
     exit 1
   fi
+}
+
+# A slot found reassigned only at a later recheck was admitted by an owned-mode
+# proof. Repeat the proof in reassigned mode and restage the pending backlog
+# close for it, so a local-only ship settled on its recorded PR does not keep
+# its owned-mode local-main note.
+teardown_reprove_reassigned_slot() {
+  teardown_release_project_lock || exit 1
+  require_worktree_teardown_safety
+  teardown_restage_backlog_close
 }
 
 # Fix 1 (see script header): does the active-or-most-recent no-mistakes run in
@@ -6186,6 +6252,7 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     echo "error: the pending backlog $BACKLOG_TRANSITION for $ID is not replayable; refusing destructive teardown" >&2
     exit 1
   }
+  teardown_require_bundle_close_held
   BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
   if ! fm_backlog_record_parent_authorized "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE" \
      || { { [ -e "$BACKLOG_CLOSE_MARKER" ] || [ -L "$BACKLOG_CLOSE_MARKER" ]; } \

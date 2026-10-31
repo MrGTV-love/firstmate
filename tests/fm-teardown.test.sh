@@ -3156,47 +3156,163 @@ test_bundle_close_note_is_not_removal_authority() {
   pass 'a preserved-in-bundle close note is bookkeeping only, never removal authority'
 }
 
-test_bundle_kept_ship_closes_its_row_as_not_landed() {
-  local shape case_dir rc
+# Teardown holds the row before it takes the control lock that
+# bin/fm-captain-hold.sh also takes, so a bounded wait proves it never waits on
+# its own lock.
+run_teardown_bounded() {  # <case-dir>
+  local case_dir=$1 pid i rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  pid=$!
+  for ((i = 0; i < 1800; i++)); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    pkill -P "$pid" 2>/dev/null || true
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "$case_dir: teardown did not finish; it waited on a lock: $(cat "$case_dir/stderr")"
+  fi
+  wait "$pid" || rc=$?
+  return "$rc"
+}
+
+# The shared landed selector over the real fleet snapshot of a case's home.
+bundle_case_snapshot() {  # <case-dir>
+  PATH="$1/fakebin:$PATH" FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/state" \
+    FM_DATA_OVERRIDE="$1/data" FM_CONFIG_OVERRIDE="$1/config" \
+    FM_SNAPSHOT_NOW=2026-10-30T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json
+}
+
+bundle_case_landed_ids() {  # <snapshot-json>
+  (
+    . "$ROOT/bin/fm-landed-lib.sh"
+    printf '%s' "$1" | jq -c "$FM_LANDED_JQ_DEFS"' [.backlog.records[] | select(landed_record) | .id]'
+  )
+}
+
+# A verified bundle lets the copy go, but its commits still go to the captain to
+# land or drop: the row stays open, held for the captain with a reason naming
+# every preserved tip and the bundle, never closed, marked a drop or landed.
+test_bundle_kept_ship_keeps_its_row_held_for_the_captain() {
+  local shape case_dir rc second tips tip shown snapshot
   for shape in local-only open-pr; do
     if [ "$shape" = local-only ]; then
       make_bundle_copy_case "bundle-row-$shape" local-only
+      second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'independent unpublished tip')
+      git -C "$NESTED_COPY" update-ref refs/heads/fm/second "$second"
+      record_preservation_bundle "$NESTED_CASE" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot bundle both tips'
     else
       make_bundle_copy_case "bundle-row-$shape"
     fi
     case_dir=$NESTED_CASE
+    tips=$(cut -f3 "$case_dir/data/task-x1/preservation-bundles.tsv")
     seed_backlog_in_flight "$case_dir"
     [ "$shape" != open-pr ] || append_pr_meta_url "$case_dir"
     rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown_bounded "$case_dir" || rc=$?
     expect_code 0 "$rc" "bundle-row-$shape: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
-    grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "bundle-row-$shape: the backlog row was not closed"
-    assert_grep "preserved in bundle $BUNDLE_PATH, not landed" "$case_dir/data/backlog.md" "bundle-row-$shape: the row does not name the bundle"
+    assert_absent "$NESTED_COPY" "bundle-row-$shape: the preserved copy was not removed"
+    assert_absent "$case_dir/state/task-x1.meta" "bundle-row-$shape: the task was not retired"
+    shown=$(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md") || fail "bundle-row-$shape: cannot read the row"
+    [ "$(backlog_row_state "$case_dir")" != "done" ] || fail "bundle-row-$shape: the row was closed: $shown"
+    printf '%s\n' "$shown" | grep -Eq '^  hold_kind: *captain$' || fail "bundle-row-$shape: the row is not held for the captain: $shown"
+    ( . "$ROOT/bin/fm-hold-reason-lib.sh"; fm_hold_reason_decode_stream markdown ) \
+      < "$case_dir/data/backlog.md" > "$case_dir/backlog.decoded" || fail "bundle-row-$shape: cannot decode the hold reason"
+    for tip in $tips; do
+      assert_grep "$tip" "$case_dir/backlog.decoded" "bundle-row-$shape: the hold does not name preserved tip $tip"
+    done
+    [ "$shape" != local-only ] || [[ "$tips" == *"$second"* ]] || fail "bundle-row-$shape: the fixture does not record two tips"
+    assert_grep "Land or drop the unlanded commits of task-x1: tips $tips are preserved only in bundle $BUNDLE_PATH" \
+      "$case_dir/backlog.decoded" "bundle-row-$shape: the hold does not ask to land or drop the bundle's tips"
+    assert_grep "Deliverable of the finished work: preserved in bundle $BUNDLE_PATH, not landed" \
+      "$case_dir/data/backlog.md" "bundle-row-$shape: the row does not record the bundle"
     assert_no_grep 'local main' "$case_dir/data/backlog.md" "bundle-row-$shape: the row claims a local-main landing"
     assert_no_grep 'pull/7' "$case_dir/data/backlog.md" "bundle-row-$shape: the row links a PR that is not merged"
+    snapshot=$(bundle_case_snapshot "$case_dir") || fail "bundle-row-$shape: fleet snapshot failed"
+    printf '%s' "$snapshot" | jq -e '.backlog.records | any(.id == "task-x1" and .captain_drop == false and .hold_kind == "captain")' \
+      >/dev/null || fail "bundle-row-$shape: the snapshot marks the held row a drop: $snapshot"
+    assert_equals '[]' "$(bundle_case_landed_ids "$snapshot")" "bundle-row-$shape: the held row is listed as landed"
   done
-  pass 'a ship kept only by a verified bundle closes its backlog row as preserved in that bundle, not landed'
+  pass 'a ship kept only by a verified bundle leaves its row held for the captain, naming every tip and the bundle'
 }
 
+# The captain's answer closes the held row on the bundle note: still neither a
+# drop nor a landing, and the opt-in ledger records the close with no landing
+# evidence. The teardown itself retains the row and records no close.
 test_bundle_kept_ship_records_no_landing_in_the_ledger() {
-  local shape case_dir rc
-  for shape in local-only open-pr; do
-    if [ "$shape" = local-only ]; then
-      make_bundle_copy_case "bundle-ledger-$shape" local-only
-    else
-      make_bundle_copy_case "bundle-ledger-$shape"
+  local case_dir rc snapshot
+  make_bundle_copy_case bundle-ledger local-only
+  case_dir=$NESTED_CASE
+  seed_backlog_in_flight "$case_dir"
+  : > "$case_dir/config/fleet-ledger"
+  rc=0
+  run_teardown_bounded "$case_dir" || rc=$?
+  expect_code 0 "$rc" "bundle-ledger: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
+  assert_equals '' "$(ledger_closed_rows "$case_dir")" 'bundle-ledger: the retained row was recorded as closed'
+  printf 'Drop it; the bundle is enough.\n' > "$case_dir/answer.txt"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-captain-hold.sh" answer task-x1 --decision-file "$case_dir/answer.txt" \
+    > "$case_dir/answer.out" 2>&1 || fail "bundle-ledger: the captain's answer failed: $(cat "$case_dir/answer.out")"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail 'bundle-ledger: the answer did not close the row'
+  assert_equals '["task-x1","none",null,true]' "$(ledger_closed_rows "$case_dir")" \
+    'bundle-ledger: a bundle close must not be recorded as a landing'
+  snapshot=$(bundle_case_snapshot "$case_dir") || fail 'bundle-ledger: fleet snapshot failed'
+  printf '%s' "$snapshot" | jq -e '.backlog.records | any(.id == "task-x1" and .state == "done" and .captain_drop == false)' \
+    >/dev/null || fail "bundle-ledger: the answered row is marked a drop: $snapshot"
+  assert_equals '[]' "$(bundle_case_landed_ids "$snapshot")" 'bundle-ledger: the answered row is listed as landed'
+  pass 'ledger on: a bundle-kept ship is retained, and its answered close records no landing evidence'
+}
+
+# Unattended cleanup keeps its refusal and never files the captain's question.
+test_unattended_bundle_teardown_places_no_hold() {
+  local case_dir rc shown
+  make_bundle_copy_case bundle-unattended-hold
+  case_dir=$NESTED_CASE
+  seed_backlog_in_flight "$case_dir"
+  printf 'away\n' > "$case_dir/state/.afk"
+  rc=0
+  run_teardown_bounded "$case_dir" || rc=$?
+  expect_code 1 "$rc" 'away teardown must refuse bundle-only cleanup'
+  assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" 'original refusal changed'
+  shown=$(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md") || fail 'cannot read the row'
+  printf '%s\n' "$shown" | grep -Eq '^  hold_kind: *captain$' && fail "unattended teardown held the row: $shown"
+  assert_present "$NESTED_COPY/work.txt" 'copy was removed'
+  pass 'unattended bundle teardown refuses as before and places no captain hold'
+}
+
+# A bundle close for a row the pre-lock step did not hold must not close it.
+test_bundle_close_of_an_unheld_row_refuses() {
+  local case_dir rc
+  make_bundle_copy_case bundle-unheld
+  case_dir=$NESTED_CASE
+  seed_backlog_in_flight "$case_dir"
+  # The first tip walk is the pre-lock look for a claimed commit; hide it so
+  # the row reaches the in-lock close without a hold.
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" rev-list --stdin --children --not --remotes "*)
+    if [ ! -e "$case_dir/tip-walks" ]; then
+      : > "$case_dir/tip-walks"
+      cat > /dev/null
+      exit 0
     fi
-    case_dir=$NESTED_CASE
-    seed_backlog_in_flight "$case_dir"
-    [ "$shape" != open-pr ] || append_pr_meta_url "$case_dir"
-    : > "$case_dir/config/fleet-ledger"
-    rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "bundle-ledger-$shape: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
-    assert_equals '["task-x1","none",null,true]' "$(ledger_closed_rows "$case_dir")" \
-      "bundle-ledger-$shape: a bundle close must not be recorded as a landing"
-  done
-  pass 'ledger on: a ship kept only by a verified bundle records a close with no landing evidence'
+    ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_teardown_bounded "$case_dir" || rc=$?
+  expect_code 1 "$rc" "bundle-unheld: an unheld bundle close must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'is not held for the captain' "$case_dir/stderr" 'bundle-unheld: the refusal does not name the missing hold'
+  assert_grep "bin/fm-captain-hold.sh hold task-x1 --owner captain" "$case_dir/stderr" 'bundle-unheld: no hold command printed'
+  [ "$(backlog_row_state "$case_dir")" != "done" ] || fail 'bundle-unheld: the row was closed'
+  assert_present "$NESTED_COPY/work.txt" 'bundle-unheld: copy was removed'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-unheld: task record was removed'
+  pass 'a bundle close for a row not held for the captain refuses and prints the hold command'
 }
 
 test_bundle_hint_needs_unlanded_tips() {
@@ -3501,8 +3617,10 @@ test_bundle_restore_memo_misses_a_changed_record_or_bundle
 test_bundle_restore_memo_is_keyed_by_object_format
 test_unattended_teardown_refuses_bundle_only_copy
 test_bundle_close_note_is_not_removal_authority
-test_bundle_kept_ship_closes_its_row_as_not_landed
+test_bundle_kept_ship_keeps_its_row_held_for_the_captain
 test_bundle_kept_ship_records_no_landing_in_the_ledger
+test_unattended_bundle_teardown_places_no_hold
+test_bundle_close_of_an_unheld_row_refuses
 test_bundle_hint_needs_unlanded_tips
 test_bundle_needs_the_copys_own_unlanded_tip
 test_bundle_hint_skips_a_moved_head_at_final_custody

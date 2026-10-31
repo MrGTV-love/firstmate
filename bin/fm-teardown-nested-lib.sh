@@ -506,6 +506,72 @@ teardown_bundle_tips() {  # <copy>
   printf '%s\n' "$walk" | awk 'NF == 1 {print $1}'
 }
 
+# Automatic cleanup still requires landing, including replays of an attended
+# teardown's interrupted return. Never let the mere record authorize it.
+teardown_bundle_attended() {
+  [ "${FM_IDLE_REAP_ADMISSION:-0}" != 1 ] \
+    && [ "${FM_SUPERVISION_ACTOR:-main}" = main ] \
+    && [ ! -e "$STATE/.afk" ] && [ ! -L "$STATE/.afk" ] \
+    && [ ! -e "$STATE/.afk-contract" ] && [ ! -L "$STATE/.afk-contract" ]
+}
+
+# Reads $DATA/$ID/preservation-bundles.tsv into TEARDOWN_BUNDLE_RECORD_PATH,
+# TEARDOWN_BUNDLE_RECORD_HASH and TEARDOWN_BUNDLE_RECORD_TIPS (space-separated
+# full tips). On failure TEARDOWN_BUNDLE_REASON names the defect.
+teardown_bundle_record() {
+  local record="$DATA/$ID/preservation-bundles.tsv" line='' extra='' extra_seen='' rest bundle hash tips tip
+  local -a recorded=()
+  TEARDOWN_BUNDLE_RECORD_PATH=
+  TEARDOWN_BUNDLE_RECORD_HASH=
+  TEARDOWN_BUNDLE_RECORD_TIPS=
+  if [ ! -f "$record" ] || [ -L "$record" ]; then
+    TEARDOWN_BUNDLE_REASON="missing preservation record (regular nonsymlink file required): $record"
+    return 1
+  fi
+  {
+    IFS= read -r line || true
+    if IFS= read -r extra || [ -n "$extra" ]; then extra_seen=1; fi
+  } < "$record"
+  if [ -n "$extra_seen" ]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (exactly one line required)"
+    return 1
+  fi
+  if [ -z "$line" ]; then
+    TEARDOWN_BUNDLE_REASON="empty preservation record: $record"
+    return 1
+  fi
+  bundle=${line%%$'\t'*}
+  rest=${line#*$'\t'}
+  hash=${rest%%$'\t'*}
+  tips=${rest#*$'\t'}
+  if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
+      || [ -z "$bundle" ] || [ -z "$tips" ] \
+      || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
+      || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)"
+    return 1
+  fi
+  read -r -a recorded <<< "$tips"
+  if [ "${#recorded[@]}" = 0 ]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (no commit tips)"
+    return 1
+  fi
+  for tip in "${recorded[@]}"; do
+    if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+      TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (invalid full commit tip: $tip)"
+      return 1
+    fi
+  done
+  TEARDOWN_BUNDLE_RECORD_PATH=$bundle
+  TEARDOWN_BUNDLE_RECORD_HASH=$hash
+  TEARDOWN_BUNDLE_RECORD_TIPS="${recorded[*]}"
+}
+
+# The captain's land-or-drop question for commits only a bundle holds.
+teardown_bundle_hold_reason() {  # <bundle> <tips>
+  printf 'Land or drop the unlanded commits of %s: tips %s are preserved only in bundle %s, not landed.' "$ID" "$2" "$1"
+}
+
 # The record is exactly one line, so re-bundling replaces it. <ref> itself must
 # carry a locally-only commit, or the bundle proves nothing and the delivery
 # proof is still required. The recorded bundle must then advertise all maximal
@@ -513,17 +579,14 @@ teardown_bundle_tips() {  # <copy>
 # checked out; a checked-out branch belongs to its own worktree's task.
 teardown_bundle_preserved() {  # <copy> <ref> [hint]
   local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
-  local line='' extra='' extra_seen='' rest bundle hash tips tip own required side heads advertised digest
-  local -a recorded=()
+  local bundle hash tips tip own required side heads advertised digest
   TEARDOWN_BUNDLE_ACCEPTED=
-  # Automatic cleanup still requires landing, including replays of an attended
-  # teardown's interrupted return. Never let the mere record authorize it.
-  if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ] \
-      || [ "${FM_SUPERVISION_ACTOR:-main}" != main ] \
-      || [ -e "$STATE/.afk" ] || [ -L "$STATE/.afk" ] \
-      || [ -e "$STATE/.afk-contract" ] || [ -L "$STATE/.afk-contract" ]; then
-    teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
-    echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
+  if ! teardown_bundle_attended; then
+    if [ -f "$record" ] && [ ! -L "$record" ] \
+        && own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") && [ -n "$own" ]; then
+      teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
+      echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
+    fi
     return 1
   fi
   own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
@@ -539,45 +602,13 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
     teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
   }
-  if [ ! -f "$record" ] || [ -L "$record" ]; then
-    teardown_bundle_refuse "missing preservation record (regular nonsymlink file required): $record" "$hint"
+  if ! teardown_bundle_record; then
+    teardown_bundle_refuse "$TEARDOWN_BUNDLE_REASON" "$hint"
     return 1
   fi
-  {
-    IFS= read -r line || true
-    if IFS= read -r extra || [ -n "$extra" ]; then extra_seen=1; fi
-  } < "$record"
-  if [ -n "$extra_seen" ]; then
-    teardown_bundle_refuse "malformed preservation record in $record (exactly one line required)" "$hint"
-    return 1
-  fi
-  if [ -z "$line" ]; then
-    teardown_bundle_refuse "empty preservation record: $record" "$hint"
-    return 1
-  fi
-  bundle=${line%%$'\t'*}
-  rest=${line#*$'\t'}
-  hash=${rest%%$'\t'*}
-  tips=${rest#*$'\t'}
-  if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
-      || [ -z "$bundle" ] || [ -z "$tips" ] \
-      || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
-      || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
-    teardown_bundle_refuse "malformed preservation record in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)" "$hint"
-    return 1
-  fi
-  read -r -a recorded <<< "$tips"
-  if [ "${#recorded[@]}" = 0 ]; then
-    teardown_bundle_refuse "malformed preservation record in $record (no commit tips)" "$hint"
-    return 1
-  fi
-  for tip in "${recorded[@]}"; do
-    if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
-      teardown_bundle_refuse "malformed preservation record in $record (invalid full commit tip: $tip)" "$hint"
-      return 1
-    fi
-  done
-  tips="${recorded[*]}"
+  bundle=$TEARDOWN_BUNDLE_RECORD_PATH
+  hash=$TEARDOWN_BUNDLE_RECORD_HASH
+  tips=$TEARDOWN_BUNDLE_RECORD_TIPS
   TEARDOWN_BUNDLE_REASON=
   if ! teardown_bundle_external "$copy" "$bundle"; then
     :
