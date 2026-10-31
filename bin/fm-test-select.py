@@ -51,8 +51,9 @@ on file B when A runs, sources, copies, reads or lists B:
   - Python, JavaScript and TypeScript depend on every whole string literal that
     names a file. In the argument list of a git ls-files call a literal
     pathspec matches as git matches it, and an argument that is not a literal
-    (a variable, a spread, items joined to the list) names every tracked
-    file, unless the call lists only untracked files.
+    (a variable, a spread, items joined to the list, a list assigned,
+    returned or yielded for other code to add to) names every tracked file,
+    unless the call lists only untracked files.
 A test is affected by a changed file when that file is reachable from the test
 through code files. Documents, data and other non-code files are leaves,
 because mentioning a script inside a document never runs it. Tests are
@@ -83,9 +84,10 @@ only inside a longer string that a program later parses, a script passed to a
 shell function that runs it, a file reached only through a program's own search
 path or an environment variable's value, a directory listed from a bare name
 with no path around it, a here-document piped into an interpreter rather than
-given to it as its script, a pathspec a shell script holds in a variable, what a shared test helper's teardown starts beyond the
-libraries it loads, and behavior that depends on a file's content but not on
-its name or location. A full suite runs on every push to main, so a miss is
+given to it as its script, a pathspec a shell script holds in a variable, a git
+ls-files argument list passed as an argument to other code that adds to it,
+what a shared test helper's teardown starts beyond the libraries it loads, and
+behavior that depends on a file's content but not on its name or location. A full suite runs on every push to main, so a miss is
 caught there; docs/fm-test-portable-shards.md "Change-based test selection"
 owns this list and how to force a full run.
 """
@@ -775,22 +777,23 @@ def ls_files_arguments(code):
 
     Each list is the items of one bracketed or parenthesized group: a literal's
     value, or None for anything else (a variable, a spread, a call). A group
-    that is assigned to a name or joined to more items ("[...] + extra",
-    "[...].concat(extra)") can hold arguments it does not spell out, so it
-    ends with None too.
+    that is assigned to a name, returned or yielded, or joined to more items
+    ("[...] + extra", "(...) + extra", "[...].concat(extra)") can hold
+    arguments it does not spell out, so it ends with None too.
     """
     groups, opened, found = [[[]]], [False], []
-    previous, closed = "", None
+    previous, closed, joins = "", None, ()
     for match in ARGUMENT_TOKEN.finditer(code):
         literal = next((g for g in match.groups()[:3] if g is not None), None)
         mark = match.group(4)
         text = match.group(0).strip()
-        if closed is not None and text.startswith(("+", ".")):
+        if closed is not None and text.startswith(joins):
             closed.append(None)
         closed = None
         if mark in ("[", "("):
             groups.append([[]])
-            opened.append(previous.endswith(("+", "=")))
+            opened.append(previous.endswith(("+", "="))
+                          or re.search(r"(?:^|\W)(?:return|yield)$", previous) is not None)
         elif mark in ("]", ")") and len(groups) > 1:
             group = groups.pop()
             items = [item[0] if len(item) == 1 and isinstance(item[0], str) else None
@@ -799,7 +802,8 @@ def ls_files_arguments(code):
                 if opened.pop():
                     items.append(None)
                 found.append(items)
-                closed = items if mark == "]" else None
+                closed = items
+                joins = ("+", ".") if mark == "]" else ("+",)
             else:
                 opened.pop()
             groups[-1][-1].append(None)
