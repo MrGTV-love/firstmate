@@ -18,7 +18,7 @@ In no-mistakes mode the earlier `done [at=<epoch>]: {summary}` is the pipeline h
 Tell the captain the PR's full `https://...` URL copied from the worker's ready line, the resolved checks-green crew-state line, or the task's `pr=` metadata, a concise outcome summary, and the no-mistakes risk level when applicable.
 A captain instruction to merge is explicit authority; `yolo` and the standing merge rule in AGENTS.md section 7 are the standing routine merge authority.
 `bin/fm-pr-merge.sh` enforces commit/run-derived author-group coverage or the captain's recorded live-head merge words through `bin/fm-review-record.py`, whose header owns the rule and its harm-model rationale.
-For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, finish before `FM_CHECK_TIMEOUT`, then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
+For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, never sit silent and CPU-idle for `FM_CHECK_TIMEOUT` (the watcher stops such a check and treats that pass as unknown), then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
 Tear down a ship task only after landing is confirmed.

@@ -53,7 +53,7 @@ Select Herdr in any of these ways:
 
 A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
 
-Herdr is also auto-detected when the primary runs natively under `HERDR_ENV=1` and is not inside tmux.
+Herdr is also auto-detected outside tmux from native `HERDR_ENV=1` or the managed Claude child's `FM_HERDR_RUNTIME=1` signal.
 A tmux pane nested inside Herdr resolves to tmux because the innermost multiplexer wins.
 An auto-detected Herdr spawn stays silent, matching the verified tmux default path.
 
@@ -123,7 +123,7 @@ The metadata rules in [`configuration.md`](configuration.md#runtime-backend-conf
 A tmux task missing from Herdr's Agents pane is therefore expected, even if another primary agent is visible there.
 
 For new tasks, inspect the environment of the Firstmate process issuing the spawn, rather than an unrelated shell or the terminal displaying it.
-Native Herdr auto-detection needs `HERDR_ENV=1`; an attaching viewer does not add that marker to an already-running Firstmate process.
+Native Herdr auto-detection uses `HERDR_ENV=1`, while a Firstmate-managed Claude child retains the runtime-only signal described in [ownership after native restoration](#ownership-after-native-restoration); an attaching viewer adds neither signal to an already-running Firstmate process.
 An absent marker, a nested tmux marker, or an explicit override can select a different backend according to the [selection order](configuration.md#backend-selection-order).
 When this home should always create Herdr endpoints, set its local `config/backend` to `herdr`, and check for a higher-priority environment or per-task override.
 This also lets a Firstmate running outside Herdr create visible workers through the [per-home workspace path](#firstmate-running-outside-herdr).
@@ -157,7 +157,7 @@ Later task creation does not intentionally steal focus.
 Herdr does not enforce workspace or tab label uniqueness, so a label can never decide where a worker goes.
 
 Herdr 0.7.5 exports `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_SESSION`, `HERDR_SOCKET_PATH`, `HERDR_TAB_ID`, and `HERDR_WORKSPACE_ID` into every process it manages a pane for.
-A Firstmate or secondmate agent's own commands inherit them.
+A Firstmate or secondmate agent's own commands inherit them, except that a Firstmate-launched Claude child loses `HERDR_ENV` as described in [ownership after native restoration](#ownership-after-native-restoration).
 Older injection shapes are unverified, so a claimed launcher pane without the injected socket identity cannot be trusted.
 
 With presentation spaces disabled, a crewmate or scout is created in the exact workspace that identity currently resolves to.
@@ -782,7 +782,14 @@ Disabling `session.resume_agents_on_restore` would also disable restoration of u
 The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
 Changing a user's global configuration is therefore not the scoped repair.
 
-The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only unless the explicit [omp session-record repair](agent-control.md#repairing-a-restored-omp-session-record) authorizes them.
+Firstmate Claude launches suppress `HERDR_ENV` only in the launched child, while the pane shell, unrelated workers and the child's other `HERDR_*` pane identity variables keep their values.
+The suppression is intended to stop Herdr's Claude integration from registering a bare-Claude resume recipe; that effect on installed Herdr is not yet proven.
+Whether the same suppression also stops Herdr's native agent-status and session reports for that pane, which the Herdr adapter reads, is also not yet proven.
+`fm-spawn.sh` owns this child-only boundary for normal, raw-command and secondmate launches; the TeamClaude wrapper continues to own proxy setup.
+The child retains `FM_HERDR_RUNTIME=1` as a runtime-only detection signal, so a Claude secondmate without explicit backend configuration still selects Herdr for later spawns and supervisor routing; it grants no lifecycle ownership.
+Existing saved registrations are not retroactively removed by an environment change.
+Already-restored Claude workers are not yet covered by this prevention boundary; it neither changes lifecycle attribution nor releases saved native registrations.
+The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's [session-record repair](agent-control.md#repairing-a-restored-omp-session-record).
 The [runtime verification record](verification/runtime-backends.md) owns captured composer evidence and the current native-restoration preservation guard.
 
 ### Stale agent registrations

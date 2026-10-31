@@ -522,15 +522,18 @@ PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
 [ -s "$INIT_ENTERED" ] || fail "the refresh never attempted state initialization"
 [ ! -e "$INIT_DONE" ] || fail "the stalled initializer completed instead of being interrupted"
 init_pid=$(cat "$INIT_ENTERED")
-fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
+fm_test_wait_until --while-alive "$init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
   || fail "the refresh left its stalled initializer alive"
+[ ! -e "$INIT_DONE" ] || fail "the refresh left its stalled initializer alive until it finished on its own"
 cmp -s "$TMP_ROOT/before-state-init-ledger.json" "$HOME_DIR/state/home-summary.json" \
   || fail "interrupted initialization changed the prior published ledger"
 pass "best-effort refresh bounds state initialization"
 
 DETACH_INIT_MARKER="$TMP_ROOT/detach-init-entered"
+DETACH_INIT_DONE="$TMP_ROOT/detach-init-done"
 PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
   FM_TEST_STALLED_STATE="$HOME_DIR/state" FM_TEST_MKDIR_MARKER="$DETACH_INIT_MARKER" \
+  FM_TEST_MKDIR_DONE_MARKER="$DETACH_INIT_DONE" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
   WRITER="$WRITER" python3 - <<'PY' \
   || fail "detached state initialization blocked its foreground caller"
@@ -558,11 +561,12 @@ if result != 0:
 if time.monotonic() - started >= 2:
     raise SystemExit("the detached foreground caller waited for state initialization")
 PY
-fm_test_wait_until 60 test -e "$DETACH_INIT_MARKER" \
+fm_test_wait_until --progress-file "$DETACH_INIT_MARKER" -- test -e "$DETACH_INIT_MARKER" \
   || fail "the detached worker never attempted its bounded state initialization"
 detach_init_pid=$(cat "$DETACH_INIT_MARKER")
-fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
+fm_test_wait_until --while-alive "$detach_init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
   || fail "the detached worker left its stalled initialization running past the bound"
+[ ! -e "$DETACH_INIT_DONE" ] || fail "the detached worker left its stalled initialization running until it finished on its own"
 pass "detached foreground returns before stalled bounded state initialization"
 
 SIGNALBIN="$TMP_ROOT/signalbin"
@@ -1178,7 +1182,7 @@ hold_refresh_lock() {  # <home> <seconds>
     sleep "$4"
   ' _ "$ROOT" "$home" "$marker" "$2" &
   LOCK_HOLDER_PID=$!
-  fm_test_wait_until 20 test -e "$marker" || fail "could not hold the refresh lock for $home"
+  fm_test_wait_until --while-alive "$LOCK_HOLDER_PID" -- test -e "$marker" || fail "could not hold the refresh lock for $home"
 }
 
 release_refresh_lock() {
@@ -1206,7 +1210,7 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
   || fail "a detached trigger changed its caller's result"
 elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 10 ] || fail "a detached trigger waited $elapsed seconds on an in-flight refresh"
-fm_test_wait_until 60 test -e "$DETACH_HOME/state/.home-summary-refresh.pending" \
+fm_test_wait_until --progress-file "$DETACH_HOME/state/.home-summary-refresh.pending" -- test -e "$DETACH_HOME/state/.home-summary-refresh.pending" \
   || fail "a trigger that found a refresh in flight left no marker for it"
 sleep 2
 [ ! -s "$DETACH_HOME/state/.home-summary-refresh.log" ] \
@@ -1217,7 +1221,7 @@ pass "a detached trigger returns at once and records no failure while a refresh 
 # With the lock free, the same detached trigger publishes and clears its marker.
 PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
   "$WRITER" --detach || fail "a detached trigger on an idle home failed"
-fm_test_wait_until 120 jq -e '.schema == "fm-secondmate-home-summary.v1"' \
+fm_test_wait_until --progress-file "$DETACH_HOME/state/home-summary.json" -- jq -e '.schema == "fm-secondmate-home-summary.v1"' \
   "$DETACH_HOME/state/home-summary.json" \
   || fail "a detached trigger on an idle home never published"
 [ ! -e "$DETACH_HOME/state/.home-summary-refresh.pending" ] \
@@ -1251,13 +1255,13 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
   FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
   "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
-fm_test_wait_until 60 test -e "$CO_HOLD.entered" || fail "the in-flight refresh never reached its held read"
+fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$CO_COUNT" -- test -e "$CO_HOLD.entered" || fail "the in-flight refresh never reached its held read"
 for _ in 1 2 3; do
   PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
     FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
     "$WRITER" --detach || fail "a trigger during a refresh failed"
 done
-fm_test_wait_until 60 test -e "$COALESCE_HOME/state/.home-summary-refresh.pending" \
+fm_test_wait_until --progress-file "$COALESCE_HOME/state/.home-summary-refresh.pending" -- test -e "$COALESCE_HOME/state/.home-summary-refresh.pending" \
   || fail "triggers during a refresh left no marker"
 sleep 2
 rm -f "$CO_HOLD"
@@ -1309,14 +1313,14 @@ PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
 for run in 1 2 3 4 5 6; do
-  fm_test_wait_until 120 test -e "$VALIDATE_DIR/entered.$run" \
+  fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$VALIDATE_DIR/count" -- test -e "$VALIDATE_DIR/entered.$run" \
     || fail "pending triggers stopped draining before successful refresh $run"
   if [ "$run" -lt 6 ]; then
     printf '## In flight\n\n## Queued\n- [ ] pending-%s - Latest pending trigger (repo: firstmate) (kind: ship)\n\n## Done\n' "$run" \
       > "$DRAIN_HOME/data/backlog.md"
     PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" \
       "$WRITER" --detach || fail "pending trigger $run changed its caller result"
-    fm_test_wait_until 60 test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
+    fm_test_wait_until --progress-file "$DRAIN_HOME/state/.home-summary-refresh.pending" -- test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
       || fail "pending trigger $run left no marker"
   fi
   : > "$VALIDATE_DIR/release.$run"
@@ -1347,13 +1351,13 @@ FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" bash -c '
   sleep 120
 ' _ "$ROOT" "$SERIAL_HOME" "$SERIAL_WAKE_MARKER" &
 LOCK_HOLDER_PID=$!
-fm_test_wait_until 60 test -e "$SERIAL_WAKE_MARKER" \
+fm_test_wait_until --while-alive "$LOCK_HOLDER_PID" -- test -e "$SERIAL_WAKE_MARKER" \
   || fail "could not hold the wake lock for serialized timeout accounting"
 PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
   "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
-fm_test_wait_until 100 grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
+fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$SERIAL_HOME/state/.home-summary-refresh.streak" -- grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
   || fail "the timed-out attempt did not reach serialized wake accounting"
 SUCCESS_ENTERED="$TMP_ROOT/serial-success-entered"
 PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
@@ -1361,7 +1365,7 @@ PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
   FM_SNAPSHOT_NOW="$NOW_TWO" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" "$WRITER" &
 SUCCESS_WRITER_PID=$!
-fm_test_wait_until 60 test -e "$SUCCESS_ENTERED" \
+fm_test_wait_until --while-alive "$SUCCESS_WRITER_PID" -- test -e "$SUCCESS_ENTERED" \
   || fail "the succeeding refresh never started during timeout accounting"
 sleep 1
 jq -e --arg now "$NOW_ONE" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \
@@ -1532,7 +1536,9 @@ pass "publication on a large history reads only what was appended and retains de
 # refuses the mutex, or lets a live process take it first.
 # The code reaches the worker through a code-root/bin symlink, as in the teardown
 # fixtures, so every process of its tree names this home in its command line and
-# the checks are scoped to this home alone.
+# the checks are scoped to this home alone. Each worker counts its fence polls in
+# <home>.fence-polls, beside the home so a removed home keeps it, and a worker
+# that should end or publish is judged by those polls, not by a clock.
 FENCE_BIN="$TMP_ROOT/fence-bin"
 fm_test_refresh_fence_stub "$FENCE_BIN" || fail "could not write the fence stub"
 
@@ -1553,26 +1559,28 @@ start_fenced_refresh() {  # <name> <action>
   FENCE_HOME=$home
   mkdir -p "$home/code-root"
   ln -s "$ROOT/bin" "$home/code-root/bin"
-  env FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" \
-    PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
-    "$home/code-root/bin/fm-home-summary-refresh.sh" --detach \
-    || fail "could not start the detached refresh for $name"
+  (
+    fm_test_export_sleep_counter home_summary_fence
+    exec env FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" FM_TEST_SLEEP_COUNT="$home.fence-polls" \
+      PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
+      "$home/code-root/bin/fm-home-summary-refresh.sh" --detach
+  ) || fail "could not start the detached refresh for $name"
 }
 
 start_fenced_refresh gone-home remove
 GONE_HOME=$FENCE_HOME
-fm_test_wait_until 20 test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
-fm_test_wait_until 20 no_refresh_workers_of "$GONE_HOME" \
-  || fail "a refresh worker for a removed home was still running 20 seconds later: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
+fm_test_wait_until --progress-file "$GONE_HOME" -- test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
+fm_test_wait_until --cycles 10 "$GONE_HOME.fence-polls" -- no_refresh_workers_of "$GONE_HOME" \
+  || fail "a refresh worker for a removed home kept polling its fence: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
 pass "a refresh worker whose home is removed as it reaches its fence ends instead of polling forever"
 
 start_fenced_refresh uncreatable-fence-home refuse
 UNCREATABLE_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -e "$UNCREATABLE_HOME/state/.test-fence-refused" \
+fm_test_wait_until --progress-file "$UNCREATABLE_HOME/state/.test-fence-refused" -- test -e "$UNCREATABLE_HOME/state/.test-fence-refused" \
   || fail "the worker never reached the refused fence"
-fm_test_wait_until 20 no_refresh_workers_of "$UNCREATABLE_HOME" \
-  || fail "a refresh worker whose fence nothing holds was still running 20 seconds later: $(refresh_workers_of "$UNCREATABLE_HOME" | tr '\n' ' ')"
-fm_test_wait_until 5 grep -q 'no process holds it' "$UNCREATABLE_HOME/state/.home-summary-refresh.log" \
+fm_test_wait_until --cycles 10 "$UNCREATABLE_HOME.fence-polls" -- no_refresh_workers_of "$UNCREATABLE_HOME" \
+  || fail "a refresh worker whose fence nothing holds kept polling it: $(refresh_workers_of "$UNCREATABLE_HOME" | tr '\n' ' ')"
+fm_test_wait_until --progress-file "$UNCREATABLE_HOME/state/.home-summary-refresh.log" -- grep -q 'no process holds it' "$UNCREATABLE_HOME/state/.home-summary-refresh.log" \
   || fail "the unholdable fence was not logged: $(cat "$UNCREATABLE_HOME/state/.home-summary-refresh.log" 2>&1)"
 pass "a refresh worker whose fence cannot be created and is held by nothing fails at once and logs why"
 
@@ -1584,16 +1592,16 @@ ledger_published() {  # <home>
 # the worker finishes the refresh once the holder releases.
 start_fenced_refresh held-fence-home hold
 HELD_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -s "$HELD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+fm_test_wait_until --progress-file "$HELD_HOME/state/.test-fence-holder" -- test -s "$HELD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
 HELD_HOLDER=$(cat "$HELD_HOME/state/.test-fence-holder")
 sleep 3
 [ -n "$(refresh_workers_of "$HELD_HOME")" ] \
   || fail "the worker gave up on a fence a live process still held"
 kill -0 "$HELD_HOLDER" 2>/dev/null || fail "the fence holder ended before the worker could be judged"
 : > "$HELD_HOME/state/.test-fence-release"
-fm_test_wait_until 30 ledger_published "$HELD_HOME" \
+fm_test_wait_until --cycles 10 "$HELD_HOME.fence-polls" --progress-file "$HELD_HOME/state/home-summary.json" -- ledger_published "$HELD_HOME" \
   || fail "the worker never published once the live holder released the fence: $(cat "$HELD_HOME/state/.home-summary-refresh.log" 2>&1)"
-fm_test_wait_until 20 no_refresh_workers_of "$HELD_HOME" \
+fm_test_wait_until --cycles 10 "$HELD_HOME.fence-polls" -- no_refresh_workers_of "$HELD_HOME" \
   || fail "a refresh worker was left running after its fence holder released"
 pass "a refresh worker waits for a live fence holder and finishes once it releases"
 
@@ -1601,11 +1609,11 @@ pass "a refresh worker waits for a live fence holder and finishes once it releas
 # takes it over, so the worker neither waits forever nor fails.
 start_fenced_refresh dead-fence-home hold
 DEAD_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -s "$DEAD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+fm_test_wait_until --progress-file "$DEAD_HOME/state/.test-fence-holder" -- test -s "$DEAD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
 DEAD_HOLDER=$(cat "$DEAD_HOME/state/.test-fence-holder")
 kill -KILL "$DEAD_HOLDER" 2>/dev/null || fail "could not stop the fence holder"
-fm_test_wait_until 30 ledger_published "$DEAD_HOME" \
+fm_test_wait_until --cycles 10 "$DEAD_HOME.fence-polls" --progress-file "$DEAD_HOME/state/home-summary.json" -- ledger_published "$DEAD_HOME" \
   || fail "the worker did not recover a fence whose holder died: $(cat "$DEAD_HOME/state/.home-summary-refresh.log" 2>&1)"
-fm_test_wait_until 20 no_refresh_workers_of "$DEAD_HOME" \
+fm_test_wait_until --cycles 10 "$DEAD_HOME.fence-polls" -- no_refresh_workers_of "$DEAD_HOME" \
   || fail "a refresh worker was left running after it recovered a dead holder's fence"
 pass "a refresh worker recovers a fence whose holder died"

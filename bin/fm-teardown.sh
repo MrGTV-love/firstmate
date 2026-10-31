@@ -2196,6 +2196,7 @@ remove_pr_poll_artifacts() {
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
     "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
+  fm_check_stop_episode_clear "$state_dir" "$id"
 }
 
 # Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a

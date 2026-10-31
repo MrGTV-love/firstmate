@@ -1773,7 +1773,8 @@ fm_backend_herdr_workspace_find() {  # <session>
 # Herdr 0.7.5 injects HERDR_ENV=1, HERDR_PANE_ID, HERDR_SESSION,
 # HERDR_SOCKET_PATH, HERDR_TAB_ID, and HERDR_WORKSPACE_ID into every process it
 # manages a pane for (docs/verification/runtime-backends.md), and a firstmate
-# or secondmate agent's own tool calls inherit them. Older injection shapes are
+# or secondmate agent's own tool calls inherit the pane and socket identity
+# (a managed Claude child loses only HERDR_ENV). Older injection shapes are
 # unverified and cannot establish launcher ancestry without both pane and
 # socket identity. Workspace LABELS are mutable and herdr enforces no
 # uniqueness on them, so a label search cannot tell one `firstmate` workspace

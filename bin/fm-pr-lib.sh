@@ -1423,6 +1423,12 @@ fm_pr_poll_retirement_publish() {
   fm_pr_poll_retirement_receipt_valid "$state" "$id" || return 1
 }
 
+# The watcher's stop-episode marker for check <id>. Every disarm or retirement
+# removes it, so the check's next stop after a re-arm starts a new episode.
+fm_check_stop_episode_clear() {  # <state> <id>
+  rm -f -- "$1/$2.check-stopped"
+}
+
 fm_pr_poll_retirement_recover_one() {
   local state=$1 id=$2 template=$3 receipt state_device check data registration
   local receipt_hash receipt_identity
@@ -1445,6 +1451,7 @@ fm_pr_poll_retirement_recover_one() {
     fm_pr_poll_retirement_remove_exact "$check" "$state_device" \
       "$FM_PR_RETIRE_CHECK_IDENTITY" "$FM_PR_RETIRE_TEMPLATE_HASH" || return 1
   fi
+  fm_check_stop_episode_clear "$state" "$id" || return 1
   if [ -e "$registration" ] || [ -L "$registration" ]; then
     fm_pr_poll_retirement_remove_exact "$registration" "$state_device" \
       "$FM_PR_RETIRE_REG_IDENTITY" "$FM_PR_RETIRE_REG_HASH" || return 1

@@ -2115,6 +2115,7 @@ arm() {
 
 disarm() {
   rm -f -- "$CHECK_SHIM" "$CHECK_TRUST" "$RECORD"
+  fm_check_stop_episode_clear "$STATE" "$CHECK_ID"
   printf 'disarmed: state/%s.check.sh\n' "$CHECK_ID"
 }
 

@@ -5,7 +5,8 @@
 # explicitly empty override, an invalid id, or a resolved state path that is
 # not an existing non-symlink directory is refused before removal.
 # Each existing named artifact must be an ordinary single-link file on the
-# state directory's device; only <id>.check.sh and <id>.check-trust are removed.
+# state directory's device; only <id>.check.sh and <id>.check-trust are removed,
+# with the watcher's <id>.check-stopped episode marker.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,4 +50,5 @@ rm -f -- "$CHECK" "$TRUST" || {
   echo "error: custom check could not be removed" >&2
   exit 1
 }
+fm_check_stop_episode_clear "$STATE" "$ID"
 printf 'unregistered: state/%s.check.sh\n' "$ID"

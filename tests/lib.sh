@@ -52,6 +52,10 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# A Claude worker launch unsets HERDR_ENV while preserving runtime-only
+# detection. Fixtures set this marker explicitly when exercising that boundary.
+unset FM_HERDR_RUNTIME
+
 # Model freshness (bin/fm-model-freshness.sh) reads each harness's live catalog,
 # which would run the developer's real claude, omp and agy from every spawn and
 # bootstrap case. The suite turns it off; tests/fm-model-freshness.test.sh turns
@@ -1622,19 +1626,172 @@ SH
   chmod +x "$1/ln"
 }
 
-# fm_test_wait_until <seconds> <command> [args...]
-# Polls until the command succeeds or the ceiling passes. For a result that a
-# detached background job publishes, such as bin/fm-home-summary-refresh.sh
-# --detach, where the foreground command under test returns before it exists.
-fm_test_wait_until() {
-  local limit=$1 ticks=0
-  shift
-  while ! "$@" >/dev/null 2>&1; do
-    ticks=$((ticks + 1))
-    [ "$ticks" -le $((limit * 10)) ] || return 1
-    sleep 0.1
-  done
+# fm_test_sampler_probe: print a PYTHONPATH directory whose sitecustomize makes
+# every pile-up sampler (bin/fm-proc-guard.py watch) started with
+# FM_TEST_SAMPLER_CYCLES=<file> add its completed samples, the sampler's own unit
+# of work, to that file, so a wait for something a procevent runner should
+# produce can be bounded with fm_test_wait_until --cycles.
+fm_test_sampler_probe() {
+  local dir
+  dir=$(fm_test_tmproot fm-sampler-probe) || return 1
+  cat > "$dir/sitecustomize.py" <<'PY'
+import os
+import sys
+import time
+
+samples = os.environ.get('FM_TEST_SAMPLER_CYCLES')
+if samples and sys.argv and sys.argv[0].endswith('fm-proc-guard.py'):
+    real_sleep = time.sleep
+
+    def counted_sleep(seconds):
+        try:
+            with open(samples) as handle:
+                done = int(handle.read())
+        except (OSError, ValueError):
+            done = 0
+        with open(samples + '.tmp', 'w') as handle:
+            handle.write('%d\n' % (done + 1))
+        os.replace(samples + '.tmp', samples)
+        real_sleep(seconds)
+
+    time.sleep = counted_sleep
+PY
+  printf '%s\n' "$dir"
 }
+
+# fm_test_export_sleep_counter <function>: export a sleep that makes each poll
+# loop whose wait is a sleep called directly from <function>, such as a
+# process-event owner guard (cmd_owner_watchdog in bin/fm-procevent.sh) or a
+# home-summary refresh worker's fence (home_summary_fence in
+# bin/fm-home-summary-refresh.sh), started with FM_TEST_SLEEP_COUNT=<file> add its
+# completed polls, the loop's own unit of work, to that file, so a wait for
+# something the loop should end or produce can be bounded with
+# fm_test_wait_until --cycles. Call it in the subshell that starts the loop's
+# ancestor; every other caller of sleep is unchanged.
+fm_test_export_sleep_counter() {
+  FM_TEST_SLEEP_CALLER=$1
+  export FM_TEST_SLEEP_CALLER
+  # shellcheck disable=SC2329 # Exported to the poll loops a child starts.
+  sleep() {
+    local polls
+    if [ "${FUNCNAME[1]:-}" = "${FM_TEST_SLEEP_CALLER:-}" ] && [ -n "${FM_TEST_SLEEP_COUNT:-}" ]; then
+      polls=$(cat "$FM_TEST_SLEEP_COUNT" 2>/dev/null) || polls=0
+      case "$polls" in ''|*[!0-9]*) polls=0 ;; esac
+      printf '%s\n' "$((polls + 1))" > "$FM_TEST_SLEEP_COUNT.tmp" \
+        && mv -f "$FM_TEST_SLEEP_COUNT.tmp" "$FM_TEST_SLEEP_COUNT"
+    fi
+    command sleep "$@"
+  }
+  export -f sleep
+}
+
+# fm_test_wait_until [--while-alive PID] [--progress-file PATH]...
+#                    [--cycles N COUNT_FILE] [--inactivity SECONDS]
+#                    -- COMMAND [ARGS...]
+# Wait for an outcome, not a total duration. It succeeds when COMMAND holds and
+# fails when the awaited work did its work without the outcome, died, or went
+# silent. Activity alone (CPU, forks) is not progress toward an outcome.
+# --cycles names a file holding the peer's own completed unit-of-work count (a
+# decimal integer; absent means 0): the wait fails once the peer completes N more
+# cycles than it had when the wait began, so a live poller that keeps polling
+# without producing the outcome cannot hang the suite. A live poller must pass
+# it, with N stated by the caller and small. --while-alive fails once that PID
+# is dead, a zombie or reused and no descendant it was last observed with remains
+# (also for a disappearance predicate); never pass the waiting test's own PID.
+# Silence means no change in any --progress-file or COUNT_FILE, outcome-specific
+# observables only, for the inactivity interval:
+# by default the operational 15-quiet-minute no-progress policy owned by
+# bin/fm-duration.py (NO_PROGRESS_LIMIT, via progress-check's "default"), with
+# --inactivity a failure-fixture override. An unreadable count or sample is
+# unknown and retried, never a stall. Every failure returns 1 only after one
+# final predicate probe, so completion at peer exit wins. Invalid
+# arguments/observer errors return 2. No peer is killed; its owner retains
+# cleanup. Predicates must be quick, nonblocking probes and may be shell
+# functions; each probe runs in a subshell with output suppressed. The probe and
+# count run every 0.1s; the observer runs at the repo's progress cadence,
+# min(1, inactivity / 4) seconds (communicate_progress in bin/fm-duration.py),
+# and at once when kill -0 first shows the peer gone.
+fm_test_wait_until() (
+  local pid=0 inactivity=default progress_record rc cycles=0 tally='' base='' count reached
+  local cadence=10 tick=0 exited=0
+  local paths=() observer=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --while-alive)
+        [ "$#" -ge 2 ] || return 2
+        pid=$2
+        case "$pid" in ''|*[!0-9]*|0) return 2 ;; esac
+        [ "$pid" != "$$" ] || return 2
+        shift 2 ;;
+      --progress-file)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        paths+=("$2")
+        shift 2 ;;
+      --cycles)
+        [ "$#" -ge 3 ] && [ -n "$3" ] && [ -z "$tally" ] || return 2
+        case "$2" in ''|*[!0-9]*|0) return 2 ;; esac
+        cycles=$2 tally=$3
+        paths+=("$3")
+        shift 3 ;;
+      --inactivity)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        inactivity=$2
+        shift 2 ;;
+      --) shift; break ;;
+      *) printf 'fm_test_wait_until: expected observation options then -- COMMAND\n' >&2; return 2 ;;
+    esac
+  done
+  [ "$#" -gt 0 ] || return 2
+  [ "$pid" -gt 0 ] || [ "${#paths[@]}" -gt 0 ] || return 2
+  read_count() {
+    count=0
+    [ ! -e "$tally" ] || count=$(cat "$tally" 2>/dev/null) || count=''
+    case "$count" in ''|*[!0-9]*) return 1 ;; esac
+  }
+  [ -z "$tally" ] || ! read_count || base=$count
+  if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+  progress_record=$(mktemp "$FM_TEST_TMPDIR/.fm-test-wait.XXXXXX") || return 2
+  trap 'rm -f "$progress_record"' EXIT
+  observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$progress_record" "$pid" "$inactivity")
+  [ "${#paths[@]}" -eq 0 ] || observer+=("${paths[@]}")
+  [ "$pid" -eq 0 ] || observer+=(--while-alive)
+  [ "$inactivity" = default ] \
+    || cadence=$(awk -v seconds="$inactivity" 'BEGIN { ticks = int(seconds * 2.5); print (ticks < 1 ? 1 : (ticks > 10 ? 10 : ticks)) }') \
+    || return 2
+  while :; do
+    reached=0
+    if [ -n "$tally" ] && read_count; then
+      if [ -z "$base" ]; then
+        base=$count
+      elif [ "$count" -ge $((base + cycles)) ]; then
+        reached=1
+      fi
+    fi
+    if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+    if [ "$reached" -eq 1 ]; then
+      printf 'fm_test_wait_until: condition unmet after %s peer cycles (%s -> %s in %s)\n' "$cycles" "$base" "$count" "$tally" >&2
+      return 1
+    fi
+    rc=0
+    if [ "$pid" -gt 0 ] && [ "$exited" -eq 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+      exited=1 tick=0
+    fi
+    if [ "$tick" -eq 0 ]; then
+      "${observer[@]}" || rc=$?
+      tick=$cadence
+    fi
+    tick=$((tick - 1))
+    case "$rc" in
+      0) ;;
+      3|124)
+        if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+        printf 'fm_test_wait_until: condition unmet (%s, pid=%s)\n' "$rc" "$pid" >&2
+        return 1 ;;
+      *) return 2 ;;
+    esac
+    sleep 0.1  # Observation cadence, not a failure deadline.
+  done
+)
 
 # fm_test_tree_leash <command...>
 # Runs a test's command tree under a stop on the tree's OWN process count.

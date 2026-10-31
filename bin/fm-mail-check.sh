@@ -26,22 +26,19 @@
 #
 # Reporting keeps state/.mail-check as the news key, but prints whenever
 # the poll is not a proven no-op. A proven no-op is a repeated identical
-# line, not a timeout, with no publication evidence. Publication evidence
-# is a timeout, fail-closed-after-queue diagnostics, a queued mail: check
-# key, or growth of state/.mail-woken. Same-line silence is only for a
-# proven no-op: successful poll with no new mail, or a repeated pre-wake
-# failure (missing env, connection refused before wake_for, missing
-# python3, missing fm-mail.sh, heal could not record a uid) that cannot
-# have queued mail. Fail-closed after a queued wake and timeout always
-# doorbell.
+# line with no publication evidence. Publication evidence is
+# fail-closed-after-queue diagnostics, a queued mail: check key, or growth of
+# state/.mail-woken. Same-line silence is only for a proven no-op: successful
+# poll with no new mail, or a repeated pre-wake failure (missing env,
+# connection refused before wake_for, missing python3, missing fm-mail.sh,
+# heal could not record a uid) that cannot have queued mail. Every pass prints
+# while a mail: row is still waiting in the wake queue, judged from the queue,
+# so mail queued by a poll that was later stopped still doorbells.
 #
-# The poll must finish inside the watcher's per-check bound
-# (FM_CHECK_TIMEOUT, default 30, read from this check's own environment
-# because the watcher runs it as a direct child). The internal budget
-# FM_MAIL_CHECK_BUDGET (default 15, valid 5..25) is cut down to whatever fits
-# inside that bound before the poll starts. A poll that does not finish is a
-# real condition, so the budget is enforced rather than assumed: a timed-out
-# poll reports one line naming the budget instead of leaving the check silent.
+# The poll has no stop of its own. FM_MAIL_TIMEOUT bounds each IMAP/SMTP
+# socket read, and the whole check runs under the watcher's check progress
+# rule. A check the watcher stops is unknown and retried next pass, never a
+# clean inbox or mail failure.
 set -u
 export LC_ALL=C
 
@@ -93,31 +90,6 @@ record_epoch_now() {
   esac
 }
 
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
-case "$CHECK_TIMEOUT" in
-  ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;;
-esac
-
-BUDGET_SECS=${FM_MAIL_CHECK_BUDGET:-15}
-case "$BUDGET_SECS" in
-  ''|*[!0-9]*|0)
-    printf 'fm-mail-check: FM_MAIL_CHECK_BUDGET must be a whole number from 5 to 25\n' >&2
-    exit 2
-    ;;
-esac
-if [ "$BUDGET_SECS" -lt 5 ] || [ "$BUDGET_SECS" -gt 25 ]; then
-  printf 'fm-mail-check: FM_MAIL_CHECK_BUDGET must be a whole number from 5 to 25\n' >&2
-  exit 2
-fi
-
-# fm_run_timed counts a whole second before it alarms, so the budget has to fit
-# inside the watcher's own bound with the alarm and kill margins left over.
-BUDGET_MAX=$((CHECK_TIMEOUT - 3))
-[ "$BUDGET_MAX" -ge 1 ] || BUDGET_MAX=1
-if [ "$BUDGET_SECS" -gt "$BUDGET_MAX" ]; then
-  BUDGET_SECS=$BUDGET_MAX
-fi
-
 # One poll summary, built only from the poll's own combined output. The
 # poll's own "fm-mail: ..." diagnostics name the missing setup value, the
 # missing python3, or the failure precisely, so they are preferred to a raw
@@ -168,6 +140,10 @@ record_write() {
   return 0
 }
 
+mail_rows_undrained() {
+  [ -s "$STATE/.wake-queue" ] && grep -q $'\tcheck\tmail:' "$STATE/.wake-queue"
+}
+
 # True when this poll has publication evidence, so a repeated diagnostic is
 # not a proven no-op. Stdout is a side channel; the durable ledger (queued
 # mail: check keys, or growth of .mail-woken) is the same record the poll
@@ -175,15 +151,12 @@ record_write() {
 # "woke for".
 poll_has_publication_evidence() {
   local rc=${1:-0} out=$2 woken_before=$3
-  [ "$rc" -eq 124 ] && return 0
   if [ -n "$out" ] && printf '%s\n' "$out" | grep -E \
     '^fm-mail: woke for |the wake stays queued|could not clear retry for recovered' >/dev/null
   then
     return 0
   fi
-  if [ -s "$STATE/.wake-queue" ] && grep -q $'\tcheck\tmail:' "$STATE/.wake-queue"; then
-    return 0
-  fi
+  mail_rows_undrained && return 0
   if [ -f "$STATE/.mail-woken" ]; then
     if [ -z "$woken_before" ] || [ ! -f "$woken_before" ] \
       || ! cmp -s "$woken_before" "$STATE/.mail-woken"; then
@@ -207,10 +180,8 @@ action_check() {
   if [ ! -x "$MAIL_BIN" ]; then
     line="fm-mail.sh is missing next to this check ($MAIL_BIN)"
   else
-    out=$(fm_run_timed "$BUDGET_SECS" "$MAIL_BIN" poll 2>&1) || rc=$?
-    if [ "${rc:-0}" -eq 124 ]; then
-      line="poll did not finish within the ${BUDGET_SECS}s budget"
-    elif [ "${rc:-0}" -ne 0 ]; then
+    out=$("$MAIL_BIN" poll 2>&1) || rc=$?
+    if [ "${rc:-0}" -ne 0 ]; then
       line=$(poll_summary "$rc" "$out")
     elif printf '%s\n' "$out" | grep '^fm-mail: woke for ' >/dev/null; then
       # A successful poll can still surface new mail: the poll itself already
@@ -227,12 +198,15 @@ action_check() {
   # Report before recording, so a record that cannot be written costs a
   # repeated report rather than a lost one. The record keeps the whole line so
   # the news key and the printed report never diverge. Invert the print gate:
-  # emit unless this poll is a proven no-op (same line, not a timeout, and no
-  # publication evidence).
+  # emit unless this poll is a proven no-op (same line and no publication
+  # evidence).
   if poll_has_publication_evidence "${rc:-0}" "${out:-}" "$woken_before"; then
     queued=1
   fi
   [ -n "$woken_before" ] && rm -f -- "$woken_before"
+  if [ -z "$line" ] && mail_rows_undrained; then
+    line="queued mail is waiting to be drained"
+  fi
   if [ -n "$line" ] && { [ "$line" != "$RECORD_REPORTED" ] || [ "$queued" -eq 1 ]; }; then
     fm_cap_line_var "mail: $line" "$MAX_LINE"
     printf '%s\n' "$FM_LINE_CAP_LINE"
@@ -383,6 +357,7 @@ action_arm() {
 
 action_disarm() {
   rm -f -- "$CHECK_SHIM" "$CHECK_TRUST" "$RECORD"
+  fm_check_stop_episode_clear "$STATE" "$CHECK_ID"
   printf 'disarmed: state/%s.check.sh\n' "$CHECK_ID"
   return 0
 }
