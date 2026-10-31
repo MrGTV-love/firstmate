@@ -1,7 +1,9 @@
 // Deterministic worker tool coverage and outbound-call policy. No model or network
 // requests occur here. docs/configuration.md "Jev guard" owns the grant contract.
 import { lstatSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "remote-storage";
 type ToolPolicy = (
@@ -116,21 +118,51 @@ function destinationClass(value: string): value is DestinationClass {
   return Object.hasOwn(classes, value);
 }
 
-/** Missing grants deny; sourceOk records readability, not authorization validity. */
-export function egressGranted(state: string, task: string, destination: DestinationClass): { granted: boolean; sourceOk: boolean } {
+/** Exact policy lookup, not a model question or prose-derived permission. */
+function decodeGrant(value: unknown): DestinationClass[] {
+  if (!Array.isArray(value) || !value.every((entry: unknown) => typeof entry === "string" && destinationClass(entry))) {
+    throw new Error("Invalid egress needs: expected an array of recognized destination classes");
+  }
+  return value;
+}
+
+/** Read only the unfenced directive in Firstmate spec, using the brief section owner. */
+export function briefEgress(brief: string): DestinationClass[] {
+  if (!lstatSync(brief).isFile()) throw new Error("Egress brief must be a regular, non-symlinked file");
+  const content = readFileSync(brief, "utf8");
+  if (content.includes("\0")) throw new Error("Egress brief must not contain NUL bytes");
+  const headingOwner = resolve(dirname(fileURLToPath(import.meta.url)), "fm-brief-heading-lib.sh");
+  const body = execFileSync("bash", ["-c", '. "$1"; task=$(fm_brief_heading_body "$2" "# Task") || exit; fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"$task"', "_", headingOwner, brief], { encoding: "utf8" });
+  const entries = body.split("\n").filter(line => line.startsWith("Egress needs:"));
+  if (entries.length === 0) return [];
+  if (entries.length !== 1) throw new Error("Egress needs must appear at most once in Firstmate spec");
+  const requested = decodeGrant(JSON.parse(entries[0].slice("Egress needs:".length)));
+  return Object.keys(classes).filter((entry): entry is DestinationClass => destinationClass(entry) && requested.includes(entry));
+}
+
+/** Grants never turn on find for an otherwise ineligible worker or change a secondmate. */
+export function nativeFindEnabled(grant: readonly DestinationClass[], project: string, noHelpers: boolean, kind: string): boolean {
+  return project === "firstmate" && !noHelpers && (kind === "secondmate" || grant.includes("semantic-search"));
+}
+
+function recordedEgress(state: string, task: string): { grant: DestinationClass[]; sourceOk: boolean } {
   let sourceOk = false;
   try {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return { granted: false, sourceOk };
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return { grant: [], sourceOk };
     const path = resolve(state, `${task}.meta`);
-    if (!lstatSync(path).isFile()) return { granted: false, sourceOk };
+    if (!lstatSync(path).isFile()) return { grant: [], sourceOk };
     const content = readFileSync(path, "utf8");
     sourceOk = true;
     const entries = content.split("\n").filter((line) => line.startsWith("egress="));
-    if (entries.length !== 1) return { granted: false, sourceOk };
-    const grant: unknown = JSON.parse(entries[0].slice("egress=".length));
-    if (!Array.isArray(grant) || !grant.every((entry: unknown) => typeof entry === "string" && destinationClass(entry))) return { granted: false, sourceOk };
-    return { granted: grant.includes(destination), sourceOk };
-  } catch { return { granted: false, sourceOk }; }
+    if (entries.length !== 1) return { grant: [], sourceOk };
+    return { grant: decodeGrant(JSON.parse(entries[0].slice("egress=".length))), sourceOk };
+  } catch { return { grant: [], sourceOk }; }
+}
+
+/** Missing grants deny; sourceOk records readability, not authorization validity. */
+export function egressGranted(state: string, task: string, destination: DestinationClass): { granted: boolean; sourceOk: boolean } {
+  const { grant, sourceOk } = recordedEgress(state, task);
+  return { granted: grant.includes(destination), sourceOk };
 }
 
 /** A learn call carrying a skill also writes a managed skill, so it takes manage_skill's write owner. */
@@ -176,4 +208,19 @@ export function memoryEgress(tool: string, setting: ((id: string) => unknown) | 
   if ((tool !== "retain" && tool !== "learn") || llmMode === "none") return undefined;
   return llmMode === "smol" || llmMode === "remote" ? `makes a Mnemopi extraction model call (mnemopi.llmMode=${llmMode})`
     : "could not be proven local because mnemopi.llmMode is not none, smol or remote";
+}
+
+// Launch interface: <runtime> bin/fm-jev-egress.ts brief <brief> | record <state> <task>
+// | find <grant-json> <project> <no-helpers:0|1> <kind>. Never prints input on failure.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const [command, ...args] = process.argv.slice(2);
+    if (command === "brief" && args.length === 1) console.log(JSON.stringify(briefEgress(args[0])));
+    else if (command === "record" && args.length === 2) console.log(JSON.stringify(recordedEgress(args[0], args[1]).grant));
+    else if (command === "find" && args.length === 4) console.log(nativeFindEnabled(decodeGrant(JSON.parse(args[0])), args[1], args[2] !== "0", args[3]) ? "on" : "off");
+    else throw new Error("Invalid egress command");
+  } catch {
+    console.error("error: invalid or unreadable task egress input; use one Egress needs: JSON array of recognized destination classes in Firstmate spec");
+    process.exitCode = 2;
+  }
 }

@@ -212,7 +212,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         await guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
-            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
+            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}report the missing egress=${JSON.stringify([destination])} to Firstmate for stopped-task redispatch with an explicit Egress needs directive; never enlarge a live task grant. No outbound call was made.`);
         }
       }
       if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });

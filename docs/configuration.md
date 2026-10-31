@@ -2957,10 +2957,17 @@ The rule is deterministic and needs neither a model verdict nor a working provid
 Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
-Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
-An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
-Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+Before ship/scout dispatch, Firstmate records the task's authorized needs in one unfenced `Egress needs: ["semantic-search","web"]` directive inside `## Firstmate spec` under `# Task`.
+Only the existing classes `semantic-search`, `web`, `browser`, `provider` and `remote-storage` are recognized; no keyword inference, wildcard, project-wide permission or trust exemption exists.
+The scaffold starts with `Egress needs: []`, and an absent directive in a legacy brief also means no authorization.
+Duplicate directives, malformed JSON, non-string or unknown members, NUL bytes, unreadable input or a symlinked brief refuse fresh dispatch before worker provisioning; fenced examples do not authorize anything.
+The spawn atomically publishes exactly one canonical `egress=` JSON-array line in `state/<task>.meta` before launch, including an empty grant, and declares the resolved classes in the generated launch brief.
+Native omp semantic `find` is constructed only when that grant includes `semantic-search` and the existing Firstmate-project and helper eligibility also permits it; otherwise the final task overlay sets `find.enabled: off`, removing it from the native registry, model tools and ordinary Eval tool bridge rather than offering a tool that must refuse.
+A relaunch reconstructs find from the recorded grant, not an edited brief, and promotion preserves that grant; neither operation adds authorization to a running task.
+Persistent secondmates keep their existing native-find eligibility and do not gain this worker grant policy.
+The runtime grant backstop stays fail closed: an absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; a grant naming the removed `subagent` class grants nothing.
+Only Firstmate may authorize task metadata at dispatch; a worker reports a mismatch for stopped-task redispatch and never writes or enlarges its live grant.
+This construction change covers native find only: other egress-classed tools retain their existing runtime grant checks, and omp's separately advertised Eval judge/completion provider helpers remain an unresolved native capability gap, not a claim of network confinement.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
