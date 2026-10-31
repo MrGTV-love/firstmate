@@ -138,6 +138,29 @@ class CardRenderingTest(unittest.TestCase):
                       'Evidence: https://example.com/pull/1\n', text)
         self.assertEqual(text.count('see CI run 1234'), 1)
 
+    def test_repeated_decision_sought_keeps_every_value_in_order(self):
+        text = self.render('Decision sought: Merge PR 1?\nDecision sought: Merge PR 2?\nBrief: Both are green.')
+        self.assertIn('Decision sought: Merge PR 1?\nMerge PR 2?\nBrief description of issue: Both are green.\n', text)
+
+    def test_legacy_repeated_recommendation_keeps_every_value_in_order(self):
+        text = self.render('Choose a rollout.\nRecommendation: A first.\nRecommendation: B second.')
+        self.assertIn('Question: Choose a rollout.\nRecommendation: A first.\nB second.\n', text)
+        self.assertEqual(text.count('A first.'), 1)
+
+    def test_repeated_evidence_links_first_valid_and_shows_the_rest(self):
+        for structured in (False, True):
+            with self.subTest(structured=structured):
+                lead = 'Decision sought: Merge?' if structured else 'Should we merge?'
+                text = self.render(lead + '\nEvidence: see CI run 1234\nEvidence: /tmp/a.md\nEvidence: /tmp/b.md')
+                if structured:
+                    self.assertIn('Decision sought: Merge?\nEvidence: /tmp/a.md\n'
+                                  'Evidence: see CI run 1234\nEvidence: /tmp/b.md\n', text)
+                else:
+                    self.assertIn('Question: Should we merge?\nEvidence: see CI run 1234\n'
+                                  'Evidence: /tmp/b.md\nEvidence: /tmp/a.md\n', text)
+                for value in ('see CI run 1234', '/tmp/a.md', '/tmp/b.md'):
+                    self.assertEqual(text.count(value), 1)
+
     def test_body_fields_do_not_include_unlabeled_prose(self):
         for structured in (False, True):
             for label in ('Decision sought', 'Brief', 'Recommendation', 'Alternatives', 'Evidence'):

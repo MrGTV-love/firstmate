@@ -188,14 +188,19 @@ def parse_fields(lines, remainder=None, multiline=False, loose=None):
         match = re.match(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$', line)
         if match and match.group(1) == 'Evidence':
             value = match.group(2).strip()
-            if value and value.lower() != 'none recorded' and not evidence_pointer(value):
+            if (value and value.lower() != 'none recorded'
+                    and (not evidence_pointer(value) or (multiline and fields.get('Evidence')))):
                 match = None
                 current = None
         if match:
             current = match.group(1)
             if current == 'Brief description of issue':
                 current = 'Brief'
-            fields[current] = match.group(2).strip()
+            value = match.group(2).strip()
+            if multiline:
+                value = '\n'.join(part for part in (fields.get(current), value)
+                                  if part and part.lower() != 'none recorded')
+            fields[current] = value
             if remainder is not None and current not in ('Recommendation', 'Evidence'):
                 remainder.append(line)
             if current == 'Evidence':
