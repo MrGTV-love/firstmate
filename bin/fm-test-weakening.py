@@ -3,8 +3,9 @@
 
 Usage: fm-test-weakening.py --repo DIR --base SHA --head SHA [--output FILE]
 
-Reads an exact-commit git diff, with renames disabled so a move cannot hide a
-removed test. Deliberately conservative: any deleted non-comment test/fixture
+Reads the git diff from the merge base of the exact base and head commits to
+the head, so later base-branch changes are never reported as PR removals, with
+renames disabled so a move cannot hide a removed test. Deliberately conservative: any deleted non-comment test/fixture
 line is flagged, including data rows and test bodies without an assert keyword.
 Assertion removals in other files and increased numeric time/retry/iteration
 bounds are also flagged. This is a review signal, not a design-quality verdict.
@@ -130,7 +131,7 @@ def main():
             if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha):
                 raise ValueError("base and head must be exact full commit shas")
         result = subprocess.run(["git", "-C", str(args.repo), "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                                 "--unified=3", args.base, args.head, "--"], capture_output=True, text=True, check=False,
+                                 "--unified=3", f"{args.base}...{args.head}", "--"], capture_output=True, text=True, check=False,
                                 env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
         if result.returncode:
             raise ValueError(result.stderr.strip())

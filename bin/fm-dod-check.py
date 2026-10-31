@@ -2,7 +2,9 @@
 """Validate and execute machine-checkable task criteria.
 
 Usage:
-  fm-dod-check.py validate --dod FILE
+  fm-dod-check.py plan --dod FILE --repo DIR --base SHA --head SHA --output DIR
+  fm-dod-check.py exec --task JSON --repo DIR --head SHA --output DIR
+  fm-dod-check.py record --plan DIR --legs DIR --execute-result RESULT --output DIR
   fm-dod-check.py run --dod FILE --repo DIR --base SHA --head SHA --output DIR
   fm-dod-check.py freeze --brief FILE --state DIR --task ID
   fm-dod-check.py dispatch --meta FILE --pr URL
@@ -21,7 +23,19 @@ dod-evidence.yml on the repository default branch through gh-axi, so the
 workflow, this checker and the weakened-test detector run from code the PR
 cannot change; the candidate tree is checked out only as data to test. A
 default branch without that workflow is reported, never bootstrapped.
-verify refuses a run whose workflow ref is not the default branch.
+verify refuses a run whose workflow ref is not the default branch or whose
+workflow commit is not in that branch's history.
+The workflow splits evidence across process and machine boundaries: plan runs
+trusted code over the candidate as data, lists one task per gate command and
+per fail-first phase, and runs the weakened-test detector; exec runs exactly one
+task's command in its own matrix runner; record, on a runner that executes no
+candidate command, takes only each leg's exit code and log, writes command,
+commit and digests itself, and fails unless every leg job succeeded. run is the
+same plan, exec and record in one local process: smoke evidence only.
+The base is the PR base GitHub reported at dispatch, recorded by plan. Changed
+tests, the fail-first base tree and the weakened-test diff use the merge base of
+that base and the head. verify accepts that recorded base while it is in the
+live base's history, so an unrelated base advance never invalidates evidence.
 claims prints the minimal claims JSON for a finished run: one id/run_id pointer
 per frozen mandatory item. The reviewer adds an accept ruling with a reason for
 each weakened-test flag that verify names.
@@ -39,16 +53,17 @@ which proves automated execution, not design quality. The reviewer still grades
 semantic adequacy. Each weakened-test flag needs an explicit accept with a reason.
 CI's exact-head artifact, run attempt, successful default-branch run,
 DoD digest, all gate commands, fail-first results, logs and file:line must resolve.
-Local runs are smoke evidence only; the resolver requires GitHub's successful
-default-branch run record and its exact-head artifact, not a model's
-statement of success.
+The resolver requires GitHub's successful default-branch run record and its
+exact-head artifact, not a model's statement of success. verify exits 3 when
+hosted or local evidence cannot be reached and 1 when evidence was read and
+does not resolve.
 Test paths named anywhere in an item's fields use tests/<name>.test.sh.
-For changed named tests, the HEAD test is overlaid onto an exported base tree:
-absence of a new test on base is not fail-first proof. Other files stay at base.
-Both trees are git archives of exact full commits, never the caller's dirty tree.
-The output directory must not exist; it holds command logs and results.json,
-bound to the DoD digest, commits and GitHub run. Logs include exit codes and
-SHA-256 digests. Commands run without forge credentials on a disposable runner.
+For changed named tests, the HEAD test is overlaid onto an exported merge-base
+tree: absence of a new test on base is not fail-first proof. Other files stay
+at base. Trees are git archives of exact full commits, never the caller's dirty
+tree. Output directories must not exist; record's holds command logs and
+results.json, bound to the DoD digest, commits and GitHub run. Logs include
+exit codes and SHA-256 digests. Commands run without forge credentials.
 A nonzero base exit and zero head exit are required for every changed named test.
 """
 import argparse
@@ -66,6 +81,10 @@ import tempfile
 
 class CheckError(Exception):
     """Invalid criteria or unavailable commit evidence."""
+
+
+class Unavailable(CheckError):
+    """Hosted evidence could not be reached; nothing was read to judge."""
 
 
 def digest(data):
@@ -150,78 +169,140 @@ def export(repo, sha, destination):
         archive.extractall(destination, filter="data")
 
 
-def execute(command, cwd, output, name, context):
+def execute(command, cwd, output, name, sha):
     log = output / f"{name}.log"
     # No token, credentials, or Actions control-file paths go to PR commands.
     environment = {key: value for key, value in os.environ.items()
                    if key in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")}
-    environment.update(FM_DOD_HEAD=context["head"], FM_DOD_BASE=context["base"])
     print(f"command: {json.dumps(command)}", flush=True)
     with log.open("wb") as stream:
-        stream.write(f"command: {command}\ncommit: {context['commit']}\n".encode())
+        stream.write(f"command: {command}\ncommit: {sha}\n".encode())
         stream.flush()
         invocation = ["bash", "-o", "pipefail", "-c", command]
         result = subprocess.run(invocation, cwd=cwd, env=environment,
                                 stdout=stream, stderr=subprocess.STDOUT, check=False)
         stream.write(f"\nexit: {result.returncode}\n".encode())
     print(f"exit: {result.returncode}\nlog: {json.dumps(log.name)}", flush=True)
-    return {"command": command, "commit": context["commit"], "exit": result.returncode,
+    return {"command": command, "commit": sha, "exit": result.returncode,
             "log": log.name, "sha256": digest(log.read_bytes())}
 
 
-def run(args, raw, items):
-    repo = args.repo.resolve()
-    base, head = commit(repo, args.base), commit(repo, args.head)
-    output = args.output.resolve()
+def plan_into(repo, base, head, raw, items, output):
+    repo = repo.resolve()
+    base, head = commit(repo, base), commit(repo, head)
+    merge_base = git(repo, "merge-base", base, head).decode().strip()
     output.mkdir(parents=True, exist_ok=False)
-    changed = set(git(repo, "diff", "--name-only", "-z", base, head, "--", "tests").decode().split("\0"))
-    manifest = {"schema": "fm-dod-evidence.v1", "head": head, "base": base,
-                "dod_sha256": digest(raw), "run_id": os.environ.get("GITHUB_RUN_ID", ""),
-                "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
-                "items": [], "tests": []}
-    passed = True
-    print(f"head: {head}\nbase: {base}\ndod_sha256: {manifest['dod_sha256']}", flush=True)
+    changed = set(git(repo, "diff", "--name-only", "-z", merge_base, head, "--", "tests").decode().split("\0"))
+    tasks = [{"name": f"gate-{item['id']}", "kind": "gate", "id": item["id"],
+              "command": item["command"], "commit": head}
+             for item in items if item["mandatory"] and item["fields"]["Authority"] == "gate"]
+    for index, path in enumerate(sorted(set(named_tests(raw.decode())) & changed)):
+        for phase, sha in (("base", merge_base), ("head", head)):
+            tasks.append({"name": f"test-{index}-{phase}", "kind": "test", "path": path,
+                          "phase": phase, "command": f"bash {path}", "commit": sha})
+    detected = subprocess.run([sys.executable, str(BIN / "fm-test-weakening.py"), "--repo", str(repo),
+                               "--base", base, "--head", head, "--output", str(output / "weakening.json")],
+                              capture_output=True, text=True, check=False)
+    if detected.returncode not in (0, 1):
+        raise CheckError(f"weakened-test detector failed: {detected.stdout.strip()}")
+    print(detected.stdout, end="", flush=True)
+    (output / "plan.json").write_text(json.dumps({"schema": "fm-dod-plan.v1", "head": head, "base": base,
+                                                  "merge_base": merge_base, "dod_sha256": digest(raw),
+                                                  "tasks": tasks}, indent=2) + "\n")
+    (output / "dod.md").write_bytes(raw)
+    print(f"head: {head}\nbase: {base}\nmerge_base: {merge_base}\ntasks: {len(tasks)}", flush=True)
+    return tasks
+
+
+def exec_into(repo, head, task, output):
+    repo = repo.resolve()
+    head = commit(repo, head)
+    sha = commit(repo, task["commit"])
+    name = task["name"]
+    if not re.fullmatch(r"(gate|test)-[A-Za-z0-9_.-]+", name) or task["kind"] not in ("gate", "test"):
+        raise CheckError("invalid evidence task")
+    output.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="fm-dod-") as scratch:
-        scratch = Path(scratch)
-        head_tree = scratch / "head"
-        export(repo, head, head_tree)
-        # Commands can mutate their tree. Each test receives a fresh base and
-        # head export so a previous command cannot manufacture a pass/failure.
-        for item in items:
-            if item["mandatory"] and item["fields"]["Authority"] == "gate":
-                tree = scratch / f"gate-{item['id']}"
-                export(repo, head, tree)
-                result = execute(item["command"], tree, output, f"gate-{item['id']}",
-                                 {"head": head, "base": base, "commit": head})
-                result["id"] = item["id"]
-                manifest["items"].append(result)
-                passed = result["exit"] == 0 and passed
-        named = sorted(set(named_tests(raw.decode())) & changed)
-        for index, path in enumerate(named):
-            source = head_tree / path
-            if source.is_symlink() or not source.is_file():
+        # Each command receives a fresh exact-commit export of its own.
+        tree = Path(scratch) / "tree"
+        export(repo, sha, tree)
+        if task["kind"] == "test":
+            # The HEAD test is overlaid onto the base tree; other files stay at base.
+            path = task["path"]
+            if named_tests(path) != [path]:
+                raise CheckError(f"invalid named test path: {path}")
+            mode = git(repo, "ls-tree", head, "--", path).decode().split(" ", 1)[0]
+            if mode not in ("100644", "100755"):
                 raise CheckError(f"changed named test is absent or a symlink at head: {path}")
-            result = {"path": path}
-            for phase, sha in (("base", base), ("head", head)):
-                tree = scratch / f"test-{index}-{phase}"
-                export(repo, sha, tree)
-                target = tree / path
-                if target.is_symlink() or any(parent.is_symlink() for parent in target.parents):
-                    raise CheckError(f"test path traverses a symlink: {path}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(source.read_bytes())
-                result[phase] = execute(f"bash {path}", tree, output, f"test-{index}-{phase}",
-                                        {"head": head, "base": base, "commit": sha})
-            result["passed"] = result["base"]["exit"] != 0 and result["head"]["exit"] == 0
-            passed = result["passed"] and passed
-            manifest["tests"].append(result)
-            print(f"test: {json.dumps(path)}\nfail_first: {'pass' if result['passed'] else 'fail'}", flush=True)
+            target = tree / path
+            if target.is_symlink() or any(parent.is_symlink() for parent in target.parents):
+                raise CheckError(f"test path traverses a symlink: {path}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(git(repo, "show", f"{head}:{path}"))
+        result = execute(task["command"], tree, output, name, sha)
+    (output / f"{name}.json").write_text(json.dumps({**result, "name": name}) + "\n")
+    return result
+
+
+def record_into(plan_dir, legs, execute_result, output):
+    plan = json.loads(safe_artifact(plan_dir, "plan.json"))
+    raw = safe_artifact(plan_dir, "dod.md")
+    weakening_bytes = safe_artifact(plan_dir, "weakening.json")
+    weakening = json.loads(weakening_bytes)
+    head, base, tasks = plan.get("head"), plan.get("base"), plan.get("tasks")
+    if (plan.get("schema") != "fm-dod-plan.v1" or plan.get("dod_sha256") != digest(raw)
+            or not isinstance(tasks, list) or weakening.get("schema") != "fm-test-weakening.v1"
+            or weakening.get("head") != head or weakening.get("base") != base):
+        raise CheckError("plan artifact does not bind this DoD, base and head")
+    output.mkdir(parents=True, exist_ok=False)
+    rows = {}
+    for task in tasks:
+        # Only the leg's exit and log come from its isolated runner; the
+        # command, commit and digest are this trusted recorder's own.
+        directory = legs / f"leg-{task['name']}"
+        result = json.loads(safe_artifact(directory, f"{task['name']}.json"))
+        if result.get("name") != task["name"] or type(result.get("exit")) is not int or result.get("log") != f"{task['name']}.log":
+            raise CheckError(f"isolated leg result does not match its planned task: {task['name']}")
+        log = safe_artifact(directory, result["log"])
+        (output / result["log"]).write_bytes(log)
+        rows[task["name"]] = {"command": task["command"], "commit": task["commit"], "exit": result["exit"],
+                              "log": result["log"], "sha256": digest(log)}
+        print(f"command: {json.dumps(task['command'])}\ncommit: {task['commit']}\nexit: {result['exit']}", flush=True)
+    passed = execute_result == "success" or (execute_result == "skipped" and not tasks)
+    manifest = {"schema": "fm-dod-evidence.v1", "head": head, "base": base, "merge_base": plan.get("merge_base"),
+                "dod_sha256": digest(raw), "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+                "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""), "items": [], "tests": []}
+    for task in tasks:
+        row = rows[task["name"]]
+        if task["kind"] == "gate":
+            manifest["items"].append({**row, "id": task["id"]})
+            passed = row["exit"] == 0 and passed
+        elif task["phase"] == "head":
+            base_row = rows[task["name"].removesuffix("-head") + "-base"]
+            test = {"path": task["path"], "base": base_row, "head": row,
+                    "passed": base_row["exit"] != 0 and row["exit"] == 0}
+            passed = test["passed"] and passed
+            manifest["tests"].append(test)
+            print(f"test: {json.dumps(task['path'])}\nfail_first: {'pass' if test['passed'] else 'fail'}", flush=True)
     manifest["passed"] = passed
     (output / "results.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (output / "summary.log").write_text(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {'pass' if passed else 'fail'}\n")
     (output / "dod.md").write_bytes(raw)
-    print(f"result: {'pass' if passed else 'fail'}", flush=True)
+    (output / "weakening.json").write_bytes(weakening_bytes)
+    print(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {'pass' if passed else 'fail'}", flush=True)
     return 0 if passed else 1
+
+
+def run(args, raw, items):
+    output = args.output.resolve()
+    if output.exists() or output.is_symlink():
+        raise CheckError("output directory must not exist")
+    with tempfile.TemporaryDirectory(prefix="fm-dod-local-") as scratch:
+        scratch = Path(scratch)
+        tasks = plan_into(args.repo, args.base, args.head, raw, items, scratch / "plan")
+        for task in tasks:
+            exec_into(args.repo, args.head, task, scratch / "legs" / f"leg-{task['name']}")
+        return record_into(scratch / "plan", scratch / "legs", "success", output)
 
 
 def forge_api(endpoint):
@@ -232,7 +313,7 @@ def forge_api(endpoint):
                             capture_output=True, text=True, check=False)
     match = re.search(r"^  body: ([A-Za-z0-9+/=]+)$", result.stdout, re.M)
     if result.returncode or not match or "  truncated: false" not in result.stdout:
-        raise CheckError(f"cannot resolve GitHub evidence: {endpoint}: {result.stderr.strip()}")
+        raise Unavailable(f"cannot resolve GitHub evidence: {endpoint}: {result.stderr.strip()}")
     return json.loads(base64.b64decode(match[1], validate=True))
 
 
@@ -324,6 +405,10 @@ def verify_evidence(args, claims):
                     raise CheckError(f"{item['id']}: CI run is missing, unfinished, failed, or not the DoD workflow")
                 if run.get("head_branch") != trusted_ref:
                     raise CheckError(f"{item['id']}: CI workflow ref is not the default branch {trusted_ref}")
+                workflow_sha = str(run.get("head_sha", ""))
+                if (not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", workflow_sha)
+                        or forge_api(f"/repos/{repo}/compare/{workflow_sha}...{trusted_ref}").get("status") not in ("identical", "ahead")):
+                    raise CheckError(f"{item['id']}: CI workflow commit is not in default branch {trusted_ref} history")
                 artifacts = forge_api(f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100")
                 name = f"fm-dod-evidence-{head}"
                 matches = [a for a in artifacts.get("artifacts", []) if a.get("name") == name and not a.get("expired")]
@@ -333,15 +418,21 @@ def verify_evidence(args, claims):
                 downloaded = subprocess.run(["gh-axi", "run", "download", run_id, "--repo", repo,
                                              "--name", name, "--dir", str(directory)], capture_output=True, text=True, check=False)
                 if downloaded.returncode:
-                    raise CheckError("cannot download recorded CI evidence artifact")
+                    raise Unavailable("cannot download recorded CI evidence artifact")
                 manifest = json.loads(safe_artifact(directory, "results.json"))
+                recorded = commit(worktree, str(manifest.get("base", "")))
+                ancestry = subprocess.run(["git", "-C", str(worktree), "merge-base", "--is-ancestor", recorded, base],
+                                          capture_output=True, check=False, env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
+                if ancestry.returncode:
+                    raise CheckError("CI evidence base is not in the live PR base history")
+                merge_base = git(worktree, "merge-base", recorded, head).decode().strip()
                 if (manifest.get("schema") != "fm-dod-evidence.v1" or manifest.get("head") != head
-                        or manifest.get("base") != base or manifest.get("dod_sha256") != digest(raw)
+                        or manifest.get("merge_base") != merge_base or manifest.get("dod_sha256") != digest(raw)
                         or str(manifest.get("run_id")) != run_id
                         or str(manifest.get("run_attempt")) != str(run.get("run_attempt"))
                         or manifest.get("passed") is not True
                         or safe_artifact(directory, "dod.md") != raw):
-                    raise CheckError("CI artifact does not prove this frozen DoD at this base/head/run attempt")
+                    raise CheckError("CI artifact does not prove this frozen DoD at this dispatch base/head/run attempt")
                 gates = {row.get('id'): row for row in manifest.get('items', [])}
                 required_gates = {i['id'] for i in items if i['fields']['Authority'] == 'gate'}
                 if set(gates) != required_gates:
@@ -351,13 +442,13 @@ def verify_evidence(args, claims):
                     if row.get('command') != by_id[gate_id]['command'] or row.get('commit') != head or row.get('exit') != 0:
                         raise CheckError("CI gate command/result does not match frozen criteria")
                     logs[row['log']] = row['sha256']
-                expected_tests = set(named_tests(raw.decode())) & set(git(worktree, 'diff', '--name-only', base, head, '--', 'tests').decode().splitlines())
+                expected_tests = set(named_tests(raw.decode())) & set(git(worktree, 'diff', '--name-only', merge_base, head, '--', 'tests').decode().splitlines())
                 tests = manifest.get('tests', [])
                 if {row.get('path') for row in tests} != expected_tests or len(tests) != len(expected_tests):
                     raise CheckError("CI fail-first evidence omits a changed named test")
                 for test in tests:
                     if (test.get('passed') is not True or test['base'].get('exit') == 0
-                            or test['base'].get('commit') != base or test['head'].get('exit') != 0
+                            or test['base'].get('commit') != merge_base or test['head'].get('exit') != 0
                             or test['head'].get('commit') != head):
                         raise CheckError("CI fail-first proof did not fail on base and pass on head")
                     for phase in ('base', 'head'):
@@ -371,12 +462,12 @@ def verify_evidence(args, claims):
                 summary = safe_artifact(directory, 'summary.log')
                 logs['summary.log'] = digest(summary)
                 weakening = json.loads(safe_artifact(directory, 'weakening.json'))
-                if weakening.get('schema') != 'fm-test-weakening.v1' or weakening.get('head') != head or weakening.get('base') != base:
+                if weakening.get('schema') != 'fm-test-weakening.v1' or weakening.get('head') != head or weakening.get('base') != recorded:
                     raise CheckError("weakened-test evidence does not match this PR diff")
                 # Recompute flags with trusted local detector too: the reviewer
                 # must explicitly accept each exact removed/raised line.
                 detected = subprocess.run([sys.executable, str(BIN / 'fm-test-weakening.py'), '--repo', str(worktree),
-                                           '--base', base, '--head', head, '--output', str(Path(scratch) / 'weakening.json')],
+                                           '--base', recorded, '--head', head, '--output', str(Path(scratch) / 'weakening.json')],
                                           capture_output=True, check=False)
                 if detected.returncode not in (0, 1) or json.loads((Path(scratch) / 'weakening.json').read_text()) != weakening:
                     raise CheckError("CI weakened-test flags do not resolve against the exact diff")
@@ -413,14 +504,23 @@ def verify_evidence(args, claims):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("validate", "run"):
+    for action in ("plan", "run"):
         command = sub.add_parser(action)
         command.add_argument("--dod", type=Path, required=True)
-        if action == "run":
-            command.add_argument("--repo", type=Path, required=True)
-            command.add_argument("--base", required=True)
-            command.add_argument("--head", required=True)
-            command.add_argument("--output", type=Path, required=True)
+        command.add_argument("--repo", type=Path, required=True)
+        command.add_argument("--base", required=True)
+        command.add_argument("--head", required=True)
+        command.add_argument("--output", type=Path, required=True)
+    command = sub.add_parser("exec")
+    command.add_argument("--task", required=True)
+    command.add_argument("--repo", type=Path, required=True)
+    command.add_argument("--head", required=True)
+    command.add_argument("--output", type=Path, required=True)
+    command = sub.add_parser("record")
+    command.add_argument("--plan", type=Path, required=True)
+    command.add_argument("--legs", type=Path, required=True)
+    command.add_argument("--execute-result", required=True)
+    command.add_argument("--output", type=Path, required=True)
     for action in ("dispatch", "claims", "verify"):
         command = sub.add_parser(action)
         command.add_argument("--meta", type=Path, required=True)
@@ -445,13 +545,21 @@ def main():
             return emit_claims(args)
         if args.action == "verify":
             return verify_evidence(args, json.load(sys.stdin))
+        if args.action == "exec":
+            exec_into(args.repo, args.head, json.loads(args.task), args.output.resolve())
+            return 0
+        if args.action == "record":
+            return record_into(args.plan.resolve(), args.legs.resolve(), args.execute_result, args.output.resolve())
         raw = args.dod.read_bytes()
         items = items_from(raw.decode())
-        if args.action == "run":
-            return run(args, raw, items)
-        print(f"result: valid\nmandatory_items: {sum(item['mandatory'] for item in items)}\ndod_sha256: {digest(raw)}")
-        return 0
-    except (CheckError, OSError, ValueError, KeyError, TypeError, tarfile.TarError) as exc:
+        if args.action == "plan":
+            plan_into(args.repo, args.base, args.head, raw, items, args.output.resolve())
+            return 0
+        return run(args, raw, items)
+    except (Unavailable, OSError) as exc:
+        print(f"error: {json.dumps(str(exc))}\nhelp: Hosted or local evidence is unreachable; retry when it can be read.")
+        return 3
+    except (CheckError, ValueError, KeyError, TypeError, tarfile.TarError) as exc:
         print(f"error: {json.dumps(str(exc))}\nhelp: Supply filled criteria with Verify and an exact Check for each gate item.")
         return 1
 

@@ -88,6 +88,21 @@ flags = inspect('renamed-test', 1)
 assert any(f['file'] == 'tests/subject.test.sh' for f in flags)
 print('ok - renaming cannot hide removal of a test')
 
+# A base branch that moved on after the branch point is not a PR removal.
+git('checkout', '-q', base)
+put('tests/subject.test.sh', git('show', base + ':tests/subject.test.sh') + '\nassert_equal later "$main"\n')
+git('commit', '-qam', 'base branch adds a later check')
+advanced = git('rev-parse', 'HEAD')
+git('checkout', '-q', base)
+put('bin/new-feature.py', 'feature = 1\n')
+git('add', '.')
+git('commit', '-qm', 'branch change')
+branch = git('rev-parse', 'HEAD')
+output = temp / 'advanced-base.json'
+call(sys.executable, detector, '--repo', repo, '--base', advanced, '--head', branch, '--output', output)
+assert json.loads(output.read_text())['flags'] == []
+print('ok - later base-branch additions are not reported as removed by the PR')
+
 out = call(sys.executable, detector, '--repo', repo, '--base', 'main', '--head', base, expected=2)
 assert 'exact full commit' in out
 print('ok - invalid revision inputs are errors rather than clean verdicts')

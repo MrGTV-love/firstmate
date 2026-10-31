@@ -157,10 +157,9 @@
 # unfenced "DoD file: <absolute path>" line inside that same span, naming an
 # existing file that passes the same placeholder check, is the one narrow escape; the
 # line anywhere else in the brief is ignored. A secondmate charter never reaches
-# the check because it carries no such sections. A brief with no such section at
-# all (scaffolded before it existed) is not refused: a fresh spawn warns once and
-# the supervision sweep reports a missing or placeholder section instead of
-# inventing criteria.
+# the check because it carries no such sections. A fresh ship or scout spawn
+# refuses a brief with no such section at all; the supervision sweep reports a
+# missing or placeholder section instead of inventing criteria.
 # fm_brief_dispatch_problems is the single dispatch verdict over the same brief:
 # it prints every unfinished Task body and every leftover Definition of Done
 # placeholder in one pass, in the order an operator fills them, so a half-filled
@@ -495,8 +494,10 @@ fm_dod_mandatory_body() {  # <text> <inline|file>
 # prose after it is not part of the item. Ids are unique. Text outside an item,
 # such as the scaffold's own instruction line, is not itself a criterion and is
 # ignored; a label-led line with no item id is reported instead of silently
-# accepted.
-fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
+# accepted. Modes dispatch and items also require a Check on each gate item;
+# the default mode, used for plan construction and the single-problem reading,
+# keeps the pre-dispatch-freeze shape.
+fm_dod_criteria_problem() {  # <mandatory-items-body> [dispatch|items]
   local body=$1 mode=${2:-problems} out
   out=$(printf '%s\n' "$body" | awk -v mode="$mode" -v check_field="$FM_DOD_CHECK_FIELD" \
     -v idre="^($FM_DOD_ITEM_ID_PATTERN)\$" -v lead="$FM_DOD_ITEM_LEAD" \
@@ -519,13 +520,16 @@ fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
       for (k in seen) delete seen[k]
       for (k in value) delete value[k]
     }
-    function quote(s,   result, j, c) {
+    function quote(s,   result, j, c, k) {
+      if (!control_ready) {
+        for (k = 1; k < 32; k++) control[sprintf("%c", k)] = sprintf("\\u%04x", k)
+        control_ready = 1
+      }
       result = "\""
       for (j = 1; j <= length(s); j++) {
         c = substr(s, j, 1)
         if (c == "\\" || c == "\"") result = result "\\" c
-        else if (c == "\t") result = result "\\t"
-        else if (c == "\r") result = result "\\r"
+        else if (c in control) result = result control[c]
         else result = result c
       }
       return result "\""
@@ -586,7 +590,7 @@ fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
       }
       check = trim(value[check_field])
       if (length(check) >= 2 && substr(check, 1, 1) == "`" && substr(check, length(check), 1) == "`") check = trim(substr(check, 2, length(check) - 2))
-      if (tolower(auth) == "gate" && check == "") {
+      if (mode != "problems" && tolower(auth) == "gate" && check == "") {
         print "mandatory item " id " with Authority gate requires an exact Check command"
         bad = 1
       }
@@ -736,7 +740,7 @@ fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
     return 0
   fi
   body=$(fm_dod_mandatory_body "$text" "$scope")
-  fm_dod_criteria_problem "$body"
+  fm_dod_criteria_problem "$body" dispatch
 }
 
 # Print every reason a ship or scout brief cannot be dispatched, one line per
@@ -1774,7 +1778,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         '--criteria validates a dispatch brief and exports the selected criteria bytes; --items validates criteria and prints mandatory items as JSON using the same parser.' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
         'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
-        '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'
+        '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule, check_field, check_required_authority.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>, --shape (or --help)' >&2; exit 2 ;;
   esac

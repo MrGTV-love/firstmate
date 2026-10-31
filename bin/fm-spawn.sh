@@ -4636,7 +4636,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     fi
     # State records are outside the PR branch and protected from worker writes.
     # Capture the exact selected bytes before launching any worker process.
-    DOD_SNAPSHOT=$(python3 "$SCRIPT_DIR/fm-dod-check.py" freeze --brief "$BRIEF" --state "$STATE" --task "$ID") || exit 1
+    DOD_SNAPSHOT=$(python3 "$SCRIPT_DIR/fm-dod-check.py" freeze --brief "$BRIEF" --state "$STATE" --task "$ID") || {
+      printf 'task %s: Definition Of Done snapshot refused\n%s\n' "$ID" "$DOD_SNAPSHOT" >&2
+      exit 1
+    }
     DOD_FROZEN_FILE=$(printf '%s\n' "$DOD_SNAPSHOT" | jq -er '.dod_file') || exit 1
     DOD_FROZEN_SHA256=$(printf '%s\n' "$DOD_SNAPSHOT" | jq -er '.dod_sha256') || exit 1
   elif DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF" task-only); then

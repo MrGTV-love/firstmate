@@ -1195,6 +1195,27 @@ test_dispatch_verdict_task_only_scope_skips_the_exclusion_list() {
   pass "the task-only scope skips the exclusion list"
 }
 
+# A gate item needs its Check where a fresh dispatch freezes criteria; a plan for
+# a task dispatched before that rule still builds from its accepted criteria.
+test_gate_check_applies_at_dispatch_not_plan_construction() {
+  local brief out rc plan
+  brief="$TMP_ROOT/dispatch-gate-without-check.md"
+  write_exclusion_brief "$brief" 'None.'
+  awk -v item="$(fm_test_dod_item C1 Authority=gate)" '/^- C1 / { print item; next } { print }' "$brief" > "$brief.gate"
+  mv "$brief.gate" "$brief"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a fresh dispatch accepted a gate item without a Check"
+  assert_contains "$out" 'mandatory item C1 with Authority gate requires an exact Check command' 'the dispatch verdict did not name the missing Check'
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1) \
+    || fail "a gate item without a Check blocked plan construction: $plan"
+  assert_contains "$plan" 'Authority: gate' 'the plan dropped the gate item'
+  awk '/^## How You.re Graded$/ { print "  - Check: true" } { print }' "$brief" > "$brief.check"
+  mv "$brief.check" "$brief"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a gate item with a Check did not pass the dispatch verdict: $out"
+  pass 'a gate Check is required at fresh dispatch but not for verification-plan construction'
+}
+
 # The stated exclusions are what independent review receives, through the
 # verification plan built from the same brief.
 test_verification_plan_carries_the_stated_exclusions() {
@@ -1568,6 +1589,7 @@ test_dispatch_verdict_passes_a_filled_brief
 test_dispatch_verdict_refuses_a_blank_exclusion_list
 test_dispatch_verdict_accepts_none_as_the_exclusion_answer
 test_dispatch_verdict_task_only_scope_skips_the_exclusion_list
+test_gate_check_applies_at_dispatch_not_plan_construction
 test_verification_plan_carries_the_stated_exclusions
 test_exclusion_list_does_not_satisfy_an_empty_firstmate_spec
 test_spec_content_survives_the_exclusion_list

@@ -816,8 +816,6 @@ artifact = case / 'machine-artifact'
 env = dict(os.environ, GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1')
 call(sys.executable, root / 'bin/fm-dod-check.py', 'run', '--dod', frozen,
      '--repo', repo, '--base', base, '--head', head, '--output', artifact, env=env)
-call(sys.executable, root / 'bin/fm-test-weakening.py', '--repo', repo,
-     '--base', base, '--head', head, '--output', artifact / 'weakening.json', allowed=(0, 1))
 flags = json.loads((artifact / 'weakening.json').read_text())['flags']
 if not existing:
     assert flags and flags[0]['file'] == 'fixtures/rows.txt'
@@ -828,6 +826,7 @@ claims = {'items': [{'id': 'C1', 'run_id': '123', 'commit': head}],
     'path': '.github/workflows/dod-evidence.yml', 'head_branch': 'main', 'head_sha': base, 'run_attempt': 1,
     'status': 'completed', 'conclusion': 'success', 'repository': {'full_name': forge_repo}}))
 (case / 'machine-repo.json').write_text(json.dumps({'default_branch': 'main'}))
+(case / 'machine-compare.json').write_text(json.dumps({'status': 'identical'}))
 (case / 'machine-artifacts.json').write_text(json.dumps({'total_count': 1, 'artifacts': [
     {'name': f'fm-dod-evidence-{head}', 'expired': False}]}))
 (case / 'github-base').write_text(base + '\n')
@@ -844,8 +843,9 @@ import base64, os, re, shutil, sys
 from pathlib import Path
 case = Path(__file__).resolve().parent.parent
 args = sys.argv[1:]
-if args[:1] == ['api'] and ('/actions/runs/123' in args[1] or re.fullmatch(r'/repos/[^/]+/[^/]+', args[1])):
-    name = 'machine-artifacts.json' if '/artifacts?' in args[1] else 'machine-run.json' if '/actions/' in args[1] else 'machine-repo.json'
+if args[:1] == ['api'] and ('/actions/runs/123' in args[1] or '/compare/' in args[1] or re.fullmatch(r'/repos/[^/]+/[^/]+', args[1])):
+    name = ('machine-artifacts.json' if '/artifacts?' in args[1] else 'machine-run.json' if '/actions/' in args[1]
+            else 'machine-compare.json' if '/compare/' in args[1] else 'machine-repo.json')
     print('api_response:\n  body: ' + base64.b64encode((case / name).read_bytes()).decode() + '\n  truncated: false')
 elif args[:3] == ['run', 'download', '123']:
     shutil.copytree(case / 'machine-artifact', args[args.index('--dir') + 1])

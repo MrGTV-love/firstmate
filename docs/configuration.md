@@ -1891,6 +1891,8 @@ Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery co
 Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
 The grading section says a session that did not build the work grades it; that each mandatory item is graded pass, fail, or unresolved; that a downstream-pending item is never a pass but does not by itself block proceeding, while any other unresolved item blocks; that supporting items never offset a failed mandatory one; and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
+It also refuses a brief with no well-formed mandatory item, or with a mandatory `Authority: gate` item that has no `  - Check: <exact bash command>` sub-bullet; the verification plan and the single-problem reading keep accepting a gate item without one.
+On acceptance it freezes the exact selected criteria bytes at `state/<task>.dod.<sha256>.md` and records `dod_file` and `dod_sha256` in the task meta before the worker starts; `bin/fm-dod-check.py --help` owns that snapshot and the machine-checked evidence that uses it.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
 A filled section may quote a placeholder inside a sentence.
@@ -1898,7 +1900,7 @@ The one escape is an unfenced `DoD file: <absolute path>` line inside that secti
 A `DoD file:` line in a fenced example or anywhere else in the brief is ignored.
 A relaunch (`bin/fm-spawn.sh --relaunch`) never runs the check, so a criteria file that moves later cannot block it.
 Secondmate charters carry neither section and are never checked.
-A fresh spawn of a brief with no such section at all is not refused: it prints one warning line on stderr that names the missing section and the task id, and carries on.
+A fresh spawn of a brief with no such section at all is refused, naming the missing section.
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
 The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.

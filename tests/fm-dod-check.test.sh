@@ -39,8 +39,12 @@ C1 Source: repair request
 '''
 
 def validate(text, expected=0):
+    # The criteria owner's --items is the one parser CI and merge share.
     dod.write_text(text)
-    return call(sys.executable, checker, 'validate', '--dod', dod, expected=expected)
+    result = subprocess.run(['bash', str(root / 'bin/fm-dod-lib.sh'), '--items', str(dod)],
+                            text=True, capture_output=True)
+    assert result.returncode == expected, (result.returncode, result.stdout, result.stderr)
+    return result.stdout + result.stderr
 
 git('init', '-q')
 git('config', 'user.email', 'test@example.invalid')
@@ -183,15 +187,33 @@ assert not list(state.glob('missing.dod.*'))
 print('ok - dispatch freezes selected bytes and digest outside the branch, refuses absent criteria, and ignores later criteria rewrites')
 
 # Forge calls alone are stubbed. Produce real command logs and exact-commit diff
-# records; the resolver must independently check their identities and digests.
+# records through the workflow's own plan, isolated exec and trusted record steps;
+# the resolver must independently check their identities and digests.
 artifact = temp / 'hosted-artifact'
-call(sys.executable, checker, 'run', '--dod', frozen, '--repo', repo, '--base', base,
-     '--head', head, '--output', artifact, env=environment)
+plan_dir, legs = temp / 'hosted-plan', temp / 'hosted-legs'
+call(sys.executable, checker, 'plan', '--dod', frozen, '--repo', repo, '--base', base,
+     '--head', head, '--output', plan_dir)
+tasks = json.loads((plan_dir / 'plan.json').read_text())['tasks']
+assert [task['name'] for task in tasks] == ['gate-C1', 'test-0-base', 'test-0-head', 'test-1-base', 'test-1-head']
+for task in tasks:
+    call(sys.executable, checker, 'exec', '--task', json.dumps(task), '--repo', repo, '--head', head,
+         '--output', legs / f"leg-{task['name']}")
+call(sys.executable, checker, 'record', '--plan', plan_dir, '--legs', legs, '--execute-result', 'failure',
+     '--output', temp / 'failed-leg-record', env=environment, expected=1)
+leg = legs / 'leg-gate-C1' / 'gate-C1.json'
+honest = leg.read_text()
+leg.write_text(json.dumps({**json.loads(honest), 'command': 'true', 'commit': base, 'sha256': '0' * 64}))
+recorded = call(sys.executable, checker, 'record', '--plan', plan_dir, '--legs', legs, '--execute-result', 'success',
+                '--output', artifact, env=environment)
 manifest = json.loads((artifact / 'results.json').read_text())
-weakening = artifact / 'weakening.json'
-call(sys.executable, root / 'bin/fm-test-weakening.py', '--repo', repo, '--base', base, '--head', head,
-     '--output', weakening, expected=1)
-flags = json.loads(weakening.read_text())['flags']
+assert manifest['passed'] is True and manifest['items'][0]['command'] == tasks[0]['command']
+assert manifest['items'][0]['commit'] == head
+assert manifest['items'][0]['sha256'] == hashlib.sha256((artifact / 'gate-C1.log').read_bytes()).hexdigest()
+assert f"command: {json.dumps(tasks[0]['command'])}" in recorded and 'exit: 0' in recorded
+leg.write_text(honest)
+flags = json.loads((artifact / 'weakening.json').read_text())['flags']
+assert flags
+print('ok - the trusted recorder writes command, commit and digests itself, takes only exit and log from isolated legs, and fails when any leg job failed')
 pointer = {'id': 'C1', 'run_id': '123', 'commit': head, 'file': 'value', 'line': 1,
            'log': manifest['items'][0]['log'], 'log_sha256': manifest['items'][0]['sha256']}
 claims = {'items': [pointer], 'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Replaced unconditional exit with a real regression.'} for f in flags]}
@@ -201,6 +223,7 @@ run_record = {'id': 123, 'event': 'workflow_dispatch', 'path': '.github/workflow
 run_file = temp / 'run.json'
 run_file.write_text(json.dumps(run_record))
 (temp / 'repo.json').write_text(json.dumps({'default_branch': 'main'}))
+(temp / 'compare.json').write_text(json.dumps({'status': 'identical'}))
 (temp / 'pr.json').write_text(json.dumps({'state': 'open', 'head': {'ref': 'fm/test', 'sha': head}}))
 artifacts_file = temp / 'artifacts.json'
 artifacts_file.write_text(json.dumps({'total_count': 1, 'artifacts': [{'name': f'fm-dod-evidence-{head}', 'expired': False}]}))
@@ -213,9 +236,13 @@ from pathlib import Path
 import shutil, sys
 root = Path(os.environ['FM_FORGE_FIXTURE'])
 args = sys.argv[1:]
+if os.environ.get('FM_FORGE_DOWN'):
+    sys.exit(1)
 if args[0] == 'api':
     if args[1].endswith('/artifacts?per_page=100'):
         name = 'artifacts.json'
+    elif '/compare/' in args[1]:
+        name = 'compare.json'
     elif '/actions/runs/' in args[1]:
         name = 'run.json'
     elif args[1].endswith('/pulls/9'):
@@ -234,10 +261,10 @@ else:
 stub.chmod(0o755)
 forge_env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'], FM_FORGE_FIXTURE=str(temp))
 
-def resolve(document=claims, expected=0):
+def resolve(document=claims, expected=0, live_base=base, env=forge_env):
     result = subprocess.run([sys.executable, str(checker), 'verify', '--meta', str(meta),
-                             '--pr', 'https://github.com/example/repo/pull/9', '--base', base, '--head', head],
-                            input=json.dumps(document), capture_output=True, text=True, env=forge_env)
+                             '--pr', 'https://github.com/example/repo/pull/9', '--base', live_base, '--head', head],
+                            input=json.dumps(document), capture_output=True, text=True, env=env)
     assert result.returncode == expected, (result.stdout, result.stderr)
     return result.stdout
 
@@ -254,12 +281,23 @@ run_file.write_text(json.dumps({**run_record, 'conclusion': 'failure'}))
 resolve(expected=1)
 run_file.write_text(json.dumps({**run_record, 'head_branch': 'fm/test', 'head_sha': head}))
 assert 'not the default branch' in resolve(expected=1)
+# A tag named like the default branch carries its own workflow commit.
+run_file.write_text(json.dumps({**run_record, 'head_sha': head}))
+(temp / 'compare.json').write_text(json.dumps({'status': 'diverged'}))
+assert 'not in default branch main history' in resolve(expected=1)
+(temp / 'compare.json').write_text(json.dumps({'status': 'identical'}))
 run_file.write_text(json.dumps(run_record))
+advanced = git('commit-tree', base + '^{tree}', '-p', base, '-m', 'unrelated base advance')
+assert 'evidence: resolved' in resolve(live_base=advanced)
+orphan = git('commit-tree', base + '^{tree}', '-m', 'unrelated history')
+assert 'not in the live PR base history' in resolve(live_base=orphan, expected=1)
+down = resolve(expected=3, env=dict(forge_env, FM_FORGE_DOWN='1'))
+assert 'cannot resolve GitHub evidence' in down
 original_log = (artifact / pointer['log']).read_bytes()
 (artifact / pointer['log']).write_text('fabricated pass\n')
 resolve(expected=1)
 (artifact / pointer['log']).write_bytes(original_log)
-print('ok - real machine proof resolves; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, PR-branch workflow runs and missing exact-line rulings refuse')
+print('ok - real machine proof resolves across an unrelated base advance; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, non-default workflow refs or commits, foreign base history and missing exact-line rulings refuse, and unreachable evidence exits 3')
 
 call(sys.executable, checker, 'dispatch', '--meta', meta, '--pr', 'https://github.com/example/repo/pull/9', env=forge_env)
 dispatched = json.loads((temp / 'dispatched.json').read_text())
@@ -296,5 +334,8 @@ assert 'not machine-checked: no dispatch-time DoD digest' in legacy.stderr
 call(sys.executable, record, 'captain-word', '--pr', 'https://github.com/example/repo/pull/9',
      '--head', head, '--words', 'Merge this exact PR.', env=review_env)
 assert call(*verify_args, env=review_env).strip() == 'review: captain-word'
+unreachable = json.loads(call(*verify_args[:-1], '--review-only', '--machine-checked', '--json', expected=1,
+                              env=dict(review_env, FM_FORGE_DOWN='1')))
+assert unreachable['ok'] is False and unreachable['error']['kind'] == 'unavailable'
 print('ok - review copies pointers immutably and resolves them for an independent PASS; a task without a dispatch digest and captain words keep their existing route')
 PY

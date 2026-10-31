@@ -20,8 +20,9 @@ all resolve, and any weakened-test ruling needs a reader whose family is not an
 author family. A refusal names the dispatch and claims commands. The
 captain-word basis keeps its existing route. A task without dod_sha256 keeps the
 existing contract, and verify prints "not machine-checked: no dispatch-time DoD
-digest" on stderr. fm-pr-merge.sh supplies it on GitHub; the readiness ledger
-uses the same mode. Without it verify reports review authority only.
+digest" on stderr. Evidence that cannot be reached is unavailable, not
+not-qualified. fm-pr-merge.sh supplies it on GitHub; the readiness ledger uses
+the same mode. Without it verify reports review authority only.
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
 FM_STATE_OVERRIDE selects its state directory, as in the PR merge/poll helpers.
@@ -671,6 +672,8 @@ def main():
                                                    "--pr", pr, "--head", args.head, "--base", args.base],
                                                   input=json.dumps(evidence.get("dod_evidence", {})),
                                                   capture_output=True, text=True, check=False)
+                        if resolved.returncode == 3:
+                            raise UnavailableError(f"machine-checked DoD evidence unavailable: {resolved.stdout.strip()} {resolved.stderr.strip()}")
                         if resolved.returncode:
                             raise VerificationError(f"machine-checked DoD unresolved: {resolved.stdout.strip()} {resolved.stderr.strip()}{repair}")
                 if emit_json:
