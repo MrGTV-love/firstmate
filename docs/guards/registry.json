@@ -5232,36 +5232,39 @@
       "id": "turnend-supervision-block",
       "owner": "bin/fm-turnend-guard.sh",
       "sites": [
-        {
-          "file": "bin/fm-turnend-guard.sh",
-          "match": "guard_event deny --source-ok \"$source_ok\""
-        },
-        {
-          "file": "bin/fm-turnend-guard.sh",
-          "match": "block_stop",
-          "key": "site:bin/fm-turnend-guard.sh:42636292f3",
-          "count": 2
-        },
-        {
-          "file": "bin/fm-turnend-guard.sh",
-          "match": "budget_account_current_epoch block || block_stop"
-        },
-        {
-          "file": "bin/fm-turnend-guard.sh",
-          "match": "exit 2",
-          "key": "site:bin/fm-turnend-guard.sh:f05ba9904f",
-          "count": 2
-        },
-        {
-          "file": "bin/fm-turnend-guard.sh",
-          "match": "fm_failure_episode_reset \"$STATE\" || exit 2",
-          "count": 2
-        }
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "guard_event deny --source-ok \"$source_ok\""
+          },
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "block_stop",
+            "key": "site:bin/fm-turnend-guard.sh:42636292f3",
+            "count": 1
+          },
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "exit 2",
+            "key": "site:bin/fm-turnend-guard.sh:f05ba9904f",
+            "count": 1
+          },
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "--cleared-by budget-unavailable"
+          },
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "--cleared-by budget-exhausted"
+          },
+          {
+            "file": "bin/fm-turnend-guard.sh",
+            "match": "[ \"$COUNT\" -gt \"$BLOCK_BUDGET\" ] || block_stop"
+          }
       ],
-      "invariant": "an in-flight primary turn never ends while no live watcher supervises this home",
+      "invariant": "on the Claude Stop-hook path, a primary without live supervision receives at most three charged blocks per failure episode, then an attended failure diagnostic, and a budget that cannot be locked or written never blocks: it allows with one repair warning and a reasoned warn event; other harnesses keep their per-turn loop suppression and have no per-episode budget; live supervision never blocks on episode bookkeeping",
       "layer": "runtime-block",
-      "source": "state/<id>.status in-flight rows, state/.last-watcher-beat age, watcher lock owner",
-      "trigger": "in-flight task, source, check, or queued wake exists and no live watcher holds state/<id>.lock past the derived grace",
+      "source": "supervision need, state/.last-watcher-beat age, identity-matched state/.watch.lock owner or away/quiet daemon",
+      "trigger": "a task, source, check, relay poll, or queued wake needs supervision and fm_supervision_liveness proves no live owner",
       "remedy": "bin/fm-supervision-instructions.sh --repair-line (renders this home's arm command: claude bin/fm-claude-stop-autoarm.sh, codex bin/fm-watch-checkpoint.sh --seconds <n>, grok <grok_arm>, pi/omp in-editor arm tool)",
       "budget": 3,
       "test": "tests/fm-turnend-guard.test.sh",
@@ -5291,8 +5294,8 @@
       "owner": "bin/fm-guard.sh",
       "invariant": "a fleet command warns when supervision is not live",
       "layer": "runtime-warn",
-      "source": "watcher lock, beacon age, per-actor pending wake rows",
-      "trigger": "a fleet mutation runs while the watcher is unhealthy or wake rows are pending for this actor",
+      "source": "fm_supervision_liveness: identity-matched watcher lock or away/quiet daemon and beacon age",
+      "trigger": "a fleet command runs while the turn-end liveness predicate is off or unknown; queued wakes retain their independent warning",
       "remedy": "bin/fm-supervision-instructions.sh --repair-line (renders the arm command for this harness and home)",
       "budget": 1,
       "test": "tests/fm-guard-stale-banner.test.sh",
