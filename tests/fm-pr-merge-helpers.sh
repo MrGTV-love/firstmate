@@ -870,7 +870,7 @@ write_github_outcome() {
 write_away_record() {
   local case_dir=$1
   shift
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-afk-contract.sh" enter "$@" >/dev/null
 }
 
@@ -879,7 +879,7 @@ write_away_record() {
 # from the real hold format. Args: case_dir
 hold_fixture_task() {
   local case_dir=$1
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
       --title 'Fixture captain call' \
@@ -945,7 +945,7 @@ review_record_command() {
     identity=(--task task-x1 --base "$(cat "$case_dir/github-base")")
   fi
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-review-record.py" "$command" ${identity[@]+"${identity[@]}"} "$@"
 }
 
