@@ -35,6 +35,12 @@ DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # A failure of one thread's own read, journaled-row post, or resolution post must not stop the other
 # threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
+
+
+def deferrable(error):
+    return str(error) in THREAD_ERRORS or str(error).startswith('secondmate_')
+
+
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
@@ -312,11 +318,10 @@ class Watch:
     def owners(self):
         if not hasattr(self, '_owners'):
             result = run('fm-slack-mirror.sh', '--registered-homes')
-            if result.returncode:
-                raise SlackError(flat(result.stderr).strip() or 'secondmate_registry_unavailable')
             fields = result.stdout.split('\0')[:-1]
-            if len(fields) % 3:
-                raise SlackError('secondmate_registry_unavailable')
+            if result.returncode or len(fields) % 3:
+                raise SlackError('secondmate_registry_unavailable: '
+                                 + (flat(result.stderr).strip() or 'unparseable registered homes'))
             self._owners = [dict(zip(('id', 'home', 'host'), fields[i:i + 3]))
                             for i in range(0, len(fields), 3)]
         return self._owners
@@ -334,7 +339,8 @@ class Watch:
 
     def probe(self, key, owner=None):
         result = self.owner_run(owner, 'fm-captain-hold.sh', 'open', key, '--identity')
-        if result.returncode not in (0, 1, 2):
+        refused = bool(owner and owner['host'] and result.returncode == 1 and result.stderr.strip())
+        if refused or result.returncode not in (0, 1, 2):
             raise self.owner_error(owner) if owner else SlackError('open_probe_failed')
         return result.returncode, result.stdout.strip() or 'unknown'
 
@@ -362,7 +368,8 @@ class Watch:
         except ValueError:
             raise self.owner_error(owner) if owner else SlackError('backlog_unavailable')
         if not snapshot.get('backlog', {}).get('present'):
-            if owner:
+            if owner and not owner['host'] and not (Path(owner['home']).is_dir()
+                                                    and os.access(owner['home'], os.R_OK | os.X_OK)):
                 raise self.owner_error(owner)
             return []
         return snapshot['backlog'].get('records', [])
@@ -603,7 +610,9 @@ class Watch:
                 lines = result.stdout.splitlines()
                 if not any(line.startswith('answers: ') for line in lines):
                     self.detail = flat(result.stderr).strip()[:200]
-                    raise SlackError('answer_intake_failed')
+                    owner = pending.get('owner')
+                    raise SlackError('secondmate_answer_intake_failed: %s (%s)' % (owner['id'], owner['home'])
+                                     if owner else 'answer_intake_failed')
                 for line in lines:
                     if not line.startswith('answers: '):
                         self.say(line)
@@ -639,7 +648,7 @@ class Watch:
             try:
                 self.publish(pending)
             except SlackError as error:
-                if str(error) not in THREAD_ERRORS and not str(error).startswith('secondmate_home_unavailable:'):
+                if not deferrable(error):
                     raise
                 deferred = deferred or error
             remaining -= self.advanced - advanced
@@ -648,9 +657,19 @@ class Watch:
     def mirror(self):
         if not self.bound():
             return
-        self.mirror_home()
         errors = []
-        for owner in self.owners():
+        try:
+            self.mirror_home()
+        except SlackError as error:
+            if str(error) != 'backlog_unavailable':
+                raise
+            errors.append(str(error))
+        try:
+            owners = self.owners()
+        except SlackError as error:
+            errors.append(str(error))
+            owners = []
+        for owner in owners:
             try:
                 self.mirror_home(owner)
             except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
@@ -741,7 +760,7 @@ class Watch:
                               + '\nThe decision is no longer open. Full resolution remains in the local backlog.',
                               record['ts'])
             except SlackError as error:
-                if str(error) not in THREAD_ERRORS and not str(error).startswith('secondmate_home_unavailable:'):
+                if not deferrable(error):
                     raise
                 deferred = deferred or error
                 continue
@@ -845,7 +864,7 @@ class Watch:
             except SlackError as error:
                 # One thread's own failure (for example a card the owner deleted) is held
                 # back and reported once; every other thread is still read.
-                if str(error) not in THREAD_ERRORS and not str(error).startswith('secondmate_home_unavailable:'):
+                if not deferrable(error):
                     raise
                 self.read_threads.discard(record['ts'])
                 remaining -= self.advanced - advanced

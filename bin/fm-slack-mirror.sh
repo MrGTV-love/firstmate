@@ -11,7 +11,7 @@ if [ "${1:-}" = --registered-homes ]; then
   # shellcheck source=bin/fm-secondmate-registry-lib.sh
   . "$script_dir/fm-secondmate-registry-lib.sh"
   if ! secondmate_registry_validate_bindings "$registry" secondmate_registry_path_key; then
-    printf 'slack: refused: %s\n' "$SECONDMATE_REGISTRY_ERROR" >&2
+    printf '%s\n' "$SECONDMATE_REGISTRY_ERROR" >&2
     exit 1
   fi
   while IFS= read -r line || [ -n "$line" ]; do

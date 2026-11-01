@@ -3474,6 +3474,10 @@ Secondmate cards identify their owning home, and that placement stays with both 
 The owner is the registered id, host, and home; a remote `root:` is only where `bin/fm-on.sh` runs, so moving the code root keeps the same card and thread.
 A removed or changed registration refuses delivery to the old card's owner rather than selecting a replacement home: a journaled answer is acknowledged as not applied, and the poll reports the orphaned thread once with a `check: slack <thread> - orphaned thread:` line and a thread reply, then stops tracking it, so it never masks a current unreadable-home refusal.
 An unreadable registered home is named in the mirror's failure output; readable homes and existing threads remain eligible for processing.
+A readable home that keeps no `data/backlog.md` has no calls rather than a refusal, and a failed main-home snapshot is reported beside, not instead of, the secondmate homes' cards.
+A remote probe that `bin/fm-on.sh` itself refuses, such as an ambiguous route, is an unreadable home, never a closed call, so its thread stays open.
+When the registry itself is refused, that refusal is reported and no secondmate home is mirrored or answered until it is fixed; journaled secondmate answers wait, and main-home cards and answers continue.
+A failed answer intake in a secondmate home likewise keeps that answer journaled without holding back main-home answers.
 Only the mirroring home's `slack-dm` binding and Slack configuration are needed; no second mirror or secondmate Slack credential is required.
 It does not create decisions, reconcile them, or change merge authority.
 The terminal, board, inbox, and existing decision records remain authoritative and unchanged.

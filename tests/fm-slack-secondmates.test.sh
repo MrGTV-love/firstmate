@@ -56,6 +56,12 @@ assert argv[0] in ('fm-fleet-snapshot.sh', 'fm-remote-file.sh', 'fm-captain-hold
 assert not any(key.startswith('SLACK_') for key in os.environ)
 with open(Path(home).parent / 'routes.jsonl', 'a') as log:
     log.write(json.dumps({'root': root, 'home': home, 'argv': argv}) + '\\n')
+if not os.path.isdir(home):
+    sys.stderr.write('error: remote home is not a safe directory\\n')
+    sys.exit(64)
+if os.environ.get('FIXTURE_REMOTE_ANSWERS_FAIL') and argv[:2] == ['fm-captain-hold.sh', 'answers']:
+    sys.stderr.write('error: remote job did not complete\\n')
+    sys.exit(70)
 env = dict(os.environ, FM_HOME=home, FM_STATE_OVERRIDE=home+'/state',
            FM_DATA_OVERRIDE=home+'/data', FM_CONFIG_OVERRIDE=home+'/config')
 os.execve('/bin/bash', ['bash', root+'/bin/'+argv[0], *argv[1:]], env)
@@ -178,5 +184,76 @@ registry.write_text(remote_line)
 out = call(main, 'fm-slack-poll.sh', *args)
 assert 'orphaned thread' not in out and 'secondmate_home_unavailable' not in out, out
 print('F3 orphan: reported once; later polls succeed without a lasting error')
+def held(home, key, at):
+    call(home, 'fm-captain-hold.sh', 'hold', key, '--title', 'Decide ' + key,
+         '--reason', 'Which way for ' + key + '?', extra={'FM_CAPTAIN_HOLD_NOW': at})
+
+empty, empty_remote = tmp / 'empty', tmp / 'empty-remote'
+for home in (empty, empty_remote):
+    for directory in ('data', 'state', 'config', 'projects'):
+        (home / directory).mkdir(parents=True)
+registry.write_text(registered
+                    + f'- empty - Empty lane (home: {empty}; scope: empty; projects: sample; added 2026-10-01)\n'
+                    + f'- empty-remote - Empty remote lane (host: fixture-host; root: {root}; home: {empty_remote}; scope: empty; projects: sample; added 2026-10-01)\n')
+out = call(main, 'fm-slack-mirror.sh', *args)
+assert 'secondmate_home_unavailable' not in out, out
+print('R2-1: readable local and remote homes without data/backlog.md have no calls, not a refusal')
+
+registry.write_text(registered)
+held(local, 'snapshot-call', '2026-10-04T00:00:00Z')
+backlog_file = main / 'data/backlog.md'
+mode = backlog_file.stat().st_mode & 0o777
+backlog_file.chmod(0)
+try:
+    out = call(main, 'fm-slack-mirror.sh', *args, code=1)
+finally:
+    backlog_file.chmod(mode)
+assert 'backlog_unavailable' in out and len(owned('snapshot-call', 'local')) == 1, (out, owned('snapshot-call', 'local'))
+print('R2-2: failed main snapshot is reported and the readable local snapshot-call still gets its card')
+
+held(remote, 'routed-call', '2026-10-05T00:00:00Z')
+call(main, 'fm-slack-mirror.sh', *args)
+routed = owned('routed-call', 'remote')
+assert len(routed) == 1, routed
+out = call(main, 'fm-slack-poll.sh', *args, code=1, extra={'FM_SSH_ALIVE_INTERVAL': 'bad'})
+assert 'secondmate_home_unavailable: remote (%s)' % remote in out, out
+assert not owned('routed-call', 'remote')[0]['retired'] and not posted('Resolved: routed-call'), out
+call(remote, 'fm-captain-hold.sh', 'open', 'routed-call')
+reply(routed[0], '999.000006', 'route a')
+out = call(main, 'fm-slack-poll.sh', *args)
+assert 'closed: routed-call' in out, out
+call(remote, 'fm-captain-hold.sh', 'open', 'routed-call', code=1)
+print('F2: an fm-on.sh routing refusal left routed-call held and tracked; a later answer closed it in remote')
+
+def blocked_owner_answer(owner_home, owner_id, key, at, fail_registry=None, fail_env=None):
+    held(owner_home, key + '-sm', at)
+    held(main, key + '-main', at)
+    call(main, 'fm-slack-mirror.sh', *args)
+    reply(owned(key + '-sm', owner_id)[0], '999.1' + at[8:10] + '1', 'secondmate answer')
+    call(main, 'fm-slack-poll.sh', *args, extra={'FM_SLACK_FAULT': 'after-stage'}, code=75)
+    pending = json.loads(state_path.read_text())['pending']
+    assert len(pending) == 1 and pending[0]['owner']['id'] == owner_id, pending
+    reply(owned(key + '-main', None)[0], '999.1' + at[8:10] + '2', 'main answer')
+    if fail_registry:
+        registry.write_text(registered + fail_registry)
+    out = call(main, 'fm-slack-poll.sh', *args, code=1, extra=fail_env)
+    registry.write_text(registered)
+    assert 'closed: %s-main' % key in out and 'closed: %s-sm' % key not in out, out
+    call(main, 'fm-captain-hold.sh', 'open', key + '-main', code=1)
+    call(owner_home, 'fm-captain-hold.sh', 'open', key + '-sm')
+    assert len(json.loads(state_path.read_text())['pending']) == 1, 'secondmate answer left the journal'
+    later = call(main, 'fm-slack-poll.sh', *args)
+    assert 'closed: %s-sm' % key in later, later
+    call(owner_home, 'fm-captain-hold.sh', 'open', key + '-sm', code=1)
+    return out
+
+out = blocked_owner_answer(local, 'local', 'registry', '2026-10-06T00:00:00Z',
+                           fail_registry=f'- broken - Broken lane (home: {tmp}/no-parent/sm; scope: broken; projects: sample; added 2026-10-01)\n')
+assert 'secondmate_registry_unavailable: unresolvable secondmate home for broken' in out, out
+print('F1 registry: refused registry kept the local answer journaled, main answer closed; answer delivered after repair')
+out = blocked_owner_answer(remote, 'remote', 'intake', '2026-10-07T00:00:00Z',
+                           fail_env={'FIXTURE_REMOTE_ANSWERS_FAIL': '1'})
+assert 'secondmate_answer_intake_failed: remote (%s)' % remote in out, out
+print('F1 intake: failed remote intake kept its answer journaled, main answer closed; answer delivered after recovery')
 print('ok - registered-home cards and crash/reload owner-home answer roundtrip')
 PY
