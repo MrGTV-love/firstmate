@@ -1,0 +1,2 @@
+base: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(worker account)=0 fm-send(empty FM_HOME)=3 rows=       3
+head: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(worker account)=0 fm-send(empty FM_HOME)=3 rows=       5

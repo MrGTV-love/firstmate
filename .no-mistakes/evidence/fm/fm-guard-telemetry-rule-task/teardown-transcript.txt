@@ -1,0 +1,10 @@
+=== A: landed work (branch on fork remote), no --force ===
+  teardown rc=0
+  rows: [{"decision":"allow","rule":"landed-work","task":"task-x1","override":false,"cleared_by":""}]
+=== B: unpushed work, no --force (refused) ===
+  teardown rc=1; REFUSED line: 1
+  rows: [{"decision":"deny","rule":"landed-work","task":"task-x1","override":false,"cleared_by":""}]
+=== C: unpushed work, --force (escape) ===
+  teardown rc=0
+  rows: [{"decision":"bypass","rule":"landed-work","task":"task-x1","override":true,"cleared_by":"force"}]
+rm: /Users/charlesabrooker/tmp/fm-teardown-tests.11okqF: Directory not empty

@@ -1,0 +1,79 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.WD9YcN
+
+=== S1 event carries rule + task; session = task ===
+rc=0
+{"guard":"pr-merge-gate","rule":"red-checks","task":"lab-t1","session":"lab-t1","decision":"deny","override":false,"actor":"main","head":"abc123","base":"main"}
+
+=== S1b no task: session is home:harness-session, stable across processes, never pid ===
+{"rule":"r-a","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.WD9YcN:1629445f-d4c5-45a5-8054-6f8fee393cd5"}
+{"rule":"r-a","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.WD9YcN:1629445f-d4c5-45a5-8054-6f8fee393cd5"}
+{"rule":"r-b","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.WD9YcN:lab-sess-9"}
+distinct unattributed sessions across 2 processes: 1
+
+=== S2 adversarial: write failure never fails caller ===
+fm-guard-event: cannot append to /Users/charlesabrooker/tmp/fm-lab.WD9YcN/ro/sub/x.jsonl
+unwritable dir rc=0
+fifo log rc=0 (returns without blocking)
+malformed args rc=0
+fm-send empty-home refusal rc=3 with unwritable log
+
+=== S3 gate containment: real fm-send in this gate worktree ===
+non-lab home fm-send rc=3
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+{"guard":"gate-agent-containment","rule":"gate-context","task":"nonlab-task","decision":"deny","actor":"gate"}
+lab home fm-send rc=1 (task does not exist; guard passed)
+{"guard":"gate-agent-containment","rule":"gate-context","task":"lab-task-send","decision":"allow","actor":"gate","override":false}
+{"guard":"send-home-fail-closed","rule":"explicit-home","task":"lab-task-send","decision":"allow","actor":"main","override":false}
+bypass fm-send rc=1
+{"guard":"gate-agent-containment","rule":"FM_GATE_REFUSE_BYPASS","task":"lab-task-bypass","decision":"bypass","override":true}
+{"guard":"send-home-fail-closed","rule":"explicit-home","task":"lab-task-bypass","decision":"allow","override":false}
+
+=== S4 bypass switches: library emitters ===
+{"guard":"compact-adviser","rule":"FM_COMPACT_ADVISER_DISABLE","task":"lab-ca","decision":"bypass","override":true}
+{"guard":"backlog-transition","rule":"manual-backend","task":"lab-bt","decision":"bypass","override":true}
+
+=== S5 waiver: --allow-api-key records allow+override; plain refusal records deny ===
+no waiver rc=1
+with --allow-api-key rc=0
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"lab-key","decision":"deny","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"lab-key","decision":"allow","override":true,"cleared_by":"allow-api-key"}
+
+=== S6 metrics on the lab log: per rule, bypass ratio, repeat denies, deny-only, zero-events ===
+metrics rc=0
+{"log":"/Users/charlesabrooker/tmp/fm-lab.WD9YcN/state/guard-events.jsonl","present":true,"guards":[{"id":"backlog-transition","opportunities":0,"denies":0,"warns":0,"override_rate":0,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"reversible","allows":0,"overrides":1,"bypasses":1,"workarounds":null,"refusal_to_bypass_ratio":null,"repeat_denies":0,"repeat_denies_per_task":
+METRIC backlog-transition opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC claude-api-billing opportunities=2 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=0 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+METRIC compact-adviser opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC gate-agent-containment opportunities=1 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC pr-merge-gate opportunities=3 denies=2 warns=0 override_rate=0.5 median_clear_attempts=2 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.5 repeat_denies=1 deny_only=false zero_events_days=0
+METRIC probe-guard opportunities=3 denies=3 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRIC send-home-fail-closed opportunities=2 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE backlog-transition rule=manual-backend opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE claude-api-billing rule=inherited-credential opportunities=2 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=0 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+RULE compact-adviser rule=FM_COMPACT_ADVISER_DISABLE opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE gate-agent-containment rule=FM_GATE_REFUSE_BYPASS opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE gate-agent-containment rule=gate-context opportunities=1 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE pr-merge-gate rule=red-checks opportunities=3 denies=2 warns=0 override_rate=0.5 median_clear_attempts=2 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.5 repeat_denies=1 deny_only=false zero_events_days=0
+REPEAT pr-merge-gate rule=red-checks task=lab-t1 denies=2 repeat_denies=1
+RULE probe-guard rule=r-a opportunities=2 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE probe-guard rule=r-b opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE send-home-fail-closed rule=explicit-home opportunities=2 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+QUIET api-billing-preflight zero_events_days=30
+QUIET captain-hold-withdraw-ruling zero_events_days=30
+QUIET cursor-park-turnend zero_events_days=30
+QUIET dispatch-profile-resolution zero_events_days=30
+QUIET git-commit-credential-shapes zero_events_days=30
+QUIET git-push-credential-shapes zero_events_days=30
+QUIET guard-watcher-down-warning zero_events_days=30
+QUIET jev-belay-stop zero_events_days=30
+QUIET jev-egress-grant zero_events_days=30
+QUIET jev-github-write-op zero_events_days=30
+QUIET jev-pretool-deny zero_events_days=30
+QUIET jev-tool-coverage zero_events_days=30
+QUIET jev-write-path-gate zero_events_days=30
+
+=== code-root log untouched ===
+code-root rows before=      44 after=      44
+
+=== teardown ===
+lab removed: yes

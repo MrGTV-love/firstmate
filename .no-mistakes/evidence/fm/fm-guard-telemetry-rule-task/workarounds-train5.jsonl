@@ -1,0 +1,1 @@
+{"guard": "merge-green-head", "rule": "base-containment", "task": "merge-train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}

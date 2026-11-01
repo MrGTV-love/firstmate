@@ -1,0 +1,6 @@
+FM_SPAWN_NO_GUARD=1: spawn rc=1 ()
+  rows: [{"guard":"gate-agent-containment","rule":"gate-context","decision":"allow","override":false},{"guard":"guard-watcher-down-warning","rule":"FM_SPAWN_NO_GUARD","decision":"bypass","override":true},{"guard":"claude-api-billing","rule":"inherited-credential","decision":"allow","override":false}]
+FM_SPAWN_NO_GUARD=internal: spawn rc=1 ()
+  rows: [{"guard":"gate-agent-containment","rule":"gate-context","decision":"allow","override":false},{"guard":"claude-api-billing","rule":"inherited-credential","decision":"allow","override":false}]
+tmux sessions on lab socket: 0
+lab removed: yes

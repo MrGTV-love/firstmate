@@ -1,0 +1,12 @@
+refused head=e9f57d36a00b3bb3cecdda970728a5c6b4212970  new head=1d8ed8a8c97ecce0050ced0608bb2df31bcfb7ad (only change: merge of origin/main)
+$ fm-guard-workarounds.py --repo <repo> --head feature --task wa-1 --log <events>
+GUARD_WORKAROUND task=wa-1 signatures=base-merge-only-after-refusal:1d8ed8a8c97ecce0050ced0608bb2df31bcfb7ad (read-only evidence; reassess the guard)
+rc=0
+{"guard": "merge-green-head", "rule": "base-containment", "task": "wa-1", "head": "1d8ed8a8c97ecce0050ced0608bb2df31bcfb7ad", "refused_head": "e9f57d36a00b3bb3cecdda970728a5c6b4212970", "kind": "base-merge-only-after-refusal"}
+$ adversarial: same history, no recorded refusal -> no base-merge-only signature
+rc=0
+$ fm-guard-metrics.sh --log <events> --workarounds <signatures>  (merge-green-head line)
+METRIC merge-green-head opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-green-head rule=base-containment opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+$ same, without --workarounds
+METRIC merge-green-head opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0

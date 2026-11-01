@@ -1,0 +1,12 @@
+=== no task, no harness session: two separate processes ===
+  writer pid=90735
+  writer pid=90808
+{"task":"","session":"/Users/charlesabrooker/tmp/fm-lab.4daOh3:unattributed"}
+{"task":"","session":"/Users/charlesabrooker/tmp/fm-lab.4daOh3:unattributed"}
+  distinct sessions: 1; any pid-shaped session: 0
+=== backlog manual backend (real switch) ===
+  applies: no (config/backlog-backend selects manual editing)
+  secondmate: no (secondmates are not backlog items)
+  rows: [{"task":"lab-bl1","rule":"manual-backend","decision":"bypass","override":true}]
+  default backend rows for lab-bl3: 0
+lab removed: yes

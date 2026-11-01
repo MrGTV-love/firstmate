@@ -1,0 +1,22 @@
+ok - the writer appends one schema-complete row per decision
+ok - an unwritable log does not fail the caller
+ok - twenty replayed rows parse and count correctly
+ok - a reversible guard that never fires is cut
+ok - an irreversible guard that never fires is kept
+ok - an undecided nomination is reported and a recorded decision retires it
+ok - a dated decision stands until the evidence changes and new evidence re-nominates
+ok - an override rate above 20% cuts a reversible guard
+ok - a median above three clear attempts cuts even an irreversible guard
+ok - a recurrence after a clear cuts even an irreversible guard
+ok - a missing log reports unmeasured and exits 0
+ok - --undecided on a missing log prints nothing
+ok - trusted Claude session IDs are stable, distinct, and never borrowed from unrelated ancestry
+ok - rule/task attribution, home-scoped sessions, and nonblocking malformed or FIFO logs
+ok - per-rule metrics count cross-session task repeats and refusal-to-bypass ratios
+ok - malformed event rows are skipped and an absent workaround feed reads as not measured
+ok - one guarded operation counts once at guard level and once per rule
+ok - only an allow from the same actor class clears a deny
+ok - real billing, containment, compact, and manual-backlog paths emit without changing their results
+fatal: no branch named 'master'
+ok - real tree-equal/base-only merges are detected read-only without blaming actual implementation or inherited base history
+ok - fm-guard-telemetry

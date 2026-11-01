@@ -1,0 +1,10 @@
+guard-telemetry rc=0 ok=21 notok=0 secs=37
+spawn-batch rc=0 ok=8 notok=0 secs=51
+spawn-worktree-settle rc=0 ok=168 notok=0 secs=194
+teardown-pool-late-recheck rc=0 ok=1 notok=0 secs=23
+teardown-cleanup-force rc=0 ok=2 notok=0 secs=13
+pr-merge-checks rc=0 ok=68 notok=0 secs=922
+spawn-compact-adviser-disable rc=1 ok=1 notok=1 secs=63
+spawn-claude-api-key-guard rc=0 ok=27 notok=0 secs=251
+secondmate-sync rc=1 ok=12 notok=1 secs=66
+DONE

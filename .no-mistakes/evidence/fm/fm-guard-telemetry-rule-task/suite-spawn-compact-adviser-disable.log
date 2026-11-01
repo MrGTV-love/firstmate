@@ -1,0 +1,2 @@
+ok - automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm
+not ok - reuse-absent-kill: the backend inherited per-invocation adviser state: unset|1|unset unset|unset|unset 

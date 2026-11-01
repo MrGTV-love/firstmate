@@ -1,0 +1,9 @@
+$ python3 bin/fm-guard-workarounds.py --repo . --head fm/fm-merge-train-5 --task merge-train-5
+GUARD_WORKAROUND task=merge-train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+rc=0
+$ ... --json
+{"guard": "merge-green-head", "rule": "base-containment", "task": "merge-train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}
+$ git: tree of 5ad471a2b vs its first parent
+merge tree=38202b99eb945630588286dee09d91b76cca111b first-parent tree=38202b99eb945630588286dee09d91b76cca111b
+$ adversarial: a normal branch head (this PR) reports nothing
+0

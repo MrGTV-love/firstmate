@@ -1,0 +1,7 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.J0wtwI
+tree-equal merge on task branch: de1a33255e5ba1eb415c0bc45534cf49dff0f7ce
+watcher ran 2s; report file:
+GUARD_WORKAROUND task=hb-task signatures=tree-equal-merge:de1a33255e5ba1eb415c0bc45534cf49dff0f7ce (read-only evidence; reassess the guard)
+guard events written by the heartbeat detector: 0
+task branch unchanged: yes
+lab removed: yes
