@@ -1949,9 +1949,9 @@ The text is static and never executed or expanded; secondmate charters never tak
 
 Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
 With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries) and the selected harness's non-secret store selectors.
-A subshell of the pane's own shell unsets every other exported name and then runs the launch command text unchanged, so a raw command keeps its pane-shell syntax and no shell startup file runs again.
-An exported name that is not a shell identifier cannot be unset this way and still reaches the worker.
-[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns the store selectors, including Claude's `DISABLE_AUTOUPDATER`.
+The launch uses `/usr/bin/env -i` with names-only retained entries, so unlisted readonly exports and non-identifier environment names are absent from the new process.
+The default starts the pane's own shell without user startup loading (`zsh -f`, or noninteractive Bash/sh without BASH_ENV/ENV), preserving its raw-command syntax.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
 [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
 Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
 
@@ -2021,7 +2021,7 @@ Raw launch commands run under noninteractive POSIX `sh` and must use compatible 
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
 The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
-The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks and dotenv-read rules for Darwin Claude tasks; kept harness credentials, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), OMP dotenv imports, renamed secret files and unconfined platforms remain outside that boundary.
+The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks; kept harness credentials, dotenv reads or imports, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), alternate credential loaders and unconfined platforms remain outside that boundary.
 A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
@@ -2818,11 +2818,9 @@ It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash der
 Both profiles include read-denial rules for standard user/system Bash and Zsh startup files, their canonical symlink targets and the resolved `ZDOTDIR`, `BASH_ENV` and `ENV` selectors, intended to stop child login and interactive shells from re-running those credential loaders.
 A selector present only in a stale destination pane, an arbitrary alternate loader and a selector changed after launch are outside this named-path boundary.
 The launch already supplies PATH; if additional operational initialization is needed, ask Main to separate it from credential-loading startup rather than sourcing a different secret-bearing file.
-The Claude profile also includes a `file-read-data` denial for `.env` and `.env.*` final path components, including nested project and foreign-home files.
-It keeps the non-secret `.env.example`, `.env.sample` and `.env.template` templates readable, and the `.env` of the task's home and of its top-most local home, which Firstmate's own hooks such as the [Jev belay Stop hook](#jev-belay-stop-hook) read for the TypeSafe key; Claude's tools can read those two files too.
+Neither profile provides dotenv read isolation; project and foreign-home dotenv files remain readable where ordinary filesystem permissions permit it.
 The executable acceptance test must run from an unconfined Darwin process; `sandbox_apply: Operation not permitted` from an already-confined worker does not prove the new rules enforce or that native authentication remains compatible.
-OMP keeps its private TypeSafe dotenv lookup and has no corresponding dotenv read-denial claim.
-These narrow read rules do not protect renamed copies, hard-link aliases, dotenv symlinks resolving to a non-dotenv target name, arbitrary alternate loaders or same-user process inspection.
+The named startup rules do not protect renamed copies, hard-link aliases, arbitrary alternate loaders or same-user process inspection.
 Guard events record one launch admission, not each kernel read denial; [`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) exercises the actual profiles with fake-only files.
 Writes are allowed by default; the profile denies writes to these named protected assets:
 

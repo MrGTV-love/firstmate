@@ -621,9 +621,9 @@
 #   the selected harness's store selectors, Claude's provider selectors and
 #   companions from bin/fm-worker-account-lib.sh, DSH's key name from
 #   bin/fm-dsh.py, the pane's numbered GIT_CONFIG entries and (after
-#   --allow-api-key) the Anthropic key names; a subshell of the pane's own shell
-#   unsets every other exported name and runs the existing command text
-#   unchanged. No other secret-valued name is kept.
+#   --allow-api-key) the Anthropic key names. /usr/bin/env -i starts the pane's
+#   own shell with only these names, dropping even readonly exports and names
+#   that are not shell identifiers. No other secret-valued name is kept.
 #   A present readable regular file replaces that whole default set with exactly
 #   the floor and its listed names, followed by /bin/sh -c of the existing command.
 #   Each line is one POSIX environment name, never a value or shell expression;
@@ -637,7 +637,8 @@
 #   locale, temp and backend routing, the task marker, compact adviser and
 #   Lavish selectors. Explicit launch assignments below pin the
 #   resolved adviser policy even when no pane export arrived.
-#   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
+#   Default work plumbing retains TRACEPARENT and DISABLE_AUTOUPDATER; an
+#   enabled task trace also retains TRACEPARENT with a custom list. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
 #   path the steering doorbell names).
@@ -6718,11 +6719,6 @@ if [ "$KIND" != secondmate ]; then
       for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
         confinement_args+=(--protect "${confinement_home_state%/state}")
       done
-      # Firstmate's own hooks resolve the TypeSafe key from this home's and the
-      # top-most local home's .env (fm_typesafe_key), so Claude keeps both.
-      if [ "$HARNESS" = claude ] && confinement_root_home=$(fm_firstmate_root_home "$FM_HOME" 2>/dev/null); then
-        confinement_args+=(--key-home "$confinement_root_home")
-      fi
       python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
         --config "$CONFIG" --projects "$PROJECTS" \
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
@@ -6731,10 +6727,6 @@ if [ "$KIND" != secondmate ]; then
         confinement_refuse false "cannot derive the protected-asset write profile"
         "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement deny --source-ok false \
           --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
-        if [ "$HARNESS" = claude ]; then
-          "$SCRIPT_DIR/fm-guard-event.sh" spawn-claude-dotenv-confinement deny --source-ok false \
-            --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
-        fi
         exit 1
       }
       # The profile grants only this session's entries, so the session folders
@@ -6756,10 +6748,6 @@ if [ "$KIND" != secondmate ]; then
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
-      if [ "$HARNESS" = claude ]; then
-        "$SCRIPT_DIR/fm-guard-event.sh" spawn-claude-dotenv-confinement allow --source-ok true \
-          --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
-      fi
       ;;
     Darwin:*) WRITE_CONFINEMENT="unconfined-macos-$HARNESS" ;;
     Linux:*) WRITE_CONFINEMENT=unconfined-linux ;;
@@ -8082,12 +8070,10 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; '"$LAUNCH"
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
-# Every launch crosses the shared clean-environment boundary, with names, never
-# values, generated here. An allowlist file keeps exactly its listed names
-# through /usr/bin/env -i and /bin/sh -c. Without one, the pane's own shell
-# unsets every other exported name in a subshell and runs the launch text there
-# unchanged, keeping the floor, work plumbing, this harness's selectors and the
-# pane's GIT_CONFIG entries.
+# Every launch starts a new environment with /usr/bin/env -i. Generate only
+# retained names here; the destination shell expands their values. An allowlist
+# file replaces the defaults and uses /bin/sh; otherwise keep the pane's shell,
+# work plumbing, this harness's selectors and numbered GIT_CONFIG entries.
 launch_env_args=()
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   for env_name in $LAUNCH_ENV_NAMES; do
@@ -8113,13 +8099,29 @@ fi
 if [ -n "$SPAWN_TRACEPARENT" ]; then
   launch_env_args+=(--keep TRACEPARENT)
 fi
+LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" --shell-prefix ${launch_env_args[@]+"${launch_env_args[@]}"}) || exit 1
+LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" --shell-prefix ${launch_env_args[@]+"${launch_env_args[@]}"}) || exit 1
-  LAUNCH="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
+  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 else
-  LAUNCH_ENV_UNSET=$(python3 "$SCRIPT_DIR/fm-worker-env.py" --shell-unset "${launch_env_args[@]}") || exit 1
-  LAUNCH="( $LAUNCH_ENV_UNSET; $LAUNCH
-)"
+  # Numbered entries are destination-owned, so collect their values only there.
+  IFS= read -r -d '' LAUNCH_GIT_CONFIG_ARGS <<'SH' || true
+set --
+case "${GIT_CONFIG_COUNT-}" in ''|*[!0-9]*) ;; *)
+  fm_i=0
+  while [ "$fm_i" -lt "$GIT_CONFIG_COUNT" ]; do
+    eval "set -- \"\$@\" \"GIT_CONFIG_KEY_$fm_i=\${GIT_CONFIG_KEY_$fm_i-}\" \"GIT_CONFIG_VALUE_$fm_i=\${GIT_CONFIG_VALUE_$fm_i-}\""
+    fm_i=$((fm_i + 1))
+  done
+  set -- "$@" "GIT_CONFIG_COUNT=$GIT_CONFIG_COUNT"
+;; esac
+SH
+  # Select the pane's absolute shell before clearing the environment. zsh -f
+  # avoids reloading its .zshenv; noninteractive Bash/sh do not load startup
+  # files when BASH_ENV/ENV are absent from the explicit keep set.
+  # shellcheck disable=SC2016 # The destination pane expands this selector.
+  LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the

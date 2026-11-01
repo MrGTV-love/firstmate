@@ -31,6 +31,14 @@ make_case() {
     fail "refusing preexisting or unavailable task temp namespace $task_tmp"
   fi
   FAKEBIN=$(fm_test_make_spawn_fakebin "$CASE_DIR/fake" gh gh-axi)
+  # These model-free shell fixtures exercise staged delivery, not native
+  # Seatbelt. The separate confinement suite owns Darwin kernel acceptance.
+  cat > "$FAKEBIN/uname" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != -s ] || { printf 'Linux\n'; exit 0; }
+exec /usr/bin/uname "$@"
+SH
+  chmod +x "$FAKEBIN/uname"
   fm_test_spawn_home "$HOME_DIR" codex
   home_root=$(cd "$HOME_DIR" && pwd -P)
   home_hash=$(printf '%s' "$home_root" | shasum -a 256)
@@ -162,7 +170,7 @@ import json, pathlib, sys
 path, gen, filtered, config, compound, pane_shell = sys.argv[1:]
 lines = pathlib.Path(path).read_text().splitlines()
 children = [json.loads(line) for line in lines if line.startswith('{')]
-assert len(children) == 2, lines
+assert len(children) == 2, (lines, pathlib.Path(path).with_name('probe-error').read_text())
 child, resume = children
 assert child['gen'] == gen, child
 assert 'shell-gen=unset' in lines, lines
@@ -192,14 +200,6 @@ test_claude_staged_native_hook_suppression() {
     [ "$mode" != secondmate ] || kind=secondmate
     make_case "claude-$mode" "$kind"
     fm_test_fake_teamclaude "$FAKEBIN"
-    # This portable environment regression does not exercise nested macOS
-    # Seatbelt; its separate live guard owns OS-confinement evidence.
-    cat > "$FAKEBIN/uname" <<'SH'
-#!/usr/bin/env bash
-[ "$*" != -s ] || { printf 'Linux\n'; exit 0; }
-exec /usr/bin/uname "$@"
-SH
-    chmod +x "$FAKEBIN/uname"
     printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
     # The recorders name their output paths themselves: the launch boundary
     # keeps no test-only pane variable.

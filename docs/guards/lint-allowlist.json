@@ -605,7 +605,6 @@
     {"id": "site:bin/fm-spawn.sh:4856fd5bdf", "rule": "S1", "text": "confinement_refuse false \"this raw $HARNESS launch command sets $confinement_raw_var to a value that"},
     {"id": "site:bin/fm-spawn.sh:272e9c6267", "rule": "S1", "text": "CLAUDE_SESSION_ID=$(uuidgen | tr 'A-F' 'a-f') || { confinement_refuse false \"cannot mint the Claude "},
     {"id": "site:bin/fm-spawn.sh:b88133eeca", "rule": "S1", "text": "confinement_refuse false \"cannot list the local Firstmate homes to protect: $FM_LOCAL_FIRSTMATE_ERRO"},
-    {"id": "site:bin/fm-spawn.sh:37ef9a0262", "rule": "S1", "text": "${confinement_args[@]+\"${confinement_args[@]}\"} || { confinement_refuse false \"cannot derive the pro"},
     {"id": "site:bin/fm-spawn.sh:c498332dcc", "rule": "S1", "text": "[ -n \"$confinement_claude_dirs\" ] || { confinement_refuse false \"cannot read the Claude config root "},
     {"id": "site:bin/fm-spawn.sh:730a5bfa4f", "rule": "S1", "text": "|| { confinement_refuse false \"cannot create $confinement_claude_root/$confinement_dir for this Clau"},
     {"id": "site:bin/fm-spawn.sh:1300b43d16", "rule": "S1", "text": "\"$SCRIPT_DIR/fm-guard-event.sh\" spawn-confinement-coverage \"$confinement_coverage_decision\" --source"},

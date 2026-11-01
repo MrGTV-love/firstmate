@@ -1910,36 +1910,69 @@ SH
 # selector, the work plumbing and the pane's numbered GIT_CONFIG entries, while
 # env, Python and a child shell all lose every fake provider credential.
 test_default_launch_keeps_only_the_harness_route() {
-  local id rec out status launch observed pane_shell kept
+  local id rec out status launch observed pane_shell mode name python_bin nonidentifier_proved=0
   id=env-default-codex
   rec=$(make_spawn_case "$id" codex "$id")
   read_case_record "$rec"
   observed="$CASE_DIR/observed"
-  cat > "$FAKEBIN_DIR/codex" <<SH
-#!/bin/sh
-{ env; /bin/sh -c env; python3 -c 'import os; print("\\n".join(k + "=" + v for k, v in os.environ.items()))'; } > '$observed'
-SH
+  python_bin=$(python3 -c 'import sys; print(sys.executable)')
+  printf '#!%s\n' "$python_bin" > "$FAKEBIN_DIR/codex"
+  cat >> "$FAKEBIN_DIR/codex" <<PY
+import json, os, subprocess, sys
+names = ('FM_TEST_FAKE_API_KEY', 'FM_TEST_FAKE_API_KEY-BAD')
+assert not any(name in os.environ for name in names), 'Python received a fake credential'
+dumped = subprocess.run(['/usr/bin/env'], capture_output=True, check=True).stdout
+assert not any((name + '=').encode() in dumped for name in names), 'env received a fake credential'
+child = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-c', 'exec "\$1" -c "\$2"', 'probe', sys.executable,
+                        'import os; assert not any(k in os.environ for k in ' + repr(names) + ')'], capture_output=True)
+assert child.returncode == 0, 'child Bash received a fake credential'
+expected = {'CODEX_HOME': '/synthetic/codex', 'SSH_AUTH_SOCK': '/synthetic/agent.sock',
+            'HTTPS_PROXY': 'http://proxy.invalid:3128', 'TERM': 'xterm', 'FM_TASK_ID': '$id',
+            'GIT_CONFIG_KEY_0': 'user.name', 'GIT_CONFIG_VALUE_0': 'synthetic user',
+            'GIT_CONFIG_KEY_1': 'core.hooksPath', 'DISABLE_AUTOUPDATER': '1',
+            'TRACEPARENT': '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01'}
+missing = [key for key, value in expected.items() if os.environ.get(key) != value]
+assert not missing, 'worker lost operational carriers: ' + ','.join(missing)
+with open('$observed', 'w') as result:
+    json.dump({'credential_absent': True, 'operational_values_retained': True}, result)
+PY
   chmod +x "$FAKEBIN_DIR/codex"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex 2>&1)
+  out=$(FM_TEST_PANE_LOG="$CASE_DIR/pane-log" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex 2>&1)
   status=$?
   expect_code 0 "$status" "default codex spawn should succeed: $out"
-  launch=$(cat "$LAUNCH_LOG")
+  launch=$(cat "$CASE_DIR/pane-log" "$LAUNCH_LOG")
   for pane_shell in /bin/bash /bin/zsh; do
     [ -x "$pane_shell" ] || continue
-    rm -f "$observed"
-    env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:/usr/bin:/bin" TERM=xterm \
-      SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 CODEX_HOME=/synthetic/codex \
-      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='synthetic user' \
-      LINEAR_API_KEY=synthetic-unrelated GEMINI_API_KEY=synthetic-gemini OPENAI_API_KEY=synthetic-openai \
-      "$pane_shell" -c "$launch" >/dev/null 2>&1 || fail "default codex launch failed in $pane_shell"
-    for kept in CODEX_HOME=/synthetic/codex SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 \
-      TERM=xterm GIT_CONFIG_KEY_0=user.name 'GIT_CONFIG_VALUE_0=synthetic user' GIT_CONFIG_KEY_1=core.hooksPath; do
-      [ "$(grep -cFx "$kept" "$observed")" -eq 3 ] || fail "default codex launch lost $kept in $pane_shell"
+    for mode in mutable readonly non-identifier; do
+      name=FM_TEST_FAKE_API_KEY
+      [ "$mode" != non-identifier ] || name=FM_TEST_FAKE_API_KEY-BAD
+      rm -f "$observed"
+      # The fake-only pane must really contain the candidate before the launch.
+      # shellcheck disable=SC2016 # The destination shell expands the probe.
+      if env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+        SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 CODEX_HOME=/synthetic/codex \
+        GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='synthetic user' \
+        DISABLE_AUTOUPDATER=1 TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01 \
+        "$name=sentinel-not-a-secret" "$pane_shell" -c '
+          if [ "$1" = readonly ]; then readonly FM_TEST_FAKE_API_KEY; fi
+          "$4" -c "import os,sys; assert sys.argv[1] in os.environ" "$2" || exit 97
+          eval "$3"
+        ' probe "$mode" "$name" "$launch" "$python_bin" > "$CASE_DIR/probe-output" 2> "$CASE_DIR/probe-error"; then
+        status=0
+      else
+        status=$?
+      fi
+      if [ "$status" -eq 97 ] && [ "$mode" = non-identifier ]; then
+        printf '# %s removes non-identifier entries before the production launch; not counted as boundary proof\n' "$pane_shell"
+        continue
+      fi
+      expect_code 0 "$status" "default codex $mode launch failed in $pane_shell: $(cat "$CASE_DIR/probe-error")"
+      [ -s "$observed" ] || fail "default codex $mode probe did not execute in $pane_shell"
+      [ "$mode" != non-identifier ] || nonidentifier_proved=1
+      pass "default codex $mode export absent from env, Python and child Bash in $pane_shell; task, TERM and operational carriers kept"
     done
-    ! grep -Eq '^(LINEAR_API_KEY|GEMINI_API_KEY|OPENAI_API_KEY)=' "$observed" \
-      || fail "default codex launch received a fake provider credential in $pane_shell"
   done
-  pass "default codex launch keeps its store selector, work plumbing and pane GIT_CONFIG entries and drops every fake provider key through env, Python and a child shell"
+  [ "$nonidentifier_proved" -eq 1 ] || fail 'no pane exercised the non-identifier credential through the production boundary'
 }
 
 test_launch_environment_invalid_config_refuses() {
@@ -2109,6 +2142,7 @@ SH
   done
 }
 
+fm_test_only
 test_launch_environment_allowlist
 test_default_launch_keeps_only_the_harness_route
 test_launch_environment_invalid_config_refuses

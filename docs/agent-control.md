@@ -211,7 +211,7 @@ Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunc
 A record published before launch proofs existed (empty `launch_proof`) keeps the earlier rule: its live agent at the validated endpoint is attributed without a pin, and its relaunch publishes a proven launch.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
-Every launch crosses the cleared-environment boundary; without `config/launch-env-allowlist` the destination pane's own shell runs it, and an enabled allowlist still selects the POSIX-sh boundary.
+Every launch crosses an `env -i` boundary; without `config/launch-env-allowlist` a clean instance of the destination pane's own shell runs it, and an enabled allowlist still selects the POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
 A process that Herdr lists but the later process table lacks has already exited and is dropped; a vanished agent, a broken chain, or two agents still read `unknown`.
