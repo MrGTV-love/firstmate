@@ -34,9 +34,10 @@ class Slack:
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
         try:
-            # measured: 10 seconds, 2026-10-18, operator host, conservative socket ceiling.
+            # Conservative socket ceiling, first set 2026-10-18 on the operator host.
             # A hung check can starve supervision: fm-watch.sh owns its progress
             # and absolute bounds. Time between requests is not a socket failure.
+            # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
             with urllib.request.urlopen(request, timeout=10) as response:
                 header = response.headers.get('x-oauth-scopes', '')
                 if header:
