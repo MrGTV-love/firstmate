@@ -1,0 +1,12 @@
+### tree=after-starved (ae4e58bd)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=3.9s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.043s  sum_request_time=0.1s  errors=[]
+--- step: mode=stop:22 action=check  exit=0  wall=65.8s  cards_posted_total=4
+    out| (no output)
+    requests=13  longest_single_request=0.053s  sum_request_time=0.3s  errors=[]
+--- step: mode=ok action=check  exit=0  wall=22.3s  cards_posted_total=4
+    out| (no output)
+    requests=4  longest_single_request=0.036s  sum_request_time=0.1s  errors=[]
+    server| {"event": "SIGSTOP", "pid": 75670, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 75670}

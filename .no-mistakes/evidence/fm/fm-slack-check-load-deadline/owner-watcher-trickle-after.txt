@@ -1,0 +1,13 @@
+### tree=after-trickle (ae4e58bd)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=4.4s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.057s  sum_request_time=0.1s  errors=[]
+--- step: mode=ok action=check  exit=0  wall=46.5s  cards_posted_total=4
+    out| (no output)
+    requests=13  longest_single_request=0.072s  sum_request_time=0.2s  errors=[]
+--- step: mode=trickle action=watch  exit=0  wall=90.6s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| no_progress: "pid=34740 no CPU or watched-file progress for 31.2s"
+    out| watcher: FM_CHECK_STATUS=124 FM_CHECK_STOPPED=no progress
+    out| watcher: FM_CHECK_RESULT=<empty>
+    out| triage-log: [2026-10-31T23:37:24-0500] check slack stopped after 86s (no progress); result unknown, retry next pass

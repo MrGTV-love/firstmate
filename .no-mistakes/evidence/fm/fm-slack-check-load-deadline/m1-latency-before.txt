@@ -1,0 +1,10 @@
+### tree=before-latency (/tmp/fm-slack-live/before)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=3.8s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.073s  sum_request_time=0.2s  errors=[]
+--- step: mode=latency:6 action=check  exit=0  wall=22.8s  cards_posted_total=0
+    out| slack: transport failure: unreachable
+    requests=2  longest_single_request=6.239s  sum_request_time=6.3s  errors=[["conversations.history", "unreachable", 0.022]]
+--- step: mode=ok action=check  exit=0  wall=29.5s  cards_posted_total=2
+    out| slack: transport failure: request_budget_exhausted
+    requests=7  longest_single_request=0.024s  sum_request_time=0.1s  errors=[["conversations.history", "request_budget_exhausted", 0.0], ["conversations.replies", "request_budget_exhausted", 0.0]]

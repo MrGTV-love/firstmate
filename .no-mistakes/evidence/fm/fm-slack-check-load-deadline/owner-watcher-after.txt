@@ -1,0 +1,31 @@
+### tree=after-watcher (ae4e58bd)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=4.4s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.047s  sum_request_time=0.1s  errors=[]
+--- step: mode=latency:6 action=watch  exit=0  wall=137.6s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| watcher: FM_CHECK_STATUS=0 FM_CHECK_STOPPED=<none>
+    out| watcher: FM_CHECK_RESULT=<empty>
+    requests=13  longest_single_request=6.210s  sum_request_time=80.4s  errors=[]
+--- step: mode=stop:22 action=watch  exit=0  wall=59.8s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| watcher: FM_CHECK_STATUS=0 FM_CHECK_STOPPED=<none>
+    out| watcher: FM_CHECK_RESULT=<empty>
+    requests=4  longest_single_request=0.071s  sum_request_time=0.1s  errors=[]
+--- step: mode=hang action=watch  exit=0  wall=35.9s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| watcher: FM_CHECK_STATUS=0 FM_CHECK_STOPPED=<none>
+    out| watcher: FM_CHECK_RESULT=slack: transport failure: unreachable
+    requests=1  longest_single_request=10.099s  sum_request_time=10.1s  errors=[["conversations.replies", "unreachable", 10.099]]
+--- step: mode=hang action=watch  exit=0  wall=33.5s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| watcher: FM_CHECK_STATUS=0 FM_CHECK_STOPPED=<none>
+    out| watcher: FM_CHECK_RESULT=<empty>
+    requests=1  longest_single_request=10.117s  sum_request_time=10.1s  errors=[["conversations.replies", "unreachable", 10.117]]
+--- step: mode=ok action=watch  exit=0  wall=48.1s  cards_posted_total=4
+    out| watcher: CHECK_TIMEOUT(no-progress bound)=30s
+    out| watcher: FM_CHECK_STATUS=0 FM_CHECK_STOPPED=<none>
+    out| watcher: FM_CHECK_RESULT=<empty>
+    requests=4  longest_single_request=0.144s  sum_request_time=0.2s  errors=[]
+    server| {"event": "SIGSTOP", "pid": 1449, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 1449}

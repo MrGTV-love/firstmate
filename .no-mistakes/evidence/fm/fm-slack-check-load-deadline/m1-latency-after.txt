@@ -1,0 +1,10 @@
+### tree=after-latency (ae4e58bd)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=3.8s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.037s  sum_request_time=0.1s  errors=[]
+--- step: mode=latency:6 action=check  exit=0  wall=123.0s  cards_posted_total=4
+    out| (no output)
+    requests=13  longest_single_request=6.226s  sum_request_time=80.1s  errors=[]
+--- step: mode=ok action=check  exit=0  wall=21.3s  cards_posted_total=4
+    out| (no output)
+    requests=4  longest_single_request=0.022s  sum_request_time=0.0s  errors=[]

@@ -1,0 +1,12 @@
+### tree=before-starved (/tmp/fm-slack-live/before)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=4.1s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.034s  sum_request_time=0.1s  errors=[]
+--- step: mode=stop:22 action=check  exit=0  wall=45.8s  cards_posted_total=1
+    out| slack: transport failure: request_budget_exhausted
+    requests=5  longest_single_request=0.096s  sum_request_time=0.1s  errors=[["conversations.history", "request_budget_exhausted", 0.002], ["conversations.replies", "request_budget_exhausted", 0.0]]
+--- step: mode=ok action=check  exit=0  wall=21.9s  cards_posted_total=2
+    out| (no output)
+    requests=5  longest_single_request=0.065s  sum_request_time=0.1s  errors=[["conversations.history", "request_budget_exhausted", 0.0], ["conversations.replies", "request_budget_exhausted", 0.0]]
+    server| {"event": "SIGSTOP", "pid": 74906, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 74906}

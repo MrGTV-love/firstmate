@@ -1,0 +1,19 @@
+### tree=after-hang (ae4e58bd)  fake Slack at 127.0.0.1 (local, no credentials)
+--- step: mode=ok action=arm  exit=0  wall=4.1s  cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3  longest_single_request=0.070s  sum_request_time=0.1s  errors=[]
+--- step: mode=ok action=check  exit=0  wall=49.5s  cards_posted_total=4
+    out| (no output)
+    requests=13  longest_single_request=0.076s  sum_request_time=0.3s  errors=[]
+--- step: mode=hang action=check  exit=0  wall=25.4s  cards_posted_total=4
+    out| slack: transport failure: unreachable
+    requests=1  longest_single_request=10.044s  sum_request_time=10.0s  errors=[["conversations.replies", "unreachable", 10.044]]
+--- step: mode=hang action=check  exit=0  wall=23.0s  cards_posted_total=4
+    out| (no output)
+    requests=1  longest_single_request=10.025s  sum_request_time=10.0s  errors=[["conversations.replies", "unreachable", 10.025]]
+--- step: mode=ok action=check  exit=0  wall=20.7s  cards_posted_total=4
+    out| (no output)
+    requests=4  longest_single_request=0.039s  sum_request_time=0.1s  errors=[]
+--- step: mode=hang action=check  exit=0  wall=22.4s  cards_posted_total=4
+    out| slack: transport failure: unreachable
+    requests=1  longest_single_request=10.060s  sum_request_time=10.1s  errors=[["conversations.replies", "unreachable", 10.06]]
