@@ -4,7 +4,7 @@
 Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibrated] [--timed-out] [--load-start LOAD]
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
-       fm-duration.py run KEY -- COMMAND [ARGS...]
+       fm-duration.py run [--pipeline-priority CLASS] KEY -- COMMAND [ARGS...]
        fm-duration.py gate [--log-fd N] [--wait-file PATH] [--cpu-file PATH] KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
@@ -12,6 +12,14 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
        fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS|default [PATH...] [--while-alive]
        fm-duration.py check-literals [--base REF | --report]
+
+Fresh `no-mistakes axi run` calls (with --intent/--intent-file) and `no-mistakes
+rerun` commands automatically enter the existing fm-cpu-pass.py pipeline-start
+owner before any run clock or sample. --pipeline-priority chooses merge-train,
+machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
+The admission owner sets FM_PIPELINE_START_ADMITTED only on its command so this
+measured child does not requeue itself. Reattachments without fresh inputs and
+responses are unchanged. A missing admission source refuses, never guesses.
 
 keep-going is the record-free operational command runner: its only automatic
 stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
@@ -1437,6 +1445,7 @@ def main():
     lim.add_argument('key'); lim.add_argument('--percentile', type=int, choices=(95, 99), default=95)
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
+    runner.add_argument('--pipeline-priority', choices=('merge-train', 'machinery', 'vernant-build', 'other'), default='other')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     progress = commands.add_parser('keep-going')
     progress.add_argument('inactivity', type=float)
@@ -1492,6 +1501,17 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('run requires -- COMMAND')
+        fresh_pipeline = (Path(command[0]).name == 'no-mistakes' and (
+            command[1:2] == ['rerun'] or (command[1:3] == ['axi', 'run'] and any(
+                part in ('--intent', '--intent-file') or part.startswith(('--intent=', '--intent-file='))
+                for part in command[3:]))))
+        if fresh_pipeline and os.environ.get('FM_PIPELINE_START_ADMITTED') != '1':
+            # Admission precedes run(), its absolute/progress clocks and samples.
+            # The existing pool owns priority, native observations and the short
+            # check-to-daemon-registration lock; reattachments never requeue.
+            os.execv(sys.executable, [sys.executable, str(ROOT / 'bin/fm-cpu-pass.py'),
+                'pipeline-start', '--priority', args.pipeline_priority, '--',
+                sys.executable, str(Path(__file__).resolve())] + sys.argv[1:])
         try:
             slot = acquire_slot(args.key)
         except ValueError as error:

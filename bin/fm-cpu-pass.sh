@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-cpu-pass.sh - Host-wide CPU pass pool for CPU-heavy test bursts; see engine --help.
+# fm-cpu-pass.sh - Host-wide CPU passes and pipeline-start admission; see engine --help.
 # docs/cpu-pass-pool.md owns the cross-repository contract.
 # The engine header owns command behavior, including the no-Python run path.
 set -euo pipefail
@@ -77,4 +77,8 @@ if ! command -v python3 >/dev/null 2>&1 && [ "${1:-}" = run ]; then
   exec "$@"
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "fm-cpu-pass: ${1:-command} requires python3; pipeline admission cannot assume headroom" >&2
+  exit 125
+fi
 exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" "$@"

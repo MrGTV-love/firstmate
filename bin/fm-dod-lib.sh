@@ -1083,7 +1083,9 @@ EOF
 # Written once; only the two sentences about a green PR depend on the forge,
 # because on gerrit the ci step is skipped and there is no PR to report.
 fm_nm_driving_block() {  # <forge>
-  local pr_return_line='' pr_reattach_clause=';' drive_block wait_cfg
+  local pr_return_line='' pr_reattach_clause=';' drive_block wait_cfg admission_runner
+  admission_runner=$(d=${BASH_SOURCE[0]%/*}; cd "${d:-.}" && pwd)/fm-duration.py
+  printf -v admission_runner '%q' "$admission_runner"
   if [ "$1" != gerrit ]; then
     pr_return_line="Only a drive call's return reports the green PR: \`no-mistakes axi status\` shows progress but never reports \`checks-passed\` while the ci step is still monitoring the PR for merge, so never wait on a status poll for the next gate or outcome.
 "
@@ -1121,6 +1123,11 @@ The \`--intent\` string you pass must be self-sufficient: that string plus the c
 When the captain's intent refers to a report, decision, or PR ("do items 1, 2, 3, and 7 of the report"), write the substance of the referenced items into \`--intent\` in the captain's terms, not only the pointer; that substance is the captain's ask by reference, while Firstmate's build instructions and your own decisions still stay out.
 This replaces the no-mistakes skill's advice to enrich \`--intent\` with decisions and tradeoffs; that advice does not apply to Firstmate-dispatched work.
 Do not hand-edit, commit, or fix findings yourself while a run is active - the pipeline applies every fix.
+
+Start every fresh/new run (including an authorized rerun) through \`python3 $admission_runner run --pipeline-priority <class> no-mistakes.run -- no-mistakes axi run <new-run inputs>\`; the measured runner automatically queues it through \`fm-cpu-pass.sh pipeline-start\` before any execution clock.
+Choose class \`merge-train\` for merge-train work, \`machinery\` for Firstmate machinery, \`vernant-build\` for Vernant builds, and \`other\` otherwise; the pool owner enforces that priority order.
+Keep the original intent, verification-plan, base and profile arguments unchanged; admission never authorizes a start, resolves a finding or skips a step.
+Reattach and respond to the existing run normally, without new-run inputs or another admission; \`docs/cpu-pass-pool.md\` owns the start-policy and descriptor-lifetime limits.
 
 $drive_block
 A killed or timed-out call is never evidence the daemon died: the daemon accepts your response immediately and runs the round in the background, so the call was only ever waiting for a read while the run kept working.

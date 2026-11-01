@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Executable fixtures for fm-cpu-pass.test.sh; never use fleet state or load."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+
+repo, parent, python = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3]
+root = Path(tempfile.mkdtemp(prefix='admission-', dir=parent))
+shim = root / 'bin'
+shim.mkdir()
+# Test-only injection at the native observation boundary, never a production
+# environment override. The same executable owners run normally underneath it.
+proxy = shim / 'python3'
+proxy.write_text('#!' + python + '\n' + '''import json, os, runpy, sys
+real = sys.executable
+if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm-duration.py'):
+    if os.environ.get('CASE_CORES'): os.cpu_count = lambda: int(os.environ['CASE_CORES'])
+    if os.environ.get('CASE_LOAD'): os.getloadavg = lambda: tuple(json.load(open(os.environ['CASE_LOAD'])))
+    sys.executable = __file__
+    sys.argv = sys.argv[1:]
+    runpy.run_path(sys.argv[0], run_name='__main__')
+else:
+    os.execv(real, [real] + sys.argv[1:])
+''')
+proxy.chmod(0o700)
+cli = ['bash', str(repo / 'bin/fm-cpu-pass.sh')]
+base = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ['PATH'], FM_DURATION_FILE='off')
+for name in ('FM_CPU_PASS_HELD', 'FM_PIPELINE_START_ADMITTED'):
+    base.pop(name, None)
+children = []
+records = []
+
+
+def write_json(path, value):
+    temp = path.with_suffix('.new')
+    temp.write_text(json.dumps(value))
+    temp.replace(path)
+
+
+def wait_for(predicate, description):
+    until = time.monotonic() + 30
+    while not predicate():
+        if time.monotonic() >= until:
+            raise AssertionError('fixture observation fence: ' + description)
+        time.sleep(0.025)
+
+
+def case(name, cores=18, running=0, load=0):
+    folder = root / name
+    folder.mkdir()
+    db = folder / 'state.sqlite'
+    with sqlite3.connect(db) as connection:
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL)')
+        connection.executemany('INSERT INTO runs VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
+    load_file = folder / 'load.json'
+    write_json(load_file, [0, load, 0])
+    env = dict(base, CASE_LOAD=str(load_file), NM_HOME=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'))
+    if not os.environ.get('FM_ADMISSION_NATIVE'):
+        env['CASE_CORES'] = str(cores)
+    return folder, db, env
+
+
+def change(db, sql, parameters=()):
+    with sqlite3.connect(db) as connection:
+        connection.execute(sql, parameters)
+
+
+def launch(command, env, log):
+    out = open(str(log) + '.stdout', 'w')
+    err = open(str(log) + '.stderr', 'w')
+    child = subprocess.Popen(command, env=env, stdout=out, stderr=err, start_new_session=True)
+    out.close()
+    err.close()
+    children.append(child)
+    records.append(dict(command=command, stdout=str(log) + '.stdout', stderr=str(log) + '.stderr'))
+    return child
+
+
+def finish(child, code=0):
+    actual = child.wait(timeout=30)
+    assert actual == code, (actual, code, records)
+
+
+def pending(folder, count):
+    wait_for(lambda: len(list((folder / 'pool').glob('pipeline-waiter-*.lock'))) == count,
+             str(count) + ' registered waiters')
+
+
+def held(env):
+    return json.loads(subprocess.check_output(cli + ['status', '--json'], env=env, text=True))['held']
+
+
+worker = root / 'start.py'
+worker.write_text('''import pathlib, sqlite3, sys, time
+folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
+with sqlite3.connect(folder / 'state.sqlite') as db:
+    db.execute('INSERT INTO runs VALUES (?, ?)', (name, 'running'))
+with (folder / 'order').open('a') as out: out.write(name + '\\n')
+(folder / (name + '.started')).touch()
+while not (folder / (name + '.release')).exists(): time.sleep(0.025)
+with sqlite3.connect(folder / 'state.sqlite') as db:
+    db.execute('UPDATE runs SET status=? WHERE id=?', ('completed', name))
+''')
+
+try:
+    # Count == limit blocks at the exact load boundary. Releasing count while
+    # load is above the boundary still blocks; only both observations grant.
+    folder, db, env = case('thresholds', running=6, load=36)
+    if os.environ.get('FM_ADMISSION_NATIVE'):
+        cores = os.cpu_count()
+        limit = max(1, cores // 3)
+        change(db, 'DELETE FROM runs')
+        for i in range(limit): change(db, 'INSERT INTO runs VALUES (?, ?)', (str(i), 'running'))
+    else:
+        cores, limit = 18, 6
+    marker = folder / 'started'
+    command = cli + ['pipeline-start', '--db', str(db), '--', python, '-c',
+                     'import pathlib,sys; pathlib.Path(sys.argv[1]).touch()', str(marker)]
+    before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
+    child = launch(command, env, folder / 'start')
+    pending(folder, 1)
+    wait_for(lambda: (folder / 'start.stderr').stat().st_size > 0, 'blocked admission notice')
+    assert not marker.exists() and hashlib.sha256(db.read_bytes()).hexdigest() == before_hash
+    write_json(Path(env['CASE_LOAD']), [0, cores * 2 + 0.1, 0])
+    change(db, "UPDATE runs SET status='completed'")
+    # Wait for a native observation rather than a timer standing for success.
+    time.sleep(0.6)
+    assert not marker.exists()
+    write_json(Path(env['CASE_LOAD']), [0, cores * 2, 0])
+    finish(child)
+    assert marker.exists()
+
+    # Queue all classes while at capacity, then release one slot at a time.
+    # The startup lock bridges registration even while earlier clients remain
+    # alive. All requests initially observe the same full database.
+    folder, db, env = case('priority-race', cores=3, running=1)
+    limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
+    if limit > 1:
+        for i in range(1, limit): change(db, 'INSERT INTO runs VALUES (?, ?)', (str(i), 'running'))
+    classes = ['other', 'vernant-build', 'machinery', 'merge-train']
+    clients = {}
+    for priority in classes:
+        clients[priority] = launch(cli + ['pipeline-start', '--priority', priority, '--db', str(db), '--',
+            python, str(worker), str(folder), priority], env, folder / priority)
+        pending(folder, len(clients))
+    change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+    expected = list(reversed(classes))
+    for index, priority in enumerate(expected):
+        wait_for(lambda: (folder / (priority + '.started')).exists(), priority + ' grant')
+        assert (folder / 'order').read_text().splitlines() == expected[:index + 1]
+        with sqlite3.connect(db) as connection:
+            assert connection.execute("SELECT count(*) FROM runs WHERE status='running'").fetchone()[0] == limit
+        (folder / (priority + '.release')).touch()
+        finish(clients[priority])
+    assert (folder / 'order').read_text().splitlines() == expected
+
+    # Unreadable/malformed sources never manufacture headroom or create a DB.
+    folder, db, env = case('invalid')
+    for bad in (folder / 'missing.sqlite', folder / 'garbage.sqlite'):
+        if bad.name == 'garbage.sqlite': bad.write_text('not a database')
+        child = launch(cli + ['pipeline-start', '--db', str(bad), '--', 'touch', str(folder / 'bad-start')], env, folder / bad.stem)
+        finish(child, 125)
+        assert not (folder / 'bad-start').exists()
+    assert not (folder / 'missing.sqlite').exists()
+    write_json(Path(env['CASE_LOAD']), [0, -1, 0])
+    child = launch(cli + ['pipeline-start', '--db', str(db), '--', 'touch', str(folder / 'bad-load')], env, folder / 'bad-load')
+    finish(child, 125)
+    assert not (folder / 'bad-load').exists()
+
+    # Queue interruption cannot launch work, strand priority, or release another
+    # request's CPU reservation. Failed commands preserve their actual status.
+    folder, db, env = case('interrupt', cores=3, running=20)
+    marker = folder / 'interrupted-start'
+    child = launch(cli + ['pipeline-start', '--db', str(db), '--', 'touch', str(marker)], env, folder / 'queued')
+    pending(folder, 1)
+    os.killpg(child.pid, signal.SIGTERM)
+    finish(child, -signal.SIGTERM)
+    assert not marker.exists()
+    change(db, "UPDATE runs SET status='completed'")
+    child = launch(cli + ['pipeline-start', '--db', str(db), '--', 'sh', '-c', 'exit 7'], env, folder / 'failure')
+    finish(child, 7)
+    child = launch(cli + ['pipeline-start', '--db', str(db), '--', 'true'], env, folder / 'after-failure')
+    finish(child)
+
+    # Six real child processes retain their markers but must inherit no slot
+    # descriptors. Parent/master completion frees six passes while all remain
+    # alive; this catches the pre-fix leak, not just a copied numeric marker.
+    folder, db, env = case('descriptors', cores=10)
+    master = folder / 'master.py'
+    master.write_text('''import json, os, pathlib, subprocess, sys, time
+folder = pathlib.Path(sys.argv[1]); pool = pathlib.Path(os.environ['FM_CPU_POOL_DIR'])
+if len(sys.argv) > 2:
+    inodes = {p.stat().st_ino for p in pool.glob('slot-*.lock')}
+    descriptors = []
+    for fd in range(3, 256):
+        try:
+            if os.fstat(fd).st_ino in inodes: descriptors.append(fd)
+        except OSError: pass
+    (folder / (str(os.getpid()) + '.child')).write_text(json.dumps(dict(pid=os.getpid(), fds=descriptors, marker=os.environ['FM_CPU_PASS_HELD'])))
+    while not (folder / 'release-children').exists(): time.sleep(0.025)
+else:
+    children = [subprocess.Popen([sys.executable, __file__, str(folder), 'child'], close_fds=False) for _ in range(6)]
+    while not (folder / 'release-master').exists(): time.sleep(0.025)
+''')
+    child = launch(cli + ['run', '--passes', '6', '--', python, str(master), str(folder)], env, folder / 'master')
+    wait_for(lambda: len(list(folder.glob('*.child'))) == 6, 'six children')
+    observations = [json.loads(p.read_text()) for p in folder.glob('*.child')]
+    assert held(env) == 6
+    assert all(item['fds'] == [] and item['marker'] == '6' for item in observations), observations
+    (folder / 'release-master').touch()
+    finish(child)
+    assert held(env) == 0
+    for item in observations: os.kill(item['pid'], 0)
+    (folder / 'release-children').touch()
+    (folder / 'observations.json').write_text(json.dumps(observations, indent=2))
+
+    # Actual measured CLI: fresh input goes through admission BEFORE its bound;
+    # wait-only reattachment does not requeue. This fake native start writes only
+    # the private DB and never invokes the shared no-mistakes daemon.
+    folder, db, env = case('duration', cores=3, running=20)
+    fake_nm = shim / 'no-mistakes'
+    fake_nm.write_text('#!' + python + '\n' + '''import os, pathlib, sqlite3, sys
+folder = pathlib.Path(os.environ['NM_HOME'])
+if '--intent' in sys.argv:
+    with sqlite3.connect(folder / 'state.sqlite') as db: db.execute("INSERT INTO runs VALUES ('fresh', 'running')")
+(folder / 'command-started').touch()
+''')
+    fake_nm.chmod(0o700)
+    env['FM_DURATION_FILE'] = str(folder / 'durations.jsonl')
+    env['FM_DURATION_ABSOLUTE_SECS'] = '3'
+    duration = [str(proxy), str(repo / 'bin/fm-duration.py'), 'run', '--pipeline-priority', 'machinery', 'no-mistakes.run', '--', str(fake_nm)]
+    child = launch(duration + ['axi', 'run', '--intent', 'inert admission fixture'], env, folder / 'fresh')
+    pending(folder, 1)
+    time.sleep(3.5)
+    assert not (folder / 'command-started').exists()
+    change(db, "UPDATE runs SET status='completed'")
+    finish(child)
+    assert (folder / 'command-started').exists()
+    rows = [json.loads(line) for line in Path(env['FM_DURATION_FILE']).read_text().splitlines()]
+    samples = [row for row in rows if row.get('key') == 'no-mistakes.run' and 'event' not in row]
+    assert samples[-1]['exit'] == 0 and not samples[-1]['timed_out'] and samples[-1]['duration_ms'] < 3000, samples
+    change(db, "UPDATE runs SET status='running'")
+    (folder / 'command-started').unlink()
+    child = launch(duration + ['axi', 'run'], env, folder / 'reattach')
+    finish(child)
+    assert (folder / 'command-started').exists()
+    print(json.dumps(dict(result='pass', artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
+finally:
+    for file in root.glob('*/release-children'):
+        file.touch()
+    for folder in root.glob('*'):
+        if folder.is_dir(): (folder / 'release-children').touch()
+    for child in children:
+        if child.poll() is None:
+            try: os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+        child.wait()
+    (root / 'commands.json').write_text(json.dumps(records, indent=2) + '\n')

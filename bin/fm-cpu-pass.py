@@ -4,6 +4,7 @@ fm-cpu-pass.py - host-wide CPU pass pool for CPU-heavy test bursts.
 
 Usage:
   fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] -- COMMAND [ARGS...]
+  fm-cpu-pass.sh pipeline-start [--priority CLASS] [--db PATH] [--log-fd N] -- COMMAND [ARGS...]
   fm-cpu-pass.sh status [--json]
   fm-cpu-pass.sh size
 
@@ -39,21 +40,46 @@ Running:
   - Nested work takes no new passes and may request at most the inherited count.
     FM_CPU_PASS_HELD must be a nonnegative decimal integer or run exits 125,
     including without Python; 0 denotes degraded work and imposes no budget.
-  - The child inherits the slot lock fds so passes survive a killed wrapper.
+  - Only this owner retains slot descriptors; close-on-exec/close_fds prevents
+    COMMAND and its descendants retaining passes after COMMAND exits.
+    Killing this owner with SIGKILL releases its slots even if work survives;
+    ordinary TERM/INT/HUP still keep the owner until COMMAND ends.
     The log fd is closed; stdout and stderr carry only COMMAND's own output.
   - A degraded run (the protocol's rule 7) writes one notice to the log fd.
 
-Exit status of `run`: COMMAND's own status; 126 when COMMAND cannot be
+Pipeline starts:
+  - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
+    priority waiter files. The start policy, core scaling and class order are
+    owned by docs/cpu-pass-pool.md. --db defaults to <NM_HOME>/state.sqlite or
+    ~/.no-mistakes/state.sqlite; all SQLite reads use mode=ro.
+  - Admission is before COMMAND (including any measured execution wrapper).
+    No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
+  - A short start lock bridges the check-to-registration race until a new
+    running run ID appears, or COMMAND returns. It does not reserve a run's
+    lifetime or poll after registration; status changes release capacity.
+    Participating starts serialize this handshake, not their required checks.
+    Bypassing this owner or external daemon status changes cannot be made
+    atomic with a read-only external database; deployment must route starts here.
+  - Unreadable DB/load/pool sources refuse with 125 instead of guessing headroom.
+    If a read fails after launch, retain the start lock until COMMAND returns;
+    never stop running work because the observer lost its source.
+
+Exit status of `run` and `pipeline-start`: COMMAND's own status; 126 when COMMAND cannot be
 executed, 127 when it is not found, 125 for a usage error.
 """
 
 import argparse
+import contextlib
 import errno
 import json
+import math
 import os
+from pathlib import Path
 import random
 import signal
+import sqlite3
 import stat
+import tempfile
 import subprocess
 import sys
 import time
@@ -231,14 +257,14 @@ def exit_code_for(returncode: int) -> int:
     return returncode
 
 
-def run_child(command: List[str], env: dict, log_fd: int, held: List[int]) -> int:
+def run_child(command: List[str], env: dict, log_fd: int, on_poll=None) -> int:
     previous = {}
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         previous[signum] = signal.signal(signum, signal.SIG_IGN)
     try:
         try:
             child = subprocess.Popen(
-                command, env=env, close_fds=True, pass_fds=tuple(held),
+                command, env=env, close_fds=True,
                 preexec_fn=_restore_default_signals)
         except FileNotFoundError:
             log(log_fd, "command not found: %s" % command[0])
@@ -247,8 +273,12 @@ def run_child(command: List[str], env: dict, log_fd: int, held: List[int]) -> in
             log(log_fd, "command not executable: %s" % command[0])
             return 126
         while True:
+            if on_poll is not None and on_poll():
+                on_poll = None
             try:
-                return exit_code_for(child.wait())
+                return exit_code_for(child.wait(timeout=POLL_MAX_SECS if on_poll else None))
+            except subprocess.TimeoutExpired:
+                continue
             except InterruptedError:  # pragma: no cover - PEP 475 retries
                 continue
     finally:
@@ -322,13 +352,132 @@ def cmd_run(args: argparse.Namespace) -> int:
         return exec_direct(command, env, log_fd)
     env[HELD_ENV] = str(passes)
     try:
-        return run_child(command, env, log_fd, held)
+        return run_child(command, env, log_fd)
     finally:
         for fd in held:
             try:
                 os.close(fd)
             except OSError:
                 pass
+
+
+PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
+PIPELINE_ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
+
+
+def running_runs(database: str) -> set:
+    """Read host execution state without creating or changing its database."""
+    uri = Path(database).expanduser().resolve().as_uri() + "?mode=ro"
+    with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+        return {row[0] for row in connection.execute("SELECT id FROM runs WHERE status = 'running'")}
+
+
+def pipeline_observation(database: str) -> Tuple[set, int, float, int]:
+    cores = os.cpu_count()
+    if not isinstance(cores, int) or cores < 1:
+        raise ValueError("cannot read a positive native CPU count")
+    load5 = os.getloadavg()[1]
+    if not math.isfinite(load5) or load5 < 0:
+        raise ValueError("cannot read a finite nonnegative native load5")
+    return running_runs(database), cores, load5, max(1, cores // 3)
+
+
+def first_pipeline_waiter(directory: str) -> str:
+    """Locked entries are live waiters; a dead waiter's unlocked file is inert."""
+    entries = []
+    for path in Path(directory).glob("pipeline-waiter-*.lock"):
+        try:
+            fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
+        except FileNotFoundError:
+            continue
+        try:
+            if try_lock(fd):
+                path.unlink(missing_ok=True)
+                continue
+            entry = json.loads(path.read_text())
+            entries.append((PIPELINE_PRIORITIES.index(entry["priority"]), entry["queued_ns"], str(path)))
+        finally:
+            os.close(fd)
+    return min(entries)[2] if entries else ""
+
+
+def cmd_pipeline_start(args: argparse.Namespace) -> int:
+    command = list(args.command)
+    if command[:1] == ["--"]:
+        command = command[1:]
+    if not command:
+        log(args.log_fd, "pipeline-start needs a command after --")
+        return 125
+    waiter_fd = admission_fd = None
+    waiter_path = None
+    try:
+        directory = pool_dir()
+        ensure_pool_dir(directory)
+        # Publish a fully written, locked entry atomically; no reader sees a
+        # partial priority record. These are startup waiters, not CPU passes.
+        waiter_fd, temporary = tempfile.mkstemp(prefix=".pipeline-waiter-", dir=directory)
+        fcntl.flock(waiter_fd, fcntl.LOCK_EX)
+        os.write(waiter_fd, json.dumps({"priority": args.priority, "queued_ns": time.time_ns()}).encode())
+        waiter_path = str(Path(directory) / (Path(temporary).name[1:] + ".lock"))
+        os.rename(temporary, waiter_path)
+        admission_fd = open_lock(os.path.join(directory, "pipeline-start.lock"))
+        next_notice = time.monotonic() + FIRST_NOTICE_SECS
+        delay = POLL_MIN_SECS
+        while True:
+            reason = "another start is registering"
+            if try_lock(admission_fd):
+                before, cores, load5, limit = pipeline_observation(args.db)
+                first = first_pipeline_waiter(directory)
+                if first == waiter_path and len(before) < limit and load5 <= 2 * cores:
+                    break
+                reason = "running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
+                    len(before), limit, load5, 2 * cores, args.priority)
+                fcntl.flock(admission_fd, fcntl.LOCK_UN)
+            now = time.monotonic()
+            if now >= next_notice:
+                log(args.log_fd, "pipeline-start waiting: " + reason)
+                next_notice = now + NOTICE_EVERY_SECS
+            time.sleep(delay)
+            delay = min(POLL_MAX_SECS, delay * 2)
+        os.unlink(waiter_path)
+        waiter_path = None
+        log(args.log_fd, "pipeline-start admitted: running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
+            len(before), limit, load5, 2 * cores, args.priority))
+        env = dict(os.environ)
+        env[PIPELINE_ADMITTED_ENV] = "1"
+        registration_error = False
+
+        def registered() -> bool:
+            nonlocal registration_error
+            try:
+                if running_runs(args.db) - before:
+                    # Serialize only the check-to-registration gap. The daemon
+                    # owns status after this handoff; no lifetime watcher remains.
+                    fcntl.flock(admission_fd, fcntl.LOCK_UN)
+                    return True
+            except (OSError, sqlite3.Error, ValueError) as exc:
+                if not registration_error:
+                    log(args.log_fd, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
+                    registration_error = True
+            return False
+
+        return run_child(command, env, args.log_fd, registered)
+    except KeyboardInterrupt:
+        return 130
+    except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
+        # Unlike a burst's optional throughput pool, an unreadable start source
+        # cannot stand in for proof of headroom under the explicit start policy.
+        log(args.log_fd, "pipeline-start refused: %s" % exc)
+        return 125
+    finally:
+        if waiter_path is not None:
+            try:
+                os.unlink(waiter_path)
+            except FileNotFoundError:
+                pass
+        for fd in (waiter_fd, admission_fd):
+            if fd is not None:
+                os.close(fd)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -376,6 +525,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--label", default="", help="holder label shown in status and notices")
     run.add_argument("--log-fd", type=int, default=2, help="fd for wait notices (default 2)")
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
+    start = sub.add_parser("pipeline-start", help="queue a fresh pipeline start before its execution clock")
+    start.add_argument("--priority", choices=PIPELINE_PRIORITIES, default="other", help="start class in descending priority order")
+    start.add_argument("--db", default=os.path.join(os.environ.get("NM_HOME") or os.path.expanduser("~/.no-mistakes"), "state.sqlite"), help="host no-mistakes database (opened read-only)")
+    start.add_argument("--log-fd", type=int, default=2, help="fd for admission notices")
+    start.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
     status = sub.add_parser("status", help="report held and free passes")
     status.add_argument("--json", action="store_true", help="print one JSON object")
     sub.add_parser("size", help="print the pool size")
@@ -390,6 +544,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0 if exc.code == 0 else 125
     if args.action == "run":
         return cmd_run(args)
+    if args.action == "pipeline-start":
+        return cmd_pipeline_start(args)
     if args.action == "status":
         return cmd_status(args)
     if args.action == "size":
