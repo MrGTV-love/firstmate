@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 root, temp = map(Path, sys.argv[1:])
 checker = root / 'bin/fm-dod-check.py'
@@ -120,6 +121,14 @@ print('ok - exact-head gate runs and overlaid new regression fails on base, pass
 
 manifest, _ = run('nonzero', criteria(command='exit 7'), 1)
 assert manifest['items'][0]['exit'] == 7 and manifest['passed'] is False
+# The recorder's own wait supplies the exit, whatever the command prints, and a
+# command's background writer ends with it before any evidence is written.
+boundary = temp / 'recorder-boundary'
+manifest, _ = run('recorder-boundary', criteria(command=f"(sleep 3; printf forged > {boundary / 'gate-C1.log'}) & printf 'exit: 0\\n'; exit 7"), 1)
+assert manifest['items'][0]['exit'] == 7 and manifest['passed'] is False
+time.sleep(4)
+assert hashlib.sha256((boundary / 'gate-C1.log').read_bytes()).hexdigest() == manifest['items'][0]['sha256']
+assert (boundary / 'gate-C1.log').read_text().endswith('\nexit: 7\n')
 manifest, _ = run('pipefail', criteria(command='false | true'), 1)
 assert manifest['items'][0]['exit'] != 0
 print('ok - nonzero commands and failed pipeline components make the check fail')
@@ -155,6 +164,49 @@ assert 'exact full commit' in out
 assert not (temp / 'invalid-ref').exists()
 print('ok - mutable refs are rejected before running any command')
 
+# Exit polarity is not semantic proof. Expected: `bash app.sh` prints exactly
+# fixed. A marker-file test fails on base and passes on a head whose app still
+# prints the wrong text; a test of the real output rejects that head and accepts
+# the genuine repair.
+oracle = temp / 'oracle'
+oracle.mkdir()
+def ogit(*args):
+    return call('git', '-C', oracle, *args).strip()
+ogit('init', '-q')
+ogit('config', 'user.email', 'test@example.invalid')
+ogit('config', 'user.name', 'test')
+(oracle / 'app.sh').write_text('printf broken\n')
+ogit('add', '.')
+ogit('commit', '-qm', 'broken app')
+oracle_base = ogit('rev-parse', 'HEAD')
+(oracle / 'app.sh').write_text('printf wrong\n')
+(oracle / '.fixed').write_text('marker\n')
+(oracle / 'tests').mkdir()
+(oracle / 'tests/marker.test.sh').write_text('test -f .fixed\n')
+(oracle / 'tests/output.test.sh').write_text('observed=$(bash app.sh)\necho "observed=$observed expected=fixed"\ntest "$observed" = fixed\n')
+ogit('add', '.')
+ogit('commit', '-qm', 'planted wrong implementation')
+wrong_head = ogit('rev-parse', 'HEAD')
+(oracle / 'app.sh').write_text('printf fixed\n')
+ogit('commit', '-qam', 'genuine repair')
+repaired_head = ogit('rev-parse', 'HEAD')
+assert call('bash', oracle / 'app.sh') == 'fixed'
+def oracle_run(name, test, head_sha, expected):
+    dod.write_text(criteria(command=f'bash {test}', verify=f'bash {test} shows bash app.sh prints exactly fixed'))
+    stdout = call(sys.executable, checker, 'run', '--dod', dod, '--repo', oracle, '--base', oracle_base,
+                  '--head', head_sha, '--output', temp / name, expected=expected)
+    assert 'semantics: unassessed' in stdout
+    assert 'semantics: unassessed' in (temp / name / 'summary.log').read_text()
+    return json.loads((temp / name / 'results.json').read_text())
+proxy = oracle_run('oracle-proxy', 'tests/marker.test.sh', wrong_head, 0)
+assert proxy['passed'] is True and proxy['tests'][0]['base']['exit'] != 0 and proxy['tests'][0]['head']['exit'] == 0
+real = oracle_run('oracle-wrong', 'tests/output.test.sh', wrong_head, 1)
+assert real['passed'] is False and real['items'][0]['exit'] != 0 and real['tests'][0]['head']['exit'] != 0
+assert 'observed=wrong expected=fixed' in (temp / 'oracle-wrong' / real['tests'][0]['head']['log']).read_text()
+repaired = oracle_run('oracle-repaired', 'tests/output.test.sh', repaired_head, 0)
+assert repaired['passed'] is True and repaired['tests'][0]['base']['exit'] != 0 and repaired['tests'][0]['head']['exit'] == 0
+print('ok - a marker-file proxy passes fail-first on a wrong app, the real output test rejects it and accepts the repair, and evidence states semantics unassessed')
+
 # Freeze through the same public interface spawn uses, outside the PR repo.
 home = temp / 'home'
 state = home / 'state'
@@ -187,33 +239,16 @@ assert not list(state.glob('missing.dod.*'))
 print('ok - dispatch freezes selected bytes and digest outside the branch, refuses absent criteria, and ignores later criteria rewrites')
 
 # Forge calls alone are stubbed. Produce real command logs and exact-commit diff
-# records through the workflow's own plan, isolated exec and trusted record steps;
-# the resolver must independently check their identities and digests.
+# records through the workflow's trusted recorder; the resolver must
+# independently check their identities and digests.
 artifact = temp / 'hosted-artifact'
-plan_dir, legs = temp / 'hosted-plan', temp / 'hosted-legs'
-call(sys.executable, checker, 'plan', '--dod', frozen, '--repo', repo, '--base', base,
-     '--head', head, '--output', plan_dir)
-tasks = json.loads((plan_dir / 'plan.json').read_text())['tasks']
-assert [task['name'] for task in tasks] == ['gate-C1', 'test-0-base', 'test-0-head', 'test-1-base', 'test-1-head']
-for task in tasks:
-    call(sys.executable, checker, 'exec', '--task', json.dumps(task), '--repo', repo, '--head', head,
-         '--output', legs / f"leg-{task['name']}")
-call(sys.executable, checker, 'record', '--plan', plan_dir, '--legs', legs, '--execute-result', 'failure',
-     '--output', temp / 'failed-leg-record', env=environment, expected=1)
-leg = legs / 'leg-gate-C1' / 'gate-C1.json'
-honest = leg.read_text()
-leg.write_text(json.dumps({**json.loads(honest), 'command': 'true', 'commit': base, 'sha256': '0' * 64}))
-recorded = call(sys.executable, checker, 'record', '--plan', plan_dir, '--legs', legs, '--execute-result', 'success',
-                '--output', artifact, env=environment)
+recorded = call(sys.executable, checker, 'run', '--dod', frozen, '--repo', repo, '--base', base,
+                '--head', head, '--output', artifact, env=environment)
 manifest = json.loads((artifact / 'results.json').read_text())
-assert manifest['passed'] is True and manifest['items'][0]['command'] == tasks[0]['command']
-assert manifest['items'][0]['commit'] == head
-assert manifest['items'][0]['sha256'] == hashlib.sha256((artifact / 'gate-C1.log').read_bytes()).hexdigest()
-assert f"command: {json.dumps(tasks[0]['command'])}" in recorded and 'exit: 0' in recorded
-leg.write_text(honest)
+assert manifest['passed'] is True and manifest['items'][0]['commit'] == head
+assert f"command: {json.dumps(manifest['items'][0]['command'])}" in recorded and 'exit: 0' in recorded
 flags = json.loads((artifact / 'weakening.json').read_text())['flags']
 assert flags
-print('ok - the trusted recorder writes command, commit and digests itself, takes only exit and log from isolated legs, and fails when any leg job failed')
 pointer = {'id': 'C1', 'run_id': '123', 'commit': head, 'file': 'value', 'line': 1,
            'log': manifest['items'][0]['log'], 'log_sha256': manifest['items'][0]['sha256']}
 claims = {'items': [pointer], 'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Replaced unconditional exit with a real regression.'} for f in flags]}

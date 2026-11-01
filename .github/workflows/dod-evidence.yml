@@ -4,9 +4,8 @@ name: Machine-checked DoD
 # PR branch. Run inputs and uploaded artifacts are GitHub's durable CI record.
 # Dispatch on the default branch: this workflow, the checker and the detector
 # run from that trusted tree; the PR head is checked out only as data to test.
-# Each candidate command runs in its own matrix runner. Only the record job,
-# which executes no candidate command, writes the evidence manifest, from each
-# leg's exit code and log and GitHub's own result for the execute jobs.
+# The trusted recorder executes every frozen command itself and records the
+# exit codes it observes; bin/fm-dod-check.py --help owns that boundary.
 # The merge checker refuses a run from any other ref and binds the artifact's
 # DoD digest to the dispatch-time record.
 on:
@@ -34,14 +33,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  plan:
-    name: Plan machine-checked DoD evidence
+  evidence:
+    name: Machine-checked DoD evidence
     runs-on: ubuntu-latest
     # Normal tier: docs/fm-test-portable-shards.md "Timeouts".
     timeout-minutes: 60
-    outputs:
-      head: ${{ steps.pr.outputs.head }}
-      tasks: ${{ steps.plan.outputs.tasks }}
     steps:
       - name: Resolve exact PR commits
         id: pr
@@ -62,7 +58,7 @@ jobs:
             }
             core.setOutput('head', pr.head.sha);
             core.setOutput('base', pr.base.sha);
-      - name: Check out trusted default-branch checker
+      - name: Check out trusted default-branch recorder
         uses: actions/checkout@v6
         with:
           path: trusted
@@ -74,8 +70,7 @@ jobs:
           path: candidate
           fetch-depth: 0
           persist-credentials: false
-      - name: Plan gate commands, fail-first phases and weakened-test flags
-        id: plan
+      - name: Record gate commands, fail-first proof and weakened-test flags
         env:
           FROZEN_DOD: ${{ inputs.dod }}
           DOD_BASE: ${{ steps.pr.outputs.base }}
@@ -86,94 +81,14 @@ jobs:
           from pathlib import Path
           Path(os.environ['RUNNER_TEMP'], 'dod.md').write_text(os.environ['FROZEN_DOD'])
           PY
-          python3 trusted/bin/fm-dod-check.py plan \
+          python3 trusted/bin/fm-dod-check.py run \
             --dod "$RUNNER_TEMP/dod.md" --repo candidate \
             --base "$DOD_BASE" --head "$DOD_HEAD" \
-            --output "$RUNNER_TEMP/plan"
-          python3 - "$RUNNER_TEMP/plan/plan.json" >> "$GITHUB_OUTPUT" <<'PY'
-          import json, sys
-          print("tasks=" + json.dumps(json.load(open(sys.argv[1]))["tasks"], separators=(",", ":")))
-          PY
-      - name: Upload trusted plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: fm-dod-plan-${{ inputs.head }}
-          path: ${{ runner.temp }}/plan/
-          if-no-files-found: error
-
-  execute:
-    name: ${{ matrix.task.name }}
-    needs: plan
-    if: ${{ needs.plan.outputs.tasks != '[]' }}
-    runs-on: ubuntu-latest
-    # Normal tier: docs/fm-test-portable-shards.md "Timeouts".
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        task: ${{ fromJSON(needs.plan.outputs.tasks) }}
-    steps:
-      - name: Check out trusted default-branch checker
-        uses: actions/checkout@v6
-        with:
-          path: trusted
-          persist-credentials: false
-      - name: Fetch exact candidate history
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.plan.outputs.head }}
-          path: candidate
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Run one frozen command on this isolated runner
-        env:
-          DOD_TASK: ${{ toJSON(matrix.task) }}
-          DOD_HEAD: ${{ needs.plan.outputs.head }}
-        run: |
-          python3 trusted/bin/fm-dod-check.py exec --task "$DOD_TASK" \
-            --repo candidate --head "$DOD_HEAD" --output "$RUNNER_TEMP/leg"
-      - name: Upload this leg's exit code and log
-        uses: actions/upload-artifact@v4
-        with:
-          name: leg-${{ matrix.task.name }}
-          path: ${{ runner.temp }}/leg/
-          if-no-files-found: error
-
-  record:
-    name: Record machine-checked DoD evidence
-    needs: [plan, execute]
-    if: ${{ always() && needs.plan.result == 'success' }}
-    runs-on: ubuntu-latest
-    # Fast tier: docs/fm-test-portable-shards.md "Timeouts".
-    timeout-minutes: 5
-    steps:
-      - name: Check out trusted default-branch checker
-        uses: actions/checkout@v6
-        with:
-          path: trusted
-          persist-credentials: false
-      - name: Download trusted plan
-        uses: actions/download-artifact@v4
-        with:
-          name: fm-dod-plan-${{ needs.plan.outputs.head }}
-          path: ${{ runner.temp }}/plan
-      - name: Download leg results
-        if: ${{ needs.plan.outputs.tasks != '[]' }}
-        uses: actions/download-artifact@v4
-        with:
-          pattern: leg-*
-          path: ${{ runner.temp }}/legs
-      - name: Record gate and fail-first results from the trusted side
-        env:
-          EXECUTE_RESULT: ${{ needs.execute.result }}
-        run: |
-          python3 trusted/bin/fm-dod-check.py record \
-            --plan "$RUNNER_TEMP/plan" --legs "$RUNNER_TEMP/legs" \
-            --execute-result "$EXECUTE_RESULT" --output "$RUNNER_TEMP/dod-evidence"
+            --output "$RUNNER_TEMP/dod-evidence"
       - name: Upload machine evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-dod-evidence-${{ needs.plan.outputs.head }}
+          name: fm-dod-evidence-${{ steps.pr.outputs.head }}
           path: ${{ runner.temp }}/dod-evidence/
           if-no-files-found: error

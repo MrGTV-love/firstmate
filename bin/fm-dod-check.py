@@ -2,9 +2,6 @@
 """Validate and execute machine-checkable task criteria.
 
 Usage:
-  fm-dod-check.py plan --dod FILE --repo DIR --base SHA --head SHA --output DIR
-  fm-dod-check.py exec --task JSON --repo DIR --head SHA --output DIR
-  fm-dod-check.py record --plan DIR --legs DIR --execute-result RESULT --output DIR
   fm-dod-check.py run --dod FILE --repo DIR --base SHA --head SHA --output DIR
   fm-dod-check.py freeze --brief FILE --state DIR --task ID
   fm-dod-check.py dispatch --meta FILE --pr URL
@@ -25,14 +22,24 @@ cannot change; the candidate tree is checked out only as data to test. A
 default branch without that workflow is reported, never bootstrapped.
 verify refuses a run whose workflow ref is not the default branch or whose
 workflow commit is not in that branch's history.
-The workflow splits evidence across process and machine boundaries: plan runs
-trusted code over the candidate as data, lists one task per gate command and
-per fail-first phase, and runs the weakened-test detector; exec runs exactly one
-task's command in its own matrix runner; record, on a runner that executes no
-candidate command, takes only each leg's exit code and log, writes command,
-commit and digests itself, and fails unless every leg job succeeded. run is the
-same plan, exec and record in one local process: smoke evidence only.
-The base is the PR base GitHub reported at dispatch, recorded by plan. Changed
+Recorder boundary: run is the trusted default-branch recorder. It plans one
+task per gate command and per fail-first phase, runs the weakened-test detector
+before any candidate command, then executes each command itself in a fresh
+exact-commit export and its own process group. It captures output through its
+own pipe and the exit code from its own wait, never from a file a command wrote,
+ends the command's process group before continuing, and creates the evidence
+directory only after the last command. Candidate tests are candidate code: the
+weakened-test detector and the independent reviewer cover their quality. The
+commands share the recorder's runner account, so a command that deliberately
+escapes its process group could still reach that account's files; a separate
+OS account on the runner is the missing prerequisite to exclude that.
+Semantic limit: criteria pair a natural-language Expected with an arbitrary
+shell Check, and there is no executable oracle for Expected. A recorded zero
+exit, and a fail-first base-nonzero/head-zero pair, prove only that the
+command's own assertions held; a test that checks a proxy such as a marker file
+passes while the behavior stays wrong. summary.log and verify output state
+semantics unassessed; the reviewer grades each test against Expected.
+The base is the PR base GitHub reported at dispatch, recorded by run. Changed
 tests, the fail-first base tree and the weakened-test diff use the merge base of
 that base and the head. verify accepts that recorded base while it is in the
 live base's history, so an unrelated base advance never invalidates evidence.
@@ -61,7 +68,7 @@ Test paths named anywhere in an item's fields use tests/<name>.test.sh.
 For changed named tests, the HEAD test is overlaid onto an exported merge-base
 tree: absence of a new test on base is not fail-first proof. Other files stay
 at base. Trees are git archives of exact full commits, never the caller's dirty
-tree. Output directories must not exist; record's holds command logs and
+tree. The output directory must not exist; it holds command logs and
 results.json, bound to the DoD digest, commits and GitHub run. Logs include
 exit codes and SHA-256 digests. Commands run without forge credentials.
 A nonzero base exit and zero head exit are required for every changed named test.
@@ -73,10 +80,12 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import signal
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 
 
 class CheckError(Exception):
@@ -92,6 +101,7 @@ def digest(data):
 
 
 BIN = Path(__file__).resolve().parent
+SEMANTICS = "unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome"
 
 
 def owner(*args):
@@ -169,29 +179,35 @@ def export(repo, sha, destination):
         archive.extractall(destination, filter="data")
 
 
-def execute(command, cwd, output, name, sha):
-    log = output / f"{name}.log"
+def execute(command, cwd, sha):
     # No token, credentials, or Actions control-file paths go to PR commands.
     environment = {key: value for key, value in os.environ.items()
                    if key in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")}
-    print(f"command: {json.dumps(command)}", flush=True)
-    with log.open("wb") as stream:
-        stream.write(f"command: {command}\ncommit: {sha}\n".encode())
-        stream.flush()
-        invocation = ["bash", "-o", "pipefail", "-c", command]
-        result = subprocess.run(invocation, cwd=cwd, env=environment,
-                                stdout=stream, stderr=subprocess.STDOUT, check=False)
-        stream.write(f"\nexit: {result.returncode}\n".encode())
-    print(f"exit: {result.returncode}\nlog: {json.dumps(log.name)}", flush=True)
-    return {"command": command, "commit": sha, "exit": result.returncode,
-            "log": log.name, "sha256": digest(log.read_bytes())}
+    print(f"command: {json.dumps(command)}\ncommit: {sha}", flush=True)
+    process = subprocess.Popen(["bash", "-o", "pipefail", "-c", command], cwd=cwd, env=environment,
+                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               start_new_session=True)
+    captured = []
+    reader = threading.Thread(target=lambda: captured.append(process.stdout.read()))
+    reader.start()
+    code = process.wait()
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    reader.join()
+    process.stdout.close()
+    print(f"exit: {code}", flush=True)
+    return code, f"command: {command}\ncommit: {sha}\n".encode() + b"".join(captured) + f"\nexit: {code}\n".encode()
 
 
-def plan_into(repo, base, head, raw, items, output):
-    repo = repo.resolve()
-    base, head = commit(repo, base), commit(repo, head)
+def run(args, raw, items):
+    repo = args.repo.resolve()
+    base, head = commit(repo, args.base), commit(repo, args.head)
+    output = args.output.resolve()
+    if output.exists() or output.is_symlink():
+        raise CheckError("output directory must not exist")
     merge_base = git(repo, "merge-base", base, head).decode().strip()
-    output.mkdir(parents=True, exist_ok=False)
     changed = set(git(repo, "diff", "--name-only", "-z", merge_base, head, "--", "tests").decode().split("\0"))
     tasks = [{"name": f"gate-{item['id']}", "kind": "gate", "id": item["id"],
               "command": item["command"], "commit": head}
@@ -200,76 +216,39 @@ def plan_into(repo, base, head, raw, items, output):
         for phase, sha in (("base", merge_base), ("head", head)):
             tasks.append({"name": f"test-{index}-{phase}", "kind": "test", "path": path,
                           "phase": phase, "command": f"bash {path}", "commit": sha})
-    detected = subprocess.run([sys.executable, str(BIN / "fm-test-weakening.py"), "--repo", str(repo),
-                               "--base", base, "--head", head, "--output", str(output / "weakening.json")],
-                              capture_output=True, text=True, check=False)
-    if detected.returncode not in (0, 1):
-        raise CheckError(f"weakened-test detector failed: {detected.stdout.strip()}")
-    print(detected.stdout, end="", flush=True)
-    (output / "plan.json").write_text(json.dumps({"schema": "fm-dod-plan.v1", "head": head, "base": base,
-                                                  "merge_base": merge_base, "dod_sha256": digest(raw),
-                                                  "tasks": tasks}, indent=2) + "\n")
-    (output / "dod.md").write_bytes(raw)
-    print(f"head: {head}\nbase: {base}\nmerge_base: {merge_base}\ntasks: {len(tasks)}", flush=True)
-    return tasks
-
-
-def exec_into(repo, head, task, output):
-    repo = repo.resolve()
-    head = commit(repo, head)
-    sha = commit(repo, task["commit"])
-    name = task["name"]
-    if not re.fullmatch(r"(gate|test)-[A-Za-z0-9_.-]+", name) or task["kind"] not in ("gate", "test"):
-        raise CheckError("invalid evidence task")
-    output.mkdir(parents=True, exist_ok=False)
+    print(f"head: {head}\nbase: {base}\nmerge_base: {merge_base}\ndod_sha256: {digest(raw)}", flush=True)
+    logs, rows = {}, {}
     with tempfile.TemporaryDirectory(prefix="fm-dod-") as scratch:
-        # Each command receives a fresh exact-commit export of its own.
-        tree = Path(scratch) / "tree"
-        export(repo, sha, tree)
-        if task["kind"] == "test":
-            # The HEAD test is overlaid onto the base tree; other files stay at base.
-            path = task["path"]
-            if named_tests(path) != [path]:
-                raise CheckError(f"invalid named test path: {path}")
-            mode = git(repo, "ls-tree", head, "--", path).decode().split(" ", 1)[0]
-            if mode not in ("100644", "100755"):
-                raise CheckError(f"changed named test is absent or a symlink at head: {path}")
-            target = tree / path
-            if target.is_symlink() or any(parent.is_symlink() for parent in target.parents):
-                raise CheckError(f"test path traverses a symlink: {path}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(git(repo, "show", f"{head}:{path}"))
-        result = execute(task["command"], tree, output, name, sha)
-    (output / f"{name}.json").write_text(json.dumps({**result, "name": name}) + "\n")
-    return result
-
-
-def record_into(plan_dir, legs, execute_result, output):
-    plan = json.loads(safe_artifact(plan_dir, "plan.json"))
-    raw = safe_artifact(plan_dir, "dod.md")
-    weakening_bytes = safe_artifact(plan_dir, "weakening.json")
-    weakening = json.loads(weakening_bytes)
-    head, base, tasks = plan.get("head"), plan.get("base"), plan.get("tasks")
-    if (plan.get("schema") != "fm-dod-plan.v1" or plan.get("dod_sha256") != digest(raw)
-            or not isinstance(tasks, list) or weakening.get("schema") != "fm-test-weakening.v1"
-            or weakening.get("head") != head or weakening.get("base") != base):
-        raise CheckError("plan artifact does not bind this DoD, base and head")
-    output.mkdir(parents=True, exist_ok=False)
-    rows = {}
-    for task in tasks:
-        # Only the leg's exit and log come from its isolated runner; the
-        # command, commit and digest are this trusted recorder's own.
-        directory = legs / f"leg-{task['name']}"
-        result = json.loads(safe_artifact(directory, f"{task['name']}.json"))
-        if result.get("name") != task["name"] or type(result.get("exit")) is not int or result.get("log") != f"{task['name']}.log":
-            raise CheckError(f"isolated leg result does not match its planned task: {task['name']}")
-        log = safe_artifact(directory, result["log"])
-        (output / result["log"]).write_bytes(log)
-        rows[task["name"]] = {"command": task["command"], "commit": task["commit"], "exit": result["exit"],
-                              "log": result["log"], "sha256": digest(log)}
-        print(f"command: {json.dumps(task['command'])}\ncommit: {task['commit']}\nexit: {result['exit']}", flush=True)
-    passed = execute_result == "success" or (execute_result == "skipped" and not tasks)
-    manifest = {"schema": "fm-dod-evidence.v1", "head": head, "base": base, "merge_base": plan.get("merge_base"),
+        scratch = Path(scratch)
+        detected = subprocess.run([sys.executable, str(BIN / "fm-test-weakening.py"), "--repo", str(repo),
+                                   "--base", base, "--head", head, "--output", str(scratch / "weakening.json")],
+                                  capture_output=True, text=True, check=False)
+        if detected.returncode not in (0, 1):
+            raise CheckError(f"weakened-test detector failed: {detected.stdout.strip()}")
+        print(detected.stdout, end="", flush=True)
+        weakening = (scratch / "weakening.json").read_bytes()
+        for task in tasks:
+            # Each command receives a fresh exact-commit export of its own.
+            tree = scratch / task["name"]
+            export(repo, task["commit"], tree)
+            if task["kind"] == "test":
+                # The HEAD test is overlaid onto the base tree; other files stay at base.
+                path = task["path"]
+                mode = git(repo, "ls-tree", head, "--", path).decode().split(" ", 1)[0]
+                if mode not in ("100644", "100755"):
+                    raise CheckError(f"changed named test is absent or a symlink at head: {path}")
+                target = tree / path
+                if target.is_symlink() or any(parent.is_symlink() for parent in target.parents):
+                    raise CheckError(f"test path traverses a symlink: {path}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(git(repo, "show", f"{head}:{path}"))
+            code, log = execute(task["command"], tree, task["commit"])
+            name = f"{task['name']}.log"
+            logs[name] = log
+            rows[task["name"]] = {"command": task["command"], "commit": task["commit"], "exit": code,
+                                  "log": name, "sha256": digest(log)}
+    passed = True
+    manifest = {"schema": "fm-dod-evidence.v1", "head": head, "base": base, "merge_base": merge_base,
                 "dod_sha256": digest(raw), "run_id": os.environ.get("GITHUB_RUN_ID", ""),
                 "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""), "items": [], "tests": []}
     for task in tasks:
@@ -285,24 +264,17 @@ def record_into(plan_dir, legs, execute_result, output):
             manifest["tests"].append(test)
             print(f"test: {json.dumps(task['path'])}\nfail_first: {'pass' if test['passed'] else 'fail'}", flush=True)
     manifest["passed"] = passed
+    result = "pass" if passed else "fail"
+    output.mkdir(parents=True, exist_ok=False)
+    for name, log in logs.items():
+        (output / name).write_bytes(log)
     (output / "results.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    (output / "summary.log").write_text(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {'pass' if passed else 'fail'}\n")
+    (output / "summary.log").write_text(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {result}\n"
+                                        f"semantics: {SEMANTICS}\n")
     (output / "dod.md").write_bytes(raw)
-    (output / "weakening.json").write_bytes(weakening_bytes)
-    print(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {'pass' if passed else 'fail'}", flush=True)
+    (output / "weakening.json").write_bytes(weakening)
+    print(f"result: {result}\nsemantics: {SEMANTICS}", flush=True)
     return 0 if passed else 1
-
-
-def run(args, raw, items):
-    output = args.output.resolve()
-    if output.exists() or output.is_symlink():
-        raise CheckError("output directory must not exist")
-    with tempfile.TemporaryDirectory(prefix="fm-dod-local-") as scratch:
-        scratch = Path(scratch)
-        tasks = plan_into(args.repo, args.base, args.head, raw, items, scratch / "plan")
-        for task in tasks:
-            exec_into(args.repo, args.head, task, scratch / "legs" / f"leg-{task['name']}")
-        return record_into(scratch / "plan", scratch / "legs", "success", output)
 
 
 def forge_api(endpoint):
@@ -497,29 +469,18 @@ def verify_evidence(args, claims):
                 mode = git(worktree, 'ls-tree', head, '--', file).decode().split(' ', 1)[0]
                 if mode not in ('100644', '100755') or line > len(git(worktree, 'show', f'{head}:{file}').splitlines()):
                     raise CheckError(f"{item['id']}: file:line does not exist at the exact PR head")
-    print(f"evidence: resolved head={head} items={len(items)}")
+    print(f"evidence: resolved head={head} items={len(items)}\nsemantics: {SEMANTICS}")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("plan", "run"):
-        command = sub.add_parser(action)
-        command.add_argument("--dod", type=Path, required=True)
-        command.add_argument("--repo", type=Path, required=True)
-        command.add_argument("--base", required=True)
-        command.add_argument("--head", required=True)
-        command.add_argument("--output", type=Path, required=True)
-    command = sub.add_parser("exec")
-    command.add_argument("--task", required=True)
+    command = sub.add_parser("run")
+    command.add_argument("--dod", type=Path, required=True)
     command.add_argument("--repo", type=Path, required=True)
+    command.add_argument("--base", required=True)
     command.add_argument("--head", required=True)
-    command.add_argument("--output", type=Path, required=True)
-    command = sub.add_parser("record")
-    command.add_argument("--plan", type=Path, required=True)
-    command.add_argument("--legs", type=Path, required=True)
-    command.add_argument("--execute-result", required=True)
     command.add_argument("--output", type=Path, required=True)
     for action in ("dispatch", "claims", "verify"):
         command = sub.add_parser(action)
@@ -545,17 +506,8 @@ def main():
             return emit_claims(args)
         if args.action == "verify":
             return verify_evidence(args, json.load(sys.stdin))
-        if args.action == "exec":
-            exec_into(args.repo, args.head, json.loads(args.task), args.output.resolve())
-            return 0
-        if args.action == "record":
-            return record_into(args.plan.resolve(), args.legs.resolve(), args.execute_result, args.output.resolve())
         raw = args.dod.read_bytes()
-        items = items_from(raw.decode())
-        if args.action == "plan":
-            plan_into(args.repo, args.base, args.head, raw, items, args.output.resolve())
-            return 0
-        return run(args, raw, items)
+        return run(args, raw, items_from(raw.decode()))
     except (Unavailable, OSError) as exc:
         print(f"error: {json.dumps(str(exc))}\nhelp: Hosted or local evidence is unreachable; retry when it can be read.")
         return 3

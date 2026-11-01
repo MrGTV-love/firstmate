@@ -72,7 +72,8 @@ PY
     else
       [ "$rc" -ne 0 ] || fail "$scenario merged without resolving its evidence"
       assert_grep "$expected" "$case_dir/stderr" "$scenario did not name the unresolved item, exact flagged line or unqualified ruling reader"
-      assert_no_grep 'pr merge' "$case_dir/gh-axi.log" "$scenario reached the forge merge"
+      assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario reached the forge merge"
+      assert_no_grep 'pr merge' "$case_dir/gh-axi.log" "$scenario reached the gh-axi forge merge"
       if [ "$scenario" = unresolved-id ]; then
         assert_grep 'fm-dod-check.py dispatch --meta' "$case_dir/stderr" 'an unresolved pointer refusal must name the dispatch command'
       fi
