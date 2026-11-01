@@ -2,6 +2,9 @@
   "schema_version": 2,
   "note": "Entries may only shrink. bin/fm-guard-lint.sh fails on a stale entry, so removing the last occurrence is how this file empties. Each S1 entry is a legacy refusal site, found by bin/fm-guard-sites.py, that maps to no registry entry yet; the id is the file plus a hash of the line text, so it survives line moves. Map a site with a sites marker on its guard entry, then delete its entry here. A site on a changed line must map: the allowlist never excuses a touched site.",
   "allowed": [
+    {"id": "site:bin/fm-pr-merge.sh:2a230112fa", "rule": "S1", "text": "printf 'error: refusing to merge %s\\n' \"$URL\" >&2"},
+    {"id": "site:bin/fm-pr-merge.sh:2a230112fa~2", "rule": "S1", "text": "printf 'error: refusing to merge %s\\n' \"$URL\" >&2"},
+    {"id": "site:bin/fm-pr-merge.sh:2a230112fa~3", "rule": "S1", "text": "printf 'error: refusing to merge %s\\n' \"$URL\" >&2"},
     {
       "id": "site:.omp/extensions/fm-primary-omp-watch.ts:17b49ca501",
       "rule": "S1",

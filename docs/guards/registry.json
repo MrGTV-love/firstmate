@@ -141,7 +141,10 @@
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
     "open-loops-one-deferral",
-    "pipeline-start-unreadable-source"
+    "pipeline-start-unreadable-source",
+    "merge-required-reported",
+    "merge-landing-tree-tested",
+    "merge-auto-not-armed"
   ],
   "guards": [
     {
@@ -5637,12 +5640,72 @@
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
-      "id": "merge-green-head",
+      "id": "merge-checks-green",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
         {
           "file": "bin/fm-pr-merge.sh",
-          "match": "merge-green-head deny",
+          "match": "merge-checks-green deny"
+        }
+      ],
+      "invariant": "every unwaived reported check at the exact head is green",
+      "layer": "runtime-block",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
+      "trigger": "any unwaived reported check at the current head is pending or failed",
+      "remedy": "wait for pending checks or repair the failed check, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> waives one named non-green check",
+      "budget": 1,
+      "test": "tests/fm-pr-merge-checks.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "merge-required-reported",
+      "owner": "bin/fm-pr-merge.sh",
+      "sites": [
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "merge-required-reported deny"
+        }
+      ],
+      "invariant": "every unwaived check required by the base branch has reported at the exact head",
+      "layer": "runtime-block",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, check-run producers at the exact head",
+      "trigger": "a required check has not reported at the current head",
+      "remedy": "wait for the named required check to report, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-missing <check-name> waives one named required check that never reported",
+      "budget": 1,
+      "test": "tests/fm-pr-merge-checks.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "merge-landing-tree-tested",
+      "owner": "bin/fm-pr-merge.sh",
+      "sites": [
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "merge-landing-tree-tested deny",
           "count": 5
         },
         {
@@ -5656,19 +5719,48 @@
         },
         {
           "file": "bin/fm-pr-merge.sh",
-          "match": "where GitHub merges at once"
+          "match": "is not proven to be tested tree"
+        }
+      ],
+      "invariant": "a GitHub merge lands only a tree that verified CI tree records prove tested, or one the ancestry or proven merge-queue rule covers; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
+      "layer": "runtime-block",
+      "source": "live compare API, check runs at the head, Actions attempt-scoped artifacts, git merge-tree and queue rules",
+      "trigger": "github_landing_tree_safe or the live base or queue read cannot prove the landing tree safe",
+      "remedy": "push a new head commit, first updating the branch to contain the base tip when it lacks it, so CI tests the tree the merge would land, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; no waiver applies",
+      "budget": 1,
+      "test": "tests/fm-pr-merge-checks.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "merge-auto-not-armed",
+      "owner": "bin/fm-pr-merge.sh",
+      "sites": [
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "merge-auto-not-armed deny"
         },
         {
           "file": "bin/fm-pr-merge.sh",
-          "match": "printf 'error: refusing to merge %s\\n' \"$URL\" >&2",
-          "count": 3
+          "match": "where GitHub merges at once"
         }
       ],
-      "invariant": "a PR is never merged while a required check is red or has not reported at that head; a GitHub PR is also never merged while that head lacks the base branch's live tip, so the landed tree is one no check ran on, nor does an off-queue --auto request leave auto-merge armed to land later on a moved tip; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
+      "invariant": "off-queue auto-merge cannot remain armed to land later on an unverified tip",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
-      "trigger": "any unwaived required check at the current head is not green, or a GitHub head does not contain the base branch's live tip, read before verifying and again immediately before the merge; an attended --auto merge into a base with exactly one recognised merge_queue rule, proven live at both reads, and a required check set the verify read found complete and non-empty skips only the tip containment, because the queue runs those required checks on its own combined tree before landing, while a queue with no required check keeps the containment and an unreadable queue rule or required set is retried at verify, and refused at the last read when verify relied on the queue, as an unreadable source, never judged as a head that lacks the tip; off a proven queue, --auto also refuses unless the live mergeStateStatus at that last read is CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once instead of arming auto-merge, and a request that does not read back merged or queued, whether its merge command succeeded or failed, is disarmed and confirmed by a fresh read, or reported loudly as possibly still armed",
-      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a head that lacks the base tip clears only by updating the branch so CI runs on the combined tree, and no waiver applies",
+      "source": "base branch merge_queue rule, live mergeStateStatus read immediately before the merge",
+      "trigger": "an off-queue --auto merge would arm auto-merge instead of merging immediately",
+      "remedy": "clear the condition holding the PR, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
