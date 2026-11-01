@@ -1,0 +1,7 @@
+$ python3 bin/fm-guard-workarounds.py --repo . --head fm/fm-merge-train-5 --task merge-train-5
+GUARD_WORKAROUND task=merge-train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+exit=0
+$ ... --json
+{"guard": "merge-green-head", "rule": "base-containment", "task": "merge-train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}
+exit=0
+git status lines after: 0

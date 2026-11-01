@@ -1,0 +1,28 @@
+$ bash tests/fm-spawn-batch.test.sh (from the gate worktree; code root = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ)
+ok - scout batch refuses ship delivery flags instead of ignoring them
+ok - projects/ paths are scoped through the firstmate home for single-task spawn
+exit=0
+<code-root>/state/guard-events.jsonl rows before=      44 after=      66 (added 22)
+rows added by this one test run:
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"nope-batch-a-z1","override":true}
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"nope-batch-a-z1","override":false}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"nope-batch-b-z2","override":true}
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"nope-batch-b-z2","override":false}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"nope-batch-solo-z3","override":true}
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"nope-batch-solo-z3","override":false}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"nope-batch-mix-z5","override":true}
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"nope-batch-mix-z5","override":false}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"nope-single-z4","override":true}
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"nope-single-z4","override":true}
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"nope-single-z4","override":false}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"","override":true}

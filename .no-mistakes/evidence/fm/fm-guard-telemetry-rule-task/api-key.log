@@ -1,0 +1,5 @@
+spawn exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JB972J
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <o
+{"guard":"claude-api-billing","decision":"deny","rule":"inherited-credential","task":"probe-key","override":false}
+launched windows: 0

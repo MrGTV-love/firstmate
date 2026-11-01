@@ -1,0 +1,3 @@
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+ok - a forced scout teardown records no landed-work escape
+exit=0

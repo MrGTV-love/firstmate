@@ -1,0 +1,13 @@
+clone tree-equal check: 38202b99eb945630588286dee09d91b76cca111b vs first parent 38202b99eb945630588286dee09d91b76cca111b
+lab tree-equal merge: 0f62af79a02e39e072e95dd8273e360e1efc4502
+== state/.guard-workarounds-next written by the heartbeat:
+GUARD_WORKAROUND task=lab-task signatures=tree-equal-merge:0f62af79a02e39e072e95dd8273e360e1efc4502 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+real instance 5ad471a2b reported: yes
+lab tree-equal merge reported: yes
+temp leftovers: 0
+== wake queue:
+(none)
+no guard-workarounds wake queued
+== read-only: gate worktree status lines 0 -> 0; train-5 ref unchanged: yes
+== guard events written by the scan: 0

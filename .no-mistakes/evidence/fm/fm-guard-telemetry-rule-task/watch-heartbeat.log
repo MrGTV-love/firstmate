@@ -1,0 +1,8 @@
+watcher output (first lines):
+report file: -rw-r--r--  1 charlesabrooker  staff  0 Nov  1 10:08 /Users/charlesabrooker/tmp/fm-lab.4Vh4iS/state/.guard-workarounds-next
+report bytes:        0
+temp leftovers: 0
+presented marker: ls: /Users/charlesabrooker/tmp/fm-lab.4Vh4iS/state/.guard-workarounds-presented: No such file or directory
+wake queue rows:
+(none)
+no guard-workarounds wake queued

@@ -1,0 +1,10 @@
+# HEAD 3a5dfaee0 driver=/Users/charlesabrooker/.no-mistakes/evidence/01M6A1M5XYTCJS89BZNWQEAKMJ/drive-teardown.sh
+teardown (no --force) exit=1
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.lQG3i7/projects/wt-probe-td has uncommitted changes.
+worktree still present: yes
+{"guard":"backlog-transition","decision":"bypass","rule":"manual-backend","task":"probe-td","override":true,"cleared_by":""}
+{"guard":"teardown-unlanded","decision":"deny","rule":"landed-work","task":"probe-td","override":false,"cleared_by":""}
+teardown --force exit=0
+worktree still present: yes
+{"guard":"teardown-unlanded","decision":"bypass","rule":"landed-work","task":"probe-td","override":true,"cleared_by":"force"}
+driver exit=0

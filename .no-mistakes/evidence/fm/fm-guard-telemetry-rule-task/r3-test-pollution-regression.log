@@ -1,0 +1,22 @@
+# HEAD 3a5dfaee0: tests/fm-spawn-batch.test.sh; code-root log = /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/state/guard-events.jsonl
+before: rows=44 cksum=964657026 16302
+suite exit=0
+ok - batch dispatch re-execs and reports every id=repo pair
+ok - batch pair re-execs are internal while the operator's switch is still recorded
+ok - batch detection: single pair batches, non-pair rejected, single-task and slash-id stay single
+ok - batch dispatch requires the shared ship delivery contract before any pair runs
+ok - scout batch refuses ship delivery flags instead of ignoring them
+ok - projects/ paths are scoped through the firstmate home for single-task spawn
+ok - a cleared-home bypass writes the suite's own guard log, not the code checkout's
+after:  rows=44 cksum=964657026 16302
+
+# FAIL-BEFORE: same suite with the tests/lib.sh FM_GUARD_EVENT_LOG default removed
+lib.sh default removed: 0	2	tests/lib.sh
+suite exit=1
+not ok - a cleared-home spawn wrote to the code checkout's guard log (expected '2552276597 24585', got '3979040763 25591')
+after:  rows=69 (rows the suite wrote to the code-root log without the fix)
+new rows by kind:
+   6 {"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","override":false}
+  13 {"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","override":true}
+   6 {"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","override":true}
+restored: lib.sh changes=0 code-root rows=44

@@ -1,0 +1,12 @@
+# HEAD 3a5dfaee0 driver=/Users/charlesabrooker/.no-mistakes/evidence/01M6A1M5XYTCJS89BZNWQEAKMJ/drive-spawn-switches.sh
+== FM_SPAWN_NO_GUARD=1 (operator): spawn exit=1 ()
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"probe-sw","override":true}
+   bypass rows: 1
+== FM_SPAWN_NO_GUARD=internal (firstmate re-exec): spawn exit=1 ()
+   bypass rows: 0
+== FM_COMPACT_ADVISER_DISABLE=1 (operator) + internal watcher skip: spawn exit=1 ()
+{"guard":"compact-adviser","decision":"bypass","rule":"FM_COMPACT_ADVISER_DISABLE","task":"probe-sw","override":true}
+   bypass rows: 1
+== no switches: spawn exit=1 ()
+   bypass rows: 0
+driver exit=0

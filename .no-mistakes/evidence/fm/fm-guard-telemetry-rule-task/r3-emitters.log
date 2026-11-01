@@ -1,0 +1,35 @@
+# HEAD 3a5dfaee0 driver=/Users/charlesabrooker/.no-mistakes/evidence/01M6A1M5XYTCJS89BZNWQEAKMJ/drive-emitters.sh
+== S1 gate refusal still refuses an unmarked home from inside a gate worktree
+exit=3
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+--- unmarked home log
+{"guard":"gate-agent-containment","decision":"deny","rule":"gate-context","task":"probe-task","session":"probe-task","override":false,"actor":"gate","cleared_by":""}
+== S2 marked lab home passes the gate; send records explicit-home allow
+exit=1 (later failure is expected: no such task)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1akBrI
+error: target 'probe-task' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.1akBrI/state/probe-task.meta; metadata window/terminal lookup; backend=none). Use fm-probe-task for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+--- lab log
+{"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"probe-task","session":"probe-task","override":false,"actor":"gate","cleared_by":""}
+{"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"probe-task","session":"probe-task","override":false,"actor":"main","cleared_by":""}
+== S3 FM_GATE_REFUSE_BYPASS=1 records a bypass; missing FM_HOME records explicit-home deny
+exit=1
+error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home
+--- bypass log
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"probe-task","session":"probe-task","override":true,"actor":"main","cleared_by":""}
+{"guard":"send-home-fail-closed","decision":"deny","rule":"explicit-home","task":"probe-task","session":"probe-task","override":false,"actor":"main","cleared_by":""}
+== S4 an event write failure never changes the guarded outcome
+log=/Users/charlesabrooker/tmp/fm-emit.8mgnZe/logdir send exit=1 (expect 1, same as S3)
+  writer exit=0
+log=/Users/charlesabrooker/tmp/fm-emit.8mgnZe/fifo send exit=1 (expect 1, same as S3)
+  writer exit=0
+log=/nonexistent-root-dir/x/guard.jsonl send exit=1 (expect 1, same as S3)
+  writer exit=0
+malformed args writer exit=0
+== S5 session key is stable and never pid-$$
+{"session":"/Users/charlesabrooker/tmp/fm-lab.1akBrI:unattributed","task":"","actor":"main"}
+{"session":"/Users/charlesabrooker/tmp/fm-lab.1akBrI:unattributed","task":"","actor":"main"}
+{"session":"/Users/charlesabrooker/tmp/fm-lab.1akBrI:harness-42","task":"","actor":"main"}
+{"session":"task-a","task":"task-a","actor":"main"}
+{"session":"task-b","task":"task-b","actor":"worker"}
+no pid- session
+driver exit=0
