@@ -230,7 +230,7 @@ Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validati
 Merge refusals record `head` and `base` for the read-only detector; empty fields are missing evidence, not an inferred commit or branch.
 
 A guard records allows as well as denies so opportunities are observable.
-A waiver records `override: true` only when it changed the outcome, so an unused `--allow-red`, `--allow-missing`, `--allow-api-key` or `--attended-override` writes no escape; teardown `--force` skips the landed-work check without reading it, so each forced teardown that reaches that check records one escape; a skipped check records decision `bypass` and its activation rule.
+A waiver records `override: true` only when it changed the outcome, so an unused `--allow-red`, `--allow-missing`, `--allow-api-key` or `--attended-override` writes no escape; teardown `--force` skips the landed-work check without reading it, so each forced teardown that reaches that check records one escape; a skipped check records decision `bypass` and its activation rule, except that Firstmate's own supervised re-execs set `FM_SPAWN_NO_GUARD`, `FM_SKIP_SECONDMATE_INHERIT` or `FM_SKIP_SECONDMATE_SYNC` to `internal`, which skips the same check and records nothing.
 `actor` is the class of the caller: `gate`, `worker` (it has `FM_TASK_ID`) or `main`.
 An operation that writes one row per rule counts as one opportunity at guard level; its extra rule rows carry `opportunity: false`.
 A bypass is an escape record, not an additional inspected opportunity, and an override is a reassessment signal rather than proof of a false positive.
@@ -246,10 +246,9 @@ The ratio is undefined (`null`) when there are no denies, rather than zero evide
 Deny-only rows and guards with no recorded events in the selected window remain visible without inventing opportunities.
 
 `bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
-Its header owns the bounded first-parent scan, local metadata scope and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
+Its header owns the bounded first-parent scan, local metadata scope, base resolution and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
 A tree-equal merge is a signature, not proof that a guard caused it, and a base-merge-only signature requires every intervening commit to be a merge from the recorded base lineage.
-The watcher runs the detector detached and single-flight, so a slow worktree read cannot hold its poll; it presents a finished run's new signatures at the next heartbeat in one line per task and suppresses an unchanged report.
-A bare base name resolves through `refs/remotes/origin/<name>` first, then the local branch.
+The watcher runs the detector detached and single-flight, so a slow worktree read cannot hold its poll; at the next heartbeat it queues a finished run's changed report as one `check` wake keyed `guard-workarounds`, so plain heartbeat deduplication cannot drop it, and it suppresses an unchanged report.
 Neither detection nor metrics changes refs, waives a refusal or disables a guard.
 The behavior entry points are `tests/fm-guard-telemetry.test.sh` and the focused `test_guard_workaround_heartbeat` case in `tests/fm-watch-triage.test.sh`.
 Turns-to-clear and tool-calls-to-clear remain the real cost unit because an agent clears the block.
