@@ -1,0 +1,43 @@
+Live Claude Code primary (claude -p, real login) in lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIis09
+impl root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4FYSH0WTND2A0GFBCQKAT head=7f6ad898ac3c36c84729dc6ceed40f45b54e24ff (scoped as primary via transient gitignored .fm-secondmate-home marker)
+
+== run-supervised
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"num_turns":1,"is_error":false,"result":"OK"}
+
+== run-absent-writable
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":2,"stdout":"","stderr":"●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642800s ago)."}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":2,"stdout":"","stderr":"●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642860s ago)."}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":2,"stdout":"","stderr":"●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642911s ago)."}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"{\"systemMessage\":\"FIRSTMATE SUPERVISION IS GENUINELY DOWN: 1 task(s) in flight, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, includi","stderr":""}
+{"num_turns":4,"is_error":false,"result":"Captain, the guard blocked the stop a third time. I still did not run any tools.\n\nThe recent commits on this branch put a limit on how many times the guard can block a stop. So the guard should let th"}
+
+== run-budget-unwritable
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"","stderr":""}
+{"exit_code":0,"stdout":"{\"systemMessage\":\"FIRSTMATE SUPERVISION IS OFF and the turn-end block budget cannot be locked or written, so this stop is allowed instead of blocked. Repair: Away mode owns watcher supervision; load /afk and ensure the daemon is running instead of starting nor","stderr":""}
+{"num_turns":1,"is_error":false,"result":"OK"}
+
+== guard-events (all runs, chronological)
+{"ts":"2026-11-01T02:44:28Z","decision":"allow","cleared_by":"continue","repeat":1}
+{"ts":"2026-11-01T02:46:41Z","decision":"deny","cleared_by":"","repeat":1}
+{"ts":"2026-11-01T02:47:41Z","decision":"deny","cleared_by":"","repeat":2}
+{"ts":"2026-11-01T02:48:32Z","decision":"deny","cleared_by":"","repeat":3}
+{"ts":"2026-11-01T02:49:25Z","decision":"allow","cleared_by":"continue","repeat":1}
+{"ts":"2026-11-01T02:50:57Z","decision":"warn","cleared_by":"budget-unavailable","repeat":1}

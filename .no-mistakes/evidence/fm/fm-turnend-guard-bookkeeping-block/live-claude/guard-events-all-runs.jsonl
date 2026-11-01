@@ -1,0 +1,6 @@
+{"ts":"2026-11-01T02:44:28Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-32158","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"continue","repeat":1,"override":false}
+{"ts":"2026-11-01T02:46:41Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-53132","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-01T02:47:41Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-13502","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":2,"override":false}
+{"ts":"2026-11-01T02:48:32Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-61553","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":3,"override":false}
+{"ts":"2026-11-01T02:49:25Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-11342","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"continue","repeat":1,"override":false}
+{"ts":"2026-11-01T02:50:57Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-3015","decision":"warn","source_ok":true,"elapsed_ms":0,"cleared_by":"budget-unavailable","repeat":1,"override":false}

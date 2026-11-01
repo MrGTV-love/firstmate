@@ -1,0 +1,345 @@
+# BASE comparison: tree = git archive 3948d62ffa86123d35baeb84746ed7639d948a02 (pre-change base) in plain checkout /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi
+impl-root=/Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi
+impl-head=c01f1afb44f00799b8749c7cf6d4e9382e1c7c0f
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.YTyVSI
+Sun Nov  1 02:35:37 UTC 2026
+
+=== S1 supervised turn + episode bookkeeping cannot be reset (failure notice is a directory) ===
+real watcher lock-pid=65970 cmd=bash bin/fm-watch.sh watcher-path=/Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-watch.sh
+shared-verdict: live=live reason=watcher
+--- S1 --claude stop: exit=2
+bookkeeping left intact (reset failed as designed)
+
+=== S1b supervised turn + episode reset lock held by another live process ===
+shared-verdict: live=live reason=watcher
+--- S1b --claude stop: exit=2
+bookkeeping left intact (reset lock contended)
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A4FYSH0WTND2A0GFBCQKAT/turnend-smoke.sh: line 98: 70473 Terminated: 15          sleep 600
+
+=== S5 shared liveness: fm-guard (pull) vs turn-end guard on the same states ===
+[state healthy: real watcher + fresh beacon]
+shared-verdict: live=live reason=watcher
+--- pull healthy: silent
+--- turnend healthy: exit=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A4FYSH0WTND2A0GFBCQKAT/turnend-smoke.sh: line 36: 65970 Terminated: 15          nohup bash bin/fm-watch.sh > "$FM_HOME/data/watch.out" 2>&1
+[state hand-off: fresh beacon, no watcher lock/process]
+shared-verdict: live=off reason=no-watcher
+--- pull handoff: silent
+--- turnend handoff: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 1s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch= 
+[state missing lock + no beacon]
+shared-verdict: live=off reason=stale-beacon
+--- pull missing: WARNS
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- turnend missing: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch= 
+real watcher lock-pid=76680 cmd=bash bin/fm-watch.sh watcher-path=/Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-watch.sh
+[state stale beacon with live identity-matched watcher (paused)]
+shared-verdict: live=off reason=stale-beacon
+--- pull stale: WARNS
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: 215642144s ago, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- turnend stale: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642145s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch= 
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A4FYSH0WTND2A0GFBCQKAT/turnend-smoke.sh: line 36: 76680 Terminated: 15          nohup bash bin/fm-watch.sh > "$FM_HOME/data/watch.out" 2>&1
+
+=== S2 genuinely absent supervision, writable budget: 3 charged blocks then loud allow (default 12s auto-arm wait) ===
+shared-verdict: live=off reason=stale-beacon
+--- S2 --claude stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642146s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch= 
+--- S2 --claude stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642180s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=2 epoch= 
+--- S2 --claude stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642214s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=3 epoch= 
+--- S2 --claude stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642248s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=4 epoch= 
+--- S2 --claude stop 5: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642280s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=5 epoch= 
+S2 exits: 2 2 2 2 2
+S2 guard events:
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":"","repeat":1,"source_ok":true}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":"","repeat":2,"source_ok":true}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":"","repeat":3,"source_ok":true}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":"","repeat":4,"source_ok":true}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":"","repeat":5,"source_ok":true}
+
+=== S3 fresh failed-suppressed epoch + notice + budget from previous session / missing: exactly 3 blocks then loud allow ===
+--- S3[previous-session] stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642313s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=0 epoch=4 
+--- S3[previous-session] stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642314s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch=4 
+--- S3[previous-session] stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642315s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=2 epoch=4 
+--- S3[previous-session] stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642316s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=3 epoch=4 
+S3[previous-session] exits: 2 2 2 2
+--- S3[missing] stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642317s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=0 epoch=4 
+--- S3[missing] stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642318s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=1 epoch=4 
+--- S3[missing] stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642318s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=2 epoch=4 
+--- S3[missing] stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642319s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+budget-file: session=lab-smoke-sess count=3 epoch=4 
+S3[missing] exits: 2 2 2 2
+
+=== S4 budget cannot be written: allow with one repair warning + warn event, never block ===
+--- S4[budget-is-directory] stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642320s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-is-directory] stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642321s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-is-directory] stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642322s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-is-directory] stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642322s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+S4[budget-is-directory] exits: 2 2 2 2
+S4[budget-is-directory] events:
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+--- S4[budget-lock-held] stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642323s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-lock-held] stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642324s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-lock-held] stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642324s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[budget-lock-held] stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642325s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+S4[budget-lock-held] exits: 2 2 2 2
+S4[budget-lock-held] events:
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A4FYSH0WTND2A0GFBCQKAT/turnend-smoke.sh: line 52: 18848 Terminated: 15          sleep 600
+--- S4[state-readonly] stop 1: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642325s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[state-readonly] stop 2: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642326s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[state-readonly] stop 3: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642327s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- S4[state-readonly] stop 4: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642327s ago).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+S4[state-readonly] exits: 2 2 2 2
+S4[state-readonly] events:
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+
+=== S6 non-Claude (codex-style) turn-end with absent supervision still blocks ===
+--- S6 default-mode stop: exit=2
+stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 215642328s ago).
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-impl.OXZ8qi/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== SUMMARY ===
+S1  supervised+notice-dir reset fail      exit=2 (want 0)
+S1b supervised+reset lock held            exit=2 (want 0)
+S5  turnend healthy/handoff/missing/stale  0/2/2/2 (want 0/2/2/2)
+S2  absent, writable budget                 2 2 2 2 2 (want 2 2 2 0 0)
+S3  failed-suppressed previous-session      2 2 2 2 (want 2 2 2 0)
+S3  failed-suppressed missing budget        2 2 2 2 (want 2 2 2 0)
+S4  budget dir                              2 2 2 2 (want 0 0 0 0)
+S4  budget lock held                        2 2 2 2 (want 0 0 0 0)
+S4  state read-only                         2 2 2 2 (want 0 0 0 0)
+S6  default mode absent                    exit=2 (want 2)
