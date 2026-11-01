@@ -1,0 +1,16 @@
+node:1: command not found: _nvm_lazy_load
+✔ T6(a): repository and kind facts make non-Vernant rules unreachable for Vernant ships (1077.349541ms)
+✔ inherited foreign selectors stay inert beside an exactly matched local project (460.942ms)
+✔ T6 predicates combine in code, preserve complements, and never pool independent support (489.979291ms)
+✔ T6(b): replay all 136 logged rule structures offline without Q7 escalation (26806.77175ms)
+✔ Q9 desktop capability keeps its boundary; obsolete workflow answers remain inert (1936.172291ms)
+✔ malformed fact selectors and missing semantic references fail before provider access (2525.857375ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33436.321458
+exit=0

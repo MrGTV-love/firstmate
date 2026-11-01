@@ -1,0 +1,151 @@
+### repo=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4G55B5733NQDM13NP2TNC label=head head=25db54c3f6b27ffd0002fe19b380273fed7cf4e8
+
+== S1 propagation: real fm-config-push.sh from parent into live child homes
+  config-push: /Users/charlesabrooker/tmp/fm-live.KN1BS9/parent -> live secondmate homes
+  secondmate sm-absent (/Users/charlesabrooker/tmp/fm-live.KN1BS9/sm-absent):
+    model-index.json: unchanged
+    crew-dispatch.json: pushed
+    dispatch-never-send: unchanged
+    crew-harness: unchanged
+    backlog-backend: unchanged
+    backend: unchanged
+    herdr-presentation-spaces: unchanged
+    startup-memory-budget: unchanged
+    trace-context: unchanged - session-scoped
+    launch-env-allowlist: unchanged
+    compact-adviser: unchanged
+    session-launch-policy: unchanged
+    claude-permission-mode: unchanged
+    claude-launcher: unchanged
+    lavish-axi-host: unchanged
+    supervision-host-off: unchanged
+    firstmate-role: unchanged
+    data/captain-shared.md: unchanged
+  CONFIG_REREAD: secondmate sm-absent: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/eded895c05cf.git)
+  secondmate sm-broken (/Users/charlesabrooker/tmp/fm-live.KN1BS9/sm-broken):
+    model-index.json: unchanged
+    crew-dispatch.json: pushed
+    dispatch-never-send: unchanged
+    crew-harness: unchanged
+    backlog-backend: unchanged
+    backend: unchanged
+    herdr-presentation-spaces: unchanged
+    startup-memory-budget: unchanged
+    trace-context: unchanged - session-scoped
+    launch-env-allowlist: unchanged
+    compact-adviser: unchanged
+    session-launch-policy: unchanged
+    claude-permission-mode: unchanged
+    claude-launcher: unchanged
+    lavish-axi-host: unchanged
+    supervision-host-off: unchanged
+    firstmate-role: unchanged
+    data/captain-shared.md: unchanged
+  CONFIG_REREAD: secondmate sm-broken: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/eded895c05cf.git)
+  secondmate sm-empty (/Users/charlesabrooker/tmp/fm-live.KN1BS9/sm-empty):
+    model-index.json: unchanged
+    crew-dispatch.json: pushed
+    dispatch-never-send: unchanged
+    crew-harness: unchanged
+    backlog-backend: unchanged
+    backend: unchanged
+    herdr-presentation-spaces: unchanged
+    startup-memory-budget: unchanged
+    trace-context: unchanged - session-scoped
+    launch-env-allowlist: unchanged
+    compact-adviser: unchanged
+    session-launch-policy: unchanged
+    claude-permission-mode: unchanged
+    claude-launcher: unchanged
+    lavish-axi-host: unchanged
+    supervision-host-off: unchanged
+    firstmate-role: unchanged
+    data/captain-shared.md: unchanged
+  CONFIG_REREAD: secondmate sm-empty: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/eded895c05cf.git)
+  secondmate sm-subset (/Users/charlesabrooker/tmp/fm-live.KN1BS9/sm-subset):
+    model-index.json: unchanged
+    crew-dispatch.json: pushed
+    dispatch-never-send: unchanged
+    crew-harness: unchanged
+    backlog-backend: unchanged
+    backend: unchanged
+    herdr-presentation-spaces: unchanged
+    startup-memory-budget: unchanged
+    trace-context: unchanged - session-scoped
+    launch-env-allowlist: unchanged
+    compact-adviser: unchanged
+    session-launch-policy: unchanged
+    claude-permission-mode: unchanged
+    claude-launcher: unchanged
+    lavish-axi-host: unchanged
+    supervision-host-off: unchanged
+    firstmate-role: unchanged
+    data/captain-shared.md: unchanged
+  CONFIG_REREAD: secondmate sm-subset: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/eded895c05cf.git)
+  push exit=1
+  sm-subset: crew-dispatch.json identical to parent
+  sm-empty: crew-dispatch.json identical to parent
+  sm-absent: crew-dispatch.json identical to parent
+  sm-broken: crew-dispatch.json identical to parent
+
+== S0 parent primary home (owns policy, registers both projects): bootstrap
+  (no CREW_DISPATCH lines)
+
+== bootstrap in secondmate home sm-subset (registry: subset)
+  (no CREW_DISPATCH lines)
+
+== bootstrap in secondmate home sm-empty (registry: empty)
+  (no CREW_DISPATCH lines)
+
+== bootstrap in secondmate home sm-absent (registry: absent)
+  (no CREW_DISPATCH lines)
+
+== bootstrap in secondmate home sm-broken (registry: broken)
+  CREW_DISPATCH: invalid config/crew-dispatch.json - project registry has an invalid or duplicate project id
+
+== S5 adversarial: home-owned (no secondmate marker) policy with typo 'Local-app'
+  CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+
+== S6 adversarial: forged secondmate marker (symlink) on home-owned policy naming parent-app
+  CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+  (and invalid marker id 'bad id!')
+  CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+
+== S7 adversarial: malformed parent-only profile in secondmate sm-subset
+  CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+  (and empty match.projects in sm-empty)
+  CREW_DISPATCH: invalid config/crew-dispatch.json - match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout
+  (and malformed JSON in sm-absent)
+  CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON
+
+== Resolver: real fm-dispatch-resolve.sh against a local loopback TypeSafe endpoint
+-- S8 sm-subset: task bound to local clone /Users/charlesabrooker/tmp/fm-live.KN1BS9/sm-subset/projects/local-app
+  exit=0 provider_calls=1
+      status: clear
+      rule: rule_2 (Shared fleet project)   confidence: 1
+      support: rule_2=1 default=0
+      note: rule matched
+    questions sent: ["ambiguity","effort","judgment_j_local","model","needs_desktop"]
+-- S9 sm-subset: task bound to parent-only path (not a local clone)
+  exit=0 provider_calls=0
+      status: escalate
+      reason: brief project_path must resolve to exactly one registered project clone
+-- S9b sm-subset: brief with no FIRSTMATE_DISPATCH binding
+  exit=0 provider_calls=0
+      status: escalate
+      reason: brief is missing FIRSTMATE_DISPATCH project_path
+-- S10 sm-broken: duplicate-id registry, task bound to local clone
+  exit=0 provider_calls=0
+      status: escalate
+      reason: project registry has an invalid or duplicate project id
+-- S11 owned home (no marker), policy names parent-app it does not register
+  exit=2 provider_calls=0
+    stderr: error: malformed rules file: /Users/charlesabrooker/tmp/fm-live.KN1BS9/owned/config/crew-dispatch.json - match.projects contains an unregistered project id; fix that field in /Users/charlesabrooker/tmp/fm-live.KN1BS9/owned/config/crew-dispatch.json resolved against /Users/charlesabrooker/tmp/fm-live.KN1BS9/owned/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>
+-- S12 sm-empty (project-less home): task bound to the home itself
+  exit=0 provider_calls=0
+      status: escalate
+      reason: project registry has no project ids
+
+== S13 adversarial: secondmate registry is a dangling symlink (unreadable)
+  CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable
+/tmp/fm-livescripts/live.sh: line 108: 18242 Terminated: 15          node "$(dirname "$0")/provider.mjs" "$W/calls.jsonl" "$W/port"
