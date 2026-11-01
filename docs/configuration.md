@@ -2967,8 +2967,8 @@ Native omp semantic `find` is constructed only when that grant includes `semanti
 A relaunch reconstructs find from the recorded grant, not an edited brief, and promotion preserves that grant; neither operation adds authorization to a running task.
 Persistent secondmates keep their existing native-find eligibility and do not gain this worker grant policy.
 The runtime grant backstop stays fail closed: an absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; a grant naming the removed `subagent` class grants nothing.
-Only Firstmate may authorize task metadata at dispatch; a worker reports a mismatch for stopped-task redispatch and never writes or enlarges its live grant.
-This construction change covers native find only: other egress-classed tools retain their existing runtime grant checks, and omp's separately advertised Eval judge/completion provider helpers remain an unresolved native capability gap, not a claim of network confinement.
+Only Firstmate may authorize task metadata at dispatch; a worker reports a mismatch for stopped-task redispatch, meaning teardown and then a fresh dispatch from the corrected brief, and never writes or enlarges its live grant.
+Construction-time removal covers native find only: other egress-classed tools retain their existing runtime grant checks, and omp's separately advertised Eval judge/completion provider helpers remain an unresolved native capability gap, not a claim of network confinement.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
