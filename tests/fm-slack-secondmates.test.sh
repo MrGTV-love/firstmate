@@ -6,6 +6,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 0; }
 TMP=$(fm_test_tmproot fm-slack-secondmates)
 python3 - "$ROOT" "$TMP" <<'PY'
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -56,6 +57,8 @@ assert argv[0] in ('fm-fleet-snapshot.sh', 'fm-remote-file.sh', 'fm-captain-hold
 assert not any(key.startswith('SLACK_') for key in os.environ)
 with open(Path(home).parent / 'routes.jsonl', 'a') as log:
     log.write(json.dumps({'root': root, 'home': home, 'argv': argv}) + '\\n')
+if os.environ.get('FIXTURE_REMOTE_BANNER'):
+    sys.stderr.write('Authorized users only. Activity may be monitored.\\n')
 if not os.path.isdir(home):
     sys.stderr.write('error: remote home is not a safe directory\\n')
     sys.exit(64)
@@ -255,5 +258,32 @@ out = blocked_owner_answer(remote, 'remote', 'intake', '2026-10-07T00:00:00Z',
                            fail_env={'FIXTURE_REMOTE_ANSWERS_FAIL': '1'})
 assert 'secondmate_answer_intake_failed: remote (%s)' % remote in out, out
 print('F1 intake: failed remote intake kept its answer journaled, main answer closed; answer delivered after recovery')
+held(remote, 'banner-call', '2026-10-08T00:00:00Z')
+call(main, 'fm-slack-mirror.sh', *args)
+assert len(owned('banner-call', 'remote')) == 1, owned('banner-call', 'remote')
+call(remote, 'fm-captain-hold.sh', 'answers', '--any-origin', '--source', 'fixture',
+     text='banner-call\tclosed in the remote home\t\tdone\n')
+out = call(main, 'fm-slack-poll.sh', *args, extra={'FIXTURE_REMOTE_BANNER': '1'})
+assert 'secondmate_home_unavailable' not in out, out
+assert owned('banner-call', 'remote')[0]['retired'] and len(posted('Resolved: banner-call')) == 1, out
+print('R3-1: SSH banner stderr on a closed remote probe still resolves and retires banner-call')
+
+held(local, 'response-call', '2026-10-09T00:00:00Z')
+identity = call(local, 'fm-captain-hold.sh', 'open', 'response-call', '--identity').strip()
+owner = {'id': 'local', 'home': str(local), 'host': ''}
+occurrence = json.dumps(owner, sort_keys=True) + ':response-call:' + identity
+replay = json.loads(replay_path.read_text())
+replay['messages'].append({'user': 'UBOT0123456', 'text': 'card without ts',
+                           'metadata': {'event_type': 'slack-watch', 'event_payload': {
+                               'id': hashlib.sha256(('card:' + occurrence).encode()).hexdigest()}}})
+replay_path.write_text(json.dumps(replay))
+out = call(main, 'fm-slack-mirror.sh', *args, code=1)
+assert 'local_state_or_response_error' in out and 'secondmate_home_unavailable' not in out, out
+replay = json.loads(replay_path.read_text())
+replay['messages'] = [m for m in replay['messages'] if 'ts' in m]
+replay_path.write_text(json.dumps(replay))
+call(main, 'fm-slack-mirror.sh', *args)
+assert len(owned('response-call', 'local')) == 1, owned('response-call', 'local')
+print('R3-2: a Slack response without ts is reported as itself, not as an unreadable local home')
 print('ok - registered-home cards and crash/reload owner-home answer roundtrip')
 PY

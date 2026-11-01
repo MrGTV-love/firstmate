@@ -339,7 +339,8 @@ class Watch:
 
     def probe(self, key, owner=None):
         result = self.owner_run(owner, 'fm-captain-hold.sh', 'open', key, '--identity')
-        refused = bool(owner and owner['host'] and result.returncode == 1 and result.stderr.strip())
+        refused = bool(owner and owner['host'] and result.returncode == 1
+                       and re.search(r'(?m)^error: ', result.stderr))
         if refused or result.returncode not in (0, 1, 2):
             raise self.owner_error(owner) if owner else SlackError('open_probe_failed')
         return result.returncode, result.stdout.strip() or 'unknown'
@@ -672,16 +673,21 @@ class Watch:
         for owner in owners:
             try:
                 self.mirror_home(owner)
-            except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
-                errors.append(str(error) if isinstance(error, SlackError) else str(self.owner_error(owner)))
+            except SlackError as error:
+                errors.append(str(error))
         if errors:
             raise SlackError('; '.join(errors))
 
     def mirror_home(self, owner=None):
-        rows = self.backlog(owner)
+        try:
+            rows = self.backlog(owner)
+            generated, cards = self.board(owner)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            if not owner:
+                raise
+            raise self.owner_error(owner)
         candidates = [r for r in rows if r.get('id') and r.get('hold_kind') == 'captain'
                       and r.get('state') != 'done']
-        generated, cards = self.board(owner)
         for row in candidates:
             key = row['id']
             rc, identity = self.probe(key, owner)
@@ -703,7 +709,7 @@ class Watch:
                 card = {}
             if owner:
                 card = dict(card, about='Secondmate %s (%s)%s' % (
-                    owner['id'], owner['home'], ': ' + card['about'] if card.get('about') else ''))
+                    owner['id'], owner['home'], ': %s' % card['about'] if card.get('about') else ''))
             text, options, usable = self.card_payload(row, card, text_only)
             self.scope_notice()
             # Re-check immediately before the network post.
