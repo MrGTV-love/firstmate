@@ -2750,7 +2750,8 @@ work_is_landed_proof() {
 # keeps it, as before. The forge proof is built before project custody, and
 # both runtime routes retire with it before detaching/deleting the slot branch,
 # after the route's own landed work proof and never on a discard proof.
-# The command header owns report-only recovery of earlier stale declarations.
+# bin/fm-slot-manifest-retire.py's header owns report-only recovery of earlier
+# stale declarations.
 TEARDOWN_SLOT_PROOF=
 teardown_slot_manifest_helper() {  # <slot> <phase arguments...>
   local slot=$1 branch keep=

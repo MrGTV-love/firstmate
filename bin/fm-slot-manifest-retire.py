@@ -22,7 +22,8 @@ after its landed-work proof runs only the local entry point with that file.
 --keep REASON leaves the slot's records in place. A slot with no record, no
 entry point, no proof, or a record naming another branch keeps the old teardown
 behavior. No record is removed here. The Vernant command owns locking and both
-removals.
+removals. Under --apply, a refused or unattested Vernant retirement exits 1;
+teardown then refuses before it detaches or deletes the slot branch.
 """
 
 import argparse
