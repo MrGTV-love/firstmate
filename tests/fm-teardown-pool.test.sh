@@ -3317,7 +3317,7 @@ fi
 SH
     chmod +x "$case_dir/fakebin/gh-axi"
     cat > "$case_dir/project/scripts/git-stability/retire_slot_manifest.py" <<PY
-import argparse, json, pathlib, sys
+import argparse, json, os, pathlib, sys
 p=argparse.ArgumentParser()
 p.add_argument('action', choices=['retire'])
 for key in ['slot-path','repo-root','owner-id','owner-branch','proof-file','state-dir']:
@@ -3328,7 +3328,7 @@ assert proof == {'pr_url':'https://github.com/test/vernant/pull/42','merged_pr_h
 assert a.owner_id == 'task-x1' and a.owner_branch == 'fm/task-x1'
 assert a.slot_path == '$NESTED_SLOT' and a.state_dir == '$records'
 pathlib.Path('$case_dir/called').write_text(json.dumps(vars(a)))
-code={'refused':2,'orca-refused':2,'error':1}.get('$variant',0)
+code={'refused':2,'orca-refused':2,'error':1}.get('$variant',int(os.environ.get('FM_FAKE_RETIRE_EXIT','0')))
 if code:
     print(json.dumps({'status':'refused','reason':'fixture_refusal','next_step':'retain_slot'}))
     sys.exit(code)
@@ -3434,6 +3434,23 @@ PY
         assert_absent "$case_dir/called" 'sweep retired a record whose PR came from another branch'
         assert_present "$records/worktree-lifecycle/$digest.json" 'sweep removed branch-differs legacy record'
         assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'sweep removed branch-differs durable record'
+        rc=0
+        FM_FAKE_RETIRE_EXIT=2 FM_GUARD_EVENT_LOG="$case_dir/sweep-events.jsonl" "${sweep[@]}" --apply > "$case_dir/apply-refused" || rc=$?
+        expect_code 1 "$rc" 'a refused sweep retirement should fail the sweep'
+        assert_grep "$digest.json owner=task-x1 slot=$NESTED_SLOT landing=MERGED retire=REFUSED: Vernant retirement exited 2" "$case_dir/apply-refused" 'sweep did not report the entry point refusal'
+        assert_grep retain_slot "$case_dir/apply-refused" 'sweep lost the entry point next_step'
+        assert_present "$records/worktree-lifecycle/$digest.json" 'refused sweep removed legacy record'
+        assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'refused sweep removed durable record'
+        [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-events.jsonl" 2>/dev/null)" = 1 ] \
+          || fail "refused sweep retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-events.jsonl" 2>/dev/null)"
+        rm "$case_dir/called"
+        rc=0
+        FM_GUARD_EVENT_LOG="$case_dir/sweep-outer-events.jsonl" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
+          --project "$(mktemp -d)" --firstmate-state "$case_dir/state" > /dev/null 2> "$case_dir/sweep-outer.err" || rc=$?
+        expect_code 1 "$rc" 'a sweep outside any repository should refuse'
+        assert_grep 'next_step: verify Firstmate landing record' "$case_dir/sweep-outer.err" 'sweep outer refusal not reported'
+        [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)" = 1 ] \
+          || fail "sweep outer refusal did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)"
         rc=0
         "${sweep[@]}" --apply > "$case_dir/apply" || rc=$?
         expect_code 1 "$rc" 'apply should report the unproven owner'

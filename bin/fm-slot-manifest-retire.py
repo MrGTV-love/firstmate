@@ -47,6 +47,12 @@ def run(args, project):
     return result.stdout.strip()
 
 
+def sweep_deny_event():
+    writer = Path(__file__).resolve().parent / "fm-guard-event.sh"
+    subprocess.run([str(writer), "teardown-unlanded", "deny", "--source-ok", "true"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+
 def owner_meta(state, owner):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", owner):
         raise Refusal("invalid owner identity")
@@ -272,6 +278,7 @@ def main():
                             retire(args, slot, owner, branch, paths, proof_file)
                         except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
                             print(f"{name} owner={owner} slot={slot} landing=MERGED retire=REFUSED: {exc}")
+                            sweep_deny_event()
                             failed = True
             except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
                 print(f"{name} owner={record.get('owner_id', 'unknown') if isinstance(record, dict) else 'unknown'} landing=UNPROVEN: {exc}")
@@ -279,6 +286,8 @@ def main():
         return 1 if failed else 0
     except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
         print(f"REFUSED: {exc}; next_step: verify Firstmate landing record and Vernant retirement output", file=sys.stderr)
+        if not args.slot:
+            sweep_deny_event()
         return 1
 
 
