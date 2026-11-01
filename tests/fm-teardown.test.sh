@@ -3640,6 +3640,56 @@ test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files() {
   pass 'bundle admission refuses before sweeping anchored or landed prior copies with unique ignored bytes'
 }
 
+# The task's current copy is already gone, so the bundle admits its branch ref.
+# A swept anchored prior's unique ignored bytes refuse before retire reaps.
+test_bundle_removed_copy_sweep_refuses_before_retire() {
+  local case_dir prior bytes rc head
+  for bytes in unique clean; do
+    make_bundle_copy_case "bundle-gone-prior-$bytes"
+    case_dir=$NESTED_CASE
+    prior="$NESTED_SLOT/nested/prior"
+    mkdir -p "${prior%/*}"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-prior "$prior" main
+    printf 'prior work\n' > "$prior/prior.txt"
+    git -C "$prior" add prior.txt
+    git -C "$prior" commit -qm 'anchored prior work outside the bundle'
+    head=$(git -C "$prior" rev-parse HEAD)
+    git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$head" "$head"
+    printf 'prior_worktree=%s\n' "$prior" >> "$case_dir/state/task-x1.meta"
+    if [ "$bytes" = unique ]; then
+      printf 'unique-anchored.dat\n' >> "$(git -C "$prior" rev-parse --path-format=absolute --git-path info/exclude)"
+      printf 'only copy\n' > "$prior/unique-anchored.dat"
+    fi
+    git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+    assert_absent "$NESTED_COPY" "gone-prior-$bytes: setup did not remove the current copy"
+    cat > "$case_dir/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) printf '%s\n' "\$*" >> "$case_dir/lsof-cwd.log"; exit 0 ;;
+esac
+exit 1
+SH
+    chmod +x "$case_dir/fakebin/lsof"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$bytes" = clean ]; then
+      expect_code 0 "$rc" "gone-prior-clean: a clean anchored prior must not block the bundle route: $(cat "$case_dir/stderr")"
+      assert_absent "$prior" 'gone-prior-clean: clean prior copy survived'
+      assert_absent "$case_dir/state/task-x1.meta" 'gone-prior-clean: task was not retired'
+      assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" 'gone-prior-clean: the slot was not returned'
+      continue
+    fi
+    expect_code 1 "$rc" "gone-prior-unique: bundle admission must not discard a prior copy's ignored bytes: $(cat "$case_dir/stderr")"
+    assert_grep 'ignored files no hash record preserves: unique-anchored.dat' "$case_dir/stderr" 'gone-prior-unique: ignored-file refusal missing'
+    assert_equals 'only copy' "$(cat "$prior/unique-anchored.dat")" 'gone-prior-unique: prior ignored bytes lost'
+    assert_present "$prior/.git" 'gone-prior-unique: prior copy removed before refusal'
+    assert_present "$case_dir/state/task-x1.meta" 'gone-prior-unique: task retired before refusal'
+    assert_absent "$case_dir/treehouse.log" 'gone-prior-unique: slot reserved or returned before refusal'
+    assert_absent "$case_dir/lsof-cwd.log" 'gone-prior-unique: retire reaped processes before refusal'
+  done
+  pass 'a removed copy'"'"'s bundle-admitted branch refuses before retire while a swept prior holds unique ignored bytes'
+}
+
 # A foreign copy inside an own nested copy cannot stay held. Its bundle must
 # trigger the same own-copy ignored-byte proof without changing foreign classes.
 test_foreign_bundle_sweep_keeps_anchored_prior_ignored_files() {
@@ -3890,6 +3940,7 @@ test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
 test_bundle_does_not_excuse_nested_copy_ignored_files
 test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files
+test_bundle_removed_copy_sweep_refuses_before_retire
 test_foreign_bundle_sweep_keeps_anchored_prior_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs
 )

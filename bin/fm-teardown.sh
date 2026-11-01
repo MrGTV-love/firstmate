@@ -3278,6 +3278,7 @@ validate_worktree_teardown_safety() {
   fi
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
     if teardown_nested_slot landed; then
+      [ -z "$TEARDOWN_BUNDLE_PROOF" ] || teardown_bundle_swept_ignored_kept "$wt_real" || return 1
       return 0
     fi
     if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] \
