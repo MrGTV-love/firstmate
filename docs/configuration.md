@@ -3056,7 +3056,7 @@ No device that sends data off the machine is admitted.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
 Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
-Device `edit` calls and other schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; ordinary filesystem spelling refusals still request a plain path.
+Device `edit` calls and other `scheme://` targets, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; on unconfined or unproved workers, ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard validates the replacement-input schema but does not judge or scan write/edit content.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
