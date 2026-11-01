@@ -49,22 +49,40 @@ Running:
 
 Pipeline starts:
   - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
-    priority waiter files. The start policy, core scaling and class order are
-    owned by docs/cpu-pass-pool.md. The counted runs always come from the host's
+    priority waiter files. The start policy, formula and class order are owned
+    by docs/cpu-pass-pool.md. The counted runs always come from the host's
     ~/.no-mistakes/state.sqlite, opened only with mode=ro (plus immutable=1 when
     mode=ro cannot open a stopped WAL database with no -wal file): status = 'running'
     AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Notices go to stderr.
+  - Admission is by measured memory reservations, never by load average. The
+    first waiter is admitted when, as bytes, (counted + 1) x R + S fits
+    B = available memory + the resident memory the counted runs hold now. R is
+    the 75th percentile (nearest rank) and S the largest per-run peak across the
+    host's recorded no-mistakes runs with at least 2 readings, read from the root
+    home's .memory-calibration.json (written by fm-mem-guard.sh probe). available
+    and each run's resident memory come from one fm-mem-guard.py admission_sample
+    reading, re-taken at most every 2 s while waiting. With fewer than 2
+    qualifying recorded runs, or no native memory facts on this platform, the
+    start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
+    record never refuses a start and never reads as an empty host.
+  - Pause-only backstop: while that reading is unreadable or reports a reason to
+    defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
+    pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
+    process count above its warning line) or cannot be read, no start is
+    admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
   - A short start lock bridges the check-to-registration race until a new
     running run ID appears, or COMMAND returns. It does not reserve a run's
     lifetime or poll after registration; status changes release capacity.
     Participating starts serialize this handshake, not their required checks.
+    A registered run whose process tree the reading cannot see yet holds no
+    memory in B, so it reserves its full R in the next decision.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
-  - Unreadable DB/load/pool sources refuse with 125 instead of guessing headroom.
-    If a read fails after launch, retain the start lock until COMMAND returns;
-    never stop running work because the observer lost its source.
+  - An unreadable run database or CPU count refuses with 125 instead of
+    guessing headroom. If a read fails after launch, retain the start lock until
+    COMMAND returns; never stop running work because the observer lost its source.
 
 Exit status of `run` and `pipeline-start`: COMMAND's own status; 126 when COMMAND cannot be
 executed, 127 when it is not found, 125 for a usage error.
@@ -73,6 +91,7 @@ executed, 127 when it is not found, 125 for a usage error.
 import argparse
 import contextlib
 import errno
+import importlib.util
 import json
 import math
 import os
@@ -368,7 +387,7 @@ HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 
 
 def running_runs() -> dict:
-    """Map each status-running run ID to whether it counts against the start limit.
+    """Map each status-running run ID to (repo ID, whether it counts against the start limit).
 
     Reads host execution state without creating or changing its database.
     """
@@ -376,8 +395,8 @@ def running_runs() -> dict:
 
     def read(query: str) -> dict:
         with contextlib.closing(sqlite3.connect(path.as_uri() + query, uri=True)) as connection:
-            return {row[0]: bool(row[1]) for row in connection.execute(
-                "SELECT id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
+            return {row[0]: (row[1], bool(row[2])) for row in connection.execute(
+                "SELECT id, repo_id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
 
     try:
         return read("?mode=ro")
@@ -389,14 +408,129 @@ def running_runs() -> dict:
     return read("?mode=ro&immutable=1")
 
 
-def pipeline_observation() -> Tuple[dict, int, float, int]:
+RESERVATION_QUANTILE = 0.75  # policy choice (Main 2473 ruling); the peaks it ranks are measured
+MIN_QUALIFYING_RUNS = 2
+# Cadence for re-reading the host while a start waits, not a deadline; no command is stopped by it.
+# Ten real full readings (memory census plus process count): maximum 0.192 s (private task evidence).
+# measured: value=2.0 date=2026-11-01 host=Mac-Studio.local margin=10
+OBSERVE_EVERY_SECS = 2.0
+CALIBRATION_SCHEMA = "fm-memory-calibration.v1"
+
+
+def sibling(module: str, filename: str):
+    """Load a sibling engine as a module (read-only functions only)."""
+    loaded = sys.modules.get(module)
+    if loaded is not None:
+        return loaded
+    spec = importlib.util.spec_from_file_location(module, Path(__file__).with_name(filename))
+    loaded = importlib.util.module_from_spec(spec)
+    sys.modules[module] = loaded
+    spec.loader.exec_module(loaded)
+    return loaded
+
+
+def root_home() -> Path:
+    """The top-most local firstmate home, which owns the host's calibration record."""
+    # A worker has FM_DURATION_HOME (the owning home fm-spawn exports) and may have no FM_HOME.
+    home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_DURATION_HOME")
+                or Path(__file__).resolve().parent.parent).resolve()
+    for _ in range(16):
+        record = home / ".fm-secondmate-parent"
+        if not record.is_file() or record.is_symlink():
+            break
+        fields = dict(line.split("=", 1) for line in record.read_text().splitlines() if "=" in line)
+        if fields.get("route") != "local" or not fields.get("parent_home", "").startswith("/"):
+            break
+        home = Path(fields["parent_home"]).resolve()
+    return home
+
+
+def rank_quantile(values: List[int], quantile: float) -> int:
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(quantile * len(ordered)) - 1)]
+
+
+def measured_reservations(report: dict) -> Optional[Tuple[int, int, int]]:
+    """(R, S, qualifying runs) from the host's recorded no-mistakes run peaks, or None.
+
+    None means too little record on this host, never an error: the caller falls
+    back to the counted-run limit. A record for another host or RAM size is not
+    this host's measurement.
+    """
+    try:
+        record = json.loads((root_home() / "state" / ".memory-calibration.json").read_text())
+        if (record["schema"] != CALIBRATION_SCHEMA or record["host"] != report["host"]
+                or record["total_bytes"] != report["total_bytes"]):
+            return None
+        peaks = [run["peak_bytes"] for name, run in record["runs"].items()
+                 if name.startswith("no-mistakes:") and type(run["samples"]) is int
+                 and run["samples"] >= MIN_QUALIFYING_RUNS and type(run["peak_bytes"]) is int
+                 and run["peak_bytes"] > 0]
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+    if len(peaks) < MIN_QUALIFYING_RUNS:
+        return None
+    return rank_quantile(peaks, RESERVATION_QUANTILE), max(peaks), len(peaks)
+
+
+_observed: dict = {}
+
+
+def host_observation() -> dict:
+    """One cached reading of the harm signals; an unreadable source is itself a reason to wait."""
+    now = time.monotonic()
+    if _observed and now - _observed["at"] < OBSERVE_EVERY_SECS:
+        return _observed
+    reasons: List[str] = []
+    memory = None
+    if sys.platform == "darwin" or os.environ.get("FM_MEMORY_FIXTURE_DIR"):
+        try:
+            guard = sibling("fm_mem_guard", "fm-mem-guard.py")
+            report = guard.admission_sample()
+            deferred, _, _ = guard.admission_evaluate(report, None)
+            reasons += ["memory: " + text for text in deferred]
+            if not report["errors"]:
+                memory = report
+        except Exception as exc:  # an unreadable reading must wait, never admit
+            reasons.append("memory: observation failed: %s" % exc)
+    try:
+        guard = sibling("fm_proc_guard", "fm-proc-guard.py")
+        source = guard.open_source()
+        limit, limit_source = source.limit()
+        count = source.count()
+        if limit and count > limit * guard.WARN_PERCENT / 100.0:
+            reasons.append("process pile-up: %d of %d user processes" % (count, limit))
+    except Exception as exc:
+        reasons.append("process count unreadable: %s" % exc)
+    _observed.clear()
+    _observed.update(at=now, reasons=reasons, memory=memory)
+    return _observed
+
+
+def decide(counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
+    """(admit, one-line reason) for the first waiter, from the counted runs and the host reading."""
+    seen = host_observation()
+    if seen["reasons"]:
+        return False, "overload: %s counted=%d priority=%s" % ("; ".join(seen["reasons"]), len(counted), priority)
+    report = seen["memory"]
+    reserved = measured_reservations(report) if report is not None else None
+    if reserved is None:
+        limit = max(1, cores // 3)
+        return len(counted) < limit, "counted=%d limit=%d basis=fallback priority=%s" % (len(counted), limit, priority)
+    reservation, slack, qualifying = reserved
+    held = sum(report["runs"].get("no-mistakes:%s/%s" % (repo, run), {}).get("rss_bytes", 0)
+               for run, repo in counted.items())
+    budget = report["available_bytes"] + held
+    need = (len(counted) + 1) * reservation + slack
+    return need <= budget, ("counted=%d need=%d budget=%d reservation=%d slack=%d runs_measured=%d priority=%s"
+                            % (len(counted), need, budget, reservation, slack, qualifying, priority))
+
+
+def pipeline_observation() -> Tuple[dict, int]:
     cores = os.cpu_count()
     if not isinstance(cores, int) or cores < 1:
         raise ValueError("cannot read a positive native CPU count")
-    load5 = os.getloadavg()[1]
-    if not math.isfinite(load5) or load5 < 0:
-        raise ValueError("cannot read a finite nonnegative native load5")
-    return running_runs(), cores, load5, max(1, cores // 3)
+    return running_runs(), cores
 
 
 def first_pipeline_waiter(directory: str) -> str:
@@ -443,13 +577,15 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         while True:
             reason = "another start is registering"
             if try_lock(admission_fd):
-                before, cores, load5, limit = pipeline_observation()
-                counted = sum(before.values())
+                before, cores = pipeline_observation()
+                counted = {run: repo for run, (repo, is_counted) in before.items() if is_counted}
                 first = first_pipeline_waiter(directory)
-                if first == waiter_path and counted < limit and load5 <= 2 * cores:
-                    break
-                reason = "counted=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
-                    counted, limit, load5, 2 * cores, args.priority)
+                if first == waiter_path:
+                    admit, reason = decide(counted, cores, args.priority)
+                    if admit:
+                        break
+                else:
+                    reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), args.priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
             now = time.monotonic()
             if now >= next_notice:
@@ -459,8 +595,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             delay = min(POLL_MAX_SECS, delay * 2)
         os.unlink(waiter_path)
         waiter_path = None
-        log(2, "pipeline-start admitted: counted=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
-            counted, limit, load5, 2 * cores, args.priority))
+        log(2, "pipeline-start admitted: " + reason)
         registration_error = False
 
         def registered() -> bool:

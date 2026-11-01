@@ -66,19 +66,63 @@ The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner
 
 ## Fresh pipeline starts
 
-Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner checks the host's `~/.no-mistakes/state.sqlite` read-only and native five-minute load.
+Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner reads the host's `~/.no-mistakes/state.sqlite` read-only and one host memory and process reading.
 It has no option or environment variable that selects another database.
-It admits only when the counted runs are below `max(1, floor(logical CPUs / 3))` and load5 is at most twice that CPU count.
+It admits by the memory the counted runs are measured to need, not by load average and not by a CPU-count ratio.
 A counted run is a `runs` row with `status = 'running' AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL`; both of those columns are facts the daemon records.
 A CI-ready run that is only monitoring its PR, and a run parked waiting for its agent, are still `running` but are not counted.
-That is six counted runs on eighteen cores and three on a ten-core host; rounding is downward, with a one-start minimum.
 A run that leaves `running`, reaches CI-ready or parks for its agent releases its count implicitly; no daemon-lifetime lease or watcher is installed.
+
+### Admission formula
+
+The first waiter in class order is admitted when, in bytes:
+
+```text
+(counted + 1) x R + S  <=  B          where  B = available_bytes + held
+```
+
+| Symbol | Meaning | Source |
+|---|---|---|
+| `counted` | counted runs, as defined above | the run database, read now |
+| `R` | the reservation of one run: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe` |
+| `S` | slack for one run reaching its tail: the largest of those same peaks | same record |
+| `available_bytes` | free, file-backed and purgeable pages, never compressed or swapped memory | one `bin/fm-mem-guard.py` `admission_sample()` reading, at most 2 s old |
+| `held` | resident memory the counted runs hold now, summed over their process trees; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
+
+`B` is the memory the counted runs may still use plus what the host has free, so the inequality is the same as "the reservations of the counted runs, the new run and one tail run fit the host's available memory": a counted run's reservation is partly already held, and `held` counts that part once.
+A run that is registered but not yet visible in the reading therefore reserves its whole `R` in the next decision.
+The record belongs to the host: it must name this host and its RAM size.
+The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's record.
+`R` and `S` are measurements; taking the 75th percentile as the reservation is a policy choice (Main 2473 ruling), made after replaying it against the recorded readings (the captain-private record `data/fm-admission-measured-reservations/measurements.md` holds the readings, per-phase peaks, the five proc-guard pile-up censuses and the replay).
+The 41 recorded readings (5.3 hours, frozen at epoch 1793568514) held 13 qualifying runs: `R` was 3.99 GiB and `S` 8.06 GiB, which admitted 6 to 8 runs at each reading (a fixed 6 under the previous count limit).
+Example from the reading at 17:40 UTC: `available_bytes` 26.4 GiB plus 12.8 GiB `held` gives `B` 39.1 GiB, and `floor((B - S) / R)` is 7, so a start is admitted while `counted` is at most 6.
+The gain over the previous limit is small today because the record is thin; `R` and `S` re-derive from every probe, and the pause-only backstop, not a larger guess, is what bounds the tail.
+Those peaks are tree snapshots and lower bounds; native memory pressure never reached level 2 in that window, so no measured margin exists and the formula keeps none.
+
+Process count is not a reservation: a run's tree peaked at 34 processes against the host's 10,666 per-user cap, and every recorded pile-up was a runaway `bash` chain, not a run tree.
+Processes appear only in the backstop below.
+
+### Fallback
+
+With fewer than 2 qualifying recorded runs, a record for another host or RAM size, an unreadable record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
+That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
+
+### Pause-only backstop
+
+While either signal reports an actual overload, or cannot be read, no new start is admitted and a notice names the reason:
+
+- the memory reading is unreadable or would make `bin/fm-mem-guard.sh admit` exit 75 (native pressure level 2 or higher, or a required fact unavailable; `admission_evaluate` returns the same list);
+- `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count.
+
+Nothing running is stopped, paused or reprioritised.
+This backstop covers the tail the reservation does not: a run that exceeds `R`, and process pile-ups.
+It only delays a start; the unreadable run database or CPU count still refuses with 125.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.
-The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom.
+The short start lock covers the observation-to-daemon-registration gap, so participating simultaneous starts cannot all spend the same observed headroom, and a burst of ready starts is admitted back to back while the formula fits, with no spacing between them.
 The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failure behavior and the limit of read-only coordination with starts that bypass it.
-Unusable state or load observations do not imply an empty host.
+Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
 `bin/fm-duration.py run` automatically routes fresh `no-mistakes axi run` inputs and `no-mistakes rerun` through that owner before starting its execution clock; its `--pipeline-priority` option selects the class.
 Generated worker delivery instructions require this measured route for fresh starts across harnesses and runtime backends.
@@ -91,7 +135,7 @@ If that reattach refuses because no run is active and `no-mistakes axi status` s
 Admission adds no inherited CPU-worker budget, reduces no worker counts and serializes none of a task's required checks.
 It is not start authority: explicit task admission, original intent and verification evidence, Test/Document and all other validation gates still apply.
 
-The start gate uses load5; post-deployment acceptance below still uses measured one-minute load p95, not a synthetic gate result.
+The start gate does not use load average; post-deployment acceptance below still uses measured one-minute load p95, not a synthetic gate result.
 Cross-project CPU-worker participation, including `vernant-cpu-pass-pool-participation`, remains a separate dependency.
 
 ## Phase 1 cutover
