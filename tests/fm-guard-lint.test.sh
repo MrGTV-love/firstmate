@@ -659,6 +659,14 @@ assert_remedy_missing
 printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
 "$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
   || fail "an absolute system executable must not be read as a repository bin/ path"
+printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/missing.sh, then git status" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/./bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "an absolute /usr/./bin/ path must not be read as a repository ./bin/ path"
+printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a ./bin/ repository command must satisfy S3"
 printf 'echo "REFUSED: cannot proceed # pending. Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
 "$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
   || fail "a diagnostic with its executable completing step must pass S3"
