@@ -20,8 +20,11 @@ headers. This observer intentionally uses the REST counter rather than spending
 points on a GraphQL accounting query. REST shard agreement is not established.
 A slow request is not overlapped or retried in a burst; pending ticks are recorded.
 
-Process source: one LC_ALL=C ps table every 0.2 seconds; new gh/gh-axi PID/start
-identities retain sanitized argv and the observed ancestor chain. Payloads and
+Process source: one LC_ALL=C ps table every 0.2 seconds in the root home's
+watcher context, not a confined worker. run's process_source callable is a test
+seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
+Injected rows prove output behavior, not actual host observations. New gh/gh-axi
+PID/start identities retain sanitized argv and the observed ancestor chain. Payloads and
 arbitrary argument values are withheld, as in the process census's safe logging
 convention. Executable/script basenames, command words and recognized option
 names are retained; no environment, headers, prompts or free text is logged.
@@ -234,7 +237,10 @@ def quota_result(db, child, stream, began, run_id):
     stream.close()
 
 
-def run(root, duration=None, ready=None):
+def run(root, duration=None, ready=None, *, process_source=None):
+    # Root-home execution uses ps; deterministic callers inject the same table
+    # shape without changing filtering, ancestry, identity or storage behavior.
+    source = process_table if process_source is None else process_source
     with ownership(root) as lock:
         db = database(root)
         run_id = uuid.uuid4().hex
@@ -284,7 +290,7 @@ def run(root, duration=None, ready=None):
                     previous = now
                     scans += 1
                     try:
-                        found, seen = process_records(process_table(), seen)
+                        found, seen = process_records(source(), seen)
                         for item in found:
                             record(db, "process", dict(item, run_id=run_id))
                     except (OSError, subprocess.SubprocessError, RuntimeError):
