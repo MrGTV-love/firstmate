@@ -3449,7 +3449,12 @@ The poll has no stop of its own: `FM_MAIL_TIMEOUT` bounds each socket read and t
 
 ## Slack decision plane (.env)
 
-The Slack plane mirrors this home's open captain-held tasks into one owner DM, one thread per hold occurrence, and returns answers through the existing keyed-answer intake.
+The Slack plane mirrors this home's and every registered secondmate home's open captain-held tasks into one owner DM, one thread per owning home and hold occurrence, and returns answers through the existing keyed-answer intake.
+The existing `data/secondmates.md` registry supplies placement; local homes use their own data and state directories, while remote homes use `bin/fm-on.sh` and the existing remote file reader.
+Secondmate cards identify their owning home, and that placement stays with both the thread and any journaled answer, so identical task ids in different homes cannot redirect a reply into main.
+A removed or changed registration refuses delivery to the old card's owner rather than selecting a replacement home.
+An unreadable registered home is named in the mirror's failure output; readable homes and existing threads remain eligible for processing.
+Only the mirroring home's `slack-dm` binding and Slack configuration are needed; no second mirror or secondmate Slack credential is required.
 It does not create decisions, reconcile them, or change merge authority.
 The terminal, board, inbox, and existing decision records remain authoritative and unchanged.
 There is no inbound listener, Socket Mode connection, or separate schedule.
@@ -3545,7 +3550,7 @@ No local child process (the captain-hold intake, the fleet snapshot, the check r
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
 
-`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
+`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-secondmates.test.sh` exercises registered local/remote homes and persisted answer ownership through fake transport; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.
 
 ## Relay (.env)
