@@ -1385,6 +1385,7 @@ if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ]; then
       exit 1
     fi
     TEARDOWN_BACKLOG_SKIP_REASON=$FM_BACKLOG_TRANSITION_SKIP
+    fm_backlog_transition_skip_event "$ID"
   fi
 fi
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
@@ -6316,11 +6317,16 @@ if [ -n "$X_REQUEST" ]; then
 fi
 
 require_worktree_teardown_safety
-if [ "$FORCE" = --force ]; then
-  "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
-else
-  "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
-fi
+case "$KIND" in
+  secondmate|scout) ;;
+  *)
+    if [ "$FORCE" = --force ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
+    else
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
+    fi
+    ;;
+esac
 
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=

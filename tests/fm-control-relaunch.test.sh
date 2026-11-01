@@ -1098,6 +1098,20 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   pass "fm-control relaunch: a recorded api_key=allow opt-in is carried to the replacement launch"
 }
 
+test_manual_backlog_relaunch_records_one_skip() {
+  local dir out rc id=rl-manual-backlog
+  dir=$(new_case manual-backlog "$id")
+  add_ship_task "$dir" "$id" codex
+  mkdir -p "$dir/home/config"
+  printf 'manual\n' > "$dir/home/config/backlog-backend"
+  out=$(FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl" run_control "$dir" "$id" relaunch --note "manual backlog"); rc=$?
+  expect_code 0 "$rc" "a relaunch on a manual-backlog home should succeed"$'\n'"$out"
+  jq -se --arg id "$id" '[.[] | select(.guard == "backlog-transition")] | length == 1
+    and .[0].decision == "bypass" and .[0].rule == "manual-backend" and .[0].task == $id' "$dir/guard-events.jsonl" >/dev/null \
+    || fail "one manual-backlog relaunch must record one skip: $(cat "$dir/guard-events.jsonl" 2>/dev/null)"
+  pass "fm-control relaunch: a manual-backlog home records one backlog skip per relaunch"
+}
+
 test_api_key_guard_refuses_before_stop() {
   local dir out rc id=rl-key-refuse
   dir=$(new_case key-refuse "$id")
@@ -2314,6 +2328,7 @@ test_owned_path_relaunch_refuses_before_stop() {
 }
 
 control_relaunch_test_cases=(
+test_manual_backlog_relaunch_records_one_skip
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
 test_relaunch_refuses_contradictory_dsh_route_before_stopping
