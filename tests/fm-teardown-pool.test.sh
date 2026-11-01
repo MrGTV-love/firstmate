@@ -3310,9 +3310,9 @@ if [ "\${1:-}" = api ]; then
   [ '$variant' != forge-fail ] || exit 1
 fi
 if [ '$variant' = not-merged ]; then
-  printf 'merged: false\nhead: $head\nmerge: $merge\n'
+  printf 'merged: false\nhead: $head\nmerge: $merge\nbranch: %s\n' "\${FM_FAKE_PR_BRANCH:-fm/task-x1}"
 else
-  printf 'merged: true\nhead: $head\nmerge: $merge\n'
+  printf 'merged: true\nhead: $head\nmerge: $merge\nbranch: %s\n' "\${FM_FAKE_PR_BRANCH:-fm/task-x1}"
 fi
 SH
     chmod +x "$case_dir/fakebin/gh-axi"
@@ -3349,6 +3349,7 @@ PY
       git -C "$NESTED_SLOT" add unlanded.txt
       git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm unlanded
     fi
+    case "$variant" in success|orca-success) seed_backlog_in_flight "$case_dir" ;; esac
     rc=0
     case "$variant" in
       *forced*)
@@ -3386,14 +3387,12 @@ PY
         assert_present "$case_dir/called" 'entry point was not called'
         assert_absent "$records/worktree-lifecycle/$digest.json" 'legacy record remains'
         assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'durable record remains'
-        # Historical declarations can outlive task metadata. Recover only the
-        # PR explicitly retained by Firstmate's merge-outcome marker.
-        printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/vernant\n42\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
         cp "$case_dir/manifest.json" "$records/worktree-lifecycle/$digest.json"
         cp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json"
         jq '.owner_id="unknown-owner"' "$case_dir/manifest.json" > "$common/vernant-worktree-lifecycle/unknown.json"
         rm "$case_dir/called"
         sweep=(env "CODEX_HOOK_STATE_DIR=$records" "WORKTREE_LIFECYCLE_STORE_DIR=$common/vernant-worktree-lifecycle"
+          "FM_HOME=$case_dir/home" "FM_DATA_OVERRIDE=$case_dir/data" "FM_CONFIG_OVERRIDE=$case_dir/config"
           "PATH=$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py"
           --project "$case_dir/project" --firstmate-state "$case_dir/state")
         "${sweep[@]}" > "$case_dir/report"
@@ -3418,6 +3417,11 @@ PY
         assert_present "$records/worktree-lifecycle/$digest.json" 'sweep removed unlanded legacy record'
         assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'sweep removed unlanded durable record'
         git -C "$NESTED_SLOT" checkout -q --detach "$orig"
+        FM_FAKE_PR_BRANCH=fm/other "${sweep[@]}" --apply > "$case_dir/apply-branch" || true
+        assert_grep "$digest.json owner=task-x1 slot=$NESTED_SLOT landing=MERGED stayed: branch differs" "$case_dir/apply-branch" 'sweep did not keep a record whose PR came from another branch'
+        assert_absent "$case_dir/called" 'sweep retired a record whose PR came from another branch'
+        assert_present "$records/worktree-lifecycle/$digest.json" 'sweep removed branch-differs legacy record'
+        assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'sweep removed branch-differs durable record'
         rc=0
         "${sweep[@]}" --apply > "$case_dir/apply" || rc=$?
         expect_code 1 "$rc" 'apply should report the unproven owner'

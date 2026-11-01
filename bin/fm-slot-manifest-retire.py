@@ -5,8 +5,10 @@ Usage: fm-slot-manifest-retire.py --project PATH --firstmate-state PATH
        [--state-dir PATH] [--apply]
 Report-only by default. Lists durable and legacy records with owner and landing
 status. --apply retires a record only when its owner has no live Firstmate task
-record (state/<owner>.meta), its recorded PR is forge-merged, and the slot's
-HEAD has no commit outside origin/main; every other record is listed and kept.
+record (state/<owner>.meta), this home's backlog Done entry for the owner
+records a PR (read through bin/fm-tasks-axi.sh show), the forge reports that PR
+merged from the record's branch, and the slot's HEAD has no commit outside
+origin/main; every other record is listed and kept.
 For teardown: --slot PATH --owner-id ID --owner-branch BRANCH --prove-to FILE
 builds the forge proof before project custody; then --apply --proof-file FILE
 after its landed-work proof runs only the local entry point with that file.
@@ -50,32 +52,44 @@ def recorded_pr(state, owner):
         urls = [line[3:] for line in meta.read_text().splitlines() if line.startswith("pr=")]
         if urls:
             return urls[-1]
-    marker = state / (owner + ".pr-poll-merge-notified")
-    if marker.is_file():
-        lines = marker.read_text().splitlines()
-        if len(lines) == 5 and lines[:3] == ["fm-pr-poll-merge-notified-v1", "github", "github.com"]:
-            return f"https://github.com/{lines[3]}/pull/{lines[4]}"
     raise Refusal("no Firstmate-recorded PR; landing unproven")
 
 
-def landing_proof(project, state, owner, fetch=False):
-    url = recorded_pr(state, owner)
+def done_pr(owner):
+    show = Path(__file__).resolve().parent / "fm-tasks-axi.sh"
+    result = subprocess.run([str(show), "show", owner], text=True, capture_output=True, check=False)
+    if result.returncode:
+        raise Refusal("no backlog Done entry for the owner; landing unproven")
+    fields = {}
+    for line in result.stdout.splitlines():
+        if line.startswith("  ") and not line.startswith("   ") and ": " in line:
+            key, value = line[2:].split(": ", 1)
+            fields[key] = json.loads(value) if value.startswith('"') else value
+    if fields.get("state") != "done":
+        raise Refusal("the owner's backlog entry is not Done; landing unproven")
+    urls = [link[3:] for link in str(fields.get("links", "none")).split(",") if link.startswith("pr:")]
+    if len(urls) != 1:
+        raise Refusal("the owner's backlog Done entry records no single PR; landing unproven")
+    return urls[0]
+
+
+def landing_proof(project, url, fetch=False):
     match = re.fullmatch(r"https://github.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)", url)
     if not match:
         raise Refusal("invalid Firstmate-recorded PR URL")
     # Read the same merged-PR identities used by teardown's archive proof. The
     # API spelling avoids presentation parsing and preserves both immutable IDs.
     raw = run(["gh-axi", "api", f"/repos/{match[1]}/pulls/{match[2]}", "--jq",
-               '{merged: .merged, head: .head.sha, merge: .merge_commit_sha}'], project)
+               '{merged: .merged, head: .head.sha, merge: .merge_commit_sha, branch: .head.ref}'], project)
     # gh-axi serializes API objects as TOON, including caller-shaped objects.
-    # This projection has only three scalar fields, so reject anything outside
+    # This projection has only four scalar fields, so reject anything outside
     # that exact flat shape instead of interpreting general presentation text.
     lines = raw.splitlines()
-    if len(lines) != 3 or any(": " not in line for line in lines):
+    if len(lines) != 4 or any(": " not in line for line in lines):
         raise Refusal("unexpected merged-PR response shape")
     data = dict(line.split(": ", 1) for line in lines)
     data = {key: json.loads(value) if value.startswith('"') else value for key, value in data.items()}
-    if set(data) != {"merged", "head", "merge"}:
+    if set(data) != {"merged", "head", "merge", "branch"}:
         raise Refusal("unexpected merged-PR response fields")
     if data["merged"] != "true":
         raise Refusal("recorded PR is not MERGED; landing unproven")
@@ -90,7 +104,7 @@ def landing_proof(project, state, owner, fetch=False):
                 raise Refusal("merged PR commit is not present locally; report mode will not fetch") from None
             run(["git", "fetch", "--quiet", "--no-tags", "origin", sha], project)
             run(["git", "cat-file", "-e", sha + "^{commit}"], project)
-    return proof
+    return proof, data["branch"]
 
 
 def stores(project, state_dir):
@@ -153,7 +167,7 @@ def prove_slot(args):
         _, paths, existing = slot_records(args)
         if not existing or not entry_point(args.project).is_file() or slot_keep_reason(args, paths):
             return 0
-        outcome = landing_proof(args.project, args.firstmate_state, args.owner_id, fetch=True)
+        outcome, _ = landing_proof(args.project, recorded_pr(args.firstmate_state, args.owner_id), fetch=True)
     except (Refusal, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         outcome = {"kept_reason": str(exc)}
     args.prove_to.write_text(json.dumps(outcome) + "\n")
@@ -229,7 +243,10 @@ def main():
                 if os.path.lexists(owner_meta(args.firstmate_state, owner)):
                     print(f"{name} owner={owner} slot={slot} landing=LIVE: {owner}.meta is a live Firstmate task record; both copies kept")
                     continue
-                proof = landing_proof(args.project, args.firstmate_state, owner, fetch=args.apply)
+                proof, pr_branch = landing_proof(args.project, done_pr(owner), fetch=args.apply)
+                if pr_branch != branch:
+                    print(f"{name} owner={owner} slot={slot} landing=MERGED stayed: branch differs (PR head {pr_branch}, record {branch}); both copies kept")
+                    continue
                 outside = run(["git", "-C", str(slot), "rev-list", "--count", "HEAD", "--not", "refs/remotes/origin/main"], args.project)
                 if outside != "0":
                     print(f"{name} owner={owner} slot={slot} landing=UNLANDED: slot HEAD has {outside} commit(s) outside origin/main; both copies kept")
