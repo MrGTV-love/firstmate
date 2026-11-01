@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Synthetic registered-home mirror/poll roundtrip; no credentials or network.
 set -euo pipefail
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 command -v tasks-axi >/dev/null || { printf 'skip: tasks-axi not found\n'; exit 0; }
