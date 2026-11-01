@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the shell Slack check with fake HTTP bodies and a real socket timeout."""
 import contextlib
-import importlib.util
 import io
 import json
 import os
@@ -22,11 +21,6 @@ def install():
     if Path(sys.argv[0]).name != 'fm_slack_watch.py':
         return
     sys.path.insert(0, str(ROOT / 'bin'))
-    if os.environ.get('FM_TEST_SLACK_TRANSPORT'):
-        spec = importlib.util.spec_from_file_location('fm_slack', os.environ['FM_TEST_SLACK_TRANSPORT'])
-        module = importlib.util.module_from_spec(spec)
-        sys.modules['fm_slack'] = module
-        spec.loader.exec_module(module)
     from fm_slack_replay import Replay
     import urllib.request
     replay = Replay(ROOT / 'tests/fixtures/slack/mirror/transcript.json',
@@ -123,8 +117,6 @@ def main():
         assert command('check') == ''
         assert len(cards()) == 4, cards()
         print('ok - slow standing check completes after %.3fs; four cards remain four on repeat' % elapsed)
-        if os.environ.get('FM_TEST_SLACK_ONLY_SLOW'):
-            return
 
         timings.write_text('')
         started = time.monotonic()
