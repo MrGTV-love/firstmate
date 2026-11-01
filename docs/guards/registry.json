@@ -91,7 +91,7 @@
       "invariant": "remote secondmate access requires its exact task binding in the configured Herdr session",
       "layer": "runtime-block", "source": "remote endpoint metadata and configured session identity",
       "trigger": "invalid identity, foreign backend or session, or target outside that session",
-      "remedy": "restore state/<secondmate>.meta from its verified launch evidence with the exact task and session binding, then retry the refused operation",
+      "remedy": "restore state/<secondmate>.meta from its verified launch evidence with the exact task and session binding, then retry the refused operation; if that evidence shows a launch in another Herdr session or on another backend, no supported route exists yet, so preserve the copy and its unlanded work, change no metadata and report the endpoint and the evidence to the owning home's supervisor",
       "decision": "deny", "fail_direction": "closed", "budget": 1,
       "telemetry": "state/guard-events.jsonl", "instrumented": false,
       "test": "tests/fm-remote-reply.test.sh", "tier": "C", "harm": "irreversible"
