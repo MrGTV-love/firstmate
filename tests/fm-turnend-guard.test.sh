@@ -2559,20 +2559,30 @@ SH
     esac
     for i in 1 2 3 4 5 6; do
       out=$(PATH="$fakebin:$PATH" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
+      case "$scenario" in
+        budget-lock|budget-write|budget-rename)
+          expect_code 2 "$status" "$scenario stop $i must refuse a blind stop when the budget cannot be charged"
+          assert_contains "$out" 'TURN WOULD END BLIND' "$scenario stop $i omitted the repair banner"
+          assert_not_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "$scenario stop $i allowed without a charged budget"
+          continue ;;
+      esac
       expected=2
-      if [ "$i" -gt 3 ] || [ "$scenario" = budget-lock ] || [ "$scenario" = budget-write ] || [ "$scenario" = budget-rename ]; then expected=0; fi
+      [ "$i" -le 3 ] || expected=0
       expect_code "$expected" "$status" "$scenario stop $i must stay within three charged blocks"
       if [ "$expected" -eq 0 ]; then
         assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "$scenario stop $i concealed missing supervision"
         assert_contains "$out" 'Keep this session attended' "$scenario stop $i omitted attended recovery"
       fi
     done
-    if [ -f "$dir/state/.turnend-claude-blocks" ]; then
-      count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
-      [ "$count" -eq 4 ] || fail "$scenario must saturate the exhausted count at 4, got $count"
-    fi
+    case "$scenario" in
+      budget-lock|budget-rename) assert_absent "$dir/state/.turnend-claude-blocks" "$scenario invented a budget ledger" ;;
+      budget-write) [ -d "$dir/state/.turnend-claude-blocks" ] || fail "budget-write replaced the unwritable budget path" ;;
+      *)
+        count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
+        [ "$count" -eq 4 ] || fail "$scenario must saturate the exhausted count at 4, got $count" ;;
+    esac
   done
-  pass "fm-turnend-guard --claude: absent recovery and bookkeeping failures never exceed three blocks"
+  pass "fm-turnend-guard --claude: absent recovery never exceeds three charged blocks, and an uncharged budget keeps refusing"
 }
 
 test_hook_claude_mode_verified_failure_stays_loud_after_budget() {

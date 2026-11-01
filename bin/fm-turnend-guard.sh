@@ -87,7 +87,9 @@
 #      (default 3) consecutive blocks per session - safely below Claude Code's
 #      hard 8-consecutive-block override - then allow one loud attended
 #      fail-open. A missing failure notice or failed bookkeeping cannot extend
-#      that budget. Positive supervision allows even if episode reset fails.
+#      that budget; a budget that cannot be locked or written keeps refusing,
+#      bounded by Claude Code's cap. Positive supervision allows even if
+#      episode reset fails.
 #      The budget
 #      charges each event epoch once, and it also charges every re-block
 #      against an epoch the auto-arm never advanced past the previous
@@ -568,18 +570,13 @@ if autoarm_owns_recovery; then
 fi
 
 # No automatic recovery was proved: every re-block consumes the same budget.
-# Never issue an uncharged block: if the budget cannot be persisted there is
-# no safe way to bound another continuation across hook processes. Stay loud
-# about absent supervision rather than creating an unendable bookkeeping loop.
-BUDGET_STATUS=exhausted
-if budget_account_current_epoch block; then
-  [ "$COUNT" -gt "$BLOCK_BUDGET" ] || block_stop
-  terminal_fail_open
-  terminal_status=$?
-else
-  BUDGET_STATUS=unavailable
-  terminal_status=1
-fi
+# A budget that cannot be locked or written still refuses the blind stop; only
+# Claude Code's own consecutive-continuation cap then bounds the re-blocks
+# (https://code.claude.com/docs/en/hooks, Stop input).
+budget_account_current_epoch block || block_stop
+[ "$COUNT" -gt "$BLOCK_BUDGET" ] || block_stop
+terminal_fail_open
+terminal_status=$?
 if [ "$terminal_status" -ne 2 ]; then
   if [ "$FM_SUP_IN_FLIGHT" -gt 0 ]; then
     NEED_DESC="$FM_SUP_IN_FLIGHT task(s) in flight"
@@ -592,7 +589,7 @@ if [ "$terminal_status" -ne 2 ]; then
   else
     NEED_DESC="X-mode relay polling active"
   fi
-  printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, no live supervisor or automatic recovery was proved, and the block budget is %s. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkeeping, before relying on unattended supervision."}\n' "$NEED_DESC" "$BUDGET_STATUS"
+  printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkeeping, before relying on unattended supervision."}\n' "$NEED_DESC"
   guard_event_allow
   exit 0
 fi
