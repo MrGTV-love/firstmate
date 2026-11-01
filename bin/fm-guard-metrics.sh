@@ -39,9 +39,11 @@
 # `retirement_decision` does not judge it, one per line: a nomination nobody has
 # judged yet. A decision starting `keep|redesign|cut YYYY-MM-DD` judges the
 # events through that day and stands until the evidence changes: the events after
-# it nominate the guard again only when they meet the threshold on their own and
-# the log holds a deny, warn, override or other non-allow decision. It is the
-# question a session start asks, so the pass cannot sit unread in a log forever.
+# it nominate the guard again only when they hold a deny, warn, override or other
+# non-allow decision, or meet the threshold on their own as a quiet window after
+# a judged window (the last --min-opportunities events through that day) that
+# held a fire. It is the question a session start asks, so the pass cannot sit
+# unread in a log forever.
 #
 # Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log
 # is not an error: every guard is simply unmeasured, because no evidence is not
@@ -57,7 +59,7 @@ JSON=0
 UNDECIDED=0
 ONLY=''
 
-usage() { sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
@@ -187,20 +189,26 @@ measure() {  # <rows-json-array> <harm>
   printf '%s %s %s %s %s %s %s\n' "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict"
 }
 
-# A recorded decision judges the evidence through its date and stands until that
-# evidence changes. The events after the date nominate the guard again only when
-# they meet the retirement rule on their own and the log holds new evidence: any
-# decision other than a plain allow (a deny, warn, override or bypass), or a fire
-# rate that changed to zero. An unchanged all-allow log never re-nominates. A
-# decision without a leading `keep|redesign|cut YYYY-MM-DD` judges nothing.
+# A recorded decision judges the evidence through its date and stands until the
+# events after that date differ from the window it judged. They differ when they
+# hold any decision other than a plain allow (a deny, warn, override or bypass),
+# or when they meet the retirement rule on their own as a quiet window while the
+# judged window, the last --min-opportunities events through that date, held a
+# fire: a fire rate that changed to zero. History older than the judged window
+# never re-nominates. A decision without a leading `keep|redesign|cut YYYY-MM-DD`
+# judges nothing.
 judged() {  # <id> <rows-json-array> <harm>
-  local day fresh v
+  local day after fresh v
   day=$(decision_of "$1" | jq -Rr 'capture("^(keep|redesign|cut) (?<d>[0-9]{4}-[0-9]{2}-[0-9]{2})").d // ""' 2>/dev/null)
   [ -n "$day" ] || return 1
-  fresh=$(printf '%s' "$2" | jq -c --arg after "${day}T23:59:59Z" '[.[] | select((.ts // "") > $after)]')
+  after="${day}T23:59:59Z"
+  fresh=$(printf '%s' "$2" | jq -c --arg after "$after" '[.[] | select((.ts // "") > $after)]')
+  printf '%s' "$fresh" | jq -e 'all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1 || return 1
   v=$(measure "$fresh" "$3")
   [ "${v##* }" != cut ] && return 0
-  printf '%s' "$2" | jq -e 'all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1
+  printf '%s' "$2" | jq -e --arg after "$after" --argjson n "$MIN_OPPS" '
+    [.[] | select((.ts // "") <= $after)] | sort_by(.ts) | .[-$n:]
+    | all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1
 }
 
 guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''

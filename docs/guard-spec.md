@@ -104,8 +104,9 @@ An active guard added after the audit is named in the registry's
 `retirement_decision` records the outcome, date and reason for the [bad-guard decision](#who-decides), in the form `<keep|redesign|cut> YYYY-MM-DD: <reason>` (`cut` is Remove).
 It is not limited to metrics nominations; any flag in that policy can require a decision.
 A decision judges the evidence through its date and stands until that evidence changes, never on the date alone.
-`bin/fm-guard-metrics.sh --undecided` nominates the guard again only when the events after that date meet the [retirement rule](#retirement-rule) on their own and the guard's log holds new evidence: a deny, warn, override, bypass or other non-allow decision, or a fire rate that changed to zero.
-An unchanged zero-fire log does not re-nominate a guard whose zero fires were judged, and a `keep` or `redesign` never hides a nomination backed by new evidence.
+`bin/fm-guard-metrics.sh --undecided` compares only the events after that date with the window the decision judged, the last 30 opportunities through that date.
+It nominates the guard again when those newer events hold a deny, warn, override, bypass or other non-allow decision, or when they meet the [retirement rule](#retirement-rule) on their own as a quiet window while the judged window held a fire, a fire rate that changed to zero.
+Quiet events after a decision that judged a quiet window never re-nominate the guard, and a fire older than the judged window never does either; a `keep` or `redesign` never hides a nomination backed by new evidence.
 A nominated guard with no decision, or with one that does not start with an outcome and a date, is still waiting for judgment.
 
 `remedy` is rendered text, not a pointer. Every remedy contains at least one

@@ -171,6 +171,21 @@ dated_rows "$RATE" 2026-03-10 30
 got=$(undecided_for "$RATE" "$TMP/dated-keep.json")
 [ "$got" = gquiet ] || fail "a fire rate that changed to zero after a keep is new evidence, got '$got'"
 
+decided_with "keep 2026-03-20: process fixed, guard is a quiet backstop" "$TMP/rejudged.json"
+dated_rows "$RATE" 2026-04-10 30
+got=$(undecided_for "$RATE" "$TMP/rejudged.json")
+[ -z "$got" ] || fail "a historical deny must not re-nominate a quiet window after a keep that judged a quiet window, got '$got'"
+decided_with "keep 2026-04-20: still a quiet backstop" "$TMP/rejudged2.json"
+dated_rows "$RATE" 2026-05-10 30
+dated_rows "$RATE" 2026-06-10 30
+for reg in rejudged rejudged2; do
+  got=$(undecided_for "$RATE" "$TMP/$reg.json")
+  [ -z "$got" ] || fail "unchanged quiet windows after $reg must not re-nominate, got '$got'"
+done
+dated_rows "$RATE" 2026-06-11 1 deny
+got=$(undecided_for "$RATE" "$TMP/rejudged2.json")
+[ "$got" = gquiet ] || fail "a new deny after a keep must re-nominate, got '$got'"
+
 decided_with "keep: no date recorded" "$TMP/undated.json"
 got=$(undecided_for "$ZERO" "$TMP/undated.json")
 [ "$got" = gquiet ] || fail "a decision without an outcome and date must not retire a nomination, got '$got'"
