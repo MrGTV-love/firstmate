@@ -1082,6 +1082,11 @@ Ship and scout completion requires delivery evidence or the captain's own words,
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+A pull request that finishes a queued item names it with a `Closes: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion once it has proved the merge, so no owner words are needed for work that already landed.
+A merge train closes its members' items too.
+[`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes, hands to teardown, and reports as left open, and [`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh) owns the line syntax.
+A close that fails never undoes or fails the merge.
+An item that moves to Done by any route also leaves every other item's blocked-by list, so work stops waiting on a blocker that finished; [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
 [`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
 Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.

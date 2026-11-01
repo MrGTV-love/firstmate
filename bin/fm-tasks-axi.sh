@@ -72,11 +72,16 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
+# A `done`/`close` that tasks-axi accepted also removes the finished id from every other
+# item's blocked-by list, so work stops waiting on a blocker that is done; the cleared
+# edges are reported on stderr as `unblocked:` lines
+# (bin/fm-backlog-transition-lib.sh's fm_backlog_unblock_dependents owns the rule).
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): an `add` that created a
 # new item also appends one task.filed record, and a `done`/`close` that passed
 # the proof check above and moved a row to Done appends one task.closed record
 # (bin/fm-backlog-transition-lib.sh, which writes a repeat of a close once). The
-# command's stdout, stderr, and exit status stay tasks-axi's own; an add that
+# command's stdout and exit status stay tasks-axi's own (stderr carries only the
+# `unblocked:`/`actionable:` lines above and tasks-axi's own diagnostics); an add that
 # found the id already present (tasks-axi reports `already`) writes nothing, and
 # a failed ledger write costs one stderr line. While config/fleet-ledger is
 # absent the command runs as before.
@@ -407,6 +412,12 @@ if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
   task_status=$?
   [ "$task_status" -ne 0 ] || [ "${#LEDGER_CLOSE_ARGS[@]}" -eq 0 ] \
     || fm_backlog_ledger_closed "$task_state" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TASK_ID" "${LEDGER_CLOSE_ARGS[@]}"
+  # A completed item stops blocking its dependents (fm_backlog_unblock_dependents).
+  if [ "$task_status" -eq 0 ] && [ "$TASK_HELP" = 0 ]; then
+    case "$TASK_COMMAND" in
+      done|close) fm_backlog_unblock_dependents "$DATA" "$TASK_ID" >&2 ;;
+    esac
+  fi
   exit "$task_status"
 fi
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

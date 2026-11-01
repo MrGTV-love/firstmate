@@ -1180,7 +1180,7 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     echo "error: fm_dod_block: mode=no-mistakes needs the durable task brief to build its verification plan" >&2
     return 1
   fi
-  local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check
+  local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check closes_note
   fm_forge_valid_for_mode "$forge" "$mode" fm_dod_block || return 1
   fm_base_branch_valid "$base" "$mode" "$forge" fm_dod_block || return 1
   if [ -n "$consent" ]; then
@@ -1190,9 +1190,15 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     fi
     contract_consent=" upstream-consent=$consent"
   fi
+  # A merge through bin/fm-pr-merge.sh closes the items the merged body names with
+  # `Closes:` lines (bin/fm-pr-close-items.sh; bin/fm-pr-closes-lib.sh owns the syntax).
+  # Only a GitHub body is read, and only a PR mode has one.
+  closes_note="Name the backlog items your change finishes: put \`Closes: <task-id>\` on a line of its own in your commit message, and one such line for each other queued backlog item it fixes, so the PR body carries them and a merge through bin/fm-pr-merge.sh closes each named item. Once the PR exists, read its body back and, if a line is missing, add it with \`gh-axi pr edit\`.
+"
   draft_check="(\`gh-axi pr view <number>\` must print \`draft: no\`, where <number> is the PR number from your PR URL); if it is a draft, mark it ready with \`gh-axi pr ready <number>\`."
   if [ "$forge" = forgejo ]; then
     contract_forge=' forge=forgejo'
+    closes_note=
     forge_cli=tea
     draft_check="(\`tea api --repo <owner>/<repo> /repos/{owner}/{repo}/pulls/<number>\` must show \`draft\` as false, where <owner>/<repo> and <number> come from your PR URL); Forgejo marks a draft by a work-in-progress title prefix such as \`WIP:\`, so if it is a draft, remove that prefix with \`tea pulls edit <number> --repo <owner>/<repo> --title '<title without the prefix>'\`."
   fi
@@ -1264,7 +1270,7 @@ The task is complete only when committed on your branch.
 When it is implemented and committed, push your branch and open a PR with \`$forge_cli\` that is ready for review, not a draft$pr_base.
 Before you report done, read the PR back from the forge and confirm it is not a draft $draft_check
 A draft cannot be merged, so a done report on one leaves the merge unasked.
-Then append \`done [at=<epoch>]: PR {url}\` to the status file and stop.
+${closes_note}Then append \`done [at=<epoch>]: PR {url}\` to the status file and stop.
 That \`done:\` is accepted only when this copy's HEAD - your latest commit - is pushed to your PR branch; the check tests that commit, not merely that a branch moved.
 If you deliberately keep the PR a draft, append \`paused [at=<epoch>]: {why the draft is held}\` instead of done.
 Do NOT run /no-mistakes. The configured merge authority decides whether to merge the PR; firstmate relays the outcome.
@@ -1292,7 +1298,7 @@ The task is complete only when committed on your branch.
 When you believe it is complete, append \`done [at=<epoch>]: {summary}\` to the status file and stop.
 Firstmate will then instruct you to run /no-mistakes to validate and ship a PR.
 That first \`done:\` is the handoff that starts the pipeline, which owns the push; it is not a request to push from this copy.
-${nm_base}
+${closes_note}${nm_base}
 EOF
       fm_verification_plan_block "$brief"
       fm_nm_driving_block "$forge"

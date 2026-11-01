@@ -201,6 +201,13 @@ case "${1:-} ${2:-}" in
     [ "$#" -eq 5 ] && [ "${4:-}" = --repo ] || exit 2
     printf 'pull_request:\n  number: %s\n  state: %s\n' "$3" "${FM_TEST_GH_MERGE_STATE:-merged}"
     ;;
+  "api /repos/"*)
+    # The merged proof bin/fm-tasks-axi.sh done reads: a pull request counts as
+    # merged only when its number is listed in $case_dir/merged-prs.
+    merged=false
+    if grep -qxF "${2##*/}" "$FM_TEST_GH_MERGED_PRS" 2>/dev/null; then merged=true; fi
+    printf '  body: "merged=%s"\n' "$merged"
+    ;;
 esac
 exit 0
 SH
@@ -210,6 +217,11 @@ printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
+      *" --json body "*)
+        # The body close-at-merge reads: $case_dir/bodies/<pr number>, empty when absent.
+        cat "$FM_TEST_GH_BODIES/${3##*/}" 2>/dev/null
+        exit 0
+        ;;
       *mergeStateStatus*)
         if [ -n "${FM_TEST_GH_MERGEABLE_SEQUENCE:-}" ]; then
           call_n=$(( $(cat "$FM_TEST_GH_MERGEABLE_CALLS" 2>/dev/null || echo 0) + 1 ))
@@ -805,6 +817,8 @@ run_pr_merge() {
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" \
   FM_STATE_OVERRIDE="$case_dir/state" \
   FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
+  FM_TEST_GH_BODIES="$case_dir/bodies" \
+  FM_TEST_GH_MERGED_PRS="$case_dir/merged-prs" \
   FM_TEST_GH_LOG="$case_dir/gh.log" \
   FM_TEST_GH_OUTCOME="$case_dir/github-outcome" \
   FM_TEST_GH_RULES="$case_dir/github-rules" \

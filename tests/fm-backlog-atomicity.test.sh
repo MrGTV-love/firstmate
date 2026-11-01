@@ -3134,6 +3134,36 @@ test_dispatch_and_completion_are_structural() {
   pass "dispatch and completion transition structurally with evidence"
 }
 
+# Teardown is the main route to Done, so it must clear a finished blocker from the
+# items that waited on it exactly as bin/fm-tasks-axi.sh does; an edge to another,
+# unfinished blocker stays.
+test_teardown_completion_clears_the_finished_blocker() {
+  local case_dir home id pr out deps
+  id=fm-unblock-b16
+  pr=https://github.com/example/firstmate/pull/16
+  case_dir=$(make_home unblock-on-teardown "$id")
+  home=$(home_of "$case_dir")
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" fm-unblock-open
+  add_item "$case_dir" fm-unblock-dep-two
+  add_item "$case_dir" fm-unblock-dep-one
+  tasks-axi block fm-unblock-dep-two --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block fm-unblock-dep-two --by fm-unblock-open --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block fm-unblock-dep-one --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+
+  out=$(run_ship_spawn "$case_dir" "$id") || fail "unblock spawn failed: $out"
+  printf 'pr=%s\n' "$pr" >> "$home/state/$id.meta"
+  out=$(run_teardown "$case_dir" "$id") || fail "unblock teardown failed: $out"
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "teardown left the blocker outside Done"
+  assert_contains "$out" "unblocked: fm-unblock-dep-one no longer waits on $id" "teardown did not report the cleared edge"
+  assert_contains "$out" "unblocked: fm-unblock-dep-two no longer waits on $id" "teardown did not report the second cleared edge"
+  deps=$(tasks-axi show fm-unblock-dep-two --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = "blocked-by:fm-unblock-open" ] || fail "the unfinished blocker did not stay on the dependent: $deps"
+  deps=$(tasks-axi show fm-unblock-dep-one --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = none ] || fail "the finished blocker stayed on its only dependent: $deps"
+  pass "teardown completion clears the finished blocker from every dependent and keeps another blocker"
+}
+
 test_refused_teardown_leaves_the_item_live() {
   local case_dir home id out rc=0
   id=fm-structural-refusal-b15
@@ -3616,6 +3646,7 @@ test_spawn_refuses_an_unsafe_tasks_config_before_exempting_a_missing_backlog
 test_spawn_refuses_a_data_directory_symlinked_outside_the_home
 test_configured_adapter_refuses_a_data_directory_outside_the_home
 test_dispatch_and_completion_are_structural
+test_teardown_completion_clears_the_finished_blocker
 test_refused_teardown_leaves_the_item_live
 test_environment_selected_adapter_is_not_forced_to_markdown
 test_manual_backend_home_dispatches_and_completes_without_touching_the_backlog

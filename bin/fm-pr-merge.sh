@@ -214,6 +214,10 @@
 # destination, normal-case deduplication, and at-least-once recovery.
 # A landed merge whose outcome cannot be written is reported loudly rather than
 # misreported as a failed merge.
+# Once the outcome is recorded, bin/fm-pr-close-items.sh closes every backlog item the
+# merged pull request names with a `Closes: <item-id>` line, and the items of a merge
+# train's members; an item it cannot close is reported by id with its reason and never
+# changes this script's exit status.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -2202,6 +2206,14 @@ case "$outcome_rc" in
     printf 'actionable: merged %s but could not record the outcome for supervision\n' "$URL" >&2
     ;;
 esac
+
+# The merge is verified and recorded: close the backlog items its body names with
+# `Closes: <item-id>` lines, and a merge train's members' items too. A failure here
+# never changes the merge result: the close step reports each item it left open and its
+# exit status is ignored (bin/fm-pr-close-items.sh header owns the contract). The
+# explicit home and state keep it on this merge's own backlog.
+FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  "$SCRIPT_DIR/fm-pr-close-items.sh" "$ID" "$URL" </dev/null || true
 
 # The merge is verified and its outcome recorded: arm the prune of the task's
 # pool copy and start one detached attempt. Teardown stays the authority and the
