@@ -1938,7 +1938,7 @@ A missing or mismatched snapshot, a replaced plan at the same path, a different 
 The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
 This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
-A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
+Independent review reads that list as the task's stated boundary.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
 
 ## Home brief include (config/brief-include.md)
