@@ -1,0 +1,38 @@
+
+=== base code | LANDED (merged into main) nested prior copy at <slot>/nested/side | unique ignored file | no bundle (t-i11) ===
+Fast-forwarding to: fm/t-i11
+Trying simple merge with fm/t-i11-side
+teardown t-i11 complete (window firstmate:fm-t-i11, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-3f8506/1/project)
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-3f8506/1/project/nested/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-3f8506/1/project/nested/side/unique.dat: No such file or directory
+preserved:
+
+=== new code | LANDED (merged into main) nested prior copy at <slot>/nested/side | unique ignored file | no bundle (t-i12) ===
+Fast-forwarding to: fm/t-i12
+Trying simple merge with fm/t-i12-side
+teardown t-i12 complete (window firstmate:fm-t-i12, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-18951b/1/project)
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-18951b/1/project/nested/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-18951b/1/project/nested/side/unique.dat: No such file or directory
+preserved:
+
+=== S9: stored copy location inside a removal root (data/<id>/preserved-bundles is a symlink into the slot) ===
+lrwxr-xr-x  1 charlesabrooker  staff  94 Oct 31 16:25 /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9/preserved-bundles -> /Users/charlesabrooker/tmp/fm-lab.HDM4oq/work/t-s9/project/.git/worktrees/project/fm-lab-store
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9.bundle is held on task t-s9
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9/preserved-bundles/c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd.bundle sha256=c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd tips=0351d1e5682923e9391b4b79dc0a6db2b06
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9.bundle is held on task t-s9
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9/preserved-bundles/c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd.bundle sha256=c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd tips=0351d1e5682923e9391b4b79dc0a6db2b06
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9.bundle is held on task t-s9
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9/preserved-bundles/c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd.bundle sha256=c65c1196b0b0ac0a85e5b5edc1ebdc8e2c3bcbd32f493368b352ab55a0eef4cd tips=0351d1e5682923e9391b4b79dc0a6db2b06
+🌳 Worktree returned to pool.
+teardown t-s9 complete (window firstmate:fm-t-s9, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-751c86/1/project)
+Backlog: t-s9 stays open in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/state/t-s9.meta
+slot HEAD: 55ab688b9babcc91b6b5cc91d2b74e95847f4021
+--- variant: preserved-bundles symlink points into the copy's checkout ---
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.HDM4oq/state/t-s9.meta
+[exit 1]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/state/t-s9.meta
+slot HEAD: 55ab688b9babcc91b6b5cc91d2b74e95847f4021

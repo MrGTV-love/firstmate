@@ -1,0 +1,50 @@
+
+=== A (base): task's own returned slot, unlanded, holds a unique ignored file; bundle + call ===
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+853cca2 unpublished work of t-a-base
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+slot-unique.dat after: slot bytes
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/state/t-a-base.meta
+slot HEAD: 853cca2
+
+=== B (base): slot bundle-only; nested prior copy is LANDED (merged, pushed) and holds a unique ignored file ===
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+dbd0f5f unpublished work of t-b-base
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-f7287e/1/project/nested/side/.git
+unique.dat in copy: only copy of these bytes
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/state/t-b-base.meta
+hash-recorded copies:
+
+=== C (base): slot bundle-only; nested prior copy is ANCHORED (refs/fm/anchor) and holds a unique ignored file ===
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+0066570 unpublished work of t-c-base
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-924871/1/project/nested/side/.git
+unique.dat in copy: only copy of these bytes
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/state/t-c-base.meta
+hash-recorded copies:
+
+=== D (base): task's current copy nested in the claimed slot (enclosing), unlanded, unique ignored file; bundle + call ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-8f261d/1/project would sweep away task t-d-base's claimed pool slot /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-8f261d/1/project, whose HEAD 0673a373174ce6e259d1fd049cf8f9ed55eb275b is neither landed nor h
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-8f261d/1/project/nested/current/.git
+unique.dat in copy: only copy of these bytes
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/state/t-d-base.meta
+hash-recorded copies:
+
+=== F (base): nested prior copy, unlanded, holds ONLY machinery ignored files (node_modules, .claude/x); bundle + call ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-c61e54/1/project would sweep away task t-f-base's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-c61e54/1/project/nested/side, whose HEAD 9a64271a83d97b7d9dcc2e71656d3b715dbc8243 is ne
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/pool/.treehouse/project-c61e54/1/project/nested/side/.git
+present: /Users/charlesabrooker/tmp/fm-lab.MR0UXy/state/t-f-base.meta
+
+=== A (new): task's own returned slot, unlanded, holds a unique ignored file; bundle + call ===

@@ -1,0 +1,31 @@
+=== S6: the bundle-kept row stays held for the captain; answering it is not a landing ===
+--- t-s1 row after its bundle teardown (state / held / hold_kind / closed / links) ---
+  state: queued
+  held: yes
+  hold_kind: captain
+  closed: "-"
+  links: none
+--- the pending-close deliverable recorded for the row ---
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md:22:  Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle, no
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md:27:  Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle, no
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md:32:  Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preserved-bundles/72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29.bundle, no
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md:37:  Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4b/preserved-bundles/81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b.bundle, n
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md:42:  Deliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle, n
+--- Recently Landed BEFORE the captain answers (bearings --json --all-landed) ---
+[{"id":"t-s4g-new","artifact":"local main"},{"id":"t-s4g-base","artifact":"local main"},{"id":"t-s4e-new-1","artifact":"local main"},{"id":"t-s4e-new-0","artifact":"local main"},{"id":"t-s4e-base-1","artifact":"local main"},{"id":"t-s4e-base-0","artifact":"local main"}]
+--- captain answers t-s1: drop the commits ---
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69T9DQA5WG038MFEC5MDJ8F/bin/fm-captain-hold.sh answer t-s1 --decision-file /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.decision
+answered: t-s1
+[exit 0]
+  state: done
+  held: no
+  hold_kind: captain
+  closed: 2026-10-31
+  links: none
+--- fleet snapshot record for t-s1 (captain_drop) ---
+{"id":"t-s1","state":"done","captain_drop":false}
+--- Recently Landed AFTER the answer ---
+[{"id":"t-s4g-new","artifact":"local main"},{"id":"t-s4g-base","artifact":"local main"},{"id":"t-s4e-new-1","artifact":"local main"},{"id":"t-s4e-new-0","artifact":"local main"},{"id":"t-s4e-base-1","artifact":"local main"},{"id":"t-s4e-base-0","artifact":"local main"}]
+--- control: a really landed task (t-s4e-new-0, merged into main) for comparison ---
+  state: done
+  links: none

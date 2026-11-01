@@ -1,0 +1,50 @@
+=== S7 setup: a real bundle-route child teardown inside the secondmate home /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home ===
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle sha256=c5c19ff869578aad66f9e85b9193cf9a51
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle sha256=c5c19ff869578aad66f9e85b9193cf9a51
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle sha256=c5c19ff869578aad66f9e85b9193cf9a51
+live child c-live: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-4dd322/1/project
+stored bundle in the home: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+
+=== S7: retire the secondmate (task t-s7 in the primary lab home) ===
+--- S7a: ordinary retirement ---
+REFUSED: secondmate home /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home holds bundle-preserved commits that only its data/ keeps:
+  /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/.fm-secondmate-home
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s7.meta
+--- S7b: forced retirement (--force --drop-file) ---
+REFUSED: secondmate home /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home holds bundle-preserved commits that only its data/ keeps:
+  /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/data/c-bundled/preserved-bundles/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/.fm-secondmate-home
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home/state/c-live.meta
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-4dd322/1/project/.git
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s7.meta
+--- S7c: move the stored bundle to a durable place outside the home, then forced retirement ---
+REFUSED: unsafe child worktree removal target /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-4dd322/1/project is inside the active firstmate home
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/durable/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s7.meta
+$ git -C /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/restore-s7 bundle unbundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/durable/c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+20d12373fa3f4acdb342c420462c2ada9b0a7187 refs/heads/fm/c-bundled
+8fced081dd3cc9d727278870e28f1869040839c1 refs/heads/main
+8fced081dd3cc9d727278870e28f1869040839c1 refs/remotes/origin/HEAD
+8fced081dd3cc9d727278870e28f1869040839c1 refs/remotes/origin/main
+20d12373fa3f4acdb342c420462c2ada9b0a7187 HEAD
+8fced081dd3cc9d727278870e28f1869040839c1 main-worktree/HEAD
+[exit 0]
+
+=== S7d: after the bundle left the home: drop the live lab child inside the home, then ordinary retirement ===
+teardown c-live complete (window firstmate:fm-c-live, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-4dd322/1/project)
+[exit 0]
+teardown t-s7 complete (window firstmate:fm-t-s7, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-740b45/1/project)
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/sm-home
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/durable
+c5c19ff869578aad66f9e85b9193cf9a51ad804a1b1455e765075ece376524b0.bundle
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s7.meta

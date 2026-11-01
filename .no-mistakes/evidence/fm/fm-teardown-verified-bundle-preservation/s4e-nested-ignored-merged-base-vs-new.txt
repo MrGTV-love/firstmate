@@ -1,0 +1,46 @@
+
+=== base code, landed (merged into main and pushed) commits, nested copy with unique ignored file, preservation blocked=1 ===
+Fast-forwarding to: fm/t-s4e-base-1
+Trying simple merge with fm/t-s4e-base-1-side
+🌳 Worktree returned to pool.
+teardown t-s4e-base-1 complete (window firstmate:fm-t-s4e-base-1, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-9f5b45/1/project)
+Backlog: t-s4e-base-1 is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-9f5b45/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-9f5b45/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved copies under data/t-s4e-base-1:
+data/t-s4e-base-1/nested-copy-preserved
+
+=== base code, landed (merged into main and pushed) commits, nested copy with unique ignored file, preservation blocked=0 ===
+Fast-forwarding to: fm/t-s4e-base-0
+Trying simple merge with fm/t-s4e-base-0-side
+🌳 Worktree returned to pool.
+teardown t-s4e-base-0 complete (window firstmate:fm-t-s4e-base-0, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-efb285/1/project)
+Backlog: t-s4e-base-0 is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-efb285/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-efb285/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved copies under data/t-s4e-base-0:
+
+=== new code, landed (merged into main and pushed) commits, nested copy with unique ignored file, preservation blocked=1 ===
+Fast-forwarding to: fm/t-s4e-new-1
+Trying simple merge with fm/t-s4e-new-1-side
+🌳 Worktree returned to pool.
+teardown t-s4e-new-1 complete (window firstmate:fm-t-s4e-new-1, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-be53b7/1/project)
+Backlog: t-s4e-new-1 is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-be53b7/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-be53b7/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved copies under data/t-s4e-new-1:
+data/t-s4e-new-1/nested-copy-preserved
+
+=== new code, landed (merged into main and pushed) commits, nested copy with unique ignored file, preservation blocked=0 ===
+Fast-forwarding to: fm/t-s4e-new-0
+Trying simple merge with fm/t-s4e-new-0-side
+🌳 Worktree returned to pool.
+teardown t-s4e-new-0 complete (window firstmate:fm-t-s4e-new-0, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-dd00a6/1/project)
+Backlog: t-s4e-new-0 is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-dd00a6/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-dd00a6/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved copies under data/t-s4e-new-0:

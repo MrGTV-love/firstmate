@@ -1,0 +1,59 @@
+=== S1: one unpushed commit; verified bundle in a temporary scratch location ===
+copy: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project (treehouse pool slot)
+copy HEAD: fd0242657ecb48237f78fbd828ff117a06a22857
+--- BEFORE any bundle: ordinary teardown ---
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+fd02426 unpublished work of t-s1
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project
+$ record_bundle t-s1 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle
+[exit 0]
+record:
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle	cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9	f3a6f237e24b0734a48b2524f882fdd6bdbf6224 fd0242657ecb48237f78fbd828ff117a06a22857
+--- bundle recorded, captain's call NOT filed: ordinary teardown ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle: task t-s1 is not held for the captain's land-or-drop call naming the bundle and every recorded tip.
+Hold it for the captain, then retry ordinary teardown: bin/fm-captain-hold.sh hold t-s1 --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ t-s1\,\ tips\ fd0242657ecb48237f78fbd828ff117a06a22857:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle\,\ whose\ record\ lists\ advertised\ tips\ f3a6f237e24b0734a48b2524f882fdd6bdbf6224\ fd0242657ecb48237f78fbd828ff117a06a22857\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+fd02426 unpublished work of t-s1
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project
+backlog row held? no
+--- file the captain's call (header recipe) ---
+$ hold_call t-s1 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle f3a6f237e24b0734a48b2524f882fdd6bdbf6224 fd0242657ecb48237f78fbd828ff117a06a22857
+t-s1
+[exit 0]
+--- ordinary teardown, no --force ---
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle is held on task t-s1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle sha256=cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9 tips=f3a6f237e24b0734a48b2524f882fdd6bdbf6224 fd0242657ecb48237f78fbd828ff117a06a22857 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle is held on task t-s1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle sha256=cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9 tips=f3a6f237e24b0734a48b2524f882fdd6bdbf6224 fd0242657ecb48237f78fbd828ff117a06a22857 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle is held on task t-s1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle sha256=cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9 tips=f3a6f237e24b0734a48b2524f882fdd6bdbf6224 fd0242657ecb48237f78fbd828ff117a06a22857 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle)
+🌳 Worktree returned to pool.
+teardown t-s1 complete (window firstmate:fm-t-s1, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project)
+Backlog: t-s1 stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s1.meta
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle
+stored sha256: cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9  record sha256: cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9
+treehouse pool status:
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.sbAHl7/pool/.treehouse/project-733eb2/1/project  (detached)
+--- delete the original source bundle; restore with the documented command ---
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s1.bundle
+$ git -C /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/restore-s1 fetch /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle fd0242657ecb48237f78fbd828ff117a06a22857:refs/heads/recovered
+From /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s1/preserved-bundles/cbe0c96e79cef80fdcefebfa24f5970d887157d4a8b3a18e190d12e8604599b9.bundle
+ * [new ref]         fd0242657ecb48237f78fbd828ff117a06a22857 -> recovered
+[exit 0]
+$ git -C /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/restore-s1 show recovered:work.txt
+work of t-s1
+[exit 0]
+$ git -C /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/restore-s1 fsck --strict
+[exit 0]

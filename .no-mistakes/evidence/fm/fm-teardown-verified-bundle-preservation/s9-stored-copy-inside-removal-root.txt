@@ -1,0 +1,22 @@
+
+=== S9 (slot-checkout): data/t-s9-slot-checkout/preserved-bundles is a symlink into a removal root ===
+8 Oct 31 16:25 /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9-slot-checkout/preserved-bundles -> /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-e551c0/1/project/.store
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9-slot-checkout.bundle is held on task t-s9-slot-checkout
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9-slot-checkout.bundle: bundle is inside task copy /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-e551c0/1/project.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9-slot-checkout/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary te
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+6219584 unpublished work of t-s9-slot-checkout
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/state/t-s9-slot-checkout.meta
+slot HEAD: 621958438f461c0d55d3d22ab2bf1735c9deee67 (branch fm/t-s9-slot-checkout tip 621958438f461c0d55d3d22ab2bf1735c9deee67)
+
+=== S9 (tasktmp-like): data/t-s9-tasktmp-like/preserved-bundles is a symlink into a removal root ===
+1 Oct 31 16:26 /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9-tasktmp-like/preserved-bundles -> /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-773919/1/project
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9-tasktmp-like.bundle is held on task t-s9-tasktmp-like
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.HDM4oq.scratch/t-s9-tasktmp-like.bundle: bundle is inside task copy /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-773919/1/project.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-s9-tasktmp-like/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary tea
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+b92a5c0 unpublished work of t-s9-tasktmp-like
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/state/t-s9-tasktmp-like.meta
+slot HEAD: b92a5c01806e3f7d76323be2798b3e1ac936322c (branch fm/t-s9-tasktmp-like tip b92a5c01806e3f7d76323be2798b3e1ac936322c)

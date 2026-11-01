@@ -1,0 +1,74 @@
+=== S5: unattended cleanup cannot use the bundle route (valid bundle + call filed each time) ===
+valid bundle recorded and call filed for t-s5
+--- S5a: away mode (.afk in state) ---
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+2d1b3ce unpublished work of t-s5
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s5.meta
+--- S5b: quiet contract (.afk-contract in state) ---
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+2d1b3ce unpublished work of t-s5
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s5.meta
+--- S5c: idle reaper admission (FM_IDLE_REAP_ADMISSION=1) ---
+REFUSED: automatic reap ineligible: active: busy state unknown missing
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s5.meta
+--- S5d: supervision branch actor (FM_SUPERVISION_ACTOR=branch) ---
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+2d1b3ce unpublished work of t-s5
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s5.meta
+--- control: attended main actor, same bundle ---
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle is held on task t-s5
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s5/preserved-bundles/237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945.bundle sha256=237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945 tips=2d1b3ce2e944fddec3052cc71fdc8af799709760 37df3ef13b2cb93485c91c61ce6c0a5d3a4b4af7 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle is held on task t-s5
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s5/preserved-bundles/237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945.bundle sha256=237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945 tips=2d1b3ce2e944fddec3052cc71fdc8af799709760 37df3ef13b2cb93485c91c61ce6c0a5d3a4b4af7 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle is held on task t-s5
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s5/preserved-bundles/237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945.bundle sha256=237a6db7f0adfc11d01743ebff9489bb75fe76cbc9edcae44270110d2a1ce945 tips=2d1b3ce2e944fddec3052cc71fdc8af799709760 37df3ef13b2cb93485c91c61ce6c0a5d3a4b4af7 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s5.bundle)
+🌳 Worktree returned to pool.
+teardown t-s5 complete (window firstmate:fm-t-s5, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-6803d3/1/project)
+Backlog: t-s5 stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s5.meta
+
+=== S8: --force with NO bundle, BASE vs NEW code ===
+--- base: --force without --drop-file ---
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+[exit 1]
+--- base: --force --drop-file ---
+🌳 Worktree returned to pool.
+teardown t-s8-base complete (window firstmate:fm-t-s8-base, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-dca0f0/1/project)
+Backlog: t-s8-base is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s8-base.meta
+slot HEAD: 2d6aed0491b0e23fd3220cff17a7255bc75524ed  main: 2d6aed0491b0e23fd3220cff17a7255bc75524ed
+  state: done
+  held: no
+  links: none
+--- new: --force without --drop-file ---
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+[exit 1]
+--- new: --force --drop-file ---
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69T9DQA5WG038MFEC5MDJ8F/bin/fm-home-summary-refresh.sh: child setpgid (24483 to 24483): Operation not permitted
+teardown t-s8-new complete (window firstmate:fm-t-s8-new, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-1dd38f/1/project)
+Backlog: t-s8-new is closed in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s8-new.meta
+slot HEAD: c8d15f4c5ec13ff4b715137db208be111a8129e7  main: c8d15f4c5ec13ff4b715137db208be111a8129e7
+  state: done
+  held: no
+  links: none

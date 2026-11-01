@@ -1,0 +1,36 @@
+
+=== base code, landed commits, nested copy with unique ignored file, preservation blocked=1 ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-98ed5e/1/project would sweep away task t-s4d-base-1's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-98ed5e/1/project/.claude/worktrees/side, whose HEAD 91d1b66136e1557cd30f4ae2c0b878f66f7546fb is neither landed nor held by a refs/fm/anchor/t-s4d-base-1-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-98ed5e/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved copies under data/t-s4d-base-1:
+data/t-s4d-base-1/nested-copy-preserved
+
+=== base code, landed commits, nested copy with unique ignored file, preservation blocked=0 ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-ba796e/1/project would sweep away task t-s4d-base-0's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-ba796e/1/project/.claude/worktrees/side, whose HEAD a484be18719fb6d147ef3954a092372703569591 is neither landed nor held by a refs/fm/anchor/t-s4d-base-0-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-ba796e/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved copies under data/t-s4d-base-0:
+
+=== new code, landed commits, nested copy with unique ignored file, preservation blocked=1 ===
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-b73bf4/1/project would sweep away task t-s4d-new-1's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-b73bf4/1/project/.claude/worktrees/side, whose HEAD 3b4c32a551f699077b1d43a4c9a301aa16dfa769 is neither landed nor held by a refs/fm/anchor/t-s4d-new-1-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-b73bf4/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved copies under data/t-s4d-new-1:
+data/t-s4d-new-1/nested-copy-preserved
+
+=== new code, landed commits, nested copy with unique ignored file, preservation blocked=0 ===
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-f6ee73/1/project would sweep away task t-s4d-new-0's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-f6ee73/1/project/.claude/worktrees/side, whose HEAD 3cd49111f2eb0bb872ef7c9e7bd29d97b196c31e is neither landed nor held by a refs/fm/anchor/t-s4d-new-0-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-f6ee73/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved copies under data/t-s4d-new-0:

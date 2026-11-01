@@ -1,0 +1,44 @@
+=== S2: copy with two locally-only tips (HEAD + task archive branch) ===
+HEAD tip: 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+archive tip (archive/t-s2-submitted-deadbeef): 17bf92f249120a531742a1bd0f8434db097fc11a
+--- bundle lists ONLY the HEAD tip (git bundle create <b> fm/t-s2) ---
+$ record_bundle t-s2 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle fm/t-s2
+[exit 0]
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle	534ab281455b2e6ca27a3891c38bf2825410138f1da3bf3ce23c9c9cd76501c7	8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+$ hold_call t-s2 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+t-s2
+[exit 0]
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle: bundle does not list unlanded tip 17bf92f249120a531742a1bd0f8434db097fc11a.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+8911a3a unpublished work of t-s2
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s2.meta
+slot HEAD: 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+--- re-bundle with --all (lists both tips), re-file the call ---
+$ record_bundle t-s2 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle --all
+[exit 0]
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle	8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261	17bf92f249120a531742a1bd0f8434db097fc11a 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+$ hold_call t-s2 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle 17bf92f249120a531742a1bd0f8434db097fc11a 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78
+t-s2
+[exit 0]
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle is held on task t-s2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle sha256=8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261 tips=17bf92f249120a531742a1bd0f8434db097fc11a 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle)
+notice: keeping archive/t-s2-submitted-deadbeef (merged PR head and matching merge content could not be proven)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle is held on task t-s2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle sha256=8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261 tips=17bf92f249120a531742a1bd0f8434db097fc11a 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle is held on task t-s2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle sha256=8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261 tips=17bf92f249120a531742a1bd0f8434db097fc11a 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78 (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s2.bundle)
+🌳 Worktree returned to pool.
+teardown t-s2 complete (window firstmate:fm-t-s2, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-45ef52/1/project)
+Backlog: t-s2 stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s2.meta
+slot HEAD now: 1d6e2d903c7f0c3217c45d38665bc06ca58c9968 (main is 1d6e2d903c7f0c3217c45d38665bc06ca58c9968)
+$ git -C /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/restore-s2 fetch /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle 8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78:refs/heads/r1 17bf92f249120a531742a1bd0f8434db097fc11a:refs/heads/r2
+From /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s2/preserved-bundles/8a82b93db4af5288858070dcb8cf1e52b34194721c9c13e3130354925a2b7261.bundle
+ * [new ref]         8911a3a34c827d52524cdfd3d7ae7a0ba4fe9f78 -> r1
+ * [new ref]         17bf92f249120a531742a1bd0f8434db097fc11a -> r2
+[exit 0]

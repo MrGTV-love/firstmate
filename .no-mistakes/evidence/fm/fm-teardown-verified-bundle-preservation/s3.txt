@@ -1,0 +1,136 @@
+=== S3: invalid bundle or record shapes keep the refusal (call filed for the valid bundle) ===
+
+--- case: recorded sha256 does not match the bundle ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle: bundle sha256 does not match record.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: truncated bundle (git bundle verify fails), digest re-recorded ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle: bundle cannot be restored in an isolated repository.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: bundle lacks the copy's unlanded tip (bundle of main only) ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle: bundle does not list unlanded tip c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: record has two lines ---
+teardown: bundle preservation unavailable: malformed preservation record in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv (exactly one line required).
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: malformed record line (two fields) ---
+teardown: bundle preservation unavailable: malformed preservation record in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv (expected absolute path, SHA-256 and full tips in three TAB-separated fields).
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: empty record ---
+teardown: bundle preservation unavailable: empty preservation record: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: relative bundle path in record ---
+teardown: bundle preservation unavailable: relative.bundle: bundle path is not absolute.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: no record under the task's data directory ---
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: source bundle is a symlink ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle: bundle is not a regular nonsymlink file.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- case: bundle path inside the copy, call not re-filed for it (copy then dirty) ---
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-ff1976/1/project has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  inside.bundle
+Commit them (or get the captain's explicit OK to discard, then --force).
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+slot HEAD: c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+
+--- control: the good record and bundle restored; ordinary teardown ---
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle: bundle is not a regular nonsymlink file.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c5ddf7a unpublished work of t-s3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta
+
+=== S3 control (re-run after fixing the lab script's leftover symlink) ===
+-rw-r--r--  1 charlesabrooker  staff  808 Oct 31 15:44 /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle
+/Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle	72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29	9c538e6a1e6102ca0e57b1503d41add12aa5d8f2 c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df
+--- control: good record and regular bundle; ordinary teardown ---
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle is held on task t-s3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preserved-bundles/72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29.bundle sha256=72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29 tips=9c538e6a1e6102ca0e57b1503d41add12aa5d8f2 c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle is held on task t-s3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preserved-bundles/72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29.bundle sha256=72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29 tips=9c538e6a1e6102ca0e57b1503d41add12aa5d8f2 c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle is held on task t-s3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s3/preserved-bundles/72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29.bundle sha256=72eee54b3bee20996b9f42e38a6e42b94b9df51ea0135ba84a8758b5cf525f29 tips=9c538e6a1e6102ca0e57b1503d41add12aa5d8f2 c5ddf7a40fa82c70ce0c7ed7cf61ed8d25f552df (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s3.bundle)
+🌳 Worktree returned to pool.
+teardown t-s3 complete (window firstmate:fm-t-s3, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-ff1976/1/project)
+Backlog: t-s3 stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s3.meta

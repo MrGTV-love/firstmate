@@ -1,0 +1,96 @@
+
+=== base code | unlanded nested prior copy at <slot>/.claude/worktrees/side | unique ignored file | bundle+call recorded | preservation blocked=0 (t-h1) ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-291379/1/project would sweep away task t-h1's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-291379/1/project/.claude/worktrees/side, whose HEAD 9d3d5764d4a1725b52f
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-291379/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved files under data/t-h1/nested-copy-preserved:
+
+=== base code | unlanded nested prior copy at <slot>/.claude/worktrees/side | unique ignored file | bundle+call recorded | preservation blocked=1 (t-h2) ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-dacdbc/1/project would sweep away task t-h2's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-dacdbc/1/project/.claude/worktrees/side, whose HEAD 54308ce21330fb842de
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-dacdbc/1/project/.claude/worktrees/side/.git
+unique.dat in copy: only copy of these bytes
+preserved files under data/t-h2/nested-copy-preserved:
+data/t-h2/nested-copy-preserved
+
+=== new code | unlanded nested prior copy at <slot>/.claude/worktrees/side | unique ignored file | bundle+call recorded | preservation blocked=0 (t-h3) ===
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h3/preserved-bundles/9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07.bundle sha256=9f640f11969e9ff9da821d40bdbf1e446cff33c10e3d5cba74573db82d3d0c07 tips=2a3873f8370b1d187e20e6443bf97986be1
+teardown t-h3 complete (window firstmate:fm-t-h3, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0c3dd0/1/project)
+Backlog: t-h3 stays open in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0c3dd0/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0c3dd0/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved files under data/t-h3/nested-copy-preserved:
+
+=== new code | unlanded nested prior copy at <slot>/.claude/worktrees/side | unique ignored file | bundle+call recorded | preservation blocked=1 (t-h4) ===
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h4/preserved-bundles/0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130.bundle sha256=0cd4b5db427b2e003ea67c755fc1633dadc5e0702276ce1551f385223f5e9130 tips=7e179781cd37ada3f9d3938d72b947aa293
+teardown t-h4 complete (window firstmate:fm-t-h4, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-ac3d3e/1/project)
+Backlog: t-h4 stays open in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-ac3d3e/1/project/.claude/worktrees/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-ac3d3e/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+preserved files under data/t-h4/nested-copy-preserved:
+data/t-h4/nested-copy-preserved
+
+=== base code | unlanded nested prior copy at <slot>/nested/side | unique ignored file | bundle+call recorded | preservation blocked=0 (t-h5) ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0648fe/1/project would sweep away task t-h5's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0648fe/1/project/nested/side, whose HEAD 7d485cab4860d06965cc03b23bb1ef
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-0648fe/1/project/nested/side/.git
+unique.dat in copy: only copy of these bytes
+preserved files under data/t-h5/nested-copy-preserved:
+
+=== base code | unlanded nested prior copy at <slot>/nested/side | unique ignored file | bundle+call recorded | preservation blocked=1 (t-h6) ===
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-92e936/1/project would sweep away task t-h6's recorded prior_worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-92e936/1/project/nested/side, whose HEAD e910eff2ecd475a00b6c59e83f1e0b
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-92e936/1/project/nested/side/.git
+unique.dat in copy: only copy of these bytes
+preserved files under data/t-h6/nested-copy-preserved:
+data/t-h6/nested-copy-preserved
+
+=== new code | unlanded nested prior copy at <slot>/nested/side | unique ignored file | bundle+call recorded | preservation blocked=0 (t-h7) ===
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h7/preserved-bundles/1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01.bundle sha256=1a5aaa67577e079a39fc1b15f315da88c9a408b75c0b98a02a73d71e9c56da01 tips=7837772b7eceeb9a89c15793901ddc28c1f
+teardown t-h7 complete (window firstmate:fm-t-h7, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-af1560/1/project)
+Backlog: t-h7 stays open in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-af1560/1/project/nested/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-af1560/1/project/nested/side/unique.dat: No such file or directory
+preserved files under data/t-h7/nested-copy-preserved:
+
+=== new code | unlanded nested prior copy at <slot>/nested/side | unique ignored file | bundle+call recorded | preservation blocked=1 (t-h8) ===
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/t-h8/preserved-bundles/15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c.bundle sha256=15d98e3fa20341c1cd8ec1d0dd23dfbb09f2581248a0b687cf5ea39a9fef829c tips=2f92b75414c045fcd4a318fa97738b1df81
+teardown t-h8 complete (window firstmate:fm-t-h8, worktree /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-7436cd/1/project)
+Backlog: t-h8 stays open in /Users/charlesabrooker/tmp/fm-lab.HDM4oq/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-7436cd/1/project/nested/side/.git
+unique.dat in copy: cat: /Users/charlesabrooker/tmp/fm-lab.HDM4oq/pool/.treehouse/project-7436cd/1/project/nested/side/unique.dat: No such file or directory
+preserved files under data/t-h8/nested-copy-preserved:
+data/t-h8/nested-copy-preserved

@@ -1,0 +1,53 @@
+=== S4a: valid bundle, copy has an uncommitted tracked change ===
+valid bundle recorded and call filed for t-s4a
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-a109dd/1/project has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+[exit 1]
+present: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s4a.meta
+copy work.txt now:
+work of t-s4a
+unsaved edit
+
+=== S4b: valid bundle, a live process has its cwd inside the copy ===
+valid bundle recorded and call filed for t-s4b
+live process pid 46300 cwd: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-e40667/1/project
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle is held on task t-s4b
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4b/preserved-bundles/81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b.bundle sha256=81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b tips=3517c462bc10fdd401ce34da8698e533199f8f0e 3fbe3c28757697442b834535d5ab8fd0d9ac808b (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle)
+teardown: reaping leaked worktree process(es) for t-s4b: 46300
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle is held on task t-s4b
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4b/preserved-bundles/81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b.bundle sha256=81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b tips=3517c462bc10fdd401ce34da8698e533199f8f0e 3fbe3c28757697442b834535d5ab8fd0d9ac808b (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle is held on task t-s4b
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4b/preserved-bundles/81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b.bundle sha256=81818bf97f14ba83ac647c60bad43377145fc287b156ddec7ffce59e4562d71b tips=3517c462bc10fdd401ce34da8698e533199f8f0e 3fbe3c28757697442b834535d5ab8fd0d9ac808b (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4b.bundle)
+🌳 Worktree returned to pool.
+teardown t-s4b complete (window firstmate:fm-t-s4b, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-e40667/1/project)
+Backlog: t-s4b stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+/tmp/claude-bundle-lab/run.sh: line 8: 46300 Terminated: 15          ( cd "$COPY" && exec sleep 600 )
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s4b.meta
+process 46300 is gone
+
+=== S4c: valid bundle on a nested prior copy that holds a unique ignored file ===
+bundle verifies
+--- S4c-1: ignored-file preservation blocked (a plain file sits where data/t-s4c/nested-copy-preserved must be a directory) ---
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle is held on task t-s4c
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/t-s4c/preserved-bundles/03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3.bundle sha256=03bd678bafba7bcd14001913cc333da4dedb7ba486c33ecff39c767559a412b3 tips=0b435c1ed646f606ed1a191dd074e7cbdb16fe5f 3756ab5ea833d9985de8a8575f8ab700e0d3fdbc d2f247259008c9a6a2469831650e3fddb5f64f2d (source /Users/charlesabrooker/tmp/fm-lab.sbAHl7.scratch/t-s4c.bundle)
+🌳 Worktree returned to pool.
+teardown t-s4c complete (window firstmate:fm-t-s4c, worktree /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-78e2fd/1/project)
+Backlog: t-s4c stays open in /Users/charlesabrooker/tmp/fm-lab.sbAHl7/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[exit 0]
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-78e2fd/1/project/.claude/worktrees/side/.git
+unique.dat: cat: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/pool/.treehouse/project-78e2fd/1/project/.claude/worktrees/side/unique.dat: No such file or directory
+ABSENT: /Users/charlesabrooker/tmp/fm-lab.sbAHl7/state/t-s4c.meta
