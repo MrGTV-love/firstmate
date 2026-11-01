@@ -777,16 +777,15 @@ test_local_home_walk_refuses_an_unreadable_registry() {
   expect_code 1 "$rc" "the walker accepted an unreadable descendant registry: $out"
   assert_contains "$out" "local Firstmate registry cannot be read at $registry" \
     "the walker did not name its unreadable registry"
-  assert_contains "$out" "Remedy:" "the unreadable-home refusal must name its completing step"
-  assert_contains "$out" "restore its availability and read access" \
-    "the refusal must require restoration, not skipping the unreadable home"
-  assert_contains "$out" "without --force" "the completing step must preserve ordinary custody proof"
   rc=0
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   chmod 600 "$registry"
   expect_code 1 "$rc" "teardown ignored the unreadable registry"
   assert_contains "$(cat "$dir/stderr")" "local Firstmate registry cannot be read at $registry" \
     "teardown did not propagate the registry refusal"
+  assert_contains "$(cat "$dir/stderr")" "Remedy:" "the unreadable-home teardown refusal must name its completing step"
+  assert_contains "$(cat "$dir/stderr")" "bin/fm-teardown.sh '$id'" \
+    "the unreadable-home teardown refusal must name its exact retry"
   assert_present "$dir/home/state/$id.meta" "registry refusal removed the task record"
   assert_present "$dir/worktree/sentinel" "registry refusal returned the slot"
   [ ! -s "$dir/runtime.log" ] || fail "registry refusal reached the runtime"

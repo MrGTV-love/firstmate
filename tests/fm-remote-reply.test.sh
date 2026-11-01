@@ -1161,9 +1161,9 @@ assert_absent "$PARENT/state/procevent/$SID.source" \
 remedy_count=0
 while IFS= read -r remedy; do
   case "$remedy" in
-    'Remedy: FM_HOME='*)
+    'FM_HOME='*)
       remedy_count=$((remedy_count + 1))
-      remote_env bash -c "${remedy#Remedy: }" >/dev/null 2>&1 || [ "$?" -eq 3 ] \
+      remote_env bash -c "$remedy" >/dev/null 2>&1 || [ "$?" -eq 3 ] \
         || fail "the printed pending-result remedy did not handle its exact capture"
       ;;
   esac

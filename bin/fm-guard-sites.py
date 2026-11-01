@@ -11,8 +11,9 @@ Usage:
 
 Output is one JSON object on stdout:
   paths      the scanned files, relative to the root
-  sites      one record per site: key, file, line, sig, text, entry, touched,
-             remedy and inclusive remedy_spans (diagnostic plus local helper bodies)
+  sites      one record per site: key, file, line, sig, text, entry, touched (its own
+             line changed), remedy, inclusive remedy_spans (diagnostic plus local
+             helper bodies) and remedy_touched (a span line or deletion boundary changed)
   errors     mapping problems: rule, id, message
   helpers    the refusal helper names the scan derived from the code
 
@@ -528,7 +529,7 @@ def site_key(rel, text, seen):
 
 
 def touched_lines(root, ref, rels):
-    """File -> changed new-side lines/deletion boundaries; None when the file is new."""
+    """File -> changed new-side lines (None when the file is new), and file -> deletion boundaries."""
     def git(*args):
         return subprocess.run(['git', '-C', root] + list(args), capture_output=True, text=True)
 
@@ -536,7 +537,7 @@ def touched_lines(root, ref, rels):
     if probe.returncode != 0:
         print('error: cannot resolve base ref %r' % ref, file=sys.stderr)
         sys.exit(2)
-    changed = {}
+    changed, boundaries = {}, {}
     diff = git('diff', '-U0', '--no-color', '--no-ext-diff', '--no-prefix', ref, '--', *rels)
     current = None
     for row in diff.stdout.split('\n'):
@@ -554,12 +555,12 @@ def touched_lines(root, ref, rels):
                 else:
                     # A deleted footer has no new-side lines; retain both sides
                     # of its boundary so an unchanged caller cannot hide it.
-                    changed[current].update((max(1, start), start + 1))
+                    boundaries.setdefault(current, set()).update((max(1, start), start + 1))
     untracked = git('ls-files', '--others', '--exclude-standard', '--', *rels).stdout.split('\n')
     for rel in untracked:
         if rel:
             changed[rel] = None
-    return changed
+    return changed, boundaries
 
 
 def map_sites(sites, registry):
@@ -645,15 +646,19 @@ def main(argv):
         for number, sig, text in discovered:
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
                           'text': text[:200], 'text_full': text, 'entry': None, 'touched': False,
-                          'remedy': remedies[number][0], 'remedy_spans': remedies[number][1]})
+                          'remedy': remedies[number][0], 'remedy_spans': remedies[number][1],
+                          'remedy_touched': False})
     errors = map_sites(sites, registry)
 
     if touched_ref:
-        changed = touched_lines(root, touched_ref, files)
+        changed, boundaries = touched_lines(root, touched_ref, files)
         for site in sites:
             lines = changed.get(site['file'], set())
-            site['touched'] = lines is None or any(start <= line <= end
-                                                   for start, end in site['remedy_spans'] for line in lines)
+            site['touched'] = lines is None or site['line'] in lines
+            if lines is not None:
+                lines = lines | boundaries.get(site['file'], set())
+            site['remedy_touched'] = lines is None or any(start <= line <= end
+                                                          for start, end in site['remedy_spans'] for line in lines)
 
     for site in sites:
         del site['text_full']

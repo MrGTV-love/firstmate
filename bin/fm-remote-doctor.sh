@@ -881,7 +881,7 @@ start_herdr_server() {
     fix_report herdr-server applied "started the herdr server for session $HERDR_SESSION_NAME"
     return 0
   fi
-  fix_report herdr-server failed "$(fm_backend_herdr_server_ensure_failure "$rc" "$HERDR_SESSION_NAME"): $err"
+  fix_report herdr-server failed "$(fm_backend_herdr_server_ensure_failure "$rc" "$HERDR_SESSION_NAME" "$err")"
   return 1
 }
 

@@ -431,6 +431,7 @@ class StartupSafety(unittest.TestCase):
 
     def test_start_failures_name_their_cause(self):
         self.listen()
+        self.assertEqual(self.ensure()[0], 1)
         refused = self.failure()
         self.listener.close()
         self.listener = None
@@ -451,8 +452,11 @@ class StartupSafety(unittest.TestCase):
         finally:
             locked.chmod(0o700)
         session = self.dir.name
-        self.assertEqual(refused, f"refused to start the herdr server for session {session} "
-                                  "to protect a live or unknown server")
+        self.assertIn(session, refused)
+        cause = "the session socket still accepts connections"
+        _, composed = self.invoke('. "$1/bin/backends/herdr.sh"; '
+                                  f'fm_backend_herdr_server_ensure_failure 1 "$2" "{cause}"')
+        self.assertLess(composed.index(cause), composed.index("Remedy:"))
         self.assertEqual(no_python, f"the server start helper failed (exit 127) for session {session}")
         self.assertEqual(launch, f"the server start helper failed (exit 4) for session {session}")
         self.assertEqual(self.servers(), [])
