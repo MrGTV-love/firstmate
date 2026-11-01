@@ -325,13 +325,14 @@ The cost lands whenever no claim is open at the end of the wait, not only when t
 Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and it adds up over the Stops of one failure episode:
 
 - Every exit-2 decision on the Claude Stop-hook path must charge the same persisted budget, capped at three blocks per session failure episode by default.
-- The fourth unsupervised Stop allows with an attended failure diagnostic, even without an auto-arm failure notice, in away mode, or after the episode alarm was already recorded.
+- The fourth unsupervised Stop allows with an attended failure diagnostic and records a `warn` guard event with `cleared_by` `budget-exhausted`, even without an auto-arm failure notice, in away mode, or after the episode alarm was already recorded.
 - If the budget cannot be locked or written, no bound on another block can be proved, so the guard never blocks that Stop: it allows it, prints the repair command once as a warning, and records a `warn` guard event with `cleared_by` `budget-unavailable`.
 - A proven live supervisor always allows; failed episode-reset bookkeeping remains for a later retry and never changes that verdict.
 
 Budget exhaustion never reports supervision as restored.
 The diagnostic requires attended diagnosis of the automatic mechanism and episode bookkeeping before unattended supervision is trusted again.
-The alarm marker still suppresses further automatic failure continuations, but later unsupervised Stops remain loud without restarting the exhausted budget.
+Only a verified failure episode records the alarm marker: a failure notice plus a failed epoch, outside away mode.
+That marker suppresses further automatic failure continuations, and later unsupervised Stops remain loud without restarting the exhausted budget either way.
 
 These are nominal floors; wall time can stretch about 9 times under load.
 The wait ends before the full 12 seconds only when the watcher is healthy, the auto-arm's generation claim is open, a legacy build's lock-holding claim is live, or a fresh actionable rewake is recorded.
@@ -413,6 +414,7 @@ When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_
 This is the guard's own block budget for the Claude Stop-hook path, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.
 [Compatibility limits](#compatibility-limits) names the other harnesses' bound.
 In Claude mode, positive watcher recovery allows the stop and clears the block budget, failure notice, and attended alarm together under the existing budget lock; a contended or failed clear leaves that bookkeeping for a later retry and never blocks the supervised stop.
+An idle verdict allows the stop and clears nothing, because only a live watcher or away daemon ends a failure episode.
 
 The block budget is charged by two rules:
 
@@ -433,10 +435,13 @@ On the Claude Stop-hook path, the loud attended fail-open applies when both of t
 - A final check finds neither a healthy watcher nor an automatic continuation.
 
 It needs no recorded auto-arm failure or consumed notice, and it applies in away mode too.
-The first such Stop records the attended alarm.
+Every such Stop allows with the same loud diagnostic, records a `warn` guard event with `cleared_by` `budget-exhausted`, and never restarts the exhausted budget.
+
+The first such Stop of a verified failure episode records the attended alarm.
+A verified episode has a failure notice and a `failed` or `failed-suppressed` epoch, outside away mode.
 After that alarm, the Stop auto-arm suppresses further exit-2 continuations until positive watcher recovery.
-Every later unsupervised Stop in that episode allows with the same loud diagnostic and never restarts the exhausted budget.
-A positively verified healthy watcher clears the failure notice, alarm, and block budget for a future independent episode.
+An unverified exhausted budget records no alarm, so the auto-arm still delivers a later wake.
+A positively verified healthy watcher or away daemon clears the failure notice, alarm, and block budget for a future independent episode.
 A Claude failure notice describes the automatic mechanism as broken and does not direct a routine manual background arm.
 
 ### Passive adapters
@@ -573,6 +578,9 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - The cooperative `--claude` open-generation claim wait.
 - Monotonic failed-epoch progression.
 - Bounded attended fail-open on the Claude Stop-hook path.
+- The attended alarm limited to a verified failure episode, including the away-mode exclusion.
+- An idle verdict leaving the failure episode open at every reset site.
+- A `warn` guard event on each Stop past the block budget.
 - The same bound against a ledger frozen by an inert auto-arm with and without a verified failure episode.
 - Post-alarm continuation suppression.
 - Positive recovery reset.

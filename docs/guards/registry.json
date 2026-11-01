@@ -153,6 +153,7 @@
       "sites": [
         {"file": "bin/fm-turnend-guard.sh", "match": "guard_event deny --source-ok \"$source_ok\""},
         {"file": "bin/fm-turnend-guard.sh", "match": "--cleared-by budget-unavailable"},
+        {"file": "bin/fm-turnend-guard.sh", "match": "--cleared-by budget-exhausted"},
         {"file": "bin/fm-turnend-guard.sh", "match": "[ \"$COUNT\" -gt \"$BLOCK_BUDGET\" ] || block_stop"}
       ],
       "invariant": "on the Claude Stop-hook path, a primary without live supervision receives at most three charged blocks per failure episode, then an attended failure diagnostic, and a budget that cannot be locked or written never blocks: it allows with one repair warning and a reasoned warn event; other harnesses keep their per-turn loop suppression and have no per-episode budget; live supervision never blocks on episode bookkeeping",

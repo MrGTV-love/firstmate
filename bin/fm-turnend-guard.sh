@@ -47,7 +47,8 @@
 # 300s window under load (a slow registered check, a busy supervisor pane) with
 # the daemon perfectly healthy throughout. The strict watcher predicate and
 # $GRACE are unchanged everywhere else, including for a dead daemon pid or a
-# beacon older than AFK_GRACE, which still block.
+# beacon older than AFK_GRACE, which still prove no live owner: they block, and
+# on the Claude Stop-hook path only inside its block budget.
 #
 # Loop-guard, codex/Grok (default) mode: never block twice in the same turn.
 # Codex uses stop_hook_active and Grok uses stopHookActive; typed camel-case
@@ -83,19 +84,22 @@
 #      the first fresh exhausted-failure epoch preserves the bounded progression,
 #      while later fresh failed epochs consume it instead of resetting it;
 #   4. only when neither materializes is the auto-arm genuinely absent: re-block
-#      with the repair banner, bounded to FM_CLAUDE_TURNEND_BLOCK_BUDGET
-#      (default 3) consecutive blocks per session - below Claude Code's default
-#      cap of eight consecutive continuations - then allow with a loud attended
-#      diagnostic. A missing failure notice or failed bookkeeping cannot extend
-#      that budget; a budget that cannot be locked or written proves no bound,
-#      so that stop allows with one repair warning and a warn guard event.
-#      Positive supervision allows even if episode reset fails.
+#      with the repair banner, bounded by the guard's own budget of
+#      FM_CLAUDE_TURNEND_BLOCK_BUDGET (default 3) charged blocks per session
+#      failure episode, then allow with a loud attended diagnostic and a warn
+#      guard event. Only a verified failure episode (failure notice plus failed
+#      epoch, outside away mode) records the attended alarm. A missing failure
+#      notice or failed bookkeeping cannot extend that budget; a budget that
+#      cannot be locked or written proves no bound, so that stop allows with one
+#      repair warning and a warn guard event.
+#      Positive supervision allows even if episode reset fails; only a live
+#      watcher or away daemon clears the episode, and an idle verdict leaves it.
 #      The budget
 #      charges each event epoch once, and it also charges every re-block
 #      against an epoch the auto-arm never advanced past the previous
 #      re-block (budget_account_current_epoch owns that rule), so an inert
 #      hook that leaves the ledger frozen cannot hold the guard in an
-#      unbounded re-block loop below that override.
+#      unbounded re-block loop.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -251,14 +255,21 @@ guard_event_allow() {
   guard_event allow --source-ok "${FM_SUP_SOURCE_OK:-true}" --cleared-by continue
 }
 
+# Episode state is bookkeeping, not a supervision proof. Only a live watcher or
+# away daemon ends the episode: an idle verdict leaves it open. Leave it intact
+# for a later reset when contended or unwritable; never block a live owner.
+episode_reset_if_supervised() {  # [held]
+  case "$FM_SUP_REASON" in
+    watcher|away-daemon) fm_failure_episode_reset "$STATE" "$@" || true ;;
+  esac
+}
+
 # One owner of the "supervision is on, let this turn end" exit contract, shared
 # by every proof of supervision below.
 allow_supervised_stop() {
   [ "$CLAUDE_MODE" -eq 1 ] || exit 0
   guard_event_allow
-  # Episode state is bookkeeping, not a supervision proof. Leave it intact
-  # for a later reset when contended or unwritable; never block a live owner.
-  fm_failure_episode_reset "$STATE" || true
+  episode_reset_if_supervised
   exit 0
 }
 
@@ -266,7 +277,8 @@ allow_supervised_stop() {
 # beacon-age, lock-owner, and away/quiet-daemon checks this guard used to
 # compose inline: a live identity-matched watcher, or away/quiet mode's live
 # daemon with a beacon inside the poll-derived grace. A live verdict is the only
-# thing that lets this turn end here; off and unknown keep blocking below.
+# thing that lets this turn end here; off and unknown continue below, where a
+# non-Claude harness blocks and the Claude Stop-hook path blocks inside its budget.
 fm_supervision_liveness "$STATE" "$GRACE" "$WATCH" "$FM_HOME"
 if [ "$FM_SUP_LIVE" != live ]; then
   SUP_EPISODE_UNHEALTHY=1
@@ -413,7 +425,6 @@ budget_account_current_epoch() {  # [observe|block]
       *) COUNT=1 ;;
     esac
   fi
-  [ "$COUNT" -le "$BLOCK_BUDGET" ] || COUNT=$((BLOCK_BUDGET + 1))
   tmp="$BUDGET_FILE.tmp.$$"
   if ! printf 'session=%s\ncount=%s\nepoch=%s\n' "$SESSION_ID" "$COUNT" "$current_epoch" > "$tmp" 2>/dev/null \
     || ! mv -f "$tmp" "$BUDGET_FILE" 2>/dev/null; then
@@ -488,6 +499,7 @@ autoarm_owns_recovery() {
 terminal_fail_open() {
   local pid role old_session old_count
   [ "$COUNT" -gt "$BLOCK_BUDGET" ] || return 1
+  failure_episode_verified || return 1
   [ ! -e "$FAILURE_ALARM" ] || return 1
   # A live open generation claim is a concurrent recovery decision to step
   # aside for, exactly like the legacy live-owner case below.
@@ -524,14 +536,14 @@ terminal_fail_open() {
   esac
   role=$(fm_lock_role "$OWNER_LOCK" 2>/dev/null || true)
   if [ "$role" != terminal-check ] || [ "$old_session" != "$SESSION_ID" ] \
-    || [ "$old_count" -le "$BLOCK_BUDGET" ] \
+    || [ "$old_count" -le "$BLOCK_BUDGET" ] || ! failure_episode_verified \
     || [ -e "$FAILURE_ALARM" ]; then
     fm_lock_release "$BUDGET_LOCK"
     fm_lock_release "$OWNER_LOCK"
     return 1
   fi
   if supervision_live; then
-    fm_failure_episode_reset "$STATE" held || true
+    episode_reset_if_supervised held
     fm_lock_release "$BUDGET_LOCK"
     fm_lock_release "$OWNER_LOCK"
     return 2
@@ -555,11 +567,22 @@ terminal_fail_open() {
   return 0
 }
 
+failure_episode_verified() {
+  local outcome
+  [ ! -e "$STATE/.afk" ] || return 1
+  [ -e "$FAILURE_NOTICE" ] || return 1
+  outcome=$(sed -n '1s/^.*outcome=\([a-z][a-z-]*\) .*$/\1/p' "$STATE/.claude-autoarm-epoch" 2>/dev/null || true)
+  case "$outcome" in
+    failed|failed-suppressed) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 i=0
 while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   if autoarm_owns_recovery; then
     if supervision_live; then
-      fm_failure_episode_reset "$STATE" || true
+      episode_reset_if_supervised
     fi
     guard_event_allow
     exit 0
@@ -569,7 +592,7 @@ while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
 done
 if autoarm_owns_recovery; then
   if supervision_live; then
-    fm_failure_episode_reset "$STATE" || true
+    episode_reset_if_supervised
   fi
   guard_event_allow
   exit 0
@@ -590,21 +613,21 @@ budget_account_current_epoch block || allow_unbudgeted_stop
 [ "$COUNT" -gt "$BLOCK_BUDGET" ] || block_stop
 terminal_fail_open
 terminal_status=$?
-if [ "$terminal_status" -ne 2 ]; then
-  if [ "$FM_SUP_IN_FLIGHT" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_IN_FLIGHT task(s) in flight"
-  elif [ "$FM_SUP_SOURCES" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_SOURCES process-event source(s) registered"
-  elif [ "$FM_SUP_CHECKS" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_CHECKS registered custom check(s)"
-  elif [ "$FM_SUP_QUEUE_PENDING" = true ]; then
-    NEED_DESC="unread wake(s) queued"
-  else
-    NEED_DESC="X-mode relay polling active"
-  fi
-  printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkeeping, before relying on unattended supervision."}\n' "$NEED_DESC"
+if [ "$terminal_status" -eq 2 ]; then
   guard_event_allow
   exit 0
 fi
-guard_event_allow
+if [ "$FM_SUP_IN_FLIGHT" -gt 0 ]; then
+  NEED_DESC="$FM_SUP_IN_FLIGHT task(s) in flight"
+elif [ "$FM_SUP_SOURCES" -gt 0 ]; then
+  NEED_DESC="$FM_SUP_SOURCES process-event source(s) registered"
+elif [ "$FM_SUP_CHECKS" -gt 0 ]; then
+  NEED_DESC="$FM_SUP_CHECKS registered custom check(s)"
+elif [ "$FM_SUP_QUEUE_PENDING" = true ]; then
+  NEED_DESC="unread wake(s) queued"
+else
+  NEED_DESC="X-mode relay polling active"
+fi
+printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkeeping, before relying on unattended supervision."}\n' "$NEED_DESC"
+guard_event warn --source-ok "${FM_SUP_SOURCE_OK:-true}" --cleared-by budget-exhausted
 exit 0
