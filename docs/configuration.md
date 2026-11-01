@@ -112,6 +112,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
+- The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
 
@@ -2230,6 +2231,38 @@ When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record,
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 
+## Host memory admission
+
+On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
+Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
+Every fresh spawn, including a new secondmate, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
+An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
+
+Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin, but neither refuses work yet.
+They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
+The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
+These are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+No exhaustion experiment or stress run is needed or recommended; the records come from real work.
+
+The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.
+A reading with unreadable facts judges neither the baseline nor the headroom record, so a transient read failure is reported only as unavailable measurements.
+Only the root local home's watcher runs the periodic probe and publishes memory alarms; every home, including a confined worker's secondmate home, records its own admission readings in its own state and writes no other home's state.
+Before running `baseline` from the root home, let its watcher record readings over a known-healthy representative workload.
+The command derives the alarm boundary only from those root probe readings, never from admission, run-start, `sample` or `baseline` readings, because a confined worker's admission cannot read other users' resident sizes and its lower maximum would fake spread and lower the episode floor; it records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings, or readings whose largest non-fleet resident size never varies, it names that missing input instead of writing a baseline, so the alarm waits for real spread.
+An alarm starts when a non-fleet process exceeds the largest non-fleet resident size observed across those readings, and the episode lasts until that process is at or below the smallest per-reading maximum, the low end of the same measured variation, so a process moving around the boundary wakes once.
+The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+A matching baseline is never silently replaced as usage grows; an invalid baseline, one whose readings show no spread, or one recorded for a different host name or RAM size, is unusable for alarms and is replaced by the next `baseline`.
+The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
+The records contain process identity, run identity and resident size, not process arguments, environment contents or working directories.
+
+Generated worker instructions select the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
+Reattachment and gate responses remain direct so pressure cannot strand running validation.
+This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
+The watcher presents each queued memory row once, naming non-fleet outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
+No memory observation stops existing work or restarts a process.
+Linux retains the existing diagnostic interface; native admission is currently macOS-only.
+
 ## Nested task copy sweep (config/copy-budget)
 
 A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
@@ -3520,12 +3553,34 @@ The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
-Each card includes only decision-card fields: the task id and title, the current board's about/question text or the hold reason, options, recommendation, and evidence pointer; arbitrary task-body prose is never posted.
-Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
-A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the affordance, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
+Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
+
+| Hold reason or body label | Card heading | Content |
+| --- | --- | --- |
+| `Decision sought:` | `Decision sought:` | The concrete choice needed. |
+| `Brief:` (also `Brief description of issue:`) | `Brief description of issue:` | A brief description of the issue. |
+| `Recommendation:` | `Recommendation and key reasons:` | The recommended choice and the key reasons it is most advisable. |
+| `Alternatives:` | `Alternatives considered:` | The alternatives and why each is not as good as the recommendation. |
+
+Hold-reason fields override corresponding body fields and the current board's recommendation.
+The four-part layout requires a nonempty `Decision sought:` field in the reason or body and replaces the current board's question, which four-part cards do not show; otherwise the legacy layout keeps the title, the current board's about text when available, and a question. The legacy question is the current board's question text when a fresh board supplies one, and the hold reason otherwise; its recommendation lines, its first valid `Evidence:` pointer, and its empty or `none recorded` evidence lines leave the question, while brief, alternatives, option, unlabeled, and other evidence lines remain in it.
+Four-part cards show every hold-reason line outside the labeled parts, including option lines, text before the first label, the whole reason when it carries no labels, and every nonempty `Evidence:` value other than the first valid pointer except `none recorded`, as plain text after the fields and options and before the answer footer; these lines do not create answer bindings or reactions.
+Missing fields are omitted, never filled with `none recorded`; an `Evidence:` pointer appears only for an absolute path or an HTTP(S) URL, followed by any numbered options. A label repeated in the hold reason keeps every value, joined in input order one per line under that label, and only the first valid `Evidence:` pointer becomes the evidence link.
+On legacy cards, a recommendation or evidence line removed from the question appears as a plain line when the card does not already show that value as its recommendation or evidence link; with the hold reason as the question this adds no line, and with a fresh board question it shows the board question's own `Recommendation:` and `Evidence:` lines. When a fresh board question replaces the hold reason, the reason's question text, unlabeled and option lines, brief, and alternatives are not shown; its recommendation and first valid evidence pointer still fill those fields, and every other nonempty hold-reason `Evidence:` value except `none recorded` appears as a plain line after the board question's lines. Plain lines carry no link or answer binding.
+One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
+Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.
+Only replies inside the card's thread map to that decision; messages typed in the main DM window are not read.
+A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
+Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
+A Slack-returned update failure is reported once for that text change without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt. Local `request_budget_exhausted` and `unreachable` failures propagate without recording an attempted digest, so the next pass can try again.
+Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
+A changed option set is never applied to an existing card and requires a new hold lifecycle.
+Card posts and edits are not limited by `FM_SLACK_POLL_MAX_ANSWERS`; the open cards and existing request deadline bound each mirror pass.
 Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
 Every value posted to Slack (card fields, option text, task ids, and conflict candidates) has `&`, `<`, and `>` escaped as `&amp;`, `&lt;`, and `&gt;`, so a placeholder such as `<source-id>` shows as written instead of being read as Slack markup; the card budget and the post cut count the escaped length and never split an escape, and the wake line keeps the plain text.
-The mirror reads explicit `Option N:`, `Recommendation:`, and `Evidence:` fields from the task body, but does not post other body lines or infer options from arbitrary prose.
+Beyond the labeled parts above and evidence pointers, the mirror reads only explicit `Option N:` fields from the task body and never infers options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.
 When a board card exists but that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
@@ -3562,7 +3617,7 @@ The per-poll answer cap counts only progress made in that poll: a newly staged a
 A journaled row that is only retried or acknowledged again, and a thread read that fails before it delivers an answer, do not count, so a card that can no longer be read, or a row stuck before its acknowledgement, never uses up the cap of the threads after it.
 A journaled row whose thread can no longer be posted to, and a resolution post that fails, are held back the same way: the row stays journaled, the thread stays tracked, and every other thread is still read.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
-Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
+Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post, edit, or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
 No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
@@ -4516,6 +4571,7 @@ FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
+FM_MEMORY_GUARD_BIN=   # test seam: the guard the watcher's memory probe and bin/fm-spawn.sh's admission run instead of bin/fm-mem-guard.sh
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1

@@ -625,7 +625,7 @@ test_batch_reports_a_deferred_pair() {
   write_live "$home" live-a "$case_dir/project"
   out=$(run_spawn "$case_dir" "$home" "$case_dir/unused" "task-c=$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
   expect_code "$DEFER_EXIT" "$rc" "a batch whose only pair was deferred did not exit with the deferral status: $out"
-  assert_contains "$out" "batch: DEFERRED task-c ($case_dir/project) - its project is at capacity, so it stays queued" \
+  assert_contains "$out" "batch: DEFERRED task-c ($case_dir/project) - the spawn was deferred and stays queued" \
     "the batch did not report the deferral"
   assert_not_contains "$out" "batch: FAILED" "the batch reported a deferral as a failure"
   pass "a batch reports a capacity deferral as deferred, not failed"
@@ -2100,6 +2100,88 @@ test_cpu_baseline_follows_a_falling_total() {
   pass "a falling live-tree CPU total lowers the baseline, so later growth still counts as progress"
 }
 
+test_memory_admission_defers_before_dispatch_then_admits_recovery() {
+  local case_dir home native rc out before worktrees batch_line
+  case_dir=$(make_case memory-admission later)
+  home="$case_dir/home"; native="$case_dir/native"
+  mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  write_live "$home" running "$case_dir/project"
+  cp "$home/state/running.meta" "$case_dir/running.before"
+  before=$(call_count "$case_dir"); worktrees=$(worktree_list "$case_dir")
+  printf '34359738368\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" later "$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 75 "$rc" "native pressure must defer actual spawn: $out"
+  assert_nothing_created "$case_dir" "$home" later "$before" "$worktrees"
+  cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'memory deferral changed running work'
+  jq -es '.[-1].pressure_level == 2 and .[-1].admission == "defer" and .[-1].source == "admit"' \
+    "$home/state/memory-readings.jsonl" >/dev/null || fail 'actual spawn did not retain its pressured observation'
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" "later=$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 75 "$rc" "native pressure must defer a batch pair: $out"
+  batch_line=$(grep '^batch: DEFERRED' <<<"$out")
+  assert_equals "batch: DEFERRED later ($case_dir/project) - the spawn was deferred and stays queued" "$batch_line" \
+    "the batch line named a cause for a memory refusal"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    spawn_ship "$case_dir" later) || rc=$?
+  expect_code 0 "$rc" "healthy memory must admit the same queued task: $out"
+  assert_present "$home/state/later.meta" 'healthy memory failed to publish its worker'
+  cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'healthy admission changed existing work'
+  pass 'actual spawn reads memory before dispatch, leaves pressure-deferred work queued, and admits it after pressure recovers'
+}
+
+# Healthy host memory admits a fresh spawn into a free declared place, and the
+# whole case stays inside this suite's private temp root: the native facts are
+# the case's own fixture files, never live host memory, and the admitted worker's
+# copy, record and memory reading are all fixture paths. Healthy memory never
+# lifts the declared cap: the next spawn still defers on capacity alone.
+test_healthy_memory_admits_within_declared_capacity() {
+  local case_dir home native rc out before worktrees readings
+  case_dir=$(make_case memory-healthy-capacity task-c task-d)
+  home="$case_dir/home"; native="$case_dir/native"
+  case "$case_dir" in "$FM_TEST_TMPDIR"/*) ;; *) fail "the case left the suite's private temp root: $case_dir" ;; esac
+  mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  declare_capacity "$home" "project 2"
+  write_live "$home" live-a "$case_dir/project"
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    spawn_ship "$case_dir" task-c) || rc=$?
+  expect_code 0 "$rc" "healthy memory with a free place must admit the spawn: $out"
+  assert_contains "$out" "spawned task-c" "healthy memory with a free place did not launch the worker"
+  assert_not_contains "$out" "deferred:" "healthy memory with a free place reported a deferral"
+  assert_present "$home/state/task-c.meta" "healthy admission published no task record"
+  assert_equals "$case_dir/wt-task-c" "$(sed -n 's/^worktree=//p' "$home/state/task-c.meta")" \
+    "the admitted worker's copy is not the case's private worktree"
+  if [ "$HAVE_TASKS_AXI" = 1 ]; then
+    [ "$(row_state "$home" task-c)" = in_flight ] || fail "healthy admission did not move task-c In flight"
+  fi
+  readings="$home/state/memory-readings.jsonl"
+  jq -es --arg fixture "$native" \
+    'length == 1 and .[0].source == "admit" and .[0].fixture == $fixture and .[0].pressure_level == 1 and .[0].admission == "admit"' \
+    "$readings" >/dev/null || fail "healthy admission did not record one fixture-marked admit reading: $(cat "$readings" 2>/dev/null)"
+  before=$(call_count "$case_dir"); worktrees=$(worktree_list "$case_dir")
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    spawn_ship "$case_dir" task-d "$case_dir/unused") || rc=$?
+  expect_code "$DEFER_EXIT" "$rc" "healthy memory lifted the declared capacity: $out"
+  assert_contains "$out" "deferred: project project admits 2 worker(s) at once on this machine" \
+    "the full project's deferral did not name its capacity"
+  assert_nothing_created "$case_dir" "$home" task-d "$before" "$worktrees"
+  pass "healthy fixture memory admits a spawn into a free declared place inside the private temp root, and never lifts the cap"
+}
+
+test_memory_admission_defers_before_dispatch_then_admits_recovery
+test_healthy_memory_admits_within_declared_capacity
 test_cpu_sampler_portability_and_failure_extreme
 test_cpu_baseline_follows_a_falling_total
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
