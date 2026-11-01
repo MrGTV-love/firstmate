@@ -3245,7 +3245,7 @@ SH
 test_vernant_slot_manifest_retirement() {
   local variant case_dir common digest records rc head merge orig reason
   local -a sweep
-  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged no-manifest scout local-only no-branch branch-mismatch detached forge-fail orca-success orca-refused; do
+  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged no-manifest scout local-only no-branch branch-mismatch detached forge-fail slot-entry orca-success orca-refused; do
     case "$variant" in
       orca-*)
         case_dir=$(make_case "vernant-manifest-$variant")
@@ -3340,6 +3340,11 @@ PY
       rm "$case_dir/project/scripts/git-stability/retire_slot_manifest.py"
       touch "$case_dir/project/scripts/git-stability/provision_existing_slot.py"
     fi
+    if [ "$variant" = slot-entry ]; then
+      mkdir -p "$NESTED_SLOT/scripts/git-stability"
+      mv "$case_dir/project/scripts/git-stability/retire_slot_manifest.py" "$NESTED_SLOT/scripts/git-stability/"
+      printf 'scripts/\n' >> "$common/info/exclude"
+    fi
     if [ "$variant" = detached ]; then
       git -C "$NESTED_SLOT" checkout -q --detach
       git -C "$case_dir/project" branch -D fm/task-x1 >/dev/null
@@ -3358,6 +3363,7 @@ PY
         ;;
       *)
         CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+          FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
           FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
         ;;
     esac
@@ -3373,6 +3379,12 @@ PY
         if git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1; then
           fail 'forced teardown did not delete its task branch'
         fi
+        ;;
+      slot-entry)
+        expect_code 0 "$rc" "slot-copy entry point: $(cat "$case_dir/err")"
+        assert_present "$case_dir/called" 'stale project checkout skipped the slot copy entry point'
+        assert_absent "$records/worktree-lifecycle/$digest.json" 'slot-copy entry point left legacy record'
+        assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'slot-copy entry point left durable record'
         ;;
       detached)
         expect_code 0 "$rc" "detached slot rerun: $(cat "$case_dir/err")"
@@ -3471,6 +3483,8 @@ PY
         if [ "$variant" = refused ] || [ "$variant" = orca-refused ] || [ "$variant" = error ]; then
           assert_grep fixture_refusal "$case_dir/out" 'reason was lost'
           assert_grep retain_slot "$case_dir/out" 'next_step was lost'
+          [ "$(grep -c '"teardown-unlanded"' "$case_dir/guard-events.jsonl" 2>/dev/null)" = 1 ] \
+            || fail "$variant refused retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
         else
           assert_absent "$case_dir/called" 'unproven owner called retire'
         fi

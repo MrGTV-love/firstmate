@@ -12,6 +12,10 @@ origin/main; every other record is listed and kept.
 Limit: tasks-axi show reads only the live backlog. An owner whose Done entry
 done_keep pruned into the archive has no readable Done entry, so its record is
 listed UNPROVEN and kept; the fail direction is always keep.
+--project may be any up-to-date worktree of the Vernant clone: the record
+stores come from its shared git common directory.
+The entry point is the project checkout's scripts/git-stability/
+retire_slot_manifest.py, else the slot copy's own when the checkout lacks it.
 For teardown: --slot PATH --owner-id ID --owner-branch BRANCH --prove-to FILE
 builds the forge proof before project custody; then --apply --proof-file FILE
 after its landed-work proof runs only the local entry point with that file.
@@ -119,12 +123,14 @@ def stores(project, state_dir):
     return common, durable, state_dir / "worktree-lifecycle"
 
 
-def entry_point(project):
-    return project / "scripts/git-stability/retire_slot_manifest.py"
+def entry_point(project, slot):
+    script = project / "scripts/git-stability/retire_slot_manifest.py"
+    copy = slot / "scripts/git-stability/retire_slot_manifest.py"
+    return copy if not script.is_file() and copy.is_file() else script
 
 
 def retire(args, slot, owner, branch, paths, proof_file):
-    script = entry_point(args.project)
+    script = entry_point(args.project, slot)
     if not script.is_file():
         print(f"missing entry point: {script}; lifecycle records unchanged")
         return
@@ -133,13 +139,13 @@ def retire(args, slot, owner, branch, paths, proof_file):
     result = subprocess.run([interpreter, str(script), "retire", "--slot-path", str(slot),
                              "--repo-root", str(args.project), "--owner-id", owner,
                              "--owner-branch", branch, "--proof-file", str(proof_file),
-                             "--state-dir", str(args.state_dir)], cwd=args.project, text=True,
+                             "--state-dir", str(args.state_dir)], cwd=script.parents[2], text=True,
                             capture_output=True, check=False)
     print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
     if result.stderr:
         print(result.stderr, file=sys.stderr, end="")
     if result.returncode:
-        raise Refusal(f"Vernant retirement exited {result.returncode}; branch preserved; resolve reason/next_step above")
+        raise Refusal(f"Vernant retirement exited {result.returncode}; resolve reason/next_step above")
     report = json.loads(result.stdout)
     if report.get("status") not in ("retired", "already_retired"):
         raise Refusal("entry point did not attest retirement")
@@ -167,8 +173,8 @@ def slot_keep_reason(args, paths):
 
 def prove_slot(args):
     try:
-        _, paths, existing = slot_records(args)
-        if not existing or not entry_point(args.project).is_file() or slot_keep_reason(args, paths):
+        slot, paths, existing = slot_records(args)
+        if not existing or not entry_point(args.project, slot).is_file() or slot_keep_reason(args, paths):
             return 0
         outcome, _ = landing_proof(args.project, recorded_pr(args.firstmate_state, args.owner_id), fetch=True)
     except (Refusal, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
@@ -183,8 +189,8 @@ def retire_slot(args):
         slot, paths, existing = slot_records(args)
         if not existing:
             return 0
-        if not entry_point(args.project).is_file():
-            print(f"missing entry point: {entry_point(args.project)}; lifecycle records unchanged")
+        if not entry_point(args.project, slot).is_file():
+            print(f"missing entry point: {entry_point(args.project, slot)}; lifecycle records unchanged")
             return 0
         reason = slot_keep_reason(args, paths)
         if reason:
@@ -200,7 +206,10 @@ def retire_slot(args):
     except (Refusal, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         print(f"lifecycle record {' and '.join(existing) or 'of ' + str(slot)} stayed: {exc}")
         return 0
-    retire(args, slot, args.owner_id, args.owner_branch, paths, args.proof_file)
+    try:
+        retire(args, slot, args.owner_id, args.owner_branch, paths, args.proof_file)
+    except Refusal as exc:
+        raise Refusal(f"{exc}; branch preserved") from None
     return 0
 
 
@@ -259,7 +268,11 @@ def main():
                     with tempfile.TemporaryDirectory(prefix="fm-slot-proof-") as temp:
                         proof_file = Path(temp) / "proof.json"
                         proof_file.write_text(json.dumps(proof) + "\n")
-                        retire(args, slot, owner, branch, paths, proof_file)
+                        try:
+                            retire(args, slot, owner, branch, paths, proof_file)
+                        except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+                            print(f"{name} owner={owner} slot={slot} landing=MERGED retire=REFUSED: {exc}")
+                            failed = True
             except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
                 print(f"{name} owner={record.get('owner_id', 'unknown') if isinstance(record, dict) else 'unknown'} landing=UNPROVEN: {exc}")
                 failed = failed or args.apply

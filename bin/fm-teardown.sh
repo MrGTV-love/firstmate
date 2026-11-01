@@ -2757,7 +2757,9 @@ teardown_slot_manifest_helper() {  # <slot> <phase arguments...>
   shift
   [ "$FORCE" != "--force" ] || return 0
   if [ ! -f "$PROJ/scripts/git-stability/provision_existing_slot.py" ] \
-     && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then
+     && [ ! -f "$slot/scripts/git-stability/provision_existing_slot.py" ] \
+     && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ] \
+     && [ ! -f "$slot/scripts/git-stability/retire_slot_manifest.py" ]; then
     return 0
   fi
   branch=$(fm_meta_get "$META" branch)
@@ -4983,7 +4985,10 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-      teardown_retire_slot_manifest "$teardown_slot" || exit 1
+      teardown_retire_slot_manifest "$teardown_slot" || {
+        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+        exit 1
+      }
       if [ "$branch" != "HEAD" ]; then
         if git -C "$teardown_slot" checkout --detach -q 2>/dev/null; then
           git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
@@ -6601,7 +6606,10 @@ reap_task_archive_branches
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-    teardown_retire_slot_manifest "$WT" || exit 1
+    teardown_retire_slot_manifest "$WT" || {
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+      exit 1
+    }
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
         git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true
