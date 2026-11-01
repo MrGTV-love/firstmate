@@ -241,9 +241,10 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       if (device) {
         terminal.branch = "device";
         const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
-        if (device.effect === "uri") return deny(device.alternative ? `${device.reason}.` : `${device.reason}. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it.`, device.alternative);
+        if (device.effect === "uri" && device.alternative) return deny(`${device.reason}.`, device.alternative);
         if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
         if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
+        if (device.effect === "uri") return deny(`${device.reason}. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it.`);
         if (device.effect === "egress") {
           terminal.branch = "egress";
           terminal.destination_class = device.destination;

@@ -663,6 +663,11 @@ for (const path of [file, 'conflicted.txt']) {
 }
 const outside = await handlers.tool_call({ toolName: 'edit', input: { path: '/etc/conflicted.txt', old_string: conflict, new_string: 'resolved\n' } }, ctx);
 assert.equal(outside?.block, true, 'the completing step must not widen the permitted roots');
+const sshEdit = await handlers.tool_call({ toolName: 'edit', input: { path: 'ssh://remote/file', old_string: 'a', new_string: 'b' } }, ctx);
+assert.equal(sshEdit?.block, true);
+assert.match(sshEdit.reason, /native devices require omp write.*Report this invocation mismatch to Firstmate/,
+  'other URIs on edit keep the invocation-mismatch refusal');
+assert.doesNotMatch(sshEdit.reason, /Apart from the alternative this refusal names/);
 assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before, 'conflict path policy stays deterministic and sends no content');
 console.log('conflict-remedy-ok');
 JS
