@@ -153,8 +153,22 @@ test_scout_batch_refuses_delivery_flags() {
   pass "scout batch refuses ship delivery flags instead of ignoring them"
 }
 
+# A spawn with FM_HOME cleared falls back to the code checkout's own guard log.
+# The shared harness default must keep the suite's bypass rows out of it.
+test_cleared_home_bypass_spares_code_root_log() {
+  local code_log="$ROOT/state/guard-events.jsonl" before after
+  before=$(cksum < "$code_log" 2>/dev/null || printf 'absent')
+  FM_ROOT='' run_spawn nope-batch-log-z13 projects/none-log --mode no-mistakes --yolo off >/dev/null
+  after=$(cksum < "$code_log" 2>/dev/null || printf 'absent')
+  assert_equals "$before" "$after" "a cleared-home spawn wrote to the code checkout's guard log"
+  jq -se 'any(.[]; .task == "nope-batch-log-z13")' "$FM_GUARD_EVENT_LOG" >/dev/null \
+    || fail "the cleared-home spawn was not recorded in the suite's own log: $(cat "$FM_GUARD_EVENT_LOG" 2>/dev/null)"
+  pass "a cleared-home bypass writes the suite's own guard log, not the code checkout's"
+}
+
 test_batch_dispatches_every_pair
 test_batch_mode_boundaries
 test_batch_requires_the_shared_delivery_contract
 test_scout_batch_refuses_delivery_flags
 test_projects_path_scoping
+test_cleared_home_bypass_spares_code_root_log
