@@ -114,15 +114,16 @@ fm_task_copy_default_branch() {
 
 # A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
 # names why: it is cleared only once the check compared the two trees, and a
-# merge conflict is that comparison's answer.
+# merge conflict is that comparison's answer. With no-fetch the same rule reads
+# the refs already here: merge-tree adds objects only, and no ref or worktree moves.
 FM_TASK_COPY_UNASKED=
-fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
+fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+    [ "$fetch" = no-fetch ] || git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
       FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
       return 1
     }

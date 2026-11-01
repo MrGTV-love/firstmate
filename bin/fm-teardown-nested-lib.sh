@@ -314,23 +314,74 @@ EOF
   esac
 }
 
+# The sweep's closed regenerable class: directories rebuilt from tracked lockfiles
+# and sources. A release of a proven copy removes them with it unpreserved. This
+# list decides no hold and adds no pattern.
+TEARDOWN_REGENERABLE_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
+
+# Prints each outermost directory at or under <root> whose name is in the class.
+# A symlink is never one, and find does not follow one.
+teardown_regenerable_dirs() {  # <root>
+  local name args=()
+  for name in "${TEARDOWN_REGENERABLE_NAMES[@]}"; do
+    args+=(-o -name "$name")
+  done
+  find "$1" -type d \( "${args[@]:1}" \) -print -prune 2>/dev/null
+}
+
+# Prints the class's outermost directories inside the ignored entries of <copy>.
+teardown_regenerable_ignored() {  # <copy>
+  local copy=$1 listing entry rc=0
+  listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' entry; do
+      teardown_regenerable_dirs "$copy/${entry%/}" || { rc=1; break; }
+    done <"$listing"
+  fi
+  rm -f "$listing"
+  return "$rc"
+}
+
+# Prints ignored <entry> of <copy> without the class: whole when it holds none of
+# those directories, otherwise split only as far as needed to leave them out.
+teardown_entry_without_regenerable() {  # <copy> <entry>
+  local copy=$1 entry=$2 found child
+  found=$(teardown_regenerable_dirs "$copy/$entry") || return 1
+  if [ -z "$found" ]; then
+    printf '%s\n' "$entry"
+    return 0
+  fi
+  [ "$found" != "$copy/$entry" ] || return 0
+  for child in "$copy/$entry"/* "$copy/$entry"/.[!.]* "$copy/$entry"/..?*; do
+    { [ -e "$child" ] || [ -L "$child" ]; } || continue
+    teardown_entry_without_regenerable "$copy" "$entry/${child##*/}" || return 1
+  done
+}
+
+teardown_print_entry() {  # <copy> <entry>
+  printf '%s\n' "$2"
+}
+
 # Ignored entries no commit holds that must be preserved before removal.
 # Symlinks, caches, virtual environments, Firstmate's own hook files, graft's
 # generated output (teardown_graft_generated) and regenerable build output are
 # derived machinery and are skipped; every other entry is printed for
-# teardown_preserve_ignored to copy. Optional all mode includes the disposable
-# entries too, so the unlocked sweep can preserve their bytes without widening
-# this owner's disposable classification.
-teardown_preservable_ignored() {  # <copy> [all]
-  local copy=$1 mode=${2:-} listing entry name child rc=0
-  case "$mode" in ''|all) ;; *) return 1 ;; esac
+# teardown_preserve_ignored to copy. A sweep release of a proven copy names a mode,
+# and both modes leave out the regenerable class at any depth: releasable applies
+# that to the list above, and all mode starts from every ignored entry, so the
+# unlocked sweep can preserve the disposable bytes without widening this owner's
+# disposable classification.
+teardown_preservable_ignored() {  # <copy> [all|releasable]
+  local copy=$1 mode=${2:-} listing entry name child rc=0 emit=teardown_entry_without_regenerable
+  case "$mode" in '') emit=teardown_print_entry ;; all|releasable) ;; *) return 1 ;; esac
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' entry; do
       entry=${entry%/}
       if [ "$mode" = all ]; then
-        printf '%s\n' "$entry"
+        "$emit" "$copy" "$entry" || { rc=1; break; }
         continue
       fi
       [ ! -L "$copy/$entry" ] || continue
@@ -341,7 +392,10 @@ teardown_preservable_ignored() {  # <copy> [all]
       if [ "$entry" = .tac ] && [ -d "$copy/.tac" ]; then
         for child in "$copy/.tac"/* "$copy/.tac"/.[!.]*; do
           { [ -e "$child" ] && [ ! -L "$child" ]; } || continue
-          case "${child##*/}" in tmp|uv-cache) ;; *) printf '%s\n' ".tac/${child##*/}" ;; esac
+          case "${child##*/}" in
+            tmp|uv-cache) ;;
+            *) "$emit" "$copy" ".tac/${child##*/}" || { rc=1; break 2; } ;;
+          esac
         done
         continue
       fi
@@ -349,7 +403,7 @@ teardown_preservable_ignored() {  # <copy> [all]
         .venv|venv|node_modules|__pycache__|.pytest_cache|.ruff_cache|.mypy_cache|.DS_Store|.fm-grok-turnend|.fm-kimi-turnend) continue ;;
         .import_linter_cache|.next|graphify-out|*.tsbuildinfo) continue ;;
       esac
-      printf '%s\n' "$entry"
+      "$emit" "$copy" "$entry" || { rc=1; break; }
     done <"$listing"
   fi
   rm -f "$listing"
@@ -769,16 +823,15 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
-# Copies every preservable ignored entry of <copy> (all ignored entries in
-# optional all mode) into $DATA/$ID/nested-copy-preserved/<copy-path-sha256>
-# and records each file's
+# Copies every entry teardown_preservable_ignored prints for <copy> in the given
+# mode into $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
 # SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
 # replaces an earlier preserve of the same copy only after every entry is copied
 # and hashed, so a failed run never costs the earlier one. Returns 1 when
 # anything cannot be listed, copied or hashed, after removing the one staging
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
-teardown_preserve_ignored() {  # <copy> [all]
+teardown_preserve_ignored() {  # <copy> [all|releasable]
   local copy=$1 root dest stage entries entry file hash
   entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
   [ -n "$entries" ] || return 0

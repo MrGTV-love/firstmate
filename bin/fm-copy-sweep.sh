@@ -138,13 +138,20 @@
 # the copy's preservable ignored content must still match this run's preserve,
 # or the earlier preserve a run reused. A mismatch runs no execute, uses no slot
 # and takes the reproof-failure route.
-# An unlocked copy first preserves every ignored entry, including the teardown
+# The regenerable class is this closed list of directory names, matched by name at
+# any depth inside a proven copy: node_modules, .venv, venv, __pycache__,
+# .pytest_cache, .mypy_cache, .ruff_cache, .next, .turbo, .cache. Those directories
+# are rebuilt from tracked lockfiles and sources, so a release removes them with
+# the copy and never hashes or preserves them. The class never proves a copy
+# releasable, and a held copy stays held exactly as before. A report row of a proven
+# copy names its regenerable bytes, and the report's "regenerable:" line totals them.
+# An unlocked copy first preserves every other ignored entry, including the teardown
 # owner's existing disposable cache/scratch/log/generated machinery, through its
 # SHA256SUMS storage contract. Unique non-cache ignored files still hold it.
 # After custody and HEAD are rechecked, the actual preserved tree fingerprint
 # must equal the source fingerprint before plain `git worktree remove` from the
 # parent clone. Missing, unreadable or differing preservation leaves both copy
-# and preserve; no new disposable class or forced removal is introduced.
+# and preserve; no forced removal is introduced.
 # A locked copy first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
@@ -160,7 +167,8 @@
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
 # driver nor anything it started outlives the sweep. A copy whose plan allows it
-# has its ignored entries preserved by the teardown library's own preservation,
+# has its ignored entries, other than the regenerable class, preserved by the
+# teardown library's own preservation,
 # then released and removed by the driver as bin/fm-teardown.sh does it.
 # Preserved entries land in
 # data/copy-sweep/<run-stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
@@ -226,8 +234,12 @@
 # Each removal appends one line to data/copy-sweep.log (append-only).
 # An outer copy whose inner copy was removed in the same run is removed by the
 # next run. Report mode reads the cache, receipts and waiting records and writes
-# nothing;
+# no file of its own;
 # `check` writes only the size cache and the record (budgets and live copies).
+# Report, check and --apply prove content by the same merge-tree rule
+# (fm_task_copy_content_in_default), so on the same refs a report line predicts
+# what --apply decides. That rule can add Git objects to the object store; it moves
+# no ref and touches no worktree.
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -631,6 +643,8 @@ git() { bounded git "$@"; }
 
 lsof() { bounded lsof "$@"; }
 
+find() { bounded find "$@"; }
+
 # --- process table -----------------------------------------------------------
 
 PROC_TABLE=
@@ -668,29 +682,15 @@ CLASS=
 REASON=
 APPLY=0
 
-# True when the copy's content is already in the default branch. Only --apply
-# fetches; the others read the refs that are already here.
+# True when the copy's content is already in the default branch, by the one
+# merge-tree rule of bin/fm-task-copy-lib.sh. Only --apply fetches; the others
+# read the refs that are already here.
 content_in_default() {  # <copy> <clone>
-  local copy=$1 clone=$2 name ref base listing path rc=0
   if [ "$APPLY" = 1 ]; then
-    fm_task_copy_content_in_default "$copy" "$clone"
-    return
+    fm_task_copy_content_in_default "$1" "$2"
+  else
+    fm_task_copy_content_in_default "$1" "$2" "" HEAD no-fetch
   fi
-  name=$(fm_task_copy_default_branch "$clone") || return 1
-  ref=refs/remotes/origin/$name
-  git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || ref=refs/heads/$name
-  base=$(git -C "$copy" merge-base "$ref" HEAD 2>/dev/null) || return 1
-  listing=$(mktemp "${TMPDIR:-/tmp}/fm-copy-content.XXXXXX") || return 1
-  # Compare the exact tree entries of every locally changed path. Unlike
-  # merge-tree --write-tree this writes no objects into a real dry-run copy.
-  git -C "$copy" diff --no-ext-diff --no-renames --name-only -z "$base" HEAD -- > "$listing" 2>/dev/null || rc=1
-  if [ "$rc" = 0 ]; then
-    while IFS= read -r -d '' path; do
-      GIT_LITERAL_PATHSPECS=1 git -C "$copy" diff --quiet --no-ext-diff --ignore-submodules=none "$ref" HEAD -- "$path" 2>/dev/null || { rc=1; break; }
-    done < "$listing"
-  fi
-  rm -f -- "$listing"
-  return "$rc"
 }
 
 # Read the whole lock, not just its first line. The launcher pid is what counts;
@@ -809,11 +809,11 @@ tree_fingerprint() {  # <root> <find-args>...
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
-# The fingerprint of every preservable ignored entry of <copy>, including
-# disposable machinery when all mode is requested for an unlocked removal.
+# The fingerprint of every entry a release of proven <copy> preserves: the locked
+# route's by default, the unlocked route's when all mode is requested.
 content_fingerprint() {  # <copy> [all]
   local entries entry paths=()
-  entries=$(teardown_preservable_ignored "$1" "${2:-}") || return 1
+  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
   while IFS= read -r entry; do
     [ -z "$entry" ] || paths+=("./$entry")
   done <<< "$entries"
@@ -1096,6 +1096,9 @@ classify() {  # <copy> <clone> <pool> <container>
 
 SCAN_CUT=0
 SIZING=1
+REGENERABLE_KIB=0
+REGENERABLE_COPIES=0
+REGENERABLE_UNMEASURED=0
 CACHE_NOW=
 SIZE_KIB=
 CACHE_NEW=
@@ -1159,6 +1162,33 @@ measure_copy() {  # <copy>
 }
 
 # --- the scan ----------------------------------------------------------------
+
+# Report mode adds the regenerable bytes of a proven copy to its reason and to the
+# run's total. Those bytes go with the copy and are never preserved. A held copy
+# keeps its reason. Call it before measure_copy, which SIZE_KIB belongs to.
+note_regenerable() {  # <copy>
+  local dirs dir total=0 unmeasured=0
+  case "$CLASS" in REAPABLE-PROVEN|PENDING-DRIVER) ;; *) return 0 ;; esac
+  dirs=$(teardown_regenerable_ignored "$1") || {
+    REGENERABLE_UNMEASURED=$((REGENERABLE_UNMEASURED + 1))
+    REASON="$REASON; regenerable ? GiB, its directories cannot be listed"
+    return 0
+  }
+  [ -n "$dirs" ] || return 0
+  while IFS= read -r dir; do
+    SIZE_KIB=
+    [ "$SIZING" != 1 ] || du_kib "$dir"
+    if [ -n "$SIZE_KIB" ]; then total=$((total + SIZE_KIB)); else unmeasured=1; fi
+  done <<< "$dirs"
+  if [ "$unmeasured" = 1 ]; then
+    REGENERABLE_UNMEASURED=$((REGENERABLE_UNMEASURED + 1))
+    REASON="$REASON; regenerable ? GiB removed with it, not preserved"
+    return 0
+  fi
+  REGENERABLE_KIB=$((REGENERABLE_KIB + total))
+  REGENERABLE_COPIES=$((REGENERABLE_COPIES + 1))
+  REASON="$REASON; regenerable $(kib_to_gib "$total") GiB removed with it, not preserved"
+}
 
 # One line per copy: container, pool, clone, copy, class, KiB net of the copies
 # nested in it ("-" when unmeasured), reason. Empty fields are never used; tab is
@@ -1240,6 +1270,7 @@ scan_clone() {  # <pool> <container> <clone>
     else
       classify "$copy" "$clone" "$pool" "$container"
     fi
+    [ "$SCAN_MODE" != report ] || note_regenerable "$copy"
     measure_copy "$copy"
     ROWS="$ROWS$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
   done 4< <(printf '%s\n' "$nested" | LC_ALL=C sort -u)
@@ -1515,7 +1546,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   if [ "$preserved" != 1 ]; then
     DATA=$DATA_DIR
     ID=$3
-    teardown_preserve_ignored "$copy" || rc=$?
+    teardown_preserve_ignored "$copy" releasable || rc=$?
     DATA=$saved_data
     ID=$saved_id
   fi
@@ -1685,8 +1716,9 @@ apply_removals() {
       fi
     else
       # Classification still holds unique non-cache ignored work. Preserve the
-      # existing disposable classes too, then prove their actual bytes match;
-      # neither a class name nor a manifest alone is custody evidence.
+      # other disposable classes too, then prove their actual bytes match; neither
+      # a class name nor a manifest alone is custody evidence. Regenerable
+      # directories go with the copy.
       release_id="$CHECK_ID/$stamp-$head"
       preserve_dir=$(run_preserve_dir "$copy" "$release_id") || preserve_dir=
       if [ -z "$preserve_dir" ] || ! err=$(DATA="$DATA_DIR" ID="$release_id" teardown_preserve_ignored "$copy" all 2>&1); then
@@ -2077,6 +2109,9 @@ print_report() {  # <mode>
     [ -n "$line" ] || continue
     printf '%s\n' "$line"
   done <<< "$BUDGET_REPORT"
+  if [ "$1" = report ]; then
+    printf 'regenerable: %s GiB in %s proven copies, %s proven copies unmeasured\n' "$(kib_to_gib "$REGENERABLE_KIB")" "$REGENERABLE_COPIES" "$REGENERABLE_UNMEASURED"
+  fi
   if [ "$1" = apply ]; then
     printf 'sizes: %s scanned copies unmeasured, %s removed copies unmeasured\n' "$SCANNED_UNMEASURED" "$FREED_UNMEASURED"
     printf 'copies=%s GiB=%s reaped=%s freed=%s\n' "$SCANNED_COUNT" "$(kib_to_gib "$SCANNED_KIB")" "$REMOVED_COUNT" "$(kib_to_gib "$FREED_KIB")"

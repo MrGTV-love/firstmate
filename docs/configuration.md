@@ -2281,7 +2281,7 @@ No budget gates it, so it still fires when both budgets are `off`.
 The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
 It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, the live-copy fact and its record, and how `check` stays inside the watcher's timeout.
 `bin/fm-copy-sweep.sh --help` prints that header.
-The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
+The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it removes nothing, moves no ref, touches no worktree, and lists every copy with its class and reason. Its content proof is the one `--apply` uses, and that proof can add Git objects to the object store.
 
 ### Hourly command and watcher check
 
@@ -2327,7 +2327,7 @@ The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only ver
 Review the first batch's records before unattended operation.
 The header also owns the closeout-script liveness dependency and the proposed Vernant follow-ups that would replace this fallback, `vernant-lock-lease` and `vernant-commits-remote-before-lock`; neither is built yet, so the sweep keeps its own proofs.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
-[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the main regression entry point; [`tests/fm-copy-sweep-orphan.test.sh`](../tests/fm-copy-sweep-orphan.test.sh) covers locked squash-content eligibility, read-only report proofs, hash-preserved disposable classes and diagnostic-preserving launcher observation.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the main regression entry point; [`tests/fm-copy-sweep-orphan.test.sh`](../tests/fm-copy-sweep-orphan.test.sh) covers locked squash-content eligibility, report and `--apply` agreement on content proofs, hash-preserved disposable classes, the unpreserved regenerable class and diagnostic-preserving launcher observation.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 

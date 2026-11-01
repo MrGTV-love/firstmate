@@ -42,6 +42,11 @@ make_squash_world() {
   for name in clean unique tracked untracked; do
     git -C "$CLONE" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$CLONE/.claude/worktrees/$name"
   done
+  install_fixture_driver
+}
+
+# A quiet process table and a closeout driver that models the release interface.
+install_fixture_driver() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/lsof"
   mkdir -p "$CLONE/scripts/git-stability"
   cat > "$CLONE/scripts/git-stability/closeout_pr.py" <<'DRIVER'
@@ -55,6 +60,20 @@ DRIVER
   chmod +x "$W/python" "$W/bin/lsof"
 }
 
+# Locks <copy> in Vernant's format with a launcher that really ran and exited.
+lock_with_gone_launcher() {  # <copy>
+  local launcher
+  sleep 0.1 &
+  launcher=$!
+  wait "$launcher"
+  git -C "$CLONE" worktree lock --reason "vernant-session-active owner=launcher:$launcher launcher=$launcher" "$1"
+}
+
+# The class of <copy> in the sweep's last output.
+class_of() {  # <copy>
+  printf '%s\n' "$OUT" | awk -F '\t' -v c="$1" 'NF >= 4 && $3 == c { print $1; exit }'
+}
+
 sweep() {
   local rc=0
   OUT=$(env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
@@ -65,13 +84,8 @@ sweep() {
 }
 
 test_squash_orphans() {
-  local before after
   make_squash_world
-  # A report must not create merge-tree objects in a real repository.
-  before=$(find "$CLONE/.git/objects" -type f | LC_ALL=C sort)
   sweep
-  after=$(find "$CLONE/.git/objects" -type f | LC_ALL=C sort)
-  assert_equals "$before" "$after" 'dry-run content proof wrote repository objects'
   assert_contains "$OUT" "PENDING-DRIVER" 'clean locked squash was not a driver candidate'
   assert_contains "$OUT" 'content already in the default branch' 'squash content proof missing'
   assert_present "$CLEAN" 'report removed a copy'
@@ -84,6 +98,79 @@ test_squash_orphans() {
   assert_contains "$OUT" 'HELD-DIRTY' 'uncommitted work was not held'
   assert_equals 'second' "$(tail -n 1 "$CLONE/.claude/worktrees/unique/feature.txt")" 'delivered bytes changed'
   pass 'locked squash-contained orphan is reaped; a unique commit, tracked edit and untracked file are held'
+}
+
+make_later_edit_world() {
+  local name line
+  W="$TMP_ROOT/later-edit"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/worktrees/\nscripts/\n' > "$CLONE/.gitignore"
+  for line in $(seq 1 100); do printf 'line %s\n' "$line"; done > "$CLONE/shared.txt"
+  git -C "$CLONE" add .gitignore shared.txt
+  git -C "$CLONE" commit -qm 'shared file'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  git -C "$CLONE" fetch -q origin
+  FORK=$(git -C "$CLONE" rev-parse HEAD)
+  git -C "$CLONE" worktree add -qb fm/squashed "$CLONE/.claude/worktrees/source"
+  SOURCE="$CLONE/.claude/worktrees/source"
+  sed 's/^line 1$/line 1 delivered/' "$SOURCE/shared.txt" > "$W/edit" && cat "$W/edit" > "$SOURCE/shared.txt"
+  git -C "$SOURCE" commit -qam 'delivered change'
+  TIP=$(git -C "$SOURCE" rev-parse HEAD)
+  git -C "$CLONE" merge --squash fm/squashed >/dev/null
+  git -C "$CLONE" commit -qm 'squash delivered change'
+  sed 's/^line 50$/line 50 later main edit/' "$CLONE/shared.txt" > "$W/edit" && cat "$W/edit" > "$CLONE/shared.txt"
+  git -C "$CLONE" commit -qam 'later edit to the same file'
+  git -C "$CLONE" push -q origin main
+  git -C "$CLONE" worktree remove "$SOURCE"
+  for name in locked unlocked; do
+    git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/$name" "$TIP"
+  done
+  git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/conflict" "$FORK"
+  CONFLICT="$CLONE/.claude/worktrees/conflict"
+  sed 's/^line 50$/line 50 never delivered/' "$CONFLICT/shared.txt" > "$W/edit" && cat "$W/edit" > "$CONFLICT/shared.txt"
+  git -C "$CONFLICT" commit -qam 'conflicting unlanded change'
+  git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/unique" "$TIP"
+  UNIQUE="$CLONE/.claude/worktrees/unique"
+  sed 's/^line 90$/line 90 never delivered/' "$UNIQUE/shared.txt" > "$W/edit" && cat "$W/edit" > "$UNIQUE/shared.txt"
+  git -C "$UNIQUE" commit -qam 'clean-merging unlanded change'
+  for name in locked conflict unique; do
+    lock_with_gone_launcher "$CLONE/.claude/worktrees/$name"
+  done
+  install_fixture_driver
+}
+
+test_report_predicts_apply_after_later_main_edit() {
+  local refs_before refs_after heads_before heads_after locked unlocked conflict unique
+  make_later_edit_world
+  locked="$CLONE/.claude/worktrees/locked"
+  unlocked="$CLONE/.claude/worktrees/unlocked"
+  conflict="$CLONE/.claude/worktrees/conflict"
+  unique="$CLONE/.claude/worktrees/unique"
+  refs_before=$(git -C "$CLONE" for-each-ref)
+  heads_before=$(git -C "$CLONE" worktree list --porcelain)
+  sweep
+  refs_after=$(git -C "$CLONE" for-each-ref)
+  heads_after=$(git -C "$CLONE" worktree list --porcelain)
+  assert_equals "$refs_before" "$refs_after" 'report moved a ref'
+  assert_equals "$heads_before" "$heads_after" 'report moved a worktree'
+  assert_equals PENDING-DRIVER "$(class_of "$locked")" 'report did not prove the locked squash copy'
+  assert_equals REAPABLE-PROVEN "$(class_of "$unlocked")" 'report did not prove the unlocked squash copy'
+  assert_equals HELD-UNPUSHED "$(class_of "$conflict")" 'report did not hold the conflicting copy'
+  assert_equals HELD-UNPUSHED "$(class_of "$unique")" 'report did not hold the unique commit'
+  assert_contains "$OUT" 'content already in the default branch' 'report named no content proof'
+  sweep --apply
+  assert_absent "$locked" 'apply left the copy the report listed'
+  assert_absent "$unlocked" 'apply left the copy the report listed'
+  assert_contains "$OUT" "REMOVED"$'\t'"$locked" 'apply did not report the locked removal'
+  assert_contains "$OUT" "REMOVED"$'\t'"$unlocked" 'apply did not report the unlocked removal'
+  assert_equals HELD-UNPUSHED "$(class_of "$conflict")" 'apply label differs from report for the conflicting copy'
+  assert_equals HELD-UNPUSHED "$(class_of "$unique")" 'apply label differs from report for the unique commit'
+  assert_present "$conflict/shared.txt" 'conflicting unlanded work was lost'
+  assert_present "$unique/shared.txt" 'unique unlanded work was lost'
+  pass 'after a later main edit to a squash-merged path, report and apply agree on every copy'
 }
 
 test_confined_launcher_observation() {
@@ -133,7 +220,7 @@ make_preserved_world() {
   CLONE="$HOMED/projects/example"
   mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
   fm_git_init_commit "$CLONE"
-  printf '.claude/\n.pytest_cache/\n.tac/\ngraft/\nunique.dat\n' > "$CLONE/.gitignore"
+  printf '.claude/\n.import_linter_cache/\n.tac/\ngraft/\nunique.dat\n' > "$CLONE/.gitignore"
   git -C "$CLONE" add .gitignore
   git -C "$CLONE" commit -qm 'ignore fixture payloads'
   fm_git_add_origin "$CLONE" "$W/origin.git"
@@ -141,7 +228,7 @@ make_preserved_world() {
   for name in cache scratch log generated unique missing mismatch; do
     git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/$name" origin/main
     case "$name" in
-      cache|missing|mismatch) rel=.pytest_cache/payload ;;
+      cache|missing|mismatch) rel=.import_linter_cache/payload ;;
       scratch) rel=.tac/tmp/payload ;;
       log) rel=.claude/logs/payload ;;
       generated) rel=graft/payload ;;
@@ -159,8 +246,8 @@ make_preserved_world() {
 #!/usr/bin/env bash
 "$REAL_CP" "$@" || exit $?
 case "${2:-}" in
-  */worktrees/missing/.pytest_cache) rm -f "$3/payload" ;;
-  */worktrees/mismatch/.pytest_cache) printf 'corrupted fixture preservation\n' > "$3/payload" ;;
+  */worktrees/missing/.import_linter_cache) rm -f "$3/payload" ;;
+  */worktrees/mismatch/.import_linter_cache) printf 'corrupted fixture preservation\n' > "$3/payload" ;;
 esac
 COPY
   chmod +x "$W/bin/lsof" "$W/bin/cp"
@@ -171,7 +258,7 @@ test_preserved_classes() {
   make_preserved_world
   for name in cache scratch log generated; do
     case "$name" in
-      cache) rel=.pytest_cache/payload ;;
+      cache) rel=.import_linter_cache/payload ;;
       scratch) rel=.tac/tmp/payload ;;
       log) rel=.claude/logs/payload ;;
       generated) rel=graft/payload ;;
@@ -185,7 +272,7 @@ test_preserved_classes() {
   assert_equals 1 "$rc" 'failed preservation must fail the apply run'
   for name in cache scratch log generated; do
     case "$name" in
-      cache) rel=.pytest_cache/payload ;;
+      cache) rel=.import_linter_cache/payload ;;
       scratch) rel=.tac/tmp/payload ;;
       log) rel=.claude/logs/payload ;;
       generated) rel=graft/payload ;;
@@ -207,9 +294,111 @@ test_preserved_classes() {
     assert_present "$CLONE/.claude/worktrees/$name" "$name must hold"
   done
   assert_equals 'unique bytes requiring preservation' "$(cat "$CLONE/.claude/worktrees/unique/unique.dat")" 'unique non-cache payload changed'
-  assert_equals 'missing bytes requiring preservation' "$(cat "$CLONE/.claude/worktrees/missing/.pytest_cache/payload")" 'missing preserve lost original bytes'
-  assert_equals 'mismatch bytes requiring preservation' "$(cat "$CLONE/.claude/worktrees/mismatch/.pytest_cache/payload")" 'mismatched preserve lost original bytes'
+  assert_equals 'missing bytes requiring preservation' "$(cat "$CLONE/.claude/worktrees/missing/.import_linter_cache/payload")" 'missing preserve lost original bytes'
+  assert_equals 'mismatch bytes requiring preservation' "$(cat "$CLONE/.claude/worktrees/mismatch/.import_linter_cache/payload")" 'mismatched preserve lost original bytes'
   pass 'cache, scratch, log and generated bytes survive by hash; unique, missing and mismatched preservation hold'
+}
+
+make_regenerable_world() {
+  local name
+  W="$TMP_ROOT/class-world"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/\nscripts/\nbuild/\nunique.dat\n' > "$CLONE/.gitignore"
+  for name in "${CLASS_NAMES[@]}"; do printf '%s/\n' "$name" >> "$CLONE/.gitignore"; done
+  git -C "$CLONE" add .gitignore
+  git -C "$CLONE" commit -qm 'ignore fixture payloads'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  git -C "$CLONE" fetch -q origin
+  for name in unlocked locked held-cache held-unique; do
+    git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/$name" origin/main
+  done
+  install_fixture_driver
+}
+
+put_file() {  # <path> <text>
+  mkdir -p "$(dirname "$1")"
+  printf '%s\n' "$2" > "$1"
+}
+
+# Exactly the entries under <preserve> that belong to the regenerable class.
+class_dirs_in() {  # <preserve>
+  local name args=()
+  for name in "${CLASS_NAMES[@]}"; do args+=(-o -name "$name"); done
+  find "$1" -type d \( "${args[@]:1}" \) -print
+}
+
+test_regenerable_class() {
+  local name unlocked locked key preserve
+  CLASS_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
+  make_regenerable_world
+  unlocked="$CLONE/.claude/worktrees/unlocked"
+  locked="$CLONE/.claude/worktrees/locked"
+
+  # Today's skip list names these at the root, so they never held the copy.
+  for name in node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next; do
+    put_file "$unlocked/$name/payload" "regenerable $name"
+  done
+  mkdir -p "$unlocked/node_modules/big"
+  dd if=/dev/zero of="$unlocked/node_modules/big/blob" bs=1048576 count=11 2>/dev/null
+  # Inside an ignored entry every name of the class counts at any depth.
+  for name in "${CLASS_NAMES[@]}"; do
+    put_file "$unlocked/.claude/deep/er/$name/payload" "nested regenerable $name"
+  done
+  # A near name, a plain file with a class name and a symlink with one all stay.
+  put_file "$unlocked/.claude/deep/er/keep.txt" 'keep me'
+  put_file "$unlocked/.claude/deep/er/node_modules2/keep.txt" 'near name'
+  put_file "$unlocked/.claude/file/.cache" 'plain file with a class name'
+  ln -s /nonexistent/target "$unlocked/.claude/file/venv"
+
+  lock_with_gone_launcher "$locked"
+  put_file "$locked/.cache/payload" 'regenerable cache'
+  put_file "$locked/.turbo/payload" 'regenerable turbo'
+  put_file "$locked/build/node_modules/payload" 'regenerable nested'
+  put_file "$locked/build/keep.txt" 'keep build output'
+  put_file "$locked/unique.dat" 'keep unique bytes'
+
+  # The class never makes a held copy releasable.
+  put_file "$CLONE/.claude/worktrees/held-cache/.cache/payload" 'held cache bytes'
+  put_file "$CLONE/.claude/worktrees/held-unique/unique.dat" 'held unique bytes'
+  put_file "$CLONE/.claude/worktrees/held-unique/node_modules/payload" 'held regenerable bytes'
+
+  sweep
+  assert_equals REAPABLE-PROVEN "$(class_of "$unlocked")" 'unlocked copy was not proven'
+  assert_equals PENDING-DRIVER "$(class_of "$locked")" 'locked copy was not a driver candidate'
+  assert_equals HELD-DIRTY "$(class_of "$CLONE/.claude/worktrees/held-cache")" 'class released a held copy'
+  assert_equals HELD-DIRTY "$(class_of "$CLONE/.claude/worktrees/held-unique")" 'class released a held copy'
+  assert_contains "$(printf '%s\n' "$OUT" | grep -F "$unlocked")" 'regenerable 0.01 GiB removed with it, not preserved' 'report row misses regenerable bytes'
+  assert_contains "$(printf '%s\n' "$OUT" | grep -F "$locked")" 'regenerable 0.00 GiB removed with it, not preserved' 'report row misses regenerable bytes'
+  assert_not_contains "$(printf '%s\n' "$OUT" | grep -F "$CLONE/.claude/worktrees/held-unique")" 'regenerable' 'a held row changed'
+  assert_contains "$OUT" 'regenerable: 0.01 GiB in 2 proven copies, 0 proven copies unmeasured' 'report total misses regenerable bytes'
+
+  sweep --apply
+  assert_absent "$unlocked" 'unlocked copy was not removed'
+  assert_absent "$locked" 'locked copy was not removed'
+  assert_contains "$(printf '%s\n' "$OUT" | grep -F "REMOVED"$'\t'"$unlocked")" 'preserved 0.00 GiB, net freed 0.01 GiB' 'regenerable bytes were not freed'
+
+  key=$(printf '%s' "$unlocked" | shasum -a 256 | cut -d ' ' -f 1)
+  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")
+  assert_equals 'keep me' "$(cat "$preserve/.claude/deep/er/keep.txt")" 'other ignored bytes were not preserved'
+  assert_equals 'near name' "$(cat "$preserve/.claude/deep/er/node_modules2/keep.txt")" 'a near name was treated as the class'
+  assert_equals 'plain file with a class name' "$(cat "$preserve/.claude/file/.cache")" 'a plain file was treated as the class'
+  [ -L "$preserve/.claude/file/venv" ] || fail 'a symlink was treated as the class'
+  assert_equals '' "$(class_dirs_in "$preserve")" 'unlocked preserve holds a regenerable directory'
+  assert_contains "$(cat "$preserve/SHA256SUMS")" '.claude/deep/er/keep.txt' 'manifest misses a preserved file'
+
+  key=$(printf '%s' "$locked" | shasum -a 256 | cut -d ' ' -f 1)
+  preserve=$(printf '%s\n' "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key")
+  assert_equals 'keep build output' "$(cat "$preserve/build/keep.txt")" 'locked ignored bytes were not preserved'
+  assert_equals 'keep unique bytes' "$(cat "$preserve/unique.dat")" 'locked unique bytes were not preserved'
+  assert_equals '' "$(class_dirs_in "$preserve")" 'locked preserve holds a regenerable directory'
+
+  assert_equals 'held cache bytes' "$(cat "$CLONE/.claude/worktrees/held-cache/.cache/payload")" 'held copy changed'
+  assert_equals 'held unique bytes' "$(cat "$CLONE/.claude/worktrees/held-unique/unique.dat")" 'held copy changed'
+  assert_equals 'held regenerable bytes' "$(cat "$CLONE/.claude/worktrees/held-unique/node_modules/payload")" 'held copy changed'
+  pass 'the closed regenerable class goes with a proven copy, other ignored paths survive by hash, and held copies are unchanged'
 }
 
 test_ps_observation_diagnostics() {
@@ -246,6 +435,8 @@ test_ps_observation_diagnostics() {
 
 fm_test_only
 test_squash_orphans
+test_report_predicts_apply_after_later_main_edit
 test_confined_launcher_observation
 test_preserved_classes
+test_regenerable_class
 test_ps_observation_diagnostics
