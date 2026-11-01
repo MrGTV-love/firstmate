@@ -18,8 +18,10 @@ bin/fm-watch.sh), so a reboot, a crash or a plain stop recovers at its next cycl
 A detached owner's stderr appends to owner.log, which start trims to its newest
 bytes before a launch once it passes LOG_LIMIT.
 Only run holds owner.lock exclusively, so an exclusive holder is a live owner;
-records and prune hold it shared. Any command that meets a held lock exits BUSY
-(75), started nothing and may retry; start exits 1 only for another failure.
+records and prune hold it shared. start, run, records and prune exit BUSY (75)
+when the lock they need is unavailable; a busy start started nothing and may
+retry, and any other failed start exits 1. A stop during startup exits 1. A second
+concurrent reader can exit 1 after the SQLite wait.
 
 Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
 every 15 seconds. Records identify REST resources.graphql, not GraphQL response

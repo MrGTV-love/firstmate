@@ -111,8 +111,9 @@
 #                          in a cycle
 #   check: github-accounting owner failed to start: exit=<n>; ...
 #                          a primary home's start of the standing GitHub accounting
-#                          owner exited nonzero (github_accounting_tick); reported
-#                          once per failure episode and retried on a long cadence.
+#                          owner exited nonzero other than 75 (github_accounting_tick);
+#                          reported once per failure episode and retried on a long
+#                          cadence.
 #                          docs/configuration.md "Standing GitHub caller accounting"
 #                          owns the contract
 #   check: rejected unauthenticated state checks: <paths>
