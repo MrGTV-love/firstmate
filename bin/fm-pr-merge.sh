@@ -10,6 +10,30 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
+# A PR can be a Firstmate landing when its task copy shares Firstmate's Git
+# history or its repository is any remote of this code root. Such a landing runs
+# only in an unseeded primary Git worktree whose config/firstmate-role records
+# a local maintainer scope for the PR's repository (resolved by fm-role-lib.sh).
+# Remotes identify candidate self-repository landings but never their owner.
+# Unknown task lineage without a matching code-root remote refuses before any
+# merge action; fetch full history with git fetch --unshallow in that task copy
+# before retrying. Only proven-unrelated copies keep the home-local merge path.
+# Other homes refuse before bookkeeping and hand the PR to Main: a landing-record
+# task spawned there lands it under its own task id and is torn down normally,
+# and its review names every source-home author model in --author-groups. The
+# refusal names a home only when that home's own role record proves the grant;
+# otherwise it names the grant to find, never a path or a remote. A remote or
+# unreadable parent uses the parent channel, and an unreadable primary-worktree
+# record names its repair. One-task --upstream-consent authorizes a contribution
+# (push and PR), not a landing; the repository's maintainer lands it.
+# Main's state/.firstmate-landing.lock serializes all such landings from
+# verification through the confirmed outcome and notification. Every other
+# project keeps its existing merge path, with no lock.
+# .agents/skills/ship-landing/SKILL.md owns the train planning procedure.
+# This is installation-local coordination, not a lock against external forge
+# users or independent installations with their own explicit maintainer grants;
+# the live tree and head checks still apply.
+#
 # Every supported forge verifies recorded review evidence inside the away-record
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
@@ -477,6 +501,82 @@ META="$STATE/$ID.meta"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
+# Firstmate's own repository has one landing owner. A PR can be that landing when
+# its task copy shares Firstmate's history or its repository is any remote of this
+# code root. Which remote a home publishes to by default does not decide this: a
+# repair clone defaults to its upstream while its PRs land on its origin.
+# shellcheck source=bin/fm-role-lib.sh
+. "$SCRIPT_DIR/fm-role-lib.sh"
+LANDING_REPO=$(fm_role_scope_norm "$PR_HOST/$PR_PATH")
+firstmate_landing_possible() {  # <task-worktree>
+  local remote url lineage=1
+  if [ -n "$1" ]; then
+    lineage=0
+    fm_role_self_repo "$1" "$FM_ROOT" || lineage=$?
+    [ "$lineage" -ne 0 ] || return 0
+  fi
+  while IFS= read -r remote; do
+    url=$(git -C "$FM_ROOT" remote get-url "$remote" 2>/dev/null) || continue
+    [ "$(fm_role_remote_identity "$url" "$FM_ROOT")" != "$LANDING_REPO" ] || return 0
+  done < <(git -C "$FM_ROOT" remote 2>/dev/null)
+  if [ "$lineage" -eq 2 ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
+    printf 'error: refusing merge: task copy %s lineage cannot be determined; fetch full history in that copy: git -C %q fetch --unshallow; then retry this merge\n' "$1" "$1" >&2
+    exit 1
+  fi
+  return 1
+}
+
+# The landing home is an unseeded primary worktree whose local maintainer scope
+# records the PR's publication target. Remotes never select that authority.
+# Every merge gate below still applies; other homes hand the PR to Main.
+firstmate_landing_route() {
+  local landing_home='' landing_root=$FM_ROOT landing_parent=false landing_line caller_home
+  local landing_owner='(unreadable)'
+  if [ -e "$FM_HOME/.fm-secondmate-parent" ] || [ -L "$FM_HOME/.fm-secondmate-parent" ]; then
+    landing_parent=true
+    landing_root=$(fm_firstmate_root_home "$FM_HOME") || landing_root=
+    # A remote parent has no local lockable Main home. Its existing parent
+    # channel carries the handoff; this machine must not become a second owner.
+    if [ -n "$landing_root" ] \
+      && { [ -e "$landing_root/.fm-secondmate-parent" ] || [ -L "$landing_root/.fm-secondmate-parent" ]; }; then
+      landing_root=
+    fi
+  fi
+  if [ -n "$landing_root" ]; then
+    while IFS= read -r landing_line; do
+      case "$landing_line" in
+        'worktree '*) landing_home=${landing_line#worktree }; break ;;
+      esac
+    done < <(git -C "$landing_root" worktree list --porcelain 2>/dev/null)
+  fi
+  if [ -n "$landing_home" ]; then
+    landing_home=$(CDPATH='' cd -- "$landing_home" 2>/dev/null && pwd -P) || landing_home=
+  fi
+  caller_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || caller_home=
+  if [ -n "$landing_home" ]; then
+    fm_role_resolve "$landing_home" "$landing_home/config"
+    if [ "$FM_ROLE" = maintainer ] && [ "$FM_ROLE_SOURCE" = local ] \
+      && [ "$FM_ROLE_SCOPE" = "$LANDING_REPO" ]; then
+      [ "$caller_home" != "$landing_home" ] || return 0
+      landing_owner=$(printf '%q' "$landing_home")
+    else
+      landing_owner="the home whose config/firstmate-role grants maintainer $LANDING_REPO"
+    fi
+  fi
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok "$([ -n "$landing_home" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+  printf 'error: refusing a firstmate landing outside its Main home, %s; ' "$landing_owner" >&2
+  if [ -z "$landing_home" ] && [ "$landing_parent" = true ]; then
+    printf 'hand the ready PR and review to Main through the existing secondmate parent channel; if that channel cannot resolve Main, repair .fm-secondmate-parent before retrying\n' >&2
+  elif [ -z "$landing_home" ]; then
+    printf 'restore the primary worktree registration, confirm it with git -C %q worktree list --porcelain, then re-run this merge\n' "$FM_ROOT" >&2
+  else
+    printf 'in that home, spawn a landing-record task, record the PR\047s exact-head review with bin/fm-review-record.py review and name every source-home author model in --author-groups, place it in Main\047s train order, merge with bin/fm-pr-merge.sh <landing-task> %q, then tear the task down normally\n' "$URL" >&2
+  fi
+  printf 'one-task --upstream-consent authorizes a contribution (push and PR), not a landing; the repository\047s maintainer lands it\n' >&2
+  exit 1
+}
+
 if [ ! -f "$META" ] || [ -L "$META" ]; then
   echo "error: task metadata is unavailable" >&2
   exit 1
@@ -486,6 +586,13 @@ if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
   exit 1
 fi
 MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
+
+MERGE_LANDING_LOCK=
+if firstmate_landing_possible "$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)"; then
+  firstmate_landing_route
+  MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner allow --cleared-by route-to-main 2>/dev/null
+fi
 
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
@@ -497,8 +604,12 @@ merge_control_cleanup() {
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
+  [ -z "$MERGE_LANDING_LOCK" ] || fm_lock_release "$MERGE_LANDING_LOCK" || true
 }
 trap merge_control_cleanup EXIT
+# One Main-wide lock precedes the per-task lock and remains held through the
+# forge outcome read and its durable notification, not just the merge request.
+[ -z "$MERGE_LANDING_LOCK" ] || fm_lock_acquire_wait "$MERGE_LANDING_LOCK"
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
 if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then

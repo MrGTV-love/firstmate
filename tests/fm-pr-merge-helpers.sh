@@ -801,7 +801,7 @@ record_review() {
   done
   printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
-  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
+  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
     "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
@@ -822,9 +822,9 @@ run_pr_merge() {
       record_review "$case_dir" "$2" "$head" >/dev/null 2>&1 || true
     fi
   fi
-  FM_ROOT_OVERRIDE="$ROOT" \
+  FM_ROOT_OVERRIDE="${FM_TEST_CODE_ROOT:-$ROOT}" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
   FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
   FM_TEST_GH_LOG="$case_dir/gh.log" \
   FM_TEST_GH_OUTCOME="$case_dir/github-outcome" \

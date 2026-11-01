@@ -701,6 +701,7 @@ Supported secondmate propagation writes or removes the inherited copy as describ
 A malformed, unreadable, or symlinked file - including one with a second directive anywhere - resolves to user/operator; the role fails closed rather than guessing.
 
 Authority is also available for one task at a time: `--upstream-consent <host>/<owner>/<repo>` on `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh` records the captain's explicit approval in the task's delivery contract and metadata without changing the home's role.
+That consent authorizes a contribution (a push and a pull request), not a landing; the repository's maintainer lands it, and `bin/fm-pr-merge.sh` refuses a firstmate landing outside the primary home with that maintainer grant.
 Role is never inferred from GitHub identity, forge permissions, remotes, repository ownership, authentication state, environment, or CI.
 `bin/fm-role.sh report` prints the resolved role with no network call, and the session-start digest shows it in the HOME ROLE subsection.
 
