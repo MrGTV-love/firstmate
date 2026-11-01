@@ -84,19 +84,21 @@ The first waiter in class order is admitted when, in bytes:
 | Symbol | Meaning | Source |
 |---|---|---|
 | `counted` | counted runs, as defined above | the run database, read now |
-| `R` | the reservation of one run: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe` |
+| `R` | the reservation of one run: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs that are not running now (a running run has not reached its peak) | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe`, leaving out every run whose `runs` row is `status = 'running'` |
 | `S` | slack for one run reaching its tail: the largest of those same peaks | same record |
 | `available_bytes` | free, file-backed and purgeable pages, never compressed or swapped memory | one `bin/fm-mem-guard.py` `admission_sample()` reading, at most 2 s old |
 | `held` | resident memory the counted runs hold now, summed over their process trees with each run's share capped at `R`; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
 
 `B` is the memory the counted runs may still use plus what the host has free, so the inequality is the same as "the reservations of the counted runs, the new run and one tail run fit the host's available memory": a counted run's reservation is partly already held, and `held` counts that part once. A run that holds more than `R` adds only `R` to `B`, so its excess is never treated as free memory for new starts.
 A run that is registered but not yet visible in the reading therefore reserves its whole `R` in the next decision.
+With no counted run, one start is admitted even when the inequality does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
 The record belongs to the host: it must name this host and its RAM size.
-The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's record.
+The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's record, found by `fm_firstmate_root_home` in `bin/fm-secondmate-parent-lib.sh`, the same walk the record's writer uses; a walk that fails takes the fallback below.
 `R` and `S` are measurements; taking the 75th percentile as the reservation is a policy choice (Main 2473 ruling), made after replaying it against the recorded readings (the captain-private record `data/fm-admission-measured-reservations/measurements.md` holds the readings, per-phase peaks, the five proc-guard pile-up censuses and the replay).
-The 41 recorded readings (5.3 hours, frozen at epoch 1793568514) held 13 qualifying runs: `R` was 3.99 GiB and `S` 8.06 GiB, which admitted 6 to 8 runs at each reading (a fixed 6 under the previous count limit).
-Example from the reading at 17:40 UTC: `available_bytes` 26.4 GiB plus 12.8 GiB `held` gives `B` 39.1 GiB, and `floor((B - S) / R)` is 7, so a start is admitted while `counted` is at most 6.
-The gain over the previous limit is small today because the record is thin; `R` and `S` re-derive from every probe, and the pause-only backstop, not a larger guess, is what bounds the tail.
+Measured: the record frozen at epoch 1793568514 (41 readings over 5.3 hours) held 13 `no-mistakes:` entries with at least 2 samples, and ranked together their peaks give `R` 3.99 GiB and `S` 8.06 GiB; which of those runs were still running at the freeze is in the record, and admission leaves such runs out.
+That replay predates two parts of the shipped formula, the cap of each run's `held` at `R` and leaving running runs out of the peaks, so its admitted counts per reading are not quoted here.
+Illustration (arithmetic, not a recorded reading): with those `R` and `S` and `B` 39 GiB, `floor((B - S) / R)` is 7, so a start is admitted while `counted` is at most 6.
+`R` and `S` re-derive from every probe, and the pause-only backstop, not a larger guess, is what bounds the tail.
 Those peaks are tree snapshots and lower bounds; native memory pressure never reached level 2 in that window, so no measured margin exists and the formula keeps none.
 
 Process count is not a reservation: a run's tree peaked at 34 processes against the host's 10,666 per-user cap, and every recorded pile-up was a runaway `bash` chain, not a run tree.

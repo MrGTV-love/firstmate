@@ -106,14 +106,20 @@ def procs(folder, count=100, limit=10666, error=False):
     write_json(folder / 'procs.json', dict(count=count, limit=limit, error=error))
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None):
-    """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each."""
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=()):
+    """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
+
+    live names runs (repo_id NULL) whose young, low peak the probe has folded in already.
+    """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
     runs = {'no-mistakes:repo/run-%d' % i: dict(peak_bytes=int(peak * GIB), samples=2, incomplete_samples=0,
                                                  first_seen='x', last_seen='x', max_gap_seconds=0)
             for i, peak in enumerate(peaks)}
     runs['task:crewmate'] = dict(peak_bytes=64 * GIB, samples=9)
+    for run in live:
+        runs['no-mistakes:None/' + run] = dict(peak_bytes=GIB // 5, samples=2, incomplete_samples=0,
+                                                first_seen='x', last_seen='x', max_gap_seconds=0)
     write_json(state / '.memory-calibration.json', dict(
         schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
 
@@ -257,6 +263,28 @@ try:
     env['FM_DURATION_HOME'] = str(folder / 'fmhome')
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'worker.marker')], env, folder / 'worker'))
     assert 'admitted: counted=6 need=' in (folder / 'worker.stderr').read_text(), (folder / 'worker.stderr').read_text()
+
+    # A running run's peak so far is not a per-run peak: six young runs at 0.2 GiB would pull
+    # the 75th percentile down to 1 GiB, but R stays 3 GiB from the 13 finished runs.
+    folder, db, env = case('live-runs', running=6, measured=True)
+    calibrate(folder, live=['baseline-%d' % i for i in range(6)])
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'live.marker')], env, folder / 'live'))
+    text = (folder / 'live.stderr').read_text()
+    assert 'admitted: counted=6 need=%d ' % (7 * 3 * GIB + 8 * GIB) in text and 'reservation=%d slack=%d runs_measured=13 ' % (3 * GIB, 8 * GIB) in text, text
+
+    # One-start minimum: with nothing counted, one start is admitted although R + S = 11 GiB
+    # exceeds the 10 GiB budget, unless the backstop reports an overload.
+    folder, db, env = case('floor', measured=True, available=10 * GIB)
+    facts(folder, available=10 * GIB, pressure=2)
+    marker = folder / 'floor.marker'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'floor')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: overload: memory: native memory pressure level 2' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
+    time.sleep(0.6)
+    assert not marker.exists() and child.poll() is None
+    facts(folder, available=10 * GIB)
+    finish(child)
+    assert marker.exists() and 'admitted: counted=0 need=%d budget=%d' % (11 * GIB, 10 * GIB) in (folder / 'floor.stderr').read_text()
 
     # Measured mode. R = 3 GiB (75th percentile of the 13 recorded peaks) and S = 8 GiB
     # (the largest); the task:crewmate record is not a no-mistakes run and is ignored.

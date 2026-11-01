@@ -57,10 +57,13 @@ Pipeline starts:
   - Admission is by measured memory reservations, never by load average. The
     first waiter is admitted when, as bytes, (counted + 1) x R + S fits
     B = available memory + the resident memory each counted run holds now, at
-    most R per run (memory a run holds above R is not free for new starts). R is
-    the 75th percentile (nearest rank) and S the largest per-run peak across the
-    host's recorded no-mistakes runs with at least 2 readings, read from the root
-    home's .memory-calibration.json (written by fm-mem-guard.sh probe). available
+    most R per run (memory a run holds above R is not free for new starts), or
+    when nothing is counted (a one-start minimum). R is the 75th percentile
+    (nearest rank) and S the largest per-run peak across the host's recorded
+    no-mistakes runs with at least 2 readings that are not status-running now,
+    read from the root home's .memory-calibration.json (written by
+    fm-mem-guard.sh probe; the root home comes from fm_firstmate_root_home in
+    fm-secondmate-parent-lib.sh, and a failed walk falls back). available
     and each run's resident memory come from one fm-mem-guard.py admission_sample
     reading, re-taken at most every 2 s while waiting. With fewer than 2
     qualifying recorded runs, or no native memory facts on this platform, the
@@ -433,17 +436,16 @@ def sibling(module: str, filename: str):
 def root_home() -> Path:
     """The top-most local firstmate home, which owns the host's calibration record."""
     # A worker has FM_DURATION_HOME (the owning home fm-spawn exports) and may have no FM_HOME.
-    home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_DURATION_HOME")
-                or Path(__file__).resolve().parent.parent).resolve()
-    for _ in range(16):
-        record = home / ".fm-secondmate-parent"
-        if not record.is_file() or record.is_symlink():
-            break
-        fields = dict(line.split("=", 1) for line in record.read_text().splitlines() if "=" in line)
-        if fields.get("route") != "local" or not fields.get("parent_home", "").startswith("/"):
-            break
-        home = Path(fields["parent_home"]).resolve()
-    return home
+    start = (os.environ.get("FM_HOME") or os.environ.get("FM_DURATION_HOME")
+             or str(Path(__file__).resolve().parent.parent))
+    walk = subprocess.run(
+        ["bash", "-c", '. "$1" && fm_firstmate_root_home "$2"', "bash",
+         str(Path(__file__).with_name("fm-secondmate-parent-lib.sh")), start],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10, check=True)
+    home = walk.stdout.strip()
+    if not home.startswith("/"):
+        raise ValueError("no root home resolved from %s" % start)
+    return Path(home)
 
 
 def rank_quantile(values: List[int], quantile: float) -> int:
@@ -451,23 +453,25 @@ def rank_quantile(values: List[int], quantile: float) -> int:
     return ordered[max(0, math.ceil(quantile * len(ordered)) - 1)]
 
 
-def measured_reservations(report: dict) -> Optional[Tuple[int, int, int]]:
+def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, int, int]]:
     """(R, S, qualifying runs) from the host's recorded no-mistakes run peaks, or None.
 
+    Only finished runs are ranked: a run still running has not reached its peak.
     None means too little record on this host, never an error: the caller falls
     back to the counted-run limit. A record for another host or RAM size is not
     this host's measurement.
     """
+    live = {"no-mistakes:%s/%s" % (repo, run) for run, (repo, _) in running.items()}
     try:
         record = json.loads((root_home() / "state" / ".memory-calibration.json").read_text())
         if (record["schema"] != CALIBRATION_SCHEMA or record["host"] != report["host"]
                 or record["total_bytes"] != report["total_bytes"]):
             return None
         peaks = [run["peak_bytes"] for name, run in record["runs"].items()
-                 if name.startswith("no-mistakes:") and type(run["samples"]) is int
+                 if name.startswith("no-mistakes:") and name not in live and type(run["samples"]) is int
                  and run["samples"] >= MIN_QUALIFYING_RUNS and type(run["peak_bytes"]) is int
                  and run["peak_bytes"] > 0]
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
         return None
     if len(peaks) < MIN_QUALIFYING_RUNS:
         return None
@@ -510,13 +514,13 @@ def host_observation() -> dict:
     return _observed
 
 
-def decide(counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
-    """(admit, one-line reason) for the first waiter, from the counted runs and the host reading."""
+def decide(running: dict, counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
+    """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation()
     if seen["reasons"]:
         return False, "overload: %s counted=%d priority=%s" % ("; ".join(seen["reasons"]), len(counted), priority)
     report = seen["memory"]
-    reserved = measured_reservations(report) if report is not None else None
+    reserved = measured_reservations(report, running) if report is not None else None
     if reserved is None:
         limit = max(1, cores // 3)
         return len(counted) < limit, "counted=%d limit=%d basis=fallback priority=%s" % (len(counted), limit, priority)
@@ -525,8 +529,9 @@ def decide(counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
                for run, repo in counted.items())
     budget = report["available_bytes"] + held
     need = (len(counted) + 1) * reservation + slack
-    return need <= budget, ("counted=%d need=%d budget=%d reservation=%d slack=%d runs_measured=%d priority=%s"
-                            % (len(counted), need, budget, reservation, slack, qualifying, priority))
+    return need <= budget or not counted, (
+        "counted=%d need=%d budget=%d reservation=%d slack=%d runs_measured=%d priority=%s"
+        % (len(counted), need, budget, reservation, slack, qualifying, priority))
 
 
 def pipeline_observation() -> Tuple[dict, int]:
@@ -584,7 +589,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 counted = {run: repo for run, (repo, is_counted) in before.items() if is_counted}
                 first = first_pipeline_waiter(directory)
                 if first == waiter_path:
-                    admit, reason = decide(counted, cores, args.priority)
+                    admit, reason = decide(before, counted, cores, args.priority)
                     if admit:
                         break
                 else:
