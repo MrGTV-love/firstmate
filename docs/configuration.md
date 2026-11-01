@@ -1075,6 +1075,17 @@ The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its 
 The check needs no call of its own because it reads headers from calls the sweeps were already making.
 Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test.sh), [`tests/fm-contributions.test.sh`](../tests/fm-contributions.test.sh), and [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh).
 
+### Standing GitHub caller accounting
+
+[`bin/fm-github-accounting.py`](../bin/fm-github-accounting.py)'s header and `--help` own the optional observer's launch/stop commands, private state format, cadences, retention, and argument projection.
+It is not auto-started by bootstrap and does not wrap, throttle, or change GitHub callers or the sweep quota floor above.
+Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql` body through `gh-axi`, not the enforcing response headers used by the sweeps.
+That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
+Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
+Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
+Run the observer under the existing home/process manager when continuous observation is wanted; its own start/stop commands manage only its private owner and quota child group, never a shared service.
+Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
+
 ### Completion and discard
 
 Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
