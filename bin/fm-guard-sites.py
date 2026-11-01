@@ -359,8 +359,18 @@ def python_event_lines(lines):
         while scope is not None:
             name = (scope.name if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
                     else expression_scopes.get(type(scope)))
+            comprehension = isinstance(scope, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp))
+            if comprehension and any(child is node for child in ast.walk(scope.generators[0].iter)):
+                name = None
             if name is not None:
                 candidates = tables.get((scope.lineno, name), [])
+                if not candidates and comprehension:
+                    if any(isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store)
+                           and target.id == node.func.id
+                           for generator in scope.generators for target in ast.walk(generator.target)):
+                        return False
+                    scope = parents.get(scope)
+                    continue
                 if len(candidates) != 1:
                     return False  # Ambiguous same-line scopes are not proven wrapper calls.
                 table = candidates[0]
@@ -491,7 +501,19 @@ def scan_file(root, rel, helpers, hook_names):
             sig.append('E')
         if sig:
             sites.append((number, ','.join(sig), stripped))
-    return sites
+    return [(number, sig, text, block_opener(lines, number, kind)) for number, sig, text in sites]
+
+
+def block_opener(lines, number, kind):
+    """The nearest earlier code line indented less than the site's line: the block the site sits in."""
+    line = lines[number - 1]
+    indent = len(line) - len(line.lstrip())
+    if indent:
+        for row in reversed(lines[:number - 1]):
+            stripped = row.strip()
+            if stripped and not is_comment(stripped, kind) and len(row) - len(row.lstrip()) < indent:
+                return ' '.join(stripped.split())
+    return ''
 
 
 def site_key(rel, text, seen):
@@ -542,8 +564,9 @@ def map_sites(sites, registry):
         if not isinstance(markers, list) or not all(
                 isinstance(m, dict) and isinstance(m.get('file'), str) and isinstance(m.get('match'), str)
                 and m['file'] and m['match']
-                and ('key' not in m or (isinstance(m['key'], str) and m['key'])) for m in markers):
-            errors.append(('S2', gid, 'sites must be a list of {file, match, key?} objects with non-empty strings'))
+                and all(field not in m or (isinstance(m[field], str) and m[field]) for field in ('key', 'within'))
+                for m in markers):
+            errors.append(('S2', gid, 'sites must be a list of {file, match, key?, within?} objects with non-empty strings'))
             continue
         for marker in markers:
             expected = marker.get('count', 1)
@@ -551,7 +574,8 @@ def map_sites(sites, registry):
                 errors.append(('S2', gid, 'site marker count for %s must be a positive integer' % marker['file']))
                 continue
             hits = [s for s in sites if s['file'] == marker['file'] and marker['match'] in s['text_full']
-                    and ('key' not in marker or s['key'] == marker['key'])]
+                    and ('key' not in marker or re.sub(r'~[0-9]+$', '', s['key']) == marker['key'])
+                    and ('within' not in marker or marker['within'] in s['within'])]
             if not hits:
                 errors.append(('S2', gid, "site marker '%s' in %s matches no site; remove or update it"
                                % (marker['match'], marker['file'])))
@@ -612,9 +636,10 @@ def main(argv):
     sites = []
     for rel in files:
         seen = {}
-        for number, sig, text in scan_file(root, rel, helpers, hook_names):
+        for number, sig, text, opener in scan_file(root, rel, helpers, hook_names):
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
-                          'text': text[:200], 'text_full': text, 'entry': None, 'touched': False})
+                          'text': text[:200], 'text_full': text, 'within': opener, 'entry': None,
+                          'touched': False})
     errors = map_sites(sites, registry)
 
     if touched_ref:
@@ -624,7 +649,7 @@ def main(argv):
             site['touched'] = lines is None or site['line'] in lines
 
     for site in sites:
-        del site['text_full']
+        del site['text_full'], site['within']
     json.dump({'paths': files, 'sites': sites, 'helpers': {k: sorted(v) for k, v in helpers.items()},
                'errors': [{'rule': r, 'id': i, 'message': m} for r, i, m in errors]}, sys.stdout)
     sys.stdout.write('\n')

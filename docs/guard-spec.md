@@ -121,6 +121,7 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   It follows one module-local function wrapper that forwards a positional decision parameter to that writer, including calls that supply the decision by keyword.
   The call site, not the wrapper's forwarding statement, is enumerated; a conditional decision is excluded only when both branches are exactly `allow`.
   Wrapper calls must resolve to the module's function in Python's symbol table; parameter, local-import, local-variable, closure and comprehension bindings that shadow its name are not event calls.
+  A comprehension that the interpreter inlines without its own symbol table (Python 3.12 and later) is judged by its loop targets and then by the enclosing scope, and a call in a comprehension's first iterable belongs to the enclosing scope.
   Unrelated functions named `record`, comments, strings and allow-only events are not Python event sites.
   Python event discovery does not execute the source or resolve imports, arbitrary path builders, additional wrapper layers or embedded heredoc code; if parsing fails, the existing line-based signatures still apply.
 
@@ -133,11 +134,12 @@ A refusal message should therefore stay on one line, or carry the `REFUSED:` mar
 A site maps to a registry entry through the entry's `sites` list.
 Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
 The lint requires the item to match exactly `count` sites, so a new site that a marker would silently absorb changes the count and fails until a reviewer updates it.
-When identical source lines in one file enforce different invariants, an item may also name the exact discovered `key` to select one occurrence; `file`, `match` and `count` are still checked against that selected site.
-A keyed marker never absorbs another occurrence, so a new identical refusal remains S1 until it is separately mapped.
+An item may also name a site `key` to select the lines with that text, and a `within` substring of the line that opens the site's block (the nearest earlier code line indented less than the site) to tell identical lines apart; `file`, `match` and `count` still apply to the selected sites.
+A marker key is the site id without its `~n` suffix, because that suffix counts identical lines in file order and changes when code moves; identical lines that enforce different invariants are told apart by `within`, never by order.
+A moved block keeps its owner, and a new identical refusal changes a marker's count (S2) or matches no marker (S1).
 Two entries may not map the same site, and a marker that matches nothing is stale.
 
-A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.
+A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves; the second and later identical lines in one file add `~2`, `~3` and so on in file order.
 The lint computes the unregistered count as the number of sites that map to nothing.
 A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 

@@ -277,6 +277,10 @@ site_ids() {  # <root> -> the S1 site ids a report-mode run prints
   "$LINT" --root "$1" --mode report 2>&1 | awk '$1 == "VIOLATION" && $2 == "S1" {sub(/:$/, "", $3); print $3}'
 }
 
+site_owners() {  # <root> -> "<line> <entry>" for every site the scan discovers
+  python3 "$ROOT/bin/fm-guard-sites.py" --root "$1" | jq -r '.sites[] | "\(.line) \(.entry)"'
+}
+
 assert_mapped() {  # <label> <root> <mapped-count>: clean, and the scan counts that many mapped sites
   local label=$1 dir=$2 want=$3 out
   out=$(run_lint "$dir" --counts) || fail "$label: expected clean exit, got: $out"
@@ -445,16 +449,32 @@ def locally_imported():
 
 shadowed_lambda = lambda record: record('lambda-data', 'deny')
 shadowed_comprehension = [record('comprehension-data', 'deny') for record in callbacks]
+
+def comprehensions(denied):
+    [record(guard, 'deny') for guard in denied]
+    {record(guard, 'deny') for guard in denied}
+    {guard: record(guard, 'deny') for guard in denied}
+    list(record(guard, 'deny') for guard in denied)
+    [guard for record in record('iterable-fixture', 'deny') for guard in record]
+
+def shadowed_comprehensions(callbacks):
+    [record('list-data', 'deny') for record in callbacks]
+    {record('set-data', 'deny') for record in callbacks}
+    {record: record('dict-data', 'deny') for record in callbacks}
+    list(record('generator-data', 'deny') for record in callbacks)
+    [record('nested-data', 'deny') for group in callbacks for record in group]
 PY
 assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
-[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 4 ] \
-  || fail "only conditional, keyword, direct and unshadowed function deny calls may be sites: $(site_ids "$SIG")"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 9 ] \
+  || fail "only conditional, keyword, direct and unshadowed function and comprehension deny calls may be sites: $(site_ids "$SIG")"
 mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
   {"file":"bin/a.py","match":"record(guard="},
   {"file":"bin/a.py","match":"subprocess.run(["},
-  {"file":"bin/a.py","match":"record('\''function-fixture'\''"}]'
-assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 4
+  {"file":"bin/a.py","match":"record('\''function-fixture'\''"},
+  {"file":"bin/a.py","match":"record(guard, '\''deny'\'')","count":4},
+  {"file":"bin/a.py","match":"record('\''iterable-fixture'\''"}]'
+assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 9
 
 SIG=$(fixture sig_python_unbound_record)
 cat >"$SIG/bin/a.py" <<'PY'
@@ -567,23 +587,54 @@ mutate "$TWICE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"contested re
 assert_fails_with "S2 fails a site that two entries map" "$TWICE" S2
 
 KEYED=$(fixture site_keyed)
-printf 'echo "REFUSED: repeated line" >&2\necho "REFUSED: repeated line" >&2\n' >"$KEYED/bin/a.sh"
-read -r KEY_A KEY_B < <(site_ids "$KEYED" | tr '\n' ' '; printf '\n')
-mutate "$KEYED" ".guards[0].sites = [{\"file\":\"bin/a.sh\",\"match\":\"REFUSED: repeated line\",\"key\":\"$KEY_A\"}]
-  | .guards += [(.guards[0] | .id = \"gother\" | .invariant = \"another invariant\" | .sites[0].key = \"$KEY_B\")]
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+KEY=$(site_ids "$KEYED" | sed 's/~[0-9]*$//' | sort -u)
+mutate "$KEYED" ".guards[0].sites = [{\"file\":\"bin/a.sh\",\"match\":\"REFUSED: repeated line\",\"key\":\"$KEY\",\"within\":\"\$first\"}]
+  | .guards += [(.guards[0] | .id = \"gother\" | .invariant = \"another invariant\" | .sites[0].within = \"\$second\")]
   | .beyond_audit_active = [\"gother\"]"
-assert_mapped "exact site keys distinguish identical lines enforcing different invariants" "$KEYED" 2
-mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_A\""
-assert_fails_with "an exact site key still cannot have two owners" "$KEYED" S2
-mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_B\" | .guards[1].sites[0].match = \"missing text\""
-assert_fails_with "a valid key does not bypass its marker text" "$KEYED" S2
+assert_mapped "a block context distinguishes identical lines enforcing different invariants" "$KEYED" 2
+[ "$(site_owners "$KEYED")" = "$(printf '2 gguard\n5 gother')" ] \
+  || fail "each identical line must map to the guard its block names: $(site_owners "$KEYED")"
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+assert_mapped "moving identical refusal blocks keeps every site mapped" "$KEYED" 2
+[ "$(site_owners "$KEYED")" = "$(printf '2 gother\n5 gguard')" ] \
+  || fail "a moved identical line must keep its owner: $(site_owners "$KEYED")"
+{ printf 'if [ -n "$third" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\n'; cat "$KEYED/bin/a.sh"; } >"$KEYED/a.tmp"
+mv "$KEYED/a.tmp" "$KEYED/bin/a.sh"
+assert_fails_with "a new identical refusal in another block is S1" "$KEYED" S1
+[ "$(site_owners "$KEYED")" = "$(printf '2 null\n5 gother\n8 gguard')" ] \
+  || fail "a new identical line above mapped ones must stay unmapped while they keep their owners: $(site_owners "$KEYED")"
+printf 'if [ -n "$first" ]; then\n  echo "REFUSED: repeated line" >&2\n  echo "REFUSED: repeated line" >&2\nfi\n' >"$KEYED/bin/a.sh"
+assert_fails_with "a new identical refusal in a mapped block changes its marker count" "$KEYED" S2
+printf 'if [ -n "$first" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\nif [ -n "$second" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\n' >"$KEYED/bin/a.sh"
+mutate "$KEYED" '.guards[1].sites[0].within = "$first"'
+assert_fails_with "a block context still cannot give a site two owners" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].within = "$second" | .guards[1].sites[0].match = "missing text"'
+assert_fails_with "a valid key and context do not bypass marker text" "$KEYED" S2
 mutate "$KEYED" '.guards[1].sites[0].match = "REFUSED: repeated line" | .guards[1].sites[0].key = "site:missing"'
-assert_fails_with "a missing exact site key is stale" "$KEYED" S2
+assert_fails_with "a missing site key is stale" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY~2\""
+assert_fails_with "an occurrence-ordered key never selects a site" "$KEYED" S2
 mutate "$KEYED" '.guards[1].sites[0].key = 1'
-assert_fails_with "a non-string exact site key is invalid" "$KEYED" S2
-mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY_B\""
-printf 'echo "REFUSED: repeated line" >&2\n' >>"$KEYED/bin/a.sh"
-assert_fails_with "a keyed marker does not excuse a new identical refusal" "$KEYED" S1
+assert_fails_with "a non-string site key is invalid" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY\" | .guards[1].sites[0].within = 1"
+assert_fails_with "a non-string block context is invalid" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].within = "$second"'
+assert_mapped "the restored block contexts map both identical lines" "$KEYED" 2
 
 # --- computed unregistered count ---------------------------------------------
 TYPED=$(fixture typed_unregistered)
