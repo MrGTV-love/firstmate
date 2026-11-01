@@ -1446,7 +1446,7 @@ def main():
     lim.add_argument('key'); lim.add_argument('--percentile', type=int, choices=(95, 99), default=95)
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
-    runner.add_argument('--pipeline-priority', choices=('merge-train', 'machinery', 'vernant-build', 'other'), default='other')
+    runner.add_argument('--pipeline-priority', default='other')
     runner.add_argument('--pipeline-admitted', action='store_true', help=argparse.SUPPRESS)
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     progress = commands.add_parser('keep-going')

@@ -1124,7 +1124,7 @@ When the captain's intent refers to a report, decision, or PR ("do items 1, 2, 3
 This replaces the no-mistakes skill's advice to enrich \`--intent\` with decisions and tradeoffs; that advice does not apply to Firstmate-dispatched work.
 Do not hand-edit, commit, or fix findings yourself while a run is active - the pipeline applies every fix.
 
-Start every fresh/new run (including an authorized rerun) through \`python3 $admission_runner run --pipeline-priority <class> no-mistakes.run -- no-mistakes axi run <new-run inputs>\`; the measured runner automatically queues it through \`fm-cpu-pass.sh pipeline-start\` before any execution clock.
+Start every fresh/new run through \`python3 $admission_runner run --pipeline-priority <class> no-mistakes.run -- no-mistakes axi run <new-run inputs>\`; when a rerun is expressly authorized, issue it through the same runner as \`python3 $admission_runner run --pipeline-priority <class> no-mistakes.run -- no-mistakes rerun\`, never as \`axi run\`. The measured runner automatically queues either through \`fm-cpu-pass.sh pipeline-start\` before any execution clock.
 Choose class \`merge-train\` for merge-train work, \`machinery\` for Firstmate machinery, \`vernant-build\` for Vernant builds, and \`other\` otherwise; the pool owner enforces that priority order.
 Keep the original intent, verification-plan, base and profile arguments unchanged; admission never authorizes a start, resolves a finding or skips a step.
 Reattach and respond to the existing run normally, without new-run inputs or another admission; \`docs/cpu-pass-pool.md\` owns the start-policy and descriptor-lifetime limits.

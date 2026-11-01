@@ -69,9 +69,8 @@ def case(name, cores=18, running=0, load=0):
         connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
-    env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'))
-    if not os.environ.get('FM_ADMISSION_NATIVE'):
-        env['CASE_CORES'] = str(cores)
+    env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
+               CASE_CORES=str(cores))
     return folder, db, env
 
 
@@ -121,13 +120,7 @@ try:
     # Count == limit blocks at the exact load boundary. Releasing count while
     # load is above the boundary still blocks; only both observations grant.
     folder, db, env = case('thresholds', running=6, load=36)
-    if os.environ.get('FM_ADMISSION_NATIVE'):
-        cores = os.cpu_count()
-        limit = max(1, cores // 3)
-        change(db, 'DELETE FROM runs')
-        for i in range(limit): change(db, 'INSERT INTO runs (id, status) VALUES (?, ?)', (str(i), 'running'))
-    else:
-        cores, limit = 18, 6
+    cores = 18
     marker = folder / 'started'
     command = cli + ['pipeline-start', '--', python, '-c',
                      'import pathlib,sys; pathlib.Path(sys.argv[1]).touch()', str(marker)]
@@ -149,7 +142,7 @@ try:
     # count. Every excluded state is seeded; included rows alone fill the limit,
     # and each daemon-recorded exclusion releases a count when it is set.
     folder, db, env = case('count-definition', cores=3)
-    limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
+    limit = 1
     for row in (('ci-ready', 'running', 1, None), ('parked', 'running', None, 1), ('ci-ready-parked', 'running', 1, 1),
                 ('pending', 'pending', None, None), ('completed', 'completed', None, None), ('failed', 'failed', None, None)):
         change(db, 'INSERT INTO runs (id, status, ci_ready_at, awaiting_agent_since) VALUES (?, ?, ?, ?)', row)
@@ -170,9 +163,7 @@ try:
     # The startup lock bridges registration even while earlier clients remain
     # alive. All requests initially observe the same full database.
     folder, db, env = case('priority-race', cores=3, running=1)
-    limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
-    if limit > 1:
-        for i in range(1, limit): change(db, 'INSERT INTO runs (id, status) VALUES (?, ?)', (str(i), 'running'))
+    limit = 1
     classes = ['other', 'vernant-build', 'machinery', 'merge-train']
     clients = {}
     for priority in classes:
@@ -269,7 +260,6 @@ else:
     # admitted client is a descendant and must queue like any other start. This
     # fake native start writes only the private DB, never the shared daemon.
     folder, db, env = case('duration', cores=3, running=20)
-    limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
     fake_nm = shim / 'no-mistakes'
     fake_nm.write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, subprocess, sys
 folder = pathlib.Path(os.environ['CASE_FOLDER'])
@@ -291,7 +281,7 @@ if name == 'outer':
     pending(folder, 1)
     time.sleep(3.5)
     assert not (folder / 'outer.started').exists()
-    change(db, "UPDATE runs SET status='completed' WHERE id NOT IN (SELECT id FROM runs LIMIT ?)", (limit - 1,))
+    change(db, "UPDATE runs SET status='completed'")
     finish(child)
     assert (folder / 'outer.started').exists()
     samples = lambda key='no-mistakes.run': [row for row in map(json.loads, Path(env['FM_DURATION_FILE']).read_text().splitlines())
