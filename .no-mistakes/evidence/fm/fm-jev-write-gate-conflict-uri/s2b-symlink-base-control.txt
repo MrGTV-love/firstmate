@@ -1,0 +1,6 @@
+omp-exit=0
+--- step 1: edit 'escape/t.txt'
+[escape/t.txt]
+1:PWNED
+{'tool': 'edit', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'refused_path': None, 'request_started': False}
+victim-after=PWNED

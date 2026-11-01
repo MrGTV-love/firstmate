@@ -1,0 +1,21 @@
+omp=omp/18.14.0 real login, real model, lab home
+exit=0
+== final model text ==
+Working...
+Resolved both conflicted files by keeping the lines from both sides, then staged them and successfully completed the rebase.
+== guard audit ==
+node:1: command not found: _nvm_lazy_load
+{'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'refused_path': None}
+{'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'refused_path': None}
+== repo after ==
+On branch topic
+nothing to commit, working tree clean
+1c73437 topic
+0a4b768 main
+6cffc32 base
+-- conflicted.txt
+main
+topic
+-- second.txt
+main2
+topic2

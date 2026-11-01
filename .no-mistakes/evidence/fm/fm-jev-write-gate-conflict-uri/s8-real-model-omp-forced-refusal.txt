@@ -1,0 +1,22 @@
+omp=omp/18.14.0 real login, real model, lab home; prompt starts the worker on conflict://
+exit=0
+== final model text ==
+Working...
+The tools read both files, refused `conflict://` writes because their paths could not be verified, then preserved both sides using the explicitly permitted direct edits. I staged both files and ran `git rebase --continue`, which successfully finished the rebase.
+== guard audit ==
+{'tool': 'write', 'decision': 'block', 'enforcement': 'pretool_deny', 'branch': 'device', 'refused_path': 'conflict://1'}
+{'tool': 'write', 'decision': 'block', 'enforcement': 'pretool_deny', 'branch': 'device', 'refused_path': 'conflict://2'}
+{'tool': 'edit', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'refused_path': None}
+{'tool': 'edit', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'refused_path': None}
+== repo after ==
+On branch topic
+nothing to commit, working tree clean
+6b190e5 topic
+1040c84 main
+186f6b0 base
+-- conflicted.txt
+main
+topic
+-- second.txt
+main2
+topic2
