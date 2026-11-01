@@ -479,7 +479,7 @@ def statement_has_remedy(statement, root):
     return False
 
 
-REPO_BIN = r'(?<![\w/.~-])bin/'
+REPO_BIN = r'(?<![\w/.~-])(?:\./)?bin/'
 
 
 def remedy_has_command(remedy, root):
