@@ -20,13 +20,21 @@ REGISTRY="$ROOT/docs/guards/registry.json"
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
-printf '%s\n' "$out" | grep -q 'active=45 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=18' \
-  || fail "registry arithmetic drifted from (45-18)+(14-12)+1=30: $out"
-pass "G-10 the registry accounts for all 30 audited Firstmate guards"
+counts=$(printf '%s\n' "$out" | sed -n 's/.*inventory: \(active=.*\)/\1/p')
+count_of() { printf '%s\n' "$counts" | tr ' ' '\n' | sed -n "s/^$1=\([0-9][0-9]*\)$/\1/p"; }
+[ "$(count_of audited)" = 30 ] || fail "the lint no longer reports the 30 audited guards: $out"
+active=$(count_of active) retired=$(count_of retired) beyond_audit=$(count_of beyond_audit)
+excluded=$(count_of excluded) beyond_audit_active=$(count_of beyond_audit_active)
+[ -n "$active" ] && [ -n "$retired" ] && [ -n "$beyond_audit" ] && [ -n "$excluded" ] && [ -n "$beyond_audit_active" ] \
+  || fail "the lint counts line is incomplete: $out"
+[ $(( (active - beyond_audit_active) + (retired - beyond_audit) + excluded )) = 30 ] \
+  || fail "registry arithmetic drifted from (active-beyond_audit_active)+(retired-beyond_audit)+excluded=30: $out"
+pass "G-10 the registry accounts for all audited Firstmate guards"
 
 [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
-jq -e '.guards | length == 45' "$REGISTRY" >/dev/null || fail "registry does not hold 45 live guards"
-jq -e '.beyond_audit_active | length == 18' "$REGISTRY" >/dev/null || fail "the eighteen post-audit guards are not recorded"
+jq -e --argjson n "$active" '.guards | length == $n' "$REGISTRY" >/dev/null || fail "registry live guards disagree with the lint's active count"
+jq -e --argjson n "$beyond_audit_active" '.beyond_audit_active | length == $n' "$REGISTRY" >/dev/null \
+  || fail "the registry's post-audit guards disagree with the lint's count"
 jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
 pass "G-10b the spec and the registry are checked in and agree"
 

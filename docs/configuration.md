@@ -103,7 +103,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
-- The heartbeat guard-workaround report `state/.guard-workarounds-next` and its last presented copy `state/.guard-workarounds-presented`, both owned by `bin/fm-watch.sh`.
+- The heartbeat guard-workaround report `state/.guard-workarounds-next`, written by `bin/fm-watch.sh` as file output only; no wake presents it.
 - The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
 - The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.

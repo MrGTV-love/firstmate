@@ -248,9 +248,10 @@ Deny-only rows and guards with no recorded events in the selected window remain 
 `bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
 Its header owns the bounded first-parent scan, local metadata scope, base resolution and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
 A tree-equal merge is a signature, not proof that a guard caused it, and a base-merge-only signature requires every intervening commit to be a merge from the recorded base lineage.
-The watcher runs the detector detached and single-flight, so a slow worktree read cannot hold its poll; at the next heartbeat it queues a finished run's changed report as one `check` wake keyed `guard-workarounds`, so plain heartbeat deduplication cannot drop it, and it suppresses an unchanged report.
+The watcher runs the detector detached and single-flight at each heartbeat, so a slow worktree read cannot hold its poll, and leaves the latest finished report in `state/.guard-workarounds-next`.
+That report is file output only: no wake presents it to Main, so a new signature is seen only by reading that file or running the detector.
 Neither detection nor metrics changes refs, waives a refusal or disables a guard.
-The behavior entry points are `tests/fm-guard-telemetry.test.sh` and the focused `test_guard_workaround_heartbeat` case in `tests/fm-watch-triage.test.sh`.
+The behavior entry point is `tests/fm-guard-telemetry.test.sh`.
 Turns-to-clear and tool-calls-to-clear remain the real cost unit because an agent clears the block.
 
 ## Required detection
