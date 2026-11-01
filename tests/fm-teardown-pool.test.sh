@@ -3243,9 +3243,9 @@ SH
 # Vernant owns the lifecycle format and removal. Fixtures model its public CLI,
 # while teardown still runs its real landing, custody and branch-delete path.
 test_vernant_slot_manifest_retirement() {
-  local variant case_dir common digest records rc head merge orig
+  local variant case_dir common digest records rc head merge orig reason
   local -a sweep
-  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged no-manifest scout local-only orca-success orca-refused; do
+  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged no-manifest scout local-only no-branch branch-mismatch detached forge-fail orca-success orca-refused; do
     case "$variant" in
       orca-*)
         case_dir=$(make_case "vernant-manifest-$variant")
@@ -3254,7 +3254,7 @@ test_vernant_slot_manifest_retirement() {
         fm_write_meta "$case_dir/state/task-x1.meta" \
           'window=fm-task-x1' 'endpoint_task_id=task-x1' "worktree=$NESTED_SLOT" \
           "project=$case_dir/project" 'kind=ship' 'mode=no-mistakes' 'backend=orca' \
-          'spawn_gen=teardown-test-task-x1' 'terminal=fixture-terminal' \
+          'branch=fm/task-x1' 'spawn_gen=teardown-test-task-x1' 'terminal=fixture-terminal' \
           "orca_worktree_id=$case_dir/project::$NESTED_SLOT"
         printf '#!/usr/bin/env bash\nprintf '\''{"ok":true}\\n'\''\n' > "$case_dir/fakebin/orca"
         chmod +x "$case_dir/fakebin/orca"
@@ -3263,15 +3263,16 @@ test_vernant_slot_manifest_retirement() {
         make_nested_slot_case "vernant-manifest-$variant" enclosing .claude/worktrees/x local-only
         case_dir=$NESTED_CASE
         ;;
-      no-manifest)
-        make_nested_slot_case "vernant-manifest-$variant" slot .claude/worktrees/x
-        case_dir=$NESTED_CASE
-        ;;
-      *)
+      forced-landed|unlanded|scout|branch-mismatch)
         make_nested_slot_case "vernant-manifest-$variant" enclosing .claude/worktrees/x
         case_dir=$NESTED_CASE
         ;;
+      *)
+        make_nested_slot_case "vernant-manifest-$variant" slot .claude/worktrees/x
+        case_dir=$NESTED_CASE
+        ;;
     esac
+    [ "$variant" != no-branch ] || perl -ni -e 'print unless /^branch=/' "$case_dir/state/task-x1.meta"
     if [ "$variant" = scout ] || [ "$variant" = no-manifest ]; then
       perl -pi -e 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta"
       mkdir -p "$case_dir/data/task-x1"
@@ -3300,6 +3301,14 @@ test_vernant_slot_manifest_retirement() {
     cat > "$case_dir/fakebin/gh-axi" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$case_dir/gh-axi.log'
+if [ "\${1:-}" = api ]; then
+  lock=free
+  for held in '$case_dir'/*/state/.treehouse-project-*.lock; do
+    [ ! -e "\$held/pid" ] || lock=held
+  done
+  printf '%s\n' "\$lock" >> '$case_dir/forge-lock.log'
+  [ '$variant' != forge-fail ] || exit 1
+fi
 if [ '$variant' = not-merged ]; then
   printf 'merged: false\nhead: $head\nmerge: $merge\n'
 else
@@ -3331,6 +3340,10 @@ PY
       rm "$case_dir/project/scripts/git-stability/retire_slot_manifest.py"
       touch "$case_dir/project/scripts/git-stability/provision_existing_slot.py"
     fi
+    if [ "$variant" = detached ]; then
+      git -C "$NESTED_SLOT" checkout -q --detach
+      git -C "$case_dir/project" branch -D fm/task-x1 >/dev/null
+    fi
     if [ "$variant" = unlanded ] || [ "$variant" = orca-forced-unlanded ]; then
       printf 'unlanded\n' > "$NESTED_SLOT/unlanded.txt"
       git -C "$NESTED_SLOT" add unlanded.txt
@@ -3347,6 +3360,9 @@ PY
           FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
         ;;
     esac
+    if grep -q held "$case_dir/forge-lock.log" 2>/dev/null; then
+      fail "$variant asked the forge while holding the project lock"
+    fi
     case "$variant" in
       *forced*)
         expect_code 0 "$rc" "authorized forced teardown changed behavior: $(cat "$case_dir/err")"
@@ -3357,8 +3373,16 @@ PY
           fail 'forced teardown did not delete its task branch'
         fi
         ;;
+      detached)
+        expect_code 0 "$rc" "detached slot rerun: $(cat "$case_dir/err")"
+        assert_present "$case_dir/called" 'detached slot rerun did not call the entry point'
+        assert_absent "$records/worktree-lifecycle/$digest.json" 'detached slot rerun left legacy record'
+        assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'detached slot rerun left durable record'
+        ;;
       success|orca-success)
         expect_code 0 "$rc" "retirement success: $(cat "$case_dir/err")"
+        assert_grep free "$case_dir/forge-lock.log" 'retirement built no forge proof'
+
         assert_present "$case_dir/called" 'entry point was not called'
         assert_absent "$records/worktree-lifecycle/$digest.json" 'legacy record remains'
         assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'durable record remains'
@@ -3402,12 +3426,21 @@ PY
         assert_present "$common/vernant-worktree-lifecycle/unknown.json" 'apply touched unproven owner'
         ;;
 
-      no-record|not-merged|scout|local-only)
+      no-record|not-merged|scout|local-only|no-branch|branch-mismatch|forge-fail)
+        case "$variant" in
+          no-record) reason='no Firstmate-recorded PR; landing unproven' ;;
+          not-merged) reason='recorded PR is not MERGED; landing unproven' ;;
+          scout) reason='scout task records no merged PR' ;;
+          local-only) reason='local-only ship records no merged PR' ;;
+          no-branch) reason='task records no branch' ;;
+          branch-mismatch) reason='record names branch fm/task-x1; task records branch fm/task-x1-v2' ;;
+          forge-fail) reason='command failed: gh-axi api' ;;
+        esac
         expect_code 0 "$rc" "$variant teardown changed behavior: $(cat "$case_dir/err")"
         assert_absent "$case_dir/called" "$variant called retirement"
         assert_present "$records/worktree-lifecycle/$digest.json" "$variant removed legacy record"
         assert_present "$common/vernant-worktree-lifecycle/$digest.json" "$variant removed durable record"
-        assert_grep "$digest.json stayed: " "$case_dir/out" "$variant did not name the kept record"
+        assert_grep "$digest.json stayed: $reason" "$case_dir/out" "$variant did not name the kept record and why: $(cat "$case_dir/out")"
         if git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1; then
           fail "$variant teardown did not delete its task branch"
         fi
@@ -3440,7 +3473,7 @@ PY
         ;;
     esac
   done
-  pass 'Vernant retirement honors landing proof, kept records, live owners, both copies, refusals, and old checkouts'
+  pass 'Vernant retirement honors landing proof, recorded branch, lock-free forge proof, kept records, live owners, both copies, refusals, and old checkouts'
 }
 
 teardown_test_cases=(
