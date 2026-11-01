@@ -738,12 +738,16 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
 # never past it: a writer that appends after the check grows the source but not the
 # copy, so the check bounds the bytes written, not just the bytes seen. The copy takes
 # the source's mtime as read with that size, before the copy, as cp -p would have.
-snapshot_capture_status() {  # <source> <destination>
-  local source=$1 destination=$2 size mtime endpoint limit copied
+snapshot_capture_status() {  # <source> <destination> [<identity-out-var>]
+  local source=$1 destination=$2 size='' mtime='' capture_ident='' endpoint limit copied
+  [ -z "${3:-}" ] || printf -v "$3" '%s' ''
   [ -f "$source" ] || return 0
-  size=$(_fm_status_file_size "$source" 2>/dev/null) || size=''
+  # Identity, size and mtime describe one pre-copy observation, not three
+  # separate stat processes. Never batch live facts across capture/validation.
+  _fm_status_stat_into "$source" capture_ident size mtime 2>/dev/null \
+    || { capture_ident=''; size=''; mtime=''; }
+  [ -z "${3:-}" ] || printf -v "$3" '%s' "$capture_ident"
   size=${size//[[:space:]]/}
-  mtime=$(_fm_status_file_mtime "$source" 2>/dev/null) || mtime=''
   mtime=${mtime//[[:space:]]/}
   fm_status_read_limit_bytes limit
   case "$size" in
@@ -793,8 +797,7 @@ prefetch_task_observations() {  # <meta> <id>
 
   snapshot_task_generation_is_current "$meta" "$id" || generation_current=0
   if [ "$generation_current" = 1 ]; then
-    status_ident=$(_fm_open_decisions_file_ident "$status_log" 2>/dev/null) || status_ident=''
-    snapshot_capture_status "$status_log" "$status_capture" || current_rc=1
+    snapshot_capture_status "$status_log" "$status_capture" status_ident || current_rc=1
     status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
     snapshot_mark_optional_present "$report_path" "$report_capture" || current_rc=1
   fi
@@ -959,8 +962,8 @@ task_json_one() {  # <captured-meta> - prints one task record
     status_present=true
     last_nonempty_line_to "$status_log" last_event_raw
     status_line_verb "$last_event_raw" last_event_verb
-    last_event_note=$(status_line_note "$last_event_raw")
-    last_event_epoch=$(status_line_at_epoch "$last_event_raw") || last_event_epoch=null
+    status_line_note "$last_event_raw" last_event_note
+    _fm_status_at_epoch "$last_event_raw" last_event_epoch || last_event_epoch=null
     if [ "$last_event_epoch" != null ] && [ "$last_event_epoch" -le "$SNAPSHOT_EPOCH" ]; then
       last_event_age=$((SNAPSHOT_EPOCH - last_event_epoch))
     fi
@@ -985,7 +988,7 @@ task_json_one() {  # <captured-meta> - prints one task record
   # open decision surfacing.
   open_decisions_unreadable=false
   [ ! -e "$status_log.refused" ] || open_decisions_unreadable=true
-  open_decisions_tsv=$(status_open_decisions "$status_log" "$kind") \
+  status_open_decisions "$status_log" "$kind" open_decisions_tsv \
     || { open_decisions_tsv=''; open_decisions_unreadable=true; }
 
   endpoint_exists=null
@@ -1113,8 +1116,11 @@ task_json_one() {  # <captured-meta> - prints one task record
 # observations: a record starts as soon as a slot frees, and the finished files are
 # merged in id order.
 task_json_lines() {
-  local meta id index=0 read_slot=0 pid rc=0
+  local meta id index=0 read_slot=0 pid rc=0 _FM_STATUS_STAT_BATCH=''
   local -a pids=() files=()
+  # Captures are immutable after observation joins. Share one stat scan across
+  # their read-only folds, never with live-log or checkpoint carry validation.
+  _fm_status_stat_batch_into "$SNAPSHOT_TASK_DIR" _FM_STATUS_STAT_BATCH
   while [ "$index" -lt "$SNAPSHOT_TASK_META_COUNT" ]; do
     if [ "$index" -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
       snapshot_wait_current_read_slot read_slot "${pids[@]}" || rc=1

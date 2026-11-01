@@ -74,6 +74,30 @@ test('T6(a): repository and kind facts make non-Vernant rules unreachable for Ve
   assert.deepEqual(unknown.selection.support, { default: 1 });
 });
 
+test('inherited foreign selectors stay inert beside an exactly matched local project', () => {
+  writeFileSync(registryPath, JSON.stringify({ firstmate: '/home' }));
+  try {
+    const inherited = { ...cfg, rules: [
+      { ...cfg.rules[0], match: { projects: ['vernant', 'Firstmate', ' firstmate', 'parent-only'], all: ['boundary'] } },
+      cfg.rules[1],
+    ] };
+    writeFileSync(rulesPath, JSON.stringify(inherited));
+    const owned = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath, registryPath], { encoding: 'utf8' });
+    assert.equal(owned.status, 65, 'a home-owned policy still rejects selectors its registry lacks');
+    assert.match(owned.stderr, /^match.projects contains an unregistered project id/);
+    process.env.FM_DISPATCH_INHERITED_POLICY = '1';
+    const request = prepare('firstmate', 'ship', inherited);
+    assert.equal(request.questions.judgment_boundary, undefined, 'parent-only and near-spelling selectors send no semantic question');
+    assert.ok(request.questions.judgment_bounded, 'the exact local selector retains its semantic question');
+    const result = apply(request, { judgment_bounded: 1 }, { judgment_boundary: { type: 'noul', noul: 1 } });
+    assert.deepEqual(result.selection.support, { rule_2: 1, default: 0 });
+    assert.equal(result.selection.choice, 'rule_2', 'even a positive foreign answer cannot admit an ineligible rule');
+  } finally {
+    delete process.env.FM_DISPATCH_INHERITED_POLICY;
+    writeFileSync(registryPath, JSON.stringify({ vernant: '/clone/vernant', firstmate: '/home' }));
+  }
+});
+
 test('T6 predicates combine in code, preserve complements, and never pool independent support', () => {
   const result = apply(prepare(), { judgment_boundary: .2, judgment_bounded: .9 });
   assert.equal(result.selection.support.rule_1, .2);
