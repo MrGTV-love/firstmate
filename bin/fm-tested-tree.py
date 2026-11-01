@@ -8,7 +8,8 @@ ran at the head, every GitHub Actions check run has a verified matching tree,
 and at least one does; a check run from another app needs no record, since
 GitHub's head_sha is all it can show. 1 means evidence unavailable (ancestry fallback,
 with a one-line reason on stderr), 2 means complete verified records prove a
-different tree (refuse even if the head contains the tip). Artifact metadata is
+different tree, and 3 means a check run names another head (both refuse even
+if the head contains the tip). Artifact metadata is
 read only through gh. Names bind HEAD^{tree}, HEAD^1 (the actual merge parent,
 not the event's possibly newer base SHA), and run attempt. Nothing from an
 artifact is executed or extracted.
@@ -27,6 +28,10 @@ import sys
 
 
 class Unavailable(Exception):
+    pass
+
+
+class ForeignHead(Exception):
     pass
 
 
@@ -58,6 +63,9 @@ def check_runs(repo, head):
     runs = listing(repo, f'commits/{head}/check-runs', 'check_runs')
     if not runs or len({r['id'] for r in runs}) != len(runs):
         raise Unavailable(f'the check runs at head {head} are empty or repeated')
+    for check in runs:
+        if check['head_sha'] != head:
+            raise ForeignHead(f'check run {check["id"]} did not run at head {head}')
     return runs
 
 
@@ -65,8 +73,6 @@ def read_records(repo, head, runs):
     records = []
     cache = {}
     for check in runs:
-        if check['head_sha'] != head:
-            raise Unavailable(f'check run {check["id"]} did not run at head {head}')
         if check['app']['slug'] != 'github-actions':
             # Not an Actions run: it saw the head being merged, and that is all
             # it can show, so it needs no record. Actions runs test GitHub's
@@ -176,6 +182,9 @@ def verify(repo, head, tip, scratch, worktree, *mode):
 if __name__ == '__main__':
     try:
         sys.exit(verify(*sys.argv[1:]))
+    except ForeignHead as error:
+        print(f'error: {error}; no waiver applies', file=sys.stderr)
+        sys.exit(3)
     except Unavailable as error:
         print(f'note: tested-tree records unavailable ({error}); the ancestry rule applies', file=sys.stderr)
         sys.exit(1)

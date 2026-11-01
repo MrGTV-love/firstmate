@@ -1348,7 +1348,7 @@ test_required_producer_identity() {
         assert_grep 'pr merge' "$case_dir/gh.log" "accepted producer did not merge"
       fi
       case "$variant" in
-        unreadable|malformed|stale)
+        unreadable|malformed)
           assert_grep 'required check producers at head' "$case_dir/stderr" "producer read error not reported" ;;
       esac
     done
@@ -2425,7 +2425,7 @@ test_tested_tree_repo_case_differs_from_url() {
 
 # A check run from an app other than GitHub Actions carries no tested-tree
 # record. It counts only when GitHub reports it ran at the head being merged;
-# a run at another head, or a head with no Actions record at all, keeps the
+# a run at another head refuses outright. No Actions record at all keeps the
 # ancestry rule.
 test_tested_tree_non_actions_check_run_must_see_the_head() {
   local variant case_dir head tip
@@ -2447,6 +2447,12 @@ test_tested_tree_non_actions_check_run_must_see_the_head() {
         assert_logged_gh_merge "$case_dir" 188 example/repo --squash
         assert_final_read_is_offline "$case_dir" 'non-Actions run at the head'
         ;;
+      other-head)
+        expect_code 1 "$RC" 'a non-Actions check at another head must refuse outright'
+        assert_grep 'check run 9 did not run at head' "$case_dir/stderr" 'the foreign check must be identified'
+        assert_no_grep 'the ancestry rule applies' "$case_dir/stderr" 'a foreign check must not fall back to ancestry'
+        assert_no_grep 'pr merge' "$case_dir/gh.log" 'a foreign check reached the forge merge'
+        ;;
       *)
         expect_code 1 "$RC" "$variant must not land a tree no record proves"
         assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" "$variant must keep the ancestry refusal"
@@ -2457,6 +2463,51 @@ test_tested_tree_non_actions_check_run_must_see_the_head() {
     [ "$variant" != other-head ] \
       || assert_grep 'check run 9 did not run at head' "$case_dir/stderr" 'other-head must name the run that missed the head'
     pass "tested-tree non-Actions check run $variant"
+  done
+}
+
+# A foreign check head is a definite refusal, independent of ancestry, merge
+# method, legacy status contexts, or merge queue eligibility.
+test_foreign_check_head_refuses_with_current_ancestry() {
+  local case_dir head path producer
+  for path in squash merge rebase legacy-status queue missing-record changed-run; do
+    for producer in non-actions actions; do
+      case_dir=$(make_case "foreign-check-current-$path-$producer")
+      make_tested_train "$case_dir"
+      head=$(cat "$case_dir/github-head")
+      write_github_compare "$case_dir" "$head" "$head" 0
+      [ "$path" != changed-run ] || cp "$case_dir/github-runs.json" "$case_dir/github-runs-first.json"
+      jq '.total_count = 2 | .check_runs += [{"id":9,"name":"foreign check","head_sha":"0000000000000000000000000000000000000000","details_url":"https://socket.dev/report/9","app":{"id":156372,"slug":"socket-security"}}]' \
+        "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+      mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+      if [ "$producer" = actions ]; then
+        jq '.check_runs[1].app = {"id":15368,"slug":"github-actions"}' \
+          "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+        mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+      fi
+      case "$path" in
+        legacy-status)
+          jq '.statusCheckRollup += [{"__typename":"StatusContext","context":"legacy","state":"SUCCESS"}]' \
+            "$case_dir/github-view.json" > "$case_dir/view.tmp"
+          mv "$case_dir/view.tmp" "$case_dir/github-view.json"
+          ;;
+        queue)
+          write_github_required "$case_dir" classic:ci
+          printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+          ;;
+        missing-record) rm "$case_dir/artifacts.json" ;;
+      esac
+      case "$path" in
+        queue) run_required_case "$case_dir" 188 --attended-override -- --auto --squash ;;
+        merge|rebase) run_required_case "$case_dir" 188 "--$path" ;;
+        *) run_required_case "$case_dir" 188 ;;
+      esac
+      expect_code 1 "$RC" "$path/$producer must refuse a foreign check even when ancestry is current"
+      assert_grep "check run 9 did not run at head $head" "$case_dir/stderr" "$path/$producer must name the foreign check"
+      assert_no_grep 'the ancestry rule applies' "$case_dir/stderr" "$path/$producer must not treat a foreign check as unavailable"
+      assert_no_grep 'pr merge' "$case_dir/gh.log" "$path/$producer reached the forge merge"
+      pass "foreign check head refuses with current ancestry: $path/$producer"
+    done
   done
 }
 
@@ -2588,6 +2639,7 @@ test_reverted_ancestor_compares_trees_not_ancestry
 test_stacked_train_lands_without_new_head
 test_tested_tree_repo_case_differs_from_url
 test_tested_tree_non_actions_check_run_must_see_the_head
+test_foreign_check_head_refuses_with_current_ancestry
 test_tested_tree_rechecks_a_check_run_added_during_retry
 test_tested_tree_waits_for_a_definite_refusal
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head

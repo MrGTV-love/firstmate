@@ -487,13 +487,17 @@
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "merge-checks-green deny"
+        },
+        {
+          "file": "bin/fm-pr-merge.sh",
+          "match": "check run %s did not run at head"
         }
       ],
-      "invariant": "every unwaived reported check at the exact head is green",
+      "invariant": "every relied-on check run names the exact head, and every unwaived reported check is green",
       "layer": "runtime-block",
       "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
-      "trigger": "any unwaived reported check at the current head is pending or failed",
-      "remedy": "wait for pending checks or repair the failed check, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> waives one named non-green check",
+      "trigger": "a check run names another head, or any unwaived reported check at the current head is pending or failed",
+      "remedy": "repair a foreign-head check binding or wait for pending checks or repair the failed check, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; attended only, bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> waives one named non-green check, never a foreign-head binding",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
