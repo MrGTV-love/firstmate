@@ -1,0 +1,1 @@
+GUARD PASS: queued-wakes-warning nominated for retirement with no recorded decision covering its evidence; run bin/fm-guard-metrics.sh, judge it, and record "<keep|redesign|cut> YYYY-MM-DD: <reason>" under retirement_decision in docs/guards/registry.json

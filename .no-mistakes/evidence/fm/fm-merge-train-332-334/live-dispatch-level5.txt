@@ -1,0 +1,19 @@
+# Live: bin/fm-dispatch-level5.ts via bun (the resolver's runtime). Registry has only 'firstmate'; rule 1 names only foreign/near-spelling ids.
+validate inherited=0 train: exit=65 match.projects contains an unregistered project id
+validate inherited=0 base: exit=65 match.projects contains an unregistered project id
+validate inherited=1 train: exit=0 
+validate inherited=1 base: exit=65 match.projects contains an unregistered project id
+prepare inherited=1 project=firstmate ship: exit=0
+  questions sent to provider: ["ambiguity","effort","judgment_bounded","model","needs_desktop"]
+  (expected: only judgment_bounded; the foreign-only rule's judgment_boundary is not asked)
+prepare inherited=1 project=vernant (not local): exit=0 {"model":"jev-latest","state":{"task":"Repair the written acceptance case.
+","repository":"vernant"},"questions":{"ambiguity":{"type":"score","instructions":"H
+
+# Note: `prepare` trusts its caller's project argument. Called directly with an
+# unregistered id (vernant) under FM_DISPATCH_INHERITED_POLICY=1 it asks the
+# foreign rule's judgment_boundary question. In the product path this is not
+# reachable: bin/fm-dispatch-resolve.sh derives PROJECT only through
+# fm-dispatch-project.py resolve, which requires the brief's clone path to
+# resolve to exactly one registered project in the frozen snapshot, so only a
+# locally registered id reaches prepare. Covered by tests/fm-dispatch-resolve.test.sh
+# ("a foreign-only selector never participates in local selection").

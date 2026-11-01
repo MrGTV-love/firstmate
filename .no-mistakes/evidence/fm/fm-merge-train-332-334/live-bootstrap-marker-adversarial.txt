@@ -1,0 +1,5 @@
+# Adversarial: a forged or malformed secondmate marker must not unlock inherited leniency (lab home, train).
+D8 marker is a symlink:        CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D9 marker id has bad chars:    CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D10 marker is empty:          CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D11 valid marker (control):    (no CREW_DISPATCH line)

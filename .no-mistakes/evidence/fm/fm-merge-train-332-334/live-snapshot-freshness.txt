@@ -1,0 +1,5 @@
+# Live freshness: fm-fleet-snapshot.sh --json (train) re-reads t1's status log after each change.
+before:              {"open":["k1"],"pending":true,"last":"needs-decision [key=k1] [at=1793512601]: decide 1"}
+after append:        {"open":["k1b"],"pending":true,"last":"needs-decision [key=k1b] [at=1793512750]: follow-up question"}
+after atomic replace (mtime kept): {"open":["fresh"],"pending":true,"last":"needs-decision [key=fresh] [at=1793512758]: replaced log question"}
+after resolve:       {"open":[],"pending":false,"last":"resolved [key=fresh]: done"}

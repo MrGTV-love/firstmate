@@ -1,0 +1,15 @@
+# Live: bin/fm-guard-metrics.sh --undecided against lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.DrMR04
+# log = $FM_HOME/state/guard-events.jsonl; registry = lab copy; --min-opportunities 30
+# train = worktree HEAD f038107e108296c7752da511d4cf543a42da75d0; base = 8618f637 (git archive of main)
+# Expected (docs/guard-spec.md): dated '<keep|redesign|cut> YYYY-MM-DD' decision judges events through that day;
+#   it stands until later events hold a non-allow/override, or a quiet window follows a judged window that fired.
+S1 zero-fire, no decision -> nominate                      | verdict=cut  | undecided train=[glab] base=[glab]
+S2 dated keep, nothing after -> silent                     | verdict=cut  | undecided train=[] base=[]
+S3 undated keep judges nothing -> nominate                 | verdict=cut  | undecided train=[glab] base=[]
+S4 dated keep + unchanged quiet window -> silent           | verdict=cut  | undecided train=[] base=[]
+S4b dated redesign + unchanged quiet -> silent             | verdict=cut  | undecided train=[] base=[]
+S5 dated keep + new overridden denies -> nominate          | verdict=cut  | undecided train=[glab] base=[]
+S6 same-day decision covers them -> silent                 | verdict=cut  | undecided train=[] base=[]
+S7 one more override next day -> nominate                  | verdict=cut  | undecided train=[glab] base=[]
+S8 judged window fired, later quiet -> nominate            | verdict=cut  | undecided train=[glab] base=[]
+S9 re-judged quiet window, then quiet -> silent            | verdict=cut  | undecided train=[] base=[]

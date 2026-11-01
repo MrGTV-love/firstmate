@@ -1,0 +1,5 @@
+# Live xtrace count: commands executed by one fm-fleet-snapshot.sh --json over the 10-task lab home (bash -x, same process tree).
+train  /usr/bin/stat execs=1     status_line_at_epoch subshells=0    status_line_note via \$()=21   total traced lines=11869
+base   /usr/bin/stat execs=10    status_line_at_epoch subshells=10   status_line_note via \$()=21   total traced lines=11687
+# Output identity (normalized; fm_root path differs by design):
+normalized JSON identical: yes

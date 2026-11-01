@@ -1,0 +1,5 @@
+# Live ownership: fm-fleet-snapshot.sh --secondmate-home-summary, train vs base, lab home.
+owned    train: {"valid":false,"state":"unknown","invalidity":{"kind":"child_current_unavailable","ids":["alpha","beta","t1","t2","t3","t4","t5","t6","t7","t8"]},"open":["pick","k2","k3","k4","k5","k6","k7","k8"]}
+owned    base : {"valid":false,"state":"unknown","invalidity":{"kind":"child_current_unavailable","ids":["alpha","beta","t1","t2","t3","t4","t5","t6","t7","t8"]},"open":["pick","k2","k3","k4","k5","k6","k7","k8"]}
+t1 unowned train: {"valid":false,"state":"unknown","invalidity":{"kind":"unowned_current","ids":["t1"]},"open":["pick","k2","k3","k4","k5","k6","k7","k8"]}
+t1 unowned base : {"valid":false,"state":"unknown","invalidity":{"kind":"unowned_current","ids":["t1"]},"open":["pick","k2","k3","k4","k5","k6","k7","k8"]}

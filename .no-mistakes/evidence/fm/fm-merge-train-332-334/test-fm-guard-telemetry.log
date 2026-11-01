@@ -1,0 +1,13 @@
+ok - the writer appends one schema-complete row per decision
+ok - an unwritable log does not fail the caller
+ok - twenty replayed rows parse and count correctly
+ok - a reversible guard that never fires is cut
+ok - an irreversible guard that never fires is kept
+ok - an undecided nomination is reported and a recorded decision retires it
+ok - a dated decision stands until the evidence changes and new evidence re-nominates
+ok - an override rate above 20% cuts a reversible guard
+ok - a median above three clear attempts cuts even an irreversible guard
+ok - a recurrence after a clear cuts even an irreversible guard
+ok - a missing log reports unmeasured and exits 0
+ok - --undecided on a missing log prints nothing
+ok - fm-guard-telemetry

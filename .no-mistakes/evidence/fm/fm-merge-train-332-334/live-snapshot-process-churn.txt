@@ -1,0 +1,6 @@
+# Live process-churn probe: macOS assigns PIDs in sequence, so the PID gap around one fm-fleet-snapshot.sh --json run
+# approximates processes it spawned (noisy: other host activity adds to it). Lab home with 10 tasks. Lower minimum = less churn.
+train pid gaps: 5629 6808 3549 3625 4081 6049
+base  pid gaps: -95031 3713 3293 4213 5260 7353
+train min: 3549   base min: -95031
+tasks in snapshot: train=10 base=10

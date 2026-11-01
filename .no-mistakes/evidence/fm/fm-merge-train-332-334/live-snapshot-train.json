@@ -1,0 +1,398 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-11-01T05:56:26Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.DrMR04",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6ASRR5BKFV86K69J425KE80",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/projects"
+  },
+  "backlog": {
+    "records": [
+      {
+        "hold_until": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "since": "2026-10-30",
+        "pr_url": null,
+        "state": "in_flight",
+        "checked": false,
+        "priority": null,
+        "hold_reason": null,
+        "blocked_by": null,
+        "body_excerpt": null,
+        "repo": "alpha",
+        "title": "Alpha task",
+        "reported": null,
+        "captain_actionable": false,
+        "requires_child_metadata": true,
+        "structured": true,
+        "links": [],
+        "hold_kind": null,
+        "merged": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "local_note": null,
+        "id": "alpha",
+        "raw": "- [ ] alpha - Alpha task (repo: alpha) (kind: ship) (since 2026-10-30)",
+        "hold_bucket": null,
+        "done": null,
+        "kind": "ship",
+        "body_lines": [],
+        "order": 1,
+        "report_path": null,
+        "captain_drop": false,
+        "hold_set": null,
+        "blocked_reason": null,
+        "hold_age_days": 2,
+        "blocked_by_ids": []
+      },
+      {
+        "hold_bucket": null,
+        "done": null,
+        "kind": "scout",
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "local_note": null,
+        "id": "beta",
+        "raw": "- [ ] beta - Beta scout (repo: beta) (kind: scout) (since 2026-10-31)",
+        "captain_drop": false,
+        "hold_set": null,
+        "body_lines": [],
+        "order": 2,
+        "report_path": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "hold_age_days": 1,
+        "checked": false,
+        "priority": null,
+        "hold_until": null,
+        "pr_url": null,
+        "current_role": "worker",
+        "unresolved_blocker_ids": [],
+        "since": "2026-10-31",
+        "state": "in_flight",
+        "body_excerpt": null,
+        "title": "Beta scout",
+        "repo": "beta",
+        "blocked_by": null,
+        "hold_reason": null,
+        "reported": null,
+        "captain_actionable": false,
+        "requires_child_metadata": true,
+        "links": [],
+        "hold_kind": null,
+        "merged": null,
+        "structured": true
+      }
+    ],
+    "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/data/backlog.md",
+    "present": true
+  },
+  "tasks": [
+    {
+      "id": "alpha",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "ship",
+      "yolo": "",
+      "branch": null,
+      "project": "alpha",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/state/alpha.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/state/alpha.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "still going: detail",
+            "raw": "working [at=1793512526]: still going: detail",
+            "age_seconds": 60
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/projects/alpha",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/data/alpha/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "backend target gone: firstmate:fm-alpha",
+        "raw": "state: unknown · source: none · backend target gone: firstmate:fm-alpha",
+        "observed_at": "2026-11-01T05:56:26Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-alpha",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-11-01T05:56:26Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": true,
+        "blocked_event": false,
+        "open_decisions": [
+          {
+            "key": "pick",
+            "verb": "needs-decision",
+            "summary": "choose A or B"
+          }
+        ],
+        "open_decisions_unreadable": false,
+        "scout_report_present": false,
+        "last_event_text": "working [at=1793512526]: still going: detail"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-alpha",
+        "steer": "bin/fm-send.sh fm-alpha '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "hold_until": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "since": "2026-10-30",
+        "pr_url": null,
+        "state": "in_flight",
+        "checked": false,
+        "priority": null,
+        "hold_reason": null,
+        "blocked_by": null,
+        "body_excerpt": null,
+        "repo": "alpha",
+        "title": "Alpha task",
+        "reported": null,
+        "captain_actionable": false,
+        "requires_child_metadata": true,
+        "structured": true,
+        "links": [],
+        "hold_kind": null,
+        "merged": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "local_note": null,
+        "id": "alpha",
+        "raw": "- [ ] alpha - Alpha task (repo: alpha) (kind: ship) (since 2026-10-30)",
+        "hold_bucket": null,
+        "done": null,
+        "kind": "ship",
+        "body_lines": [],
+        "order": 1,
+        "report_path": null,
+        "captain_drop": false,
+        "hold_set": null,
+        "blocked_reason": null,
+        "hold_age_days": 2,
+        "blocked_by_ids": []
+      }
+    },
+    {
+      "id": "beta",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "scout",
+      "yolo": "",
+      "branch": null,
+      "project": "beta",
+      "spawn_gen": "g1",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/state/beta.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/state/beta.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "scout report ready",
+            "raw": "done [at=1793512466]: scout report ready",
+            "age_seconds": 120
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/projects/beta",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/data/beta/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "backend target gone: firstmate:fm-beta",
+        "raw": "state: unknown · source: none · backend target gone: firstmate:fm-beta",
+        "observed_at": "2026-11-01T05:56:26Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-beta",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-11-01T05:56:26Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "open_decisions_unreadable": false,
+        "scout_report_present": false,
+        "last_event_text": "done [at=1793512466]: scout report ready"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-beta",
+        "steer": "bin/fm-send.sh fm-beta '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "hold_bucket": null,
+        "done": null,
+        "kind": "scout",
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "local_note": null,
+        "id": "beta",
+        "raw": "- [ ] beta - Beta scout (repo: beta) (kind: scout) (since 2026-10-31)",
+        "captain_drop": false,
+        "hold_set": null,
+        "body_lines": [],
+        "order": 2,
+        "report_path": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "hold_age_days": 1,
+        "checked": false,
+        "priority": null,
+        "hold_until": null,
+        "pr_url": null,
+        "current_role": "worker",
+        "unresolved_blocker_ids": [],
+        "since": "2026-10-31",
+        "state": "in_flight",
+        "body_excerpt": null,
+        "title": "Beta scout",
+        "repo": "beta",
+        "blocked_by": null,
+        "hold_reason": null,
+        "reported": null,
+        "captain_actionable": false,
+        "requires_child_metadata": true,
+        "links": [],
+        "hold_kind": null,
+        "merged": null,
+        "structured": true
+      }
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-lab.DrMR04/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-11-01T05:56:26Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

@@ -1,0 +1,6 @@
+# Live process-count probe: PATH shims log each exec of stat/date/awk/sed/jq/cat during one fm-fleet-snapshot.sh --json over the lab home (2 tasks).
+# Probe only sees PATH-resolved execs (absolute /usr/bin paths are not counted). Run twice each to show stability.
+train run1:    6 date    1 jq  total=       7
+base  run1:    6 date    1 jq  total=       7
+train run2:    6 date    1 jq  total=       7
+base  run2:    6 date    1 jq  total=       7

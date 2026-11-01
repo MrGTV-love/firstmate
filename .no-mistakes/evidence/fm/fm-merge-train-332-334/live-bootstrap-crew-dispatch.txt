@@ -1,0 +1,28 @@
+# Live: bin/fm-bootstrap.sh (FM_BOOTSTRAP_DETECT_ONLY=1, network skip) in lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.DrMR04
+# Policy names parent-app (fleet project not in this home's registry). TYPESAFE_API_KEY is a placeholder only to activate typed validation; no network call is made.
+## D1 home-owned policy, unregistered selector -> must stay strict  [home=primary registry=subset]
+  train: CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+## D2 secondmate inherited policy, subset registry -> no error  [home=sm registry=subset]
+  train: (no CREW_DISPATCH line)
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+## D3 secondmate inherited policy, empty registry -> no error  [home=sm registry=empty]
+  train: (no CREW_DISPATCH line)
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - project registry has no project ids
+## D4 secondmate inherited policy, absent registry -> no error  [home=sm registry=absent]
+  train: (no CREW_DISPATCH line)
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable
+## D5 secondmate, broken (duplicate) registry -> strict diagnostic  [home=sm registry=broken]
+  train: CREW_DISPATCH: invalid config/crew-dispatch.json - project registry has an invalid or duplicate project id
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - project registry has an invalid or duplicate project id
+## D6 secondmate, parent-only rule with bad harness -> still rejected  [home=sm registry=subset]
+  train: CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+## D7 secondmate, absent registry, bad harness -> still rejected  [home=sm registry=absent]
+  train: CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+  base : CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable
+# Adversarial: a forged or malformed secondmate marker must not unlock inherited leniency (lab home, train).
+D8 marker is a symlink:        CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D9 marker id has bad chars:    CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D10 marker is empty:          CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+D11 valid marker (control):    (no CREW_DISPATCH line)
