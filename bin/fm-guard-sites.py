@@ -479,11 +479,14 @@ def statement_has_remedy(statement, root):
     return False
 
 
+REPO_BIN = r'(?<![\w/.~-])bin/'
+
+
 def remedy_has_command(remedy, root):
-    paths = re.findall(r'\bbin/[A-Za-z0-9_./-]+', remedy)
+    paths = re.findall(REPO_BIN + r'[A-Za-z0-9_./-]+', remedy)
     if any(not os.path.isfile(os.path.join(root, path.rstrip('.'))) for path in paths):
         return False
-    return bool(re.search(r'\bbin/[A-Za-z0-9_.-]+|\bgit\s+|\bherdr\s+|\benv\s+-u\s+', remedy))
+    return bool(re.search(REPO_BIN + r'[A-Za-z0-9_.-]+|\bgit\s+|\bherdr\s+|\benv\s+-u\s+', remedy))
 
 
 def site_remedies(root, lines, discovered, helpers):
