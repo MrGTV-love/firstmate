@@ -4602,8 +4602,9 @@ while :; do
       touch "$STATE/.last-heartbeat"
       wake "heartbeat"
     fi
-    # Triage: in always-on mode a heartbeat is benign unless the cheap fleet-scan
-    # turns up a captain-relevant status the per-wake path missed. Absorb the
+    # Triage: with no changed report above, in always-on mode a heartbeat is benign
+    # unless the cheap fleet-scan turns up a captain-relevant status the per-wake
+    # path missed. Absorb the
     # no-change case (advance the schedule and back off exactly as wake() would,
     # without exiting); the away-mode daemon, when present, owns triage and wants
     # every heartbeat.
