@@ -1,0 +1,24 @@
+# target f5bf308b2, 2026-11-01T07:14:42Z
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-pr-merge-checks.test.sh test_tested_tree_non_actions_check_run_must_see_the_head test_stacked_train_lands_without_new_head test_tested_tree_refusals_and_fallbacks test_equivalent_tree_after_last_tip_move_still_lands test_tested_tree_rechecks_a_check_run_added_during_retry test_tested_tree_repo_case_differs_from_url test_tested_tree_waits_for_a_definite_refusal test_reverted_ancestor_compares_trees_not_ancestry
+ok - last tip read recomputes and accepts a still-identical tested tree
+ok - tested-tree disjoint refuses without weakening ancestry fallback
+ok - tested-tree forged refuses without weakening ancestry fallback
+ok - tested-tree missing refuses without weakening ancestry fallback
+ok - tested-tree unreadable refuses without weakening ancestry fallback
+ok - tested-tree expired refuses without weakening ancestry fallback
+ok - tested-tree rebase refuses without weakening ancestry fallback
+ok - tested-tree moving-tip refuses without weakening ancestry fallback
+ok - tested-tree partial-record refuses without weakening ancestry fallback
+ok - tested-tree foreign-head refuses without weakening ancestry fallback
+ok - tested-tree old-attempt refuses without weakening ancestry fallback
+ok - tested-tree unrecorded-check refuses without weakening ancestry fallback
+ok - reverted ancestor refuses by tree comparison even when head contains live tip
+ok - stacked train --squash accepts identical tested landing tree without a new head
+ok - stacked train --merge accepts identical tested landing tree without a new head
+ok - tested-tree records match the repository case-insensitively
+ok - tested-tree non-Actions check run same-head
+ok - tested-tree non-Actions check run other-head
+ok - tested-tree non-Actions check run only-non-actions
+ok - a kept tested-tree verdict is reused only for the same check runs
+ok - tested-tree records are not read when a definite refusal already fails the attempt
+rc=0

@@ -1,0 +1,20 @@
+# target 6f3f86290, 2026-11-01T03:45:25Z (continuation; first batch in round2-targeted-merge-tests.log was stopped by the 20-min tool limit after the cases listed there)
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-pr-merge-checks.test.sh test_equivalent_tree_after_last_tip_move_still_lands test_reverted_ancestor_compares_trees_not_ancestry test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment test_off_queue_auto_merges_only_where_github_merges_at_once
+ok - last tip read recomputes and accepts a still-identical tested tree
+ok - reverted ancestor refuses by tree comparison even when head contains live tip
+ok - fm-pr-merge skips only the tip containment for an --auto merge into the base's merge queue
+ok - fm-pr-merge lets off-queue --auto run only where GitHub merges at once
+rc=0
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-ci-workflow.test.sh (whole file: workflow semantics incl. test_pull_request_uploads_actual_tested_tree)
+ok - both pull_request workflows upload the actual checked merge tree and parent for the run attempt
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - main pushes share one group per branch and never cancel the running run
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+ok - both portable parallel jobs pass the concurrency the model starts from
+rc=0

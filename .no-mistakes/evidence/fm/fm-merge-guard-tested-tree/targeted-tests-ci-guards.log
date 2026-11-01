@@ -1,0 +1,27 @@
+== fm-ci-workflow test_pull_request_uploads_actual_tested_tree
+rc=
+== fm-guard-audit-closure
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+rc=
+== fm-guard-refcheck
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+rc=
+== bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=47 retired=14 beyond_audit=12 excluded=1 unregistered=841 audited=30 beyond_audit_active=20 sites=931 mapped=90
+LINT_SUMMARY mode=enforce guards=47 violations=841 allowlisted=841 stale=0 shown=0 sites=931
+rc=0

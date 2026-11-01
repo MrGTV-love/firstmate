@@ -1,0 +1,26 @@
+# Live: real GitHub pull_request merge refs (refs/pull/N/merge) for open firstmate PRs, 2026-11-01T01:47:39Z
+# producer step shell (identical in ci.yml Lint 1 and no-mistakes-required.yml):
+#   tree=$(git rev-parse 'HEAD^{tree}')
+#   base=$(git rev-parse 'HEAD^1')
+#   printf 'tree=%s\nbase=%s\n' "$tree" "$base" >> "$GITHUB_OUTPUT"
+#   printf '%s %s\n' "$tree" "$base" > "$RUNNER_TEMP/fm-tested-tree"
+PR 328: head=3f3534d25850d9ae1dce1e362cd751d5b03a09cd
+   recorded base (HEAD^1 of GitHub merge ref) = 3c750632e88113254e14d012ea6240e66ecde1df ; recorded tree = 9e8401472ccadcbf9e02fdc411e6a348b5beddcd
+   record file = '9e8401472ccadcbf9e02fdc411e6a348b5beddcd 3c750632e88113254e14d012ea6240e66ecde1df' ; artifact name = fm-tested-tree-9e8401472ccadcbf9e02fdc411e6a348b5beddcd-base-3c750632e88113254e14d012ea6240e66ecde1df-attempt-1
+   HEAD^2 is the PR head: yes
+   git merge-tree --write-tree <base> <head> = 9e8401472ccadcbf9e02fdc411e6a348b5beddcd -> MATCH
+PR 330: head=ac46dd4dade80db48fa307225458dc2b543138d6
+   recorded base (HEAD^1 of GitHub merge ref) = 3948d62ffa86123d35baeb84746ed7639d948a02 ; recorded tree = 58fac25001f6efd3e85bcf3f8800be16b30466c4
+   record file = '58fac25001f6efd3e85bcf3f8800be16b30466c4 3948d62ffa86123d35baeb84746ed7639d948a02' ; artifact name = fm-tested-tree-58fac25001f6efd3e85bcf3f8800be16b30466c4-base-3948d62ffa86123d35baeb84746ed7639d948a02-attempt-1
+   HEAD^2 is the PR head: yes
+   git merge-tree --write-tree <base> <head> = 58fac25001f6efd3e85bcf3f8800be16b30466c4 -> MATCH
+PR 331: head=c07368c0583dbdb8917b68ab62331a8e9ceacf89
+   recorded base (HEAD^1 of GitHub merge ref) = 3948d62ffa86123d35baeb84746ed7639d948a02 ; recorded tree = 407cda7015b042b15a46c6c7c9153ae77e8cced9
+   record file = '407cda7015b042b15a46c6c7c9153ae77e8cced9 3948d62ffa86123d35baeb84746ed7639d948a02' ; artifact name = fm-tested-tree-407cda7015b042b15a46c6c7c9153ae77e8cced9-base-3948d62ffa86123d35baeb84746ed7639d948a02-attempt-1
+   HEAD^2 is the PR head: yes
+   git merge-tree --write-tree <base> <head> = 407cda7015b042b15a46c6c7c9153ae77e8cced9 -> MATCH
+PR 292: head=a32b67fbafa93cc3778ee9507d1b0e06cb4675f0
+   recorded base (HEAD^1 of GitHub merge ref) = 3948d62ffa86123d35baeb84746ed7639d948a02 ; recorded tree = 87953ee4655a09663cb8187c83bdc43f2959641e
+   record file = '87953ee4655a09663cb8187c83bdc43f2959641e 3948d62ffa86123d35baeb84746ed7639d948a02' ; artifact name = fm-tested-tree-87953ee4655a09663cb8187c83bdc43f2959641e-base-3948d62ffa86123d35baeb84746ed7639d948a02-attempt-1
+   HEAD^2 is the PR head: yes
+   git merge-tree --write-tree <base> <head> = 87953ee4655a09663cb8187c83bdc43f2959641e -> MATCH

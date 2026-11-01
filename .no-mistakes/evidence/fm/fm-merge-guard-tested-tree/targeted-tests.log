@@ -1,0 +1,4 @@
+== fm-pr-merge-checks (tested-tree + containment cases)
+ok - last tip read recomputes and accepts a still-identical tested tree
+ok - tested-tree disjoint refuses without weakening ancestry fallback
+ok - tested-tree forged refuses without weakening ancestry fallback

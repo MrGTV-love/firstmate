@@ -1,0 +1,16 @@
+train-4 head tree: 819bed119d106375928334dca2a7803ea4155698   main-after-train-4 tree: 819bed119d106375928334dca2a7803ea4155698
+B=0959a6554a27905959e3fdeb5b56e551a3d0c14b (tree 6f51e436164dc54db0752f56b1ce39c0ce0b824a, parent = train-4 head)  fork point on main=98bd3e78f3b823ea953a2baea1d980f87a6f596c
+main-after-train-4 is NOT an ancestor of B  (old rule refuses)
+CI tested: merge-tree(fork, B) = 6f51e436164dc54db0752f56b1ce39c0ce0b824a
+landing:   merge-tree(main-after-train-4, B) = 6f51e436164dc54db0752f56b1ce39c0ce0b824a
+--- stacked train: head lacks tip, landing tree = tested tree
+$ fm-tested-tree.py MrGTV-love/firstmate B ba40458055a70fa9ec7e6408a185f4581570e783 <scratch> <wt>   (record tree=6f51e436164dc54db0752f56b1ce39c0ce0b824a)
+6f51e436164dc54db0752f56b1ce39c0ce0b824a
+exit=0
+--- same head, main moved on to a later commit (landing tree never tested)
+$ fm-tested-tree.py MrGTV-love/firstmate B 3948d62ffa86123d35baeb84746ed7639d948a02 <scratch> <wt>   (record tree=6f51e436164dc54db0752f56b1ce39c0ce0b824a)
+exit=2
+--- forged record: claims a tree that merge-tree(base, head) does not give
+$ fm-tested-tree.py MrGTV-love/firstmate B ba40458055a70fa9ec7e6408a185f4581570e783 <scratch> <wt>   (record tree=e02d08b982f65df6cb02c03de3a87ed76ab317c4)
+note: tested-tree records unavailable (the tested-tree record for base 98bd3e78f3b823ea953a2baea1d980f87a6f596c does not match its merge); the ancestry rule applies
+exit=1

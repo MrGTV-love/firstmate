@@ -1,0 +1,23 @@
+# target 6f3f86290, 2026-11-01T03:52:09Z
+$ bin/fm-proc-budget.sh --own-procs 128 -- bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=47 retired=14 beyond_audit=12 excluded=1 unregistered=841 audited=30 beyond_audit_active=20 sites=931 mapped=90
+LINT_SUMMARY mode=enforce guards=47 violations=841 allowlisted=841 stale=0 shown=0 sites=931
+rc=
+
+# merge-* entries in docs/guards/registry.json (id, status, sites):
+merge-checks-green status=active sites=1
+merge-required-reported status=active sites=1
+merge-landing-tree-tested status=active sites=4
+merge-auto-not-armed status=active sites=2
+merge-away-waiver status=active sites=0
+merge-held-task status=active sites=1
+
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-guard-audit-closure.test.sh
+
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-guard-audit-closure.test.sh
+# NOT COMPLETED: the guard audit-closure and refcheck test runs above did not finish before the test step had to report (host load average ~190) and were stopped; the lint rc was not captured (zsh has no PIPESTATUS), LINT_SUMMARY above is the lint result.
+rc=143
+
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-guard-refcheck.test.sh
+rc=143

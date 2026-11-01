@@ -1,0 +1,56 @@
+# Live, 2026-11-01T03:30:41Z: real bin/fm-pr-merge.sh (target 6f3f86290) on real PR https://github.com/MrGTV-love/firstmate/pull/333
+# head 7421298d98909cfe58fbce8f26bde0f261a360b1, live main 8618f63732d41ed857468b40a825f4db4135cf66 (head is 5 behind); head has 35 github-actions + 2 socket-security check runs; no tested-tree record (its CI predates this change).
+# gh = read-only pass-through wrapper (refuses pr merge, -X, REST -f, graphql mutation). Disposable lab FM_HOME and a disposable blobless clone as the task worktree.
+$ bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333
+armed: state/live-r2.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/333
+  - check 'Behavior portable serial 10' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 12' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 14' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 15' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 16' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 17' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 18' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 20' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 21' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 25' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 3' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 4' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 6' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 8' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 9' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 2' is not green: it is still running, and it is not required by base branch main
+  - head 7421298d98909cfe58fbce8f26bde0f261a360b1 lacks the current tip 8618f63732d41ed857468b40a825f4db4135cf66 of base branch main (5 commits behind); whether its tested-tree records cover the tree this merge would land is checked once the refusals above clear
+error: these checks are not green: Behavior portable serial 10, Behavior portable serial 12, Behavior portable serial 14, Behavior portable serial 15, Behavior portable serial 16, Behavior portable serial 17, Behavior portable serial 18, Behavior portable serial 20, Behavior portable serial 21, Behavior portable serial 25, Behavior portable serial 3, Behavior portable serial 4, Behavior portable serial 6, Behavior portable serial 8, Behavior portable serial 9, Lint 1, Lint 2
+Wait for the pending or unreported check to report, then re-run this merge: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 10
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 12
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 14
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 15
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 16
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 17
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 18
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 20
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 21
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 25
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 3
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 4
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 6
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 8
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Behavior portable serial 9
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Lint 1
+Attended only, waive one named check with: bin/fm-pr-merge.sh live-r2 https://github.com/MrGTV-love/firstmate/pull/333 --allow-red Lint 2
+exit=1
+
+# gh calls made (all reads; no 'pr merge'; REFUSED lines would show a blocked write):
+pr view https://github.com/MrGTV-love/firstmate/pull/333 --json headRefOid -q .headRefOid 
+pr view https://github.com/MrGTV-love/firstmate/pull/333 --json state\,isDraft\,reviewDecision\,mergeable\,mergeStateStatus\,headRefOid\,baseRefName\,baseRefOid 
+api graphql --paginate -f query=query\(\$owner:String\!\,\$repo:String\!\,\$head:GitObjectID\!\,\$endCursor:String\)\{repository\(owner:\$owner\,name:\$repo\)\{object\(oid:\$head\)\{...\ on\ Commit\{oid\ statusCheckRollup\{contexts\(first:100\,after:\$endCursor\)\{totalCount\ pageInfo\{hasNextPage\ endCursor\}\ nodes\{__typename\ ...\ on\ CheckRun\{id\ name\ status\ conclusion\ startedAt\}\ ...\ on\ StatusContext\{id\ context\ state\}\}\}\}\}\}\}\} -F owner=MrGTV-love -F repo=firstmate -F head=7421298d98909cfe58fbce8f26bde0f261a360b1 
+api repos/MrGTV-love/firstmate/branches/main 
+api --paginate repos/MrGTV-love/firstmate/rules/branches/main 
+api repos/MrGTV-love/firstmate/compare/main...7421298d98909cfe58fbce8f26bde0f261a360b1\?per_page=1 
+
+# Guard telemetry written to the lab home:
+{"ts":"2026-11-01T03:30:52Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-34460","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-11-01T03:30:58Z","guard":"merge-checks-green","version":"1","system":"firstmate","session":"pid-44173","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

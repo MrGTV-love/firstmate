@@ -1,0 +1,31 @@
+== fm-pr-merge-checks (tested-tree cases)
+ok - last tip read recomputes and accepts a still-identical tested tree
+ok - tested-tree disjoint refuses without weakening ancestry fallback
+ok - tested-tree forged refuses without weakening ancestry fallback
+ok - tested-tree missing refuses without weakening ancestry fallback
+ok - tested-tree unreadable refuses without weakening ancestry fallback
+ok - tested-tree expired refuses without weakening ancestry fallback
+ok - tested-tree rebase refuses without weakening ancestry fallback
+ok - tested-tree moving-tip refuses without weakening ancestry fallback
+ok - tested-tree partial-record refuses without weakening ancestry fallback
+ok - tested-tree foreign-head refuses without weakening ancestry fallback
+ok - tested-tree old-attempt refuses without weakening ancestry fallback
+ok - tested-tree unrecorded-check refuses without weakening ancestry fallback
+ok - reverted ancestor refuses by tree comparison even when head contains live tip
+ok - stacked train --squash accepts identical tested landing tree without a new head
+ok - stacked train --merge accepts identical tested landing tree without a new head
+ok - tested-tree records match the repository case-insensitively
+ok - a kept tested-tree verdict is reused only for the same check runs
+ok - tested-tree records are not read when a definite refusal already fails the attempt
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge
+rc=0
+== fm-pr-merge-checks (existing containment cases)
+ok - fm-pr-merge refuses a head that lacks the live base tip, naming both bases
+ok - fm-pr-merge merges a head that contains the live base tip with no extra step
+ok - fm-pr-merge refuses a head that lacks the tip however fresh its green runs, with no waiver
+ok - fm-pr-merge refuses when the base tip moves between the verify read and the merge
+ok - fm-pr-merge refuses and records a deny when the base tip cannot be re-read before the merge
+ok - fm-pr-merge skips only the tip containment for an --auto merge into the base's merge queue
+ok - fm-pr-merge keeps the tip containment for a direct merge, no queue, or a queue with no required check
+ok - fm-pr-merge refuses when whether the head contains the base tip cannot be read
+rc=0

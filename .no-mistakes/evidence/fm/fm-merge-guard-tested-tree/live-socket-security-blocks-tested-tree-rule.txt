@@ -1,0 +1,15 @@
+# Real GitHub reads for PR 328 head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd (check runs, jobs, run attempts). Only the artifact list is injected: the record CI would upload after this change.
+$ fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd 3c750632e88113254e14d012ea6240e66ecde1df <scratch> <wt>   # tip == the recorded base, so the landing tree IS the tested tree
+note: tested-tree records unavailable (check run 124643987034 is not a GitHub Actions run at head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd); the ancestry rule applies
+exit=1
+
+# The check runs of that head that are not GitHub Actions runs:
+id=124643987034 app=socket-security name=Socket Security: Pull Request Alerts conclusion=success
+id=124643975088 app=socket-security name=Socket Security: Project Report conclusion=success
+
+# Same read with socket-security check runs hidden (all other reads real): proves Socket is the only thing in the way.
+$ tip=3c750632 (recorded base): landing tree = tested tree
+9e8401472ccadcbf9e02fdc411e6a348b5beddcd
+exit=0
+$ tip=3948d62ffa86123d35baeb84746ed7639d948a02 (live main, one commit past the recorded base): landing tree was never tested
+exit=2

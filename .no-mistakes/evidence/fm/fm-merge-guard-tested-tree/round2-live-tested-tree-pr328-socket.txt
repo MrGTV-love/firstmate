@@ -1,0 +1,33 @@
+# Live 2026-11-01T03:35:37Z, target 6f3f86290: bin/fm-tested-tree.py against real GitHub reads for real PR 328 head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd.
+# Real: check runs, jobs, run attempts, git objects (fetched from GitHub into a private scratch repo). Injected: only the artifact list, holding the record CI would upload after this change:
+#   tree=9e8401472ccadcbf9e02fdc411e6a348b5beddcd (= git merge-tree --write-tree 3c750632e88113254e14d012ea6240e66ecde1df 3f3534d25850d9ae1dce1e362cd751d5b03a09cd) base=3c750632e88113254e14d012ea6240e66ecde1df (the main commit GitHub merged against when it ran CI).
+
+## A. Real check-run set (includes 2 socket-security check runs). tip = recorded base, so landing tree IS the tested tree.
+$ 3c750632e88113254e14d012ea6240e66ecde1df
+note: tested-tree records unavailable (check run 124643987034 is not a GitHub Actions run at head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd); the ancestry rule applies
+exit=1
+
+## B. Same, socket-security runs hidden (every other read real). tip = recorded base.
+$ 3c750632e88113254e14d012ea6240e66ecde1df
+9e8401472ccadcbf9e02fdc411e6a348b5beddcd
+exit=0
+
+## C. Same, socket-security hidden. tip = live main 8618f63732d41ed857468b40a825f4db4135cf66 (6 commits later; landing tree never tested). Expect exit 2 (refuse).
+$ 8618f63732d41ed857468b40a825f4db4135cf66
+note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+exit=1
+
+## D. Forged record: claims tree of base commit, which merge-tree(base, head) does not give. Expect exit 1 (fallback).
+$ 3c750632e88113254e14d012ea6240e66ecde1df
+note: tested-tree records unavailable (the tested-tree record for base 3c750632e88113254e14d012ea6240e66ecde1df does not match its merge); the ancestry rule applies
+exit=1
+
+# Non-Actions check runs at this head:
+id=124643987034 app=socket-security name=Socket Security: Pull Request Alerts conclusion=success
+id=124643975088 app=socket-security name=Socket Security: Project Report conclusion=success
+
+## C re-run (2026-11-01T04:05:30Z): the first C run above hit a transient gh read failure and fell back to ancestry (fail-closed). Same inputs, output captured:
+$ FM_SHIM_HIDE_SOCKET=1 python3 bin/fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd 8618f63732d41ed857468b40a825f4db4135cf66 <scratch> ''
+exit=143
+# gh calls: 48 (writes refused: 0)
+# NOT CAPTURED: this re-run did not finish before the test step had to report (host load average ~190); it was stopped. An earlier uncaptured interactive re-run of C printed exit=2; that is not recorded evidence.

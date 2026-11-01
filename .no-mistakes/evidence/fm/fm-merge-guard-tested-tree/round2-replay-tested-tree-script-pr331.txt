@@ -1,0 +1,25 @@
+# 2026-11-01T03:51:04Z, target 6f3f86290: real bin/fm-tested-tree.py, real firstmate git objects, SYNTHETIC GitHub metadata (heads not on GitHub). Not a live GitHub run.
+
+## 1. Stacked train B: record = CI's merge with old main. Landing on real post-331 main. Expect exit 0 then offline final read exit 0.
+$ FAKE_HEAD=04cdefba4f1a8df8854979cc0ace38cdeb8f5b41 FAKE_TREE=89177d9cd4296cf523853603956b6b7f1fa6857e FAKE_BASE=3948d62ffa86123d35baeb84746ed7639d948a02 fm-tested-tree.py MrGTV-love/firstmate <head> 8618f63732d41ed857468b40a825f4db4135cf66 <scratch> <task worktree>
+89177d9cd4296cf523853603956b6b7f1fa6857e
+exit=0
+$ ... --offline (final read, tip 8618f63732d41ed857468b40a825f4db4135cf66)
+89177d9cd4296cf523853603956b6b7f1fa6857e
+exit=0
+
+## 2. Disjoint train D: record = CI's merge with old main. Landing on post-331 main. Expect exit 2 (refuse).
+$ FAKE_HEAD=0ed0b5198e2f18fd4068d6e086ac67ab7630d8de FAKE_TREE=2967a6b15c4c5af297a148c0fd97c7560f5b9fe3 FAKE_BASE=3948d62ffa86123d35baeb84746ed7639d948a02 fm-tested-tree.py MrGTV-love/firstmate <head> 8618f63732d41ed857468b40a825f4db4135cf66 <scratch> <task worktree>
+exit=2
+
+## 3. Stacked train B, tip moves at the final read to a later commit with a different tree. Expect verify exit 0, offline final read exit 2.
+$ FAKE_HEAD=04cdefba4f1a8df8854979cc0ace38cdeb8f5b41 FAKE_TREE=89177d9cd4296cf523853603956b6b7f1fa6857e FAKE_BASE=3948d62ffa86123d35baeb84746ed7639d948a02 fm-tested-tree.py MrGTV-love/firstmate <head> 8618f63732d41ed857468b40a825f4db4135cf66 <scratch> <task worktree>
+89177d9cd4296cf523853603956b6b7f1fa6857e
+exit=0
+$ ... --offline (final read, tip 587996a699e50b4c9b19f311aa1f38f4d3b6e4b0)
+exit=2
+
+## 4. Forged record for B (tree of old main, not merge-tree(old main, B)). Expect exit 1 (ancestry fallback).
+$ FAKE_HEAD=04cdefba4f1a8df8854979cc0ace38cdeb8f5b41 FAKE_TREE=e02d08b982f65df6cb02c03de3a87ed76ab317c4 FAKE_BASE=3948d62ffa86123d35baeb84746ed7639d948a02 fm-tested-tree.py MrGTV-love/firstmate <head> 8618f63732d41ed857468b40a825f4db4135cf66 <scratch> <task worktree>
+note: tested-tree records unavailable (the tested-tree record for base 3948d62ffa86123d35baeb84746ed7639d948a02 does not match its merge); the ancestry rule applies
+exit=1

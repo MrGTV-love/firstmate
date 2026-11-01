@@ -1,0 +1,6 @@
+$ python3 bin/fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd 3948d62ffa86123d35baeb84746ed7639d948a02 <scratch> ''   # real GitHub, PR 328 head, live main tip
+note: tested-tree records unavailable (run 41237401256 attempt 1 has no single tested-tree record); the ancestry rule applies
+exit=1
+$ ... --offline (final read with no verdict kept)
+note: tested-tree records unavailable (no tested-tree records were verified for head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd before the final read); the ancestry rule applies
+exit=1

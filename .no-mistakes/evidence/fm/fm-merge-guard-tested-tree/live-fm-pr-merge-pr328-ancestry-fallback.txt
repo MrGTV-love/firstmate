@@ -1,0 +1,18 @@
+# Live: real bin/fm-pr-merge.sh (target 6f3f862) on real PR https://github.com/MrGTV-love/firstmate/pull/328
+# head 3f3534d2 lacks main tip 3948d62f (1 behind), all 39 checks green, no tested-tree record exists (CI predates this change).
+# gh = read-only pass-through wrapper; any write (pr merge, REST -f/-X, graphql mutation) is refused. Disposable lab FM_HOME.
+$ bin/fm-pr-merge.sh live-l1 https://github.com/MrGTV-love/firstmate/pull/328
+note: tested-tree records unavailable (run 41237401256 attempt 1 has no single tested-tree record); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/328
+  - head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd lacks the current tip 3948d62ffa86123d35baeb84746ed7639d948a02 of base branch main (1 commits behind): it was built on main at 3c750632e88113254e14d012ea6240e66ecde1df, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 3948d62ffa86123d35baeb84746ed7639d948a02 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69XNHTSB642S2PF8EM6J4M8/bin/fm-pr-merge.sh live-l1 https://github.com/MrGTV-love/firstmate/pull/328
+exit=1
+
+# gh calls made (all reads; note no 'pr merge'):
+pr view https://github.com/MrGTV-love/firstmate/pull/328 --json headRefOid -q .headRefOid pr view https://github.com/MrGTV-love/firstmate/pull/328 --json state\,isDraft\,reviewDecision\,mergeable\,mergeStateStatus\,headRefOid\,baseRefName\,baseRefOid
+api graphql --paginate -f query=query\(\$owner:String\!\,\$repo:String\!\,\$head:GitObjectID\!\,\$endCursor:String\)\{repository\(owner:\$owner\,name:\$repo\)\{
+api repos/MrGTV-love/firstmate/branches/main api --paginate repos/MrGTV-love/firstmate/rules/branches/main api repos/MrGTV-love/firstmate/compare/main...3f3534d25850d9ae1dce1e362cd751d5b03a09cd\?per_page=1 api --paginate --slurp repos/MrGTV-love/firstmate/commits/3f3534d25850d9ae1dce1e362cd751d5b03a09cd/check-runs api --paginate --slurp repos/MrGTV-love/firstmate/actions/jobs/124651081578 api --paginate --slurp repos/MrGTV-love/firstmate/actions/runs/41237401256/attempts/1 api --paginate --slurp repos/MrGTV-love/firstmate/actions/runs/41237401256/artifacts 
+# Guard telemetry written to the lab home (state/guard-events.jsonl):
+{"ts":"2026-11-01T01:35:29Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-53074","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-11-01T01:37:19Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-35282","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-11-01T01:37:47Z","guard":"merge-landing-tree-tested","version":"1","system":"firstmate","session":"pid-79774","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

@@ -1,0 +1,42 @@
+# Round 3 live, 2026-11-01T07:09:50Z, target f5bf308b2: real bin/fm-pr-merge.sh on real PR https://github.com/MrGTV-love/firstmate/pull/328
+# head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd (37 github-actions + 2 socket-security check runs, all success), live main 8618f63732d41ed857468b40a825f4db4135cf66 (head 6 behind).
+# Disposable lab FM_HOME from bin/fm-lab-home.sh env; task worktree = disposable blobless clone with HEAD at the PR head (also the script's object alternates).
+# gh = round3-gh-readonly-shim.sh: real reads, every write refused; case 1 injects only the CI tested-tree record (tree 9e8401472ccadcbf9e02fdc411e6a348b5beddcd, base 3c750632e88113254e14d012ea6240e66ecde1df).
+
+## Case 1: CI record present (Socket runs present). Landing tree on live main = a068142b4..., tested tree = 9e8401472... Expect refusal naming the tested-tree reason; no forge merge.
+$ bin/fm-pr-merge.sh live-r3-1 https://github.com/MrGTV-love/firstmate/pull/328
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/live-r3-1.check.sh
+note: tested-tree records unavailable (tip 8618f63732d41ed857468b40a825f4db4135cf66 and head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd do not merge); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/328
+  - head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd lacks the current tip 8618f63732d41ed857468b40a825f4db4135cf66 of base branch main (6 commits behind): it was built on main at 3c750632e88113254e14d012ea6240e66ecde1df, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 8618f63732d41ed857468b40a825f4db4135cf66 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69XNHTSB642S2PF8EM6J4M8/bin/fm-pr-merge.sh live-r3-1 https://github.com/MrGTV-love/firstmate/pull/328
+exit=1
+# gh calls: 50; injected: 3; 'pr merge' attempted: 0; writes refused: 0
+
+## Case 2: no CI record (today's real artifacts: none). Expect the unchanged ancestry refusal plus a one-line note; no forge merge.
+$ bin/fm-pr-merge.sh live-r3-2 https://github.com/MrGTV-love/firstmate/pull/328
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/live-r3-2.check.sh
+note: tested-tree records unavailable (run 41237401256 attempt 1 has no single tested-tree record); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/328
+  - head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd lacks the current tip 8618f63732d41ed857468b40a825f4db4135cf66 of base branch main (6 commits behind): it was built on main at 3c750632e88113254e14d012ea6240e66ecde1df, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 8618f63732d41ed857468b40a825f4db4135cf66 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69XNHTSB642S2PF8EM6J4M8/bin/fm-pr-merge.sh live-r3-2 https://github.com/MrGTV-love/firstmate/pull/328
+exit=1
+# gh calls: 10; injected: 0; 'pr merge' attempted: 0; writes refused: 0
+
+# Guard telemetry written to the lab home:
+{"ts":"2026-11-01T07:11:23Z","guard":"merge-landing-tree-tested","version":"1","system":"firstmate","session":"pid-75455","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-01T07:11:56Z","guard":"merge-landing-tree-tested","version":"1","system":"firstmate","session":"pid-54177","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+
+## Case 1 re-run (2026-11-01T07:12:52Z). The first Case 1 run used a BLOBLESS clone (my setup; no bin/ script makes partial clones), so merge-tree(tip, head) had no file contents and the script fell back to ancestry (fail-closed). Re-run with a full (non-partial) task copy at the PR head. Expect refusal naming the tested-tree reason; no forge merge.
+$ bin/fm-pr-merge.sh live-r3-1b https://github.com/MrGTV-love/firstmate/pull/328
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/live-r3-1b.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/328
+  - head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd lacks the current tip 8618f63732d41ed857468b40a825f4db4135cf66 of base branch main (6 commits behind): it was built on main at 3c750632e88113254e14d012ea6240e66ecde1df, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 8618f63732d41ed857468b40a825f4db4135cf66 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M69XNHTSB642S2PF8EM6J4M8/bin/fm-pr-merge.sh live-r3-1b https://github.com/MrGTV-love/firstmate/pull/328
+exit=1
+# gh calls: 50; injected: 3; 'pr merge' attempted: 0; writes refused: 0
+# Guard telemetry for this re-run:
+{"ts":"2026-11-01T07:14:26Z","guard":"merge-landing-tree-tested","version":"1","system":"firstmate","session":"pid-74551","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

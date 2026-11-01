@@ -1,0 +1,24 @@
+# target 6f3f86290, 2026-11-01T03:15:24Z
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-pr-merge-checks.test.sh <tested-tree, stacked-train, containment, telemetry cases>
+ok - tested-tree disjoint refuses without weakening ancestry fallback
+ok - tested-tree forged refuses without weakening ancestry fallback
+ok - tested-tree missing refuses without weakening ancestry fallback
+ok - tested-tree unreadable refuses without weakening ancestry fallback
+ok - tested-tree expired refuses without weakening ancestry fallback
+ok - tested-tree rebase refuses without weakening ancestry fallback
+ok - tested-tree moving-tip refuses without weakening ancestry fallback
+ok - tested-tree partial-record refuses without weakening ancestry fallback
+ok - tested-tree foreign-head refuses without weakening ancestry fallback
+ok - tested-tree old-attempt refuses without weakening ancestry fallback
+ok - tested-tree unrecorded-check refuses without weakening ancestry fallback
+ok - stacked train --squash accepts identical tested landing tree without a new head
+ok - stacked train --merge accepts identical tested landing tree without a new head
+ok - tested-tree records match the repository case-insensitively
+ok - a kept tested-tree verdict is reused only for the same check runs
+ok - tested-tree records are not read when a definite refusal already fails the attempt
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge
+ok - fm-pr-merge refuses a head that lacks the live base tip, naming both bases
+ok - fm-pr-merge merges a head that contains the live base tip with no extra step
+ok - fm-pr-merge refuses a head that lacks the tip however fresh its green runs, with no waiver
+ok - fm-pr-merge refuses when the base tip moves between the verify read and the merge
+ok - fm-pr-merge refuses and records a deny when the base tip cannot be re-read before the merge

@@ -1,0 +1,13 @@
+# BEFORE: tests at target 6f3f862, bin/ from base 3948d62 (old ancestry-only guard)
+$ bash tests/fm-pr-merge-checks.test.sh test_stacked_train_lands_without_new_head
+not ok - stacked train should land its already tested tree: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.ZzuQW1/before/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head d7fb7d7e9a4380aa16bf72ffb127167cdf20997a lacks the current tip 5dd229fe3adf9b3b5c4d3b43af3249924e8d2793 of base branch main (1 commits behind): it was built on main at 9156f6658024ae87bfb26990be0d8e7902d2ff24, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 5dd229fe3adf9b3b5c4d3b43af3249924e8d2793 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/tmp/fm-lab.ZzuQW1/before/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188: expected exit 0, got 1
+rc=

@@ -1,0 +1,84 @@
+# Round 3 live, 2026-11-01T07:31:01Z, target f5bf308b2: real bin/fm-tested-tree.py, real GitHub reads for real PR 328, behind-main stacked-train case.
+# head=3f3534d25850d9ae1dce1e362cd751d5b03a09cd (37 github-actions + 2 socket-security check runs, real). CI record injected by round3-gh-readonly-shim.sh (the ONLY injected read): tree=9e8401472ccadcbf9e02fdc411e6a348b5beddcd base=3c750632e88113254e14d012ea6240e66ecde1df.
+# Stand-in tip T=d0ed6dc12ade34352dd0267c868dd74406d18dba: a LOCAL commit made in the disposable task copy (not on GitHub), standing for 'train N squash-landed on main'.
+#   T = commit-tree(7a294f1939a13163274f5da12f2dc64a4156d7db^{tree}) with parent 3c750632e88113254e14d012ea6240e66ecde1df, i.e. a squash of the first PR commit 7a294f1939a13163274f5da12f2dc64a4156d7db onto the recorded base.
+#   head is stacked on train N: it contains 7a294f1939a13163274f5da12f2dc64a4156d7db but not T.
+#   is T an ancestor of head? no -> head is BEHIND this tip; the old ancestry rule (behind_by == 0) refuses it.
+#   merge-tree(T, head) = 82f8243c7d4a5ee1fda4fbb240b6bb53ea1bfefa
+100755 c148d52027e25e5e7bccdd060c2234be4a172ce1 1	bin/fm_slack_watch.py
+100755 4a04acaa0540231970b5b33b8f6dc3b67c36ecae 2	bin/fm_slack_watch.py
+100755 683e7b2e224144062e5262464265e86b2b8b4dda 3	bin/fm_slack_watch.py
+100644 56bbb5624f0d1dd790c381d5102b3023ed687a05 1	docs/configuration.md
+100644 3120b98b7965c0640e57abe57e9fe85dbba5a937 2	docs/configuration.md
+100644 da671c1e2202e64da30b85afc34f396c4734dd9d 3	docs/configuration.md
+100644 990a5c4ed3360c3f0a5012e54d674ee701ea2e95 1	docs/verification/slack-watch.md
+100644 7c37312782c1985e8a48ebcd267935a9966d1333 2	docs/verification/slack-watch.md
+100644 c48c2ede67e5a5320a163aba6911e45b2c2859ac 3	docs/verification/slack-watch.md
+100755 07ab2befd8f0959e10d073e7026f0f056e3d7693 1	tests/fm-slack-watch.test.sh
+100755 9b337a61187eb27c510f4e2e0a004d6a5a5f6c07 2	tests/fm-slack-watch.test.sh
+100755 da3db008006ced69462bedc5f60fe1f915c11ff3 3	tests/fm-slack-watch.test.sh
+100755 252ec3d2a757c598e923cc05e0d669519e73aefa 1	tests/fm_slack_watch_test.py
+100755 e166332bc7931e01b97b949ee3126244d3c2a164 2	tests/fm_slack_watch_test.py
+100755 e33f2d8fdd0dfa7c4f26554f079392992353a8d8 3	tests/fm_slack_watch_test.py
+
+Auto-merging bin/fm_slack_watch.py
+CONFLICT (content): Merge conflict in bin/fm_slack_watch.py
+Auto-merging docs/configuration.md
+CONFLICT (content): Merge conflict in docs/configuration.md
+Auto-merging docs/verification/slack-watch.md
+CONFLICT (content): Merge conflict in docs/verification/slack-watch.md
+Auto-merging tests/fm-slack-watch.test.sh
+CONFLICT (content): Merge conflict in tests/fm-slack-watch.test.sh
+Auto-merging tests/fm_slack_watch_test.py
+CONFLICT (content): Merge conflict in tests/fm_slack_watch_test.py  (tested tree 9e8401472ccadcbf9e02fdc411e6a348b5beddcd)
+
+## tip = T, verify read (expect exit 0: landing tree equals the tested tree; Socket runs need no record)
+$ fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd d0ed6dc12ade34352dd0267c868dd74406d18dba <scratch> <task copy> 
+note: tested-tree records unavailable (tip d0ed6dc12ade34352dd0267c868dd74406d18dba and head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd do not merge); the ancestry rule applies
+exit=1  FAIL
+# cumulative gh calls: 44; injected: 3; writes refused: 0
+
+## tip = T, --offline (expect exit 0: landing tree equals the tested tree; Socket runs need no record)
+$ fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd d0ed6dc12ade34352dd0267c868dd74406d18dba <scratch> <task copy> --offline
+note: tested-tree records unavailable (tip d0ed6dc12ade34352dd0267c868dd74406d18dba and head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd do not merge); the ancestry rule applies
+exit=1  FAIL
+# cumulative gh calls: 44; injected: 3; writes refused: 0
+
+## Observation on the squash stand-in above: it is a real limit, not a script fault. For EVERY split Y of PR 328's 15 commits (Y in base..head^),
+## a squash of base..Y onto 3c750632e88113254e14d012ea6240e66ecde1df conflicts with head in git merge-tree, because later PR commits re-edit lines earlier ones changed.
+## So a --squash-landed predecessor whose successor re-edits its lines cannot be proven; the script exits 1 and the ancestry rule refuses (fail-closed).
+#   Y=283b9601f54b2640886affa76370346874f0254b conflict
+#   Y=92478e3d056233b57cd40654790e23d598d08b26 conflict
+#   Y=aa88e9b7da95da93e5d19ac6ae056ec2d09bb040 conflict
+#   Y=1abeb81962f521c8916e7b1eec7364bd80162d91 conflict
+#   Y=a173cd81a90014696eff888fc5428971f69399bf conflict
+#   Y=ed47c6b17a339da4fb41af8874e37d84e4af30ab conflict
+#   Y=b60909151b319da3c9a1b91a0e2a49699135e662 conflict
+#   Y=d7fec46b93781deca4037c5dd152164173b63f67 conflict
+#   Y=1c6b4672e6278a8988d15870e9bd7687ef198353 conflict
+#   Y=3be5bcc84bfc02a485db4b4d3e139d8a6559f92c conflict
+#   Y=0ea076233eac74c4cd51c539e6b8189baa666408 conflict
+#   Y=7444595719c5e89ae436d32abdd4c88c0f49b8bb conflict
+#   Y=9564cffe56aee07143bd0e675f0ec5343219a4de conflict
+#   Y=7a294f1939a13163274f5da12f2dc64a4156d7db conflict
+
+# ===== Accept path: predecessor landed as a MERGE COMMIT =====
+# Stand-in tip T=bba2ec905c244c252d57ef954d064f6f9973c695: LOCAL merge commit in the disposable task copy (not on GitHub), parents 3c750632e88113254e14d012ea6240e66ecde1df and train N head 7a294f1939a13163274f5da12f2dc64a4156d7db, tree = 7a294f1939a13163274f5da12f2dc64a4156d7db^{tree}.
+#   is T an ancestor of head? no -> head is BEHIND this tip; the old ancestry rule (behind_by == 0) refuses it.
+#   merge-tree(T, head) = 9e8401472ccadcbf9e02fdc411e6a348b5beddcd  (tested tree 9e8401472ccadcbf9e02fdc411e6a348b5beddcd)
+
+## tip = T (merge-commit stand-in), verify read. Expect exit 0: landing tree equals the tested tree, Socket runs at the head need no record.
+$ fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd bba2ec905c244c252d57ef954d064f6f9973c695 <scratch> <task copy> 
+9e8401472ccadcbf9e02fdc411e6a348b5beddcd
+exit=0  PASS
+# cumulative gh calls: 44; injected: 3; writes refused: 0
+
+## tip = T (merge-commit stand-in), --offline. Expect exit 0: landing tree equals the tested tree, Socket runs at the head need no record.
+$ fm-tested-tree.py MrGTV-love/firstmate 3f3534d25850d9ae1dce1e362cd751d5b03a09cd bba2ec905c244c252d57ef954d064f6f9973c695 <scratch> <task copy> --offline
+9e8401472ccadcbf9e02fdc411e6a348b5beddcd
+exit=0  PASS
+# cumulative gh calls: 44; injected: 3; writes refused: 0
+
+## Control: same stand-in tip, socket-security runs rewritten to another head_sha. Expect exit 1 (fallback).
+note: tested-tree records unavailable (check run 124643987034 did not run at head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd); the ancestry rule applies
+exit=1  PASS

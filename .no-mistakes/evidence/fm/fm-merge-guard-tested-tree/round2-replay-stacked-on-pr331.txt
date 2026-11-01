@@ -1,0 +1,12 @@
+# Replay 2026-11-01T03:50:22Z on REAL firstmate objects: PR 331 (head c07368c0583dbdb8917b68ab62331a8e9ceacf89) was built on main 3948d62ffa86123d35baeb84746ed7639d948a02 and really landed as main 8618f63732d41ed857468b40a825f4db4135cf66.
+# real landed tree of 8618f63732d41ed857468b40a825f4db4135cf66: 407cda7015b042b15a46c6c7c9153ae77e8cced9;  tree GitHub's PR-331 merge ref had (recorded by the producer shell in round 1): 407cda7015b042b15a46c6c7c9153ae77e8cced9
+# -> the producer's recorded tree is exactly the tree that landed.
+
+## Stacked train B=04cdefba4f1a8df8854979cc0ace38cdeb8f5b41 (one commit on PR 331's head; opened while main was 3948d62ffa86123d35baeb84746ed7639d948a02)
+is 8618f63732d41ed857468b40a825f4db4135cf66 an ancestor of B? no  (old ancestry rule refuses B)
+CI would test: merge-tree(3948d62ffa86123d35baeb84746ed7639d948a02, B) = 89177d9cd4296cf523853603956b6b7f1fa6857e
+landing:       merge-tree(8618f63732d41ed857468b40a825f4db4135cf66, B) = 89177d9cd4296cf523853603956b6b7f1fa6857e
+
+## Disjoint train D=0ed0b5198e2f18fd4068d6e086ac67ab7630d8de (one unrelated commit on old main 3948d62ffa86123d35baeb84746ed7639d948a02, NOT stacked)
+CI would test: merge-tree(3948d62ffa86123d35baeb84746ed7639d948a02, D) = 2967a6b15c4c5af297a148c0fd97c7560f5b9fe3
+landing:       merge-tree(8618f63732d41ed857468b40a825f4db4135cf66, D) = 8630bb45f30962b8fd856973b63a1e2ddcd49420   (differs: PR 331's files were never tested with D)

@@ -1,0 +1,14 @@
+# target f5bf308b2, 2026-11-01T07:34:23Z
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-ci-workflow.test.sh
+ok - both pull_request workflows upload the actual checked merge tree and parent for the run attempt
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - main pushes share one group per branch and never cancel the running run
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+ok - both portable parallel jobs pass the concurrency the model starts from
+rc=0
