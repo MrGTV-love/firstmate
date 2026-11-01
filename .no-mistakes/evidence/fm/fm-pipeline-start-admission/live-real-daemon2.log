@@ -1,0 +1,21 @@
+native: cores=10 loadavg={ 8.97 12.59 12.26 }
+== A. a start is queued at full count. The real daemon then stops cleanly.
+fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=12.47 ceiling=20 priority=other
+queued alive=yes
+FORCE: daemon stop will stop/restart the daemon while 3 active pipeline runs are in progress
+state files: state.sqlite 
+queued start ended exit=125 marker=no
+fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=12.47 ceiling=20 priority=other
+fm-cpu-pass: pipeline-start refused: unable to open database file
+== B. the real daemon dies by SIGKILL, with runs marked running.
+running rows: 3
+state files after SIGKILL: state.sqlite state.sqlite-shm state.sqlite-wal 
+fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=12.39 ceiling=20 priority=other
+queued alive=yes marker=no
+== C. the real daemon restarts. Its own recovery moves runs out of running.
+queued start exit=0 marker=yes
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=3 load5=12.39 ceiling=20 priority=other
+rows: stale1|failed stale2|failed stale3|failed 
+  ✓ daemon stopped
+== leftovers:
+(end)

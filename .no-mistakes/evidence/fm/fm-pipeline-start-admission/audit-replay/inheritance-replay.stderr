@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/fm-adm-live.kOsjNo/inheritance-replay.py", line 108, in <module>
+    assert all(len(w['descriptors']) == (6 if mode == 'inherit' else 0) for w in workers)
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

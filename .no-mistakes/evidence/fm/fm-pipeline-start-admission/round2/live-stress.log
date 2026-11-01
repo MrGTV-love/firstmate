@@ -1,0 +1,4 @@
+daemon stop/start cycles 17 real stats calls 51
+admission exit tally {0: 962}
+refusals none
+state files ['state.sqlite']

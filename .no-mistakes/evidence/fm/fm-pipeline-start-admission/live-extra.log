@@ -1,0 +1,13 @@
+== no CPU budget or slot assigned by a pipeline start (private home, real daemon schema)
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=3 load5=10.84 ceiling=20 priority=other
+FM_CPU_PASS_HELD=[unset]
+{"available": true, "dir": "/tmp/fm-adm-live.kOsjNo/budget/home/.cache/fm-cpu-pool", "free": 10, "held": 0, "holders": [], "size": 10}
+exit=0
+== C2 load report: one native sample, private pool, lab DB. Not acceptance.
+record exit=0
+report exit=0
+{"load":{"cpus":10,"first":1793534450,"last":1793534450,"load1_max":11.65,"load1_p50":11.65,"load1_p95":11.65,"load_within_2x_cpus":true,"pool_held_max":0,"pool_held_mean":0.0,"samples":1,"share_above_2x_cpus":0.0},"verdict":null}
+== C4 private draft stays out of this change
+-rw-r--r--@ 1 charlesabrooker  staff  3975 Nov  1 01:58 /Users/charlesabrooker/fleet/fm-mini-home/data/fm-pipeline-start-admission/upstream-draft.md
+0
+       0

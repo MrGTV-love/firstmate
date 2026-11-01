@@ -1,0 +1,38 @@
+You drive no-mistakes by responding to its gates, not by implementing fixes.
+Follow the guidance no-mistakes itself provides for the mechanics: it loads when you invoke /no-mistakes, and `no-mistakes axi run --help` plus the `help` lines in each `axi` response are authoritative and version-matched to the installed binary.
+When starting no-mistakes, pass `--intent` as only this brief's `## Captain's intent` subsection body, not its heading, plus any later words the captain actually said.
+Preserve the actual words without adding speaker labels or direct address; the subsection heading supplies provenance outside the pipeline input.
+For a legacy brief with no such subsection, include only words on lines marked `[captain] `, excluding that metadata prefix; never copy its mixed `# Task` wholesale.
+If it has no provenance-marked captain words, stop and ask firstmate instead of starting no-mistakes.
+Do not include `## Firstmate spec`, later Firstmate build constraints, or your own decisions and tradeoffs.
+The `--intent` string you pass must be self-sufficient: that string plus the codebase must let a reader reconstruct roughly the same specification, without depending on a separate report, a PR, or context that lives only in this conversation.
+When the captain's intent refers to a report, decision, or PR ("do items 1, 2, 3, and 7 of the report"), write the substance of the referenced items into `--intent` in the captain's terms, not only the pointer; that substance is the captain's ask by reference, while Firstmate's build instructions and your own decisions still stay out.
+This replaces the no-mistakes skill's advice to enrich `--intent` with decisions and tradeoffs; that advice does not apply to Firstmate-dispatched work.
+Do not hand-edit, commit, or fix findings yourself while a run is active - the pipeline applies every fix.
+
+Start every fresh/new run through `python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority <class> no-mistakes.run -- no-mistakes axi run <new-run inputs>`; when a rerun is expressly authorized, issue it through the same runner as `python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority <class> no-mistakes.run -- no-mistakes rerun`, never as `axi run`. The measured runner automatically queues either through `fm-cpu-pass.sh pipeline-start` before any execution clock.
+Choose class `merge-train` for merge-train work, `machinery` for Firstmate machinery, `vernant-build` for Vernant builds, and `other` otherwise; the pool owner enforces that priority order.
+Keep the original intent, verification-plan, base and profile arguments unchanged; admission never authorizes a start, resolves a finding or skips a step.
+Reattach and respond to the existing run normally, without new-run inputs or another admission; `docs/cpu-pass-pool.md` owns the start-policy and descriptor-lifetime limits.
+A fresh-start call that ends - killed, timed out, or by its harness bound - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run, so there is nothing to reattach to: issue the same fresh start again through the admission runner, the same way, rather than a flagless reattach or a status read.
+The admitted line proves only that the client was launched, not that a run exists: after it, reattach as the rules below say.
+If that reattach refuses because no run is active and `no-mistakes axi status` shows no run created since the fresh-start call began, that start created no run, so issue it again through the admission runner the same way; when status shows such a run, read its outcome and never start another.
+
+One drive call blocks until the next gate or outcome, which routinely outlives what your harness lets a single command run: Claude Code kills a command at ten minutes maximum, while one fix round is capped around thirty minutes and up to three rounds chain.
+So background the drive call instead of sitting in one blocking hold your harness will kill, and read its return when it finishes.
+Declare that wait using the brief's status-reporting rule before waiting on the backgrounded drive call.
+Where a harness's own command limit is not established, assume it bounds commands and use that same backgrounded shape.
+Only a drive call's return reports the green PR: `no-mistakes axi status` shows progress but never reports `checks-passed` while the ci step is still monitoring the PR for merge, so never wait on a status poll for the next gate or outcome.
+Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - unless the admission rule above re-issues a fresh start that never printed its admitted line, reattach at once by re-running `no-mistakes axi run` without flags, backgrounded the same way; once checks are green it returns `checks-passed` immediately, and if it refuses because no run is active, read the finished outcome from `no-mistakes axi status`, unless that call was a fresh start and status shows no run created since it began, which the admission rule above re-issues.
+A drive call's own wait ending, or your harness's command bound passing, never kills the run, proves failure, or permits a final timeout blocker: the measured-command instructions above own long-command limits and progress checks, so judge continued work by output growth and cumulative process-tree CPU time.
+The helper never stops a wrapped drive call for silence, because the client waits quietly on the shared daemon; only the 6 hour wall clock limit stops one. Its measured p99 x 3 for the wrapped call's own key is only a slower_than_usual report line, not a stop and not a guessed tool wait.
+The per-step durations the helper imports from completed pipeline runs are record-only under `no-mistakes-step.<step>` and never set a drive call's ceiling.
+A killed or timed-out call is never evidence the daemon died: the daemon accepts your response immediately and runs the round in the background, so the call was only ever waiting for a read while the run kept working.
+Reattach and keep going rather than reporting the pipeline blocked; rule 7 owns the checks that decide when a pipeline block is real.
+
+Two firstmate-specific rules layer on top of that guidance:
+- ask-user findings are never yours to answer: escalate to firstmate using rule 6's ask-user format and stop.
+  Firstmate applies `ask-user-authority` and obtains any required captain decision.
+  When the decision comes back, feed it to the gate with `no-mistakes axi respond` and let the pipeline apply it - do not route the question to "the user" or implement the fix yourself.
+- NEVER pass `--yes` (or `-y`) to `no-mistakes axi run` or `no-mistakes axi respond`. It is banned fleet-wide.
+  It auto-resolves every gate including ask-user findings with no escalation, and answering your own ask-user finding is a hard rule violation.

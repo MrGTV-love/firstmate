@@ -1,0 +1,2 @@
+fm-cpu-pass: pipeline-start waiting: another start is registering
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=1 load5=0.00 ceiling=6 priority=other

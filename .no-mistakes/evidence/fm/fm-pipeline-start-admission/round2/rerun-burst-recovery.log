@@ -1,0 +1,24 @@
+  three grants took 4.02 s
+  after 6s: started ['b1', 'b10', 'b11'] peak counted 3 waiters 9 live clients 12
+--- PASS simultaneous-starts-cannot-overrun-and-checks-stay-parallel 19.9s
+  stale merge-train waiter did not block other; file swept
+  unregistered client: fm-cpu-pass: pipeline-start waiting: another start is registering
+  owner SIGKILL freed the start lock with the client alive
+  exit status 7, 127, 126, 125 preserved; queue still usable
+--- PASS queue-and-owner-death-do-not-strand-the-queue 7.4s
+  three grants took 4.41 s
+  after 6s: started ['b0', 'b7', 'b8'] peak counted 3 waiters 9 live clients 12
+--- PASS simultaneous-starts-cannot-overrun-and-checks-stay-parallel 20.9s
+  stale merge-train waiter did not block other; file swept
+  unregistered client: fm-cpu-pass: pipeline-start waiting: another start is registering
+  owner SIGKILL freed the start lock with the client alive
+  exit status 7, 127, 126, 125 preserved; queue still usable
+--- PASS queue-and-owner-death-do-not-strand-the-queue 7.3s
+  three grants took 3.5 s
+  after 6s: started ['b2', 'b6', 'b7'] peak counted 3 waiters 9 live clients 12
+--- PASS simultaneous-starts-cannot-overrun-and-checks-stay-parallel 20.8s
+  stale merge-train waiter did not block other; file swept
+  unregistered client: fm-cpu-pass: pipeline-start waiting: another start is registering
+  owner SIGKILL freed the start lock with the client alive
+  exit status 7, 127, 126, 125 preserved; queue still usable
+--- PASS queue-and-owner-death-do-not-strand-the-queue 8.6s

@@ -1,0 +1,6 @@
+database state before each start: real-schema WAL file, no side files, count at limit 3
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes axi run --intent 'x'
+ queued-for-3s True client-ran-while-queued False exit 0 | ['fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=9.15 ceiling=20 priority=machinery', 'fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=9.15 ceiling=20 priority=machinery']
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority merge-train no-mistakes.run -- no-mistakes rerun
+ queued-for-3s True client-ran-while-queued False exit 0 | ['fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=9.03 ceiling=20 priority=merge-train', 'fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=9.03 ceiling=20 priority=merge-train']
+client calls: ['axi run --intent x', 'rerun']

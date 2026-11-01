@@ -1,0 +1,32 @@
+native: cores=10 loadavg={ 8.27 13.05 12.39 }
+== 1. real daemon up, in foreground, disposable NM_HOME
+  ● daemon running (pid 7641)
+state files with live daemon: state.sqlite state.sqlite-shm state.sqlite-wal 
+== 2. two counted runs, real daemon live: third start
+fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=13.05 ceiling=20 priority=other
+exit=0 marker=yes
+== 3. three counted runs, real daemon live: fourth start queues
+fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=12.89 ceiling=20 priority=other
+alive=yes marker=no
+after release exit=0 marker=yes
+fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=12.89 ceiling=20 priority=other
+== 4. clean daemon stop with the real CLI
+  ✓ daemon stopped
+daemon status:   ○ daemon not running
+state files after clean stop: state.sqlite 
+== 5. fresh start with the daemon stopped
+fm-cpu-pass: pipeline-start refused: unable to open database file
+exit=125 marker=no
+state files: state.sqlite 
+== 6. does a read-only real CLI call heal it?
+stats exit=0
+state files after real stats: state.sqlite 
+fm-cpu-pass: pipeline-start refused: unable to open database file
+exit=125 marker=no
+== 7. real daemon back up: fresh start works again
+state files: state.sqlite state.sqlite-shm state.sqlite-wal 
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=3 load5=13.01 ceiling=20 priority=other
+exit=0 marker=yes
+  ✓ daemon stopped
+== leftover processes for this home:
+(end)

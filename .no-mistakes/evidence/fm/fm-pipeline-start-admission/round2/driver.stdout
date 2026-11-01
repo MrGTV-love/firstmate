@@ -1,0 +1,200 @@
+
+=== SCENARIO native-10core-count-boundary-real-schema 06:19:22
+  native cores 10 load5 11.19140625 ceiling 20 independent limit 3
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/native/below
+   fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=11.06 ceiling=20 priority=other
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/native/at
+   fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=11.06 ceiling=20 priority=other
+   fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=11.06 ceiling=20 priority=other
+--- PASS native-10core-count-boundary-real-schema 4.6s
+
+=== SCENARIO core-scaling-table 06:19:27
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-1/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-1/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-2/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-2/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-3/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-3/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-5/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-5/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-6/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-6/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-9/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-9/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-10/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-10/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-11/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-11/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-12/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-12/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-18/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-18/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-19/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-19/at
+  $ below : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-36/below
+  $ at : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/scale-36/at
+  cores->limit {1: 1, 2: 1, 3: 1, 5: 1, 6: 2, 9: 3, 10: 3, 11: 3, 12: 4, 18: 6, 19: 6, 36: 12}
+--- PASS core-scaling-table 35.5s
+
+=== SCENARIO both-thresholds-required-18core 06:20:02
+  $ s : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/thresholds/m
+  count=6 load=36: fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 load5=36.00 ceiling=36 priority=other
+   fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 load5=36.00 ceiling=36 priority=other
+--- PASS both-thresholds-required-18core 8.4s
+
+=== SCENARIO count-definition-real-schema 06:20:10
+  $ none-counted : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/count/a
+   fm-cpu-pass: pipeline-start admitted: counted=0 limit=3 load5=0.00 ceiling=18 priority=other
+  $ full : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/count/b
+   fm-cpu-pass: pipeline-start waiting: counted=3 limit=3 load5=0.00 ceiling=18 priority=other
+  after park: fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=0.00 ceiling=18 priority=other
+  $ full2 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/count/c
+  after ci-ready: fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=0.00 ceiling=18 priority=other
+  $ full3 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/count/d
+  after complete: fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=0.00 ceiling=18 priority=other
+--- PASS count-definition-real-schema 10.7s
+
+=== SCENARIO priority-order-and-arrival-order 06:20:21
+  $ o1 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority other -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  $ v1 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority vernant-build -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  $ m1 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority machinery -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  $ t1 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority merge-train -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  $ o2 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority other -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  $ t2 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority merge-train -- /private/tmp/fm-adm-r2.fV7GhT/cases/priority/shim/no-mistakes axi run --intent x
+  arrival ['o1', 'v1', 'm1', 't1', 'o2', 't2'] -> grant ['t1', 't2', 'm1', 'v1', 'o1', 'o2']
+--- PASS priority-order-and-arrival-order 9.2s
+
+=== SCENARIO simultaneous-starts-cannot-overrun-and-checks-stay-parallel 06:20:30
+  $ b0 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b1 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b2 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b3 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b4 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b5 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b6 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b7 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b8 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b9 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b10 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  $ b11 : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- /private/tmp/fm-adm-r2.fV7GhT/cases/burst/shim/no-mistakes axi run --intent x
+  after 6s: started ['b0', 'b5'] peak counted 2 waiters 9 live clients 12
+--- FAIL simultaneous-starts-cannot-overrun-and-checks-stay-parallel AssertionError('overrun or underrun')
+
+=== SCENARIO queue-time-outside-execution-clock 06:20:36
+  $ queued : /private/tmp/fm-adm-r2.fV7GhT/cases/clock/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/clock/shim/no-mistakes axi run --intent clock-test
+  queued 6s against a 3s bound. sample: [{'host': 'GTT-CB.local', 'repo': 'clock', 'key': 'no-mistakes.run', 'duration_ms': 1339, 'exit': 0, 'recorded_at': '2026-11-01T12:20:44.726066+00:00', 'load_start': 0, 'load_end': 0, 'cpus': 3, 'sample_id': '7ffcc240-0e48-454c-8a71-6f5d153ff17d', 'calibration': True, 'timed_out': False}] stderr-last: ['progress: "no-mistakes.run elapsed=1.0s output_bytes=0 tree_cpu=0.04s"']
+  $ slow : /private/tmp/fm-adm-r2.fV7GhT/cases/clock-bound/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/clock-bound/shim/no-mistakes axi run --intent slow
+  genuine overrun: exit 124 elapsed 2.6s [{'host': 'GTT-CB.local', 'repo': 'clock-bound', 'key': 'no-mistakes.run', 'duration_ms': 2077, 'exit': 124, 'recorded_at': '2026-11-01T12:20:47.324631+00:00', 'load_start': 0, 'load_end': 0, 'cpus': 3, 'sample_id': 'f71d6fda-c9be-49f1-8886-0fb28dca5831', 'calibration': True, 'timed_out': True}, {'host': 'GTT-CB.local', 'repo': 'clock-bound', 'key': 'no-mistakes.run', 'event': 'timeout', 'duration_ms': 2077, 'event_id': 'f71d6fda-c9be-49f1-8886-0fb28dca5831', 'recorded_at': '2026-11-01T12:20:47.325657+00:00'}]
+--- PASS queue-time-outside-execution-clock 10.6s
+
+=== SCENARIO fresh-starts-queue-and-reattach-does-not 06:20:47
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f0/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f0/shim/no-mistakes axi run --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f1/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f1/shim/no-mistakes axi run --intent=x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f2/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f2/shim/no-mistakes axi run --intent-file /private/tmp/fm-adm-r2.fV7GhT/cases/intent.txt
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f3/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f3/shim/no-mistakes axi run --intent-file=/private/tmp/fm-adm-r2.fV7GhT/cases/intent.txt
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f4/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f4/shim/no-mistakes axi run --intent -
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f5/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f5/shim/no-mistakes axi run --skip push,pr,ci --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f6/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f6/shim/no-mistakes axi run --wait 1m --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f7/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f7/shim/no-mistakes rerun
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-f8/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-f8/shim/no-mistakes rerun --intent y
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o0/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o0/shim/no-mistakes axi run
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o1/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o1/shim/no-mistakes axi run --wait 1m
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o2/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o2/shim/no-mistakes axi respond --action fix
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o3/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o3/shim/no-mistakes axi status
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o4/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o4/shim/no-mistakes status
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-o5/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-o5/shim/no-mistakes runs
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-space/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority merge-train no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-space/shim/no-mistakes axi run --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-equals/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority=vernant-build no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-equals/shim/no-mistakes axi run --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-default/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-p-default/shim/no-mistakes axi run --intent x
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-bad/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority bogus no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-bad/shim/no-mistakes axi run --intent x
+  $ outer : /private/tmp/fm-adm-r2.fV7GhT/cases/route-nested/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-nested/shim/no-mistakes axi run --intent outer
+  $ nested : /private/tmp/fm-adm-r2.fV7GhT/cases/route-nested/nested.sh
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-probe0/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-probe0/shim/no-mistakes --skip x rerun
+  $ x : /private/tmp/fm-adm-r2.fV7GhT/cases/route-probe1/shim/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run no-mistakes.run -- /private/tmp/fm-adm-r2.fV7GhT/cases/route-probe1/shim/no-mistakes --skip x axi run --intent x
+  routing table:
+    queued : axi run --intent x
+    queued : axi run --intent=x
+    queued : axi run --intent-file /private/tmp/fm-adm-r2.fV7GhT/cases/intent.txt
+    queued : axi run --intent-file=/private/tmp/fm-adm-r2.fV7GhT/cases/intent.txt
+    queued : axi run --intent -
+    queued : axi run --skip push,pr,ci --intent x
+    queued : axi run --wait 1m --intent x
+    queued : rerun
+    queued : rerun --intent y
+    direct : axi run
+    direct : axi run --wait 1m
+    direct : axi respond --action fix
+    direct : axi status
+    direct : status
+    direct : runs
+    priority : space->merge-train
+    priority : equals->vernant-build
+    priority : default->other
+    refused-125 : --pipeline-priority bogus
+    queued : nested fresh start under an admitted client
+  probes outside the template: [('--skip x rerun', 'direct'), ('--skip x axi run --intent x', 'direct')]
+--- PASS fresh-starts-queue-and-reattach-does-not 24.4s
+
+=== SCENARIO unusable-sources-refuse-and-never-start 06:21:11
+  $ missing-db : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-missing/m-missing-db
+   missing-db -> fm-cpu-pass: pipeline-start refused: unable to open database file
+  $ garbage-db : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-garbage/m-garbage-db
+   garbage-db -> fm-cpu-pass: pipeline-start refused: file is not a database
+  $ no-runs-table : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-noschema/m-no-runs-table
+   no-runs-table -> fm-cpu-pass: pipeline-start refused: no such table: runs
+  $ old-schema-no-columns : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-old/m-old-schema-no-columns
+   old-schema-no-columns -> fm-cpu-pass: pipeline-start refused: no such column: awaiting_agent_since
+  $ unreadable-db : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-perm/m-unreadable-db
+   unreadable-db -> fm-cpu-pass: pipeline-start refused: unable to open database file
+  $ negative-load : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-negative-load/m-negative-load
+   negative-load -> fm-cpu-pass: pipeline-start refused: cannot read a finite nonnegative native load5
+  $ nan-load : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-nan-load/m-nan-load
+   nan-load -> fm-cpu-pass: pipeline-start refused: cannot read a finite nonnegative native load5
+  $ inf-load : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-inf-load/m-inf-load
+   inf-load -> fm-cpu-pass: pipeline-start refused: cannot read a finite nonnegative native load5
+  $ pool-path-is-a-file : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-pool/m-pool-path-is-a-file
+   pool-path-is-a-file -> fm-cpu-pass: pipeline-start refused: pool directory /private/tmp/fm-adm-r2.fV7GhT/cases/ref-pool/home/.cache/fm-cpu-pool is unusable: [Errno 17] File exists: '/private/tmp/fm-adm-r2.fV7GhT/cases/ref-pool/home/.cache/fm-cpu-pool'
+  $ env-select : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-env/env
+  $ ro : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/ref-ro/ro
+--- PASS unusable-sources-refuse-and-never-start 5.1s
+
+=== SCENARIO queue-and-owner-death-do-not-strand-the-queue 06:21:17
+  $ low : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority other -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/rec/low
+  $ high : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh pipeline-start --priority merge-train -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/rec/high
+--- FAIL queue-and-owner-death-do-not-strand-the-queue AssertionError('dead waiter file stays, inert')
+
+=== SCENARIO six-children-cannot-hold-master-slots-before-vs-after 06:21:17
+  $ master : bash /private/tmp/fm-adm-r2.fV7GhT/base/bin/fm-cpu-pass.sh run --passes 6 -- /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /private/tmp/fm-adm-r2.fV7GhT/cases/kids-before-base-8618f637/master.py
+  $ second : bash /private/tmp/fm-adm-r2.fV7GhT/base/bin/fm-cpu-pass.sh run --passes 6 -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/kids-before-base-8618f637/second
+   {"impl": "before-base-8618f637", "passes": 6, "workers": 6, "marker": ["6"], "held_while_master_alive": 6, "slot_fds_per_child": [6, 6, 6, 6, 6, 6], "held_after_master_exit": 6, "children_alive_after_master": true, "second_burst_blocked_5s": true, "second_burst_wait_s": 5.15, "second_stderr": "fm-cpu-pass: waiting 2s for 6 CPU pass(es) for touch: all passes in use; pool size 10; holders: pid=61086 passes=6 since=1793535678 label=touch; pid=60177 passes=6 since=1793535677 label=python3; pid="}
+  $ master : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh run --passes 6 -- /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /private/tmp/fm-adm-r2.fV7GhT/cases/kids-final-a1dc28be/master.py
+  $ second : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh run --passes 6 -- touch /private/tmp/fm-adm-r2.fV7GhT/cases/kids-final-a1dc28be/second
+   {"impl": "final-a1dc28be", "passes": 6, "workers": 6, "marker": ["6"], "held_while_master_alive": 6, "slot_fds_per_child": [0, 0, 0, 0, 0, 0], "held_after_master_exit": 0, "children_alive_after_master": true, "second_burst_blocked_5s": false, "second_burst_wait_s": 0.13, "second_stderr": ""}
+--- PASS six-children-cannot-hold-master-slots-before-vs-after 8.5s
+
+=== SCENARIO real-pytest-xdist-n6-worker-lock-inheritance-before-vs-after 06:21:25
+  $ pytest : bash /private/tmp/fm-adm-r2.fV7GhT/base/bin/fm-cpu-pass.sh run --passes 6 --label pytest -n 6 -- /private/tmp/fm-adm-r2.fV7GhT/venv/bin/pytest -n 6 -q -p no:cacheprovider /private/tmp/fm-adm-r2.fV7GhT/cases/xdist-before-base-8618f637/test_x.py
+   {"impl": "before-base-8618f637", "xdist_workers": ["gw0", "gw1", "gw2", "gw3", "gw4", "gw5"], "slot_fds_per_real_worker": [0, 0, 0, 0, 0, 0], "slot_fds_pytest_master": [6], "held": 6, "nested": ["6\n|0", "6\n|0", "6\n|0", "6\n|0", "6\n|0", "6\n|0"], "held_after": 0, "summary": "6 passed in 1.26s"}
+  $ pytest : bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-cpu-pass.sh run --passes 6 --label pytest -n 6 -- /private/tmp/fm-adm-r2.fV7GhT/venv/bin/pytest -n 6 -q -p no:cacheprovider /private/tmp/fm-adm-r2.fV7GhT/cases/xdist-final-a1dc28be/test_x.py
+   {"impl": "final-a1dc28be", "xdist_workers": ["gw0", "gw1", "gw2", "gw3", "gw4", "gw5"], "slot_fds_per_real_worker": [0, 0, 0, 0, 0, 0], "slot_fds_pytest_master": [0], "held": 6, "nested": ["6\n|0", "6\n|0", "6\n|0", "6\n|0", "6\n|0", "6\n|0"], "held_after": 0, "summary": "6 passed in 1.19s"}
+--- PASS real-pytest-xdist-n6-worker-lock-inheritance-before-vs-after 3.3s
+
+=== SCENARIO generated-brief-command-runs-as-written 06:21:29
+  literal: python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes axi run --intent 'x'
+  $ fresh : bash -c python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes axi run --intent 'x'
+  literal: python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes rerun
+  $ rerun : bash -c python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes rerun
+  literal: python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes axi run --intent 'x'
+  $ fresh : bash -c python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes axi run --intent 'x'
+  literal: python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes rerun
+  $ rerun : bash -c python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AZ1QHMZQHT42BMMBYGZT8E/bin/fm-duration.py run --pipeline-priority machinery no-mistakes.run -- no-mistakes rerun
+/private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-dod-lib.sh: line 179: /private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-pr-lib.sh: No such file or directory
+/private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-dod-lib.sh: line 181: /private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-classify-lib.sh: No such file or directory
+/private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-dod-lib.sh: line 183: /private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-nm-run-lib.sh: No such file or directory
+/private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-dod-lib.sh: line 185: /private/tmp/fm-adm-r2.fV7GhT/path with space/bin/fm-brief-heading-lib.sh: No such file or directory
+  $ spaced : bash -c python3 /private/tmp/fm-adm-r2.fV7GhT/path\ with\ space/bin/fm-duration.py run --pipeline-priority other no-mistakes.run -- no-mistakes axi run --intent x
+  spaced path literal: python3 /private/tmp/fm-adm-r2.fV7GhT/path\ with\ space/bin/fm-duration.py run --pipeline-priority other no-mistakes.run -- no-mistakes axi run --intent x
+--- PASS generated-brief-command-runs-as-written 4.0s
+
+summary: [('native-10core-count-boundary-real-schema', 'pass'), ('core-scaling-table', 'pass'), ('both-thresholds-required-18core', 'pass'), ('count-definition-real-schema', 'pass'), ('priority-order-and-arrival-order', 'pass'), ('simultaneous-starts-cannot-overrun-and-checks-stay-parallel', 'fail'), ('queue-time-outside-execution-clock', 'pass'), ('fresh-starts-queue-and-reattach-does-not', 'pass'), ('unusable-sources-refuse-and-never-start', 'pass'), ('queue-and-owner-death-do-not-strand-the-queue', 'fail'), ('six-children-cannot-hold-master-slots-before-vs-after', 'pass'), ('real-pytest-xdist-n6-worker-lock-inheritance-before-vs-after', 'pass'), ('generated-brief-command-runs-as-written', 'pass')]
+driver exit=1

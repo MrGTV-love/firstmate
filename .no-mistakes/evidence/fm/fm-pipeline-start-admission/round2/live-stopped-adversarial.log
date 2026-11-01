@@ -1,0 +1,24 @@
+native cores 10 limit 3 load5 10.13916015625 python /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+PASS stopped database, count below limit: admits with the true count :: (0, True, 'fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=10.14 ceiling=20 priority=other')
+PASS stopped database read writes no byte and adds no state file :: ['state.sqlite']
+PASS stopped database, count at limit: queues
+PASS live writer frees one count: queued start admits :: fm-cpu-pass: pipeline-start admitted: counted=2 limit=3 load5=10.27 ceiling=20 priority=other
+PASS rows only in a live -wal file count: start queues, main file not used alone
+PASS unreadable -wal holding the rows: refuses, no work :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS dangling -wal symlink: refuses, no work :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS -wal with no -shm (crash shape), unread rows: never a start from the main file :: queued files ['state.sqlite', 'state.sqlite-shm', 'state.sqlite-wal']
+PASS missing database: refuses, creates nothing :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS missing database with stray -wal: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS garbage database with no side files: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: file is not a database')
+PASS unreadable database with no side files: immutable read also refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS database path is a directory: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS stopped WAL database with no runs table: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: no such table: runs')
+PASS stopped WAL database with old schema: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: no such column: awaiting_agent_since')
+PASS read-only state directory, stopped database, full count: queues on the true count
+PASS symlinked stopped database, full count: queues
+PASS symlinked database, unreadable -wal at the real path: refuses :: (125, False, 'fm-cpu-pass: pipeline-start refused: unable to open database file')
+PASS burst of 7 starts from a stopped database, client keeps connection: exactly limit start, none refused :: ['n0', 'n1', 'n2']
+PASS burst drains to all exit 0 :: {'n0': 0, 'n1': 0, 'n2': 0, 'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0}
+PASS burst of 7 starts from a stopped database, client closes connection: exactly limit start, none refused :: ['n0', 'n2', 'n3']
+PASS burst drains to all exit 0 :: {'n0': 0, 'n1': 0, 'n2': 0, 'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0}
+FAILED: none

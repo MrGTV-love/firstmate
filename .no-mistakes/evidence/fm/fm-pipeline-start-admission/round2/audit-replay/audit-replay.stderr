@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/fleet/fm-mini-home/data/fm-pipeline-start-admission/audit-replay.py", line 109, in <module>
+    observe('lint-one', ['bash', str(lint / 'bin/fm-lint.sh'), 'bin/probe.sh'], lint, 1)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/fleet/fm-mini-home/data/fm-pipeline-start-admission/audit-replay.py", line 77, in observe
+    assert rc == 0, (name, rc, (case / 'stderr.log').read_text())
+           ^^^^^^^
+AssertionError: ('lint-one', 1, 'fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\n')
