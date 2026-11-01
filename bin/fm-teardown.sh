@@ -2748,6 +2748,7 @@ work_is_landed_proof() {
 # this before detaching/deleting the slot branch, never on a discard proof.
 # The command header owns report-only recovery of earlier stale declarations.
 teardown_retire_slot_manifest() {
+  [ "$FORCE" != "--force" ] || return 0
   local slot=$1 branch=$2
   if [ ! -f "$PROJ/scripts/git-stability/provision_existing_slot.py" ] \
      && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then

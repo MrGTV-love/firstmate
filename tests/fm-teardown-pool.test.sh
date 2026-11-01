@@ -3244,7 +3244,7 @@ SH
 # while teardown still runs its real landing, custody and branch-delete path.
 test_vernant_slot_manifest_retirement() {
   local variant case_dir common digest records rc head merge
-  for variant in success refused error absent unlanded no-record not-merged orca-success orca-refused; do
+  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged orca-success orca-refused; do
     case "$variant" in
       orca-*)
         case_dir=$(make_case "vernant-manifest-$variant")
@@ -3310,15 +3310,32 @@ PY
       rm "$case_dir/project/scripts/git-stability/retire_slot_manifest.py"
       touch "$case_dir/project/scripts/git-stability/provision_existing_slot.py"
     fi
-    if [ "$variant" = unlanded ]; then
+    if [ "$variant" = unlanded ] || [ "$variant" = orca-forced-unlanded ]; then
       printf 'unlanded\n' > "$NESTED_SLOT/unlanded.txt"
       git -C "$NESTED_SLOT" add unlanded.txt
       git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm unlanded
     fi
     rc=0
-    CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
-      FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
     case "$variant" in
+      *forced*)
+        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+          FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+        ;;
+      *)
+        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+          FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+        ;;
+    esac
+    case "$variant" in
+      *forced*)
+        expect_code 0 "$rc" "authorized forced teardown changed behavior: $(cat "$case_dir/err")"
+        assert_absent "$case_dir/called" 'forced teardown called retirement'
+        assert_present "$records/worktree-lifecycle/$digest.json" 'forced teardown removed legacy record'
+        assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'forced teardown removed durable record'
+        if git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1; then
+          fail 'forced teardown did not delete its task branch'
+        fi
+        ;;
       success|orca-success)
         expect_code 0 "$rc" "retirement success: $(cat "$case_dir/err")"
         assert_present "$case_dir/called" 'entry point was not called'
