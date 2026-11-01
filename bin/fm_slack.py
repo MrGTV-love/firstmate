@@ -19,6 +19,7 @@ SAFE_ERRORS = {
 
 class Slack:
     base = 'https://slack.com/api/'
+    on_reply = None
 
     def __init__(self, token):
         self.token = token
@@ -53,6 +54,8 @@ class Slack:
             raise SlackError('http_' + str(error.code)) from None
         except (OSError, ValueError, urllib.error.URLError):
             raise SlackError('unreachable') from None
+        if self.on_reply:
+            self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
             code = data.get('error', '') if isinstance(data, dict) else ''
             # Never relay arbitrary API text, including an echoed Authorization header.

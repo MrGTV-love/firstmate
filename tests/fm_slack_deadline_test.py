@@ -14,6 +14,10 @@ import urllib.parse
 
 
 ROOT = Path(__file__).resolve().parent.parent
+# Two replies fit inside one no-progress bound, as 9 s replies fit inside the
+# watcher's default 30 s; the check still outlasts the bound with no CPU to show.
+LATENCY_SECONDS = 3
+NO_PROGRESS_SECONDS = 6
 
 
 def install():
@@ -58,6 +62,9 @@ def install():
                     reader.settimeout(timeout)
                     reader.recv(1)
                 raise AssertionError('silent peer returned')
+            if scenario == 'latency':
+                # Slack itself is slow: the wait is idle, inside the request.
+                time.sleep(LATENCY_SECONDS)
             body = replay.call(method, **fields)
             return Response(json.dumps(body).encode())
         finally:
@@ -87,20 +94,26 @@ def main():
         timings = home / 'timings.jsonl'
         env['FM_TEST_SLACK_TIMINGS'] = str(timings)
 
-        def command(*args, scenario=''):
+        def invoke(*args, scenario=''):
             entry = (['bash', str(home / 'state/slack.check.sh')]
                      if args == ('check',) else ['bash', str(ROOT / 'bin/fm-slack-check.sh'), *args])
-            result = subprocess.run(entry, env=dict(env, FM_TEST_SLACK_SCENARIO=scenario),
-                                    capture_output=True, text=True, check=True)
-            assert not result.stderr, result.stderr
+            return subprocess.run(entry, env=dict(env, FM_TEST_SLACK_SCENARIO=scenario),
+                                  capture_output=True, text=True, check=True)
+
+        def command(*args, scenario=''):
+            result = invoke(*args, scenario=scenario)
+            finished = len(result.stderr.splitlines())
+            assert result.stderr == 'slack: request finished\n' * finished, result.stderr
             return result.stdout
 
         assert 'armed:' in command('arm')
         timings.write_text('')
         started = time.monotonic()
-        output = command('check', scenario='slow')
+        result = invoke('check', scenario='slow')
+        output = result.stdout
         elapsed = time.monotonic() - started
         rows = [json.loads(line) for line in timings.read_text().splitlines()]
+        assert result.stderr == 'slack: request finished\n' * len(rows), result.stderr
         print('slow check elapsed: %.3fs; request timings: %s' % (elapsed, json.dumps(rows)), flush=True)
         assert 'transport failure' not in output, output
         assert elapsed >= 21, elapsed
@@ -119,7 +132,31 @@ def main():
         print('ok - slow standing check completes after %.3fs; four cards remain four on repeat' % elapsed)
 
         timings.write_text('')
-        first = command('check', scenario='hang')
+        watched = subprocess.run(
+            ['bash', '-c', '''
+                . "$1"
+                WATCHER_PID=$$
+                trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+                watcher_beat force
+                CHECK_TIMEOUT=$3
+                run_check_capture slack "$2" || exit 21
+                printf 'status=%s stopped=%s notice=%s result=%s\\n' \
+                  "$FM_CHECK_STATUS" "$FM_CHECK_STOPPED" "$FM_CHECK_STOP_NOTICE" "$FM_CHECK_RESULT"
+             ''', '_', str(ROOT / 'bin/fm-watch.sh'), str(home / 'state/slack.check.sh'), str(NO_PROGRESS_SECONDS)],
+            env=dict(env, FM_TEST_SLACK_SCENARIO='latency'), capture_output=True, text=True)
+        rows = [json.loads(line) for line in timings.read_text().splitlines()]
+        assert watched.returncode == 0, watched
+        assert watched.stdout == 'status=0 stopped= notice= result=\n', watched
+        assert sum(row['seconds'] for row in rows) > NO_PROGRESS_SECONDS, rows
+        assert all(row['seconds'] < row['timeout'] for row in rows), rows
+        assert len(cards()) == 4, cards()
+        print('ok - watcher lets %d requests of %ds each finish under a %ds no-progress bound'
+              % (len(rows), LATENCY_SECONDS, NO_PROGRESS_SECONDS), flush=True)
+
+        timings.write_text('')
+        hung = invoke('check', scenario='hang')
+        assert hung.stderr == '', hung.stderr  # a hung request is not progress
+        first = hung.stdout
         assert first.count('slack: transport failure: unreachable') == 1, first
         assert command('check', scenario='hang') == ''
         assert len(cards()) == 4, cards()

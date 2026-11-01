@@ -3621,6 +3621,7 @@ Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the f
 No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 Each Slack API request keeps its own 10-second socket timeout, and no budget is shared across the requests of one run; `bin/fm-watch.sh` owns the standing check's no-progress and absolute bounds.
+The standing check writes one `slack: request finished` line to stderr after each reply, because a check that waits on slow replies uses almost no CPU and the watcher counts check stderr as progress; a hung or trickling request writes nothing, so the no-progress bound still stops it.
 
 `tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.

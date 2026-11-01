@@ -9,6 +9,7 @@ State is a write-ahead journal: a staged publication is saved before it reaches
 the intake, and a resumed poll continues the exact same stage. A crash may
 repeat a notification but cannot discard a read reply.
 """
+import contextlib
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -996,6 +997,14 @@ def emit(watch, command):
     watch.printed(len(watch.output))
 
 
+def note_progress():
+    # A check waiting on a slow reply uses almost no CPU, so the watcher would
+    # stop it as idle. Its progress rule also counts check stderr. Only a finished
+    # request writes here, so a hung or trickling request still shows no progress.
+    with contextlib.suppress(OSError):
+        os.write(2, b'slack: request finished\n')
+
+
 def main(argv):
     os.umask(0o077)
     action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
@@ -1027,6 +1036,8 @@ def main(argv):
         replay = Replay(replay_path, state_home() / STATE_KEY,
                         token_present=bool(env_value('SLACK_BOT_TOKEN'))) if replay_path else None
         watch = Watch(replay=replay, token=env_value('SLACK_BOT_TOKEN').strip())
+        if action == 'check':
+            watch.api.on_reply = note_progress
         if action != 'retarget':
             # Only an explicit retarget may move the plane to a changed owner DM.
             watch.verify_target()

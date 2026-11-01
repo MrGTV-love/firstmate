@@ -46,6 +46,9 @@ That run was recorded as `9c4ac32b` before the rebase, and `tests/fm_slack_deadl
 It printed `ok - slow standing check completes after 44.270s; four cards remain four on repeat`, passed the hang case with one report per failure episode, and ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=198406`.
 The fake successful requests each completed within the retained ten-second timeout; the two recorded silent socket reads ended after 10.006 and 10.002 seconds, each well below the watcher's 30-second no-progress bound.
 
+The regression also runs the check through the watcher's `run_check_capture` with a 6-second no-progress bound and a 3-second idle wait inside each request.
+Without the per-reply stderr line, the watcher stopped that check in 3 of 3 2026-11-01 runs; with it, the check completed, and the registered-shim run ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=111597`.
+
 ## Live read-only probe
 
 Command: `auth.test` and `users.info` with the home token, followed by no other Slack call.
