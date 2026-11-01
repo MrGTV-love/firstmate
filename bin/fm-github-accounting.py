@@ -13,6 +13,10 @@ start detaches one owner, run stays foreground, status reports its lock ownershi
 and stop requests that owner's shutdown and awaits release. No launchd agent or
 shared service is installed. Repeating start is idempotent. run refuses a second
 owner. --duration is an optional observation window, not a request timeout.
+A primary home's watcher runs start each cycle (github_accounting_tick in
+bin/fm-watch.sh), so a reboot, a crash or a plain stop recovers at its next cycle.
+A detached owner's stderr appends to owner.log, which start trims to its newest
+bytes before a launch once it passes LOG_LIMIT.
 
 Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
 every 15 seconds. Records identify REST resources.graphql, not GraphQL response
@@ -53,6 +57,7 @@ QUOTA_INTERVAL = 15.0
 PROCESS_INTERVAL = 0.2
 RETENTION = 48 * 60 * 60
 APPLICATION_ID = 0x464D4748
+LOG_LIMIT = 64 * 1024
 QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
 QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null) remaining=(\d+|null)["']?$''', re.MULTILINE)
 ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
@@ -82,6 +87,17 @@ def open_private(path):
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     os.fchmod(descriptor, 0o600)
     return os.fdopen(descriptor, "r+")
+
+
+def owner_log(root):
+    descriptor = os.open(root / "owner.log", os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    os.fchmod(descriptor, 0o600)
+    size = os.fstat(descriptor).st_size
+    if size > LOG_LIMIT:
+        newest = os.pread(descriptor, LOG_LIMIT // 2, size - LOG_LIMIT // 2)
+        os.ftruncate(descriptor, 0)
+        os.write(descriptor, newest)
+    return descriptor
 
 
 @contextmanager
@@ -356,25 +372,33 @@ def main():
     elif args.command == "run":
         run(root, args.duration, args.ready_fd)
     elif args.command == "start":
-        status = owner_status(root)
-        if status["state"] != "stopped":
-            print(json.dumps(status))
-            return
-        read_fd, write_fd = os.pipe()
-        try:
-            child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "run", "--ready-fd", str(write_fd)],
-                                     pass_fds=(write_fd,), start_new_session=True, stdin=subprocess.DEVNULL,
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            os.close(write_fd)
-            write_fd = None
-            if os.read(read_fd, 32) != b"ready\n":
-                child.wait()
-                raise RuntimeError("observer failed to start")
-        finally:
-            os.close(read_fd)
-            if write_fd is not None:
+        with open_private(root / "start.lock") as starting:
+            try:
+                fcntl.flock(starting, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                print(json.dumps({"state": "starting"}))
+                return
+            status = owner_status(root)
+            if status["state"] != "stopped":
+                print(json.dumps(status))
+                return
+            log = owner_log(root)
+            read_fd, write_fd = os.pipe()
+            try:
+                child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "run", "--ready-fd", str(write_fd)],
+                                         pass_fds=(write_fd,), start_new_session=True, stdin=subprocess.DEVNULL,
+                                         stdout=subprocess.DEVNULL, stderr=log)
                 os.close(write_fd)
-        print(json.dumps(owner_status(root)))
+                write_fd = None
+                if os.read(read_fd, 32) != b"ready\n":
+                    child.wait()
+                    raise RuntimeError("observer failed to start")
+            finally:
+                os.close(log)
+                os.close(read_fd)
+                if write_fd is not None:
+                    os.close(write_fd)
+            print(json.dumps(owner_status(root)))
     elif args.command == "stop":
         status = owner_status(root)
         if status.get("run_id"):
