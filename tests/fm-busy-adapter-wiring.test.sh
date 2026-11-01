@@ -653,8 +653,8 @@ test_secondmate_claude_spawn_arms_busy_for_the_stall_gate() {
   pass "a claude secondmate spawn arms the busy contract the stall gate can see, and Stop does not wake the parent"
 }
 
-run_secondmate_stop_guard() { # <sm-home>
-  printf '{"stop_hook_active":false,"session_id":"sm-guard"}' \
+run_secondmate_stop_guard() { # <sm-home> [session-id]
+  jq -cn --arg session "${2:-sm-guard}" '{stop_hook_active: false, session_id: $session}' \
     | CLAUDECODE=1 FM_ROOT_OVERRIDE="$1" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
       bash "$ROOT/bin/fm-turnend-guard.sh" --claude >/dev/null 2>&1
 }
@@ -668,20 +668,20 @@ run_secondmate_local_stop_hooks() { # <settings-file>
 # Claude runs the --settings Stop hooks beside the home's tracked Stop
 # guard, in parallel, so their order is not fixed. Fire one Stop event in the
 # given order and return the guard's status.
-fire_secondmate_stop() { # <sm-home> <guard-first|guard-last|parallel> <settings>
-  local sm=$1 settings=$3 status
+fire_secondmate_stop() { # <sm-home> <guard-first|guard-last|parallel> <settings> [session-id]
+  local sm=$1 settings=$3 session=${4:-sm-guard} status
   case "$2" in
     guard-first)
-      run_secondmate_stop_guard "$sm"; status=$?
+      run_secondmate_stop_guard "$sm" "$session"; status=$?
       run_secondmate_local_stop_hooks "$settings"
       ;;
     guard-last)
       run_secondmate_local_stop_hooks "$settings"
-      run_secondmate_stop_guard "$sm"; status=$?
+      run_secondmate_stop_guard "$sm" "$session"; status=$?
       ;;
     parallel)
       run_secondmate_local_stop_hooks "$settings" &
-      run_secondmate_stop_guard "$sm"; status=$?
+      run_secondmate_stop_guard "$sm" "$session"; status=$?
       wait
       ;;
   esac
@@ -722,9 +722,12 @@ test_secondmate_claude_stop_guard_owns_the_stop_verdict() {
   grep -F 'secondmate wake-loop stalled' "$case_dir/watch-blocked.out" >/dev/null \
     && fail "a secondmate inside a guard-forced continuation was escalated as stalled: $(cat "$case_dir/watch-blocked.out")"
 
+  # The three blocks above spent this session's turn-end block budget
+  # (FM_CLAUDE_TURNEND_BLOCK_BUDGET, default 3). The queue-only Stops below
+  # run in a fresh session, so they prove the queue alone blocks.
   rm -f "$sm/state/child.meta"
   for order in guard-first guard-last parallel; do
-    fire_secondmate_stop "$sm" "$order" "$settings"; status=$?
+    fire_secondmate_stop "$sm" "$order" "$settings" sm-guard-queue; status=$?
     expect_code 2 "$status" "the unread queue must still block a blind Stop after child work ends ($order)"
     out=$(classify claude "$id" "$state")
     [ "$out" = "busy claude-hook" ] || fail "an unread-queue Stop must record busy ($order), got '$out'"

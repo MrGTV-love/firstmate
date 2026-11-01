@@ -151,7 +151,9 @@
       "id": "turnend-supervision-block",
       "owner": "bin/fm-turnend-guard.sh",
       "sites": [
-        {"file": "bin/fm-turnend-guard.sh", "match": "guard_event deny --source-ok \"$source_ok\""}
+        {"file": "bin/fm-turnend-guard.sh", "match": "guard_event deny --source-ok \"$source_ok\""},
+        {"file": "bin/fm-turnend-guard.sh", "match": "--cleared-by budget-unavailable"},
+        {"file": "bin/fm-turnend-guard.sh", "match": "[ \"$COUNT\" -gt \"$BLOCK_BUDGET\" ] || block_stop"}
       ],
       "invariant": "a primary without live supervision receives at most three charged Claude blocks per failure episode, then an attended failure diagnostic; a budget that cannot be locked or written never blocks: it allows with one repair warning and a reasoned warn event; live supervision never blocks on episode bookkeeping",
       "layer": "runtime-block",
