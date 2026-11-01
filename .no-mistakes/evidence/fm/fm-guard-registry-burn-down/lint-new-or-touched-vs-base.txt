@@ -1,0 +1,3 @@
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=164 retired=14 beyond_audit=12 excluded=1 unregistered=289 audited=30 beyond_audit_active=137 sites=926 mapped=637
+LINT_SUMMARY mode=new-or-touched guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926

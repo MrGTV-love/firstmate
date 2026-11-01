@@ -1,0 +1,28 @@
+FM_TEST_BEGIN 2026-11-01T08:30:34Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 18 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+FM_TEST_END 2026-11-01T08:32:02Z tests/fm-guard-audit-closure.test.sh exit=0 duration_ms=88127 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B340G6SJJ7FRKGWE5ZG662/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=89186
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=88127 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-guard-audit-closure.test.sh duration_ms=88127
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B340G6SJJ7FRKGWE5ZG662/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

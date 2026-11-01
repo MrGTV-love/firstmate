@@ -1,0 +1,38 @@
+{
+  "policy_families_in_tsv": 150,
+  "redesign_excluded": 15,
+  "kept_families": 135,
+  "kept_new_ids": 120,
+  "kept_already_registered": 15,
+  "registry_guards_head": 164,
+  "registry_guards_base": 44,
+  "kept_missing_from_registry": [],
+  "redesign_wrongly_registered": [],
+  "unexpected_new_ids": [],
+  "preexisting_entries_changed_beyond_sites": [],
+  "scanner_errors": [],
+  "sites_head": 926,
+  "mapped_head": 637,
+  "covered_sites_classified": 113,
+  "kept_sites_classified": 551,
+  "classified_site_keys_no_longer_in_source": [
+    "site:bin/fm-jev-guard.ts:576cc9883b",
+    "site:bin/fm-jev-guard.ts:ff7761a0f4",
+    "site:bin/fm-jev-guard.ts:9473a19102"
+  ],
+  "classified_sites_wrong_owner": [],
+  "covered_sites_mapped_to_family": 110,
+  "credential_site": {
+    "file": "bin/fm-git-secrets.py",
+    "line": 221,
+    "sig": "E",
+    "entry": "git-commit-credential-shapes",
+    "text": "record(guard, \"deny\" if denied else \"allow\", source_ok, started, count)"
+  },
+  "redesign_sites_left_unmapped": true,
+  "allowlist_base": 837,
+  "allowlist_head": 289,
+  "allowlist_added_entries": [],
+  "allowlist_removed_not_by_mapping": [],
+  "unmapped_sites_equal_S1_allowlist": true
+}

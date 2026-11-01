@@ -1,0 +1,38 @@
+Fixture: /Users/charlesabrooker/.no-mistakes/evidence/01M6B340G6SJJ7FRKGWE5ZG662/scripts/py-scope-fixture.py (copied to a disposable root as bin/a.py)
+Expected E sites: N1 N3 P1 and lines a,c,d(S3),e,h. Expected excluded: N2 N4 S6 S7 P2.
+## scanner=pre:513634a1 interpreter=Python 3.13.6
+  E line 19 a, b = [record(g, 'deny') for g in denied], [x for x in other]
+  E line 20 c = list(record(g, 'deny') for g in denied), list(x for x in other)
+  E line 21 d = (lambda: record('S3-lambda-sibling', 'deny')), (lambda: 0)
+  E line 22 e = {record(g, 'deny') for g in denied}, {x for x in other}
+  E line 23 h = {g: record(g, 'deny') for g in denied}, {x: x for x in other}
+  E line 30 record('P1-plain', 'deny')
+## scanner=head:e39c2abc interpreter=Python 3.13.6
+  E line 7 f = lambda: (record('N1-outer-deny-beside-nested-binding', 'deny'), (lambda: (record := None)))
+  E line 19 a, b = [record(g, 'deny') for g in denied], [x for x in other]
+  E line 20 c = list(record(g, 'deny') for g in denied), list(x for x in other)
+  E line 21 d = (lambda: record('S3-lambda-sibling', 'deny')), (lambda: 0)
+  E line 22 e = {record(g, 'deny') for g in denied}, {x for x in other}
+  E line 23 h = {g: record(g, 'deny') for g in denied}, {x: x for x in other}
+  E line 30 record('P1-plain', 'deny')
+## scanner=pre:513634a1 interpreter=Python 3.9.6
+  E line 19 a, b = [record(g, 'deny') for g in denied], [x for x in other]
+  E line 20 c = list(record(g, 'deny') for g in denied), list(x for x in other)
+  E line 21 d = (lambda: record('S3-lambda-sibling', 'deny')), (lambda: 0)
+  E line 22 e = {record(g, 'deny') for g in denied}, {x for x in other}
+  E line 23 h = {g: record(g, 'deny') for g in denied}, {x: x for x in other}
+  E line 30 record('P1-plain', 'deny')
+## scanner=head:e39c2abc interpreter=Python 3.9.6
+  E line 7 f = lambda: (record('N1-outer-deny-beside-nested-binding', 'deny'), (lambda: (record := None)))
+  E line 19 a, b = [record(g, 'deny') for g in denied], [x for x in other]
+  E line 20 c = list(record(g, 'deny') for g in denied), list(x for x in other)
+  E line 21 d = (lambda: record('S3-lambda-sibling', 'deny')), (lambda: 0)
+  E line 22 e = {record(g, 'deny') for g in denied}, {x for x in other}
+  E line 23 h = {g: record(g, 'deny') for g in denied}, {x: x for x in other}
+  E line 30 record('P1-plain', 'deny')
+
+Correction to the expectation line above, from Python's own symbol table (python-symtable-ground-truth.txt):
+N3 and N4 are genuine shadows. A walrus in a nested lambda's default, or in a comprehension, binds `record` in the outer lambda.
+So the correct E set is N1, P1 and lines a, c, d(S3), e, h. The correct excluded set is N2, N3, N4, S6, S7, P2.
+Head scanner (e39c2abc) matches this on Python 3.13.6 and 3.9.6.
+Pre-fix scanner (513634a1) misses N1 on both interpreters: the nested-lambda regression reproduces before the fix.

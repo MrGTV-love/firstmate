@@ -1,0 +1,1 @@
+REFCHECK_SUMMARY registrations=51 paths=106 missing=0 registry_missing=0 retired=14 resurrected=0

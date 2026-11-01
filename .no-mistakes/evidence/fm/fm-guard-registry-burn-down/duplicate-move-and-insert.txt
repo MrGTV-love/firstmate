@@ -1,0 +1,32 @@
+## baseline
+  line 1491 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e
+  line 2540 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~2
+  line 2617 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~3
+  line 5145 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~4
+LINT_SUMMARY mode=enforce guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926
+  lint exit=0
+## move
+  line 1491 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e
+  line 1495 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~2
+  line 2544 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~3
+  line 5145 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~4
+LINT_SUMMARY mode=enforce guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926
+  lint exit=0
+## insert-new
+  line 1491 owner None site:bin/fm-spawn.sh:72505e7e0e
+  line 1495 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~2
+  line 2544 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~3
+  line 2621 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~4
+  line 5149 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~5
+VIOLATION S1 site:bin/fm-spawn.sh:72505e7e0e: bin/fm-spawn.sh:1491 [B] echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=164 violations=290 allowlisted=289 stale=0 shown=1 sites=927
+  lint exit=1
+## insert-same-block
+  line 1491 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e
+  line 1495 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~2
+  line 2544 owner state-record-home-containment site:bin/fm-spawn.sh:72505e7e0e~3
+  line 2621 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~4
+  line 5149 owner backlog-dispatch-admission site:bin/fm-spawn.sh:72505e7e0e~5
+VIOLATION S2 state-record-home-containment: site marker 'echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2' in bin/fm-spawn.sh matches 3 sites, the entry declares 2; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=164 violations=290 allowlisted=289 stale=0 shown=1 sites=927
+  lint exit=1

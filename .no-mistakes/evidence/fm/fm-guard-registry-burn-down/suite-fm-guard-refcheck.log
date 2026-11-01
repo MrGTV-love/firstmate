@@ -1,0 +1,20 @@
+FM_TEST_BEGIN 2026-11-01T08:29:54Z tests/fm-guard-refcheck.test.sh family=unclassified expected_gate_skip=none
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a registry spec path that resolves is clean
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+FM_TEST_END 2026-11-01T08:29:57Z tests/fm-guard-refcheck.test.sh exit=0 duration_ms=2733 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B340G6SJJ7FRKGWE5ZG662/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=3696
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=2733 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-guard-refcheck.test.sh duration_ms=2733
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B340G6SJJ7FRKGWE5ZG662/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

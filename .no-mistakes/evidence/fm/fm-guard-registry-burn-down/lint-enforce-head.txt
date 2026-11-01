@@ -1,0 +1,2 @@
+INFO guard-watcher-down-warning: exemptions=1
+LINT_SUMMARY mode=enforce guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926

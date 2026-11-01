@@ -1,0 +1,18 @@
+3.13.6
+  nested_inner_binding line 7: outer lambda 'record' is global
+  nested_outer_shadow line 10: outer lambda 'record' is local
+  nested_default_walrus line 13: outer lambda 'record' is local
+  nested_comprehension_walrus line 16: outer lambda 'record' is local
+  siblings line 21: outer lambda 'record' is global
+  siblings line 21: outer lambda 'record' is n/a
+  sibling_shadowed line 27: outer lambda 'record' is local
+  sibling_shadowed line 27: outer lambda 'record' is n/a
+3.9.6
+  nested_inner_binding line 7: outer lambda 'record' is global
+  nested_outer_shadow line 10: outer lambda 'record' is local
+  nested_default_walrus line 13: outer lambda 'record' is local
+  nested_comprehension_walrus line 16: outer lambda 'record' is local
+  siblings line 21: outer lambda 'record' is global
+  siblings line 21: outer lambda 'record' is n/a
+  sibling_shadowed line 27: outer lambda 'record' is local
+  sibling_shadowed line 27: outer lambda 'record' is n/a

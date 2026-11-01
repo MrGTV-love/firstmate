@@ -1,0 +1,7 @@
+registry top keys ['schema_version', 'system', 'spec', 'audited', 'beyond_audit_active', 'guards', 'excluded', 'beyond_audit_retired']
+guards base 44 head 164 added 120 removed 0
+site markers base 56 head 568
+allowlist keys ['schema_version', 'note', 'allowed']
+base allowed 837
+head allowed 289
+allowlist entries base 837 head 289 new-in-head 0 removed 548
