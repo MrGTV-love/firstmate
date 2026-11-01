@@ -1395,6 +1395,53 @@ test_crew_dispatch_active_rules_are_verbose_bootstrap_info() {
   pass "bootstrap surfaces active crew-dispatch rules only as verbose BOOTSTRAP_INFO"
 }
 
+test_inherited_dispatch_does_not_require_local_projects() {
+  local case_dir fakebin out registry
+  case_dir="$TMP_ROOT/inherited-dispatch"
+  mkdir -p "$case_dir/parent/config"
+  printf '%s\n' '{"judgments":{},"rules":[{"when":"Parent-only project","match":{"projects":["parent-app"]},"use":{"harness":"claude"}},{"when":"Shared fleet project","match":{"projects":["local-app","parent-app"]},"use":{"harness":"codex"}}]}' \
+    > "$case_dir/parent/config/crew-dispatch.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  add_real_jq "$fakebin"
+  mkdir -p "$case_dir/owned/config" "$case_dir/owned/data"
+  printf '%s\n' manual > "$case_dir/owned/config/backlog-backend"
+  printf '%s\n' '- local-app - Local project' > "$case_dir/owned/data/projects.md"
+  cp "$case_dir/parent/config/crew-dispatch.json" "$case_dir/owned/config/crew-dispatch.json"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/owned" FM_ROOT_OVERRIDE="$case_dir/owned" \
+    TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id' \
+    "a home-owned policy must still reject projects its registry lacks"
+  for registry in subset empty absent broken; do
+    mkdir -p "$case_dir/$registry/config" "$case_dir/$registry/data"
+    printf '%s\n' "$registry" > "$case_dir/$registry/.fm-secondmate-home"
+    printf '%s\n' manual > "$case_dir/$registry/config/backlog-backend"
+    case "$registry" in
+      subset) printf '%s\n' '- local-app - Local project' > "$case_dir/$registry/data/projects.md" ;;
+      empty) printf '# Projects\n' > "$case_dir/$registry/data/projects.md" ;;
+      broken) printf '%s\n' '- local-app - Local project' '- local-app - Duplicate' > "$case_dir/$registry/data/projects.md" ;;
+    esac
+    cp "$case_dir/parent/config/crew-dispatch.json" "$case_dir/$registry/config/crew-dispatch.json"
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/$registry" FM_ROOT_OVERRIDE="$case_dir/$registry" \
+      TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+    if [ "$registry" = broken ]; then
+      assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - project registry has an invalid or duplicate project id' \
+        "a broken secondmate registry must keep its early bootstrap diagnostic"
+      continue
+    fi
+    assert_not_contains "$out" 'CREW_DISPATCH: invalid' "$registry local registry must not invalidate inherited fleet policy"
+    printf '%s\n' '{"judgments":{},"rules":[{"when":"Parent-only malformed profile","match":{"projects":["parent-app"]},"use":{"harness":"spaceship"}}]}' \
+      > "$case_dir/$registry/config/crew-dispatch.json"
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/$registry" FM_ROOT_OVERRIDE="$case_dir/$registry" \
+      TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+    assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship' \
+      "$registry registry must not hide malformed parent-only profiles"
+  done
+  pass 'inherited fleet selectors survive subset, empty and absent secondmate registries while broken registries and home-owned policy stay strict'
+}
+
 test_crew_dispatch_validation() {
   local label body expect mode case_dir fakebin out child_env n
   n=0
@@ -1964,4 +2011,5 @@ test_network_sweeps_recheck_lock_ownership
 test_network_phases_record_per_step_elapsed_times
 test_tasks_axi_verdict_handoff_is_consumed_once
 test_crew_dispatch_active_rules_are_verbose_bootstrap_info
+test_inherited_dispatch_does_not_require_local_projects
 test_crew_dispatch_validation

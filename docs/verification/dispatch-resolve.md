@@ -8,7 +8,7 @@ This record describes offline contract behavior, not calibrated model accuracy o
 
 ## Deterministic routing and historical structure
 
-Verified 2026-10-24 on macOS arm64 with Node `v26.4.0`, Bun `1.3.14`, and TypeScript `7.0.2`.
+Verified 2026-10-31 on macOS arm64 with Node `v26.11.1`; the public resolver suite also ran with Bun `1.3.14`.
 The executable acceptance command was:
 
 ```sh
@@ -19,17 +19,19 @@ It exited 0 with:
 
 ```console
 ✔ T6(a): repository and kind facts make non-Vernant rules unreachable for Vernant ships
+✔ inherited foreign selectors stay inert beside an exactly matched local project
 ✔ T6 predicates combine in code, preserve complements, and never pool independent support
 ✔ T6(b): replay all 136 logged rule structures offline without Q7 escalation
 ✔ Q9 desktop capability keeps its boundary; obsolete workflow answers remain inert
 ✔ malformed fact selectors and missing semantic references fail before provider access
-ℹ tests 5
-ℹ pass 5
+ℹ tests 6
+ℹ pass 6
 ℹ fail 0
 ```
 
 The tests invoke the actual dispatch adapter's `prepare`, `apply`, and `validate` CLI paths without calling a provider.
 They drive maximally positive semantic answers against incompatible positive project/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject negative selectors, unregistered project ids, and missing predicate references.
+The inherited-policy case uses a subset registry: a home-owned load still rejects its parent-only and near-spelling selectors, and under a secondmate home's inherited-policy flag those selectors contribute neither semantic questions nor selection support, even with a maximally positive foreign answer.
 
 The fixture [`dispatch-resolve-20261024.json`](../../tests/fixtures/dispatch-resolve-20261024.json) retains only rule choices and coarse reasons from the 136 logged resolves assessed on 2026-10-24.
 Thirty-two records carry the old human-workflow escalation reason.
@@ -42,7 +44,7 @@ No paid replay was performed.
 On the same host and date, the clone-binding cases ran inside the full public-interface suite:
 
 ```sh
-bash tests/fm-dispatch-resolve.test.sh
+bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh
 ```
 
 It exited 0, ended with `# all fm-dispatch-resolve tests passed`, and printed:
@@ -53,7 +55,7 @@ ok - B1 removes free-text project input and rejects missing, unrelated, redirect
 
 This exercises the real shell resolver, scaffold, registry binding, policy adapter, and loopback HTTP provider with synthetic text and credentials.
 It rejects the removed `--project` inputs `Vernant` and ` vernant` before sending, rejects a missing first-line metadata header even when task prose contains a valid-looking record, and rejects unrelated paths, a redirected symlink, and a registered but absent clone.
-It also rejects an unregistered project in positive rule selection before sending.
+It rejects an unregistered project in a home-owned rule before sending; in a secondmate home the same inherited selector is inert: a locally bound task still resolves, and the foreign-only rule never participates in its selection.
 A generated Vernant brief then selects only a Vernant-applicable rule despite maximally positive answers for a non-Vernant rule.
 The recorded clone-path header does not reach the provider.
 With `FM_PROJECTS_OVERRIDE` set, the scaffold records the clone under that directory and the same brief binds to Vernant, while a resolve without the override rejects that clone as unregistered.
@@ -68,9 +70,9 @@ The established suite includes the acceptance and clone-binding cases above and 
 It runs the Node fallback when Bun is absent and the unchanged vendored Level 5 tests.
 Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the provider request.
 Fenced, non-authoritative ship and scout declarations exercise neighboring boundaries.
-On the same host and date, `bash tests/fm-dispatch-resolve.test.sh` exited 0 and ended with `# all fm-dispatch-resolve tests passed` for this clone-binding cutover.
+On the same host and date, `bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh` exited 0 and the suite ended with `# all fm-dispatch-resolve tests passed`.
 The optional fast-clock case reported `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
-The scaffold and bootstrap suites also exited 0 on that host.
+The focused inherited-bootstrap regression also exercises subset, empty and absent secondmate registries, reports a duplicate-id secondmate registry, keeps a home-owned policy strict, and retains malformed-profile diagnostics through the real bootstrap entry point.
 
 ## Verification boundary
 

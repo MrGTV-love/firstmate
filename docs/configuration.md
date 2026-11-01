@@ -2399,6 +2399,8 @@ Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`
 Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
 Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
 Every rule's `match.projects` is a nonempty positive list of ids registered in `data/projects.md`; config load rejects unregistered ids, missing project lists, and negative selectors.
+The one exception is a secondmate home, marked by a valid `.fm-secondmate-home`, where `config/crew-dispatch.json` is primary-authoritative inherited material: its selectors may name fleet projects absent from that home's registry, and those exact selectors are inert there, not invalid configuration or new registrations.
+Actual task identity still requires the strict local clone binding described under [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
 It may also constrain `kind` (`ship` or `scout`) and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
 Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
 These declarations restrict routing; they do not grant an exception, new profile, or permission.
@@ -2462,6 +2464,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
 - While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; a missing, unreadable, or invalid `data/projects.md` registry is reported there with the registry's own error; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- In a secondmate home, bootstrap validates the inherited policy without requiring a local project: a missing or empty `data/projects.md` stays quiet there, including in intentionally project-less homes, while an unreadable registry or one with an invalid or duplicate project id still receives the same diagnostic; actual binding failures remain [typed intake diagnostics](#typed-dispatch-resolution-env-typesafe_api_key), not malformed policy.
 - Missing `jq` is reported through the normal [missing-tool diagnostics](#toolchain).
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 

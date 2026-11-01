@@ -821,8 +821,9 @@ fi
 # traffic rather than on work, so no ordinary turn ever asks for it: a guard
 # reaches the cut threshold weeks after anyone last looked, and the nomination
 # then sits unread in a log. Ask once a day, cache the answer, and print only
-# while a nomination carries no recorded decision in the tracked registry.
-# The recorded decision is what silences this line, so it retires itself.
+# while a nomination has no recorded decision in the tracked registry that
+# covers its evidence. A dated decision silences this line until the evidence
+# changes, so it retires itself.
 stage guard-pass
 GUARD_STAMP="$STATE/.guard-pass-checked"
 guard_line=''
@@ -840,7 +841,7 @@ fi
 if [ $(( $(date +%s) - guard_mtime )) -ge 86400 ]; then
   guard_ids=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-metrics.sh" --undecided 2>/dev/null) || guard_ids=''
   if [ -n "$guard_ids" ]; then
-    guard_line="GUARD PASS: $(printf '%s' "$guard_ids" | tr '\n' ' ' | sed 's/ $//') nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json"
+    guard_line="GUARD PASS: $(printf '%s' "$guard_ids" | tr '\n' ' ' | sed 's/ $//') nominated for retirement with no recorded decision covering its evidence; run bin/fm-guard-metrics.sh, judge it, and record \"<keep|redesign|cut> YYYY-MM-DD: <reason>\" under retirement_decision in docs/guards/registry.json"
   fi
   [ "$READ_ONLY" -eq 1 ] || printf '%s\n' "$guard_line" > "$GUARD_STAMP" 2>/dev/null || true
 else
