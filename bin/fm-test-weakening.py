@@ -24,13 +24,22 @@ import subprocess
 import sys
 
 ASSERTION = re.compile(r"\b(assert\w*|expect|should|fail|verify|check)\b|\[\[?|\btest\s", re.I)
-BOUND = re.compile(r"\b(?:\w*(?:timeout|deadline|retry|retries|attempt|iteration|poll|limit|bound|duration|sleep|elapsed|interval)\w*|range|seq)\b|(?:-lt|-le|<=|<)\s*\d", re.I)
+BOUND = re.compile(r"\b(?:\w*?(timeout|deadline|retry|retries|attempt|iteration|poll|limit|bound|duration|sleep|elapsed|interval)\w*|(range|seq))\b|(?:-lt|-le|<=|<)\s*\d", re.I)
 NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])")
 
 
 def test_path(path):
     parts = Path(path).parts
     return any(part.casefold() in ("test", "tests", "fixture", "fixtures", "__tests__", "testdata") for part in parts) or bool(re.search(r"[._](test|spec)\.", path))
+
+
+def bound_kinds(line):
+    """Return the bound kinds a line names, so a bound compares only with its own kind."""
+    kinds = set()
+    for match in BOUND.finditer(line):
+        kind = (match.group(1) or match.group(2) or "comparison").casefold()
+        kinds.add("retry" if kind == "retries" else kind)
+    return kinds
 
 
 def code(line):
@@ -61,9 +70,10 @@ def flags_from(patch):
                 skeleton = NUMBER.sub("<number>", line).strip().casefold()
                 for _, candidate in added:
                     same_expression = NUMBER.sub("<number>", candidate).strip().casefold() == skeleton
-                    # Also flag bound expressions rewritten into a different
-                    # shape; a reviewer decides whether this really weakens it.
-                    rewritten_bound = BOUND.search(line) and BOUND.search(candidate)
+                    # Also flag a bound rewritten into a different shape when it
+                    # keeps its own kind (retries with retries, timeout with
+                    # timeout); a reviewer decides whether this really weakens it.
+                    rewritten_bound = bool(bound_kinds(line) & bound_kinds(candidate))
                     if not same_expression and not rewritten_bound:
                         continue
                     values = [float(value) for value in NUMBER.findall(candidate)]

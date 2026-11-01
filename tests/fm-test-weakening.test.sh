@@ -82,6 +82,28 @@ flags = inspect('additions', 0)
 assert flags == []
 print('ok - clean changes and added assertions do not need rulings')
 
+# Each bound compares only with its own kind: lowering retries 3->2 and a
+# timeout 10->5 never pairs the old retries with the new timeout as a raise.
+put('bin/limits.py', 'retries = 3\nTIMEOUT_SECONDS = 10\n')
+flags = inspect('limits-base', 0)
+base_before_limits, base = base, git('rev-parse', 'HEAD')
+put('bin/limits.py', 'retries = 2\nTIMEOUT_SECONDS = 5\n')
+flags = inspect('lowered-bounds', 0)
+assert flags == []
+print('ok - lowering different bounds together needs no ruling')
+
+# A real increase of one bound, even rewritten into a new shape, still flags.
+put('bin/limits.py', 'max_retries = 9\nTIMEOUT_SECONDS = 5\n')
+flags = inspect('raised-retries', 1)
+assert [(f['file'], f['line'], f['reason'], f['new']) for f in flags] == [
+    ('bin/limits.py', 1, 'increased time/retry/iteration bound', 'max_retries = 9')]
+put('bin/limits.py', 'retries = 2\nTIMEOUT_SECONDS = min(60, 5)\n')
+flags = inspect('raised-timeout', 1)
+assert [(f['file'], f['line'], f['reason']) for f in flags] == [
+    ('bin/limits.py', 2, 'increased time/retry/iteration bound')]
+print('ok - a raised bound is flagged against its own kind, even in a new shape')
+base = base_before_limits
+
 # A renamed test still removes its original identity and needs a ruling.
 (repo / 'tests/subject.test.sh').rename(repo / 'tests/renamed.test.sh')
 flags = inspect('renamed-test', 1)
