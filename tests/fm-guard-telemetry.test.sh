@@ -502,6 +502,8 @@ EMITTERS="$TMP/emitters.jsonl"
   printf 'manual\n' > "$TMP/manual-config/backlog-backend"
   fm_backlog_transition_applies "$TMP/manual-config" "$TMP" ship
   [ "$?" -eq 1 ] || fail "manual backlog admission result changed"
+  ! grep -q '"backlog-transition"' "$EMITTERS" 2>/dev/null || fail "the shared backlog predicate recorded a decision itself"
+  fm_backlog_transition_skip_event emitter-task
 )
 jq -se 'any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == false)
   and any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == true)

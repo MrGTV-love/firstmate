@@ -5224,6 +5224,7 @@ else
     echo "error: task $ID cannot be dispatched because its backlog data directory is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
+  fm_backlog_transition_skip_event "$ID"
 fi
 
 if [ "$SPAWN_META_LOCK_HELD" != 1 ]; then

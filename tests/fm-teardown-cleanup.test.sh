@@ -26,6 +26,16 @@ test_local_only_force_overrides_unpushed() {
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"
+
+  case_dir=$(make_case force-scout)
+  write_meta "$case_dir" local-only scout
+  rc=0
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "force-scout: a forced scout teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  jq -se '([.[] | select(.guard == "teardown-unlanded")] | length == 0) and ([.[] | select(.task == "task-x1")] | length > 0)' \
+    "$case_dir/guard-events.jsonl" >/dev/null \
+    || fail "a forced scout teardown recorded a landed-work decision the check never inspects: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+  pass "a forced scout teardown records no landed-work escape"
 }
 
 # A teardown starts a detached home-summary refresh, which outlives the teardown

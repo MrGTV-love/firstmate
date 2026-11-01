@@ -64,7 +64,9 @@
 # finished row closes instead of reopening unheld work. If an answer already
 # closed a retained row, replay simply retires the satisfied record.
 
-# Set by fm_backlog_transition_applies for a return-1 exemption.
+# Set by fm_backlog_transition_applies for a return-1 exemption; the manual
+# backend exemption also sets FM_BACKLOG_TRANSITION_BYPASS, which the transition
+# owner records once per operation through fm_backlog_transition_skip_event.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_TRANSITION_SKIP=
 # Set by the mutating helpers when they return non-zero.
@@ -325,16 +327,22 @@ fm_backlog_tasks_axi_addressing() {  # <data-dir>
   fi
 }
 
+fm_backlog_transition_skip_event() {  # <task>
+  [ -n "${FM_BACKLOG_TRANSITION_BYPASS:-}" ] || return 0
+  "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" backlog-transition bypass --rule "$FM_BACKLOG_TRANSITION_BYPASS" --task "${1:-}" --override 2>/dev/null || true
+}
+
 fm_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   local config=$1 data authorized_data=$2 kind=$3 file root backend authorized_root
   FM_BACKLOG_TRANSITION_SKIP=
+  FM_BACKLOG_TRANSITION_BYPASS=
   if [ "$kind" = secondmate ]; then
     FM_BACKLOG_TRANSITION_SKIP="secondmates are not backlog items"
     return 1
   fi
   if fm_backlog_backend_manual "$config"; then
     FM_BACKLOG_TRANSITION_SKIP="config/backlog-backend selects manual editing"
-    "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" backlog-transition bypass --rule manual-backend --task "${ID:-${FM_TASK_ID:-}}" --override 2>/dev/null || true
+    FM_BACKLOG_TRANSITION_BYPASS=manual-backend
     return 1
   fi
   if ! data=$(fm_backlog_data_absolute "$2"); then

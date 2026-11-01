@@ -100,10 +100,6 @@
         {
           "file": "bin/fm-spawn.sh",
           "match": "secondmate-inherit bypass"
-        },
-        {
-          "file": "bin/fm-session-launch-policy-lib.sh",
-          "match": "secondmate-inherit bypass"
         }
       ],
       "decision": "warn",
