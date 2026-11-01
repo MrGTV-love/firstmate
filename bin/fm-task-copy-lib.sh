@@ -29,6 +29,36 @@ if ! declare -F secondmate_registry_parse_line >/dev/null 2>&1; then
   . "$FM_TASK_COPY_LIB_DIR/fm-secondmate-registry-lib.sh"
 fi
 
+# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. A confined
+# worker cannot execute setuid ps (126); reuse the test reaper's sysctl helper.
+# Only a complete, readable PID table proves absence there. No age or ancestry
+# exception releases a lock naming a live PID, including a recycled PID.
+fm_task_copy_confined_launcher_state() {  # <pid>
+  local pid=$1 table observed found=1
+  table=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" table pid 2>/dev/null) || return 2
+  [ -n "$table" ] || return 2
+  while IFS= read -r observed; do
+    case "$observed" in ''|*[!0-9]*) return 2 ;; esac
+    [ "$observed" != "$pid" ] || found=0
+  done <<< "$table"
+  return "$found"
+}
+
+fm_task_copy_launcher_state() {  # <pid>
+  local pid=$1 observed rc=0
+  observed=$(ps -p "$pid" -o pid= 2>/dev/null) || rc=$?
+  case "$rc" in
+    0)
+      observed=${observed//[[:space:]]/}
+      [ "$observed" = "$pid" ] || return 2
+      return 0
+      ;;
+    1) [ -z "$observed" ] && return 1; return 2 ;;
+    126) fm_task_copy_confined_launcher_state "$pid"; return $? ;;
+    *) return 2 ;;
+  esac
+}
+
 # The physical path of an existing directory, or a failure.
 fm_task_copy_canonical_dir() {  # <path>
   local target=$1

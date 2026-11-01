@@ -60,8 +60,7 @@
 #                      delete that inner copy and whatever it holds, and git
 #                      status cannot see it when `.claude/worktrees/` is ignored.
 #   HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
-#                      content is not already in the default branch (a locked
-#                      copy has no such fallback; see REAPABLE-DRIVER).
+#                      content is not already in the default branch.
 #   WAITING            it passes every REAPABLE-DRIVER proof, but its waiting
 #                      record (see below) holds a different fingerprint of its
 #                      preservable ignored content: that content is still
@@ -75,9 +74,8 @@
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
 #   REAPABLE-DRIVER    a clean worktree root, no active record, no process
-#                      inside, every local commit reachable from HEAD contained
-#                      in a remote branch (the content-in-default fallback does
-#                      not apply to a locked copy), plus Vernant's exact
+#                      inside, HEAD contained in a remote branch or its tree
+#                      content proved in the default branch, plus Vernant's exact
 #                      creation lock whose launcher pid is not running. A live
 #                      pid always holds the copy, including a recycled pid;
 #                      its start age and lock mtime are diagnostic only.
@@ -130,8 +128,8 @@
 # (the lock records its owner and a heartbeat, a dead owner expires it, and the
 # pool's own lifecycle reclaims the copy) and vernant-commits-remote-before-lock
 # (a copy's commits are on a remote before its lock is taken). Neither exists
-# today, so the sweep keeps every proof of its own, including the
-# every-commit-on-a-remote proof for a locked copy.
+# today, so the sweep keeps its own ownership, cleanliness and landed-content
+# proofs; a squash-content proof never bypasses the driver's release verdict.
 # A process appearing between the last process scan and execute is covered only
 # by the closeout script's own liveness check; the sweep cannot close that race.
 # Every ownership, process, cleanliness and remote-content proof is re-read
@@ -140,8 +138,14 @@
 # the copy's preservable ignored content must still match this run's preserve,
 # or the earlier preserve a run reused. A mismatch runs no execute, uses no slot
 # and takes the reproof-failure route.
-# An unlocked copy goes by a plain `git worktree remove` from the parent clone. A locked
-# one first gets the closeout driver's plan, run from that clone without
+# An unlocked copy first preserves every ignored entry, including the teardown
+# owner's existing disposable cache/scratch/log/generated machinery, through its
+# SHA256SUMS storage contract. Unique non-cache ignored files still hold it.
+# After custody and HEAD are rechecked, the actual preserved tree fingerprint
+# must equal the source fingerprint before plain `git worktree remove` from the
+# parent clone. Missing, unreadable or differing preservation leaves both copy
+# and preserve; no new disposable class or forced removal is introduced.
+# A locked copy first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
 # boolean true. A non-zero exit, an empty, malformed or verdictless answer, text
@@ -667,7 +671,7 @@ APPLY=0
 # True when the copy's content is already in the default branch. Only --apply
 # fetches; the others read the refs that are already here.
 content_in_default() {  # <copy> <clone>
-  local copy=$1 clone=$2 name ref default_tree merged_tree
+  local copy=$1 clone=$2 name ref base listing path rc=0
   if [ "$APPLY" = 1 ]; then
     fm_task_copy_content_in_default "$copy" "$clone"
     return
@@ -675,9 +679,18 @@ content_in_default() {  # <copy> <clone>
   name=$(fm_task_copy_default_branch "$clone") || return 1
   ref=refs/remotes/origin/$name
   git -C "$copy" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || ref=refs/heads/$name
-  default_tree=$(git -C "$copy" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
-  merged_tree=$(git -C "$copy" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
-  [ "${merged_tree%%$'\n'*}" = "$default_tree" ]
+  base=$(git -C "$copy" merge-base "$ref" HEAD 2>/dev/null) || return 1
+  listing=$(mktemp "${TMPDIR:-/tmp}/fm-copy-content.XXXXXX") || return 1
+  # Compare the exact tree entries of every locally changed path. Unlike
+  # merge-tree --write-tree this writes no objects into a real dry-run copy.
+  git -C "$copy" diff --no-ext-diff --no-renames --name-only -z "$base" HEAD -- > "$listing" 2>/dev/null || rc=1
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' path; do
+      GIT_LITERAL_PATHSPECS=1 git -C "$copy" diff --quiet --no-ext-diff --ignore-submodules=none "$ref" HEAD -- "$path" 2>/dev/null || { rc=1; break; }
+    done < "$listing"
+  fi
+  rm -f -- "$listing"
+  return "$rc"
 }
 
 # Read the whole lock, not just its first line. The launcher pid is what counts;
@@ -796,10 +809,11 @@ tree_fingerprint() {  # <root> <find-args>...
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
-# The fingerprint of every preservable ignored entry of <copy>.
-content_fingerprint() {  # <copy>
+# The fingerprint of every preservable ignored entry of <copy>, including
+# disposable machinery when all mode is requested for an unlocked removal.
+content_fingerprint() {  # <copy> [all]
   local entries entry paths=()
-  entries=$(teardown_preservable_ignored "$1") || return 1
+  entries=$(teardown_preservable_ignored "$1" "${2:-}") || return 1
   while IFS= read -r entry; do
     [ -z "$entry" ] || paths+=("./$entry")
   done <<< "$entries"
@@ -926,10 +940,19 @@ classify() {  # <copy> <clone> <pool> <container>
       fi
       # The sweep never releases a lock naming a running pid, even when its
       # start is newer than the lock. Teardown's recycled-pid policy is broader.
-      if ps -p "$pid" -o pid= >/dev/null 2>&1; then
-        REASON="$REASON (launcher $pid is alive; start age=$(teardown_pid_age_secs "$pid" || printf unknown)s; lock mtime=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE" || printf unknown))"
-        return 0
-      fi
+      rc=0
+      fm_task_copy_launcher_state "$pid" || rc=$?
+      case "$rc" in
+        0)
+          REASON="$REASON (launcher $pid is alive; start age=$(teardown_pid_age_secs "$pid" || printf unknown)s; lock mtime=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE" || printf unknown))"
+          return 0
+          ;;
+        1) ;;
+        *)
+          REASON="$REASON (launcher $pid cannot be observed; absence is not proved)"
+          return 0
+          ;;
+      esac
       REASON="$REASON (launcher $pid is gone; only Vernant's closeout driver releases it)"
       if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
         || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
@@ -1032,7 +1055,9 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="its HEAD cannot be compared with the remotes"
     return 0
   fi
-  if [ "$count" = 0 ]; then
+  if [ "$count" = 0 ] || content_in_default "$copy" "$clone"; then
+    local proof="HEAD contained in a remote branch"
+    [ "$count" = 0 ] || proof="content already in the default branch"
     if [ "$locked" = 1 ]; then
       rc=0
       content_quiet "$copy" || rc=$?
@@ -1049,24 +1074,18 @@ classify() {  # <copy> <clone> <pool> <container>
           ;;
       esac
       CLASS=REAPABLE-DRIVER
-      REASON="clean, no process, no record, HEAD contained in a remote branch, Vernant launcher $launcher is gone"
+      REASON="clean, no process, no record, $proof, Vernant launcher $launcher is gone"
       if [ "$APPLY" != 1 ]; then
         CLASS=PENDING-DRIVER
         REASON="$REASON; driver verdict not checked in report mode, not yet proven removable"
       fi
     else
       CLASS=REAPABLE-PROVEN
-      REASON="clean, no process, no record, HEAD contained in a remote branch"
+      REASON="clean, no process, no record, $proof"
     fi
   elif [ "$locked" = 1 ]; then
-    # A locked copy is released only when every local commit is on a remote.
-    # The content-in-default fallback stays an unlocked-copy rule: a bundle is
-    # the recovery for its commits, not a landed proof for a lock release.
     CLASS=HELD-UNPUSHED
-    REASON="$count commit(s) are on no remote; a locked copy is released only when every local commit is on a remote"
-  elif content_in_default "$copy" "$clone"; then
-    CLASS=REAPABLE-PROVEN
-    REASON="clean, no process, no record, content already in the default branch"
+    REASON="$count commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote"
   else
     CLASS=HELD-UNPUSHED
     REASON="$count commit(s) are on no remote and not in the default branch"
@@ -1590,7 +1609,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1665,6 +1684,37 @@ apply_removals() {
         continue
       fi
     else
+      # Classification still holds unique non-cache ignored work. Preserve the
+      # existing disposable classes too, then prove their actual bytes match;
+      # neither a class name nor a manifest alone is custody evidence.
+      release_id="$CHECK_ID/$stamp-$head"
+      preserve_dir=$(run_preserve_dir "$copy" "$release_id") || preserve_dir=
+      if [ -z "$preserve_dir" ] || ! err=$(DATA="$DATA_DIR" ID="$release_id" teardown_preserve_ignored "$copy" all 2>&1); then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload could not be preserved; the copy was left"$'\n'
+        continue
+      fi
+      # Preservation takes time: recheck custody, commits and uncommitted work
+      # before the last source/preserve comparison and non-force removal.
+      scan_processes
+      classify "$copy" "$clone" "$pool" "$container"
+      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"copy changed after preservation; the copy and preserve were left"$'\n'
+        continue
+      fi
+      want=
+      if [ -d "$preserve_dir" ] && [ ! -L "$preserve_dir" ]; then
+        want=$(preserve_fingerprint "$preserve_dir") || want=
+      elif [ ! -e "$preserve_dir" ] && [ ! -L "$preserve_dir" ]; then
+        want=$(printf '' | teardown_ignored_sha256) || want=
+        preserve_dir=
+      fi
+      if [ -z "$want" ] || ! now=$(content_fingerprint "$copy" all) || [ "$now" != "$want" ]; then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload preservation is missing, unreadable or differs by hash; the copy was left"$'\n'
+        continue
+      fi
       if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
@@ -2178,6 +2228,8 @@ run_sweep() {  # report|apply|check
   fi
   APPLY=0
   [ "$mode" != apply ] || APPLY=1
+  # Report/check inspect real copies without refreshing their Git indexes.
+  [ "$APPLY" = 1 ] || export GIT_OPTIONAL_LOCKS=0
   scan "$mode"
   [ "$mode" = report ] || evaluate_live_fact
   REMOVAL_REPORT=

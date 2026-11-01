@@ -318,14 +318,21 @@ EOF
 # Symlinks, caches, virtual environments, Firstmate's own hook files, graft's
 # generated output (teardown_graft_generated) and regenerable build output are
 # derived machinery and are skipped; every other entry is printed for
-# teardown_preserve_ignored to copy.
-teardown_preservable_ignored() {  # <copy>
-  local copy=$1 listing entry name child rc=0
+# teardown_preserve_ignored to copy. Optional all mode includes the disposable
+# entries too, so the unlocked sweep can preserve their bytes without widening
+# this owner's disposable classification.
+teardown_preservable_ignored() {  # <copy> [all]
+  local copy=$1 mode=${2:-} listing entry name child rc=0
+  case "$mode" in ''|all) ;; *) return 1 ;; esac
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' entry; do
       entry=${entry%/}
+      if [ "$mode" = all ]; then
+        printf '%s\n' "$entry"
+        continue
+      fi
       [ ! -L "$copy/$entry" ] || continue
       ! teardown_graft_generated "$copy" "$entry" || continue
       name=${entry##*/}
@@ -762,17 +769,18 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
   teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
-# Copies every preservable ignored entry of <copy> into
-# $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
+# Copies every preservable ignored entry of <copy> (all ignored entries in
+# optional all mode) into $DATA/$ID/nested-copy-preserved/<copy-path-sha256>
+# and records each file's
 # SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
 # replaces an earlier preserve of the same copy only after every entry is copied
 # and hashed, so a failed run never costs the earlier one. Returns 1 when
 # anything cannot be listed, copied or hashed, after removing the one staging
 # directory it built, and the caller then refuses the copy rather than removing
 # unpreserved content.
-teardown_preserve_ignored() {  # <copy>
+teardown_preserve_ignored() {  # <copy> [all]
   local copy=$1 root dest stage entries entry file hash
-  entries=$(teardown_preservable_ignored "$copy") || return 1
+  entries=$(teardown_preservable_ignored "$copy" "${2:-}") || return 1
   [ -n "$entries" ] || return 0
   hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"

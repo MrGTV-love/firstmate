@@ -2327,7 +2327,7 @@ The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only ver
 Review the first batch's records before unattended operation.
 The header also owns the closeout-script liveness dependency and the proposed Vernant follow-ups that would replace this fallback, `vernant-lock-lease` and `vernant-commits-remote-before-lock`; neither is built yet, so the sweep keeps its own proofs.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
-[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the main regression entry point; [`tests/fm-copy-sweep-orphan.test.sh`](../tests/fm-copy-sweep-orphan.test.sh) covers locked squash-content eligibility, read-only report proofs, hash-preserved disposable classes and conservative launcher observation.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
