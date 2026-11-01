@@ -28,7 +28,6 @@ A non-Actions check run (for example Socket Security) can show only its head com
 The rule proves a landing tree only from complete, verified records, so any missing, unreadable, or unverifiable record stays on the ancestry fallback, and so does the rebase method.
 Those cases include a rollup with a legacy commit status; a project whose CI uploads no record; an expired artifact; a recorded base that no longer merges with the head or whose merge does not match its recorded tree; a partial re-run ("Re-run failed jobs") that does not re-run Lint partition 1, because CI writes the record only in that job of the attempt that ran it; and bot-authored PRs, because they skip the compliance job, so that check run has no record.
 
-Tear down a ship task only after landing is confirmed.
 Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority; follow [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s captain-words discard contract.
