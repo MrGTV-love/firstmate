@@ -462,6 +462,7 @@ test_worker_guard_project_scope() {
     id="omp-scope-$scope"
     rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
+    printf '\nEgress needs: ["semantic-search"]\n' >> "$HOME_DIR/data/$id/brief.md"
     out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
     expect_code 0 $? "omp $scope spawn should succeed: $out"
     expected=off

@@ -675,6 +675,8 @@ IFS= read -r -d '' TASK_SECTION <<'EOF' || true
 ## Firstmate spec
 {FIRSTMATE_SPEC}
 
+Egress needs: []
+
 ### Out of scope
 EOF
 TASK_SECTION=${TASK_SECTION%$'\n'}
