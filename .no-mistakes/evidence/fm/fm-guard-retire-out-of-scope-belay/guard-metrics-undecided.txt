@@ -1,7 +1,24 @@
-== head registry --undecided
-rc=0
-== base registry --undecided
-git-commit-credential-shapes
+# Synthetic log: 99 allow-only events each for spawn-brief-out-of-scope, jev-belay-stop, and control queued-wakes-warning (active, reversible, no recorded decision)
+
+## With this change's registry (target b83a76e65)
+$ bin/fm-guard-metrics.sh --log synth.jsonl --undecided
+queued-wakes-warning
+exit=0
+METRIC jev-belay-stop opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=keep
+METRIC queued-wakes-warning opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRIC spawn-brief-out-of-scope opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=keep
+METRICS_SUMMARY guards=3 measured=3 cut=1 unmeasured=0
+
+## Same log, base commit's registry (cf0e8a49a) for contrast
+$ bin/fm-guard-metrics.sh --log synth.jsonl --registry base-registry.json --undecided
 jev-belay-stop
+queued-wakes-warning
 spawn-brief-out-of-scope
-rc=0
+exit=0
+METRIC jev-belay-stop opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRIC queued-wakes-warning opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRIC spawn-brief-out-of-scope opportunities=99 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRICS_SUMMARY guards=3 measured=3 cut=3 unmeasured=0
+
+Registry ids matching retired guards (target): 0
+retired.json entries: [{"id":"spawn-brief-out-of-scope","retired":"2026-10-31","retirement_test":"tests/fm-retired-spawn-brief-out-of-scope.test.sh"},{"id":"jev-belay-stop","retired":"2026-10-31","retirement_test":"tests/fm-retired-jev-belay-stop.test.sh"}]

@@ -1,0 +1,17 @@
+brief: data/labship/brief.md, ### Out of scope section:
+14:### Out of scope
+15-
+$ bin/fm-spawn.sh labship projects/notes --mode local-only --yolo on --harness claude --model sonnet --effort low
+local-only source: local=main@407e7bbaabaeb239e796340361d9874416a549dd origin=main@407e7bbaabaeb239e796340361d9874416a549dd selected=origin/main@407e7bbaabaeb239e796340361d9874416a549dd
+skill selection for labship: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labship harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labship worktree=/private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/1/notes
+exit=0 after 20s
+--- state/labship.meta:
+window=firstmate:fm-labship
+worktree=/private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/1/notes
+harness=claude
+kind=ship
+mode=local-only

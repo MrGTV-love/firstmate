@@ -1,0 +1,29 @@
+# Live ship worker labship after its first real Claude turn
+$ cat state/labship.busy-state
+v1 gen=g1793561194.57950.29502 seq=3 state=idle source=claude-hook event=stop ts=1793561210
+$ cat state/labship.status
+paused [at=1793561207]: lab ready, paused
+$ ls -l state/labship.turn-ended
+-rw-r--r--  1 charlesabrooker  wheel  0 Nov  1 13:26 /private/tmp/fmlab.su1ECx/home/state/labship.turn-ended
+
+# Pane capture (lab socket, window firstmate:fm-labship)
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   /private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/1/notes
+❯ : Firstmate operational input waiting: read '/private/tmp/fmlab.su1ECx/home/state/operational-inbox/1793561196-300551cb4b68d7c9.msg' and handle its contents as Firstmate operational input.
+  Read 1 file, ran 2 shell commands
+⏺ The lab is ready, and I paused as asked.
+  - The worktree is the right one: /private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/1/notes.
+  - README.md exists in the project root.
+  - I made the branch fm/labship. I changed no files, and the worktree is clean.
+  - I added this line to /private/tmp/fmlab.su1ECx/home/state/labship.status: paused [at=<epoch>]: lab ready, paused.
+  - I did not read the status file back to check the line landed. The append command printed no error.
+  - The inbox holds no waiting messages.
+  I started no services. I made no commit and no push.
+✻ Worked for 12s · done 1:26 PM
+                                                                                                                                                      Advisor Tool (experimental) is on and may use more tokens · /advisor
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 54k/1.0M fm/labship notes:f07cb8ea
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

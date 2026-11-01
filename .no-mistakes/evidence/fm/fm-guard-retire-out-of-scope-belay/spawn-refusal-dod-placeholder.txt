@@ -1,0 +1,9 @@
+brief: data/labbad/brief.md (### Out of scope blank, {DOD_MANDATORY_ITEMS} left in place)
+$ bin/fm-spawn.sh labbad projects/notes --mode local-only --yolo on --harness claude
+error: /private/tmp/fmlab.su1ECx/home/data/labbad/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+error: repair: edit /private/tmp/fmlab.su1ECx/home/data/labbad/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+--- state/labbad.meta present? no
+--- guard events in state/guard-events.jsonl:
+{"guard":"spawn-brief-dod-placeholders","decision":"deny"}

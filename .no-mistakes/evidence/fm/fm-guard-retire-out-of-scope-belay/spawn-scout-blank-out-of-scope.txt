@@ -1,0 +1,22 @@
+brief: data/labscout/brief.md, ### Out of scope section:
+14:### Out of scope
+15-
+$ bin/fm-spawn.sh labscout projects/notes --scout --harness claude --model sonnet --effort low
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for labscout: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labscout harness=claude kind=scout window=firstmate:fm-labscout worktree=/private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/2/notes
+exit=0 after 18s
+--- state/labscout.meta:
+window=firstmate:fm-labscout
+worktree=/private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/2/notes
+harness=claude
+kind=scout

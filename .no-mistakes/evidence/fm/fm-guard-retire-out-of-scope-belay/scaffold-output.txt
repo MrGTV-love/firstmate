@@ -1,0 +1,24 @@
+$ bin/fm-brief.sh labship notes --mode local-only
+scaffolded: /private/tmp/fmlab.su1ECx/home/data/labship/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+exit=0
+--- scaffolded '### Out of scope' heading line(s) in data/labship/brief.md:
+14:### Out of scope
+15-
+16-# Herdr lifecycle declaration - NOT ENABLED
+
+$ bin/fm-brief.sh labscout notes --scout
+scaffolded: /private/tmp/fmlab.su1ECx/home/data/labscout/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+exit=0
+--- scaffolded '### Out of scope' heading line(s) in data/labscout/brief.md:
+14:### Out of scope
+15-
+16-# Herdr lifecycle declaration - NOT ENABLED
+
+$ bin/fm-brief.sh labbad notes --mode local-only
+scaffolded: /private/tmp/fmlab.su1ECx/home/data/labbad/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+exit=0
+--- scaffolded '### Out of scope' heading line(s) in data/labbad/brief.md:
+14:### Out of scope
+15-
+16-# Herdr lifecycle declaration - NOT ENABLED
+

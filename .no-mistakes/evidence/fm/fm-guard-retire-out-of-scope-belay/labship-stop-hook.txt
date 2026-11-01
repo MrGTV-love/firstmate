@@ -1,0 +1,15 @@
+Stop hook entry in /private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/1/notes/.claude/settings.local.json:
+[
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "touch '/private/tmp/fmlab.su1ECx/home/state/labship.turn-ended'; '/private/tmp/fmlab.su1ECx/home/bin/fm-busy-event.sh' apply '/private/tmp/fmlab.su1ECx/home/state' 'labship' idle --gen 'g1793561194.57950.29502' --source claude-hook --event stop 2>/dev/null || true"
+      }
+    ]
+  }
+]
+Stop entry keys: [["command","type"]]
+Stop command mentions jev-belay: 0
+Any hook anywhere mentions jev-belay: 0
+Stop command touches turn-ended: 1

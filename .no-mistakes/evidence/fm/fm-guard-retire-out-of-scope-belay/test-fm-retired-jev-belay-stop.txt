@@ -1,0 +1,2 @@
+ok - Claude completion Stop closes the turn without consulting the installed evidence judgment
+fm-retired-jev-belay-stop exit=0

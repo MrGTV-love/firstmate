@@ -1,0 +1,6 @@
+# Throwaway lab home; fake key; consumer-reported 402 (no network request)
+$ FM_HOME=<lab> bin/fm-typesafe-health.sh record 402 dispatch-resolve
+exit=0
+--- wake payload(s) queued in state/.wake-queue:
+typesafe-health-credits | check: typesafe-health: the TypeSafe (Jev) account is out of credits (HTTP 402), first seen 2026-11-01T19:34Z UTC by dispatch-resolve (no earlier normal answer was recorded). Until credits are added these fail silently and carry on without Jev: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), and the Level 6 jev-guard. Tell the captain once, in plain words, that the TypeSafe account needs credits; a recovered note follows by itself.
+--- 'belay' mentions in payload: 0

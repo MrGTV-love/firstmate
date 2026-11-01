@@ -1,0 +1,36 @@
+# Live scout worker labscout
+Stop hook: [{"hooks":[{"type":"command","command":"touch '/private/tmp/fmlab.su1ECx/home/state/labscout.turn-ended'; '/private/tmp/fmlab.su1ECx/home/bin/fm-busy-event.sh' apply '/private/tmp/fmlab.su1ECx/home/state' 'labscout' idle --gen 'g1793561236.3971.19661' --source claude-hook --event stop 2>/dev/null || true"}]}]
+jev-belay mentions in settings: 0
+$ cat state/labscout.busy-state
+v1 gen=g1793561236.3971.19661 seq=3 state=idle source=claude-hook event=stop ts=1793561250
+$ ls -l state/labscout.turn-ended
+-rw-r--r--  1 charlesabrooker  wheel  0 Nov  1 13:27 /private/tmp/fmlab.su1ECx/home/state/labscout.turn-ended
+
+# Guard events recorded by this lab (all spawns):
+   2 {"guard":"jev-egress-grant","decision":"allow"}
+   2 {"guard":"jev-tool-coverage","decision":"allow"}
+   2 {"guard":"spawn-brief-dod-placeholders","decision":"allow"}
+   1 {"guard":"spawn-brief-dod-placeholders","decision":"deny"}
+   2 {"guard":"spawn-confinement-coverage","decision":"allow"}
+   2 {"guard":"spawn-write-confinement","decision":"allow"}
+spawn-brief-out-of-scope events: 0
+
+# Pane capture
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   /private/tmp/fmlab.su1ECx/treehouse/.treehouse/notes-3ec78f/2/notes
+❯ : Firstmate operational input waiting: read '/private/tmp/fmlab.su1ECx/home/state/operational-inbox/1793561238-e6e67588acd53e4f.msg' and handle its contents as Firstmate operational input.
+  Read 1 file, ran 2 shell commands
+⏺ The lab is ready and paused.
+  - README.md exists in the notes project.
+  - I wrote the status line "lab ready, paused" to /private/tmp/fmlab.su1ECx/home/state/labscout.status.
+  - I did not edit, commit, or push anything.
+  - I started no services.
+  I am stopping here, as the brief says.
+✻ Worked for 10s · done 1:27 PM
+                                                                                                            You've used 77% of your weekly limit · resets 4pm (America/Chicago) · /usage-credits to keep using Claude Code
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 53k/1.0M notes:f9ab4a2c
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

@@ -1,0 +1,18 @@
+$ bash bin/fm-dod-lib.sh --verification-plan plans/blank.md   (### Out of scope: blank)
+exit=0
+## Out-of-scope list
+Out-of-scope list: stated: none (the `### Out of scope` subsection is blank).
+
+
+$ bash bin/fm-dod-lib.sh --verification-plan plans/none.md   (### Out of scope: none)
+exit=0
+## Out-of-scope list
+None.
+
+
+$ bash bin/fm-dod-lib.sh --verification-plan plans/noheading.md   (### Out of scope: noheading)
+exit=0
+## Out-of-scope list
+Out-of-scope list: no recognized `### Out of scope` subsection or column-0 `Out of scope:` paragraph was found in this brief; check the Firstmate spec for inline exclusions.
+
+
