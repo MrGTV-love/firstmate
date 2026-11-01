@@ -241,6 +241,7 @@ Telemetry failures, unavailable writers and nonregular log targets must never pr
 `bin/fm-guard-metrics.sh` owns guard/rule metrics and the retirement rule; its header owns the CLI and output fields.
 It groups repeated denies by task and rule across harness sessions, and an allow for another task, rule or actor class cannot clear a refusal.
 The refusal-to-bypass ratio is escape records plus distinct workaround signatures divided by denies, with a record carrying both `bypass` and `override` counted once.
+No durable workaround feed exists yet, so the ratio counts escape records only unless detector JSON is supplied with `--workarounds`; without it `workarounds` is null (not measured), never zero evidence.
 The ratio is undefined (`null`) when there are no denies, rather than zero evidence of escapes.
 Deny-only rows and guards with no recorded events in the selected window remain visible without inventing opportunities.
 

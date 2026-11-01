@@ -16,7 +16,7 @@
 # The one authorized exception is a disposable LAB home: bin/fm-lab-home.sh
 # stamps a marker file only on a fresh empty dir, and inside a gate context the
 # refusal lets a lifecycle call proceed only when FM_HOME is a marked lab home
-# whose overrides stay inside it (an FM_*_OVERRIDE that leaves it stays refused).
+# used through its stock layout (any FM_*_OVERRIDE relocation stays refused).
 # The helper legs below cover the admit/refuse contract; teardown additionally
 # proves the admit end-to-end through a real entrypoint.
 #
@@ -194,27 +194,16 @@ test_helper_lab_home_admits() {
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$lab/state" FM_CONFIG_OVERRIDE="$lab/config"); rc=$?
   expect_code 0 "$rc" "helper: production branch paths in a marked lab must be permitted"
 
-  for name in FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE; do
-    for value in "$plain" "$lab/../plain-home" "$lab/state/.." "$lab/data"; do
+  for name in FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE; do
+    for value in "$plain" "$lab/../plain-home" "$lab/state/.."; do
       out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$value"); rc=$?
       expect_code 3 "$rc" "helper: relocated or noncanonical $name must refuse"
     done
   done
-  out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "FM_UNKNOWN_OVERRIDE=$lab/data"); rc=$?
-  expect_code 3 "$rc" "helper: unsupported FM_UNKNOWN_OVERRIDE must refuse"
-  mkdir -p "$lab/data/inner" "${lab}-sibling"
-  ln -s "$plain" "$lab/data/escape"
-  for name in FM_ROOT_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE; do
-    for value in "$lab/data" "$lab/data/inner" "$lab/state/.."; do
-      out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$value"); rc=$?
-      expect_code 0 "$rc" "helper: $name=$value inside the marked lab must be permitted"
-    done
-    for value in "$plain" "$lab/../plain-home" "${lab}-sibling" "$lab/data/escape" "$lab/missing"; do
-      out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$value"); rc=$?
-      expect_code 3 "$rc" "helper: $name=$value outside the marked lab must refuse"
-    done
+  for name in FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_UNKNOWN_OVERRIDE; do
+    out=$(run_guard_lib_home "$GATE_WT" "$lab" NO_MISTAKES_GATE=1 "$name=$lab/data"); rc=$?
+    expect_code 3 "$rc" "helper: unsupported $name must refuse"
   done
-  rm "$lab/data/escape"; rmdir "$lab/data/inner" "${lab}-sibling"
   ln -s "$lab" "$TMP/lab-alias"
   for value in "$TMP/lab-alias" "$lab/."; do
     out=$(run_guard_lib_home "$GATE_WT" "$value" NO_MISTAKES_GATE=1 FM_ROOT_OVERRIDE="$ROOT"); rc=$?
@@ -241,7 +230,7 @@ test_helper_lab_home_admits() {
   # no gate signal + lab home -> still a normal no-op.
   out=$(run_guard_lib_home "$NORMAL_CWD" "$lab"); rc=$?
   expect_code 0 "$rc" "helper: lab home outside a gate must not refuse"
-  pass "fm-gate-refuse-lib: production and contained lab paths permitted; escaping paths and invalid identities refused"
+  pass "fm-gate-refuse-lib: production lab paths permitted; relocated paths and invalid identities refused"
 }
 
 test_lab_home_private_tmux_socket_survives_deep_paths() {

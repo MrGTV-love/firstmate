@@ -11,7 +11,6 @@ TMP_ROOT=$(fm_test_tmproot fm-watch-checkpoint)
 make_home() {
   local name=$1 home
   home="$TMP_ROOT/$name"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   mkdir -p "$home/state" "$home/data" "$home/config"
   printf '%s\n' "$home"
 }
@@ -516,7 +515,7 @@ SH
     "XDG_CACHE_HOME=$home/cache" "XDG_RUNTIME_DIR=$home/runtime"
     "FM_HOME=$home" "FM_ROOT_OVERRIDE=$home/root" "FM_STATE_OVERRIDE=$home/state"
     "FM_CONFIG_OVERRIDE=$home/config" "FM_PROCEVENT_CLAIM_ROOT=$home/procevent-claims"
-    FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true
+    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true
     FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
     FM_HEARTBEAT_MAX=999999 FM_HOME_SUMMARY_INTERVAL=999999)
   fm_write_meta "$home/state/restored.meta" "backend=herdr" "kind=ship" \

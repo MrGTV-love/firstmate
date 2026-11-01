@@ -6,10 +6,12 @@ set -u
 
 # shellcheck source=tests/git-config-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/git-config-helpers.sh"
-# Herdr suites drive the real fleet entrypoints through the real gate check, so
-# their homes come from the shared marked lab-home fixture.
-# shellcheck source=tests/lab-home-fixture.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lab-home-fixture.sh"
+
+# Herdr backend tests drive the real fm-spawn/fm-teardown but do not source
+# tests/lib.sh, so exempt them from the gate-lifecycle refusal here too (see
+# tests/lib.sh and bin/fm-gate-refuse-lib.sh for why firstmate's own suite,
+# which the no-mistakes gate runs from a gate worktree, must be exempt).
+export FM_GATE_REFUSE_BYPASS=1
 
 HERDR_TEST_SAFETY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null

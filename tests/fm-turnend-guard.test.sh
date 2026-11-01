@@ -1245,7 +1245,7 @@ function invoke(registration, home, context, payload) {
     HOME: path.join(home, 'pane-home'), XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
     XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
     FM_HOME: home, FM_CONFIG_OVERRIDE: path.join(home, 'config'), FM_STATE_OVERRIDE: path.join(home, 'state'),
-    CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_TEST_SEAM: '1',
+    CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
     FM_CLAUDE_AUTOARM_SYNC_WAIT_MS: '100', FM_CLAUDE_AUTOARM_ATTEMPTS: '1',
   };
   if (home === task || context === 'task-marker') env.FM_TASK_ID = 'config-consumer-task';
@@ -1367,7 +1367,7 @@ if (mode === 'contexts') {
                       XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
                       XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
                       FM_HOME: task, FM_STATE_OVERRIDE: statePath(task, ''), FM_ROOT_OVERRIDE: task,
-                      FM_TEST_SEAM: '1',
+                      FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
                       FM_PROCEVENT_CLAIM_ROOT: path.join(home, 'pane-home', 'claims'),
                     },
                     encoding: 'utf8', timeout: 15000,

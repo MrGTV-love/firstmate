@@ -11,10 +11,14 @@
 # metadata publication, and the pane environment export.
 set -u
 
+# This suite does not source tests/lib.sh, so exempt its teardown subprocess from
+# the gate-lifecycle refusal (bin/fm-gate-refuse-lib.sh) the way lib.sh does for
+# the rest of the suite: the no-mistakes gate runs this suite from a gate worktree,
+# which the guard would otherwise refuse.
+export FM_GATE_REFUSE_BYPASS=1
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
-# shellcheck source=tests/lab-home-fixture.sh
-. "$ROOT/tests/lab-home-fixture.sh"
 
 fail() {
   printf 'not ok - %s\n' "$1" >&2
@@ -35,7 +39,6 @@ cleanup() {
 trap cleanup EXIT
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-gotmp-tests.XXXXXX")
-TMP_ROOT=$(cd -P "$TMP_ROOT" && pwd -P)
 
 # Build a fake FM_HOME/FM_ROOT so the real fm-teardown.sh (symlinked in) resolves
 # state and helper scripts inside it. Stub the helper scripts fm-teardown calls so no
@@ -44,7 +47,6 @@ TMP_ROOT=$(cd -P "$TMP_ROOT" && pwd -P)
 make_fake_root() {
   local id=$1 tasktmp=$2
   local fake="$TMP_ROOT/$id"
-  fm_test_lab_home "$fake" || fail "could not mark the fixture home"
   mkdir -p "$fake/bin/backends" "$fake/state" "$fake/data"
   git init -q -b main "$fake/project" || fail "could not create fixture project"
   # Symlink the REAL teardown so the test exercises actual code, not a copy.

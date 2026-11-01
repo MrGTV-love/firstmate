@@ -4347,8 +4347,11 @@ if [ "$KIND" = secondmate ]; then
   # On a remote host this spawn is the host-local leg of a launch whose parent has
   # already synced the home to ITS primary commit, and $FM_ROOT here is only that
   # host's own Firstmate copy; syncing again would target the wrong checkout, so
-  # the caller turns this step off (bin/fm-remote-secondmate-control.sh).
-  if [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
+  # the caller turns this step off with the value internal
+  # (bin/fm-remote-secondmate-control.sh); only an operator's 1 is an escape.
+  if [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = internal ]; then
+    :
+  elif [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
     "$SCRIPT_DIR/fm-guard-event.sh" secondmate-sync bypass --rule FM_SKIP_SECONDMATE_SYNC --task "$ID" --override 2>/dev/null || true
   elif sm_primary_head=$(primary_head_commit "$FM_ROOT"); then
     sm_ff_out=$(ff_target "$PROJ_ABS" "secondmate $ID" "$sm_primary_head" yes yes "$ID" "$STATE" 2>&1 || true)
@@ -4367,7 +4370,7 @@ if [ "$KIND" = secondmate ]; then
     echo "error: could not create secondmate state directory for $PROJ_ABS" >&2
     exit 1
   }
-  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != internal ]; then
     CONFIG_INHERIT_LOCK=$(fm_config_inherit_lock_path "$PROJ_ABS") || {
       echo "error: could not resolve secondmate inheritance lock for $PROJ_ABS" >&2
       exit 1
@@ -4382,7 +4385,7 @@ if [ "$KIND" = secondmate ]; then
     FM_CONFIG_INHERIT_PAIR_DIR="${SPAWN_ROUTING_PAIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" FM_CONFIG_INHERIT_LIVE=1 \
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
-  else
+  elif [ "$FM_SKIP_SECONDMATE_INHERIT" = 1 ]; then
     "$SCRIPT_DIR/fm-guard-event.sh" secondmate-inherit bypass --rule FM_SKIP_SECONDMATE_INHERIT --task "$ID" --override 2>/dev/null || true
   fi
   fm_session_launch_policy_admit_child "$CONFIG" "$PROJ_ABS" "$HARNESS" "$RAW_LAUNCH" || exit 1
@@ -8298,7 +8301,8 @@ if [ "$HARNESS" = claude ]; then
 fi
 SPAWN_BRIEF_DELIVERED=1
 
-if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ] \
+  && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != internal ]; then
   if ! fm_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
     if fm_config_reread_quarantine_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
       echo "CONFIG_REREAD: secondmate $ID: quarantined pre-relaunch generations after cleanup failure (destination=$PROJ_ABS/state/.fm-inherited-config-reread-quarantine source=$FM_HOME/state/.fm-inherited-config-reread-quarantine)" >&2

@@ -314,14 +314,9 @@ SH
 
 # fm_test_spawn_home <home> [harness]
 # Minimal firstmate home layout plus watcher-liveness beat. Optional harness
-# pin is written to config/crew-harness. A home the caller has not populated is a
-# marked lab home, because only that passes the real gate check inside a gate.
+# pin is written to config/crew-harness.
 fm_test_spawn_home() {
   local home=$1 harness=${2-}
-  mkdir -p "$home"
-  if [ -z "$(ls -A "$home")" ]; then
-    fm_test_lab_home "$home" || return 1
-  fi
   mkdir -p "$home/data" "$home/projects" "$home/state" "$home/config"
   touch "$home/state/.last-watcher-beat"
   if [ -n "$harness" ]; then
