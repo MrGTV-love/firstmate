@@ -721,6 +721,141 @@ SH
 assert_remedy_missing
 pass "S3 validates the shared formatter command argument, not a command in another argument"
 
+# S3 reads the literal message of every emitter shape the scan already
+# recognizes, so a genuine inline remedy completes it, while a useless remedy,
+# a neighboring literal or an uncalled helper still cannot.
+remedy_shape() {  # <file> <site-match> <pass|fail> <label>, file content on stdin
+  local file=$1 match=$2 expect=$3 label=$4 out
+  rm -f "$REMEDY"/bin/gnew.*
+  cat >"$REMEDY/$file"
+  mutate "$REMEDY" ".guards[0].sites = [{\"file\":\"$file\",\"match\":$(jq -Rn --arg m "$match" '$m')}]"
+  if [ "$expect" = pass ]; then
+    out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) || fail "$label must pass S3: $out"
+  else
+    out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "$label escaped S3: $out"
+    assert_contains "$out" 'VIOLATION S3 ' "$label must fail S3"
+    assert_not_contains "$out" 'VIOLATION S1 ' "$label must still map its site"
+    assert_not_contains "$out" 'VIOLATION S2 ' "$label must still match exactly its site"
+  fi
+}
+JS_DENY='function deny(reason) { return reason; }'
+remedy_shape bin/gnew.ts 'return deny(' pass 'a JS helper call with a template remedy' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(\`device \${x} blocked. Remedy: run bin/gguard.sh --clear\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'a JS helper call with a prose remedy' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(\`device \${x} blocked. Remedy: ask someone\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'a JS helper call beside a compared remedy literal' <<JS
+$JS_DENY
+export function check(x) {
+  if (x === "Remedy: run bin/gguard.sh --clear") return deny(\`device \${x} blocked\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' pass 'a multiline JS helper call' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(
+    "device blocked. " + x + ". Remedy: run bin/gguard.sh --clear",
+  );
+}
+JS
+remedy_shape bin/gnew.ts 'throw new Error' pass 'a JS throw' <<'JS'
+throw new Error("REFUSED: blocked. Remedy: run bin/gguard.sh --clear");
+JS
+remedy_shape bin/gnew.ts 'throw new Error' fail 'a JS throw beside a remedy in another statement' <<'JS'
+const hint = "Remedy: run bin/gguard.sh --clear"; throw new Error("REFUSED: blocked");
+JS
+remedy_shape bin/gnew.ts 'console.error' pass 'a JS console diagnostic' <<'JS'
+console.error(`REFUSED: ${process.argv[2]} blocked. Remedy: run bin/gguard.sh --clear`);
+JS
+remedy_shape bin/gnew.ts 'return deny(' pass "a JS arrow helper's returned remedy" <<'JS'
+const deny = (reason) => `blocked: ${reason}. Remedy: run bin/gguard.sh --clear`;
+export function check() { return deny("pending work"); }
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'an uncalled helper definition' <<'JS'
+const refuse_other = () => "Remedy: run bin/gguard.sh --clear";
+const deny = (reason) => `blocked: ${reason}`;
+export function check() { return deny("pending work"); }
+JS
+remedy_shape bin/gnew.py 'raise SystemExit' pass 'a Python raise' <<'PY'
+raise SystemExit("REFUSED: blocked. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py 'raise SystemExit' fail 'a Python raise with a prose remedy' <<'PY'
+raise SystemExit("REFUSED: blocked. Remedy: ask someone")
+PY
+remedy_shape bin/gnew.py 'raise SystemExit' fail 'a Python raise beside a remedy in another call' <<'PY'
+print("Remedy: run bin/gguard.sh --clear"); raise SystemExit("REFUSED: blocked")
+PY
+remedy_shape bin/gnew.py '"refused: ' pass 'a multiline Python raise' <<'PY'
+raise ValueError(
+    "refused: the lease is gone. "
+    "Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py 'sys.exit' pass 'a Python exit' <<'PY'
+import sys
+sys.exit("REFUSED: blocked. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py "return 'refused'" pass 'a Python refusal returned as data' <<'PY'
+def mode():
+    return 'refused', 'pending work. Remedy: run bin/gguard.sh --clear'
+PY
+remedy_shape bin/gnew.py "return 'refused'" fail 'a Python refusal returned as data without a remedy' <<'PY'
+def mode():
+    return 'refused', 'pending_work'
+PY
+remedy_shape bin/gnew.py 'self.refuse' pass 'a Python method refusal' <<'PY'
+class Gate:
+    def refuse(self, why):
+        raise SystemExit(why)
+
+    def run(self):
+        self.refuse("refused: pending work. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.sh 'fail "REFUSED' pass 'a shell fail diagnostic' <<'SH'
+fail() { echo "$1" >&2; exit 1; }
+fail "REFUSED: blocked. Remedy: run bin/gguard.sh --clear"
+SH
+remedy_shape bin/gnew.sh 'fail "REFUSED' fail 'a shell fail diagnostic with a prose remedy' <<'SH'
+fail() { echo "$1" >&2; exit 1; }
+fail "REFUSED: blocked. Remedy: ask someone"
+SH
+remedy_shape bin/gnew.sh 'log "refused' pass 'a shell log diagnostic' <<'SH'
+log() { echo "$1" >&2; }
+log "refused: blocked. Remedy: run bin/gguard.sh --clear"
+SH
+remedy_shape bin/gnew.sh 'REFUSED:' pass 'a stderr heredoc diagnostic' <<'SH'
+cat >&2 <<EOF
+REFUSED: blocked.
+Remedy: run bin/gguard.sh --clear
+EOF
+SH
+out=$(bash "$REMEDY/bin/gnew.sh" 2>&1)
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted heredoc must actually emit the completing step"
+remedy_shape bin/gnew.sh 'REFUSED:' fail 'a stderr heredoc beside a remedy outside it' <<'SH'
+echo "Remedy: run bin/gguard.sh --clear" >&2
+cat >&2 <<EOF
+REFUSED: blocked.
+EOF
+SH
+remedy_shape bin/gnew.sh 'fm_refuse gguard' pass 'a shared formatter missing text with a variable exit kind' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "pending work. Remedy: run bin/gguard.sh --clear" "$kind" "$exit_text" task fixture
+SH
+out=$(bash "$REMEDY/bin/gnew.sh" 2>&1)
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted formatter text must actually be emitted"
+remedy_shape bin/gnew.sh 'fm_refuse gguard' fail 'a variable exit kind that cannot prove a machine command' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "$missing" "$kind" 'bin/gguard.sh --clear' task fixture
+SH
+rm -f "$REMEDY"/bin/gnew.*
+pass "S3 reads JS/TS, Python and shell emitter shapes, rejecting prose, neighboring and uncalled-helper remedies"
+
 # A remedy edit is a site edit even when the refusal/call line is unchanged.
 for shape in direct helper deleted-helper; do
   FOOTER=$(fixture "site_footer_$shape")
