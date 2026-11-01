@@ -2744,6 +2744,27 @@ work_is_landed_proof() {
   return 1
 }
 
+# Vernant owns slot declarations and their removal. Both runtime routes call
+# this before detaching/deleting the slot branch, never on a discard proof.
+# The command header owns report-only recovery of earlier stale declarations.
+teardown_retire_slot_manifest() {
+  local slot=$1 branch=$2
+  if [ ! -f "$PROJ/scripts/git-stability/provision_existing_slot.py" ] \
+     && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then
+    return 0
+  fi
+  local TEARDOWN_LANDED_DIR=$slot TEARDOWN_LANDED_REF=HEAD
+  if [ -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then
+    work_is_landed "$branch" || {
+      echo "REFUSED: Vernant manifest retirement requires landed work in $slot; branch preserved" >&2
+      return 1
+    }
+  fi
+  python3 "$SCRIPT_DIR/fm-slot-manifest-retire.py" --project "$PROJ" \
+    --firstmate-state "$STATE" --slot "$slot" --owner-id "$ID" \
+    --owner-branch "$branch" --state-dir "${CODEX_HOOK_STATE_DIR:-/tmp/vernant-codex-hooks-$(id -u)}" --apply
+}
+
 # Archive cleanup needs its own stricter proof, not the pipeline-input exception:
 # the forge's merged PR head must match its merge commit on every path either
 # side changed. Keep filenames NUL-delimited and literal, including deletions.
@@ -4942,6 +4963,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      teardown_retire_slot_manifest "$teardown_slot" "$branch" || exit 1
       if [ "$branch" != "HEAD" ]; then
         if git -C "$teardown_slot" checkout --detach -q 2>/dev/null; then
           git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
@@ -6558,6 +6580,7 @@ reap_task_archive_branches
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+    teardown_retire_slot_manifest "$WT" "$branch" || exit 1
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
         git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true

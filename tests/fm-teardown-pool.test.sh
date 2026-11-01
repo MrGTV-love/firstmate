@@ -3240,7 +3240,139 @@ SH
   pass 'a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy'
 }
 
+# Vernant owns the lifecycle format and removal. Fixtures model its public CLI,
+# while teardown still runs its real landing, custody and branch-delete path.
+test_vernant_slot_manifest_retirement() {
+  local variant case_dir common digest records rc head merge
+  for variant in success refused error absent unlanded no-record not-merged orca-success orca-refused; do
+    case "$variant" in
+      orca-*)
+        case_dir=$(make_case "vernant-manifest-$variant")
+        NESTED_SLOT=$(cd "$case_dir/wt" && pwd -P)
+        mkdir -p "$case_dir/home/state"
+        fm_write_meta "$case_dir/state/task-x1.meta" \
+          'window=fm-task-x1' 'endpoint_task_id=task-x1' "worktree=$NESTED_SLOT" \
+          "project=$case_dir/project" 'kind=ship' 'mode=no-mistakes' 'backend=orca' \
+          'spawn_gen=teardown-test-task-x1' 'terminal=fixture-terminal' \
+          "orca_worktree_id=$case_dir/project::$NESTED_SLOT"
+        printf '#!/usr/bin/env bash\nprintf '\''{"ok":true}\\n'\''\n' > "$case_dir/fakebin/orca"
+        chmod +x "$case_dir/fakebin/orca"
+        ;;
+      *)
+        make_nested_slot_case "vernant-manifest-$variant" enclosing .claude/worktrees/x
+        case_dir=$NESTED_CASE
+        ;;
+    esac
+    common=$(git -C "$NESTED_SLOT" rev-parse --path-format=absolute --git-common-dir)
+    digest=$(printf '%s' "$NESTED_SLOT" | shasum -a 256 | cut -c1-16)
+    records=$case_dir/lifecycle
+    mkdir -p "$records/worktree-lifecycle" "$common/vernant-worktree-lifecycle" "$case_dir/project/scripts/git-stability"
+    jq -n --arg owner task-x1 --arg branch fm/task-x1 --arg slot "$NESTED_SLOT" --arg repo "$case_dir/project" \
+      '{owner_id:$owner,branch:$branch,worktree_path:$slot,repo_root:$repo}' > "$records/worktree-lifecycle/$digest.json"
+    cp "$records/worktree-lifecycle/$digest.json" "$common/vernant-worktree-lifecycle/$digest.json"
+    cp "$records/worktree-lifecycle/$digest.json" "$case_dir/manifest.json"
+    head=$(git -C "$NESTED_SLOT" rev-parse HEAD)
+    git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit --allow-empty -qm fixture-merge
+    merge=$(git -C "$case_dir/project" rev-parse HEAD)
+    if [ "$variant" != no-record ]; then
+      printf 'pr=https://github.com/test/vernant/pull/42\n' >> "$case_dir/state/task-x1.meta"
+    fi
+    cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+if [ '$variant' = not-merged ]; then
+  printf 'merged: false\nhead: $head\nmerge: $merge\n'
+else
+  printf 'merged: true\nhead: $head\nmerge: $merge\n'
+fi
+SH
+    chmod +x "$case_dir/fakebin/gh-axi"
+    cat > "$case_dir/project/scripts/git-stability/retire_slot_manifest.py" <<PY
+import argparse, json, pathlib, sys
+p=argparse.ArgumentParser()
+p.add_argument('action', choices=['retire'])
+for key in ['slot-path','repo-root','owner-id','owner-branch','proof-file','state-dir']:
+    p.add_argument('--'+key, required=True)
+a=p.parse_args()
+proof=json.loads(pathlib.Path(a.proof_file).read_text())
+assert proof == {'pr_url':'https://github.com/test/vernant/pull/42','merged_pr_head_sha':'$head','merge_commit_sha':'$merge'}
+assert a.owner_id == 'task-x1' and a.owner_branch == 'fm/task-x1'
+assert a.slot_path == '$NESTED_SLOT' and a.state_dir == '$records'
+pathlib.Path('$case_dir/called').write_text(json.dumps(vars(a)))
+code={'refused':2,'orca-refused':2,'error':1}.get('$variant',0)
+if code:
+    print(json.dumps({'status':'refused','reason':'fixture_refusal','next_step':'retain_slot'}))
+    sys.exit(code)
+for path in ['$records/worktree-lifecycle/$digest.json','$common/vernant-worktree-lifecycle/$digest.json']:
+    pathlib.Path(path).unlink()
+print(json.dumps({'status':'retired'}))
+PY
+    if [ "$variant" = absent ]; then
+      rm "$case_dir/project/scripts/git-stability/retire_slot_manifest.py"
+      touch "$case_dir/project/scripts/git-stability/provision_existing_slot.py"
+    fi
+    if [ "$variant" = unlanded ]; then
+      printf 'unlanded\n' > "$NESTED_SLOT/unlanded.txt"
+      git -C "$NESTED_SLOT" add unlanded.txt
+      git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm unlanded
+    fi
+    rc=0
+    CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/out" 2> "$case_dir/err" || rc=$?
+    case "$variant" in
+      success|orca-success)
+        expect_code 0 "$rc" "retirement success: $(cat "$case_dir/err")"
+        assert_present "$case_dir/called" 'entry point was not called'
+        assert_absent "$records/worktree-lifecycle/$digest.json" 'legacy record remains'
+        assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'durable record remains'
+        # Historical declarations can outlive task metadata. Recover only the
+        # PR explicitly retained by Firstmate's merge-outcome marker.
+        printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/vernant\n42\n' > "$case_dir/state/task-x1.pr-poll-merge-notified"
+        cp "$case_dir/manifest.json" "$records/worktree-lifecycle/$digest.json"
+        cp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json"
+        jq '.owner_id="unknown-owner"' "$case_dir/manifest.json" > "$common/vernant-worktree-lifecycle/unknown.json"
+        rm "$case_dir/called"
+        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+          PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
+          --project "$case_dir/project" --firstmate-state "$case_dir/state" > "$case_dir/report"
+        expect_code 0 "$?" 'report failed'
+        assert_absent "$case_dir/called" 'report invoked retirement'
+        cmp "$case_dir/manifest.json" "$records/worktree-lifecycle/$digest.json" || fail 'report changed legacy bytes'
+        cmp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json" || fail 'report changed durable bytes'
+        assert_grep 'landing=MERGED recorded_pr=https://github.com/test/vernant/pull/42' "$case_dir/report" 'report omitted proven owner'
+        assert_grep 'owner=unknown-owner landing=UNPROVEN' "$case_dir/report" 'report omitted unproven owner'
+        rc=0
+        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
+          PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
+          --project "$case_dir/project" --firstmate-state "$case_dir/state" --apply > "$case_dir/apply" || rc=$?
+        expect_code 1 "$rc" 'apply should report the unproven owner'
+        assert_absent "$records/worktree-lifecycle/$digest.json" 'apply left landed legacy copy'
+        assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'apply left landed durable copy'
+        assert_present "$common/vernant-worktree-lifecycle/unknown.json" 'apply touched unproven owner'
+        ;;
+
+      absent)
+        expect_code 0 "$rc" 'missing entry point changed teardown behavior'
+        assert_grep 'retire_slot_manifest.py; lifecycle records unchanged' "$case_dir/out" 'missing entry point not reported'
+        assert_present "$records/worktree-lifecycle/$digest.json" 'missing script removed legacy record'
+        ;;
+      *)
+        [ "$rc" -ne 0 ] || fail "$variant should refuse: $(cat "$case_dir/out" "$case_dir/err")"
+        git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1 || fail "$variant deleted branch"
+        assert_present "$records/worktree-lifecycle/$digest.json" "$variant removed legacy record"
+        if [ "$variant" = refused ] || [ "$variant" = orca-refused ] || [ "$variant" = error ]; then
+          assert_grep fixture_refusal "$case_dir/out" 'reason was lost'
+          assert_grep retain_slot "$case_dir/out" 'next_step was lost'
+        else
+          assert_absent "$case_dir/called" 'unproven owner called retire'
+        fi
+        ;;
+    esac
+  done
+  pass 'Vernant retirement honors landing proof, both copies, refusals, and old checkouts'
+}
+
 teardown_test_cases=(
+test_vernant_slot_manifest_retirement
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
 test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
