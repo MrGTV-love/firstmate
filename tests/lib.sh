@@ -1250,6 +1250,7 @@ fm_fake_config() {
   : > "$fakebin/.fm-fake-config"
   for assignment do
     value=${assignment#*=}
+    # shellcheck disable=SC2016 # expanded by the child shell that sources the file
     printf '[ -n "${%s+x}" ] || %s=%s\n' "${assignment%%=*}" "${assignment%%=*}" \
       "'${value//$quote/$escaped_quote}'" >> "$fakebin/.fm-fake-config"
   done
@@ -1538,8 +1539,8 @@ assert_not_contains() {
 # quoted -c argument, a confined launch adds a sandbox-exec level, and a launcher
 # or raw launch adds its own.
 fm_launch_holds() {
-  local quote="'" nested_quote="'\\''" token=$2 depth
-  for depth in 0 1 2 3; do
+  local quote="'" nested_quote="'\\''" token=$2
+  for _ in 0 1 2 3; do
     case "$1" in *"$token"*) return 0 ;; esac
     token=${token//$quote/$nested_quote}
   done
