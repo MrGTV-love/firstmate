@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { confinementOwner, egressClass, egressGranted, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
+import { confinementOwner, deviceEgress, egressClass, egressGranted, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -64,14 +64,25 @@ function plainPath(path: string): boolean {
     && !path.endsWith("]");
 }
 
+// Measured omp write strips a hashline header ([PATH] or [PATH#XXXX], trailing
+// whitespace ignored), sends only scheme:// targets to a protocol handler, and
+// that handler sees the URL-parsed, trimmed spelling with a lower-case scheme.
+// Devices are classified on that key; local admission still needs the exact path.
+function routedPath(path: string): string {
+  const target = /^\[([^#]+)(?:#[0-9A-Fa-f]{4})?\]$/.exec(path.trimEnd())?.[1] ?? path;
+  if (!/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(target)) return target;
+  let href = target;
+  try { href = new URL(target).href; } catch { /* omp keeps the raw spelling when URL parsing fails. */ }
+  return href.trim().replace(/^[^:]+/, (scheme) => scheme.toLowerCase());
+}
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 type DeviceInput = { path?: unknown; content?: unknown };
 type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
-  | { effect: "refused"; reason: string; alternative?: (input: DeviceInput) => string | undefined }
-  | { effect: "unknown"; reason: string };
+  | { effect: "unknown" | "uri"; reason: string };
 
 function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
   if (typeof input.content !== "string" || typeof ctx.getAsyncJobSnapshot !== "function") return false;
@@ -91,11 +102,6 @@ function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: strin
   return statSync(file).isFile() && insideRepo(file, root);
 }
 
-function githubReadAlternative(input: DeviceInput): string | undefined {
-  const args: unknown = typeof input.content === "string" ? JSON.parse(input.content) : undefined;
-  if (object(args) && (args.op === "repo_view" || args.op === "file_read")) return "For this read, use gh-axi through the shell instead.";
-}
-
 function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
   const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
   if (!job || typeof ctx.getAsyncJobSnapshot !== "function") return false;
@@ -105,15 +111,13 @@ function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
 }
 
 // Effects established against native omp 18.12.6 (docs/configuration.md "Jev guard").
-// Device arguments are not file contents. Auto QA flushes its whole pending
-// queue off the machine, and xd://github results return as unscreened write results.
+// Device arguments are not file contents. Outbound-device policy lives in
+// fm-jev-egress.ts and runs before filesystem confinement or path selection.
 const deviceEffects: Readonly<Record<string, DeviceRule>> = {
   "xd://lsp": { effect: "local", prove: scopedLsp,
     remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply absent or false), or reload with a plain existing file inside this task worktree, or a workspace symbols search (file \"*\"), with the session cwd equal to that worktree. For other workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
   "proc://<job>/kill": { effect: "local", prove: ownJob,
     remedy: "Read proc:// to identify a running job owned by this session, then use its exact proc://<job>/kill path. Ask Firstmate to handle other tasks or shared services." },
-  "xd://report_issue": { effect: "refused", reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
-  "xd://github": { effect: "refused", reason: "its results return as write-tool output, which this guard never screens for injected instructions", alternative: githubReadAlternative },
   "xd://propose": { effect: "unknown", reason: "the plan handler's downstream effects are not available to this guard" },
   "xd://resolve": { effect: "unknown", reason: "the pending apply callback's targets and downstream effects are not available to this guard" },
   "xd://reject": { effect: "unknown", reason: "the pending discard callback's targets and downstream effects are not available to this guard" },
@@ -123,7 +127,8 @@ const deviceEffects: Readonly<Record<string, DeviceRule>> = {
 function deviceRule(path: string): DeviceRule | undefined {
   if (Object.hasOwn(deviceEffects, path)) return deviceEffects[path];
   if (/^proc:\/\/[A-Za-z0-9][A-Za-z0-9._-]*\/kill$/.test(path)) return deviceEffects["proc://<job>/kill"];
-  if (/^(?:xd|proc):/i.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
+  if (/^(?:xd|proc):\/\//.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
+  if (/^[a-z][a-z0-9+.-]*:\/\//.test(path)) return { effect: "uri", reason: "omp routes this URI to a protocol handler, and no write rule is admitted for its scheme" };
 }
 
 function real(path: string): string[] {
@@ -144,6 +149,10 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   process.env.PI_DISABLE_LSPMUX = "1";
   const service = createGuardService(c);
   const roots = [...new Set([c.worktree, ...real(c.data), ...real(tmpdir()), ...real("/tmp")])];
+  // Probe lazily once per installed guard, only for launched macOS workers.
+  // The child inherits this process's sandbox and queries its kernel policy;
+  // the launch marker by itself (or a failed/unavailable probe) is not proof.
+  let filesystemConfinement: Promise<boolean> | undefined;
 
   function record(terminal: GuardTerminal): GuardTerminal & { audit_error_type?: "AuditUnavailableError" } {
     try {
@@ -225,20 +234,34 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it.");
       }
       const path = typeof input.path === "string" ? input.path : "";
-      const device = deviceRule(path);
+      const routed = routedPath(path);
+      const device = deviceEgress(routed) ?? deviceRule(routed);
       if (device) {
         terminal.branch = "device";
         const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
         if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
         if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
-        if (device.effect === "refused") {
+        if (device.effect === "uri") return deny(`${device.reason}. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it.`);
+        if (device.effect === "egress") {
+          terminal.branch = "egress";
+          terminal.destination_class = device.destination;
+          await guardEvent("jev-egress-grant", routed, "deny", egressStarted, remainingMs);
           let alternative: string | undefined;
           try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
-          return deny(`${device.reason}.`, alternative);
+          return deny(`${device.reason}. No task egress grant admits this device.`, alternative);
         }
         let admitted = false;
-        try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+        try { admitted = routed === path && device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
         return admitted ? finishCall(terminal) : deny(device.remedy);
+      }
+      if (path && process.platform === "darwin" && process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1") {
+        filesystemConfinement ??= runWriter("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "fm-write-confinement.py"),
+          "--check-active", c.state, c.task], { timeout: remainingMs() }).then(() => true, () => false);
+        if (await filesystemConfinement) {
+          const content = tool === "edit" ? input.new_string : input.content;
+          if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
+          return finishCall({ ...terminal, branch: "confinement", confinement_owner: "T5" });
+        }
       }
       if (!plainPath(path)) {
         return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },

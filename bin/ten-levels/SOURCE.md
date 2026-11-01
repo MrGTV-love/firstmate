@@ -56,7 +56,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Native device admission uses the adapter context's host (default `omp`, explicitly `claude` in the Claude adapter), not the model service; host identity remains required even without host-specific result budgets.
   Credential shape matching moves to `bin/fm-git-secrets.py` at commit and push time; write/edit content receives no model or local credential screening.
   Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers, classifying read-only commands or writing audit rows.
-  Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
+  Write/edit refusals record their target and direct an authorized correction; proved active T5 confinement owns filesystem write admission, and only unconfined or unproved workers keep the worktree, task data and temporary directory roots.
   The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and outage behavior.
 - `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
