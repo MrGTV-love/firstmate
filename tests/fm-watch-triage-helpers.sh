@@ -2371,59 +2371,6 @@ SH
   pass "late signals keep original stale routing and wake once independently, including Main-owned stale rows"
 }
 
-test_guard_workaround_heartbeat() {
-  local dir state fakebin out repo refused pid merged
-  dir=$(make_case guard-workaround-heartbeat); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; repo="$dir/repo"
-  fm_git_identity fmtest fmtest@example.invalid
-  git init -q -b main "$repo"
-  git -C "$repo" commit -q --allow-empty -m seed
-  git -C "$repo" checkout -qb feature
-  printf 'same\n' > "$repo/change"
-  git -C "$repo" add change
-  git -C "$repo" commit -qm feature
-  refused=$(git -C "$repo" rev-parse HEAD)
-  git -C "$repo" checkout -q main
-  printf 'same\n' > "$repo/change"
-  git -C "$repo" add change
-  git -C "$repo" commit -qm base
-  git -C "$repo" checkout -q feature
-  "$ROOT/bin/fm-guard-event.sh" merge-green-head deny --task task --rule base-containment \
-    --head "$refused" --base main --log "$state/guard-events.jsonl"
-  git -C "$repo" merge -q --no-ff main -m 'redundant base merge'
-  merged=$(git -C "$repo" rev-parse HEAD)
-  printf 'kind=ship\nworktree=%s\nbranch=feature\n' "$repo" > "$state/task.meta"
-  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_GUARD_EVENT_LOG="$state/guard-events.jsonl"
-  pid=$!
-  wait_for_exit "$pid" 900 || { reap "$pid"; fail "workaround evidence did not wake heartbeat"; }
-  [ "$(cat "$out")" = heartbeat ] || fail "workaround detection did not retain fleet scope"
-  grep -F "tree-equal-merge:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted the tree-equal signature"
-  grep -F "base-merge-only-after-refusal:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted refusal correlation"
-  # A plain heartbeat queued after the report before Main drains must not
-  # replace it: the report keeps its own wake identity.
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_wake_append heartbeat heartbeat heartbeat' _ "$ROOT/bin/fm-wake-lib.sh" \
-    || fail "could not queue a later plain heartbeat"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "the wake drain failed: $(cat "$dir/drain.err")"
-  grep -F "tree-equal-merge:$merged" "$dir/drain.out" >/dev/null \
-    || fail "a later plain heartbeat hid the workaround report from the drain: $(cat "$dir/drain.out")"
-  ack_stopped_cycle "$state" || fail "could not acknowledge workaround heartbeat"
-  set_mtime "$(( $(date +%s) - 60 ))" "$state/.last-heartbeat"
-  watch_bg "$state" "$fakebin" "$dir/quiet.out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_GUARD_EVENT_LOG="$state/guard-events.jsonl"
-  pid=$!
-  # The unchanged report is compared at the heartbeat after a run publishes it, so
-  # wait for a run to publish, then for a later run to replace it, then assert.
-  fm_test_wait_until --while-alive "$pid" --cycles 600 "$(watch_polls_file "$state" "$pid")" -- test -f "$state/.guard-workarounds-next" \
-    || { reap "$pid"; fail "the detached detector never published a run"; }
-  ln "$state/.guard-workarounds-next" "$dir/first-run" || { reap "$pid"; fail "could not pin the first detector run"; }
-  # shellcheck disable=SC2016 # The probe expands its own arguments.
-  fm_test_wait_until --while-alive "$pid" --cycles 600 "$(watch_polls_file "$state" "$pid")" -- \
-    bash -c '[ -f "$1" ] && [ ! "$1" -ef "$2" ]' _ "$state/.guard-workarounds-next" "$dir/first-run" \
-    || { reap "$pid"; fail "unchanged workaround signatures woke twice or the detector stopped"; }
-  [ ! -s "$dir/quiet.out" ] || { reap "$pid"; fail "unchanged workaround signatures were presented again"; }
-  reap "$pid"
-  pass "heartbeat presents read-only workaround evidence once and deduplicates unchanged signatures"
-}
-
 test_heartbeat_late_signal_retains_fleet_scope() {
   local dir state fakebin out next_out quiet_out pid id real_touch
   dir=$(make_case heartbeat-late-signal); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"

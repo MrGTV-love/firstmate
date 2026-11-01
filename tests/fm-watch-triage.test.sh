@@ -8,9 +8,6 @@ set -u
 # shellcheck source=tests/fm-watch-triage-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-watch-triage-helpers.sh"
 
-fm_test_only
-
-test_guard_workaround_heartbeat
 test_status_span_actionable_classifier
 test_status_span_survives_a_later_routine_append
 test_status_span_respects_decision_closure

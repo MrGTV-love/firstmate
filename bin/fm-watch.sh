@@ -3290,21 +3290,17 @@ review_agent_select_detached() {
 
 # Read-only guard workaround detection runs detached and single-flight for the
 # same reason: a slow worktree read must never hold the poll or its beacon.
-# A run publishes its report by rename, so a later heartbeat of this or the next
-# watcher reads only a complete report. Each heartbeat leaves that report in
-# GUARD_WORKAROUND_REPORT for the caller to deduplicate and starts the next run,
-# so a report arrives one heartbeat after its evidence.
+# Each heartbeat starts the next run, which publishes its report by rename to
+# state/.guard-workarounds-next, so a reader sees only a complete report. The
+# report is file output only: the watcher queues no wake for it.
 GUARD_WORKAROUND_PID=
-GUARD_WORKAROUND_REPORT=
 guard_workarounds_detached() {
   local out="$STATE/.guard-workarounds-next"
-  GUARD_WORKAROUND_REPORT=
   if [ -n "$GUARD_WORKAROUND_PID" ]; then
     kill -0 "$GUARD_WORKAROUND_PID" 2>/dev/null && return 0
     wait "$GUARD_WORKAROUND_PID" 2>/dev/null || true
     GUARD_WORKAROUND_PID=
   fi
-  GUARD_WORKAROUND_REPORT=$(cat "$out" 2>/dev/null || true)
   rm -f "$out"
   { python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" </dev/null >"$out.$$" 2>/dev/null \
       && mv -f "$out.$$" "$out"; } &
@@ -4595,16 +4591,8 @@ while :; do
   if [ "$(age_of "$STATE/.last-heartbeat")" -ge "$hb" ]; then
     review_agent_select_detached
     guard_workarounds_detached
-    if [ -n "$GUARD_WORKAROUND_REPORT" ] \
-      && [ "$GUARD_WORKAROUND_REPORT" != "$(cat "$STATE/.guard-workarounds-presented" 2>/dev/null || true)" ]; then
-      fm_wake_append check guard-workarounds "$GUARD_WORKAROUND_REPORT" || exit 1
-      printf '%s\n' "$GUARD_WORKAROUND_REPORT" > "$STATE/.guard-workarounds-presented"
-      touch "$STATE/.last-heartbeat"
-      wake "heartbeat"
-    fi
-    # Triage: with no changed report above, in always-on mode a heartbeat is benign
-    # unless the cheap fleet-scan turns up a captain-relevant status the per-wake
-    # path missed. Absorb the
+    # Triage: in always-on mode a heartbeat is benign unless the cheap fleet-scan
+    # turns up a captain-relevant status the per-wake path missed. Absorb the
     # no-change case (advance the schedule and back off exactly as wake() would,
     # without exiting); the away-mode daemon, when present, owns triage and wants
     # every heartbeat.
