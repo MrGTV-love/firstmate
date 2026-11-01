@@ -2673,8 +2673,12 @@ TEARDOWN_LANDED_HEADS=()
 # refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
 TEARDOWN_BUNDLE_PROOF=
+# Any accepted bundle admits this cleanup, including foreign copies whose empty
+# branch name must not change the task's own completion bookkeeping above.
+TEARDOWN_BUNDLE_SWEEP_PROOF=
 work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
   teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
+  TEARDOWN_BUNDLE_SWEEP_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
   [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
 }
 # 1 when the run-record read the pipeline-input proof needed went silent. A copy
@@ -4705,12 +4709,12 @@ teardown_remove_own_nested_copies() {  # <slot-label>
 # still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
-  local unique
+  local unique bundle=${TEARDOWN_BUNDLE_SWEEP_PROOF:-$TEARDOWN_BUNDLE_ACCEPTED}
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $TEARDOWN_BUNDLE_ACCEPTED, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
   else
-    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $TEARDOWN_BUNDLE_ACCEPTED, but its ignored files cannot be listed${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $bundle, but its ignored files cannot be listed${3:+; $3}." >&2
   fi
   echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
   return 1
@@ -4886,6 +4890,11 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       # An own copy Vernant's creation lock holds is released by its driver, so it
       # also needs the release proofs a foreign copy gets.
       [ -z "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_PEER_SLOT}" ] || teardown_own_locked_copies_prove || return 1
+      # A foreign bundle can admit cleanup even when every own HEAD is already
+      # anchored or landed. Its admission still cannot waive own ignored bytes.
+      if [ "$FORCE" != "--force" ] && [ -n "$TEARDOWN_BUNDLE_SWEEP_PROOF" ]; then
+        teardown_bundle_swept_ignored_kept "$WT" "$TEARDOWN_PROOF_OUTCOME" || return 1
+      fi
       ;;
     retire)
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
