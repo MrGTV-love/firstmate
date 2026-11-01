@@ -3,6 +3,7 @@
 
 Usage: python3 bin/fm-worker-env.py [--harness ID] [--keep NAME ...] [--startup] -- COMMAND [ARG ...]
        python3 bin/fm-worker-env.py --shell-prefix [--harness ID] [--keep NAME ...]
+       python3 bin/fm-worker-env.py --shell-unset [--harness ID] [--keep NAME ...]
 
 The default is the launch-env-allowlist operational floor. --keep adds
 validated names, never values. --harness adds the non-secret WORK plumbing and
@@ -14,7 +15,11 @@ tools; it is not credential-isolated.
 Main-run readers use the default.
 --shell-prefix emits the equivalent names-only shell expansion used by
 fm-spawn, preserving listed non-exported destination variables without reading
-or serializing their values. --startup installs the existing confinement
+or serializing their values. --shell-unset emits a command that unsets every
+other exported shell-identifier name in the destination shell, so fm-spawn's
+default launch keeps its text and pane shell unchanged; exported names that
+are not shell identifiers survive it. With --harness both forms also keep the
+numbered GIT_CONFIG entries. --startup installs the existing confinement
 owner's shell-startup read rules on Darwin for direct readers. Linux has no
 corresponding OS guarantee. No credential file is read by this helper.
 """
@@ -41,12 +46,14 @@ SSH_AUTH_SOCK SSH_ASKPASS GIT_SSH_COMMAND GIT_CONFIG_GLOBAL NM_HOME
 XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 SSL_CERT_FILE SSL_CERT_DIR NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE
+CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
 """.split())
+GIT_CONFIG = re.compile(r"GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)\Z")
 # Each harness's non-secret store selectors. Provider API keys and tokens are
-# never named here; they reach a worker only through the allowlist file, and
-# bin/fm-worker-account-lib.sh owns Claude's provider selector names.
+# never named here: fm-spawn adds Claude's provider names from
+# bin/fm-worker-account-lib.sh and DSH's key name from bin/fm-dsh.py.
 HARNESS_ROUTES = {
-    "claude": ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS"),
+    "claude": ("CLAUDE_CONFIG_DIR", "DISABLE_AUTOUPDATER"),
     "codex": ("CODEX_HOME",),
     "grok": ("GROK_HOME",),
     "omp": ("PI_CONFIG_DIR", "PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"),
@@ -74,6 +81,7 @@ def main():
     parser.add_argument("--harness", help="also keep the work plumbing and this harness's store selectors")
     parser.add_argument("--startup", action="store_true")
     parser.add_argument("--shell-prefix", action="store_true", help="emit a names-only clean-env shell prefix for fm-spawn")
+    parser.add_argument("--shell-unset", action="store_true", help="emit a names-only unset command for fm-spawn's default launch")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if any(not NAME.fullmatch(name) for name in args.keep):
@@ -82,6 +90,15 @@ def main():
     names = FLOOR.union(args.keep)
     if args.harness is not None:
         names |= WORK.union(HARNESS_ROUTES.get(args.harness, ()))
+    git_config = args.harness is not None
+    if args.shell_unset:
+        if command or args.startup or args.shell_prefix:
+            parser.error("--shell-unset accepts names only, without a command, --startup or --shell-prefix")
+        skip = r" && k !~ /^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)$/" if git_config else ""
+        program = ("BEGIN { for (k in ENVIRON) if (k ~ /^[A-Za-z_][A-Za-z0-9_]*$/ && index(fm_keep, \" \" k \" \") == 0"
+                   + skip + ") print \"unset \" k }")
+        print("eval \"$(awk -v fm_keep=' " + " ".join(sorted(names)) + " ' '" + program + "')\"")
+        return 0
     if args.shell_prefix:
         if command or args.startup:
             parser.error("--shell-prefix accepts names only, without a command or --startup")
@@ -91,7 +108,8 @@ def main():
         return 0
     if not command:
         parser.error("a worker command is required after --")
-    environment = {name: value for name, value in os.environ.items() if name in names}
+    environment = {name: value for name, value in os.environ.items()
+                   if name in names or (git_config and GIT_CONFIG.match(name))}
     if args.startup:
         started = time.monotonic()
         try:

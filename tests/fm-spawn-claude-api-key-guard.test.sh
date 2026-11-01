@@ -270,8 +270,11 @@ test_tmux_env_follows_the_allowlist() {
 # Execute the generated launch in a synthetic pane, which may have a captured
 # credential that is absent from the spawning process and tmux server.
 observe_launch() {
-  cat > "$FAKEBIN_DIR/claude" <<'SH'
-#!/usr/bin/env bash
+  # The recorder names its own output path: the launch boundary keeps no
+  # test-only pane variable.
+  {
+    printf '#!/usr/bin/env bash\nFM_OBSERVED=%q\n' "$CASE_DIR/observed"
+    cat <<'SH'
 observed="$FM_OBSERVED"
 session=none
 if [ "${1:-}" = --session-id ]; then
@@ -286,9 +289,11 @@ printf 'API_KEY=%s\nAUTH_TOKEN=%s\nCONFIG_DIR=%s\n' \
   "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" \
   "${CLAUDE_CONFIG_DIR-unset}" > "$observed"
 printf '%s\n' "$session" > "$observed.session"
+printf 'AWS_REGION=%s\n' "${AWS_REGION-unset}" > "$observed.companion"
 SH
+  } > "$FAKEBIN_DIR/claude"
   chmod +x "$FAKEBIN_DIR/claude"
-  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
+  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" AWS_REGION=us-fake-1 \
     FM_OBSERVED="$CASE_DIR/observed" ANTHROPIC_API_KEY=sk-ant-pane-only \
     ANTHROPIC_AUTH_TOKEN=sk-ant-pane-token CLAUDE_CONFIG_DIR="$CASE_DIR/stale-claude" \
     bash -c "$(cat "$LAUNCH_LOG")" \
@@ -306,7 +311,8 @@ test_launch_sheds_captured_credentials() {
   observe_launch
   assert_grep 'API_KEY=unset' "$CASE_DIR/observed" "the pane's API key must not reach Claude"
   assert_grep 'AUTH_TOKEN=unset' "$CASE_DIR/observed" "the pane's auth token must not reach Claude"
-  pass "a non-opt-in launch sheds credentials captured by the pane"
+  assert_grep 'AWS_REGION=us-fake-1' "$CASE_DIR/observed.companion" "the pane's non-secret provider companion must reach Claude"
+  pass "a non-opt-in launch sheds credentials captured by the pane and keeps its provider companion"
 }
 
 # An explicit billing opt-in must allow the pane's credentials through.

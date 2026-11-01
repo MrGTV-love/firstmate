@@ -154,7 +154,7 @@
       "trigger": "fm-spawn launches or relaunches a Claude ship/scout on Darwin",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "use the task's existing single-command credential helper instead of reading dotenv bytes; if that route is missing, preserve the worktree and ask Main to provide the required credentialed operation before retrying bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>",
+      "remedy": "preserve the task worktree and ask Main to perform the required credentialed operation, then retry bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>",
       "budget": 1,
       "budget_reason": "one launch admission; kernel enforcement has no retry or helper-name exception",
       "telemetry": "state/guard-events.jsonl; one launch admission event with source_ok, elapsed_ms and cleared_by; kernel dotenv read denials are not individually instrumented tool decisions",

@@ -243,13 +243,17 @@ if [ "${1:-}" = version ]; then
 fi
 # Like the real launcher, require its CLI through the worker's search path.
 dsh --version >/dev/null || exit 1
-log=${FM_FAKE_DSH_ENV_LOG:-/dev/null}
+# The recorder reads its output paths beside itself: the launch boundary
+# keeps no test-only pane variable.
+log=/dev/null repo=
+record="${BASH_SOURCE[0]%/*}/dsh-record"
+[ ! -f "$record" ] || { IFS= read -r log; IFS= read -r repo; } < "$record"
 env > "$log"
 printf '%s\n' "$@" > "$log.args"
-if [ -n "${FM_FAKE_DSH_REPO:-}" ]; then
-  git -C "$FM_FAKE_DSH_REPO" commit --allow-empty -q --no-verify -m probe
-  git -C "$FM_FAKE_DSH_REPO" log -1 --format=%ae > "$log.author"
-  git -C "$FM_FAKE_DSH_REPO" config --get core.hooksPath > "$log.hooks"
+if [ -n "$repo" ]; then
+  git -C "$repo" commit --allow-empty -q --no-verify -m probe
+  git -C "$repo" log -1 --format=%ae > "$log.author"
+  git -C "$repo" config --get core.hooksPath > "$log.hooks"
 fi
 exit 0
 SH
@@ -418,9 +422,9 @@ run_recorded_launch() {  # <out-log> <pane-vars...>
   [ -d "$probe/.git" ] || fm_git_init_commit "$probe"
   launch=$(cat "$LAUNCH_LOG")
   : > "$log"
+  printf '%s\n' "$log" "$probe" > "$FAKEBIN_DIR/dsh-record"
   env -i HOME="$real_home" PATH=/usr/bin:/bin \
-    CLAUDECODE=1 FM_OMP_HARNESS=omp PI_CODING_AGENT=true GROK_AGENT=1 CURSOR_AGENT=1 \
-    FM_FAKE_DSH_ENV_LOG="$log" FM_FAKE_DSH_REPO="$probe" "$@" \
+    CLAUDECODE=1 FM_OMP_HARNESS=omp PI_CODING_AGENT=true GROK_AGENT=1 CURSOR_AGENT=1 "$@" \
     /bin/sh -c "$launch" </dev/null >/dev/null 2>&1 || return 1
 }
 
@@ -431,8 +435,11 @@ test_launch_environment() {
   printf '[user]\n\tname = Known Operator\n\temail = %s\n' "$KNOWN_EMAIL" > "$real_home/.gitconfig"
   out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --scout) || fail "dsh scout spawn failed: $out"
   log="$CASE_DIR/dsh-env.log"
-  run_recorded_launch "$log" || fail "the recorded dsh launch command failed: $(cat "$LAUNCH_LOG")"
+  run_recorded_launch "$log" DEEPSEEK_API_KEY=fake-deepseek-sentinel LINEAR_API_KEY=fake-linear-sentinel \
+    || fail "the recorded dsh launch command failed: $(cat "$LAUNCH_LOG")"
   launch_env=$(cat "$log")
+  assert_contains "$launch_env" "DEEPSEEK_API_KEY=fake-deepseek-sentinel" "dsh must keep the key name its launch patch reads"
+  assert_not_contains "$launch_env" "LINEAR_API_KEY=" "an unrelated pane credential must not reach dsh"
   assert_contains "$launch_env" "FM_DSH_HARNESS=dsh" "the launch must establish its own marker"
   assert_contains "$launch_env" "DSH_PERMISSION_MODE=danger-full-access" "the launch must select the full-access permission mode"
   for foreign in CLAUDECODE FM_OMP_HARNESS PI_CODING_AGENT GROK_AGENT CURSOR_AGENT; do

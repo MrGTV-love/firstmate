@@ -1948,12 +1948,19 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
-With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, and the pane's numbered `GIT_CONFIG_*` entries) and the selected harness's non-secret store selectors, and the pane's own shell runs the launch command (zsh with `-f`, so `.zshenv` does not reload credentials).
-[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns the store selectors; `FM_WORKER_ACCOUNT_CLAUDE_SELECTORS` in [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries) and the selected harness's non-secret store selectors.
+A subshell of the pane's own shell unsets every other exported name and then runs the launch command text unchanged, so a raw command keeps its pane-shell syntax and no shell startup file runs again.
+An exported name that is not a shell identifier cannot be unset this way and still reaches the worker.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns the store selectors, including Claude's `DISABLE_AUTOUPDATER`.
+[`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
 Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
 
-The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY`.
-Other names outside the default set, such as `AWS_PROFILE`, `AWS_REGION` and Vertex project selectors, stop reaching the worker the same way.
+DSH keeps the one credential its launch patch names, `DEEPSEEK_API_KEY` (`bin/fm-dsh.py api-key-env` owns the name).
+That key reaches the dsh-tui process, so it is a retained credential, not an isolated one.
+The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKEN` names, this one included, from the base environment of the commands it starts, but an explicit per-command environment can restore an entry, and no live DSH tool run has proved this yet.
+
+The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
+Other names outside the default set stop reaching the worker the same way.
 The remedy is the optional local, gitignored `config/launch-env-allowlist`.
 That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
 A credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
