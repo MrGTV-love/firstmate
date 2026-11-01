@@ -99,7 +99,7 @@ def startup_read_rules(home):
              ".zshenv", ".zprofile", ".zshrc", ".zlogin")
     paths = {str(Path(root) / name) for root in roots if root for name in names}
     paths.update("/etc/" + name for name in (
-        "profile", "bashrc", "zshenv", "zprofile", "zshrc", "zlogin", "zshrc_Apple_Terminal"))
+        "profile", "bashrc", "zshenv", "zprofile", "zshrc", "zlogin"))
     paths.update(value for name in ("BASH_ENV", "ENV") if (value := os.environ.get(name)))
     paths.update(canonical(path) for path in tuple(paths))
     return [f"(deny file-read-data (literal {quoted(path)}))" for path in sorted(paths)]
