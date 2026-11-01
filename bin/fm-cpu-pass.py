@@ -421,7 +421,6 @@ MIN_QUALIFYING_RUNS = 2
 # Ten real full readings (memory census plus process count): maximum 0.192 s (private task evidence).
 # measured: value=2.0 date=2026-11-01 host=Mac-Studio.local margin=10
 OBSERVE_EVERY_SECS = 2.0
-CALIBRATION_SCHEMA = "fm-memory-calibration.v1"
 
 
 def sibling(module: str, filename: str):
@@ -473,9 +472,9 @@ def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, in
     """
     young = {"no-mistakes:%s/%s" % (repo, run) for run, (repo, _, ci_ready) in running.items() if not ci_ready}
     try:
-        record = json.loads((root_home() / "state" / ".memory-calibration.json").read_text())
-        if (record["schema"] != CALIBRATION_SCHEMA or record["host"] != report["host"]
-                or record["total_bytes"] != report["total_bytes"]):
+        record, _ = sibling("fm_mem_guard", "fm-mem-guard.py").host_record(
+            root_home() / "state" / ".memory-calibration.json", report, "calibration", "fm-memory-calibration.v1", ())
+        if record is None:
             return None
         peaks = {name: run["peak_bytes"] for name, run in record["runs"].items()
                  if name.startswith("no-mistakes:") and type(run["samples"]) is int

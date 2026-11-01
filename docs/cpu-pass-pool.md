@@ -68,7 +68,7 @@ The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner
 
 Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner reads the host's `~/.no-mistakes/state.sqlite` read-only and one host memory and process reading.
 It has no option or environment variable that selects another database.
-It admits by the memory the counted runs are measured to need, not by load average and not by a CPU-count ratio.
+It never admits by load average; in measured mode it admits by the memory the counted runs are measured to need, not by a CPU-count ratio, and the [fallback](#fallback) below uses the count limit.
 A counted run is a `runs` row with `status = 'running' AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL`; both of those columns are facts the daemon records.
 A CI-ready run that is only monitoring its PR, and a run parked waiting for its agent, are still `running` but are not counted.
 A run that leaves `running`, reaches CI-ready or parks for its agent releases its count implicitly; no daemon-lifetime lease or watcher is installed.
