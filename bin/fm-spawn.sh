@@ -33,16 +33,14 @@
 #   classifier: other prose is accepted. Legacy briefs use marked captain words
 #   when present, otherwise their Task body. Relaunches and secondmate charters
 #   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
-#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder
-#   and a blank scaffolded `### Out of scope` list (write None when nothing is
-#   excluded); one refusal lists every leftover Task body and DoD token and the
-#   blank exclusion list in a single pass,
+#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
+#   one refusal lists every leftover Task body and DoD token in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
 #   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
 #   proceeds. A relaunch re-checks only the Task bodies, because the Definition
-#   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
+#   of Done was accepted at the fresh spawn; a secondmate
 #   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
 #   Ship/scout egress is resolved before provisioning by fm-jev-egress.ts;
@@ -4642,7 +4640,7 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
   done <<EOF
 $problems
 EOF
-  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
 }
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   # One verdict, one refusal: the helper lists every unfinished Task body and
@@ -4652,19 +4650,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-      # One event per decision: this refusal is the decision each brief gate took.
-      case "$DISPATCH_PROBLEMS" in
-      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --source-ok true 2>/dev/null || true ;;
-      esac
-      if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vqF '### Out of scope is empty'; then
-        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
-      fi
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
       exit 1
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
-    if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
-    fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi
@@ -6903,9 +6892,8 @@ BUSY_GEN=
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
-    # a turn; accepted Stop, StopFailure (API-error turn end), and SessionEnd
-    # (process shutdown) close it. docs/configuration.md "Jev belay Stop hook"
-    # owns Stop acceptance and completion. Claude fires no hook for a manual
+    # a turn; Stop, StopFailure (API-error turn end), and SessionEnd
+    # (process shutdown) close it. Claude fires no hook for a manual
     # interrupt: fm-control preserves the adapter-owned state, while the
     # legacy fm-send --key Escape path records idle/fm-interrupt. Stop keeps
     # the turn-ended NOTIFICATION touch for the watcher. A secondmate gets no
@@ -6960,13 +6948,8 @@ BUSY_GEN=
       if [ "$busy_notify_turnend" = true ]; then
         stop_turnend="touch $(shell_quote "$TURNEND"); "
       fi
-      if [ "$KIND" = secondmate ]; then
       j_stop=$(json_escape "${stop_turnend}$busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      else
-    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      fi
-      j_stop_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-belay.claude-stop --fallback 25 --percentile 99 --margin 3) || exit 1
-      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":$j_stop_limit}]}],"
+      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\"}]}],"
     fi
     hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[${submit_entries}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
