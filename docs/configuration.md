@@ -111,6 +111,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
+- The [standing GitHub caller accounting](#standing-github-caller-accounting) owner's private directory `state/github-accounting/` and the watcher's failed-start marker `state/.github-accounting-start-failed`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
@@ -1077,14 +1078,20 @@ Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test
 
 ### Standing GitHub caller accounting
 
-[`bin/fm-github-accounting.py`](../bin/fm-github-accounting.py)'s header and `--help` own the optional observer's launch/stop commands, private state format, cadences, retention, and argument projection.
-It is not auto-started by bootstrap and does not wrap, throttle, or change GitHub callers or the sweep quota floor above.
+[`bin/fm-github-accounting.py`](../bin/fm-github-accounting.py)'s header and `--help` own the observer's launch/stop commands, private state format, cadences, retention, and argument projection.
+It does not wrap, throttle, or change GitHub callers or the sweep quota floor above.
+A primary home's watcher runs the owner's idempotent `start` as a detached, single-flight helper on each cycle (`github_accounting_tick` in `bin/fm-watch.sh`), so a reboot or a crash recovers at the next cycle and a running owner is left alone; a secondmate or disposable lab home never starts it.
+A plain `stop` therefore lasts until the next cycle: set `FM_GITHUB_ACCOUNTING=0` in the watcher's environment first to keep the observer off.
+A failed `start` raises one `check: github-accounting owner failed to start` wake.
+`state/.github-accounting-start-failed` then holds further attempts to one per hour, without another wake, until a `start` succeeds and removes it.
+An owner that starts and then dies is restarted at the next cycle and raises no wake; `start` reports only a failure to reach readiness.
+A detached owner's stderr appends to `state/github-accounting/owner.log`, which `start` trims to its newest 32 KiB before a launch once it passes 64 KiB.
 Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql` body through `gh-axi`, not the enforcing response headers used by the sweeps.
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
 Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
-Run the observer in the root home's watcher context, not a confined worker, under the existing home/process manager when continuous observation is wanted; its own start/stop commands manage only its private owner and quota child group, never a shared service.
-Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
+Its own start/stop commands manage only its private owner and quota child group, never a shared service.
+Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh) and, for the watcher's lifecycle, [`tests/fm-watch-github-accounting.test.sh`](../tests/fm-watch-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
 
 ### Completion and discard
 
@@ -4527,6 +4534,8 @@ FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
+FM_GITHUB_ACCOUNTING=1   # 0 stops a primary home's watcher from keeping the standing GitHub accounting owner running (see "Standing GitHub caller accounting"); anything else leaves it on
+FM_GITHUB_ACCOUNTING_BIN=   # test seam: the owner the watcher starts instead of bin/fm-github-accounting.py
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1

@@ -88,6 +88,12 @@ unset FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE
 # fake pool and a fake treehouse.
 export FM_MERGE_PRUNE=0
 
+# bin/fm-watch.sh keeps a primary home's standing GitHub accounting owner running,
+# which would leave a real detached observer behind every fixture watcher. The
+# suite turns it off; tests/fm-watch-github-accounting.test.sh turns it on against
+# disposable state.
+export FM_GITHUB_ACCOUNTING=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary

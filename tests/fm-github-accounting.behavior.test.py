@@ -150,6 +150,45 @@ wait
         rows = shared.Table().read()
         self.assertTrue(sleeper not in rows or rows[sleeper][3], "private quota descendant survived stop")
 
+    def test_detached_failure_reaches_the_owner_log(self):
+        root = self.state / "github-accounting"
+        root.mkdir()
+        db = sqlite3.connect(root / "observations.sqlite")
+        db.execute("CREATE TABLE unrelated(value)")
+        db.commit()
+        db.close()
+        self.assertNotEqual(self.cli("start", check=False).returncode, 0)
+        self.assertIn("operation unavailable", (root / "owner.log").read_text())
+        self.assertEqual(json.loads(self.cli("status").stdout)["state"], "stopped")
+
+    def test_owner_log_is_trimmed_to_its_newest_bytes_at_launch(self):
+        root = self.state / "github-accounting"
+        root.mkdir()
+        log = root / "owner.log"
+        limit = 64 * 1024
+        log.write_bytes(b"oldest" + b"x" * (limit * 2) + b"newest")
+        try:
+            self.cli("start")
+        finally:
+            self.cli("stop")
+        kept = log.read_bytes()
+        self.assertLessEqual(len(kept), limit)
+        self.assertTrue(kept.endswith(b"newest"))
+        self.assertNotIn(b"oldest", kept)
+
+    def test_concurrent_starts_share_one_owner(self):
+        starts = [subprocess.Popen([sys.executable, str(OWNER), "start"], env=self.env, text=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(4)]
+        try:
+            replies = [(start.communicate(), start.returncode) for start in starts]
+            self.assertEqual([code for _, code in replies], [0, 0, 0, 0], replies)
+            running = json.loads(self.cli("status").stdout)
+            self.assertEqual(running["state"], "running")
+        finally:
+            self.cli("stop")
+        owners = self.records("owner")
+        self.assertEqual([row["run_id"] for row in owners if row["action"] == "start"], [running["run_id"]])
+
     def test_symlink_and_foreign_database_are_not_modified(self):
         root = self.state / "github-accounting"
         root.mkdir()

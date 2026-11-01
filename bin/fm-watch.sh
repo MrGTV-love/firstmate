@@ -109,6 +109,12 @@
 #                          The queued payload names what to check. These three
 #                          kinds are joined with `;` when more than one surfaces
 #                          in a cycle
+#   check: github-accounting owner failed to start: exit=<n>; ...
+#                          a primary home's start of the standing GitHub accounting
+#                          owner exited nonzero (github_accounting_tick); reported
+#                          once per failure episode and retried on a long cadence.
+#                          docs/configuration.md "Standing GitHub caller accounting"
+#                          owns the contract
 #   check: rejected unauthenticated state checks: <paths>
 #                          unsafe state checks were refused without execution
 #   check: rejected unauthenticated PR poll retirement receipts: <paths>
@@ -454,6 +460,8 @@ case "$LAVISH_AUTO_RETIRE_INTERVAL" in
 esac
 LAVISH_AUTO_RETIRE_BIN=${FM_LAVISH_AUTO_RETIRE_BIN:-$SCRIPT_DIR/fm-procevent-lavish.sh}
 LAVISH_AUTO_RETIRE_NEXT=
+GITHUB_ACCOUNTING_BIN=${FM_GITHUB_ACCOUNTING_BIN:-$SCRIPT_DIR/fm-github-accounting.py}
+GITHUB_ACCOUNTING_RETRY_SECS=3600
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -3421,6 +3429,37 @@ lavish_auto_retire_tick() {
   LAVISH_AUTO_RETIRE_PID=$!
 }
 
+# The standing GitHub accounting owner is host-wide evidence, so only a primary
+# home keeps it running, never a secondmate or a disposable lab. Each cycle asks
+# the owner's own idempotent start, detached and single-flight, so a reboot or a
+# crash recovers at the next cycle and a running owner is left alone. A failed
+# start wakes once; the marker holds later attempts to one per retry interval and
+# keeps them silent, across watcher restarts, until a start succeeds.
+GITHUB_ACCOUNTING_PID=
+github_accounting_tick() {
+  local status=0 failed="$STATE/.github-accounting-start-failed" reason
+  [ "${FM_GITHUB_ACCOUNTING:-1}" != 0 ] || return 0
+  [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] || return 0
+  if [ -n "$GITHUB_ACCOUNTING_PID" ]; then
+    kill -0 "$GITHUB_ACCOUNTING_PID" 2>/dev/null && return 0
+    wait "$GITHUB_ACCOUNTING_PID" 2>/dev/null || status=$?
+    GITHUB_ACCOUNTING_PID=
+    if [ "$status" -eq 0 ]; then
+      rm -f -- "$failed"
+    elif [ -e "$failed" ]; then
+      touch -- "$failed"
+    else
+      reason="check: github-accounting owner failed to start: exit=$status; owner stderr: $STATE/github-accounting/owner.log; retries every ${GITHUB_ACCOUNTING_RETRY_SECS}s without another wake"
+      fm_wake_append check github-accounting-start-failed "$reason" || exit 1
+      : > "$failed"
+      wake "$reason"
+    fi
+  fi
+  [ "$(age_of "$failed")" -ge "$GITHUB_ACCOUNTING_RETRY_SECS" ] || return 0
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$GITHUB_ACCOUNTING_BIN" start </dev/null >/dev/null 2>&1 &
+  GITHUB_ACCOUNTING_PID=$!
+}
+
 # Surface the ledger so overdue work cannot be dropped silently. A new or changed
 # overdue row wakes firstmate at once as open-loop-ledger; the periodic waiting list
 # is its own open-loop-ledger-resurface wake every OPEN_LOOPS_RESURFACE seconds,
@@ -3777,6 +3816,7 @@ prelude_phase() {
   merge_prune_tick
   typesafe_health_tick
   lavish_auto_retire_tick
+  github_accounting_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;
