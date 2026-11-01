@@ -4738,10 +4738,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
   fi
   case $TASK_EGRESS in
-    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --task "$ID" --rule dispatch-grant 2>/dev/null || true ;;
     *)
       echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
-      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --task "$ID" --rule dispatch-grant 2>/dev/null || true
       exit 1 ;;
   esac
   # Use the existing launch-brief overlay for every worker kind, including
@@ -7186,10 +7186,10 @@ EOF
     [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
     native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || native_find=
     case $native_find in
-      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-find" 2>/dev/null || true ;;
+      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --task "$ID" --rule dispatch-find 2>/dev/null || true ;;
       *)
         echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
-        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true
+        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --task "$ID" --rule dispatch-find 2>/dev/null || true
         exit 1 ;;
     esac
     native_helpers='{}'

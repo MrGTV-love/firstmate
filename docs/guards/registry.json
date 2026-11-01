@@ -789,7 +789,8 @@
       "id": "claude-api-billing",
       "owner": "bin/fm-api-key-guard-lib.sh",
       "sites": [
-        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing \"$1\""}
+        {"file": "bin/fm-api-key-guard-lib.sh", "match": "claude-api-billing \"$1\""},
+        {"file": "bin/fm-control.sh", "match": "an Anthropic credential would reach the replacement worker"}
       ],
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",
