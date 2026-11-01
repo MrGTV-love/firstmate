@@ -1,0 +1,7 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.IXiWb1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 61s; no path/output progress for 2s; last path '/Users/charlesabrooker/tmp/fm-lab.IXiWb1/projects/firstmate' (it is the project checkout itself)
+skill selection for egress-granted: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=omp write_confinement=seatbelt-v1
+spawned egress-granted harness=omp kind=scout window=primary:fm-egress-granted worktree=/Users/charlesabrooker/tmp/fm-lab.IXiWb1/pool/.treehouse/firstmate-c10afe/2/firstmate
+SPAWN_EXIT=0

@@ -1,0 +1,1 @@
+blocked [at=1793515251]: Report lists all 15 exposed tools; completion gate cannot write egress-none.meta (Operation not permitted). Firstmate must run the gate. No private services started.

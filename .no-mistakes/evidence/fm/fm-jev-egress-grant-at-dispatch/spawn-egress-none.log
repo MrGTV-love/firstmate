@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.IXiWb1
+skill selection for egress-none: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=omp write_confinement=seatbelt-v1
+spawned egress-none harness=omp kind=scout window=primary:fm-egress-none worktree=/Users/charlesabrooker/tmp/fm-lab.IXiWb1/pool/.treehouse/firstmate-c10afe/1/firstmate
+SPAWN_EXIT=0

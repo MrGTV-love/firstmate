@@ -1,0 +1,15 @@
+functions.read
+functions.bash
+functions.edit
+functions.ask
+functions.eval
+functions.glob
+functions.grep
+functions.task
+functions.wait
+functions.todo
+functions.web_search
+functions.write
+functions.learn
+functions.manage_skill
+multi_tool_use.parallel

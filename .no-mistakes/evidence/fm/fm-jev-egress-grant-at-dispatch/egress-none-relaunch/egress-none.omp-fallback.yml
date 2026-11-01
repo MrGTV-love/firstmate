@@ -1,0 +1,15 @@
+{
+  "modelRoles": {
+    "smol": "pi/default",
+    "tiny": "pi/default"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": false,
+    "fallbackChains": {
+      "default": []
+    }
+  }
+}

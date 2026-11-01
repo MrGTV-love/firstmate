@@ -1,0 +1,16 @@
+window=primary:fm-egress-granted
+endpoint_task_id=egress-granted
+worktree=/Users/charlesabrooker/tmp/fm-lab.IXiWb1/pool/.treehouse/firstmate-c10afe/2/firstmate
+project=/Users/charlesabrooker/tmp/fm-lab.IXiWb1/projects/firstmate
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-egress-granted
+write_confinement=seatbelt-v1
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=["semantic-search"]
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1793515733.48950.10980
+spawn_gen=s1793515747.66471.23675
