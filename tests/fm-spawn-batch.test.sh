@@ -172,3 +172,16 @@ test_batch_requires_the_shared_delivery_contract
 test_scout_batch_refuses_delivery_flags
 test_projects_path_scoping
 test_cleared_home_bypass_spares_code_root_log
+
+# The harness default applies only when no log was chosen: an explicit caller
+# value survives sourcing tests/lib.sh and receives the suite's events.
+test_explicit_guard_log_survives_the_harness() {
+  local explicit="$TMP_ROOT/explicit-guard-events.jsonl"
+  FM_GUARD_EVENT_LOG="$explicit" bash -c '. "$1/tests/lib.sh"; "$1/bin/fm-guard-event.sh" gexplicit bypass --task explicit-z14 --override' \
+    _ "$ROOT" || fail "the explicit-log probe failed"
+  jq -se 'length == 1 and .[0].task == "explicit-z14"' "$explicit" >/dev/null \
+    || fail "an explicit FM_GUARD_EVENT_LOG was replaced by the harness default: $(cat "$explicit" 2>/dev/null)"
+  pass "an explicit guard log survives the shared harness default"
+}
+
+test_explicit_guard_log_survives_the_harness

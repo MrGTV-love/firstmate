@@ -2145,7 +2145,7 @@ SH
     lock=$(FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
       bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
       _ "$ROOT" "$case_dir/project")
-    FM_HOME="$case_dir/primary-home" FM_LATE_CASE="$case_dir" \
+    FM_HOME="$case_dir/primary-home" FM_LATE_CASE="$case_dir" FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
     actor=$!
     i=0
@@ -2192,6 +2192,10 @@ SH
     assert_grep 'work produced while return waits' "$slot/late.txt" "$shape: late bytes were changed"
     jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
       || fail "$shape: refused return released its durable reservation"
+    jq -se '([.[] | select(.guard == "teardown-unlanded" and .decision == "deny")] | length > 0)
+      and ([.[] | select(.guard == "teardown-unlanded" and .decision == "allow")] | length == 0)' \
+      "$case_dir/guard-events.jsonl" >/dev/null \
+      || fail "$shape: a teardown refused at its final recheck recorded a landed-work allow: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
   done
   pass 'ordinary pool return preserves dirt and new commits produced while final project custody is queued'
 }

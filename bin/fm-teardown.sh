@@ -6322,8 +6322,6 @@ case "$KIND" in
   *)
     if [ "$FORCE" = --force ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
-    else
-      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
     fi
     ;;
 esac
@@ -6858,6 +6856,10 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+case "$KIND:$FORCE" in
+  secondmate:*|scout:*|*:--force) ;;
+  *) "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true ;;
+esac
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): the item is now Done, so
 # record when it closed and on what evidence. A retained (captain-held) item
 # returned to Queued is not a completion and writes nothing. A close the next
