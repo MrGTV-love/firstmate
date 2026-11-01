@@ -475,6 +475,16 @@ def same_line_shadowed(denied, other):
     d = (lambda record: record('lambda-pair-data', 'deny')), (lambda: 0)
     e = (lambda: (record := print) and record('walrus-pair-data', 'deny')), (lambda: 0)
 
+def sibling_comprehension(denied, other):
+    i = [x for record in other], [record('sibling-fixture', 'deny') for x in denied]
+    names = [x for record in other]
+    calls = [record('sibling-line-fixture', 'deny') for x in denied]
+
+def sibling_shadowed(denied, other):
+    record = None
+    names = [x for record in other]
+    calls = [record('sibling-data', 'deny') for x in denied]
+
 def defaulted(guard=record('default-fixture', 'deny')):
     return guard
 
@@ -483,7 +493,7 @@ class Holder:
     calls = [record('class-fixture', 'deny') for guard in 'x']
 PY
 assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
-[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 14 ] \
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 16 ] \
   || fail "only conditional, keyword, direct and unshadowed function and comprehension deny calls may be sites: $(site_ids "$SIG")"
 mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
@@ -494,9 +504,11 @@ mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''iterable-fixture'\''"},
   {"file":"bin/a.py","match":"record(item, ","count":2},
   {"file":"bin/a.py","match":"record('\''lambda-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''sibling-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''sibling-line-fixture'\''"},
   {"file":"bin/a.py","match":"record('\''default-fixture'\''"},
   {"file":"bin/a.py","match":"record('\''class-fixture'\''"}]'
-assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 14
+assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 16
 
 SIG=$(fixture sig_python_unbound_record)
 cat >"$SIG/bin/a.py" <<'PY'

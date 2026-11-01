@@ -362,11 +362,13 @@ def python_event_lines(lines):
             return child is scope.body
         return not any(part is node for part in ast.walk(scope.generators[0].iter))
 
+    def parameter(arguments, name):
+        return any(arg is not None and arg.arg == name for arg in arguments.posonlyargs + arguments.args
+                   + arguments.kwonlyargs + [arguments.vararg, arguments.kwarg])
+
     def binds(scope, name):
         if isinstance(scope, ast.Lambda):
-            arguments = scope.args
-            if any(arg is not None and arg.arg == name for arg in arguments.posonlyargs + arguments.args
-                   + arguments.kwonlyargs + [arguments.vararg, arguments.kwarg]):
+            if parameter(scope.args, name):
                 return True
             targets = [part.target for part in ast.walk(scope.body) if isinstance(part, ast.NamedExpr)]
         else:
@@ -374,18 +376,47 @@ def python_event_lines(lines):
         return any(isinstance(part, ast.Name) and isinstance(part.ctx, ast.Store) and part.id == name
                    for target in targets for part in ast.walk(target))
 
+    def assigns(scope, name):
+        """Whether scope binds name itself, not only as a target of a comprehension inlined into it (PEP 709)."""
+        if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return binds(scope, name)
+        if parameter(scope.args, name):
+            return True
+        pending = list(scope.body)
+        while pending:
+            part = pending.pop()
+            if isinstance(part, ast.alias):
+                bound = part.asname or part.name.split('.')[0]
+            elif isinstance(part, ast.Name):
+                bound = None if isinstance(part.ctx, ast.Load) else part.id
+            else:
+                bound = getattr(part, 'name', None) or getattr(part, 'rest', None)
+            if bound == name:
+                return True
+            if isinstance(part, ast.comprehension):
+                pending += [part.iter, *part.ifs]
+            elif not isinstance(part, definitions + (ast.Lambda,)):
+                pending += ast.iter_child_nodes(part)
+        return False
+
     def module_wrapper(node):
         name = node.func.id
-        child, scope, nested = node, parents.get(node), False
+        child, scope, nested, merged = node, parents.get(node), False, False
         while scope is not None:
             kind = scope.name if isinstance(scope, definitions) else expression_scopes.get(type(scope))
             if kind is not None and owns(scope, child, node) and not (nested and isinstance(scope, ast.ClassDef)):
                 candidates = tables.get((scope.lineno, kind), [])
                 if len(candidates) == 1:
                     if name in candidates[0].get_identifiers():
-                        return candidates[0].lookup(name).is_global()
+                        symbol = candidates[0].lookup(name)
+                        # An inlined comprehension shares this table, so a sibling
+                        # comprehension's target can make name local here.
+                        if not (merged and symbol.is_local() and not assigns(scope, name)):
+                            return symbol.is_global()
                 elif isinstance(scope, definitions) or binds(scope, name):
                     return False
+                else:
+                    merged = True
                 nested = True
             child, scope = scope, parents.get(scope)
         return name in module_table.get_identifiers() and module_table.lookup(name).is_global()
