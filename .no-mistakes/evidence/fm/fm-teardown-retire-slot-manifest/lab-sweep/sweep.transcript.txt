@@ -1,0 +1,91 @@
+slot /tmp/fm-sweep-lab/slots/proven branch fm/vernant-lifecycle-manifest-retire-entrypoint status=''
+{
+  "base_sha": "32b712b9825d738700e9b87e197b7da2a9c06183",
+  "branch": "fm/vernant-lifecycle-manifest-retire-entrypoint",
+  "manifest_path": "/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/53ee2930ca3bc21b.json",
+  "owned_paths": [
+    "scripts/git-stability/provision_existing_slot.py"
+  ],
+  "owner_id": "vernant-lifecycle-manifest-retire-entrypoint",
+  "state": "PASS",
+  "worktree_path": "/private/tmp/fm-sweep-lab/slots/proven"
+}
+provision vernant-lifecycle-manifest-retire-entrypoint rc=0
+slot /tmp/fm-sweep-lab/slots/unproven branch fm/lab-unproven-owner status=''
+{
+  "base_sha": "32b712b9825d738700e9b87e197b7da2a9c06183",
+  "branch": "fm/lab-unproven-owner",
+  "manifest_path": "/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/4f91fef08ca85f62.json",
+  "owned_paths": [
+    "scripts/git-stability/provision_existing_slot.py"
+  ],
+  "owner_id": "lab-unproven-owner",
+  "state": "PASS",
+  "worktree_path": "/private/tmp/fm-sweep-lab/slots/unproven"
+}
+provision lab-unproven-owner rc=0
+--- backlog Done entry (tasks-axi show)
+task:
+  id: vernant-lifecycle-manifest-retire-entrypoint
+  title: "entry point https://github.com/MrGTV-love/vernant/pull/3592"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-01
+  deps: none
+  links: "pr:https://github.com/MrGTV-love/vernant/pull/3592"
+  body: ""
+--- active record files before
+/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/4f91fef08ca85f62.json
+/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/53ee2930ca3bc21b.json
+/tmp/fm-sweep-lab/hooks/worktree-lifecycle/4f91fef08ca85f62.json
+/tmp/fm-sweep-lab/hooks/worktree-lifecycle/53ee2930ca3bc21b.json
+=== report mode (no --apply)
+4f91fef08ca85f62.json owner=lab-unproven-owner landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+53ee2930ca3bc21b.json owner=vernant-lifecycle-manifest-retire-entrypoint slot=/private/tmp/fm-sweep-lab/slots/proven landing=MERGED recorded_pr=https://github.com/MrGTV-love/vernant/pull/3592
+report rc=0
+report mode: record bytes unchanged
+=== --apply
+4f91fef08ca85f62.json owner=lab-unproven-owner landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+53ee2930ca3bc21b.json owner=vernant-lifecycle-manifest-retire-entrypoint slot=/private/tmp/fm-sweep-lab/slots/proven landing=MERGED recorded_pr=https://github.com/MrGTV-love/vernant/pull/3592
+{
+  "action": "retire",
+  "archive_path": "/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/retired/53ee2930ca3bc21b/00c9d1383685c0af257074fb231ea2ea6367177d408fbe8e5656a0f53b89aa2a.json",
+  "copy_path": null,
+  "detail": null,
+  "manifest_paths": {
+    "durable": "/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/53ee2930ca3bc21b.json",
+    "legacy": "/tmp/fm-sweep-lab/hooks/worktree-lifecycle/53ee2930ca3bc21b.json"
+  },
+  "next_step": null,
+  "reason": "retired",
+  "slot_path": "/private/tmp/fm-sweep-lab/slots/proven",
+  "status": "retired"
+}
+apply rc=1
+--- active record files after
+/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/4f91fef08ca85f62.json
+/tmp/fm-sweep-lab/hooks/worktree-lifecycle/4f91fef08ca85f62.json
+--- retired archives
+/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/retired/53ee2930ca3bc21b/00c9d1383685c0af257074fb231ea2ea6367177d408fbe8e5656a0f53b89aa2a.json
+{"owner":"vernant-lifecycle-manifest-retire-entrypoint","proofs":{"caller_landing_proof":{"merge_commit_sha":"741533fba34100117cb5b664fbed04c9e4165eb0","merged_pr_head_sha":"ffb1ad553bd982de81c9ca79f7fb75c1423e6342","pr_url":"https://github.com/MrGTV-love/vernant/pull/3592"}}}
+=== --apply again (idempotent rerun)
+4f91fef08ca85f62.json owner=lab-unproven-owner landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+rerun rc=1
+=== live owner: write state/<owner>.meta for the unproven owner and a Done entry for it, then --apply
+4f91fef08ca85f62.json owner=lab-unproven-owner slot=/private/tmp/fm-sweep-lab/slots/unproven landing=LIVE: lab-unproven-owner.meta is a live Firstmate task record; both copies kept
+live-owner rc=0
+=== same owner, meta gone, Done entry PR 3592 but record branch fm/lab-unproven-owner differs from PR head
+4f91fef08ca85f62.json owner=lab-unproven-owner slot=/private/tmp/fm-sweep-lab/slots/unproven landing=MERGED stayed: branch differs (PR head fm/vernant-lifecycle-manifest-retire-entrypoint, record fm/lab-unproven-owner); both copies kept
+branch-differs rc=0
+--- active record files at end
+/private/tmp/fm-test-vernant-ep/repo/.git/vernant-worktree-lifecycle/4f91fef08ca85f62.json
+/tmp/fm-sweep-lab/hooks/worktree-lifecycle/4f91fef08ca85f62.json

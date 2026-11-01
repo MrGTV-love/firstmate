@@ -1,0 +1,4 @@
+branch: fm/vernant-lifecycle-manifest-retire-entrypoint
+head: ffb1ad553bd982de81c9ca79f7fb75c1423e6342
+merge: 741533fba34100117cb5b664fbed04c9e4165eb0
+merged: true

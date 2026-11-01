@@ -1,0 +1,5 @@
+Default-path parity (no WORKTREE_LIFECYCLE_STORE_DIR / CODEX_HOOK_STATE_DIR), computed without writes:
+vernant DEFAULT_STATE_DIR /tmp/vernant-codex-hooks-501
+firstmate helper stores(): durable=<common>/vernant-worktree-lifecycle/4875494b9a5a0cfd.json legacy=/tmp/vernant-codex-hooks-501/worktree-lifecycle/4875494b9a5a0cfd.json
+vernant manifest_path():    durable=<common>/vernant-worktree-lifecycle/4875494b9a5a0cfd.json legacy=/tmp/vernant-codex-hooks-501/worktree-lifecycle/4875494b9a5a0cfd.json
+MATCH

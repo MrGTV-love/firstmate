@@ -1,0 +1,44 @@
+== provision slot /Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/pool/1/project for owner task-x1 (real Vernant provisioner)
+{
+  "base_sha": "4999abed0fa1449e63d19626ceddf75257c16af7",
+  "branch": "fm/task-x1",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/project/.git/vernant-worktree-lifecycle/cf5c833c8d895067.json",
+  "owned_paths": [
+    "owned"
+  ],
+  "owner_id": "task-x1",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/pool/1/project"
+}
+provision rc=0
+records before: durable=present legacy=present
+== provision again before teardown (expect manifest_exists)
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/project/.git/vernant-worktree-lifecycle/cf5c833c8d895067.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+second provision rc=2
+== run real bin/fm-teardown.sh task-x1 (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6C0WGNFXK2DZK9NKWQY60WM)
+teardown rc=0
+--- teardown stdout (lifecycle lines)
+missing entry point: /Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/project/scripts/git-stability/retire_slot_manifest.py; lifecycle records unchanged
+--- teardown stderr (tail)
+records after: durable=present legacy=present
+retired archive files:
+branch fm/task-x1: deleted
+leftover proof files in TMPDIR: 0
+forge calls: 0
+== next worker provisions the slot on a new branch (real Vernant provisioner)
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-teardown-tests.fTyjGw/lab-absent/project/.git/vernant-worktree-lifecycle/cf5c833c8d895067.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+next-worker provision rc=2

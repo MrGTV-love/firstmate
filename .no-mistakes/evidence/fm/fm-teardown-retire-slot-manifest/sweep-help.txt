@@ -1,0 +1,41 @@
+usage: fm-slot-manifest-retire.py [-h] --project PROJECT
+                                  --firstmate-state FIRSTMATE_STATE
+                                  [--state-dir STATE_DIR] [--apply]
+                                  [--slot SLOT] [--owner-id OWNER_ID]
+                                  [--owner-branch OWNER_BRANCH] [--keep KEEP]
+                                  [--prove-to PROVE_TO]
+                                  [--proof-file PROOF_FILE]
+
+Retire Vernant slot declarations through Vernant's own entry point.
+
+Usage: fm-slot-manifest-retire.py --project PATH --firstmate-state PATH
+       [--state-dir PATH] [--apply]
+Report-only by default. Lists durable and legacy records with owner and landing
+status. --apply retires a record only when its owner has no live Firstmate task
+record (state/<owner>.meta), this home's backlog Done entry for the owner
+records a PR (read through bin/fm-tasks-axi.sh show), the forge reports that PR
+merged from the record's branch, and the slot's HEAD has no commit outside
+origin/main; every other record is listed and kept.
+Limit: tasks-axi show reads only the live backlog. An owner whose Done entry
+done_keep pruned into the archive has no readable Done entry, so its record is
+listed UNPROVEN and kept; the fail direction is always keep.
+For teardown: --slot PATH --owner-id ID --owner-branch BRANCH --prove-to FILE
+builds the forge proof before project custody; then --apply --proof-file FILE
+after its landed-work proof runs only the local entry point with that file.
+--keep REASON leaves the slot's records in place. A slot with no record, no
+entry point, no proof, or a record naming another branch keeps the old teardown
+behavior. No record is removed here. The Vernant command owns locking and both
+removals.
+
+options:
+  -h, --help            show this help message and exit
+  --project PROJECT
+  --firstmate-state FIRSTMATE_STATE
+  --state-dir STATE_DIR
+  --apply
+  --slot SLOT
+  --owner-id OWNER_ID
+  --owner-branch OWNER_BRANCH
+  --keep KEEP
+  --prove-to PROVE_TO
+  --proof-file PROOF_FILE
