@@ -120,7 +120,7 @@
 # the walk goes on to the next copy. Once the slots are used, the remaining
 # qualifying locked copies are DEFERRED (per-run cap), never HELD, get no driver
 # call or preserve, and are eligible again on the next run.
-# Unlocked removal is unchanged. Review the first batch's records before running
+# The cap does not apply to unlocked removal. Review the first batch's records before running
 # the sweep unattended.
 #
 # This sweep is a fallback, not the systemic lock-lifecycle fix. That fix

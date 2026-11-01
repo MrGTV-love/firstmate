@@ -73,8 +73,8 @@
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 # bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
-# data directory and ID to a per-release id, and teardown_run_closeout, for a
-# locked copy it proved on its own.
+# data directory and ID to a per-release id, for a copy it proved on its own, and
+# teardown_run_closeout for such a copy that is locked.
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
