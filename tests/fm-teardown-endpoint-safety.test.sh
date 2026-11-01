@@ -800,6 +800,32 @@ test_local_home_walk_refuses_an_unreadable_registry() {
   pass "local home walking and teardown refuse unreadable registries without hiding descendants"
 }
 
+test_unresolvable_root_home_names_its_parent_binding() {
+  local dir binding out rc
+  dir=$(make_case unresolvable-root-home)
+  binding="$dir/home/.fm-secondmate-parent"
+  printf 'route=nowhere\n' > "$binding"
+  custody_check() {
+    FM_HOME="$dir/home" bash -c '
+      . "$1/bin/fm-backend.sh"
+      . "$1/bin/fm-secondmate-parent-lib.sh"
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-task-copy-lib.sh"
+      fm_task_copy_other_record "" "$2" "$3"
+    ' _ "$ROOT" "$dir/home/state" "$dir/worktree" 2>&1
+  }
+  rc=0
+  out=$(custody_check) || rc=$?
+  expect_code 2 "$rc" "the custody check accepted an unresolvable root home: $out"
+  assert_contains "$out" "cannot resolve the root Firstmate home" "the custody check did not name the root-resolution refusal"
+  assert_contains "$out" "$binding" "the root-resolution remedy did not name the home's parent binding"
+  rm -f "$binding"
+  rc=0
+  out=$(custody_check) || rc=$?
+  expect_code 1 "$rc" "the custody check did not complete once the root binding was restored: $out"
+  pass "an unresolvable root home refuses custody proof and names the parent binding to restore"
+}
+
 test_project_lock_anchors_at_the_local_root_across_home_layouts() {
   local dir main_home main_project local_mate remote_mate remote_child
   local main_lock mate_lock remote_lock child_lock orphan_lock rc
@@ -1648,6 +1674,7 @@ test_own_and_absent_slot_claims_still_tear_down
 test_recorded_endpoint_that_changed_directory_still_tears_down
 test_project_lock_anchors_at_the_local_root_across_home_layouts
 test_local_home_walk_refuses_an_unreadable_registry
+test_unresolvable_root_home_names_its_parent_binding
 test_remote_seeded_home_returns_its_uncontested_slot
 test_remote_seeded_home_still_refuses_a_slot_its_child_holds
 test_remote_layout_homes_serialize_on_one_project_lock

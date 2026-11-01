@@ -43,7 +43,7 @@
       "invariant": "custody and teardown decisions read every local Firstmate home that could own the target",
       "layer": "runtime-block", "source": "fm_local_firstmate_state_dirs walking each local data/secondmates.md from the root home",
       "trigger": "the root home is unresolvable, or a local registry is unsafe, unreadable or malformed, or a registered local home is unavailable",
-      "remedy": "have the named home's owner restore its availability and read access to its regular data/secondmates.md from verified home records, then retry bin/fm-teardown.sh <task>; never delete registrations or skip the unreadable home",
+      "remedy": "have the named home's owner restore its availability and read access to its regular data/secondmates.md from verified home records, or, when the root home cannot be resolved, restore <home>/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh <task>; never rebind to another home, delete registrations or skip the unreadable home",
       "decision": "deny", "fail_direction": "closed", "budget": 1,
       "telemetry": "state/guard-events.jsonl", "instrumented": false,
       "test": "tests/fm-teardown-endpoint-safety.test.sh", "tier": "C", "harm": "irreversible"
