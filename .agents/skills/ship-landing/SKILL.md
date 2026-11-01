@@ -21,7 +21,7 @@ A captain instruction to merge is explicit authority; `yolo` and the standing me
 For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, never sit silent and CPU-idle for `FM_CHECK_TIMEOUT` (the watcher stops such a check and treats that pass as unknown), then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
-Tear down a ship task only after landing is confirmed.
+Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority; follow [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s captain-words discard contract.
 After successful teardown, record completion, retain only the configured recent Done history, and re-evaluate queued work whose blockers and time gates have cleared.

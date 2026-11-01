@@ -3462,6 +3462,63 @@ test_secondmate_retirement_exempts_only_its_own_missing_home() {
   pass "secondmate retirement exempts only its own missing home from the custody walk"
 }
 
+# A stored preservation bundle can be the only copy of unlanded commits, so
+# retiring the home that keeps it, forced or not, refuses before any removal,
+# including a forced retirement's child cleanup, until the bundle has left it.
+test_secondmate_retirement_keeps_stored_preservation_bundles() {
+  local case_dir posture home bundle moved rc child_wt
+  for posture in ordinary forced; do
+    case_dir=$(make_case "secondmate-stored-bundle-$posture")
+    write_meta "$case_dir" local-only secondmate
+    home="$case_dir/secondmate-home"
+    mkdir -p "$home/state"
+    printf '%s\n' task-x1 > "$home/.fm-secondmate-home"
+    printf 'home=%s\n' "$home" >> "$case_dir/state/task-x1.meta"
+    bundle="$home/data/child-a/preserved-bundles/$(printf 'ab%.0s' {1..32}).bundle"
+    mkdir -p "${bundle%/*}"
+    printf 'only copy of unlanded commits\n' > "$bundle"
+    child_wt="$case_dir/child-a-wt"
+    if [ "$posture" = forced ]; then
+      git -C "$case_dir/project" worktree add -q -b fm/child-a "$child_wt" main
+      fm_write_meta "$home/state/child-a.meta" "window=firstmate:fm-child-a" "endpoint_task_id=child-a" \
+        "worktree=$child_wt" "project=$case_dir/project" "kind=ship" "mode=local-only"
+      : > "$home/state/child-a.status"
+    fi
+    rc=0
+    if [ "$posture" = forced ]; then
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 1 "$rc" "$posture stored-bundle: retirement must refuse while the home keeps a stored bundle"
+    assert_grep "REFUSED: secondmate home $home holds bundle-preserved commits" "$case_dir/stderr" \
+      "$posture stored-bundle: the refusal did not name the home: $(cat "$case_dir/stderr")"
+    assert_grep "  $bundle" "$case_dir/stderr" "$posture stored-bundle: the refusal did not list the stored bundle"
+    assert_grep 'move it to a durable location outside this home' "$case_dir/stderr" \
+      "$posture stored-bundle: the refusal did not name the completing step"
+    assert_equals 'only copy of unlanded commits' "$(cat "$bundle")" "$posture stored-bundle: the stored bundle was lost"
+    assert_present "$home/.fm-secondmate-home" "$posture stored-bundle: the home was removed"
+    assert_present "$case_dir/state/task-x1.meta" "$posture stored-bundle: the record was retired"
+    if [ "$posture" = forced ]; then
+      assert_present "$home/state/child-a.meta" "forced stored-bundle: the refusal came after the child was retired"
+      assert_present "$child_wt/.git" "forced stored-bundle: the refusal came after the child copy was removed"
+    fi
+    moved="$case_dir/durable/${bundle##*/}"
+    mkdir -p "${moved%/*}"
+    mv "$bundle" "$moved"
+    rc=0
+    if [ "$posture" = forced ]; then
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    else
+      run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    fi
+    expect_code 0 "$rc" "$posture stored-bundle: retirement after moving the bundle must succeed: $(cat "$case_dir/stderr2")"
+    assert_absent "$home" "$posture stored-bundle: the home was not retired"
+    assert_equals 'only copy of unlanded commits' "$(cat "$moved")" "$posture stored-bundle: the moved bundle was lost"
+  done
+  pass "retiring a home that keeps a stored preservation bundle refuses until the bundle leaves it"
+}
+
 test_standalone_secondmate_skips_docker_cleanup() {
   local case_dir posture rc
   for posture in ordinary forced; do
@@ -4577,6 +4634,7 @@ test_landing_proof_that_head_changed_after_its_proof_is_unasked() {
 set -u
 eval "$(sed -n '/^work_is_landed() {/,/^}/p' "$FM_HARNESS_SCRIPT")"
 work_is_landed_proof() { return 1; }
+work_is_landed_bundle() { return 1; }
 TREEHOUSE_PROJECT_LOCK_HELD=1 TEARDOWN_SLOT_CUSTODY=lease WT=$FM_HARNESS_REPO/work
 TEARDOWN_LANDED_DIRS=(/nonexistent) TEARDOWN_LANDED_HEADS=(0)
 TEARDOWN_UNPROVEN_COMMITS='' TEARDOWN_PIPELINE_INPUT_REASON='' TEARDOWN_LANDED_UNASKED=''
@@ -6569,6 +6627,7 @@ test_docker_mixed_project_carriers_spare_empty_heuristic_networks
 test_docker_latest_foreign_carriers_veto_network_removal
 test_standalone_secondmate_skips_docker_cleanup
 test_secondmate_retirement_exempts_only_its_own_missing_home
+test_secondmate_retirement_keeps_stored_preservation_bundles
 test_docker_project_record_failure_prevents_container_removal
 test_docker_verified_cleanup_clears_retained_projects
 test_docker_ambiguous_ids_trust_only_worktree_evidence

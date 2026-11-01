@@ -583,7 +583,13 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [],
+      "exemptions": [
+        {
+          "case": "a verified bundle holds the copy's unlanded commits",
+          "derivation": "the recorded bundle passes digest, git bundle verify, advertised-tip and isolated fsck --strict restore proofs in attended teardown; admission copies it into task data and verifies the stored digest and bundle before removal, so removing the copy discards no commit; retiring a firstmate home refuses before any removal while any data/*/preserved-bundles/*.bundle remains in it",
+          "demotion": "fm-teardown-unlanded-bundle-exemption-demotion"
+        }
+      ],
       "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
@@ -591,7 +597,10 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4}
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
+        {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
+        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2}
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",
