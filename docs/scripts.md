@@ -57,7 +57,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) | Reap processes provably owned by an ended lab or test run; its header owns the safety contract |
 | [`fm-scratch-legacy-reap.sh`](../bin/fm-scratch-legacy-reap.sh) | One-time removal of old unowned scratch entries from before `fm-scratch-lib.sh` in the directory named by the required `--tmpdir`; dry run unless `--apply` |
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
-| `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
+| `fm-cpu-pass.sh`         | Host-wide CPU-worker reservations and fresh pipeline-start admission ([protocol and policy](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
 | [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth (`--own-procs` counts only the tree's own processes) and, with `--memory-kib`, its memory; its header owns the budget contract |
 | [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget or a nested copy sits inside a live task's copy ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |

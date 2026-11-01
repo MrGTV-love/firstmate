@@ -236,7 +236,7 @@ PY
   pass "a multi-pass request keeps collected passes and runs once it holds all"
 }
 
-test_killed_wrapper_keeps_work_reserved() {
+test_killed_owner_releases_reservation() {
   local pool dir holder child
   dir="$TMP_ROOT/crash"
   mkdir -p "$dir"
@@ -249,12 +249,12 @@ test_killed_wrapper_keeps_work_reserved() {
   wait_held "$pool" 1 1 "crash holder"
   kill -KILL "$holder"
   wait "$holder" 2>/dev/null || true
-  assert_equals 1 "$(held_count "$pool" 1)" "a SIGKILLed wrapper must not release its running child's pass"
+  wait_held "$pool" 1 0 "after the reservation owner exits"
   child=$(cat "$dir/child.pid")
+  kill -0 "$child" 2>/dev/null || fail "the isolated workload should still be alive for this observation"
   kill "$child" 2>/dev/null || true
-  wait_held "$pool" 1 0 "after the surviving work exits"
   reap_bg
-  pass "passes survive a killed wrapper and are freed when its work ends"
+  pass "owner death releases passes without inherited child lock copies"
 }
 
 test_cleanup_terminates_running_work() {
@@ -595,12 +595,16 @@ PY
   pass "nested runners take no new pass and limit scripts to the inherited reservation"
 }
 
+python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
+  || fail "pipeline admission and child-descriptor regression failed"
+pass "pipeline admission preserves count/load boundaries, priority, start registration, timing and descriptor ownership"
+
 test_size_follows_host
 test_run_passes_status_and_marks_child
 test_invalid_pass_counts_never_run_work
 test_passes_are_exclusive_and_waiters_queue
 test_multi_pass_request_collects_all
-test_killed_wrapper_keeps_work_reserved
+test_killed_owner_releases_reservation
 test_cleanup_terminates_running_work
 test_term_to_holder_keeps_pass_with_running_work
 test_term_to_waiter_never_runs_command
