@@ -1879,9 +1879,12 @@ test_repo_override_args_refuse_before_recording() {
 
 # Main's own home configuration, not a task record.
 landing_home_config() {
-  mkdir -p "$1/data" "$1/state"
+  mkdir -p "$1/data" "$1/state" "$1/config"
   fm_test_tasks_toml "$1/.tasks.toml"
   printf '%s\n' '## In flight' '' '## Queued' '' '## Done' > "$1/data/backlog.md"
+  if [ -n "${2:-}" ]; then
+    printf 'maintainer %s\n' "$2" > "$1/config/firstmate-role"
+  fi
 }
 
 # Run the real registration command in Main. Args: main source-home id url
@@ -1910,7 +1913,7 @@ test_firstmate_landings_belong_to_main_home() {
   assert_grep "FM_HOME=$main $main/bin/fm-pr-merge.sh --register $case_dir/home task-x1 $url" "$case_dir/stderr" \
     'routing names the supported registration command in Main'
 
-  landing_home_config "$main"
+  landing_home_config "$main" github.com/example/repo
   register_landing "$main" "$case_dir/home" task-x1 "$url" > "$case_dir/register.out" 2>&1 \
     || fail "registration failed: $(cat "$case_dir/register.out")"
   rc=0
@@ -1950,10 +1953,11 @@ test_repair_clone_routes_to_main() {
   expect_code 1 "$rc" "a standalone repair clone must not land Main's repository: $(cat "$case_dir/stderr")"
   assert_no_grep 'pr merge ' "$case_dir/gh.log" 'the repair clone never hands the PR to the forge'
   assert_absent "$repair/state/task-x1.check.sh" 'the repair clone arms no merge poll'
-  assert_grep 'github.com/kunchenguid/firstmate' "$case_dir/stderr" 'the refusal names the repair clone publication target'
+  assert_grep 'config/firstmate-role records maintainer github.com/mrgtv-love/firstmate' "$case_dir/stderr" \
+    'the refusal names Main by its recorded publication target, not repair remotes'
   assert_grep "<main-home>/bin/fm-pr-merge.sh --register $repair task-x1 $url" "$case_dir/stderr" 'the refusal names the registration step'
 
-  landing_home_config "$main"
+  landing_home_config "$main" github.com/mrgtv-love/firstmate
   register_landing "$main" "$repair" task-x1 "$url" > "$case_dir/register.out" 2>&1 \
     || fail "registration failed: $(cat "$case_dir/register.out")"
   rc=0
@@ -1962,6 +1966,86 @@ test_repair_clone_routes_to_main() {
   expect_code 0 "$rc" "Main lands the registered repair PR: $(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 303 MrGTV-love/firstmate --squash
   pass 'a standalone repair clone hands its PR to Main, which registers and lands it'
+}
+
+test_main_scope_routes_standalone_clones() {
+  local case_dir main repair head rc shape url
+  case_dir=$(make_case recorded-main-target)
+  main="$case_dir/wt"
+  repair="$case_dir/repair"
+  url=https://github.com/example/repo/pull/9
+  landing_home_config "$main" github.com/example/repo
+  git clone -q "$main" "$repair"
+  landing_home_config "$repair"
+  fm_write_meta "$repair/state/task-x1.meta" "worktree=$repair" "project=$repair" \
+    'kind=ship' 'model=gpt-5.1-codex' 'branch=fm/fixture' 'mode=no-mistakes'
+  head=$(git -C "$main" rev-parse HEAD)
+  add_gh_mocks "$case_dir" "$head"
+  for shape in origin-only with-upstream no-matching-remote; do
+    case "$shape" in
+      origin-only) git -C "$repair" remote set-url origin https://github.com/example/repo ;;
+      with-upstream) git -C "$repair" remote add upstream https://github.com/other/firstmate ;;
+      no-matching-remote)
+        git -C "$repair" remote remove origin
+        git -C "$repair" remote remove upstream ;;
+    esac
+    rc=0
+    FM_TEST_CODE_ROOT="$repair" FM_TEST_HOME="$repair" FM_TEST_STATE="$repair/state" \
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$shape clone must hand its landing to the recorded Main"
+    assert_no_grep 'pr merge ' "$case_dir/gh.log" "$shape clone never reaches forge merge"
+    assert_absent "$repair/state/task-x1.check.sh" "$shape clone never registers a poll"
+    assert_grep '<main-home>/bin/fm-pr-merge.sh --register' "$case_dir/stderr" "$shape clone names the handoff"
+  done
+  # Neither Main's remotes nor the source home's remotes match the PR. The
+  # explicit Main grant, not gh's default-remote order, owns this target.
+  git -C "$main" remote add origin https://github.com/other/fork
+  git -C "$main" remote add upstream https://github.com/other/firstmate
+  register_landing "$main" "$repair" task-x1 "$url" > "$case_dir/register.out" 2>&1 \
+    || fail "recorded Main registration failed: $(cat "$case_dir/register.out")"
+  rc=0
+  FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" \
+    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "Main's recorded target lands despite unrelated remotes: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  pass 'origin-only and remote-less clones route to the recorded Main target'
+}
+
+test_registered_models_keep_independent_review_coverage() {
+  local case_dir main head url rc authors
+  case_dir=$(make_case registered-author-history)
+  main="$case_dir/wt"
+  url=https://github.com/example/repo/pull/9
+  rm "$case_dir/fakebin/git"
+  landing_home_config "$main" github.com/example/repo
+  git -C "$main" remote add origin https://github.com/example/repo
+  printf 'spawn_gen=gen-current\n' >> "$case_dir/state/task-x1.meta"
+  printf 'gen-first\t\tclaude-opus-5-5\ngen-current\tgen-first\tgpt-5.1-codex\n' \
+    > "$case_dir/state/task-x1.launch-models"
+  printf 'model=gemini-3-pro\n' > "$case_dir/state/task-x1.control-relaunch.meta-prior"
+  ln -s ../state "$case_dir/home/state"
+  register_landing "$main" "$case_dir/home" task-x1 "$url" > "$case_dir/register.out" 2>&1 \
+    || fail "registration must retain all source authors: $(cat "$case_dir/register.out")"
+  head=$(git -C "$main" rev-parse HEAD)
+  for authors in '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' '{"ship":["gpt-5.1-codex","gemini-3-pro"]}'; do
+    FM_TEST_STATE="$main/state" record_review "$case_dir" "$url" "$head" \
+      --reader-model deepseek-v4 --author-groups "$authors" >/dev/null || fail 'record partial author read'
+    rc=0
+    FM_TEST_STATE="$main/state" review_record_command "$case_dir" verify \
+      --pr "$url" --head "$head" --review-only --json > "$case_dir/verify.json" || rc=$?
+    expect_code 1 "$rc" 'omitting either historical source model cannot satisfy review coverage'
+    "$JQ_BIN" -e '.ok == false and (.error.message | contains("uncovered commit group ship"))' \
+      "$case_dir/verify.json" >/dev/null || fail "missing historical author was not rejected: $(cat "$case_dir/verify.json")"
+  done
+  FM_TEST_STATE="$main/state" record_review "$case_dir" "$url" "$head" \
+    --reader-model deepseek-v4 --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5","gemini-3-pro"]}' \
+    >/dev/null || fail 'record independent read covering every registered author'
+  FM_TEST_STATE="$main/state" review_record_command "$case_dir" verify \
+    --pr "$url" --head "$head" --review-only --json > "$case_dir/verify.json" \
+    || fail "full source-author coverage failed: $(cat "$case_dir/verify.json")"
+  "$JQ_BIN" -e '.ok == true and .basis == "independent-review"' "$case_dir/verify.json" >/dev/null \
+    || fail 'registered author coverage did not verify'
+  pass 'registration preserves current, launch-history and prior-relaunch author coverage'
 }
 
 test_unrelated_project_keeps_home_local_merge() {
@@ -1983,31 +2067,30 @@ test_unrelated_project_keeps_home_local_merge() {
 }
 
 test_unreadable_landing_routing_refuses() {
-  local scenario case_dir head rc wt url repair
+  local scenario case_dir head rc wt url
   url=https://github.com/example/repo/pull/9
-  for scenario in absent unparseable; do
+  for scenario in absent malformed mismatched; do
     case_dir=$(make_case "unreadable-landing-$scenario")
     wt="$case_dir/wt"
     head=$(git -C "$wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     landing_home_config "$wt"
-    [ "$scenario" = absent ] || git -C "$wt" remote add upstream https://example.invalid
+    # Matching remotes never substitute for a valid recorded Main target.
+    git -C "$wt" remote add origin https://github.com/example/repo
+    case "$scenario" in
+      malformed) printf 'maintainer\n' > "$wt/config/firstmate-role" ;;
+      mismatched) printf 'maintainer github.com/other/repo\n' > "$wt/config/firstmate-role" ;;
+    esac
     rc=0
     FM_TEST_CODE_ROOT="$wt" FM_TEST_HOME="$wt" run_pr_merge "$case_dir" task-x1 "$url" \
       > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "a $scenario installation target must not silently disable routing"
-    assert_no_grep 'pr merge ' "$case_dir/gh.log" 'unreadable routing never calls the forge'
-    assert_absent "$case_dir/state/task-x1.check.sh" 'unreadable routing never arms a merge poll'
-    repair=$(sed -n 's/.*restore the intended remote with: \(git -C .*\) <canonical-repository-url>, then re-run this merge$/\1/p' "$case_dir/stderr")
-    [ -n "$repair" ] || fail "unreadable target names no repair command: $(cat "$case_dir/stderr")"
-    eval "$repair https://github.com/example/repo.git" || fail "the named repair command failed: $repair"
-    rc=0
-    FM_TEST_CODE_ROOT="$wt" FM_TEST_HOME="$wt" run_pr_merge "$case_dir" task-x1 "$url" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "the $scenario repair command restores the landing: $(cat "$case_dir/stderr")"
-    assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+    expect_code 1 "$rc" "a $scenario recorded target must not silently create a landing owner"
+    assert_no_grep 'pr merge ' "$case_dir/gh.log" 'unproved Main authority never calls the forge'
+    assert_absent "$case_dir/state/task-x1.check.sh" 'unproved Main authority never arms a merge poll'
+    assert_grep '<main-home>/bin/fm-pr-merge.sh --register' "$case_dir/stderr" \
+      'an unproved home hands the PR to the recorded Main rather than changing remotes'
   done
-  pass 'an unreadable installation target fails closed and its named repair command works'
+  pass 'absent, malformed and mismatched Main grants fail closed despite matching remotes'
 }
 
 test_seeded_homes_cannot_create_a_second_landing_owner() {
@@ -2060,7 +2143,7 @@ test_main_serializes_firstmate_landings() (
   git -C "$main" remote add origin https://github.com/example/repo.git
   head=$(git -C "$main" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
-  landing_home_config "$main"
+  landing_home_config "$main" github.com/example/repo
   ln -s ../state "$case_dir/home/state"
   cp "$case_dir/state/task-x1.meta" "$case_dir/state/task-x2.meta"
   register_landing "$main" "$case_dir/home" task-x1 https://github.com/example/repo/pull/9 >/dev/null \
@@ -2105,6 +2188,8 @@ test_unreadable_landing_routing_refuses
 test_main_serializes_firstmate_landings
 test_firstmate_landings_belong_to_main_home
 test_repair_clone_routes_to_main
+test_main_scope_routes_standalone_clones
+test_registered_models_keep_independent_review_coverage
 test_unrelated_project_keeps_home_local_merge
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
