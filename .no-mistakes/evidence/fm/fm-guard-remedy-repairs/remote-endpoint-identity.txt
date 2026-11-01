@@ -1,25 +1,19 @@
-$ FM_HOME=<home> bin/fm-remote-secondmate-control.sh route rmate   # endpoint recorded wrongly (tmux)
-error: remote secondmate rmate endpoint is recorded on backend 'tmux', expected 'herdr'; refusing access. Remedy: the owning firstmate must restore <home>/state/parent-route/rmate.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
-exit=1
-$ FM_HOME=<home> bin/fm-remote-secondmate-control.sh state rmate
-error: remote secondmate rmate endpoint is recorded on backend 'tmux', expected 'herdr'; refusing access. Remedy: the owning firstmate must restore <home>/state/parent-route/rmate.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
+## 1. endpoint recorded on the wrong backend (tmux)
+$ FM_HOME=$LAB bin/fm-remote-secondmate-control.sh state rsm
+error: remote secondmate rsm endpoint is recorded on backend 'tmux', expected 'herdr'; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
 unverified
 exit=0
-meta unchanged: yes
-$ FM_HOME=<home> bin/fm-remote-secondmate-control.sh route rmate   # endpoint recorded wrongly (session)
-error: remote secondmate rmate endpoint is recorded in Herdr session 'default', expected 'fm-remote'; refusing access. Remedy: the owning firstmate must restore <home>/state/parent-route/rmate.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
-exit=1
-$ FM_HOME=<home> bin/fm-remote-secondmate-control.sh state rmate
-error: remote secondmate rmate endpoint is recorded in Herdr session 'default', expected 'fm-remote'; refusing access. Remedy: the owning firstmate must restore <home>/state/parent-route/rmate.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
+endpoint metadata unchanged: yes
+
+## 2. endpoint recorded in a foreign Herdr session (adversarial)
+$ FM_HOME=$LAB bin/fm-remote-secondmate-control.sh state rsm
+error: remote secondmate rsm endpoint metadata is invalid; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
 unverified
 exit=0
-meta unchanged: yes
-$ # follow Remedy: owner restores the verified original herdr endpoint record, retry route
-schema=fm-remote-secondmate-control.v1
-backend=herdr
-target=fm-remote:p1
-herdr_session=fm-remote
-harness=claude
-model=default
-effort=default
-exit=0
+
+## 3. endpoint metadata invalid (missing)
+$ FM_HOME=$LAB bin/fm-remote-secondmate-control.sh capture rsm
+error: remote secondmate rsm endpoint metadata is invalid; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action; do not rewrite a foreign endpoint to make it match.
+exit=1
+
+herdr stub calls: 0

@@ -1,0 +1,17 @@
+## 1. relaunch with ANTHROPIC_API_KEY in the inherited environment
+$ ANTHROPIC_API_KEY=<set> bin/fm-control.sh rl-billing-live relaunch --note guarded
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API
+error: refused before stopping rl-billing-live: an Anthropic credential would reach the replacement worker. Remedy: remove ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN from the inherited environment and any configured replacement launch environment or backend session reported above, then retry bin/fm-control.sh 'rl-billing-live' relaunch (--note <text> | --note-file <path>) with the same intended harness and account; do not change an account pin or enable API billing to bypass this refusal.
+error: relaunch of rl-billing-live was refused before its agent was touched; nothing changed
+exit=1
+original worker command still: claude
+lifecycle input sent: no
+
+## 2. follow the remedy: remove the credential, retry the printed relaunch
+$ env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-control.sh rl-billing-live relaunch --note guarded
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+relaunched rl-billing-live harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-rl-billing-live worktree=$TMP/billing-live-15454/wt
+exit=0

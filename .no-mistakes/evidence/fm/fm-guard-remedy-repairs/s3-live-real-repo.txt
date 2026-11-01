@@ -1,0 +1,53 @@
+# Live S3 drive in a throwaway clone of HEAD 611d790c: /tmp/s3-live.Wc4cLu/repo
+## Case 1: edit the real jev-guard device deny (bin/fm-jev-guard.ts:244) to prose without a command
+ bin/fm-jev-guard.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-jev-guard.ts:988020aaf1: bin/fm-jev-guard.ts:244 [C] if (device.effect === "uri") return deny(`${device.reason}. Ask someone about it.`); maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S2 jev-write-path-gate: site marker 'do not read or fetch this URI to investigate it.' in bin/fm-jev-guard.ts matches no site; remove or update it
+VIOLATION S3 site:bin/fm-jev-guard.ts:988020aaf1: bin/fm-jev-guard.ts:244 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=771 allowlisted=768 stale=0 shown=3 sites=926
+exit=
+
+## Case 2: edit the same deny to carry a real completing command (was unsatisfiable before this change)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-jev-guard.ts:2211674e50: bin/fm-jev-guard.ts:244 [C] if (device.effect === "uri") return deny(`${device.reason}. Remedy: run bin/fm-guard-lint.sh --mode report to  maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S2 jev-write-path-gate: site marker 'do not read or fetch this URI to investigate it.' in bin/fm-jev-guard.ts matches no site; remove or update it
+LINT_SUMMARY mode=new-or-touched guards=53 violations=770 allowlisted=768 stale=0 shown=2 sites=926
+exit=
+
+## Case 3: same deny names a nonexistent repo command (adversarial)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-jev-guard.ts:8e9e61a4b0: bin/fm-jev-guard.ts:244 [C] if (device.effect === "uri") return deny(`${device.reason}. Remedy: run bin/fm-does-not-exist.sh, then git sta maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S2 jev-write-path-gate: site marker 'do not read or fetch this URI to investigate it.' in bin/fm-jev-guard.ts matches no site; remove or update it
+VIOLATION S3 site:bin/fm-jev-guard.ts:8e9e61a4b0: bin/fm-jev-guard.ts:244 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=771 allowlisted=768 stale=0 shown=3 sites=926
+exit=
+
+## Case 4: strip the Remedy from a real shipped remedy-only refusal (bin/fm-merge-local.sh dirty primary)
+ bin/fm-merge-local.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S3 site:bin/fm-merge-local.sh:58ca1af84d: bin/fm-merge-local.sh:112 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=769 allowlisted=768 stale=0 shown=1 sites=926
+exit=
+
+## Case 5: fm_refuse with non-literal exit kind at FM-TEARDOWN-PRESERVATION (bin/fm-teardown-nested-lib.sh:160), touched trivially
+ bin/fm-teardown-nested-lib.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:1e2a47c1d3: bin/fm-teardown-nested-lib.sh:160 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:5074906223: bin/fm-teardown-nested-lib.sh:613 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:5a655a9584: bin/fm-teardown-nested-lib.sh:680 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:42746bca7f: bin/fm-teardown-nested-lib.sh:693 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:be42b3bd4e: bin/fm-teardown-nested-lib.sh:697 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:bde0cf8dd6: bin/fm-teardown-nested-lib.sh:868 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:3cb7f37ffb: bin/fm-teardown-nested-lib.sh:875 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:89763f926b: bin/fm-teardown-nested-lib.sh:891 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:8b0585b29e: bin/fm-teardown-nested-lib.sh:893 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:0537a2a132: bin/fm-teardown-nested-lib.sh:924 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:6c57de2c09: bin/fm-teardown-nested-lib.sh:964 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-teardown-nested-lib.sh:17810f39fe: bin/fm-teardown-nested-lib.sh:981 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=780 allowlisted=768 stale=0 shown=12 sites=926
+VIOLATION S1 site:bin/fm-teardown-nested-lib.sh:1e2a47c1d3: bin/fm-teardown-nested-lib.sh:160 [C] fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing" "$kind" "$exit_text" nested-copy "$3" "$ID" is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=

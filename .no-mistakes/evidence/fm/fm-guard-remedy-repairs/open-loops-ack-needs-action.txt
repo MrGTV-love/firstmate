@@ -1,0 +1,43 @@
+## 1. drain presents two overdue rows; acknowledging without recorded actions
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91878.1793523480.JQeqLi
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  "row-'quoted","firstmate","job:quoted-question","obtain decision",7200,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help.
+env FM_HOME=$WORLD/home FM_STATE_OVERRIDE=$WORLD/home/state FM_SUPERVISION_ACTOR=main bash $WORLD/code/bin/fm-open-loops.sh action row-0 "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+env FM_HOME=$WORLD/home FM_STATE_OVERRIDE=$WORLD/home/state FM_SUPERVISION_ACTOR=main bash $WORLD/code/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+
+per-row printed commands: 2 (rows: 2)
+
+## 2. adversarial: run a printed command without setting the actual action/evidence
+$ bash -c <printed command for row-0>
+bash: ACTION_KIND: set the action actually performed
+exit=127
+
+ledger unchanged: True
+
+## 3. record row-0 only, with real evidence; acknowledgement must still refuse
+$ ACTION_KIND=escalated ACTION_EVIDENCE=... bash -c <printed command for row-0>
+action: "row-0"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+recorded actions: ['row-0']
+ack exit=1; quoted row still listed: True
+
+## 4. record the shell-quoted row-'quoted with its printed command, then acknowledge
+$ ACTION_KIND=escalated ACTION_EVIDENCE=... bash -c <printed command for row-'quoted>
+action: "row-'quoted"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+recorded actions: ["row-'quoted", 'row-0']
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91878.1793523480.JQeqLi
+
+exit=0
+

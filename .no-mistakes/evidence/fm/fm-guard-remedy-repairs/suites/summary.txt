@@ -1,11 +1,10 @@
-tests/fm-guard-lint.test.sh exit=0 secs=222
-tests/fm-teardown-endpoint-safety.test.sh exit=0 secs=427
-tests/fm-backlog-handoff.test.sh exit=0 secs=552
-tests/fm-remote-reply.test.sh exit=0 secs=1549
-tests/fm-pending-reply.test.sh exit=0 secs=532
-tests/fm-remote-doctor.test.sh exit=0 secs=297
-tests/fm-kimi-harness.test.sh exit=0 secs=384
-tests/fm-api-key-guard-lib.test.sh exit=0 secs=50
-tests/fm-control-relaunch.test.sh exit=0 secs=2545
-tests/fm-task-delivery.test.sh exit=0 secs=1288
-tests/fm-open-loops.test.sh exit=0 secs=4157
+fm-guard-lint.test.sh rc=0 secs=48
+fm-teardown-endpoint-safety.test.sh rc=0 secs=88
+fm-task-delivery.test.sh rc=0 secs=290
+fm-remote-reply.test.sh rc=0 secs=378
+fm-remote-doctor.test.sh rc=0 secs=78
+fm-on.test.sh rc=0 secs=34
+fm-open-loops.test.sh rc=0 secs=1393
+fm-guard-audit-closure.test.sh rc=0 secs=96
+herdr-server-start-fixture.py rc=1
+herdr-server-start-fixture.py rerun with root arg rc=0

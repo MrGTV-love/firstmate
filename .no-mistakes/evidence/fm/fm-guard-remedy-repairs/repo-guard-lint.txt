@@ -1,0 +1,10 @@
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=53 retired=14 beyond_audit=12 excluded=1 unregistered=768 audited=30 beyond_audit_active=26 sites=926 mapped=158
+LINT_SUMMARY mode=enforce guards=53 violations=768 allowlisted=768 stale=0 shown=0 sites=926
+exit=0
+
+$ bin/fm-guard-lint.sh --mode new-or-touched --base 8618f63732d41ed857468b40a825f4db4135cf66
+INFO guard-watcher-down-warning: exemptions=1
+LINT_SUMMARY mode=new-or-touched guards=53 violations=768 allowlisted=768 stale=0 shown=0 sites=926
+exit=0

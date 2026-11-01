@@ -1,0 +1,34 @@
+# api-billing-preflight: bin/fm-api-key-guard-lib.sh fm_omp_api_billing_route_check
+$ fm_omp_api_billing_route_check openai/gpt-6.1-sol
+REFUSED: omp openai/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ fm_omp_api_billing_route_check \ OpenAI\ /\ gpt-6.1-sol\ 
+REFUSED: omp OpenAI/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ fm_omp_api_billing_route_check openrouter/vendor/model
+REFUSED: omp openrouter/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ fm_omp_api_billing_route_check openai-codex/gpt-6.1-sol
+exit=0
+
+# task-endpoint-identity-binding: bin/fm-backend.sh fm_backend_validate_task_endpoint (throwaway meta files)
+## missing meta
+$ fm_backend_validate_task_endpoint $T/absent.meta t1
+REFUSED: task t1 has no regular endpoint metadata at $T/absent.meta; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $T/absent.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## ambiguous window
+$ fm_backend_validate_task_endpoint $T/t1.meta t1
+REFUSED: task t1 has a missing, empty, or ambiguous window endpoint; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $T/t1.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## foreign task binding (adversarial: another task's meta)
+$ fm_backend_validate_task_endpoint $T/t1.meta t1
+REFUSED: endpoint metadata belongs to task t2, not t1; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $T/t1.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## invalid task id
+$ fm_backend_validate_task_endpoint $T/t1.meta bad\ id
+REFUSED: task endpoint identity has an invalid task id; preserving task state. Remedy: retry with the task id recorded by the original bin/fm-spawn.sh launch, using only letters, digits, dot, underscore or hyphen; do not rename or rebind another task's metadata.
+exit=1
+## owner restores the unique fields from launch evidence, then the same check accepts
+$ fm_backend_validate_task_endpoint $T/t1.meta t1
+accepted: backend=tmux target=s:fm-t1
+exit=0

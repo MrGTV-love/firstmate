@@ -1,0 +1,49 @@
+# lab home $LAB, child home $MATE registers $HIDDEN; $MATE/data/secondmates.md is chmod 000
+## 1. teardown while one registered home is unreadable
+$ FM_HOME=$LAB bin/fm-teardown.sh lab-unreadable-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B29PA5S6HV32Q1TR097C9K/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: local Firstmate registry cannot be read at $BASE/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $LAB/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'lab-unreadable-home'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=1
+task record preserved: yes
+worktree preserved: yes
+/tmp/nm-drivers/local-homes.sh: line 30: $BASE/runtime.log: No such file or directory
+runtime calls: 0
+
+## 2. adversarial: --force does not skip the unreadable home
+REFUSED: local Firstmate registry cannot be read at $BASE/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $LAB/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'lab-unreadable-home'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=1
+task record preserved: yes
+
+## 3. owner restores read access, then the printed retry runs
+$ FM_HOME=$LAB bin/fm-teardown.sh lab-unreadable-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: scout task lab-unreadable-home has no report at $LAB/data/lab-unreadable-home/report.md.
+The report is the work product. Have the crewmate write it, or use --force after explicit discard approval.
+exit=1
+unreadable-home refusal still present: no
+task record still present
+
+## 4. scout report written; retry the printed command again
+$ FM_HOME=$LAB bin/fm-teardown.sh lab-unreadable-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+fm-captain-hold: origin lab-unreadable-home has no completed captain-call inventory
+REFUSED: scout task lab-unreadable-home has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+exit=1
+task record still present
+runtime stub calls:
+
+## 5. after restore, the local-home walk enumerates every descendant (no skip)
+state dir: $LAB/state
+state dir: $BASE/mate/state
+state dir: $BASE/hidden/state
+exit=0

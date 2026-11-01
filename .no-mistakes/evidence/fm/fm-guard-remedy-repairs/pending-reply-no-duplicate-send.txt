@@ -1,0 +1,7 @@
+# real bin/fm-send.sh, local marked secondmate lsm with an unresolved draft-risk delivery (fixture tmux)
+$ FM_PENDING_REPLY_EXISTING_CORR=f9a8c7bd841d464e bin/fm-send.sh lsm "/audit the ledger"
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: pending-reply delivery for lsm is unresolved; refusing to resend correlation f9a8c7bd841d464e. Remedy: the owning firstmate must reconcile the original request with the secondmate and obtain its actual corr=f9a8c7bd841d464e report in the parent status channel at $HOME_FIXTURE/state/lsm.status; run bin/fm-crew-state.sh 'lsm' to inspect it, then let pending-reply reconciliation resolve it before sending new work. Do not clear delivery markers or resend unknown delivery.
+exit=1
+typed planes after refusal: literal (one), Enter presses: Enter (one)
+ok - fm-send local: post-submit draft risk retains reply tracking without resending or closing decisions

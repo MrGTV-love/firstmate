@@ -1,0 +1,18 @@
+## Case 6: FM-TEARDOWN-PRESERVATION helper (bin/fm-teardown-nested-lib.sh:160) edited to carry a literal Remedy in fm_refuse's missing-text argument, exit kind still variable
+diff --git a/bin/fm-teardown-nested-lib.sh b/bin/fm-teardown-nested-lib.sh
+index 35cc5dd1..7c8d71a6 100644
+--- a/bin/fm-teardown-nested-lib.sh
++++ b/bin/fm-teardown-nested-lib.sh
+@@ -157,7 +157,7 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
+     missing="$missing Restore readable source and writable preservation storage, then run the completing command."
+   fi
+   FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="$revision" \
+-    fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing" "$kind" "$exit_text" nested-copy "$3" "$ID"
++    fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing Remedy: run bin/fm-teardown.sh $ID after restoring the copy." "$kind" "$exit_text" nested-copy "$3" "$ID"
+   TEARDOWN_REFUSED_COPIES+=("$3")
+ }
+ 
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-teardown-nested-lib.sh:3f258b2b6b: bin/fm-teardown-nested-lib.sh:160 [C] fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing Remedy: run bin/fm-teardown.sh $ID after restoring the cop maps to no registry entry: add a sites marker to the guard that owns it
+STALE S1 site:bin/fm-teardown-nested-lib.sh:1e2a47c1d3: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=53 violations=768 allowlisted=767 stale=1 shown=1 sites=926

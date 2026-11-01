@@ -1,0 +1,14 @@
+## 1. land a local-only task into a primary checkout with the owner's uncommitted work
+$ FM_HOME=$LAB bin/fm-merge-local.sh local-merge-dirty
+error: $BASE/proj has a dirty working tree; refusing to merge into it. Remedy: inspect git -C '$BASE/proj' status --short, have the owner commit or move their changes to their own branch without discarding them, return this checkout to 'main' clean, then retry bin/fm-merge-local.sh 'local-merge-dirty'.
+exit=1
+default branch unmoved: yes
+owner tracked edit: owner edit; owner untracked file: owner note
+
+## 2. completing step: owner moves their change to their own branch; checkout returns clean; retry
+$ FM_HOME=$LAB bin/fm-merge-local.sh local-merge-dirty
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/local-merge-dirty into local main (834d33f -> 9797a49) in $BASE/proj
+exit=0
+ship branch landed on main: yes
+owner/wip keeps: base=owner edit untracked=owner note

@@ -1,0 +1,33 @@
+# kimi-hook-install-refusal live drive, throwaway HOME=$H
+## 1. malformed config.toml
+model = "x"
+[broken
+$ HOME=$H bin/fm-kimi-turnend-hook.sh install
+fm-kimi-turnend-hook: refused: config.toml is malformed TOML: Expected ']' at the end of a table declaration (at line 2, column 8). Remedy: repair the named file or directory under $H/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh install; do not delete user files or registry tokens to bypass validation.
+exit=1
+config.toml unchanged after refusal: yes
+config.toml
+
+## 2. owner repairs the TOML per the remedy, then retries the printed command
+$ HOME=$H bin/fm-kimi-turnend-hook.sh install
+exit=0
+--- config.toml after install:
+model = "x"
+# BEGIN FIRSTMATE KIMI TURN-END HOOK
+[[hooks]]
+event = "Stop"
+matcher = "^$"
+command = "bash \"$HOME/.kimi-code/fm-turn-end.sh\" >/dev/null 2>&1 || true"
+timeout = 1
+# END FIRSTMATE KIMI TURN-END HOOK
+
+## 3. adversarial: symlinked config.toml
+$ HOME=$H bin/fm-kimi-turnend-hook.sh remove
+fm-kimi-turnend-hook: refused: Kimi config is not a regular non-symlink file at $H/.kimi-code/config.toml. Remedy: repair the named file or directory under $H/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh remove; do not delete user files or registry tokens to bypass validation.
+exit=1
+symlink preserved: yes
+
+## 4. HOME unset
+$ env -u HOME bin/fm-kimi-turnend-hook.sh install
+fm-kimi-turnend-hook: refused: HOME is unset. Remedy: set HOME to the intended Kimi user home, then retry bin/fm-kimi-turnend-hook.sh with the same action.
+exit=1
