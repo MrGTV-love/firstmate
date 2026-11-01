@@ -1,0 +1,12 @@
+ok - local clones, remote homes, and corrupt bindings cannot become another landing owner
+ok - absent, malformed and mismatched Main grants fail closed despite matching remotes
+ok - Main serializes different firstmate tasks through their forge outcomes
+ok - firstmate landings route to Main, and one Main PR lands normally
+ok - a standalone repair clone hands its PR to Main, which lands it
+ok - origin-only and remote-less clones route to the recorded Main target
+ok - a linked home refusal names a home only when its role record proves the grant
+ok - one-task consent authorizes a contribution, not a landing
+ok - unknown shallow lineage refuses unless a matching remote establishes the Main route
+ok - an unrelated project keeps its home-local merge path
+ok - fm-pr-merge records pr= and pr_head= for a verified GitHub merge
+rc=0

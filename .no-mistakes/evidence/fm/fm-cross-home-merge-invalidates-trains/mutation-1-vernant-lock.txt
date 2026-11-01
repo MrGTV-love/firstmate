@@ -1,0 +1,17 @@
+## Mutation 1: take the landing lock for every merge (including a Vernant PR)
+diff --git a/bin/fm-pr-merge.sh b/bin/fm-pr-merge.sh
+index 88882293b..497ecff79 100755
+--- a/bin/fm-pr-merge.sh
++++ b/bin/fm-pr-merge.sh
+@@ -588,7 +588,7 @@ if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+ fi
+ MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
+ 
+-MERGE_LANDING_LOCK=
++MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
+ if firstmate_landing_possible "$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)"; then
+   firstmate_landing_route
+   MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
+not ok - an unrelated project holds no landing lock during its forge call: held
+mutated test rc=1
+reverted: bin/fm-pr-merge.sh clean

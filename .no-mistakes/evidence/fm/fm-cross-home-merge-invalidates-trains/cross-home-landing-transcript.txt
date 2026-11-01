@@ -1,0 +1,70 @@
+Main home:   /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/main  (config/firstmate-role: maintainer github.com/MrGTV-love/firstmate)
+Repair home: /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/fm-repair  (no role file)
+  repair remote: origin	https://github.com/MrGTV-love/firstmate (fetch)
+  repair remote: origin	https://github.com/MrGTV-love/firstmate (push)
+  repair remote: upstream	https://github.com/kunchenguid/firstmate (fetch)
+  repair remote: upstream	https://github.com/kunchenguid/firstmate (push)
+
+===== S1 Main's green train 4 is landing (held inside its forge merge call) =====
+train 4 is inside forge merge; Main landing lock at that moment: held
+
+===== S2 Repair home tries to merge PR 303 while train 4 is landing (the incident) =====
+--- repair-home fm-pr-merge.sh fix303 .../pull/303 (rc=1)
+    error: refusing a firstmate landing outside its Main home, the home whose config/firstmate-role grants maintainer github.com/mrgtv-love/firstmate; in that home, spawn a landing-record task, record the PR's exact-head review with bin/fm-review-record.py review and name every source-home author model in --author-groups, place it in Main's train order, merge with bin/fm-pr-merge.sh <landing-task> https://github.com/MrGTV-love/firstmate/pull/303, then tear the task down normally
+    one-task --upstream-consent authorizes a contribution (push and PR), not a landing; the repository's maintainer lands it
+SCENARIO S2: PASS
+
+===== S3 Main takes PR 303 as a landing-record task; it waits for train 4, then lands in order =====
+PR 303 landing is waiting on Main's landing lock: yes
+forge merge calls so far:
+    pr merge 300 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+train 4 rc=0; PR 303 landing rc=0
+forge merge order:
+    pr merge 300 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+    pr merge 303 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+SCENARIO S3: PASS
+    meta: /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/main/state/train4.meta:pr=https://github.com/MrGTV-love/firstmate/pull/300
+    meta: /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/main/state/land303.meta:pr=https://github.com/MrGTV-love/firstmate/pull/303
+lock after both outcomes: released
+
+===== S4 A single ready PR with no train lands normally in Main =====
+--- Main fm-pr-merge.sh solo304 .../pull/304 (rc=0)
+    armed: state/solo304.check.sh
+    verified: https://github.com/MrGTV-love/firstmate/pull/304 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+SCENARIO S4: PASS
+
+===== S5 The repair home still lands an unrelated project (Vernant) itself, with no landing lock =====
+--- repair-home fm-pr-merge.sh vern11 acme/vernant/pull/11 (rc=0)
+    armed: state/vern11.check.sh
+    verified: https://github.com/acme/vernant/pull/11 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+landing lock during Vernant forge call: free
+SCENARIO S5: PASS
+
+===== S6 Adversarial: a plain 'git clone' home with only origin cannot become a second landing owner =====
+--- origin-only clone fm-pr-merge.sh p305 .../pull/305 (rc=1)
+    error: refusing a firstmate landing outside its Main home, the home whose config/firstmate-role grants maintainer github.com/mrgtv-love/firstmate; in that home, spawn a landing-record task, record the PR's exact-head review with bin/fm-review-record.py review and name every source-home author model in --author-groups, place it in Main's train order, merge with bin/fm-pr-merge.sh <landing-task> https://github.com/MrGTV-love/firstmate/pull/305, then tear the task down normally
+    one-task --upstream-consent authorizes a contribution (push and PR), not a landing; the repository's maintainer lands it
+SCENARIO S6: PASS
+
+===== S7 Adversarial: one-task --upstream-consent in an ungranted primary home cannot land =====
+--- consent task fm-pr-merge.sh p305 (rc=1)
+    error: refusing a firstmate landing outside its Main home, the home whose config/firstmate-role grants maintainer github.com/mrgtv-love/firstmate; in that home, spawn a landing-record task, record the PR's exact-head review with bin/fm-review-record.py review and name every source-home author model in --author-groups, place it in Main's train order, merge with bin/fm-pr-merge.sh <landing-task> https://github.com/MrGTV-love/firstmate/pull/305, then tear the task down normally
+    one-task --upstream-consent authorizes a contribution (push and PR), not a landing; the repository's maintainer lands it
+SCENARIO S7: PASS
+
+===== S8 Adversarial: a shallow task copy with no matching code-root remote refuses with the unshallow remedy =====
+--- shallow task fm-pr-merge.sh sh306 (rc=1)
+    error: refusing merge: task copy /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/shallow-copy lineage cannot be determined; fetch full history in that copy: git -C /Users/charlesabrooker/tmp/fm-pr-merge-tests.z27bgp/incident/shallow-copy fetch --unshallow; then retry this merge
+SCENARIO S8: PASS
+
+===== Final forge merge log (one stand-in forge shared by every home) =====
+    pr merge 300 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+    pr merge 303 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+    pr merge 304 --repo MrGTV-love/firstmate --match-head-commit 1495478da2a393427f626e98f720d6919a7f2933 --squash
+    pr merge 11 --repo acme/vernant --match-head-commit c4edd9cd3c92409f98ba486db2b9f40db1e50068 --squash
+
+===== Guard events in Main and repair state =====
+    {"ts":"2026-11-01T11:19:43Z","guard":"merge-single-owner","version":"1","system":"firstmate","session":"pid-45232","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"route-to-main","repeat":1,"override":false}
+    {"ts":"2026-11-01T11:19:53Z","guard":"merge-single-owner","version":"1","system":"firstmate","session":"pid-75815","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"route-to-main","repeat":1,"override":false}
+    {"ts":"2026-11-01T11:20:07Z","guard":"merge-single-owner","version":"1","system":"firstmate","session":"pid-16546","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"route-to-main","repeat":1,"override":false}
+    {"ts":"2026-11-01T11:19:52Z","guard":"merge-single-owner","version":"1","system":"firstmate","session":"pid-73393","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

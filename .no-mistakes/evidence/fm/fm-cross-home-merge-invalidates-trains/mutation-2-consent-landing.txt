@@ -1,0 +1,17 @@
+## Mutation 2: let a matching one-task consent land from its own primary home
+diff --git a/bin/fm-pr-merge.sh b/bin/fm-pr-merge.sh
+index 88882293b..b5e16b348 100755
+--- a/bin/fm-pr-merge.sh
++++ b/bin/fm-pr-merge.sh
+@@ -555,6 +555,8 @@ firstmate_landing_route() {
+     landing_home=$(CDPATH='' cd -- "$landing_home" 2>/dev/null && pwd -P) || landing_home=
+   fi
+   caller_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || caller_home=
++  if [ -n "$landing_home" ] && [ "$caller_home" = "$landing_home" ] \
++    && grep -qxF "upstream_consent=$LANDING_REPO" "$META"; then return 0; fi
+   if [ -n "$landing_home" ]; then
+     fm_role_resolve "$landing_home" "$landing_home/config"
+     if [ "$FM_ROLE" = maintainer ] && [ "$FM_ROLE_SOURCE" = local ] \
+not ok - one-task consent must not land the PR: expected exit 1, got 0
+mutated test rc=1
+reverted: bin/fm-pr-merge.sh clean
