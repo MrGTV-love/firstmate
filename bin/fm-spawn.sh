@@ -614,12 +614,13 @@
 #   task teardown removes only the current home's launch namespace.
 # Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
 # spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
-# lifecycle attribution; Herdr's bare native resume remains unmanaged.
+# lifecycle attribution; Herdr's bare native resume remains unmanaged and
+# outside the launch environment and write confinement below.
 # Launch environment (config/launch-env-allowlist):
 #   Every launch (ship, scout, secondmate, raw command, and relaunch) runs
 #   under bin/fm-worker-env.py's names-only generated clean-environment prefix.
-#   Absent keeps the operational floor, the helper's non-secret work plumbing,
-#   the selected harness's store selectors, Claude's provider selectors and
+#   Absent keeps the operational floor, the helper's non-secret work plumbing
+#   and toolchain home paths, the selected harness's store selectors, Claude's provider selectors and
 #   companions from bin/fm-worker-account-lib.sh, DSH's key name from
 #   bin/fm-dsh.py, the pane's numbered GIT_CONFIG entries and (after
 #   --allow-api-key) the Anthropic key names. /usr/bin/env -i starts the pane's
@@ -8075,7 +8076,8 @@ LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH
 # Every launch starts a new environment with /usr/bin/env -i. Generate only
 # retained names here; the destination shell expands their values. An allowlist
 # file replaces the defaults and uses /bin/sh; otherwise keep the pane's shell,
-# work plumbing, this harness's selectors and numbered GIT_CONFIG entries.
+# work plumbing, toolchain home paths, this harness's selectors and numbered
+# GIT_CONFIG entries.
 launch_env_args=()
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   for env_name in $LAUNCH_ENV_NAMES; do
@@ -8103,6 +8105,8 @@ if [ -n "$SPAWN_TRACEPARENT" ]; then
 fi
 LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" --shell-prefix ${launch_env_args[@]+"${launch_env_args[@]}"}) || exit 1
 LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
+# shellcheck disable=SC2016 # The destination pane expands this selector.
+LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 else
@@ -8121,8 +8125,6 @@ SH
   # Select the pane's absolute shell before clearing the environment. zsh -f
   # avoids reloading its .zshenv; noninteractive Bash/sh do not load startup
   # files when BASH_ENV/ENV are absent from the explicit keep set.
-  # shellcheck disable=SC2016 # The destination pane expands this selector.
-  LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
   LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
@@ -8135,9 +8137,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # bash's "$BASH", and leaves any other shell on /bin/bash, so no bare name is
   # looked up later inside the sandbox; the caller's text stays one quoted -c
   # argument, and the subshell keeps the selector out of the pane's environment.
-  # shellcheck disable=SC2016 # The pane shell expands this selector.
-  LAUNCH_CONFINED_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
-  LAUNCH="( $LAUNCH_CONFINED_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"

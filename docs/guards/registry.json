@@ -681,7 +681,7 @@
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",
       "source": "ANTHROPIC_* variables listed in config/launch-env-allowlist and set in the environment or tmux session, plus the explicit --allow-api-key opt-in",
-      "trigger": "an API key or auth token is present in the launch environment without the opt-in",
+      "trigger": "config/launch-env-allowlist lists an API key or auth token that is set, without the opt-in",
       "remedy": "env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> ... (or pass --allow-api-key to bill the API deliberately)",
       "budget": 1,
       "test": "tests/fm-api-key-guard-lib.test.sh",

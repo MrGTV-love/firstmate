@@ -52,9 +52,12 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
     assert "FM_TEST_ABSENT" not in actual and "FM_TEST_FAKE_API_KEY" not in actual
     routed_env = dict(environment, GEMINI_API_KEY=fake, OPENAI_API_KEY=fake, LINEAR_API_KEY=fake, SSH_AUTH_SOCK="/fake/agent.sock",
                       HTTPS_PROXY="http://proxy.invalid:3128", CODEX_HOME="/fake/codex", JAVA_HOME="/fake/jdk",
+                      VIRTUAL_ENV="/fake/venv", PYTHONPATH="/fake/pythonpath", NODE_OPTIONS="--fake-option",
                       FM_TASK_INBOX="/fake/inbox", FM_DURATION_HOME="/fake/home")
     def routed(*options):
-        result = subprocess.run([python, str(helper), *options, "--", python, "-c", probe],
+        generated_prefix = subprocess.run([python, str(helper), "--shell-prefix", *options], env=environment, capture_output=True, text=True)
+        assert generated_prefix.returncode == 0, generated_prefix.stderr
+        result = subprocess.run(["/bin/sh", "-c", generated_prefix.stdout.strip() + " " + shlex.quote(python) + " -c " + shlex.quote(probe)],
                                 env=routed_env, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
         return json.loads(result.stdout)
@@ -65,14 +68,11 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
     assert codex["CODEX_HOME"] == "/fake/codex" and codex["HTTPS_PROXY"] == "http://proxy.invalid:3128"
     assert not secrets & codex.keys() and codex["TERM"] == "xterm", codex
     assert codex["JAVA_HOME"] == "/fake/jdk" and "GOROOT" not in codex, codex
+    assert not {"VIRTUAL_ENV", "PYTHONPATH", "NODE_OPTIONS"} & codex.keys(), codex
     assert "JAVA_HOME" not in floor, floor
-    route_prefix = subprocess.run([python, str(helper), "--shell-prefix", "--harness", "codex"], env=environment, capture_output=True, text=True)
-    assert route_prefix.returncode == 0, route_prefix.stderr
-    routed_shell = subprocess.run(["/bin/sh", "-c", route_prefix.stdout.strip() + " " + shlex.quote(python) + " -c " + shlex.quote(probe)],
+    direct_route = subprocess.run([python, str(helper), "--harness", "codex", "--", python, "-c", probe],
                                   env=routed_env, capture_output=True, text=True)
-    assert routed_shell.returncode == 0, routed_shell.stderr
-    routed_child = json.loads(routed_shell.stdout)
-    assert routed_child["JAVA_HOME"] == "/fake/jdk" and "GOROOT" not in routed_child and not secrets & routed_child.keys(), routed_child
+    assert direct_route.returncode == 2 and direct_route.stdout == "" and "--harness requires --shell-prefix" in direct_route.stderr
     for harness in ("gemini", "omp", "raw-tool"):
         other = routed("--harness", harness)
         assert not secrets & other.keys() and "CODEX_HOME" not in other, (harness, other)
@@ -82,5 +82,5 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
     print("PASS source boundary: env, Python and child shell lose fake credential; operational floor survives; explicit auth retention preserves empty/absent semantics")
     print("PASS generated source boundary: destination-only unexported values and quoted data survive; fake credential absent; invalid names emit no executable source")
     print("PASS harness route: every harness keeps work plumbing and only its own store selector, and no harness keeps a fake provider key; the floor omits inbox and duration names")
-    print("PASS toolchain route: a set JAVA_HOME reaches the worker through direct and generated launches, an unset toolchain name stays unset, and a fake provider key does not")
+    print("PASS toolchain route: a set JAVA_HOME reaches the worker, an unset home path stays unset, and VIRTUAL_ENV, PYTHONPATH, NODE_OPTIONS and a fake provider key do not; --harness refuses outside the generated prefix")
 

@@ -1948,11 +1948,11 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
-With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries), the non-secret project toolchain selectors (`JAVA_HOME`, `GOROOT`, `GOPATH`, `CARGO_HOME`, `RUSTUP_HOME`, `PNPM_HOME`, `BUN_INSTALL`, `NVM_DIR`, `VIRTUAL_ENV`, `PYTHONPATH`, `NODE_OPTIONS`) and the selected harness's non-secret store selectors.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries), the non-secret toolchain home paths (`JAVA_HOME`, `GOROOT`, `GOPATH`, `CARGO_HOME`, `RUSTUP_HOME`, `PNPM_HOME`, `BUN_INSTALL`, `NVM_DIR`) and the selected harness's non-secret store selectors.
 Each retained name is passed only when the pane sets it.
 The launch uses `/usr/bin/env -i` with names-only retained entries, so unlisted readonly exports and non-identifier environment names are absent from the new process.
 The default starts the pane's own shell without user startup loading (`zsh -f`, or noninteractive Bash/sh without BASH_ENV/ENV), preserving its raw-command syntax.
-[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors, the `TOOLCHAIN` selectors and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors, the `TOOLCHAIN` home paths and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
 [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
 Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`; without it the default launch drops both, and the [Claude API key guard](#claude-api-key-guard) refuses only an allowlist that lists one.
 
@@ -1962,6 +1962,7 @@ The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKE
 
 The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
 Other names outside the default set stop reaching the worker the same way.
+That includes `VIRTUAL_ENV`, `PYTHONPATH` and `NODE_OPTIONS`, which the default deliberately omits because they are pane-specific or can inject code.
 A raw launch command runs inside this boundary, so a pane variable it expands is empty unless it is kept.
 The remedy is the optional local, gitignored `config/launch-env-allowlist`.
 That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
@@ -2022,6 +2023,7 @@ Verify the selected provider login and Git transport after opting in; Firstmate 
 Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when an allowlist file is present, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
+Herdr's native restore is outside this boundary: a restored pane resumes the agent from its recorded session without the clean-environment prefix or the Seatbelt profile, so that agent's tools can see what the pane shell loaded ([Herdr restart behavior](herdr-backend.md#husks-after-a-server-restart)).
 The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
 The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks; kept harness credentials, dotenv reads or imports, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), alternate credential loaders and unconfined platforms remain outside that boundary.
 A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Execute a worker through the shared destination-side environment boundary.
 
-Usage: python3 bin/fm-worker-env.py [--harness ID] [--keep NAME ...] [--startup] -- COMMAND [ARG ...]
+Usage: python3 bin/fm-worker-env.py [--keep NAME ...] [--startup] -- COMMAND [ARG ...]
        python3 bin/fm-worker-env.py --shell-prefix [--harness ID] [--keep NAME ...]
 
 The default is the launch-env-allowlist operational floor. --keep adds
-validated names, never values. --harness adds the non-secret WORK plumbing,
-the TOOLCHAIN selectors and that harness's own HARNESS_ROUTES store selectors; fm-spawn passes it on every
-launch without config/launch-env-allowlist, and an allowlist file replaces it
-with exactly the listed names. No secret-valued name is kept by default: a
+validated names, never values. --harness, valid only with --shell-prefix, adds
+the non-secret WORK plumbing, the TOOLCHAIN home paths and that harness's own
+HARNESS_ROUTES store selectors; fm-spawn passes it on every launch without
+config/launch-env-allowlist, and an allowlist file replaces it with exactly the
+listed names. No secret-valued name is kept by default: a
 credential kept through --keep or the allowlist still reaches that harness's
 tools; it is not credential-isolated.
 Main-run readers use the default.
 --shell-prefix emits the equivalent names-only shell expansion used by
 fm-spawn, preserving listed non-exported destination variables without reading
 or serializing their values. fm-spawn adds the destination pane's numbered
-GIT_CONFIG entries as env arguments for the default launch; direct --harness
-execution retains them from the invoking environment. The new process does
+GIT_CONFIG entries as env arguments for the default launch. The new process does
 not inherit readonly exports or names outside the explicit set. --startup
 installs the existing confinement
 owner's shell-startup read rules on Darwin for direct readers. Linux has no
@@ -47,12 +47,10 @@ HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 SSL_CERT_FILE SSL_CERT_DIR NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE
 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS DISABLE_AUTOUPDATER TRACEPARENT
 """.split())
-# Non-secret project toolchain selectors a worker build may need.
+# Non-secret toolchain home paths a worker build may need.
 TOOLCHAIN = frozenset("""
 JAVA_HOME GOROOT GOPATH CARGO_HOME RUSTUP_HOME PNPM_HOME BUN_INSTALL NVM_DIR
-VIRTUAL_ENV PYTHONPATH NODE_OPTIONS
 """.split())
-GIT_CONFIG = re.compile(r"GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)\Z")
 # Each harness's non-secret store selectors. Provider API keys and tokens are
 # never named here: fm-spawn adds Claude's provider names from
 # bin/fm-worker-account-lib.sh and DSH's key name from bin/fm-dsh.py.
@@ -82,18 +80,19 @@ def startup_event(decision, started):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keep", action="append", default=[])
-    parser.add_argument("--harness", help="also keep the work plumbing and this harness's store selectors")
+    parser.add_argument("--harness", help="with --shell-prefix, also keep the work plumbing, toolchain home paths and this harness's store selectors")
     parser.add_argument("--startup", action="store_true")
     parser.add_argument("--shell-prefix", action="store_true", help="emit a names-only clean-env shell prefix for fm-spawn")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if any(not NAME.fullmatch(name) for name in args.keep):
         parser.error("--keep requires an environment name, not a value or shell expression")
+    if args.harness is not None and not args.shell_prefix:
+        parser.error("--harness requires --shell-prefix")
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     names = FLOOR.union(args.keep)
     if args.harness is not None:
         names |= WORK.union(TOOLCHAIN, HARNESS_ROUTES.get(args.harness, ()))
-    git_config = args.harness is not None
     if args.shell_prefix:
         if command or args.startup:
             parser.error("--shell-prefix accepts names only, without a command or --startup")
@@ -103,8 +102,7 @@ def main():
         return 0
     if not command:
         parser.error("a worker command is required after --")
-    environment = {name: value for name, value in os.environ.items()
-                   if name in names or (git_config and GIT_CONFIG.match(name))}
+    environment = {name: value for name, value in os.environ.items() if name in names}
     if args.startup:
         started = time.monotonic()
         try:
