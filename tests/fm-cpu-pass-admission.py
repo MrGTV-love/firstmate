@@ -65,8 +65,8 @@ def case(name, cores=18, running=0, load=0):
     folder.mkdir()
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL)')
-        connection.executemany('INSERT INTO runs VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER)')
+        connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
     env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'))
@@ -109,7 +109,7 @@ worker = root / 'start.py'
 worker.write_text('''import pathlib, sqlite3, sys, time
 folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
 with sqlite3.connect(folder / 'state.sqlite') as db:
-    db.execute('INSERT INTO runs VALUES (?, ?)', (name, 'running'))
+    db.execute('INSERT INTO runs (id, status) VALUES (?, ?)', (name, 'running'))
 with (folder / 'order').open('a') as out: out.write(name + '\\n')
 (folder / (name + '.started')).touch()
 while not (folder / (name + '.release')).exists(): time.sleep(0.025)
@@ -125,7 +125,7 @@ try:
         cores = os.cpu_count()
         limit = max(1, cores // 3)
         change(db, 'DELETE FROM runs')
-        for i in range(limit): change(db, 'INSERT INTO runs VALUES (?, ?)', (str(i), 'running'))
+        for i in range(limit): change(db, 'INSERT INTO runs (id, status) VALUES (?, ?)', (str(i), 'running'))
     else:
         cores, limit = 18, 6
     marker = folder / 'started'
@@ -145,13 +145,34 @@ try:
     finish(child)
     assert marker.exists()
 
+    # Only status running rows with neither ci_ready_at nor awaiting_agent_since
+    # count. Every excluded state is seeded; included rows alone fill the limit,
+    # and each daemon-recorded exclusion releases a count when it is set.
+    folder, db, env = case('count-definition', cores=3)
+    limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
+    for row in (('ci-ready', 'running', 1, None), ('parked', 'running', None, 1), ('ci-ready-parked', 'running', 1, 1),
+                ('pending', 'pending', None, None), ('completed', 'completed', None, None), ('failed', 'failed', None, None)):
+        change(db, 'INSERT INTO runs (id, status, ci_ready_at, awaiting_agent_since) VALUES (?, ?, ?, ?)', row)
+    for i in range(limit): change(db, "INSERT INTO runs (id, status) VALUES (?, 'running')", ('active-' + str(i),))
+    for name, release in (('parked-start', "UPDATE runs SET awaiting_agent_since=1 WHERE id='active-0'"),
+                          ('ci-ready-start', "UPDATE runs SET ci_ready_at=1 WHERE id='active-new'")):
+        if name == 'ci-ready-start': change(db, "INSERT INTO runs (id, status) VALUES ('active-new', 'running')")
+        marker, log = folder / (name + '.marker'), folder / (name + '.stderr')
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / name)
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: counted=%d limit=%d ' % (limit, limit) in log.read_text(), name + ' full count')
+        assert not marker.exists()
+        change(db, release)
+        finish(child)
+        assert marker.exists() and 'admitted: counted=%d limit=%d ' % (limit - 1, limit) in log.read_text(), log.read_text()
+
     # Queue all classes while at capacity, then release one slot at a time.
     # The startup lock bridges registration even while earlier clients remain
     # alive. All requests initially observe the same full database.
     folder, db, env = case('priority-race', cores=3, running=1)
     limit = max(1, os.cpu_count() // 3) if os.environ.get('FM_ADMISSION_NATIVE') else 1
     if limit > 1:
-        for i in range(1, limit): change(db, 'INSERT INTO runs VALUES (?, ?)', (str(i), 'running'))
+        for i in range(1, limit): change(db, 'INSERT INTO runs (id, status) VALUES (?, ?)', (str(i), 'running'))
     classes = ['other', 'vernant-build', 'machinery', 'merge-train']
     clients = {}
     for priority in classes:
@@ -191,7 +212,21 @@ try:
     os.killpg(child.pid, signal.SIGTERM)
     finish(child, -signal.SIGTERM)
     assert not marker.exists()
+    # Waiters cancelled by SIGINT remove their own records while another queued
+    # start scans them; that scan must never refuse the surviving start.
+    survivor = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'survivor')], env, folder / 'survivor')
+    pending(folder, 1)
+    for i in range(20):
+        cancelled = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', 'touch', str(folder / 'cancelled')],
+                           env, folder / ('cancelled-' + str(i)))
+        pending(folder, 2)
+        os.killpg(cancelled.pid, signal.SIGINT)
+        finish(cancelled, 130)
+        assert survivor.poll() is None, (folder / 'survivor.stderr').read_text()
+    assert not (folder / 'cancelled').exists()
     change(db, "UPDATE runs SET status='completed'")
+    finish(survivor)
+    assert (folder / 'survivor').exists()
     child = launch(cli + ['pipeline-start', '--', 'sh', '-c', 'exit 7'], env, folder / 'failure')
     finish(child, 7)
     child = launch(cli + ['pipeline-start', '--', 'true'], env, folder / 'after-failure')
@@ -240,7 +275,7 @@ else:
 folder = pathlib.Path(os.environ['CASE_FOLDER'])
 name = sys.argv[sys.argv.index('--intent') + 1] if '--intent' in sys.argv else 'reattach'
 if name != 'reattach':
-    with sqlite3.connect(folder / 'state.sqlite') as db: db.execute("INSERT INTO runs VALUES (?, 'running')", (name,))
+    with sqlite3.connect(folder / 'state.sqlite') as db: db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", (name,))
 if name == 'outer':
     out = open(folder / 'nested.stdout', 'w'); err = open(folder / 'nested.stderr', 'w')
     nested = subprocess.Popen(['python3', %r, 'run', 'no-mistakes.nested', '--', sys.argv[0], 'axi', 'run', '--intent', 'nested'],

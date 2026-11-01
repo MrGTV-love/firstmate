@@ -50,8 +50,9 @@ Running:
 Pipeline starts:
   - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
     priority waiter files. The start policy, core scaling and class order are
-    owned by docs/cpu-pass-pool.md. The run count always comes from the host's
-    ~/.no-mistakes/state.sqlite, opened only with mode=ro; notices go to stderr.
+    owned by docs/cpu-pass-pool.md. The counted runs always come from the host's
+    ~/.no-mistakes/state.sqlite, opened only with mode=ro: status = 'running'
+    AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Notices go to stderr.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
   - A short start lock bridges the check-to-registration race until a new
@@ -365,14 +366,18 @@ PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
 HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 
 
-def running_runs() -> set:
-    """Read host execution state without creating or changing its database."""
+def running_runs() -> dict:
+    """Map each status-running run ID to whether it counts against the start limit.
+
+    Reads host execution state without creating or changing its database.
+    """
     uri = Path(HOST_STATE_DB).expanduser().resolve().as_uri() + "?mode=ro"
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
-        return {row[0] for row in connection.execute("SELECT id FROM runs WHERE status = 'running'")}
+        return {row[0]: bool(row[1]) for row in connection.execute(
+            "SELECT id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
 
 
-def pipeline_observation() -> Tuple[set, int, float, int]:
+def pipeline_observation() -> Tuple[dict, int, float, int]:
     cores = os.cpu_count()
     if not isinstance(cores, int) or cores < 1:
         raise ValueError("cannot read a positive native CPU count")
@@ -394,7 +399,7 @@ def first_pipeline_waiter(directory: str) -> str:
             if try_lock(fd):
                 path.unlink(missing_ok=True)
                 continue
-            entry = json.loads(path.read_text())
+            entry = json.loads(os.pread(fd, 65536, 0))
             entries.append((PIPELINE_PRIORITIES.index(entry["priority"]), entry["queued_ns"], str(path)))
         finally:
             os.close(fd)
@@ -427,11 +432,12 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             reason = "another start is registering"
             if try_lock(admission_fd):
                 before, cores, load5, limit = pipeline_observation()
+                counted = sum(before.values())
                 first = first_pipeline_waiter(directory)
-                if first == waiter_path and len(before) < limit and load5 <= 2 * cores:
+                if first == waiter_path and counted < limit and load5 <= 2 * cores:
                     break
-                reason = "running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
-                    len(before), limit, load5, 2 * cores, args.priority)
+                reason = "counted=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
+                    counted, limit, load5, 2 * cores, args.priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
             now = time.monotonic()
             if now >= next_notice:
@@ -441,14 +447,14 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             delay = min(POLL_MAX_SECS, delay * 2)
         os.unlink(waiter_path)
         waiter_path = None
-        log(2, "pipeline-start admitted: running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
-            len(before), limit, load5, 2 * cores, args.priority))
+        log(2, "pipeline-start admitted: counted=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
+            counted, limit, load5, 2 * cores, args.priority))
         registration_error = False
 
         def registered() -> bool:
             nonlocal registration_error
             try:
-                if running_runs() - before:
+                if running_runs().keys() - before.keys():
                     # Serialize only the check-to-registration gap. The daemon
                     # owns status after this handoff; no lifetime watcher remains.
                     fcntl.flock(admission_fd, fcntl.LOCK_UN)

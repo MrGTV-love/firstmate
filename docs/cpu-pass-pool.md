@@ -68,9 +68,11 @@ The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner
 
 Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner checks the host's `~/.no-mistakes/state.sqlite` read-only and native five-minute load.
 It has no option or environment variable that selects another database.
-It admits only when the count of rows whose status is exactly `running` is below `max(1, floor(logical CPUs / 3))` and load5 is at most twice that CPU count.
-That is six starts on eighteen cores and three on a ten-core host; rounding is downward, with a one-start minimum.
-A run leaving `running` releases that count implicitly; no daemon-lifetime lease or watcher is installed.
+It admits only when the counted runs are below `max(1, floor(logical CPUs / 3))` and load5 is at most twice that CPU count.
+A counted run is a `runs` row with `status = 'running' AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL`; both of those columns are facts the daemon records.
+A CI-ready run that is only monitoring its PR, and a run parked waiting for its agent, are still `running` but are not counted.
+That is six counted runs on eighteen cores and three on a ten-core host; rounding is downward, with a one-start minimum.
+A run that leaves `running`, reaches CI-ready or parks for its agent releases its count implicitly; no daemon-lifetime lease or watcher is installed.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.
@@ -84,7 +86,8 @@ Existing-run reattachment and responses do not requeue, restart a run or consume
 Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes; the wrapped client and every descendant receive no exemption, so a nested fresh start queues like any other.
 A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
 Issue the same fresh start again through `bin/fm-duration.py run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
-After the admitted line, the start is the existing run and normal reattachment applies.
+The admitted line proves only that the client was launched, not that a run exists, so after it the worker reattaches normally.
+If that reattach refuses because no run is active and `no-mistakes axi status` shows no run created since the fresh-start call began, the start created no run and is issued again the same way; when status shows such a run, the worker reads its outcome and never starts another.
 Admission adds no inherited CPU-worker budget, reduces no worker counts and serializes none of a task's required checks.
 It is not start authority: explicit task admission, original intent and verification evidence, Test/Document and all other validation gates still apply.
 
