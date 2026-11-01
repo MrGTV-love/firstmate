@@ -4597,7 +4597,7 @@ while :; do
     guard_workarounds_detached
     if [ -n "$GUARD_WORKAROUND_REPORT" ] \
       && [ "$GUARD_WORKAROUND_REPORT" != "$(cat "$STATE/.guard-workarounds-presented" 2>/dev/null || true)" ]; then
-      fm_wake_append heartbeat heartbeat "$GUARD_WORKAROUND_REPORT" || exit 1
+      fm_wake_append check guard-workarounds "$GUARD_WORKAROUND_REPORT" || exit 1
       printf '%s\n' "$GUARD_WORKAROUND_REPORT" > "$STATE/.guard-workarounds-presented"
       touch "$STATE/.last-heartbeat"
       wake "heartbeat"

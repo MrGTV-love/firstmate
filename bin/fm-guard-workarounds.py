@@ -7,9 +7,11 @@ The home scan inspects only local ship/scout metadata and the recorded branch
 (or HEAD in its isolated copy). No fetch, checkout, ref update or event write.
 The most recent 100 first-parent commits are inspected, excluding the recorded
 base lineage in a home scan; explicit --repo mode excludes nothing.
+A home-scan task's base is its recorded base_branch, else the default branch
+fm_task_copy_default_branch (bin/fm-task-copy-lib.sh) resolves for its copy.
 A bare base name resolves to refs/remotes/origin/<name> first, then the local branch.
-A home-scan task whose base resolves to no commit is attributed nothing and is
-reported as base unresolved, never scanned into the base's own history.
+A task whose base resolves to no commit is skipped with a stderr note, never
+scanned into the base's own history and never reported as a workaround.
 A tree-equal merge is a signature, not proof that a refusal caused the merge.
 A base-merge-only change additionally requires a task/head-bound merge denial,
 a later commit time, and second parents reachable from that denial's base ref.
@@ -51,6 +53,13 @@ def resolve_base(repo, ref):
         if SHA.fullmatch(sha):
             return sha
     return ''
+
+
+def default_branch(repo):
+    lib = Path(__file__).resolve().parent / 'fm-task-copy-lib.sh'
+    result = subprocess.run(['bash', '-c', '. "$1" && fm_task_copy_default_branch "$2"', '_', str(lib), str(repo)],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else ''
 
 
 def events(path, skipped):
@@ -146,7 +155,6 @@ def main():
     if skipped[0]:
         print(f'fm-guard-workarounds: skipped {skipped[0]} malformed event row(s) in {log}', file=sys.stderr)
     targets = []
-    unresolved = []
     if args.repo:
         targets.append((args.repo, args.head, args.task, ''))
     else:
@@ -163,15 +171,12 @@ def main():
             if not repo or not Path(repo).is_dir():
                 continue
             branch = metadata.get('branch')
-            base = metadata.get('base_branch') or git(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD') or 'main'
-            base_tip = resolve_base(repo, base)
+            base = metadata.get('base_branch') or default_branch(repo)
+            base_tip = resolve_base(repo, base) if base else ''
             if not base_tip:
-                unresolved.append(path.stem)
+                print(f'fm-guard-workarounds: skipped task={path.stem}: base unresolved, nothing attributed', file=sys.stderr)
                 continue
             targets.append((repo, 'refs/heads/' + branch if branch else 'HEAD', path.stem, base_tip))
-    for task in unresolved:
-        line = f'GUARD_WORKAROUND task={task} base=unresolved (nothing attributed; record base_branch in its metadata)'
-        print(line, file=sys.stderr if args.json else sys.stdout)
     seen = set()
     for repo, head, task, base_tip in targets:
         found = []

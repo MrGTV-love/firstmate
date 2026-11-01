@@ -2399,6 +2399,13 @@ test_guard_workaround_heartbeat() {
   [ "$(cat "$out")" = heartbeat ] || fail "workaround detection did not retain fleet scope"
   grep -F "tree-equal-merge:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted the tree-equal signature"
   grep -F "base-merge-only-after-refusal:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted refusal correlation"
+  # A plain heartbeat queued after the report before Main drains must not
+  # replace it: the report keeps its own wake identity.
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_wake_append heartbeat heartbeat heartbeat' _ "$ROOT/bin/fm-wake-lib.sh" \
+    || fail "could not queue a later plain heartbeat"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "the wake drain failed: $(cat "$dir/drain.err")"
+  grep -F "tree-equal-merge:$merged" "$dir/drain.out" >/dev/null \
+    || fail "a later plain heartbeat hid the workaround report from the drain: $(cat "$dir/drain.out")"
   ack_stopped_cycle "$state" || fail "could not acknowledge workaround heartbeat"
   set_mtime "$(( $(date +%s) - 60 ))" "$state/.last-heartbeat"
   watch_bg "$state" "$fakebin" "$dir/quiet.out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_GUARD_EVENT_LOG="$state/guard-events.jsonl"

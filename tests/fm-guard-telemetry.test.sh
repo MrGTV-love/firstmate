@@ -585,9 +585,10 @@ git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse "
 python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/stale-local-correlation.jsonl"
 jq -se 'any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/stale-local-correlation.jsonl" >/dev/null \
   || fail "a stale local base hid a real base-merge-only change"
-# A task whose base resolves to no commit is attributed nothing: its scan would
-# otherwise walk into the base's own history and blame the task for it.
-LEGACY="$TMP/unresolved-base-repo"
+# A task's base follows the shared default-branch rule, so a local-only master
+# project is scanned past its base history; a base that resolves to no commit
+# is skipped with a stderr note and never reaches the report.
+LEGACY="$TMP/master-base-repo"
 git init -q -b master "$LEGACY"
 git -C "$LEGACY" commit -q --allow-empty -m seed
 git -C "$LEGACY" checkout -qb topic
@@ -595,21 +596,31 @@ git -C "$LEGACY" commit -q --allow-empty -m topic
 git -C "$LEGACY" checkout -q master
 git -C "$LEGACY" merge -q --no-ff -s ours topic -m 'historic tree-equal merge'
 historic=$(git -C "$LEGACY" rev-parse HEAD)
-git -C "$LEGACY" checkout -qb feature-unresolved
+git -C "$LEGACY" checkout -qb feature-legacy
 printf 'work\n' > "$LEGACY/work.txt"
 git -C "$LEGACY" add work.txt
 git -C "$LEGACY" commit -qm ordinary
+mkdir -p "$TMP/master-state"
+printf 'kind=ship\nworktree=%s\nbranch=feature-legacy\n' "$LEGACY" > "$TMP/master-state/legacy-task.meta"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/master-state" --log "$TMP/none.jsonl" \
+  > "$TMP/master.txt" 2> "$TMP/master.err" || fail "a master-default home scan failed"
+[ ! -s "$TMP/master.txt" ] && [ ! -s "$TMP/master.err" ] \
+  || fail "a master-default base was not resolved by the shared rule: $(cat "$TMP/master.txt" "$TMP/master.err")"
+UNRESOLVED="$TMP/unresolved-base-repo"
+git clone -q --no-hardlinks "$LEGACY" "$UNRESOLVED"
+git -C "$UNRESOLVED" checkout -q feature-legacy
+git -C "$UNRESOLVED" branch -q -m master trunk
+git -C "$UNRESOLVED" remote remove origin
 mkdir -p "$TMP/unresolved-state"
-printf 'kind=ship\nworktree=%s\nbranch=feature-unresolved\n' "$LEGACY" > "$TMP/unresolved-state/legacy-task.meta"
-python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" > "$TMP/unresolved.txt" \
-  || fail "an unresolved base aborted the home scan"
-[ "$(cat "$TMP/unresolved.txt")" = 'GUARD_WORKAROUND task=legacy-task base=unresolved (nothing attributed; record base_branch in its metadata)' ] \
-  || fail "an unresolved base was not reported, or base history was attributed: $(cat "$TMP/unresolved.txt")"
-python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" --json \
-  > "$TMP/unresolved.jsonl" 2> "$TMP/unresolved.err" || fail "an unresolved base aborted the JSON home scan"
-[ ! -s "$TMP/unresolved.jsonl" ] || fail "an unresolved base leaked a signature into the JSON feed: $(cat "$TMP/unresolved.jsonl")"
-grep -q 'task=legacy-task base=unresolved' "$TMP/unresolved.err" \
-  || fail "the JSON home scan did not report the unresolved base on stderr"
+printf 'kind=ship\nworktree=%s\nbranch=feature-legacy\n' "$UNRESOLVED" > "$TMP/unresolved-state/legacy-task.meta"
+for mode in text --json; do
+  # shellcheck disable=SC2046 # The JSON flag is deliberately absent in text mode.
+  python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" $([ "$mode" = text ] || echo --json) \
+    > "$TMP/unresolved.out" 2> "$TMP/unresolved.err" || fail "an unresolved base aborted the $mode home scan"
+  [ ! -s "$TMP/unresolved.out" ] || fail "an unresolved base reached the $mode report: $(cat "$TMP/unresolved.out")"
+  grep -q 'skipped task=legacy-task: base unresolved' "$TMP/unresolved.err" \
+    || fail "the $mode home scan did not note the skipped task on stderr: $(cat "$TMP/unresolved.err")"
+done
 python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$LEGACY" --head master --task legacy-task --log "$TMP/none.jsonl" --json > "$TMP/explicit.jsonl"
 jq -se --arg head "$historic" 'length == 1 and .[0].head == $head' "$TMP/explicit.jsonl" >/dev/null \
   || fail "explicit --repo mode no longer reports a tree-equal merge it is pointed at"
