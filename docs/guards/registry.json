@@ -148,9 +148,9 @@
         {"file": "bin/fm-spawn.sh", "match": "spawn-claude-dotenv-confinement deny", "count": 1}
       ],
       "emitters": ["bin/fm-spawn.sh"],
-      "invariant": "a confined Darwin Claude task cannot read bytes from paths whose final component is .env or .env.*",
+      "invariant": "a confined Darwin Claude task cannot read bytes from paths whose final component is .env or .env.*, except the .env.example, .env.sample and .env.template templates and the task home's and top-most local home's .env that Firstmate's own TypeSafe hooks read, which its tools can also read",
       "layer": "impossible-by-construction",
-      "source": "Darwin Seatbelt file-read-data decisions on resolved filesystem paths in the existing Claude whole-worker profile",
+      "source": "Darwin Seatbelt file-read-data decisions on resolved filesystem paths in the existing Claude whole-worker profile; fm-spawn names the top-most local home through fm_firstmate_root_home",
       "trigger": "fm-spawn launches or relaunches a Claude ship/scout on Darwin",
       "decision": "deny",
       "fail_direction": "closed",

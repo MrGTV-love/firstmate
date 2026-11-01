@@ -50,8 +50,24 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
     actual = json.loads(generated.stdout)
     assert actual["FM_TEST_LOCAL"] == local_value and actual["FM_TEST_EMPTY"] == ""
     assert "FM_TEST_ABSENT" not in actual and "FM_TEST_FAKE_API_KEY" not in actual
+    routed_env = dict(environment, GEMINI_API_KEY=fake, LINEAR_API_KEY=fake, SSH_AUTH_SOCK="/fake/agent.sock",
+                      FM_TASK_INBOX="/fake/inbox", FM_DURATION_HOME="/fake/home")
+    def routed(*options):
+        result = subprocess.run([python, str(helper), *options, "--", python, "-c", probe],
+                                env=routed_env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        return json.loads(result.stdout)
+    floor = routed()
+    assert not {"FM_TASK_INBOX", "FM_DURATION_HOME", "SSH_AUTH_SOCK", "GEMINI_API_KEY"} & floor.keys(), floor
+    gemini = routed("--harness", "gemini")
+    assert gemini["GEMINI_API_KEY"] == fake and gemini["SSH_AUTH_SOCK"] == "/fake/agent.sock"
+    assert "LINEAR_API_KEY" not in gemini and gemini["TERM"] == "xterm"
+    for harness in ("omp", "raw-tool"):
+        other = routed("--harness", harness)
+        assert not {"GEMINI_API_KEY", "LINEAR_API_KEY"} & other.keys() and other["SSH_AUTH_SOCK"] == "/fake/agent.sock", (harness, other)
     invalid = subprocess.run([python, str(helper), "--shell-prefix", "--keep", "NAME;false"], env=environment, capture_output=True, text=True)
     assert invalid.returncode == 2 and invalid.stdout == ""
     print("PASS source boundary: env, Python and child shell lose fake credential; operational floor survives; explicit auth retention preserves empty/absent semantics")
     print("PASS generated source boundary: destination-only unexported values and quoted data survive; fake credential absent; invalid names emit no executable source")
+    print("PASS harness route: gemini keeps only its own fake key and work locators; omp and unknown raw tools keep neither fake key; the floor omits inbox and duration names")
 

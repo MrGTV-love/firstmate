@@ -174,12 +174,10 @@ assert 'shell-compound=unset' in lines, lines
 assert resume['argv'] == ['--resume=bare-session'], resume
 assert child['argv'] == ['--config', config], child
 assert child['compound'] == (compound or None), child
-assert child['ambient'] == (None if filtered == 'yes' else 'ambient'), child
-assert child['listed'] == 'listed', child
-if filtered == 'yes':
-    assert child['shell'] is None, child
-else:
-    assert child['shell'] in ('zsh', 'bash'), child
+# Every launch drops the pane's ambient names; only an allowlist keeps one.
+assert child['ambient'] is None, child
+assert child['listed'] == ('listed' if filtered == 'yes' else None), child
+assert child['shell'] is None, child
 PY
   pass "$harness destination-shell launch matches record without contaminating shell or bare resume"
 }

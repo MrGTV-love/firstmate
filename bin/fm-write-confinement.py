@@ -5,7 +5,7 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
        --projects DIR --data DIR --state DIR --task ID
        --harness {omp,claude} --profile FILE
        [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
-       [--claude-session UUID]
+       [--claude-session UUID] [--key-home DIR]
 
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
@@ -33,8 +33,11 @@ fm-spawn.sh and deliberately does not invoke this builder. No credentials are
 copied. Both profiles also deny reads of the named standard user/system shell
 startup files, including canonical symlink targets, so child login/interactive
 shells cannot reload operator secret exports. Claude additionally denies
-file-read-data for .env and .env.* final path components. OMP retains its existing
-private TypeSafe dotenv lookup; it has no dotenv read-isolation claim. Neither
+file-read-data for .env and .env.* final path components, except the
+.env.example, .env.sample and .env.template templates and the .env of --home
+and --key-home (the top-most local home), which Firstmate's own hooks read for
+the TypeSafe key; Claude's tools can read those two files too. OMP retains its
+existing private TypeSafe dotenv lookup; it has no dotenv read-isolation claim. Neither
 rule protects arbitrary renamed copies or hard-link aliases of secret files;
 dotenv symlinks resolving to a non-dotenv target name are also outside the
 component-matching rule.
@@ -104,11 +107,15 @@ def startup_read_rules(home):
     return [f"(deny file-read-data (literal {quoted(path)}))" for path in sorted(paths)]
 
 
-def dotenv_read_rules():
+def dotenv_read_rules(key_homes):
     # Component matching also covers nested project files and foreign homes.
     # OMP is intentionally excluded until its private TypeSafe lookup can be
     # separated from model-controlled file tools without a sandbox escape.
-    return ["(deny file-read-data " + regex(r"(^|/)\.env(\.[^/]*)?$") + ")"]
+    # Later rules win: named non-secret templates and the key files
+    # fm_typesafe_key reads stay readable, so a guard hook keeps its key.
+    return ["(deny file-read-data " + regex(r"(^|/)\.env(\.[^/]*)?$") + ")",
+            "(allow file-read-data " + regex(r"(^|/)\.env\.(example|sample|template)$") + ")",
+            *[f"(allow file-read-data (literal {quoted(canonical(Path(home) / '.env'))}))" for home in dict.fromkeys(key_homes)]]
 
 
 def worktrees(primary):
@@ -388,7 +395,7 @@ def build(args):
     lines += [f"(deny file-write* (literal {quoted(path)}))" for path in dict.fromkeys(fixed)]
     lines += startup_read_rules(home)
     if args.harness == "claude":
-        lines += dotenv_read_rules()
+        lines += dotenv_read_rules([args.home, *args.key_home])
     Path(args.profile).write_text("\n".join(lines) + "\n")
 
 
@@ -401,6 +408,7 @@ def main():
     parser.add_argument("--branch", default="")
     parser.add_argument("--claude-session")
     parser.add_argument("--protect", action="append", default=[])
+    parser.add_argument("--key-home", action="append", default=[])
     args = parser.parse_args()
     try:
         build(args)

@@ -1896,14 +1896,51 @@ SH
       FM_TEST_AMBIENT_SENTINEL=synthetic-unrelated FM_TEST_ALLOWED="$value" FM_TEST_EMPTY='' \
       "$pane_shell" -c "$launch") || fail "allowlist=$setting emitted launch failed in $pane_shell"
       case "$setting" in
-        absent|missing-config) expected=$(printf '%s\n' synthetic-unrelated "$value" '' unset) ;;
         enabled) expected=$(printf '%s\n' unset "$value" '' unset) ;;
-        empty) expected=$(printf '%s\n' unset unset unset unset) ;;
+        absent|missing-config|empty) expected=$(printf '%s\n' unset unset unset unset) ;;
       esac
       expected="$expected"$'\n'"$HOME_DIR/user-home"$'\n'"$pane_path"$'\nxterm\nsynthetic-pane\n/synthetic/gotmp'
       [ "$result" = "$expected" ] || fail "allowlist=$setting worker environment mismatch: $result"
     done
-    pass "allowlist=$setting preserves the operational floor and filters only when opted in"
+    pass "allowlist=$setting preserves the operational floor and filters the ambient environment"
+  done
+}
+
+# With no allowlist file, the real generated launch of a named harness keeps
+# that harness's own fake credential and the work locators, and env, Python
+# and a child shell all lose another harness's and an unrelated fake credential.
+test_default_launch_keeps_only_the_harness_route() {
+  local row harness kept dropped id rec out status launch observed pane_shell
+  for row in gemini:GEMINI_API_KEY:OPENAI_API_KEY codex:OPENAI_API_KEY:GEMINI_API_KEY; do
+    IFS=: read -r harness kept dropped <<EOF
+$row
+EOF
+    id="env-default-$harness"
+    rec=$(make_spawn_case "$id" "$harness" "$id")
+    read_case_record "$rec"
+    observed="$CASE_DIR/observed"
+    cat > "$FAKEBIN_DIR/$harness" <<SH
+#!/bin/sh
+{ env; /bin/sh -c env; python3 -c 'import os; print("\\n".join(k + "=" + v for k, v in os.environ.items()))'; } > '$observed'
+SH
+    chmod +x "$FAKEBIN_DIR/$harness"
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness "$harness" 2>&1)
+    status=$?
+    expect_code 0 "$status" "default $harness spawn should succeed: $out"
+    launch=$(cat "$LAUNCH_LOG")
+    for pane_shell in /bin/bash /bin/zsh; do
+      [ -x "$pane_shell" ] || continue
+      rm -f "$observed"
+      env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:/usr/bin:/bin" TERM=xterm \
+        SSH_AUTH_SOCK=/synthetic/agent.sock LINEAR_API_KEY=synthetic-unrelated \
+        GEMINI_API_KEY=synthetic-gemini OPENAI_API_KEY=synthetic-openai \
+        "$pane_shell" -c "$launch" >/dev/null 2>&1 || fail "default $harness launch failed in $pane_shell"
+      [ "$(grep -c "^$kept=synthetic-" "$observed")" -eq 3 ] || fail "$harness lost its own route $kept in $pane_shell"
+      [ "$(grep -c '^SSH_AUTH_SOCK=/synthetic/agent.sock$' "$observed")" -eq 3 ] || fail "$harness lost SSH_AUTH_SOCK in $pane_shell"
+      [ "$(grep -c '^TERM=xterm$' "$observed")" -eq 3 ] || fail "$harness lost TERM in $pane_shell"
+      ! grep -Eq "^(LINEAR_API_KEY|$dropped)=" "$observed" || fail "$harness received a foreign fake credential in $pane_shell"
+    done
+    pass "default $harness launch keeps $kept, SSH_AUTH_SOCK and TERM and drops $dropped and LINEAR_API_KEY through env, Python and a child shell"
   done
 }
 
@@ -2075,6 +2112,7 @@ SH
 }
 
 test_launch_environment_allowlist
+test_default_launch_keeps_only_the_harness_route
 test_launch_environment_invalid_config_refuses
 test_launch_environment_inaccessible_config_refuses
 test_launch_environment_inherited_by_secondmate

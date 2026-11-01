@@ -615,10 +615,14 @@
 # spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
 # lifecycle attribution; Herdr's bare native resume remains unmanaged.
 # Launch environment (config/launch-env-allowlist):
-#   Absent leaves ambient inheritance subject to harness-specific shedding.
-#   A present readable regular file opts every launch (ship, scout, secondmate,
-#   raw command, and relaunch) into bin/fm-worker-env.py's names-only generated
-#   clean-environment prefix followed by /bin/sh -c of the existing command.
+#   Every launch (ship, scout, secondmate, raw command, and relaunch) runs
+#   under bin/fm-worker-env.py's names-only generated clean-environment prefix.
+#   Absent keeps the operational floor, the helper's non-secret work locators
+#   and the selected harness's own authentication route (plus the Anthropic
+#   key names after --allow-api-key), and the pane's own shell runs the
+#   existing command (zsh with -f).
+#   A present readable regular file keeps exactly the floor and its listed
+#   names instead, followed by /bin/sh -c of the existing command.
 #   Each line is one POSIX environment name, never a value or shell expression;
 #   blank lines and lines beginning with # are ignored. Invalid input refuses
 #   before launch, as do path inspection errors such as inaccessible config
@@ -627,8 +631,8 @@
 #   not copied from the invoking process or written into the launch text.
 #   Unset names stay unset and empty values stay empty.
 #   bin/fm-worker-env.py owns the fixed operational floor: home/search/terminal,
-#   locale, temp and backend routing, task/inbox/duration identity, compact
-#   adviser and Lavish selectors. Explicit launch assignments below pin the
+#   locale, temp and backend routing, the task marker, compact adviser and
+#   Lavish selectors. Explicit launch assignments below pin the
 #   resolved adviser policy even when no pane export arrived.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
@@ -831,7 +835,7 @@
 # owns the identities, the hook install, and chaining the repository git is
 # actually running in so a project husky hook still runs. Author identity is
 # not rewritten. Every launch reconciles numbered GIT_CONFIG entries in the
-# persistent destination shell before any config/launch-env-allowlist filter,
+# persistent destination shell before the clean-environment boundary,
 # without changing shell selection. It removes only core.hooksPath entries equal
 # to this task's generated directory, compacts survivors in order, and appends
 # this task's override on every launch. Unrelated entries and
@@ -6718,6 +6722,11 @@ if [ "$KIND" != secondmate ]; then
       for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
         confinement_args+=(--protect "${confinement_home_state%/state}")
       done
+      # Firstmate's own hooks resolve the TypeSafe key from this home's and the
+      # top-most local home's .env (fm_typesafe_key), so Claude keeps both.
+      if [ "$HARNESS" = claude ] && confinement_root_home=$(fm_firstmate_root_home "$FM_HOME" 2>/dev/null); then
+        confinement_args+=(--key-home "$confinement_root_home")
+      fi
       python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
         --config "$CONFIG" --projects "$PROJECTS" \
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
@@ -8068,33 +8077,50 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; '"$LAUNCH"
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
+# Every launch crosses the shared clean-environment boundary. Without an
+# allowlist file it keeps the floor, work locators and this harness's own
+# authentication route; a file keeps exactly its listed names instead.
+# Generate names-only references here and let the destination shell expand
+# values once, including non-exported names.
+launch_env_args=(--shell-prefix)
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  # Shared with Main-run readers: generate names-only references here and let
-  # the destination shell expand values once, including non-exported names.
-  launch_env_args=(--shell-prefix)
   for env_name in $LAUNCH_ENV_NAMES; do
     launch_env_args+=(--keep "$env_name")
   done
-  if [ -n "$SPAWN_TRACEPARENT" ]; then
-    launch_env_args+=(--keep TRACEPARENT)
+else
+  launch_env_args+=(--harness "$HARNESS")
+  if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 1 ]; then
+    launch_env_args+=(--keep ANTHROPIC_API_KEY --keep ANTHROPIC_AUTH_TOKEN)
   fi
-  LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" "${launch_env_args[@]}") || exit 1
-  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
+fi
+if [ -n "$SPAWN_TRACEPARENT" ]; then
+  launch_env_args+=(--keep TRACEPARENT)
+fi
+LAUNCH_ENV_PREFIX=$(python3 "$SCRIPT_DIR/fm-worker-env.py" "${launch_env_args[@]}") || exit 1
+LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
+# The pane shell, not a wrapper, must parse the caller's launch text: a
+# zsh-only modifier or a bash-only construct keeps the meaning it has in the
+# pane. The selector runs in the pane, takes zsh's own absolute path or bash's
+# "$BASH", so no bare name is looked up later inside a sandbox; the caller's
+# text stays one quoted -c argument, and the subshell keeps the selector out of
+# the pane's environment.
+# shellcheck disable=SC2016 # The pane shell expands this selector.
+LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
+if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
+else
+  # zsh -f skips the user's .zshenv, which could otherwise reload credentials
+  # the boundary just removed; noninteractive bash and sh read no startup file
+  # without BASH_ENV or ENV, which the boundary does not keep.
+  # shellcheck disable=SC2016 # The pane shell expands this selector.
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec $LAUNCH_ENV_PREFIX \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
   # pane, so native tools and grandchildren use only the task temp root.
   LAUNCH="export TMPDIR=$(shell_quote "$TASK_TMP") TMP=$(shell_quote "$TASK_TMP") TEMP=$(shell_quote "$TASK_TMP"); $LAUNCH"
-  # The pane shell, not this wrapper, must parse the caller's launch text: a
-  # zsh-only modifier or a bash-only construct keeps the meaning it has without
-  # confinement. The selector runs in the pane, takes zsh's own absolute path or
-  # bash's "$BASH", and leaves any other shell on /bin/bash, so no bare name is
-  # looked up later inside the sandbox; the caller's text stays one quoted -c
-  # argument, and the subshell keeps the selector out of the pane's environment.
-  # shellcheck disable=SC2016 # The pane shell expands this selector.
-  LAUNCH_CONFINED_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
-  LAUNCH="( $LAUNCH_CONFINED_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
+  # Any shell other than zsh or bash stays on /bin/bash inside the sandbox.
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"

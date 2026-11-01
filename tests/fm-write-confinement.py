@@ -214,6 +214,18 @@ def child(manifest):
             results[f"refused-dotenv-{index}"] = not readable
         else:
             results[f"omp-private-dotenv-kept-{index}"] = readable
+    for index, path in enumerate(manifest["dotenv_readable"]):
+        try:
+            results[f"key-or-template-dotenv-readable-{index}"] = "sentinel-not-a-secret" in Path(path).read_text()
+        except PermissionError:
+            results[f"key-or-template-dotenv-readable-{index}"] = False
+    # The registered Stop hook itself resolves the key from the home, then
+    # from the top-most local home, and hands it to a fake pinned belay.
+    for index, fm_home in enumerate(manifest["key_homes"]):
+        hook = subprocess.run([str(Path(manifest["repo"]) / "bin/fm-jev-belay-hook.sh")], input="{}", capture_output=True, text=True,
+                              env={"HOME": os.environ["HOME"], "PATH": os.environ["PATH"], "TMPDIR": os.environ["TMPDIR"],
+                                   "FM_HOME": fm_home, "FM_TEST_SEAM": "1", "FM_JEV_BELAY_BLOB": manifest["belay_blob"]})
+        results[f"guard-hook-reads-key-{index}"] = hook.returncode == 42
     results["ordinary-source-readable"] = (worktree / "README").read_text() == "original"
     for shell, flags in (("/bin/bash", ["--login", "-i"]), ("/bin/zsh", ["-l", "-i"])):
         if Path(shell).exists():
@@ -865,15 +877,26 @@ def fixture(repo, base, harness, user_home, other):
                                "omp-models-db-shm": user_home / ".omp/agent/models.db-shm",
                                "omp-session": user_home / ".omp/agent/sessions/session.jsonl",
                                "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
-    dotenv = [worktree / ".env", worktree / "nested/.env.local", base / "other-home/.env", home / ".env"]
-    for path in dotenv:
+    dotenv = [worktree / ".env", worktree / "nested/.env.local", base / "other-home/.env"]
+    # The home and its top-most local home keep the key Firstmate's own hooks
+    # read; a crew home bound to that top-most home has no .env of its own.
+    key_home, crew_home = base / "key-home", base / "crew-home"
+    readable = [home / ".env", key_home / ".env"] + [worktree / (".env." + name) for name in ("example", "sample", "template")]
+    for path in dotenv + readable:
         write(path, "TYPESAFE_API_KEY=sentinel-not-a-secret\n")
     alias = worktree / "dotenv-alias"
     alias.symlink_to(dotenv[2])
     dotenv.append(alias)
+    write(crew_home / ".fm-secondmate-parent", f"schema=fm-secondmate-parent.v1\nroute=local\nparent_home={key_home}\n")
+    belay = 'process.exit(process.env.TYPESAFE_API_KEY === "sentinel-not-a-secret" ? 42 : 3);\n'
+    for root in (home, key_home):
+        write(root / "data/vendor/jev-belay/belay.mjs", belay)
+    belay_blob = subprocess.run(["git", "hash-object", str(home / "data/vendor/jev-belay/belay.mjs")],
+                                capture_output=True, text=True, check=True).stdout.strip()
     for name in (".bash_profile", ".bashrc", ".zshenv", ".zprofile", ".zshrc", ".zlogin"):
         write(user_home / name, "export FM_TEST_FAKE_API_KEY=sentinel-not-a-secret\n")
-    return {"harness": harness, "dotenv": [str(path) for path in dotenv],
+    return {"harness": harness, "dotenv": [str(path) for path in dotenv], "dotenv_readable": [str(path) for path in readable],
+            "key_home": str(key_home), "key_homes": [str(home), str(crew_home)], "belay_blob": belay_blob,
             "repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
             "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha, "stash_sha": stash_sha,
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
@@ -896,7 +919,7 @@ def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktre
     command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", worktree or manifest["worktree"],
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
                "--data", str(home / "data/task"), "--state", str(home / "state"), "--task", "task", "--branch", "fm/task",
-               "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
+               "--harness", harness, "--protect", manifest["other_home"], "--key-home", manifest["key_home"], "--profile", str(profile)]
     if harness == "claude":
         command += ["--claude-session", OWN_SESSION]
     if agent_dir:

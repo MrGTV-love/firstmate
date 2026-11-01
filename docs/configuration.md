@@ -1947,8 +1947,11 @@ The text is static and never executed or expanded; secondmate charters never tak
 
 ## Worker launch environment (config/launch-env-allowlist)
 
-The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
-With no file, ambient inheritance remains unfiltered except for harness-specific shedding, including the [Claude API key guard](#claude-api-key-guard); the provider, long-lived terminal daemon, and shell initialization determine the remaining inherited variables.
+Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret work locators (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME` and the `XDG_*` base directories) and the selected harness's own authentication route, and the pane's own shell runs the launch command (zsh with `-f`, so `.zshenv` does not reload credentials).
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns each harness's kept names, for example `GEMINI_API_KEY` for gemini, `META_API_KEY` for muse, `OPENAI_API_KEY` for codex and `DEEPSEEK_API_KEY` for dsh; Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
+A harness credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
+The optional local, gitignored `config/launch-env-allowlist` replaces those defaults with exactly the floor and its listed names.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -2002,11 +2005,11 @@ Choose the minimum additions for the authentication method actually in use:
 ### Validation and security limits
 
 Verify the selected provider login and Git transport after opting in; Firstmate does not infer credentials from model names or install a secret manager.
-Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when this option is enabled, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
+Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when an allowlist file is present, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
 The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
-The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks and dotenv-read rules for Darwin Claude tasks; unfiltered authentication, other harnesses, OMP dotenv imports, renamed secret files and unconfined platforms remain outside that boundary.
+The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks and dotenv-read rules for Darwin Claude tasks; kept harness credentials, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), OMP dotenv imports, renamed secret files and unconfined platforms remain outside that boundary.
 A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
@@ -2804,6 +2807,7 @@ Both profiles include read-denial rules for standard user/system Bash and Zsh st
 A selector present only in a stale destination pane, an arbitrary alternate loader and a selector changed after launch are outside this named-path boundary.
 The launch already supplies PATH; if additional operational initialization is needed, ask Main to separate it from credential-loading startup rather than sourcing a different secret-bearing file.
 The Claude profile also includes a `file-read-data` denial for `.env` and `.env.*` final path components, including nested project and foreign-home files.
+It keeps the non-secret `.env.example`, `.env.sample` and `.env.template` templates readable, and the `.env` of the task's home and of its top-most local home, which Firstmate's own hooks such as the [Jev belay Stop hook](#jev-belay-stop-hook) read for the TypeSafe key; Claude's tools can read those two files too.
 The executable acceptance test must run from an unconfined Darwin process; `sandbox_apply: Operation not permitted` from an already-confined worker does not prove the new rules enforce or that native authentication remains compatible.
 OMP keeps its private TypeSafe dotenv lookup and has no corresponding dotenv read-denial claim.
 These narrow read rules do not protect renamed copies, hard-link aliases, dotenv symlinks resolving to a non-dotenv target name, arbitrary alternate loaders or same-user process inspection.
