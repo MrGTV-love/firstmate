@@ -4601,12 +4601,12 @@ fi
 }
 if [ "$KIND" != secondmate ]; then
   if [ "$RELAUNCH" = 1 ]; then
-    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || exit 1
+    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || TASK_EGRESS=
   else
-    TASK_EGRESS=$(jev_egress brief "$BRIEF") || exit 1
+    TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
   fi
   case $TASK_EGRESS in
-    '['*']') ;;
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
     *)
       echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
       "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
@@ -7148,9 +7148,9 @@ EOF
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
     [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
-    native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || exit 1
+    native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || native_find=
     case $native_find in
-      on|off) ;;
+      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-find" 2>/dev/null || true ;;
       *)
         echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
         "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true

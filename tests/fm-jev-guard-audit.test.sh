@@ -605,7 +605,25 @@ pass 'offline guard settlement, cost completeness and S2 egress acceptance'
 # installed omp below consumes these actual generated overlays, not a copied policy.
 export AUDIT_DISPATCH_CASES="$TMP_ROOT/dispatch-cases"
 : > "$AUDIT_DISPATCH_CASES"
-for posture in directive-only absent granted other-class no-helpers other-project invalid indented silent-runtime silent-find; do
+# Replace the policy helper's answer for one launch command; every other
+# command still reaches the real helper through the real runtime.
+fake_egress_helper() { # <fakebin> <command> <exit-code>
+  local real_bun
+  real_bun=$(command -v bun) || return 1
+  cat > "$1/bun" <<SH
+#!/usr/bin/env bash
+case "\$1|\$2" in
+  */fm-jev-egress.ts\|$2) exit $3 ;;
+esac
+exec "$real_bun" "\$@"
+SH
+  chmod +x "$1/bun"
+}
+# Every jev-egress-grant event as "<session> <decision> <source_ok>", in order.
+egress_events() { # <log>
+  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.session) \(.decision) \(.source_ok)"' "$1"
+}
+for posture in directive-only absent granted other-class no-helpers other-project invalid malformed duplicate indented silent-runtime silent-find failed-find failed-record; do
   world="$TMP_ROOT/dispatch-$posture"
   home="$world/home"
   project="$world/firstmate"
@@ -619,10 +637,12 @@ for posture in directive-only absent granted other-class no-helpers other-projec
   grant='[]'
   expected=off
   case "$posture" in
-    granted|silent-find) grant='["semantic-search"]'; expected=on ;;
+    granted|silent-find|failed-find) grant='["semantic-search"]'; expected=on ;;
     no-helpers|other-project) grant='["semantic-search"]' ;;
     other-class) grant='["web","provider"]' ;;
     invalid) grant='["semantic-search","unknown"]' ;;
+    malformed) grant='["semantic-search"' ;;
+    duplicate) grant=$'[]\nEgress needs: ["web"]' ;;
   esac
   if [ "$posture" = indented ]; then
     printf '\n  Egress needs: ["semantic-search"]\n' >> "$home/data/$id/brief.md"
@@ -653,54 +673,67 @@ exec "${0%/*}/tmux-base" "$@"
 SH
   chmod +x "$fakebin/tmux"
   case "$posture" in
-    silent-runtime|silent-find)
-      real_bun=$(command -v bun) || { printf 'skip - %s needs bun for the rest of spawn\n' "$posture"; continue; }
-      silent=$([ "$posture" = silent-find ] && echo find || echo '*')
-      cat > "$fakebin/bun" <<SH
-#!/usr/bin/env bash
-case "\$1|\$2" in
-  */fm-jev-egress.ts\|$silent) exit 0 ;;
-esac
-exec "$real_bun" "\$@"
-SH
-      chmod +x "$fakebin/bun" ;;
-  esac
+    silent-runtime) fake_egress_helper "$fakebin" '*' 0 ;;
+    silent-find) fake_egress_helper "$fakebin" find 0 ;;
+    failed-find) fake_egress_helper "$fakebin" find 2 ;;
+    *) true ;;
+  esac || { printf 'skip - %s needs bun for the rest of spawn\n' "$posture"; continue; }
   extra=()
   [ "$posture" != no-helpers ] || extra=(--omp-no-helpers)
   out=$(FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
     FM_GUARD_EVENT_LOG="$world/guard-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
   status=$?
-  if [ "$posture" = invalid ] || [ "$posture" = directive-only ] || [ "$posture" = indented ] || [ "$posture" = silent-runtime ] || [ "$posture" = silent-find ]; then
+  case "$posture" in
+    invalid|malformed|duplicate|indented|silent-runtime)
+      refused="$id:dispatch-grant deny false" ;;
+    silent-find|failed-find)
+      refused="$id:dispatch-grant allow true"$'\n'"$id:dispatch-find deny false" ;;
+    directive-only) refused=directive-only ;;
+    *) refused= ;;
+  esac
+  if [ -n "$refused" ]; then
     [ "$status" -ne 0 ] || fail "$posture dispatch input was accepted: $out"
     case "$posture" in
-      indented) assert_contains "$out" 'invalid or unreadable task egress input' 'indented directive refusal' ;;
+      invalid|malformed|duplicate|indented) assert_contains "$out" 'invalid or unreadable task egress input' "$posture directive refusal" ;;
       silent-runtime) assert_contains "$out" 'egress policy returned no grant' 'silent grant refusal' ;;
-      silent-find) assert_contains "$out" 'egress policy returned no find capability' 'silent find refusal' ;;
+      silent-find|failed-find) assert_contains "$out" 'egress policy returned no find capability' "$posture find refusal" ;;
     esac
-    case "$posture" in
-      silent-runtime|silent-find)
-        subject=dispatch-grant
-        [ "$posture" != silent-find ] || subject=dispatch-find
-        [ -f "$world/guard-events.jsonl" ] || fail "$posture dispatch refusal emitted no guard events"
-        jq -se --arg session "$id:$subject" '
-          [.[] | select(.guard == "jev-egress-grant")] as $events |
-          ($events | length) == 1 and
-          ($events[0] | .decision == "deny" and .source_ok == false and .session == $session)
-        ' "$world/guard-events.jsonl" >/dev/null || fail "$posture dispatch refusal must emit exactly one deny event"
-        pass "$posture dispatch refusal emits exactly one egress deny event" ;;
-    esac
+    if [ "$posture" != directive-only ]; then
+      assert_equals "$refused" "$(egress_events "$world/guard-events.jsonl")" "$posture dispatch refusal must emit exactly one egress deny event"
+      pass "$posture dispatch refusal emits exactly one egress deny event"
+    fi
     [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid dispatch input provisioned a worker'
     continue
   fi
   expect_code 0 "$status" "$posture dispatch must succeed: $out"
+  assert_equals "$id:dispatch-grant allow true"$'\n'"$id:dispatch-find allow true" "$(egress_events "$world/guard-events.jsonl")" \
+    "$posture dispatch must emit exactly one allow per egress decision"
   assert_equals "$grant" "$(sed -n 's/^egress=//p' "$world/at-launch.meta")" 'grant must already be canonical at launch'
   assert_equals "$expected" "$(jq -r .find.enabled "$home/state/$id.omp-fallback.yml")" "$posture find capability"
+  if [ "$posture" = failed-record ]; then
+    cp "$home/state/$id.meta" "$world/before-failed-relaunch.meta"
+    if fake_egress_helper "$fakebin" record 2; then
+      out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
+        FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+      [ $? -ne 0 ] || fail "relaunch without a resolvable recorded grant was accepted: $out"
+      assert_contains "$out" 'egress policy returned no grant' 'failed record refusal'
+      assert_equals "$id:dispatch-grant deny false" "$(egress_events "$world/relaunch-events.jsonl")" \
+        'relaunch refusal must emit exactly one egress deny event'
+      cmp -s "$world/before-failed-relaunch.meta" "$home/state/$id.meta" || fail 'refused relaunch changed task authorization'
+      pass 'relaunch refusal emits exactly one egress deny event'
+    else
+      printf 'skip - relaunch refusal needs bun for the rest of spawn\n'
+    fi
+    continue
+  fi
   printf '%s|%s|%s\n' "$posture" "$home/state/$id.omp-fallback.yml" "$expected" >> "$AUDIT_DISPATCH_CASES"
   if [ "$posture" = absent ]; then
     printf '\nEgress needs: ["semantic-search"]\n' >> "$home/data/$id/brief.md"
     out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
-      fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+      FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
     expect_code 0 $? "relaunch must not authorize the edited brief: $out"
+    assert_equals "$id:dispatch-grant allow true"$'\n'"$id:dispatch-find allow true" "$(egress_events "$world/relaunch-events.jsonl")" \
+      'relaunch must emit exactly one allow per egress decision'
     assert_equals '[]' "$(sed -n 's/^egress=//p' "$home/state/$id.meta")" 'relaunch preserves recorded consent'
     assert_equals off "$(jq -r .find.enabled "$home/state/$id.omp-fallback.yml")" 'relaunch keeps ungranted find absent'
     cp "$home/data/$id/brief.md" "$world/filled-brief.md"
