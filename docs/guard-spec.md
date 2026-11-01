@@ -117,7 +117,7 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   The decision is the writer's second argument (`<guard-id> <decision>`), or the first argument of a wrapper that takes the decision first.
   The call is split with shell quoting rules and ends at an unquoted `;`, `&`, `|`, `<`, `>`, parenthesis, lone closing brace, or `#` that starts a word.
   A quoted `}` or `|`, and a `#` inside a word, are literal arguments, so the guard id, a later option and a following command never decide.
-  In Python source files, the scan also parses `subprocess.run` list or tuple arguments naming a literal writer path or a module-level binding built from that path with `os.path.join`.
+  In Python source files, the scan also parses `subprocess.run` list or tuple arguments whose first element is a literal writer path, an `os.path.join` call that ends in one, or a module-level binding to either.
   It follows one module-local function wrapper that forwards a positional decision parameter to that writer, including calls that supply the decision by keyword.
   The call site, not the wrapper's forwarding statement, is enumerated; a conditional decision is excluded only when both branches are exactly `allow`.
   Wrapper calls must resolve to the module's function in Python's symbol table; parameter, local-import, local-variable, closure and comprehension bindings that shadow its name are not event calls.
