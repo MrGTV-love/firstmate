@@ -3421,8 +3421,8 @@ memory_health_surface() {
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" && $4 ~ /^memory-health/ { print $2 "\t" $5 }' "$FM_WAKE_QUEUE")
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   [ -n "$rows" ] || return 0
-  reason=$(awk -F '\t' -v seen="$(cat "$STATE/.seen-memory-health" 2>/dev/null || true)" '
-    BEGIN { n = split(seen, list, "\n"); for (i = 1; i <= n; i++) done[list[i]] }
+  reason=$(seen="$(cat "$STATE/.seen-memory-health" 2>/dev/null || true)" awk -F '\t' '
+    BEGIN { n = split(ENVIRON["seen"], list, "\n"); for (i = 1; i <= n; i++) done[list[i]] }
     !($1 in done) { printf "%s%s", sep, $2; sep = "; " }' <<<"$rows")
   [ -n "$reason" ] || return 0
   MEMORY_HEALTH_SURFACED=$(cut -f1 <<<"$rows")
