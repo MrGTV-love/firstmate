@@ -4,7 +4,7 @@ fm-cpu-pass.py - host-wide CPU pass pool for CPU-heavy test bursts.
 
 Usage:
   fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] -- COMMAND [ARGS...]
-  fm-cpu-pass.sh pipeline-start [--priority CLASS] [--db PATH] [--log-fd N] -- COMMAND [ARGS...]
+  fm-cpu-pass.sh pipeline-start [--priority CLASS] -- COMMAND [ARGS...]
   fm-cpu-pass.sh status [--json]
   fm-cpu-pass.sh size
 
@@ -50,8 +50,8 @@ Running:
 Pipeline starts:
   - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
     priority waiter files. The start policy, core scaling and class order are
-    owned by docs/cpu-pass-pool.md. --db defaults to <NM_HOME>/state.sqlite or
-    ~/.no-mistakes/state.sqlite; all SQLite reads use mode=ro.
+    owned by docs/cpu-pass-pool.md. The run count always comes from the host's
+    ~/.no-mistakes/state.sqlite, opened only with mode=ro; notices go to stderr.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
   - A short start lock bridges the check-to-registration race until a new
@@ -362,24 +362,24 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
-PIPELINE_ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
+HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 
 
-def running_runs(database: str) -> set:
+def running_runs() -> set:
     """Read host execution state without creating or changing its database."""
-    uri = Path(database).expanduser().resolve().as_uri() + "?mode=ro"
+    uri = Path(HOST_STATE_DB).expanduser().resolve().as_uri() + "?mode=ro"
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
         return {row[0] for row in connection.execute("SELECT id FROM runs WHERE status = 'running'")}
 
 
-def pipeline_observation(database: str) -> Tuple[set, int, float, int]:
+def pipeline_observation() -> Tuple[set, int, float, int]:
     cores = os.cpu_count()
     if not isinstance(cores, int) or cores < 1:
         raise ValueError("cannot read a positive native CPU count")
     load5 = os.getloadavg()[1]
     if not math.isfinite(load5) or load5 < 0:
         raise ValueError("cannot read a finite nonnegative native load5")
-    return running_runs(database), cores, load5, max(1, cores // 3)
+    return running_runs(), cores, load5, max(1, cores // 3)
 
 
 def first_pipeline_waiter(directory: str) -> str:
@@ -406,7 +406,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     if command[:1] == ["--"]:
         command = command[1:]
     if not command:
-        log(args.log_fd, "pipeline-start needs a command after --")
+        log(2, "pipeline-start needs a command after --")
         return 125
     waiter_fd = admission_fd = None
     waiter_path = None
@@ -426,7 +426,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         while True:
             reason = "another start is registering"
             if try_lock(admission_fd):
-                before, cores, load5, limit = pipeline_observation(args.db)
+                before, cores, load5, limit = pipeline_observation()
                 first = first_pipeline_waiter(directory)
                 if first == waiter_path and len(before) < limit and load5 <= 2 * cores:
                     break
@@ -435,39 +435,37 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
             now = time.monotonic()
             if now >= next_notice:
-                log(args.log_fd, "pipeline-start waiting: " + reason)
+                log(2, "pipeline-start waiting: " + reason)
                 next_notice = now + NOTICE_EVERY_SECS
             time.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
         os.unlink(waiter_path)
         waiter_path = None
-        log(args.log_fd, "pipeline-start admitted: running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
+        log(2, "pipeline-start admitted: running=%d limit=%d load5=%.2f ceiling=%d priority=%s" % (
             len(before), limit, load5, 2 * cores, args.priority))
-        env = dict(os.environ)
-        env[PIPELINE_ADMITTED_ENV] = "1"
         registration_error = False
 
         def registered() -> bool:
             nonlocal registration_error
             try:
-                if running_runs(args.db) - before:
+                if running_runs() - before:
                     # Serialize only the check-to-registration gap. The daemon
                     # owns status after this handoff; no lifetime watcher remains.
                     fcntl.flock(admission_fd, fcntl.LOCK_UN)
                     return True
             except (OSError, sqlite3.Error, ValueError) as exc:
                 if not registration_error:
-                    log(args.log_fd, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
+                    log(2, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
                     registration_error = True
             return False
 
-        return run_child(command, env, args.log_fd, registered)
+        return run_child(command, dict(os.environ), 2, registered)
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
         # Unlike a burst's optional throughput pool, an unreadable start source
         # cannot stand in for proof of headroom under the explicit start policy.
-        log(args.log_fd, "pipeline-start refused: %s" % exc)
+        log(2, "pipeline-start refused: %s" % exc)
         return 125
     finally:
         if waiter_path is not None:
@@ -527,8 +525,6 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
     start = sub.add_parser("pipeline-start", help="queue a fresh pipeline start before its execution clock")
     start.add_argument("--priority", choices=PIPELINE_PRIORITIES, default="other", help="start class in descending priority order")
-    start.add_argument("--db", default=os.path.join(os.environ.get("NM_HOME") or os.path.expanduser("~/.no-mistakes"), "state.sqlite"), help="host no-mistakes database (opened read-only)")
-    start.add_argument("--log-fd", type=int, default=2, help="fd for admission notices")
     start.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
     status = sub.add_parser("status", help="report held and free passes")
     status.add_argument("--json", action="store_true", help="print one JSON object")

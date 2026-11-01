@@ -1084,7 +1084,7 @@ EOF
 # because on gerrit the ci step is skipped and there is no PR to report.
 fm_nm_driving_block() {  # <forge>
   local pr_return_line='' pr_reattach_clause=';' drive_block wait_cfg admission_runner
-  admission_runner=$(d=${BASH_SOURCE[0]%/*}; cd "${d:-.}" && pwd)/fm-duration.py
+  admission_runner=$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py
   printf -v admission_runner '%q' "$admission_runner"
   if [ "$1" != gerrit ]; then
     pr_return_line="Only a drive call's return reports the green PR: \`no-mistakes axi status\` shows progress but never reports \`checks-passed\` while the ci step is still monitoring the PR for merge, so never wait on a status poll for the next gate or outcome.
@@ -1099,13 +1099,13 @@ fm_nm_driving_block() {  # <forge>
 It bounds its own hold for you: \`--wait\` (default 8m) exists precisely so a harness with a ten-minute command cap gets a structured return instead of being killed mid-hold.
 Declare that wait using the brief's status-reporting rule before the foreground drive call.
 Never background a wait, and never arm a timer to stand in for one: a backgrounded call returns in milliseconds, so it does not wait at all, and every timer left behind fires later as a paid wake for nothing.
-${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - that is not a failure: reattach at once by re-running \`no-mistakes axi run\` without flags, and issue the same foreground call again, one at a time, until a gate or outcome comes back${pr_reattach_clause} if it refuses because no run is active, read the finished outcome from \`no-mistakes axi status\`."
+${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - that is not a failure: unless the admission rule above re-issues a fresh start that never printed its admitted line, reattach at once by re-running \`no-mistakes axi run\` without flags, and issue the same foreground call again, one at a time, until a gate or outcome comes back${pr_reattach_clause} if it refuses because no run is active, read the finished outcome from \`no-mistakes axi status\`."
   else
     drive_block="One drive call blocks until the next gate or outcome, which routinely outlives what your harness lets a single command run: Claude Code kills a command at ten minutes maximum, while one fix round is capped around thirty minutes and up to three rounds chain.
 So background the drive call instead of sitting in one blocking hold your harness will kill, and read its return when it finishes.
 Declare that wait using the brief's status-reporting rule before waiting on the backgrounded drive call.
 Where a harness's own command limit is not established, assume it bounds commands and use that same backgrounded shape.
-${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - reattach at once by re-running \`no-mistakes axi run\` without flags, backgrounded the same way${pr_reattach_clause} if it refuses because no run is active, read the finished outcome from \`no-mistakes axi status\`."
+${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - unless the admission rule above re-issues a fresh start that never printed its admitted line, reattach at once by re-running \`no-mistakes axi run\` without flags, backgrounded the same way${pr_reattach_clause} if it refuses because no run is active, read the finished outcome from \`no-mistakes axi status\`."
   fi
   drive_block="$drive_block
 A drive call's own wait ending, or your harness's command bound passing, never kills the run, proves failure, or permits a final timeout blocker: the measured-command instructions above own long-command limits and progress checks, so judge continued work by output growth and cumulative process-tree CPU time.
@@ -1128,6 +1128,8 @@ Start every fresh/new run (including an authorized rerun) through \`python3 $adm
 Choose class \`merge-train\` for merge-train work, \`machinery\` for Firstmate machinery, \`vernant-build\` for Vernant builds, and \`other\` otherwise; the pool owner enforces that priority order.
 Keep the original intent, verification-plan, base and profile arguments unchanged; admission never authorizes a start, resolves a finding or skips a step.
 Reattach and respond to the existing run normally, without new-run inputs or another admission; \`docs/cpu-pass-pool.md\` owns the start-policy and descriptor-lifetime limits.
+A fresh-start call that ends - killed, timed out, or by its harness bound - before it prints \`fm-cpu-pass: pipeline-start admitted\` was still queued and created no run, so there is nothing to reattach to: issue the same fresh start again through the admission runner, the same way, rather than a flagless reattach or a status read.
+After that admitted line, the start is the existing run and the reattach rules below apply.
 
 $drive_block
 A killed or timed-out call is never evidence the daemon died: the daemon accepts your response immediately and runs the round in the background, so the call was only ever waiting for a read while the run kept working.

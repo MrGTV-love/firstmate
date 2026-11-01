@@ -48,6 +48,7 @@ Every participant on a host follows these rules, so one pool is shared by every 
    The pool governs throughput; it is not a safety boundary, and a broken pool must not stop every test on the host.
 8. **Waiting stays outside work bounds:** take passes before starting any per-test or per-worker timeout, so time spent queued never counts toward that timeout.
    A caller's own overall budget, such as a harness command limit, still includes the wait.
+   For a fresh pipeline start, that limit ending the wait means no run was created; the recovery is the re-issue rule under Fresh pipeline starts, not a reattach.
 
 ## Calling it
 
@@ -65,7 +66,8 @@ The [`bin/fm-test-run.sh` header](../bin/fm-test-run.sh) owns Firstmate's runner
 
 ## Fresh pipeline starts
 
-Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner checks the host's no-mistakes database read-only and native five-minute load.
+Before a Firstmate-driven fresh/new no-mistakes run, including an authorized rerun, the existing pool's `pipeline-start` owner checks the host's `~/.no-mistakes/state.sqlite` read-only and native five-minute load.
+It has no option or environment variable that selects another database.
 It admits only when the count of rows whose status is exactly `running` is below `max(1, floor(logical CPUs / 3))` and load5 is at most twice that CPU count.
 That is six starts on eighteen cores and three on a ten-core host; rounding is downward, with a one-start minimum.
 A run leaving `running` releases that count implicitly; no daemon-lifetime lease or watcher is installed.
@@ -79,6 +81,10 @@ Unusable state or load observations do not imply an empty host.
 `bin/fm-duration.py run` automatically routes fresh `no-mistakes axi run` inputs and `no-mistakes rerun` through that owner before starting its execution clock; its `--pipeline-priority` option selects the class.
 Generated worker delivery instructions require this measured route for fresh starts across harnesses and runtime backends.
 Existing-run reattachment and responses do not requeue, restart a run or consume another start.
+Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes; the wrapped client and every descendant receive no exemption, so a nested fresh start queues like any other.
+A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
+Issue the same fresh start again through `bin/fm-duration.py run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.
+After the admitted line, the start is the existing run and normal reattachment applies.
 Admission adds no inherited CPU-worker budget, reduces no worker counts and serializes none of a task's required checks.
 It is not start authority: explicit task admission, original intent and verification evidence, Test/Document and all other validation gates still apply.
 

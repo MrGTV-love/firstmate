@@ -17,9 +17,10 @@ Fresh `no-mistakes axi run` calls (with --intent/--intent-file) and `no-mistakes
 rerun` commands automatically enter the existing fm-cpu-pass.py pipeline-start
 owner before any run clock or sample. --pipeline-priority chooses merge-train,
 machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
-The admission owner sets FM_PIPELINE_START_ADMITTED only on its command so this
-measured child does not requeue itself. Reattachments without fresh inputs and
-responses are unchanged. A missing admission source refuses, never guesses.
+The admission owner re-executes this runner once with an internal argument that
+this runner consumes, so only that measured child skips requeueing; the wrapped
+client and its descendants receive no exemption. Reattachments without fresh
+inputs and responses are unchanged. A missing admission source refuses, never guesses.
 
 keep-going is the record-free operational command runner: its only automatic
 stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
@@ -1446,6 +1447,7 @@ def main():
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
     runner.add_argument('--pipeline-priority', choices=('merge-train', 'machinery', 'vernant-build', 'other'), default='other')
+    runner.add_argument('--pipeline-admitted', action='store_true', help=argparse.SUPPRESS)
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     progress = commands.add_parser('keep-going')
     progress.add_argument('inactivity', type=float)
@@ -1505,13 +1507,13 @@ def main():
             command[1:2] == ['rerun'] or (command[1:3] == ['axi', 'run'] and any(
                 part in ('--intent', '--intent-file') or part.startswith(('--intent=', '--intent-file='))
                 for part in command[3:]))))
-        if fresh_pipeline and os.environ.get('FM_PIPELINE_START_ADMITTED') != '1':
+        if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short
             # check-to-daemon-registration lock; reattachments never requeue.
             os.execv(sys.executable, [sys.executable, str(ROOT / 'bin/fm-cpu-pass.py'),
                 'pipeline-start', '--priority', args.pipeline_priority, '--',
-                sys.executable, str(Path(__file__).resolve())] + sys.argv[1:])
+                sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted'] + sys.argv[2:])
         try:
             slot = acquire_slot(args.key)
         except ValueError as error:
