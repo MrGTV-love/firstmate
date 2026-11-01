@@ -848,7 +848,8 @@
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
         {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3},
-        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1}
+        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1},
+        {"file": "bin/fm-jev-guard.ts", "match": "device.effect === \"uri\" && device.alternative", "count": 1}
       ],
       "invariant": "a filesystem write without proved active T5 confinement must pass the filesystem path/root gate; a native local device must prove its measured effect and scope",
       "layer": "runtime-block",
