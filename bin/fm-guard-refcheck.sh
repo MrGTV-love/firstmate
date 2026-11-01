@@ -14,7 +14,8 @@
 #      under the root. Registrations are the tracked files under .claude/,
 #      .codex/, .cursor/, .grok/, .pi/, .opencode/, and .omp/, plus any file the
 #      caller adds with --registrations.
-#   2. registry: every owner and test path in the guard registry resolves.
+#   2. registry: the spec path and every owner and test path in the guard
+#      registry resolve.
 #   3. retirement: every id in the retirement changelog has zero live references
 #      outside the changelog itself and its own retirement test, and is absent
 #      from the active registry. A mention of the retirement test's own path is
@@ -119,7 +120,7 @@ done <<EOF
 $regs
 EOF
 
-# Registry wiring: owner and test paths resolve.
+# Registry wiring: spec, owner and test paths resolve.
 registry_missing=0
 if [ -f "$REGISTRY" ]; then
   while IFS=$'\t' read -r id owner test; do
@@ -140,6 +141,12 @@ if [ -f "$REGISTRY" ]; then
   done <<EOF
 $(jq -r '.guards[] | [.id, (.owner // ""), (.test // "")] | @tsv' "$REGISTRY")
 EOF
+  spec=$(jq -r '.spec // empty' "$REGISTRY")
+  if [ -n "$spec" ] && [ ! -e "$ROOT/$spec" ]; then
+    registry_missing=$((registry_missing + 1))
+    [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:spec\n' "$spec"
+    printf 'MISSING\t%s\tregistry:spec\n' "$spec" >>"$FINDINGS"
+  fi
 fi
 
 # Retirement: zero live references. The changelog and the guard's own retirement

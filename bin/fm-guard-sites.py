@@ -17,11 +17,13 @@ Output is one JSON object on stdout:
 
 Exit: 0 on success; 2 on a usage or environment error.
 """
+import ast
 import hashlib
 import json
 import os
 import re
 import subprocess
+import symtable
 import sys
 
 DEFAULT_DIRS = ('bin', '.claude', '.codex', '.cursor', '.dsh', '.grok', '.omp', '.opencode', '.pi')
@@ -283,6 +285,168 @@ def event_denies(body):
     return decision != 'allow'
 
 
+def python_event_lines(lines):
+    """Find Python subprocess writer calls and their module-local forwarding wrappers.
+
+    Resolve only literal writer paths and os.path.join bindings, not arbitrary
+    functions named record. Never execute the scanned module.
+    """
+    try:
+        source = '\n'.join(lines)
+        tree = ast.parse(source)
+        module_table = symtable.symtable(source, '<guard-scan>', 'exec')
+    except SyntaxError:
+        return set()  # Other signatures still scan incomplete or older Python syntax.
+    bindings = {node.targets[0].id: node.value for node in tree.body
+                if isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)}
+
+    def writer(node, seen=frozenset()):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return os.path.basename(node.value) == 'fm-guard-event.sh'
+        if isinstance(node, ast.Name) and node.id in bindings and node.id not in seen:
+            return writer(bindings[node.id], seen | {node.id})
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'join' and isinstance(node.func.value, ast.Attribute)
+                and isinstance(node.func.value.value, ast.Name)
+                and node.func.value.value.id == 'os' and node.func.value.attr == 'path'
+                and bool(node.args) and writer(node.args[-1], seen))
+
+    def event_decision(node):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess'
+                and node.func.attr == 'run' and node.args
+                and isinstance(node.args[0], (ast.List, ast.Tuple))):
+            args = node.args[0].elts
+            if len(args) >= 3 and writer(args[0]):
+                return args[2]
+        return None
+
+    def allows(node):
+        if isinstance(node, ast.IfExp):
+            return allows(node.body) and allows(node.orelse)
+        return isinstance(node, ast.Constant) and node.value == 'allow'
+
+    wrappers = {}
+    forwarded = set()
+    for function in tree.body:
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        parameters = [arg.arg for arg in function.args.posonlyargs + function.args.args]
+        for node in ast.walk(function):
+            decision = event_decision(node)
+            if isinstance(decision, ast.Name) and decision.id in parameters:
+                wrappers[function.name] = (parameters.index(decision.id), decision.id)
+                forwarded.add(node.lineno)
+    # A matching spelling is not enough: a parameter, local import or closure
+    # can bind record to ordinary data even beside the real module wrapper.
+    tables = {}
+
+    def collect_tables(table):
+        tables.setdefault((table.get_lineno(), table.get_name()), []).append(table)
+        for child in table.get_children():
+            collect_tables(child)
+
+    collect_tables(module_table)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    expression_scopes = {ast.Lambda: 'lambda', ast.ListComp: 'listcomp',
+                         ast.SetComp: 'setcomp', ast.DictComp: 'dictcomp',
+                         ast.GeneratorExp: 'genexpr'}
+
+    definitions = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+    def owns(scope, child, node):
+        if isinstance(scope, definitions):
+            return any(child is statement for statement in scope.body)
+        if isinstance(scope, ast.Lambda):
+            return child is scope.body
+        return not any(part is node for part in ast.walk(scope.generators[0].iter))
+
+    def parameter(arguments, name):
+        return any(arg is not None and arg.arg == name for arg in arguments.posonlyargs + arguments.args
+                   + arguments.kwonlyargs + [arguments.vararg, arguments.kwarg])
+
+    def binds(scope, name):
+        if isinstance(scope, ast.Lambda):
+            if parameter(scope.args, name):
+                return True
+            pending = [scope.body]
+            while pending:
+                part = pending.pop()
+                if isinstance(part, ast.NamedExpr) and part.target.id == name:
+                    return True
+                if isinstance(part, ast.Lambda):
+                    # A nested lambda owns its body bindings, but its defaults
+                    # still execute in this scope. Comprehension walruses also
+                    # bind here, so keep walking through comprehensions.
+                    pending.extend(value for value in part.args.defaults + part.args.kw_defaults
+                                   if value is not None)
+                else:
+                    pending.extend(ast.iter_child_nodes(part))
+            return False
+        else:
+            targets = [generator.target for generator in scope.generators]
+        return any(isinstance(part, ast.Name) and isinstance(part.ctx, ast.Store) and part.id == name
+                   for target in targets for part in ast.walk(target))
+
+    def assigns(scope, name):
+        """Whether scope binds name itself, not only as a target of a comprehension inlined into it (PEP 709)."""
+        if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return binds(scope, name)
+        if parameter(scope.args, name):
+            return True
+        pending = list(scope.body)
+        while pending:
+            part = pending.pop()
+            if isinstance(part, ast.alias):
+                bound = part.asname or part.name.split('.')[0]
+            elif isinstance(part, ast.Name):
+                bound = None if isinstance(part.ctx, ast.Load) else part.id
+            else:
+                bound = getattr(part, 'name', None) or getattr(part, 'rest', None)
+            if bound == name:
+                return True
+            if isinstance(part, ast.comprehension):
+                pending += [part.iter, *part.ifs]
+            elif not isinstance(part, definitions + (ast.Lambda,)):
+                pending += ast.iter_child_nodes(part)
+        return False
+
+    def module_wrapper(node):
+        name = node.func.id
+        child, scope, nested, merged = node, parents.get(node), False, False
+        while scope is not None:
+            kind = scope.name if isinstance(scope, definitions) else expression_scopes.get(type(scope))
+            if kind is not None and owns(scope, child, node) and not (nested and isinstance(scope, ast.ClassDef)):
+                candidates = tables.get((scope.lineno, kind), [])
+                if len(candidates) == 1:
+                    if name in candidates[0].get_identifiers():
+                        symbol = candidates[0].lookup(name)
+                        # An inlined comprehension shares this table, so a sibling
+                        # comprehension's target can make name local here.
+                        if not (merged and symbol.is_local() and not assigns(scope, name)):
+                            return symbol.is_global()
+                elif isinstance(scope, definitions) or binds(scope, name):
+                    return False
+                else:
+                    merged = True
+                nested = True
+            child, scope = scope, parents.get(scope)
+        return name in module_table.get_identifiers() and module_table.lookup(name).is_global()
+
+    sites = set()
+    for node in ast.walk(tree):
+        decision = event_decision(node)
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in wrappers and module_wrapper(node)):
+            index, name = wrappers[node.func.id]
+            decision = (node.args[index] if len(node.args) > index else
+                        next((kw.value for kw in node.keywords if kw.arg == name), None))
+        if decision is not None and node.lineno not in forwarded and not allows(decision):
+            sites.add(node.lineno)
+    return sites
+
+
 def embedded_kind(opener_line, tag):
     """The language of a heredoc body when the opener feeds an interpreter, else None (text)."""
     if re.search(r'\b(?:python3?|py)\b', opener_line):
@@ -300,6 +464,7 @@ def scan_file(root, rel, helpers, hook_names):
     if kind == 'other':
         kind = shebang_kind(path) or 'other'
     lines = read_lines(path)
+    python_events = python_event_lines(lines) if kind == 'py' else set()
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
     heredoc = None
@@ -385,11 +550,23 @@ def scan_file(root, rel, helpers, hook_names):
                     and '$#' not in (lines[number - 2] if stripped == 'exit 2' and number > 1 else stripped)) \
                 or (opencode and re.search(r'\bthrow new Error\(', line)):
             sig.append('D')
-        if event_denies(body):
+        if event_denies(body) or number in python_events:
             sig.append('E')
         if sig:
             sites.append((number, ','.join(sig), stripped))
-    return sites
+    return [(number, sig, text, block_opener(lines, number, kind)) for number, sig, text in sites]
+
+
+def block_opener(lines, number, kind):
+    """The nearest earlier code line indented less than the site's line: the block the site sits in."""
+    line = lines[number - 1]
+    indent = len(line) - len(line.lstrip())
+    if indent:
+        for row in reversed(lines[:number - 1]):
+            stripped = row.strip()
+            if stripped and not is_comment(stripped, kind) and len(row) - len(row.lstrip()) < indent:
+                return ' '.join(stripped.split())
+    return ''
 
 
 def site_key(rel, text, seen):
@@ -439,15 +616,19 @@ def map_sites(sites, registry):
             continue
         if not isinstance(markers, list) or not all(
                 isinstance(m, dict) and isinstance(m.get('file'), str) and isinstance(m.get('match'), str)
-                and m['file'] and m['match'] for m in markers):
-            errors.append(('S2', gid, 'sites must be a list of {file, match} objects with non-empty strings'))
+                and m['file'] and m['match']
+                and all(field not in m or (isinstance(m[field], str) and m[field]) for field in ('key', 'within'))
+                for m in markers):
+            errors.append(('S2', gid, 'sites must be a list of {file, match, key?, within?} objects with non-empty strings'))
             continue
         for marker in markers:
             expected = marker.get('count', 1)
             if not isinstance(expected, int) or expected < 1:
                 errors.append(('S2', gid, 'site marker count for %s must be a positive integer' % marker['file']))
                 continue
-            hits = [s for s in sites if s['file'] == marker['file'] and marker['match'] in s['text_full']]
+            hits = [s for s in sites if s['file'] == marker['file'] and marker['match'] in s['text_full']
+                    and ('key' not in marker or re.sub(r'~[0-9]+$', '', s['key']) == marker['key'])
+                    and ('within' not in marker or marker['within'] in s['within'])]
             if not hits:
                 errors.append(('S2', gid, "site marker '%s' in %s matches no site; remove or update it"
                                % (marker['match'], marker['file'])))
@@ -508,9 +689,10 @@ def main(argv):
     sites = []
     for rel in files:
         seen = {}
-        for number, sig, text in scan_file(root, rel, helpers, hook_names):
+        for number, sig, text, opener in scan_file(root, rel, helpers, hook_names):
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
-                          'text': text[:200], 'text_full': text, 'entry': None, 'touched': False})
+                          'text': text[:200], 'text_full': text, 'within': opener, 'entry': None,
+                          'touched': False})
     errors = map_sites(sites, registry)
 
     if touched_ref:
@@ -520,7 +702,7 @@ def main(argv):
             site['touched'] = lines is None or site['line'] in lines
 
     for site in sites:
-        del site['text_full']
+        del site['text_full'], site['within']
     json.dump({'paths': files, 'sites': sites, 'helpers': {k: sorted(v) for k, v in helpers.items()},
                'errors': [{'rule': r, 'id': i, 'message': m} for r, i, m in errors]}, sys.stdout)
     sys.stdout.write('\n')

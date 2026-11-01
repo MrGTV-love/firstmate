@@ -105,6 +105,14 @@ REGTEST=$(fixture regtest)
 rm -f "$REGTEST/tests/gguard.test.sh"
 assert_fails_with "a missing registry test path fails" "$REGTEST" "registration=registry:gguard"
 
+REGSPEC=$(fixture regspec)
+jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
+mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"
+: >"$REGSPEC/docs/guard-spec.md"
+assert_clean "a registry spec path that resolves is clean" "$REGSPEC"
+rm -f "$REGSPEC/docs/guard-spec.md"
+assert_fails_with "a missing registry spec path fails" "$REGSPEC" "MISSING docs/guard-spec.md registration=registry:spec"
+
 # --- retirement -------------------------------------------------------------
 RESURRECT=$(fixture resurrect)
 cat >"$RESURRECT/docs/guards/retired.json" <<'JSON'
