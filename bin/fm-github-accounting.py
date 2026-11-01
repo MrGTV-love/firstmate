@@ -32,6 +32,8 @@ points on a GraphQL accounting query. REST shard agreement is not established.
 A slow request is not overlapped or retried in a burst; pending ticks are recorded.
 A request still running after QUOTA_TIMEOUT has its private process group killed
 and is recorded unavailable with reason=timeout; the next normal tick sends a new one.
+The owner inherits PATH: a gh-axi it cannot launch records unavailable with
+reason=command_unavailable on each tick, which fails neither start nor the owner.
 
 Process source: one LC_ALL=C ps table every 0.2 seconds in the root home's
 watcher context, not a confined worker. A ps past PS_TIMEOUT is killed and counts

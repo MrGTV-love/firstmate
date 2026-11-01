@@ -65,6 +65,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-proc-guard.sh`       | Count the user's processes against the per-user limit and write one process census when a pile-up holds ([framework](host-guards.md)) |
 | `fm-proc-guard.py`       | The engine behind `fm-proc-guard.sh`                                                 |
+| [`fm-github-accounting.py`](../bin/fm-github-accounting.py) | Record standing GitHub quota and `gh`/`gh-axi` caller observations in private state, without controlling callers or proving attribution ([operator contract](configuration.md#standing-github-caller-accounting)) |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
 | `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules, require every refusal site to map to a guard, and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
