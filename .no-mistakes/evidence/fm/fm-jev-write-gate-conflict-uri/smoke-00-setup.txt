@@ -1,0 +1,8 @@
+== git status before (real merge conflict) ==
+UU conflicted.txt
+== conflicted.txt before ==
+<<<<<<< HEAD
+ours
+=======
+theirs
+>>>>>>> topic

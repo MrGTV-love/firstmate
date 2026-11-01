@@ -1,0 +1,16 @@
+== scenario 04-real-path-edit: model issues edit {"path":"conflicted.txt","old_string":"<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> topic\n","new_string":"resolved\n","i":"Resolve conflict at real path"} ==
+omp exit: 0 (omp/18.14.0)
+== tool result omp returned to the model ==
+[conflicted.txt]
+1:resolved
+== guard audit record (state/jev-guard ledger) ==
+{"tool":"edit","decision":"allow","branch":"deterministic","enforcement":"pretool_allow","refused_path":null,"request_started":false}
+== Jev requests sent: 0 ==
+== worktree conflicted.txt after ==
+resolved
+== outside copy after ==
+<<<<<<< HEAD
+ours
+=======
+theirs
+>>>>>>> topic
