@@ -119,22 +119,22 @@ def main():
         print('ok - slow standing check completes after %.3fs; four cards remain four on repeat' % elapsed)
 
         timings.write_text('')
-        started = time.monotonic()
         first = command('check', scenario='hang')
-        elapsed = time.monotonic() - started
         assert first.count('slack: transport failure: unreachable') == 1, first
-        # Default owner policy is 30s of no progress (fm-watch.sh), not a
-        # cumulative allowance. The retained socket timeout must finish first.
-        assert elapsed < 30, elapsed
         assert command('check', scenario='hang') == ''
         assert len(cards()) == 4, cards()
         rows = [json.loads(line) for line in timings.read_text().splitlines()]
+        assert rows, rows
         assert all(row['seconds'] >= row['timeout'] for row in rows), rows
         assert all(row['timeout'] == 10 for row in rows), rows
+        # Default owner policy is 30s of no progress (fm-watch.sh). Each silent
+        # read is CPU-idle, so the retained socket timeout must end it first.
+        assert all(row['seconds'] < 30 for row in rows), rows
         assert command('check') == ''  # recovery clears the failure episode
         assert command('check', scenario='hang').count('transport failure: unreachable') == 1
         assert len(cards()) == 4, cards()
-        print('ok - hung request ends after %.3fs, before owner no-progress bound 30s; one report per episode' % elapsed)
+        print('ok - longest silent read ends after %.3fs, before owner no-progress bound 30s; one report per episode'
+              % max(row['seconds'] for row in rows))
         print('hanging request timings: ' + json.dumps(rows))
 
 
