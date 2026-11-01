@@ -20,7 +20,8 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
-    "open-loops-one-deferral"
+    "open-loops-one-deferral",
+    "pipeline-start-unreadable-source"
   ],
   "guards": [
     {
@@ -1214,6 +1215,36 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains"
+    },
+    {
+      "id": "pipeline-start-unreadable-source",
+      "version": "1",
+      "owner": "bin/fm-cpu-pass.py",
+      "sites": [
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "pipeline-start refused: %s"
+        }
+      ],
+      "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable host headroom observation",
+      "layer": "runtime-block",
+      "source": "the pool directory's pipeline-start.lock and waiter files, the runs rows of ~/.no-mistakes/state.sqlite opened read-only, and the native CPU count and load5, read by cmd_pipeline_start in bin/fm-cpu-pass.py",
+      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count or a finite nonnegative load5 before it launches the command",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "repair the source the error line names, then issue the same fresh start again: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-cpu-pass.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database, a garbage database and a bad load value, and proves the admitted start on readable sources"
     }
   ],
   "excluded": [
