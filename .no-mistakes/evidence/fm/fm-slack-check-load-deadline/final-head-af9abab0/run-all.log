@@ -1,0 +1,322 @@
+### label=after-starved-sigstop tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-hang-once-per-episode tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-connection-reset tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-lost-post-reply tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-hang-before-any-card tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-request-over-timeout tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-slow-latency tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-http500 tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=before-starved-sigstop tree=/Users/charlesabrooker/tmp/fm-before-tree-af9abab0 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=after-trickle-owner-bound tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+### label=before-slow-latency tree=/Users/charlesabrooker/tmp/fm-before-tree-af9abab0 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.034s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=arm bound=na exit=0 wall=1.6s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.6s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.6s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.6s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.037s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.025s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.026s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.039s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.036s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.072s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.022s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.029s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=arm bound=na exit=0 wall=1.4s cards_posted_total=0
+    out| armed: state/slack.check.sh
+--- step mode=ok action=arm bound=na exit=0 wall=1.4s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.014s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.018s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=hang action=watch bound=120 exit=0 wall=28.2s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.S0PRrj/state/slack.check.sh: slack: transport failure: unreachable
+--- step mode=postlost action=watch bound=60 exit=0 wall=28.4s cards_posted_total=1
+    out| check: /Users/charlesabrooker/tmp/fm-lab.dnPZAq/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.S0PRrj/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.S0PRrj/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.dnPZAq/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.dnPZAq/state/slack.check.sh: slack: transport failure: unreachable
+--- step mode=ok action=watch bound=30 exit=124 wall=30.8s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=ok action=watch bound=30 exit=124 wall=30.9s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=ok action=watch bound=30 exit=124 wall=31.0s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=ok action=watch bound=30 exit=124 wall=30.9s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=10.001s sum_request_time=10.0s errors=[["chat.postMessage", "unreachable", 10.001]]
+    check_processes_still_alive=0
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=10.013s sum_request_time=10.0s errors=[["conversations.open", "unreachable", 10.013]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=31.0s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=latency:6 action=watch bound=120 exit=0 wall=31.6s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.V54mCE/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.V54mCE/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.V54mCE/state/slack.check.sh: slack: transport failure: unreachable
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.016s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.038s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.013s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.014s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.023s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=3 processes=1 socket_timeouts=[0.670604708022438, 6.793972375104204, 10] longest_single_request=6.147s sum_request_time=12.9s errors=[["chat.postMessage", "unreachable", 0.673]]
+    check_processes_still_alive=0
+final: chat.postMessage rows=1 distinct_texts=1 duplicate_texts=0
+final: threads=0 pending=0 failure='unreachable'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58211 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+--- step mode=stop:22 action=watch bound=90 exit=0 wall=47.5s cards_posted_total=1
+    out| check: /Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    requests=5 processes=1 socket_timeouts=[10] longest_single_request=0.019s sum_request_time=0.0s errors=[["conversations.history", "request_budget_exhausted", 0.0], ["conversations.replies", "request_budget_exhausted", 0.0]]
+    check_processes_still_alive=0
+    server| {"event": "SIGSTOP", "pid": 83408, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 83408}
+final: chat.postMessage rows=1 distinct_texts=1 duplicate_texts=0
+final: threads=1 pending=0 failure='request_budget_exhausted'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58139 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+--- step mode=reset action=watch bound=40 exit=0 wall=19.5s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.o53fhQ/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.o53fhQ/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.o53fhQ/state/slack.check.sh: slack: transport failure: unreachable
+--- step mode=http500 action=watch bound=40 exit=0 wall=19.0s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.nVNd90/state/slack.check.sh: slack: transport failure: http_500
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.nVNd90/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.nVNd90/state/slack.check.sh: slack: transport failure: http_500
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=0.015s sum_request_time=0.0s errors=[["conversations.replies", "unreachable", 0.015]]
+    check_processes_still_alive=0
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=0.015s sum_request_time=0.0s errors=[["conversations.replies", "http_500", 0.015]]
+    check_processes_still_alive=0
+--- step mode=hang action=watch bound=60 exit=0 wall=29.1s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh: slack: transport failure: unreachable
+--- step mode=latency:12 action=watch bound=60 exit=0 wall=29.4s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.lI1CZh/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.lI1CZh/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.lI1CZh/state/slack.check.sh: slack: transport failure: unreachable
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=10.017s sum_request_time=10.0s errors=[["conversations.replies", "unreachable", 10.017]]
+    check_processes_still_alive=0
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=10.024s sum_request_time=10.0s errors=[["conversations.replies", "unreachable", 10.024]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=40 exit=124 wall=41.6s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+--- step mode=ok action=watch bound=40 exit=124 wall=41.7s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    queued_wake_rows=0
+    wake| 
+    requests=12 processes=1 socket_timeouts=[10] longest_single_request=0.015s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    server| {"event": "post-committed-reply-withheld", "method": "chat.postMessage"}
+    requests=13 processes=1 socket_timeouts=[10] longest_single_request=0.022s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58232 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58258 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+--- step mode=trickle action=watch bound=200 exit=0 wall=50.2s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.8Rv7Xh/state/slack.check.sh: check slack stopped after 42s (no progress); result unknown, retry next pass
+    out| no_progress: "pid=44645 no CPU or watched-file progress for 31.1s"
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.8Rv7Xh/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8Rv7Xh/state/slack.check.sh: check slack stopped after 42s (no progress); result unknown, retry next pass
+--- step mode=stop:22 action=watch bound=90 exit=124 wall=90.8s cards_posted_total=4
+    out| checkpoint: no actionable wake within 90s
+    queued_wake_rows=0
+    wake| 
+--- step mode=reset action=watch bound=30 exit=124 wall=31.0s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=http500 action=watch bound=30 exit=124 wall=31.0s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    triage| [2026-11-01T11:37:51-0600] check slack stopped after 42s (no progress); result unknown, retry next pass
+    requests=21 processes=3 socket_timeouts=[10] longest_single_request=0.030s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    requests=2 processes=2 socket_timeouts=[10] longest_single_request=0.044s sum_request_time=0.1s errors=[["conversations.replies", "unreachable", 0.044], ["conversations.replies", "unreachable", 0.017]]
+    check_processes_still_alive=0
+    requests=2 processes=2 socket_timeouts=[10] longest_single_request=0.019s sum_request_time=0.0s errors=[["conversations.replies", "http_500", 0.019], ["conversations.replies", "http_500", 0.017]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=30.6s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=latency:6 action=watch bound=170 exit=0 wall=106.5s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh: check slack stopped after 98s (no progress); result unknown, retry next pass
+    out| no_progress: "pid=81051 no CPU or watched-file progress for 30.3s"
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh: check slack stopped after 98s (no progress); result unknown, retry next pass
+    requests=8 processes=2 socket_timeouts=[10] longest_single_request=0.018s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58253 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+    triage| [2026-11-01T11:38:09-0600] check slack stopped after 98s (no progress); result unknown, retry next pass
+    requests=12 processes=1 socket_timeouts=[10] longest_single_request=6.162s sum_request_time=73.5s errors=[]
+    check_processes_still_alive=0
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 55991)
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/fake_slack_server.py", line 90, in do_POST
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [Errno 54] Connection reset by peer
+----------------------------------------
+--- step mode=hang action=watch bound=45 exit=124 wall=45.8s cards_posted_total=4
+    out| checkpoint: no actionable wake within 45s
+    queued_wake_rows=0
+    wake| 
+    requests=2 processes=2 socket_timeouts=[10] longest_single_request=10.014s sum_request_time=20.0s errors=[["conversations.replies", "unreachable", 10.014], ["conversations.replies", "unreachable", 10.013]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=31.4s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=ok action=watch bound=30 exit=124 wall=31.3s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    requests=12 processes=3 socket_timeouts=[10] longest_single_request=0.015s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+    requests=12 processes=3 socket_timeouts=[10] longest_single_request=0.016s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=40 exit=124 wall=42.1s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+    queued_wake_rows=0
+    wake| 
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58221 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58243 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+    requests=12 processes=3 socket_timeouts=[10] longest_single_request=0.017s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    server| {"event": "SIGSTOP", "pid": 78317, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 78317}
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58182 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+--- step mode=ok action=watch bound=40 exit=124 wall=41.3s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+--- step mode=ok action=watch bound=30 exit=124 wall=31.5s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    requests=8 processes=2 socket_timeouts=[10] longest_single_request=0.041s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58236 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+    requests=4 processes=1 socket_timeouts=[10] longest_single_request=0.031s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=hang action=watch bound=60 exit=0 wall=17.3s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.0uJngC/state/slack.check.sh: slack: transport failure: unreachable
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=10.015s sum_request_time=10.0s errors=[["conversations.replies", "unreachable", 10.015]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=30.8s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=trickle action=watch bound=120 exit=124 wall=121.2s cards_posted_total=4
+    out| checkpoint: no actionable wake within 120s
+    queued_wake_rows=0
+    wake| 
+    requests=8 processes=2 socket_timeouts=[10] longest_single_request=0.033s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58231 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"
+    triage| [2026-11-01T11:38:37-0600] check slack stopped after 38s (no progress); result unknown, retry next pass
+    triage| [2026-11-01T11:39:22-0600] check slack stopped after 40s (no progress); result unknown, retry next pass
+--- step mode=ok action=watch bound=40 exit=124 wall=40.5s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    requests=20 processes=5 socket_timeouts=[10] longest_single_request=0.024s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    server| {"event": "trickle-client-gone", "method": "conversations.replies", "after_s": 41.0}
+    server| {"event": "trickle-client-gone", "method": "conversations.replies", "after_s": 41.01}
+    server| {"event": "trickle-client-gone", "method": "conversations.replies", "after_s": 35.995}
+    server| {"event": "trickle-client-gone", "method": "conversations.replies", "after_s": 35.913}
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58246 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

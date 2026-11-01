@@ -1,0 +1,23 @@
+### label=before-steady-latency9 tree=/Users/charlesabrooker/tmp/fm-tree-base-ff15a3d5 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.9s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.054s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.1s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=latency:9 action=watch bound=90 exit=0 wall=43.6s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.Z5qgiI/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.Z5qgiI/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.Z5qgiI/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    requests=1 processes=1 socket_timeouts=[] longest_single_request=0.000s sum_request_time=0.0s errors=[["conversations.open", "request_budget_exhausted", 0.0]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.4s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+final: chat.postMessage rows=0 distinct_texts=0 duplicate_texts=0
+final: threads=0 pending=0 failure='request_budget_exhausted'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22: 99978 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

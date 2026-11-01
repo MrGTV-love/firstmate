@@ -1,0 +1,49 @@
+### label=after-slow-latency tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.022s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:6 action=watch bound=170 exit=0 wall=106.5s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh: check slack stopped after 98s (no progress); result unknown, retry next pass
+    out| no_progress: "pid=81051 no CPU or watched-file progress for 30.3s"
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.S3Fis6/state/slack.check.sh: check slack stopped after 98s (no progress); result unknown, retry next pass
+    triage| [2026-11-01T11:38:09-0600] check slack stopped after 98s (no progress); result unknown, retry next pass
+    requests=12 processes=1 socket_timeouts=[10] longest_single_request=6.162s sum_request_time=73.5s errors=[]
+    check_processes_still_alive=0
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 55991)
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/fake_slack_server.py", line 90, in do_POST
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [Errno 54] Connection reset by peer
+----------------------------------------
+--- step mode=ok action=watch bound=40 exit=124 wall=41.3s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    requests=8 processes=2 socket_timeouts=[10] longest_single_request=0.041s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58236 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

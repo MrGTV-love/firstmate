@@ -1,0 +1,24 @@
+### label=after-hand-run-stderr tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.052s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    hand-run mirror stderr: lines=0 distinct=
+--- step mode=ok action=mirror bound=na exit=0 wall=71.3s cards_posted_total=4
+    out| 
+    requests=9 processes=1 socket_timeouts=[10] longest_single_request=0.040s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    hand-run poll stderr: lines=0 distinct=
+--- step mode=ok action=poll bound=na exit=0 wall=51.5s cards_posted_total=4
+    out| 
+    requests=4 processes=1 socket_timeouts=[10] longest_single_request=0.056s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    hand-run check stderr: lines=4 distinct=slack: request finished|
+--- step mode=ok action=handcheck bound=na exit=0 wall=50.4s cards_posted_total=4
+    out| 
+    requests=4 processes=1 socket_timeouts=[10] longest_single_request=0.045s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   292 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

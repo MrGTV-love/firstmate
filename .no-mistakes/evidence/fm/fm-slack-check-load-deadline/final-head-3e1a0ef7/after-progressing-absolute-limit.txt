@@ -1,0 +1,22 @@
+### label=after-progressing-absolute-limit tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.8s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.080s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:6 action=watch bound=90 exit=0 wall=54.2s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.C5FrCF/state/slack.check.sh: check slack stopped after 23s (absolute limit); result unknown, retry next pass
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.C5FrCF/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.C5FrCF/state/slack.check.sh: check slack stopped after 23s (absolute limit); result unknown, retry next pass
+    triage| [2026-11-01T12:16:34-0600] check slack stopped after 23s (absolute limit); result unknown, retry next pass
+--- step mode=ok action=watch bound=60 exit=124 wall=62.7s cards_posted_total=1
+    out| checkpoint: no actionable wake within 60s
+    queued_wake_rows=0
+    wake| 
+    triage| [2026-11-01T12:17:40-0600] check slack stopped after 23s (absolute limit); result unknown, retry next pass
+    check_stderr_last_sample: lines=3 distinct=slack: request finished|
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.071s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=1 distinct_texts=1 duplicate_texts=0
+final: threads=1 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   108 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

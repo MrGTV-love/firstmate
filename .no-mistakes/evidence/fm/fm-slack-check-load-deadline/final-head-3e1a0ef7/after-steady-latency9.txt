@@ -1,0 +1,34 @@
+### label=after-steady-latency9 tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=5.3s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.049s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.2s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=latency:9 action=watch bound=120 exit=124 wall=122.7s cards_posted_total=2
+    out| checkpoint: no actionable wake within 120s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=5 distinct=slack: request finished|
+    requests=5 processes=1 socket_timeouts=[10] longest_single_request=9.251s sum_request_time=45.8s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:9 action=watch bound=120 exit=124 wall=121.2s cards_posted_total=4
+    out| checkpoint: no actionable wake within 120s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=9 distinct=slack: request finished|
+    requests=9 processes=1 socket_timeouts=[10] longest_single_request=9.166s sum_request_time=82.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=30.7s cards_posted_total=4
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=4 distinct=slack: request finished|
+    requests=12 processes=3 socket_timeouts=[10] longest_single_request=0.012s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   334 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

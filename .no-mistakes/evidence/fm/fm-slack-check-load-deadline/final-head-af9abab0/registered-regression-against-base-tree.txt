@@ -1,0 +1,11 @@
+slow check elapsed: 25.845s; request timings: [{"method": "conversations.open", "timeout": 10, "seconds": 0.0005351250292733312}]
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/fm-before-tree-af9abab0/tests/fm_slack_deadline_test.py", line 142, in <module>
+    main()
+    ~~~~^^
+  File "/Users/charlesabrooker/tmp/fm-before-tree-af9abab0/tests/fm_slack_deadline_test.py", line 105, in main
+    assert 'transport failure' not in output, output
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: slack: transport failure: request_budget_exhausted
+
+exit=1

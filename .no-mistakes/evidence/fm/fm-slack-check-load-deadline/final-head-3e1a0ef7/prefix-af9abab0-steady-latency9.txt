@@ -1,0 +1,25 @@
+### label=prefix-af9abab0-steady-latency9 tree=/Users/charlesabrooker/tmp/fm-tree-prefix-af9abab0 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.3s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.099s sum_request_time=0.2s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.4s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=latency:9 action=watch bound=90 exit=124 wall=93.2s cards_posted_total=1
+    out| checkpoint: no actionable wake within 90s
+    queued_wake_rows=0
+    wake| 
+    requests=4 processes=1 socket_timeouts=[10] longest_single_request=9.217s sum_request_time=36.7s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.0s cards_posted_total=2
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    requests=2 processes=1 socket_timeouts=[10] longest_single_request=0.074s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=2 distinct_texts=2 duplicate_texts=0
+final: threads=2 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   289 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

@@ -1,0 +1,17 @@
+### label=repro-latency6-run1 tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=1.1s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.025s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:6 action=watch bound=200 exit=0 wall=92.7s cards_posted_total=4
+    out| check: /Users/charlesabrooker/tmp/fm-lab.aZ28PH/state/slack.check.sh: check slack stopped after 88s (no progress); result unknown, retry next pass
+    out| no_progress: "pid=98026 no CPU or watched-file progress for 30.6s"
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.aZ28PH/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.aZ28PH/state/slack.check.sh: check slack stopped after 88s (no progress); result unknown, retry next pass
+    triage| [2026-11-01T11:43:44-0600] check slack stopped after 88s (no progress); result unknown, retry next pass
+    requests=12 processes=1 socket_timeouts=[10] longest_single_request=6.169s sum_request_time=73.5s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 21371 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

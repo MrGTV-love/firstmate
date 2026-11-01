@@ -1,0 +1,6 @@
+# Existing Slack test assets, base ff15a3d585b692587c8ef095c84168457f16c7c5 vs HEAD 3e1a0ef71f832c13b15d6648c0ad5a556a2a53dc
+## Status of every Slack test path that differs (A = added):
+A	tests/fm-slack-deadline.test.sh
+A	tests/fm_slack_deadline_test.py
+## Blob comparison of every Slack test asset at base:
+compared=35 differing=0

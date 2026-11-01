@@ -1,0 +1,15 @@
+### label=before-slow-latency6 tree=/Users/charlesabrooker/tmp/fm-tree-base-ff15a3d5 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.0s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.055s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:6 action=watch bound=120 exit=0 wall=56.2s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.5TWu2Q/state/slack.check.sh: slack: transport failure: unreachable
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.5TWu2Q/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.5TWu2Q/state/slack.check.sh: slack: transport failure: unreachable
+    requests=1 processes=1 socket_timeouts=[0.822736082947813] longest_single_request=0.926s sum_request_time=0.9s errors=[["conversations.open", "unreachable", 0.926]]
+    check_processes_still_alive=0
+final: chat.postMessage rows=0 distinct_texts=0 duplicate_texts=0
+final: threads=0 pending=0 failure='unreachable'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   198 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

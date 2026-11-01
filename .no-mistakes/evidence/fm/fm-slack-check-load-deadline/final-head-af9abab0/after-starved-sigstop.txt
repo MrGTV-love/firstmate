@@ -1,0 +1,23 @@
+### label=after-starved-sigstop tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=af9abab0  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.034s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=stop:22 action=watch bound=90 exit=124 wall=90.8s cards_posted_total=4
+    out| checkpoint: no actionable wake within 90s
+    queued_wake_rows=0
+    wake| 
+    requests=21 processes=3 socket_timeouts=[10] longest_single_request=0.030s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=40 exit=124 wall=42.1s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    requests=12 processes=3 socket_timeouts=[10] longest_single_request=0.017s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    server| {"event": "SIGSTOP", "pid": 78317, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 78317}
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58182 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

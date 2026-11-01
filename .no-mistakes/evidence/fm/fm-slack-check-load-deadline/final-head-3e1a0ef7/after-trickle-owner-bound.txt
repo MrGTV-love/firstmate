@@ -1,0 +1,36 @@
+### label=after-trickle-owner-bound tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.3s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.036s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.7s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=trickle action=watch bound=200 exit=0 wall=74.3s cards_posted_total=0
+    out| check: /Users/charlesabrooker/tmp/fm-lab.Ur8PPX/state/slack.check.sh: check slack stopped after 63s (no progress); result unknown, retry next pass
+    out| no_progress: "pid=64916 no CPU or watched-file progress for 32.7s"
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.Ur8PPX/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.Ur8PPX/state/slack.check.sh: check slack stopped after 63s (no progress); result unknown, retry next pass
+    triage| [2026-11-01T12:17:46-0600] check slack stopped after 63s (no progress); result unknown, retry next pass
+--- step mode=trickle action=watch bound=120 exit=124 wall=121.0s cards_posted_total=0
+    out| checkpoint: no actionable wake within 120s
+    queued_wake_rows=0
+    wake| 
+    triage| [2026-11-01T12:19:13-0600] check slack stopped after 52s (no progress); result unknown, retry next pass
+    triage| [2026-11-01T12:19:58-0600] check slack stopped after 40s (no progress); result unknown, retry next pass
+--- step mode=ok action=watch bound=40 exit=124 wall=41.0s cards_posted_total=4
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=4 distinct=slack: request finished|
+    requests=25 processes=4 socket_timeouts=[10] longest_single_request=0.012s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+    server| {"event": "trickle-client-gone", "method": "conversations.open", "after_s": 41.096}
+    server| {"event": "trickle-client-gone", "method": "conversations.open", "after_s": 41.125}
+    server| {"event": "trickle-client-gone", "method": "conversations.open", "after_s": 41.008}
+    server| {"event": "trickle-client-gone", "method": "conversations.open", "after_s": 10.298}
+final: chat.postMessage rows=4 distinct_texts=4 duplicate_texts=0
+final: threads=4 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   298 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

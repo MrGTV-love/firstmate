@@ -1,0 +1,11 @@
+# Existing Slack test assets, base ff15a3d585b692587c8ef095c84168457f16c7c5 vs HEAD af9abab0514a521d4eaee42ba6f82e0382171b03
+## Status of every Slack test path that differs (A = added):
+A	tests/fm-slack-deadline.test.sh
+A	tests/fm_slack_deadline_test.py
+## Blob comparison of every Slack test asset at base:
+compared=35 differing=0
+## Lists at HEAD
+tests/fm-slack-intake-unchanged.test.sh
+tests/fm-slack-secret-scan.test.sh
+tests/fm-slack-watch.test.sh
+tests/fm_slack_watch_test.py

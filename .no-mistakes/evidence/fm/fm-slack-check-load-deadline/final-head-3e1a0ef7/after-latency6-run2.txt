@@ -1,0 +1,20 @@
+### label=after-latency6-run2 tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.3s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.043s sum_request_time=0.1s errors=[]
+    check_processes_still_alive=0
+--- step mode=latency:6 action=watch bound=130 exit=124 wall=132.6s cards_posted_total=3
+    out| checkpoint: no actionable wake within 130s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=6 distinct=slack: request finished|
+    requests=6 processes=1 socket_timeouts=[10] longest_single_request=6.240s sum_request_time=37.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=32.4s cards_posted_total=3
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+final: chat.postMessage rows=3 distinct_texts=3 duplicate_texts=0
+final: threads=2 pending=0 failure=''
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   332 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

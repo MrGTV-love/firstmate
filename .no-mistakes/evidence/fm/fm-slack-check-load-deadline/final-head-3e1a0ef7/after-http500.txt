@@ -1,0 +1,32 @@
+### label=after-http500 tree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD commit=3e1a0ef7  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=4.1s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.018s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=33.4s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+--- step mode=http500 action=watch bound=40 exit=124 wall=43.1s cards_posted_total=0
+    out| checkpoint: no actionable wake within 40s
+    queued_wake_rows=0
+    wake| 
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=0.151s sum_request_time=0.2s errors=[["conversations.open", "http_500", 0.151]]
+    check_processes_still_alive=0
+--- step mode=http500 action=watch bound=30 exit=124 wall=32.6s cards_posted_total=0
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    requests=1 processes=1 socket_timeouts=[10] longest_single_request=0.074s sum_request_time=0.1s errors=[["conversations.open", "http_500", 0.074]]
+    check_processes_still_alive=0
+--- step mode=ok action=watch bound=30 exit=124 wall=32.8s cards_posted_total=1
+    out| checkpoint: no actionable wake within 30s
+    queued_wake_rows=0
+    wake| 
+    check_stderr_last_sample: lines=3 distinct=slack: request finished|
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.095s sum_request_time=0.2s errors=[]
+    check_processes_still_alive=0
+final: chat.postMessage rows=1 distinct_texts=1 duplicate_texts=0
+final: threads=1 pending=0 failure='http_500'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-3e1a0ef7/driver/drive.sh: line 22:   191 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

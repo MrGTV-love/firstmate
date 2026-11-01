@@ -1,0 +1,12 @@
+FM_TEST_BEGIN 2026-11-01T17:37:00Z tests/fm-slack-deadline.test.sh family=unclassified expected_gate_skip=none
+slow check elapsed: 39.418s; request timings: [{"method": "conversations.open", "timeout": 10, "seconds": 0.001401041983626783}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005165410693734884}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0005007919389754534}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005414580227807164}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.00040437502320855856}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0007678329711779952}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0004877920728176832}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005441670073196292}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.00036449998151510954}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00045658403541892767}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00027537497226148844}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0002375830663368106}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0002906669396907091}]
+ok - slow standing check completes after 39.418s; four cards remain four on repeat
+ok - longest silent read ends after 10.004s, before owner no-progress bound 30s; one report per episode
+hanging request timings: [{"method": "conversations.replies", "timeout": 10, "seconds": 10.002491416991688}, {"method": "conversations.replies", "timeout": 10, "seconds": 10.003841749974526}]
+FM_TEST_END 2026-11-01T17:39:22Z tests/fm-slack-deadline.test.sh exit=0 duration_ms=141394 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=148337
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=141394 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-slack-deadline.test.sh duration_ms=141394
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6AKWSASHPZCERM1ZWF23AQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+runner exit=0

@@ -1,0 +1,11 @@
+== only bin/fm_slack.py changed; --changed --list selects:
+tests/fm-slack-deadline.test.sh
+tests/fm-slack-watch.test.sh
+== only bin/fm_slack_watch.py changed; --changed --list selects:
+tests/fm-slack-deadline.test.sh
+tests/fm-slack-watch.test.sh
+tests/fm-slack-secret-scan.test.sh
+== only bin/fm-slack-check.sh changed; --changed --list selects:
+tests/fm-slack-deadline.test.sh
+tests/fm-slack-secret-scan.test.sh
+tests/fm-slack-watch.test.sh

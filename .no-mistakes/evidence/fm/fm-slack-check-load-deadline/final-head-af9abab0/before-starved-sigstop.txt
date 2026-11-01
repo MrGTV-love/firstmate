@@ -1,0 +1,17 @@
+### label=before-starved-sigstop tree=/Users/charlesabrooker/tmp/fm-before-tree-af9abab0 commit=base-archive-ff15a3d5  lab home, fake Slack on 127.0.0.1, synthetic token
+--- step mode=ok action=arm bound=na exit=0 wall=1.7s cards_posted_total=0
+    out| armed: state/slack.check.sh
+    requests=3 processes=1 socket_timeouts=[10] longest_single_request=0.029s sum_request_time=0.0s errors=[]
+    check_processes_still_alive=0
+--- step mode=stop:22 action=watch bound=90 exit=0 wall=47.5s cards_posted_total=1
+    out| check: /Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    queued_wake_rows=1
+    wake| check	/Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.6lPRsS/state/slack.check.sh: slack: transport failure: request_budget_exhausted
+    requests=5 processes=1 socket_timeouts=[10] longest_single_request=0.019s sum_request_time=0.0s errors=[["conversations.history", "request_budget_exhausted", 0.0], ["conversations.replies", "request_budget_exhausted", 0.0]]
+    check_processes_still_alive=0
+    server| {"event": "SIGSTOP", "pid": 83408, "seconds": 22.0}
+    server| {"event": "SIGCONT", "pid": 83408}
+final: chat.postMessage rows=1 distinct_texts=1 duplicate_texts=0
+final: threads=1 pending=0 failure='request_budget_exhausted'
+final: synthetic token found in 0 file(s) outside the fixture .env
+/Users/charlesabrooker/.no-mistakes/evidence/01M6AKWSASHPZCERM1ZWF23AQD/final-head-af9abab0/driver/drive.sh: line 22: 58139 Terminated: 15          python3 "$DRV/fake_slack_server.py" "$ROOT" "$ROOT/tests/fixtures/slack/mirror/transcript.json" "$WORK/fake-slack-state" "$WORK/control"

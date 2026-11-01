@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/fm-tree-prefix-af9abab0/tests/fm_slack_deadline_test.py", line 179, in <module>
+    main()
+    ~~~~^^
+  File "/Users/charlesabrooker/tmp/fm-tree-prefix-af9abab0/tests/fm_slack_deadline_test.py", line 116, in main
+    assert result.stderr == 'slack: request finished\n' * len(rows), result.stderr
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+exit=1
