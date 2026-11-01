@@ -3038,6 +3038,7 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
+| `conflict://` targets | Refused on `write` and `edit` because the identifier does not prove a file path; the refusal names the real-path edit described below instead of a report-only outcome. |
 | Other `scheme://` URIs | Refused because omp routes them to a protocol handler with no admitted write rule; the refusal asks for a report to Firstmate and recommends no read or fetch of the URI. |
 
 LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
@@ -3054,14 +3055,15 @@ Finished or missing jobs, named project services absent from the owner snapshot,
 Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 No device that sends data off the machine is admitted.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
+Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround, except the `conflict://` refusal, which names the real-path edit described below.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
 Device `edit` calls and other `scheme://` targets, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; on unconfined or unproved workers, ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard validates the replacement-input schema but does not judge or scan write/edit content.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
 A policy block (deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
-Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
+Two refusals name an alternative, and each exempts only that named alternative from this rule: the `xd://github` read-op refusal names `gh-axi` through the shell, and the `conflict://` refusal names editing the conflicted file at its real path in the worker's own work copy with the normal edit tool.
+A `conflict://` identifier does not prove a file path; the real-path edit takes the same filesystem route as any other write, T5 confinement on a proved worker and the spelling and root checks otherwise, so it never widens what a write may reach.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 Claude receives no post-tool review notice, so an unreviewed result is exactly what the tool returned.
