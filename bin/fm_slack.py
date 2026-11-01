@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
 import json
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,20 +19,15 @@ SAFE_ERRORS = {
 
 class Slack:
     base = 'https://slack.com/api/'
+    on_reply = None
 
     def __init__(self, token):
         self.token = token
-        # measured: 10 seconds, 2026-10-18, operator host, conservative socket ceiling.
-        # The standing check additionally bounds the whole process.
-        self.deadline = time.monotonic() + 20
         self.scopes = set()
 
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
-        remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
-            raise SlackError('request_budget_exhausted')
         encoded = {key: json.dumps(value) if isinstance(value, (dict, list, bool)) else value
                    for key, value in fields.items()}
         request = urllib.request.Request(self.base + method,
@@ -41,7 +35,11 @@ class Slack:
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
         try:
-            with urllib.request.urlopen(request, timeout=min(10, remaining)) as response:
+            # Conservative socket ceiling, first set 2026-10-18 on the operator host.
+            # A hung check can starve supervision: fm-watch.sh owns its progress
+            # and absolute bounds. Time between requests is not a socket failure.
+            # measured: value=10 date=2026-10-31 host=Mac-Studio.local margin=1.1 (at 5-minute load 185-195 a whole hand-run poll took 9 s and a mirror 6 s, so no single request exceeded 9 s)
+            with urllib.request.urlopen(request, timeout=10) as response:
                 header = response.headers.get('x-oauth-scopes', '')
                 if header:
                     self.scopes = {s for s in header.replace(' ', '').split(',') if s}
@@ -56,6 +54,8 @@ class Slack:
             raise SlackError('http_' + str(error.code)) from None
         except (OSError, ValueError, urllib.error.URLError):
             raise SlackError('unreachable') from None
+        if self.on_reply:
+            self.on_reply()
         if not isinstance(data, dict) or not data.get('ok'):
             code = data.get('error', '') if isinstance(data, dict) else ''
             # Never relay arbitrary API text, including an echoed Authorization header.
