@@ -126,7 +126,7 @@ fm_supervision_liveness() {
 # beacon is inside grace (bin/fm-wake-lib.sh owns those primitives). Sets the
 # same verdict fields as fm_supervision_liveness so a caller can branch on
 # either. Callers use it where they re-check one owner mid-decision, such as the
-# Cursor park's benign-close test and the Claude auto-arm cooperation.
+# Cursor park's benign-close test.
 fm_supervision_watcher_live() {
   local state=${1:-} watch=${2:-} grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-} age
   [ -n "$watch" ] || watch="$FM_SUP_LIVENESS_DIR/fm-watch.sh"

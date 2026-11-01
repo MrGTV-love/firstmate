@@ -92,8 +92,10 @@
 #      notice or failed bookkeeping cannot extend that budget; a budget that
 #      cannot be locked or written proves no bound, so that stop allows with one
 #      repair warning and a warn guard event.
-#      Positive supervision allows even if episode reset fails; only a live
-#      watcher or away daemon clears the episode, and an idle verdict leaves it.
+#      Positive supervision allows even if episode reset fails. At the recovery
+#      checks only a live watcher or away daemon clears the episode, and an idle
+#      verdict leaves it; a Stop with no need at guard entry clears the block
+#      budget when no failure notice exists and keeps everything when one does.
 #      The budget
 #      charges each event epoch once, and it also charges every re-block
 #      against an epoch the auto-arm never advanced past the previous
@@ -255,9 +257,10 @@ guard_event_allow() {
   guard_event allow --source-ok "${FM_SUP_SOURCE_OK:-true}" --cleared-by continue
 }
 
-# Episode state is bookkeeping, not a supervision proof. Only a live watcher or
-# away daemon ends the episode: an idle verdict leaves it open. Leave it intact
-# for a later reset when contended or unwritable; never block a live owner.
+# Episode state is bookkeeping, not a supervision proof. At these recovery checks
+# only a live watcher or away daemon ends the episode: an idle verdict leaves it
+# open. Leave it intact for a later reset when contended or unwritable; never
+# block a live owner.
 episode_reset_if_supervised() {  # [held]
   case "$FM_SUP_REASON" in
     watcher|away-daemon) fm_failure_episode_reset "$STATE" "$@" || true ;;

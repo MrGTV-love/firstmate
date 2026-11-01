@@ -414,7 +414,8 @@ When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_
 This is the guard's own block budget for the Claude Stop-hook path, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.
 [Compatibility limits](#compatibility-limits) names the other harnesses' bound.
 In Claude mode, positive watcher recovery allows the stop and clears the block budget, failure notice, and attended alarm together under the existing budget lock; a contended or failed clear leaves that bookkeeping for a later retry and never blocks the supervised stop.
-An idle verdict allows the stop and clears nothing, because only a live watcher or away daemon ends a failure episode.
+At the recovery checks, an idle verdict allows the stop and clears nothing, because only a live watcher or away daemon ends a failure episode there.
+At guard entry, a Stop with no supervision need clears the block budget when no failure notice exists and keeps everything when a notice exists.
 
 The block budget is charged by two rules:
 
@@ -579,7 +580,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - Monotonic failed-epoch progression.
 - Bounded attended fail-open on the Claude Stop-hook path.
 - The attended alarm limited to a verified failure episode, including the away-mode exclusion.
-- An idle verdict leaving the failure episode open at every reset site.
+- An idle verdict at the wait-loop and terminal recovery checks leaving the failure episode open.
 - A `warn` guard event on each Stop past the block budget.
 - The same bound against a ledger frozen by an inert auto-arm with and without a verified failure episode.
 - Post-alarm continuation suppression.
