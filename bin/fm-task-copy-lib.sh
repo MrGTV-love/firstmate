@@ -44,19 +44,39 @@ fm_task_copy_confined_launcher_state() {  # <pid>
   return "$found"
 }
 
-fm_task_copy_launcher_state() {  # <pid>
-  local pid=$1 observed rc=0
-  observed=$(ps -p "$pid" -o pid= 2>/dev/null) || rc=$?
+# Interpret one completed ps observation without executing a process probe.
+# Exit 1 proves absence only with both output channels empty; any diagnostic
+# makes that failed read unknown. The acquisition owner handles exit 126.
+fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
+  local pid=$1 rc=$2 observed=$3 diagnostic=$4
   case "$rc" in
     0)
       observed=${observed//[[:space:]]/}
       [ "$observed" = "$pid" ] || return 2
       return 0
       ;;
-    1) [ -z "$observed" ] && return 1; return 2 ;;
-    126) fm_task_copy_confined_launcher_state "$pid"; return $? ;;
+    1) [ -z "$observed" ] && [ -z "$diagnostic" ] && return 1; return 2 ;;
     *) return 2 ;;
   esac
+}
+
+fm_task_copy_launcher_state() {  # <pid>
+  local pid=$1 observed diagnostic diagnostic_file rc=0
+  diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-copy-ps.XXXXXX") || return 2
+  observed=$(ps -p "$pid" -o pid= 2>"$diagnostic_file") || rc=$?
+  if [ "$rc" = 126 ]; then
+    rm -f -- "$diagnostic_file"
+    fm_task_copy_confined_launcher_state "$pid"
+    return $?
+  fi
+  # Retain even a whitespace-only diagnostic; failed reads are not absence.
+  diagnostic=$(cat "$diagnostic_file" && printf '.') || {
+    rm -f -- "$diagnostic_file"
+    return 2
+  }
+  diagnostic=${diagnostic%.}
+  rm -f -- "$diagnostic_file"
+  fm_task_copy_ps_observation_state "$pid" "$rc" "$observed" "$diagnostic"
 }
 
 # The physical path of an existing directory, or a failure.
