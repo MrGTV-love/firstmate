@@ -56,7 +56,8 @@ Pipeline starts:
     AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Notices go to stderr.
   - Admission is by measured memory reservations, never by load average. The
     first waiter is admitted when, as bytes, (counted + 1) x R + S fits
-    B = available memory + the resident memory the counted runs hold now. R is
+    B = available memory + the resident memory each counted run holds now, at
+    most R per run (memory a run holds above R is not free for new starts). R is
     the 75th percentile (nearest rank) and S the largest per-run peak across the
     host's recorded no-mistakes runs with at least 2 readings, read from the root
     home's .memory-calibration.json (written by fm-mem-guard.sh probe). available
@@ -498,7 +499,9 @@ def host_observation() -> dict:
         source = guard.open_source()
         limit, limit_source = source.limit()
         count = source.count()
-        if limit and count > limit * guard.WARN_PERCENT / 100.0:
+        if limit is None and source.name != "linux":
+            reasons.append("process limit unreadable: %s" % limit_source)
+        elif limit and count > limit * guard.WARN_PERCENT / 100.0:
             reasons.append("process pile-up: %d of %d user processes" % (count, limit))
     except Exception as exc:
         reasons.append("process count unreadable: %s" % exc)
@@ -518,7 +521,7 @@ def decide(counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
         limit = max(1, cores // 3)
         return len(counted) < limit, "counted=%d limit=%d basis=fallback priority=%s" % (len(counted), limit, priority)
     reservation, slack, qualifying = reserved
-    held = sum(report["runs"].get("no-mistakes:%s/%s" % (repo, run), {}).get("rss_bytes", 0)
+    held = sum(min(reservation, report["runs"].get("no-mistakes:%s/%s" % (repo, run), {}).get("rss_bytes", 0))
                for run, repo in counted.items())
     budget = report["available_bytes"] + held
     need = (len(counted) + 1) * reservation + slack

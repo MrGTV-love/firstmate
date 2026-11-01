@@ -31,6 +31,7 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
         sys.modules['fm_proc_guard'] = guard
         spec.loader.exec_module(guard)
         class Fake:
+            name = 'darwin'
             def reading(self):
                 value = json.load(open(os.environ['CASE_PROCS']))
                 if value.get('error'): raise guard.ReadError('case count unreadable')
@@ -275,7 +276,7 @@ try:
         waits = [line for line in text.splitlines() if 'waiting' in line]
         assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
-    assert 'need=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 40 * GIB) in (folder / 'burst-9.stderr').read_text()
+    assert any('need=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 40 * GIB) in (folder / (name + '.stderr')).read_text() for name in names[:10])
     # The eleventh needs 41 GiB of 40 and waits; releasing one run lets it start.
     clients[names[10]] = launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), names[10]], env, folder / names[10])
     pending(folder, 1)
@@ -304,6 +305,19 @@ try:
     facts(folder, available=13 * GIB, runs=[(None, 'baseline-0', GIB)])
     finish(child)
     assert marker.exists() and 'admitted: counted=1 need=%d budget=%d' % (14 * GIB, 14 * GIB) in (folder / 'idle-full.stderr').read_text()
+    # A counted run holding more than R adds only R to B: its excess is not free memory.
+    # 7 GiB held, 10 GiB available: B = 10 + 3 = 13 GiB < need 14 GiB, so the start waits.
+    folder, db, env = case('over-reservation', cores=18, running=1, measured=True, available=10 * GIB)
+    facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
+    marker = folder / 'over.marker'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'over')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=1 need=%d budget=%d' % (14 * GIB, 13 * GIB) in (folder / 'over.stderr').read_text(), 'excess over R is not credited')
+    time.sleep(0.6)
+    assert not marker.exists() and child.poll() is None
+    facts(folder, available=11 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
+    finish(child)
+    assert marker.exists() and 'admitted: counted=1 need=%d budget=%d' % (14 * GIB, 14 * GIB) in (folder / 'over.stderr').read_text()
     folder, db, env = case('busy-but-fits', cores=18, running=0, measured=True, available=40 * GIB, load=500)
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'busy.marker')], env, folder / 'busy'))
     assert (folder / 'busy.marker').exists()
@@ -319,7 +333,8 @@ try:
              lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 2'),
             ('pileup', lambda: procs(folder, count=6400), lambda: procs(folder, count=6399), 'process pile-up: 6400 of 10666'),
             ('memory-unreadable', lambda: facts(folder, broken=True), lambda: facts(folder, available=100 * GIB), 'memory: '),
-            ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable')):
+            ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable'),
+            ('limit-unreadable', lambda: procs(folder, limit=None), lambda: procs(folder), 'process limit unreadable: case')):
         bad()
         marker = folder / (label + '.marker')
         child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / label)

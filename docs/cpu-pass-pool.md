@@ -87,9 +87,9 @@ The first waiter in class order is admitted when, in bytes:
 | `R` | the reservation of one run: the 75th percentile (nearest rank) of the per-run peak resident memory of recorded no-mistakes runs | `peak_bytes` of every `no-mistakes:` entry with at least 2 samples in the root home's `state/.memory-calibration.json`, written by `bin/fm-mem-guard.sh probe` |
 | `S` | slack for one run reaching its tail: the largest of those same peaks | same record |
 | `available_bytes` | free, file-backed and purgeable pages, never compressed or swapped memory | one `bin/fm-mem-guard.py` `admission_sample()` reading, at most 2 s old |
-| `held` | resident memory the counted runs hold now, summed over their process trees; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
+| `held` | resident memory the counted runs hold now, summed over their process trees with each run's share capped at `R`; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
 
-`B` is the memory the counted runs may still use plus what the host has free, so the inequality is the same as "the reservations of the counted runs, the new run and one tail run fit the host's available memory": a counted run's reservation is partly already held, and `held` counts that part once.
+`B` is the memory the counted runs may still use plus what the host has free, so the inequality is the same as "the reservations of the counted runs, the new run and one tail run fit the host's available memory": a counted run's reservation is partly already held, and `held` counts that part once. A run that holds more than `R` adds only `R` to `B`, so its excess is never treated as free memory for new starts.
 A run that is registered but not yet visible in the reading therefore reserves its whole `R` in the next decision.
 The record belongs to the host: it must name this host and its RAM size.
 The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh` exports to workers, else the checkout holding the engine; a secondmate home reads its root home's record.
@@ -112,7 +112,7 @@ That is the previous count limit, kept only until the host has measured runs; a 
 While either signal reports an actual overload, or cannot be read, no new start is admitted and a notice names the reason:
 
 - the memory reading is unreadable or would make `bin/fm-mem-guard.sh admit` exit 75 (native pressure level 2 or higher, or a required fact unavailable; `admission_evaluate` returns the same list);
-- `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count.
+- `bin/fm-proc-guard.py` reports a pile-up (user process count above its fixed 60 % warning line of the host's per-user cap, a proc-guard constant) or cannot read the count or, on macOS, the per-user cap.
 
 Nothing running is stopped, paused or reprioritised.
 This backstop covers the tail the reservation does not: a run that exceeds `R`, and process pile-ups.
