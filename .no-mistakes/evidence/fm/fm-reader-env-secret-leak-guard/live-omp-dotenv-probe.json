@@ -1,0 +1,70 @@
+{
+ "bash_env_dropped": true,
+ "credential_shaped_names_by_channel": {
+  "child_bash": [
+   "FM_TEST_FAKE_AGENT_DOTENV_KEY",
+   "FM_TEST_FAKE_HOME_DOTENV_KEY",
+   "GEMINI_API_KEY",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "child_sh": [
+   "FM_TEST_FAKE_AGENT_DOTENV_KEY",
+   "FM_TEST_FAKE_HOME_DOTENV_KEY",
+   "GEMINI_API_KEY",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "child_zsh_f": [
+   "FM_TEST_FAKE_AGENT_DOTENV_KEY",
+   "FM_TEST_FAKE_HOME_DOTENV_KEY",
+   "GEMINI_API_KEY",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "env": [
+   "FM_TEST_FAKE_AGENT_DOTENV_KEY",
+   "FM_TEST_FAKE_HOME_DOTENV_KEY",
+   "GEMINI_API_KEY",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "python_os_environ": [
+   "FM_TEST_FAKE_AGENT_DOTENV_KEY",
+   "FM_TEST_FAKE_HOME_DOTENV_KEY",
+   "GEMINI_API_KEY",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ]
+ },
+ "disable_autoupdater_kept": true,
+ "fm_task_id_matches": true,
+ "git_works": true,
+ "goroot_unset_stays_unset": true,
+ "java_home_kept": true,
+ "kept": {
+  "FM_TASK_INBOX": true,
+  "GIT_CONFIG_COUNT": true,
+  "HOME": true,
+  "PATH": true,
+  "SHELL": false,
+  "SSH_AUTH_SOCK": false,
+  "TERM": true,
+  "TMPDIR": true,
+  "USER": true
+ },
+ "node_options_dropped": true,
+ "open_only_startup_files": {
+  "/Users/charlesabrooker/tmp/fm-lab.kdOIpT/os-home/.bash_profile": "missing",
+  "/Users/charlesabrooker/tmp/fm-lab.kdOIpT/os-home/.zprofile": "missing",
+  "/Users/charlesabrooker/tmp/fm-lab.kdOIpT/os-home/.zshenv": "missing",
+  "/Users/charlesabrooker/tmp/fm-lab.kdOIpT/os-home/.zshrc": "denied",
+  "/etc/profile": "denied",
+  "/etc/zshrc": "denied"
+ },
+ "pythonpath_dropped": true,
+ "sentinel_value_in_env_dump": true,
+ "task": "labomp-dotenvf96a34",
+ "virtual_env_dropped": true,
+ "write_confinement": "seatbelt-v1"
+}

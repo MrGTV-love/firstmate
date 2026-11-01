@@ -1,0 +1,50 @@
+treehouse get
+charlesabrooker@Mac-Studio notes % treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.BItfnF/treehouse/.treehouse/notes-e09283/1/notes. Type 'exit' to return.
+charlesabrooker@Mac-Studio notes % cd -- '/Users/charlesabrooker/tmp/fm-lab.BItfnF/treehouse/.treehouse/notes-e09283/1/notes'
+charlesabrooker@Mac-Studio notes % export GOTMPDIR=/tmp/fm-labclaude5307f9/gotmp
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=labclaude5307f9
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-labclaude5307f9+fd80e7075b379b4547ea99def14212f40bc33a042adbce0de97877fd9168f32b/launch.s1793544819.56829.2268.sh'
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Haiku 5.5 with low effort · API Usage Billing
+ ▝▝   ▝▝   ~/tmp/fm-lab.BItfnF/treehouse/.treehouse/notes-e09283/1/notes
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.BItfnF/state/operational-inbox/1793544819-b479b652d0202f8a.msg' and handle its contents as Firstmate operational       
+  input.                                                                                                                                                                                                
+
+⏺ Auto mode lets Claude handle permission prompts automatically — Claude checks each tool call for risky actions and prompt injection before executing. Actions Claude identifies as safe are 
+  executed, while actions Claude identifies as risky are blocked and Claude may try a different approach. Ideal for long-running tasks. Sessions are slightly more expensive. Claude can make 
+  mistakes that allow harmful commands to run, it's recommended to only use in isolated environments. Shift+Tab to change mode.                                                                         
+
+  Read 1 file (ctrl+o to expand)                                                                                                                                                                        
+  ⎿  1 skill available                                                                                                                                                                                
+
+⏺ The brief asks me to run one probe command from the current worktree, then report. Running it now.
+
+⏺ Bash(python3 probe.py '/Users/charlesabrooker/tmp/fm-lab.BItfnF/data/labclaude5307f9/probe-result.json' 'labclaude5307f9' login)
+  ⎿  probe finished; result written
+  ⎿  Allowed by auto mode
+
+✻ Processing… (7s · ↓ 489 tokens · thinking with low effort)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                                                                                       
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← for agents                                                                                                               ○ low · /effort
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,3 @@
+skill selection for labraw-allowlist7e47fa: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=python3 write_confinement=unconfined-macos-python3
+spawned labraw-allowlist7e47fa harness=python3 kind=scout window=firstmate:fm-labraw-allowlist7e47fa worktree=/Users/charlesabrooker/tmp/fm-lab.ZcwLOB/treehouse/.treehouse/notes-6cb465/1/notes

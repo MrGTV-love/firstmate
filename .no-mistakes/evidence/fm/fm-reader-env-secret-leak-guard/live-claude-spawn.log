@@ -1,0 +1,7 @@
+skill selection for labclaude5307f9: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned labclaude5307f9 harness=claude kind=scout window=firstmate:fm-labclaude5307f9 worktree=/Users/charlesabrooker/tmp/fm-lab.BItfnF/treehouse/.treehouse/notes-e09283/1/notes

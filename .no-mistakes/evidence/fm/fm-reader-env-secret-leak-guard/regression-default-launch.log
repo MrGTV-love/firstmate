@@ -1,0 +1,10 @@
+calibration: "0 of 5 samples for test.dispatch-profile on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.dispatch-profile elapsed=1.0s output_bytes=0 tree_cpu=0.59s"
+ok - default codex mutable export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex non-identifier export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex mutable export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+# /bin/zsh removes non-identifier entries before the production launch; not counted as boundary proof
+exit=0

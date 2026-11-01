@@ -1,0 +1,4 @@
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+skill selection for labdshadb8bd: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=dsh write_confinement=unconfined-macos-dsh
+spawned labdshadb8bd harness=dsh kind=scout window=firstmate:fm-labdshadb8bd worktree=/Users/charlesabrooker/tmp/fm-lab.MoVO8m/treehouse/.treehouse/notes-db79af/1/notes

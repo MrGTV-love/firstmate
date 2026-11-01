@@ -1,0 +1,4 @@
+line 11: claude baseline "refused-startup-bash": false "refused-startup-zsh": false 
+line 14: claude confined "refused-startup-bash": true "refused-startup-zsh": true 
+line 19: omp baseline "refused-startup-bash": false "refused-startup-zsh": false 
+line 21: omp confined "refused-startup-bash": true "refused-startup-zsh": true 

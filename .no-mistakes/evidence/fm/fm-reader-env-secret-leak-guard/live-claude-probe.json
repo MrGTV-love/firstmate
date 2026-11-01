@@ -1,0 +1,70 @@
+{
+ "bash_env_dropped": true,
+ "credential_shaped_names_by_channel": {
+  "child_bash": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "child_sh": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "child_zsh_f": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "env": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "login_interactive_bash": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "login_interactive_zsh": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ],
+  "python_os_environ": [
+   "CLAUDE_CODE_MESSAGING_TOKEN",
+   "GIT_CONFIG_KEY_0",
+   "GIT_CONFIG_KEY_1"
+  ]
+ },
+ "disable_autoupdater_kept": true,
+ "fm_task_id_matches": true,
+ "git_works": true,
+ "goroot_unset_stays_unset": true,
+ "java_home_kept": true,
+ "kept": {
+  "FM_TASK_INBOX": true,
+  "GIT_CONFIG_COUNT": true,
+  "HOME": true,
+  "PATH": true,
+  "SHELL": true,
+  "SSH_AUTH_SOCK": false,
+  "TERM": true,
+  "TMPDIR": true,
+  "USER": true
+ },
+ "node_options_dropped": true,
+ "open_only_startup_files": {
+  "/Users/charlesabrooker/.bash_profile": "missing",
+  "/Users/charlesabrooker/.zprofile": "denied",
+  "/Users/charlesabrooker/.zshenv": "denied",
+  "/Users/charlesabrooker/.zshrc": "denied",
+  "/etc/profile": "denied",
+  "/etc/zshrc": "denied"
+ },
+ "pythonpath_dropped": true,
+ "sentinel_value_in_env_dump": false,
+ "task": "labclaude5307f9",
+ "virtual_env_dropped": true,
+ "write_confinement": "seatbelt-v1"
+}

@@ -1,0 +1,4 @@
+warning: a newer model exists in another tier - openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+skill selection for labomp29e0b7: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=omp write_confinement=seatbelt-v1
+spawned labomp29e0b7 harness=omp kind=scout window=firstmate:fm-labomp29e0b7 worktree=/Users/charlesabrooker/tmp/fm-lab.oD7n4z/treehouse/.treehouse/notes-906b77/1/notes

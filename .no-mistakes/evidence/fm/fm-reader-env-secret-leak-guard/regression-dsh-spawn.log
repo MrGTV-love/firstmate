@@ -1,0 +1,28 @@
+calibration: "0 of 5 samples for test.dsh-spawn on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.dsh-spawn elapsed=1.0s output_bytes=0 tree_cpu=0.87s"
+ok - fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry
+ok - session lock and process classification: dsh is anchored, decoys stay out
+ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
+ok - fm_busy_classify: dsh follows the launch's own durable session log
+ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
+ok - fm-spawn: DeepSeek spellings omp would resolve to the deepseek provider route to dsh with no harness
+ok - fm-spawn: a DeepSeek spelling of a retired id refuses before launch once canonicalized
+ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
+progress: "test.dsh-spawn elapsed=61.0s output_bytes=790 tree_cpu=58.19s"
+ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: the dsh launch keeps an operator's XDG-only git identity under a private HOME
+ok - fm-spawn: a dsh crew harness mirrored from a DSH primary carries its bound model and the operator's install, and refuses without a live record
+ok - fm-spawn: a dsh secondmate starts on its positional brief and carries the operator's DSH install and home to nested spawns
+progress: "test.dsh-spawn elapsed=121.4s output_bytes=1312 tree_cpu=95.84s"
+ok - fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation
+ok - fm-spawn: a dsh ship relaunch resumes past uncommitted subagent and newer-version headers and refuses rather than discard a conversation it cannot read
+ok - fm-spawn: the restricted session policy admits canonical dsh-tui DeepSeek launches
+ok - fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch
+ok - fm-spawn: catalog-listed DeepSeek defaults refuse without --model; non-DeepSeek defaults retain omp
+progress: "test.dsh-spawn elapsed=182.5s output_bytes=1899 tree_cpu=143.98s"
+ok - fm-spawn: a successful version probe and durable turn cannot admit an unrecognized dsh screen
+ok - fm-spawn: exhausted omp replaces its declared DeepSeek stand-in with dsh-tui under the session policy
+progress: "test.dsh-spawn elapsed=244.6s output_bytes=2105 tree_cpu=233.93s"
+ok - live guards: an opted-in run with a missing lab input or no DeepSeek model preference fails before any lab action; the opt-out still skips
+exit=0

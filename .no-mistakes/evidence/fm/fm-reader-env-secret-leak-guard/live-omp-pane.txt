@@ -1,0 +1,130 @@
+    [key=<slug>] if you opened it with one) as you resume.                                                                                                                                              
+ 7. Never administer infrastructure that every lane shares. Two things are shared:                                                                                                                      
+   - The no-mistakes daemon - one instance serving every lane/home, so stopping, restarting, or                                                                                                         
+     updating it kills other lanes' in-flight pipeline runs; only firstmate manages the daemon.                                                                                                         
+     Before you append blocked: about the pipeline, run no-mistakes daemon status and                                                                                                                   
+     no-mistakes axi status. If the daemon socket refuses connections or is missing, append                                                                                                             
+     blocked [at=<epoch>]: {the daemon error} and stop even when the local run record still says running or                                                                                             
+     fixing, because that record can be stale after the daemon exits. A run record failed with a                                                                                                        
+     daemon error is also a real block.                                                                                                                                                                 
+     Only after ruling out socket refusal, if the run is still running or fixing, reattach and keep                                                                                                     
+     going. A drive-call error, timeout, slow read, or generic unreachability is NOT a daemon error:                                                                                                    
+     the daemon accepts respond immediately and runs the round in the background, so a killed or                                                                                                        
+     timed-out call was only waiting for a read while the run kept working.                                                                                                                             
+   - The worktree pool your own worktree came from, and the repository every lane's worktree                                                                                                            
+     shares. Never create, remove, return, prune, move, or reassign a worktree or pool slot, and                                                                                                        
+     never write into a sibling slot's directory. Rule 2 does not cover this: removing a worktree                                                                                                       
+     is administration rather than an edit outside your directory, and it lands on lanes that are                                                                                                       
+     running right now. The act is the rule and commands are only examples of it - treehouse                                                                                                            
+     get/return/remove/prune, the equivalent operations on any other worktree provider or runtime                                                                                                       
+     backend, and git worktree add|remove|move|prune. A slot that looks unused is not evidence                                                                                                          
+     that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.                                                                                                         
+    The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.                                          
+    If you genuinely need a second checkout, another slot, or the daemon touched, append                                                                                                                
+    blocked [at=<epoch>]: {what you need} and stop; firstmate arranges it.                                                                                                                              
+ 8. Stop every private service you start. A private service is any daemon, server, or watcher that                                                                                                      
+    only your task needs, including a no-mistakes home whose NO_MISTAKES_HOME sits inside your                                                                                                          
+    worktree: that home installs its own launchd agent that keeps running and restarts after a kill                                                                                                     
+    or a reboot. Before you append a paused, blocked, needs-decision, done, or failed                                                                                                                   
+    line that ends your turn, stop each one and name it in that status line. Stop a launchd agent                                                                                                       
+    with launchctl bootout gui/$(id -u)/<label> once its --root is confirmed to be inside your                                                                                                          
+    worktree. Never use no-mistakes daemon stop for this: it stops the shared daemon (rule 7).                                                                                                          
+ 9. Run any shim, lab, or measurement script through '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6B9PFQFSZQGBTR2TNRQ6DSV/bin/fm-proc-budget.sh' -- <command...>: a runaway process   
+    tree then stops at its own limit instead of starving every lane of fork. When the task requires a memory stop, use                                                                                  
+    '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6B9PFQFSZQGBTR2TNRQ6DSV/bin/fm-proc-budget.sh' --memory-kib <limit-in-KiB> -- <command...> (see the wrapper header for supported     
+    hosts and failure statuses).                                                                                                                                                                        
+ 10. Mark every Docker object you start with your task id, so teardown removes it with your task:                                                                                                       
+     pass --label fm.task=$FM_TASK_ID to docker run, docker create, docker network create, and                                                                                                          
+     docker volume create. In Compose, add fm.task: ${FM_TASK_ID} to every service's labels and to                                                                                                      
+     the labels of every declared network and volume. Use docker compose -p "$FM_TASK_ID" only when                                                                                                     
+     the exact task id is a valid Compose project name: lowercase letters, digits, hyphens and                                                                                                          
+     underscores, starting with a lowercase letter or digit. Do not substitute a task-id prefix.                                                                                                        
+     For Supabase, use an isolated task-local supabase/config.toml with project_id set to the exact                                                                                                     
+     task id, then run supabase start from that task-local project. Never edit or start the shared                                                                                                      
+     project's Supabase configuration; configure the project id in the file, not a command-line flag.                                                                                                   
+     A container with no task marker, no name starting with your task id (followed by - or _), and no                                                                                                   
+     Compose project in your worktree cannot be attributed to you and outlives your task. Remove what                                                                                                   
+     you finish with as you go; teardown only catches what is left, and never touches another task's stacks.                                                                                            
+                                                                                                                                                                                                        
+ Firstmate instruction inbox                                                                                                                                                                            
+                                                                                                                                                                                                        
+ Firstmate steers you through durable message files in '/Users/charlesabrooker/tmp/fm-lab.oD7n4z/state/labomp29e0b7.inbox'.                                                                             
+ When a terminal message names a record waiting there, list '/Users/charlesabrooker/tmp/fm-lab.oD7n4z/state/labomp29e0b7.inbox'/*.msg and read and act only on that announced record after earlier      
+ records have been handled, then acknowledge it by moving it: mv '/Users/charlesabrooker/tmp/fm-lab.oD7n4z/state/labomp29e0b7.inbox'/NNN.msg                                                            
+ '/Users/charlesabrooker/tmp/fm-lab.oD7n4z/state/labomp29e0b7.inbox'/handled/. Wait for each earlier record's own doorbell before reading it. At any natural checkpoint when you are unsure, list the   
+ inbox and handle already announced records in numeric order; report any unannounced survivors to Firstmate for re-delivery rather than reading them without their doorbells.                           
+ The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or absent inbox needs no action.                                                        
+                                                                                                                                                                                                        
+ Definition of done                                                                                                                                                                                     
+                                                                                                                                                                                                        
+ Write your findings to /Users/charlesabrooker/tmp/fm-lab.oD7n4z/data/labomp29e0b7/report.md.                                                                                                           
+ The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.                                                          
+ If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never    
+ run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with 
+ the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id>           
+ <sequence> to conclude and retire your board.                                                                                                                                                          
+ Before reporting done, read and follow /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6B9PFQFSZQGBTR2TNRQ6DSV/.agents/skills/captain-hold-lifecycle/SKILL.md and pass its shared        
+ completion gate for the report and any visual review.                                                                                                                                                  
+ When the report is complete, append done [at=<epoch>]: {one-line conclusion} to the status file and stop.                                                                                              
+ If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive             
+ mode-specific ship instructions as a follow-up message.                                                                                                                                                
+                                                                                                                                                                                                        
+ Definition Of Done (task)                                                                                                                                                                              
+                                                                                                                                                                                                        
+ These are the criteria this task is graded against.                                                                                                                                                    
+ Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.                                                                
+ If the criteria live in a finished file instead, an unfenced line DoD file: <absolute path> inside this section points to it; a fresh spawn checks that file once, and you read it before you start.   
+                                                                                                                                                                                                        
+ Capability in plain words: The named command ran once.                                                                                                                                                 
+                                                                                                                                                                                                        
+ ### Mandatory items                                                                                                                                                                                    
+                                                                                                                                                                                                        
+ Write at least one item.                                                                                                                                                                               
+ Each mandatory item starts its own line as <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ..., with an id matching [A-Za-z][A-Za-z0-9_.-]* that is       
+ unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.                                                                                                       
+ A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.                                                                      
+ The shape check is mechanical: the independent grader still decides whether each item is true and complete.                                                                                            
+ M1 Source: the task. Expected: the probe result file exists. Verify: the command prints that it finished. Edge/negative: no other command runs. Evidence place: the result file. Authority: agent      
+                                                                                                                                                                                                        
+ ### Supporting items                                                                                                                                                                                   
+                                                                                                                                                                                                        
+ None.                                                                                                                                                                                                  
+                                                                                                                                                                                                        
+ ### Hard gates                                                                                                                                                                                         
+                                                                                                                                                                                                        
+ Run only the named command.                                                                                                                                                                            
+                                                                                                                                                                                                        
+ ### Honesty rule                                                                                                                                                                                       
+                                                                                                                                                                                                        
+ Report what the command printed.                                                                                                                                                                       
+                                                                                                                                                                                                        
+ How You're Graded                                                                                                                                                                                      
+                                                                                                                                                                                                        
+ - A session that did not build this work grades it, against the items above and the evidence places they name.                                                                                         
+ - Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending,    
+   never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.                                                
+ - Supporting items earn partial credit and never offset a failed mandatory item.                                                                                                                       
+ - A crossed hard gate fails the task. Stop and report it.                                                                                                                                              
+ - Your done: status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.                                                                                
+                                                                                                                                                                                                        
+ Skill selection                                                                                                                                                                                        
+                                                                                                                                                                                                        
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.                                                                                          
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.         
+                                                                                                                                                                                                        
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available                                                                                                                                                                                       
+ New version 18.15.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ python3 probe.py '/Users/charlesabrooker/tmp/fm-lab.oD7n4z/data/labomp29e0b7/probe-result.json' 'labomp29e0b7' login                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ probe finished; result written                                                                                                                                                                       │
+╰─── Wall: 0.59s · Timeout: 300s ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ The probe finished and wrote the result file.    
+
+❯                                                 
+ π · ◔ GPT-6 Luna 👁 · 🌳 notes/notes · ⑂ detached · ◫ 5.3%/272K ⟲ · S0.00                                                                                                                   🆔 01a1978f 

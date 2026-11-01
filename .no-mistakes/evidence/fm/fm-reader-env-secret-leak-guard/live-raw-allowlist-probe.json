@@ -1,0 +1,55 @@
+{
+ "bash_env_dropped": true,
+ "credential_shaped_names_by_channel": {
+  "child_bash": [
+   "FM_TEST_FAKE_API_KEY",
+   "GIT_CONFIG_KEY_0"
+  ],
+  "child_sh": [
+   "FM_TEST_FAKE_API_KEY",
+   "GIT_CONFIG_KEY_0"
+  ],
+  "child_zsh_f": [
+   "FM_TEST_FAKE_API_KEY",
+   "GIT_CONFIG_KEY_0"
+  ],
+  "env": [
+   "FM_TEST_FAKE_API_KEY",
+   "GIT_CONFIG_KEY_0"
+  ],
+  "python_os_environ": [
+   "FM_TEST_FAKE_API_KEY",
+   "GIT_CONFIG_KEY_0"
+  ]
+ },
+ "disable_autoupdater_kept": true,
+ "fm_task_id_matches": true,
+ "git_works": true,
+ "goroot_unset_stays_unset": true,
+ "java_home_kept": false,
+ "kept": {
+  "FM_TASK_INBOX": true,
+  "GIT_CONFIG_COUNT": true,
+  "HOME": true,
+  "PATH": true,
+  "SHELL": true,
+  "SSH_AUTH_SOCK": false,
+  "TERM": true,
+  "TMPDIR": true,
+  "USER": true
+ },
+ "node_options_dropped": true,
+ "open_only_startup_files": {
+  "/Users/charlesabrooker/.bash_profile": "missing",
+  "/Users/charlesabrooker/.zprofile": "opened",
+  "/Users/charlesabrooker/.zshenv": "opened",
+  "/Users/charlesabrooker/.zshrc": "opened",
+  "/etc/profile": "opened",
+  "/etc/zshrc": "opened"
+ },
+ "pythonpath_dropped": true,
+ "sentinel_value_in_env_dump": true,
+ "task": "labraw-allowlist7e47fa",
+ "virtual_env_dropped": true,
+ "write_confinement": "unconfined-macos-python3"
+}

@@ -1,0 +1,35 @@
+calibration: "0 of 5 samples for test.api-key-guard on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.api-key-guard elapsed=1.0s output_bytes=0 tree_cpu=0.87s"
+ok - claude spawn without an allowlist drops an ambient key instead of refusing
+ok - claude spawn refuses a set key that config/launch-env-allowlist lists
+ok - claude spawn succeeds when no API key is set
+ok - claude spawn succeeds when ANTHROPIC_API_KEY is filtered out by allowlist
+progress: "test.api-key-guard elapsed=61.4s output_bytes=284 tree_cpu=56.43s"
+ok - claude spawn succeeds with --allow-api-key flag
+ok - non-claude harness ignores ANTHROPIC_API_KEY
+ok - claude spawn succeeds with pin shed when ANTHROPIC_API_KEY is set
+ok - task meta records api_key=allow when --allow-api-key is used
+ok - claude spawn refuses a key set only in the tmux session environment
+progress: "test.api-key-guard elapsed=122.0s output_bytes=597 tree_cpu=95.59s"
+ok - claude spawn refuses a key set only in the tmux global environment
+ok - claude spawn honors a tmux session removal marker over a global key
+ok - claude spawn succeeds with pin shed when the tmux environment holds a key
+ok - claude spawn tmux-environment check follows config/launch-env-allowlist
+ok - a non-opt-in launch sheds credentials captured by the pane and keeps its provider companion
+ok - an opted-in launch passes credentials captured by the pane
+ok - ambient compound Claude launch enforces credentials and account on both invocations
+progress: "test.api-key-guard elapsed=182.0s output_bytes=1148 tree_cpu=140.16s"
+ok - allowlist compound Claude launch enforces credentials and account on both invocations
+ok - opt-in-ambient compound Claude launch enforces credentials and account on both invocations
+ok - opt-in-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - named compound Claude launch enforces credentials and account on both invocations
+ok - ordinary compound Claude launch enforces credentials and account on both invocations
+progress: "test.api-key-guard elapsed=244.0s output_bytes=1610 tree_cpu=178.21s"
+ok - named-opt-in compound Claude launch enforces credentials and account on both invocations
+ok - ordinary-opt-in compound Claude launch enforces credentials and account on both invocations
+ok - named-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - ordinary-allowlist compound Claude launch enforces credentials and account on both invocations
+ok - the shared guard refuses only allowlisted non-tmux Claude keys and respects opt-in and filtering
+ok - config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in
+exit=0

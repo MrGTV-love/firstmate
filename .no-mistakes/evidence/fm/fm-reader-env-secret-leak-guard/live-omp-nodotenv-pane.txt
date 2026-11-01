@@ -1,0 +1,50 @@
+
+                                                                                    ████████████    
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.14.0
+
+                                                                Tip: Try starting your prompt with a ->, and writing a list (1. Do X, 2.
+                                                                                                 Do Y)                                                                                                  
+
+ unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.                                                                                                       
+ A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.                                                                      
+ The shape check is mechanical: the independent grader still decides whether each item is true and complete.                                                                                            
+ M1 Source: the task. Expected: the probe result file exists. Verify: the command prints that it finished. Edge/negative: no other command runs. Evidence place: the result file. Authority: agent      
+                                                                                                                                                                                                        
+ ### Supporting items                                                                                                                                                                                   
+                                                                                                                                                                                                        
+ None.                                                                                                                                                                                                  
+                                                                                                                                                                                                        
+ ### Hard gates                                                                                                                                                                                         
+                                                                                                                                                                                                        
+ Run only the named command.                                                                                                                                                                            
+                                                                                                                                                                                                        
+ ### Honesty rule                                                                                                                                                                                       
+                                                                                                                                                                                                        
+ Report what the command printed.                                                                                                                                                                       
+                                                                                                                                                                                                        
+ How You're Graded                                                                                                                                                                                      
+                                                                                                                                                                                                        
+ - A session that did not build this work grades it, against the items above and the evidence places they name.                                                                                         
+ - Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending,    
+   never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.                                                
+ - Supporting items earn partial credit and never offset a failed mandatory item.                                                                                                                       
+ - A crossed hard gate fails the task. Stop and report it.                                                                                                                                              
+ - Your done: status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.                                                                                
+                                                                                                                                                                                                        
+ Skill selection                                                                                                                                                                                        
+                                                                                                                                                                                                        
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.                                                                                          
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.         
+                                                                                                                                                                                                        
+• Bash · /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 probe.py /Users/charlesabrooker/tmp/fm-lab.u47OOa/data/labomp-nodotenv195cef/probe-result.json labomp-nodotenv195cef nologin
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available                                                                                                                                                                                       
+ New version 18.15.0 is available. Run: omp update                                                                                                                                                      
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ scripted-done                                    
+
+❯                                                 
+ π · ◔ gpt-6.1-sol · 🌳 notes/notes · ⑂ detached · ◫ 0.0%/200K ⟲ · $0.00 

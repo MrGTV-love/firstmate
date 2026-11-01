@@ -1,0 +1,1 @@
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API

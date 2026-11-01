@@ -1,0 +1,96 @@
+{
+ "bash_env_dropped": true,
+ "credential_shaped_names_by_channel": {
+  "child_bash": [
+   "ANTHROPIC_API_KEY",
+   "ANTHROPIC_AUTH_TOKEN",
+   "DEEPSEEK_API_KEY",
+   "FM_TEST_FAKE_API_KEY",
+   "GEMINI_API_KEY",
+   "LINEAR_API_KEY",
+   "OPENAI_API_KEY",
+   "TAC_HMAC_KEY",
+   "VERCEL_TOKEN",
+   "_SECRETS_LOADED"
+  ],
+  "child_sh": [
+   "ANTHROPIC_API_KEY",
+   "ANTHROPIC_AUTH_TOKEN",
+   "DEEPSEEK_API_KEY",
+   "FM_TEST_FAKE_API_KEY",
+   "GEMINI_API_KEY",
+   "LINEAR_API_KEY",
+   "OPENAI_API_KEY",
+   "TAC_HMAC_KEY",
+   "VERCEL_TOKEN",
+   "_SECRETS_LOADED"
+  ],
+  "child_zsh_f": [
+   "ANTHROPIC_API_KEY",
+   "ANTHROPIC_AUTH_TOKEN",
+   "DEEPSEEK_API_KEY",
+   "FM_TEST_FAKE_API_KEY",
+   "GEMINI_API_KEY",
+   "LINEAR_API_KEY",
+   "OPENAI_API_KEY",
+   "TAC_HMAC_KEY",
+   "VERCEL_TOKEN",
+   "_SECRETS_LOADED"
+  ],
+  "env": [
+   "ANTHROPIC_API_KEY",
+   "ANTHROPIC_AUTH_TOKEN",
+   "DEEPSEEK_API_KEY",
+   "FM_TEST_FAKE_API_KEY",
+   "GEMINI_API_KEY",
+   "LINEAR_API_KEY",
+   "OPENAI_API_KEY",
+   "TAC_HMAC_KEY",
+   "VERCEL_TOKEN",
+   "_SECRETS_LOADED"
+  ],
+  "python_os_environ": [
+   "ANTHROPIC_API_KEY",
+   "ANTHROPIC_AUTH_TOKEN",
+   "DEEPSEEK_API_KEY",
+   "FM_TEST_FAKE_API_KEY",
+   "GEMINI_API_KEY",
+   "LINEAR_API_KEY",
+   "OPENAI_API_KEY",
+   "TAC_HMAC_KEY",
+   "VERCEL_TOKEN",
+   "_SECRETS_LOADED"
+  ]
+ },
+ "disable_autoupdater_kept": true,
+ "fm_task_id_matches": false,
+ "git_error_first_line": "",
+ "git_works": true,
+ "goroot_unset_stays_unset": true,
+ "java_home_kept": true,
+ "kept": {
+  "FM_TASK_INBOX": false,
+  "GIT_CONFIG_COUNT": false,
+  "HOME": true,
+  "PATH": true,
+  "SHELL": true,
+  "SSH_AUTH_SOCK": false,
+  "TERM": true,
+  "TMPDIR": true,
+  "USER": true
+ },
+ "node_options_dropped": false,
+ "open_only_startup_files": {
+  "/Users/charlesabrooker/.bash_profile": "missing",
+  "/Users/charlesabrooker/.zprofile": "opened",
+  "/Users/charlesabrooker/.zshenv": "opened",
+  "/Users/charlesabrooker/.zshrc": "opened",
+  "/etc/profile": "opened",
+  "/etc/zshrc": "opened"
+ },
+ "pythonpath_dropped": false,
+ "sentinel_value_in_env_dump": true,
+ "task": "control",
+ "virtual_env_dropped": false,
+ "write_confinement": null
+}

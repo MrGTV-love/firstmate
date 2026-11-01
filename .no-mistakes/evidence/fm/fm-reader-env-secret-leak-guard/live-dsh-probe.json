@@ -1,0 +1,41 @@
+{
+ "bash_env_dropped": true,
+ "credential_shaped_names_by_channel": {
+  "child_bash": [],
+  "child_sh": [],
+  "child_zsh_f": [],
+  "env": [],
+  "python_os_environ": []
+ },
+ "disable_autoupdater_kept": true,
+ "fm_task_id_matches": true,
+ "git_error_first_line": "error: missing config key GIT_CONFIG_KEY_0",
+ "git_works": false,
+ "goroot_unset_stays_unset": true,
+ "java_home_kept": true,
+ "kept": {
+  "FM_TASK_INBOX": true,
+  "GIT_CONFIG_COUNT": true,
+  "HOME": true,
+  "PATH": true,
+  "SHELL": true,
+  "SSH_AUTH_SOCK": false,
+  "TERM": true,
+  "TMPDIR": true,
+  "USER": true
+ },
+ "node_options_dropped": true,
+ "open_only_startup_files": {
+  "/Users/charlesabrooker/tmp/fm-lab.MoVO8m/state/labdshadb8bd.dsh/s1793545642.71861.18184/home/.bash_profile": "missing",
+  "/Users/charlesabrooker/tmp/fm-lab.MoVO8m/state/labdshadb8bd.dsh/s1793545642.71861.18184/home/.zprofile": "opened",
+  "/Users/charlesabrooker/tmp/fm-lab.MoVO8m/state/labdshadb8bd.dsh/s1793545642.71861.18184/home/.zshenv": "opened",
+  "/Users/charlesabrooker/tmp/fm-lab.MoVO8m/state/labdshadb8bd.dsh/s1793545642.71861.18184/home/.zshrc": "opened",
+  "/etc/profile": "opened",
+  "/etc/zshrc": "opened"
+ },
+ "pythonpath_dropped": true,
+ "sentinel_value_in_env_dump": false,
+ "task": "labdshadb8bd",
+ "virtual_env_dropped": true,
+ "write_confinement": "unconfined-macos-dsh"
+}

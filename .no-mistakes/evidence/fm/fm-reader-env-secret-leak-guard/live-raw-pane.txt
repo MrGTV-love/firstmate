@@ -1,0 +1,50 @@
+treehouse get
+charlesabrooker@Mac-Studio notes % treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.BWxg41/treehouse/.treehouse/notes-34bd3b/1/notes. Type 'exit' to return.
+charlesabrooker@Mac-Studio notes % cd -- '/Users/charlesabrooker/tmp/fm-lab.BWxg41/treehouse/.treehouse/notes-34bd3b/1/notes'
+charlesabrooker@Mac-Studio notes % export GOTMPDIR=/tmp/fm-labraw6558af/gotmp
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=labraw6558af
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-labraw6558af+b1bb4242d516a5e572ed542add362c53160b17e49abec0022141536baf95a429/launch.s1793543141.54332.21840.sh'
+probe finished; result written
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
