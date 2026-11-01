@@ -1,0 +1,4 @@
+pwd -P: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE
+HEAD: d2c51045c8f3d4843b346ece1778b3cfee32ab59
+base: 3948d62ffa86123d35baeb84746ed7639d948a02
+date: 2026-11-01T00:42:01Z

@@ -1,0 +1,243 @@
+$ python3 -I /Users/charlesabrooker/.no-mistakes/evidence/01M6A4VZS35S1MHFBV6FGDZ7FE/probe/probe.py "$PWD"
+root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE
+head=d2c51045c8f3d4843b346ece1778b3cfee32ab59
+== omp confined (filesystem=T5) PASS
+  write "notes:v2.md" -> allow branch=confinement
+  write "~/fixture" -> allow branch=confinement
+  write "/etc/firstmate-probe-never-written" -> allow branch=confinement
+  write "../outside-worktree.txt" -> allow branch=confinement
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> allow branch=confinement
+  edit "~/fixture" -> allow branch=confinement
+  edit "/etc/firstmate-probe-never-written" -> allow branch=confinement
+  edit "../outside-worktree.txt" -> allow branch=confinement
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#ABCD]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#abcd]  " -> BLOCK branch=egress class=remote-storage
+  write "xd://github " -> BLOCK branch=egress class=remote-storage
+  write "XD://github" -> BLOCK branch=egress class=remote-storage
+  write "Xd://GitHub" -> BLOCK branch=device class=-
+  write "xd://github:raw" -> BLOCK branch=device class=-
+  write "XD://report_issue:conflicts" -> BLOCK branch=device class=-
+  write "xd://git\thub" -> BLOCK branch=egress class=remote-storage
+  write "xd://report_issue" -> BLOCK branch=egress class=provider
+  write "XD://report_issue" -> BLOCK branch=egress class=provider
+  write "xd://report_issue\t" -> BLOCK branch=egress class=provider
+  write "[xd://report_issue#0aF9]" -> BLOCK branch=egress class=provider
+  edit "xd://github" -> BLOCK
+  write "ssh://remote/file" -> BLOCK (no remote-read remedy)
+  write "HTTPS://example.invalid/a" -> BLOCK (no remote-read remedy)
+  write "file:///etc/passwd" -> BLOCK (no remote-read remedy)
+  write "[ssh://remote/file#ABCD]" -> BLOCK (no remote-read remedy)
+  write "xd://future_device" -> BLOCK (read-docs remedy)
+  write "XD://lsp" -> BLOCK
+  write ordinary.txt content=null -> BLOCK
+  jev-egress-grant events: ["deny smoke:xd://github","deny smoke:xd://report_issue"]
+== omp unconfined (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK branch=deterministic
+  write "~/fixture" -> BLOCK branch=deterministic
+  write "/etc/firstmate-probe-never-written" -> BLOCK branch=deterministic
+  write "../outside-worktree.txt" -> BLOCK branch=deterministic
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> BLOCK branch=deterministic
+  edit "~/fixture" -> BLOCK branch=deterministic
+  edit "/etc/firstmate-probe-never-written" -> BLOCK branch=deterministic
+  edit "../outside-worktree.txt" -> BLOCK branch=deterministic
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#ABCD]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#abcd]  " -> BLOCK branch=egress class=remote-storage
+  write "xd://github " -> BLOCK branch=egress class=remote-storage
+  write "XD://github" -> BLOCK branch=egress class=remote-storage
+  write "Xd://GitHub" -> BLOCK branch=device class=-
+  write "xd://github:raw" -> BLOCK branch=device class=-
+  write "XD://report_issue:conflicts" -> BLOCK branch=device class=-
+  write "xd://git\thub" -> BLOCK branch=egress class=remote-storage
+  write "xd://report_issue" -> BLOCK branch=egress class=provider
+  write "XD://report_issue" -> BLOCK branch=egress class=provider
+  write "xd://report_issue\t" -> BLOCK branch=egress class=provider
+  write "[xd://report_issue#0aF9]" -> BLOCK branch=egress class=provider
+  edit "xd://github" -> BLOCK
+  write "ssh://remote/file" -> BLOCK (no remote-read remedy)
+  write "HTTPS://example.invalid/a" -> BLOCK (no remote-read remedy)
+  write "file:///etc/passwd" -> BLOCK (no remote-read remedy)
+  write "[ssh://remote/file#ABCD]" -> BLOCK (no remote-read remedy)
+  write "xd://future_device" -> BLOCK (read-docs remedy)
+  write "XD://lsp" -> BLOCK
+  write ordinary.txt content=null -> BLOCK
+  jev-egress-grant events: ["deny smoke:xd://github","deny smoke:xd://report_issue"]
+== omp confined-no-marker (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK (audit unavailable, fail closed)
+  write "~/fixture" -> BLOCK (audit unavailable, fail closed)
+  write "/etc/firstmate-probe-never-written" -> BLOCK (audit unavailable, fail closed)
+  write "../outside-worktree.txt" -> BLOCK (audit unavailable, fail closed)
+  write "ordinary.txt" -> BLOCK
+  edit "notes:v2.md" -> BLOCK (audit unavailable, fail closed)
+  edit "~/fixture" -> BLOCK (audit unavailable, fail closed)
+  edit "/etc/firstmate-probe-never-written" -> BLOCK (audit unavailable, fail closed)
+  edit "../outside-worktree.txt" -> BLOCK (audit unavailable, fail closed)
+  edit "ordinary.txt" -> BLOCK
+  write "xd://github" -> BLOCK (audit unavailable, fail closed)
+  write "[xd://github]" -> BLOCK (audit unavailable, fail closed)
+  write "[xd://github#ABCD]" -> BLOCK (audit unavailable, fail closed)
+  write "[xd://github#abcd]  " -> BLOCK (audit unavailable, fail closed)
+  write "xd://github " -> BLOCK (audit unavailable, fail closed)
+  write "XD://github" -> BLOCK (audit unavailable, fail closed)
+  write "Xd://GitHub" -> BLOCK (audit unavailable, fail closed)
+  write "xd://github:raw" -> BLOCK (audit unavailable, fail closed)
+  write "XD://report_issue:conflicts" -> BLOCK (audit unavailable, fail closed)
+  write "xd://git\thub" -> BLOCK (audit unavailable, fail closed)
+  write "xd://report_issue" -> BLOCK (audit unavailable, fail closed)
+  write "XD://report_issue" -> BLOCK (audit unavailable, fail closed)
+  write "xd://report_issue\t" -> BLOCK (audit unavailable, fail closed)
+  write "[xd://report_issue#0aF9]" -> BLOCK (audit unavailable, fail closed)
+  edit "xd://github" -> BLOCK
+  write "ssh://remote/file" -> BLOCK (audit unavailable, fail closed)
+  write "HTTPS://example.invalid/a" -> BLOCK (audit unavailable, fail closed)
+  write "file:///etc/passwd" -> BLOCK (audit unavailable, fail closed)
+  write "[ssh://remote/file#ABCD]" -> BLOCK (audit unavailable, fail closed)
+  write "xd://future_device" -> BLOCK (audit unavailable, fail closed)
+  write "XD://lsp" -> BLOCK
+  write ordinary.txt content=null -> BLOCK
+== omp permissive-sandbox (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK branch=deterministic
+  write "~/fixture" -> BLOCK branch=deterministic
+  write "/etc/firstmate-probe-never-written" -> BLOCK branch=deterministic
+  write "../outside-worktree.txt" -> BLOCK branch=deterministic
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> BLOCK branch=deterministic
+  edit "~/fixture" -> BLOCK branch=deterministic
+  edit "/etc/firstmate-probe-never-written" -> BLOCK branch=deterministic
+  edit "../outside-worktree.txt" -> BLOCK branch=deterministic
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#ABCD]" -> BLOCK branch=egress class=remote-storage
+  write "[xd://github#abcd]  " -> BLOCK branch=egress class=remote-storage
+  write "xd://github " -> BLOCK branch=egress class=remote-storage
+  write "XD://github" -> BLOCK branch=egress class=remote-storage
+  write "Xd://GitHub" -> BLOCK branch=device class=-
+  write "xd://github:raw" -> BLOCK branch=device class=-
+  write "XD://report_issue:conflicts" -> BLOCK branch=device class=-
+  write "xd://git\thub" -> BLOCK branch=egress class=remote-storage
+  write "xd://report_issue" -> BLOCK branch=egress class=provider
+  write "XD://report_issue" -> BLOCK branch=egress class=provider
+  write "xd://report_issue\t" -> BLOCK branch=egress class=provider
+  write "[xd://report_issue#0aF9]" -> BLOCK branch=egress class=provider
+  edit "xd://github" -> BLOCK
+  write "ssh://remote/file" -> BLOCK (no remote-read remedy)
+  write "HTTPS://example.invalid/a" -> BLOCK (no remote-read remedy)
+  write "file:///etc/passwd" -> BLOCK (no remote-read remedy)
+  write "[ssh://remote/file#ABCD]" -> BLOCK (no remote-read remedy)
+  write "xd://future_device" -> BLOCK (read-docs remedy)
+  write "XD://lsp" -> BLOCK
+  write ordinary.txt content=null -> BLOCK
+  jev-egress-grant events: ["deny smoke:xd://github","deny smoke:xd://report_issue"]
+== claude confined (filesystem=T5) PASS
+  write "notes:v2.md" -> allow
+  write "~/fixture" -> allow
+  write "/etc/firstmate-probe-never-written" -> allow
+  write "../outside-worktree.txt" -> allow
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> allow
+  edit "~/fixture" -> allow
+  edit "/etc/firstmate-probe-never-written" -> allow
+  edit "../outside-worktree.txt" -> allow
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK
+  write "[xd://github]" -> BLOCK
+  write "[xd://github#ABCD]" -> BLOCK
+  write "[xd://github#abcd]  " -> BLOCK
+  write "xd://github " -> BLOCK
+  write "XD://github" -> BLOCK
+  write "Xd://GitHub" -> BLOCK
+  write "xd://github:raw" -> BLOCK
+  write "XD://report_issue:conflicts" -> BLOCK
+  write "xd://git\thub" -> BLOCK
+  write "xd://report_issue" -> BLOCK
+  write "XD://report_issue" -> BLOCK
+  write "xd://report_issue\t" -> BLOCK
+  write "[xd://report_issue#0aF9]" -> BLOCK
+  edit "xd://github" -> BLOCK
+== claude unconfined (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK
+  write "~/fixture" -> BLOCK
+  write "/etc/firstmate-probe-never-written" -> BLOCK
+  write "../outside-worktree.txt" -> BLOCK
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> BLOCK
+  edit "~/fixture" -> BLOCK
+  edit "/etc/firstmate-probe-never-written" -> BLOCK
+  edit "../outside-worktree.txt" -> BLOCK
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK
+  write "[xd://github]" -> BLOCK
+  write "[xd://github#ABCD]" -> BLOCK
+  write "[xd://github#abcd]  " -> BLOCK
+  write "xd://github " -> BLOCK
+  write "XD://github" -> BLOCK
+  write "Xd://GitHub" -> BLOCK
+  write "xd://github:raw" -> BLOCK
+  write "XD://report_issue:conflicts" -> BLOCK
+  write "xd://git\thub" -> BLOCK
+  write "xd://report_issue" -> BLOCK
+  write "XD://report_issue" -> BLOCK
+  write "xd://report_issue\t" -> BLOCK
+  write "[xd://report_issue#0aF9]" -> BLOCK
+  edit "xd://github" -> BLOCK
+== claude confined-no-marker (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK
+  write "~/fixture" -> BLOCK
+  write "/etc/firstmate-probe-never-written" -> BLOCK
+  write "../outside-worktree.txt" -> BLOCK
+  write "ordinary.txt" -> BLOCK
+  edit "notes:v2.md" -> BLOCK
+  edit "~/fixture" -> BLOCK
+  edit "/etc/firstmate-probe-never-written" -> BLOCK
+  edit "../outside-worktree.txt" -> BLOCK
+  edit "ordinary.txt" -> BLOCK
+  write "xd://github" -> BLOCK
+  write "[xd://github]" -> BLOCK
+  write "[xd://github#ABCD]" -> BLOCK
+  write "[xd://github#abcd]  " -> BLOCK
+  write "xd://github " -> BLOCK
+  write "XD://github" -> BLOCK
+  write "Xd://GitHub" -> BLOCK
+  write "xd://github:raw" -> BLOCK
+  write "XD://report_issue:conflicts" -> BLOCK
+  write "xd://git\thub" -> BLOCK
+  write "xd://report_issue" -> BLOCK
+  write "XD://report_issue" -> BLOCK
+  write "xd://report_issue\t" -> BLOCK
+  write "[xd://report_issue#0aF9]" -> BLOCK
+  edit "xd://github" -> BLOCK
+== claude permissive-sandbox (filesystem=lexical) PASS
+  write "notes:v2.md" -> BLOCK
+  write "~/fixture" -> BLOCK
+  write "/etc/firstmate-probe-never-written" -> BLOCK
+  write "../outside-worktree.txt" -> BLOCK
+  write "ordinary.txt" -> allow
+  edit "notes:v2.md" -> BLOCK
+  edit "~/fixture" -> BLOCK
+  edit "/etc/firstmate-probe-never-written" -> BLOCK
+  edit "../outside-worktree.txt" -> BLOCK
+  edit "ordinary.txt" -> allow
+  write "xd://github" -> BLOCK
+  write "[xd://github]" -> BLOCK
+  write "[xd://github#ABCD]" -> BLOCK
+  write "[xd://github#abcd]  " -> BLOCK
+  write "xd://github " -> BLOCK
+  write "XD://github" -> BLOCK
+  write "Xd://GitHub" -> BLOCK
+  write "xd://github:raw" -> BLOCK
+  write "XD://report_issue:conflicts" -> BLOCK
+  write "xd://git\thub" -> BLOCK
+  write "xd://report_issue" -> BLOCK
+  write "XD://report_issue" -> BLOCK
+  write "xd://report_issue\t" -> BLOCK
+  write "[xd://report_issue#0aF9]" -> BLOCK
+  edit "xd://github" -> BLOCK
+EXIT=0

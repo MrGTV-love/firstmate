@@ -1,0 +1,58 @@
+$ FM_DURATION_FILE=off python3 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-duration.py run test.tests/fm-jev-guard.test.sh -- bash bin/fm-test-run.sh tests/fm-jev-guard.test.sh
+root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE head=d2c51045c8f3d4843b346ece1778b3cfee32ab59
+calibration: "0 of 5 samples for test.tests/fm-jev-guard.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+FM_TEST_BEGIN 2026-11-01T00:43:21Z tests/fm-jev-guard.test.sh family=unclassified expected_gate_skip=none
+progress: "test.tests/fm-jev-guard.test.sh elapsed=0.9s output_bytes=106 tree_cpu=0.79s"
+ok - pure write boundaries
+✔ omp T2(a), B68: remove own smoke.py (41.355958ms)
+✔ omp T2(b), B69: four-file probe cleanup (42.342542ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (96.181709ms)
+✔ omp: rm -f of HEAD-tracked files named in the brief passes without refusal (222.528833ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (217.273167ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (85.176208ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (160.394625ms)
+✔ claude T2(a), B68: remove own smoke.py (9.948625ms)
+✔ claude T2(b), B69: four-file probe cleanup (9.808084ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (92.08975ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (181.514ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (20.974958ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (125.743875ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.125458ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (475.196792ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (201.697417ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1988.787625
+ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
+ok - Claude pre-tool allowed write roots, credential insertion deferred to commit time, removals and deterministic device refusal
+ok - active writes need no provider, never-send check or model key and send nothing; inactive scopes send nothing and keep path checks
+ok - bounded service retries: a later answer succeeds, repeated outages stop after three tries, contract failures and answers are not retried; a failed ledger write denies
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool credential tails and large writes send nothing, audit failure, inactive independence, provider-independent writes and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+progress: "test.tests/fm-jev-guard.test.sh elapsed=61.1s output_bytes=2718 tree_cpu=39.04s"
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+progress: "test.tests/fm-jev-guard.test.sh elapsed=121.8s output_bytes=2830 tree_cpu=131.35s"
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+progress: "test.tests/fm-jev-guard.test.sh elapsed=194.6s output_bytes=3005 tree_cpu=144.93s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=263.5s output_bytes=3005 tree_cpu=144.96s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=356.3s output_bytes=3005 tree_cpu=144.99s"
+ok - actual stalled requests produce a typed service timeout inside the decision budget and before a host deadline
+ok - oversized, unplannable and never-send write content is admitted locally with no request, size refusal or friction event
+progress: "test.tests/fm-jev-guard.test.sh elapsed=417.4s output_bytes=3245 tree_cpu=147.96s"
+ok - every pre-tool refusal mirrors one digest-only fm-friction.v1 event keyed by its audit branch; allows, repeated identities and writer failures write nothing and never change the refusal
+ok - private terminal audit keeps admissions, usage and cost certainty without payloads, answers or provider extensions
+FM_TEST_END 2026-11-01T00:50:23Z tests/fm-jev-guard.test.sh exit=0 duration_ms=421884 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=422801
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=421884 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard.test.sh duration_ms=421884
+EXIT=0

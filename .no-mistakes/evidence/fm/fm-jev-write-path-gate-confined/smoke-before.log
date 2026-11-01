@@ -1,0 +1,9 @@
+$ bash /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/fleet/fm-mini-home/data/fm-jev-write-path-gate-confined/smoke.py "$PWD" before 3948d62ffa86123d35baeb84746ed7639d948a02
+PWD=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE
+root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE
+head=d2c51045c8f3d4843b346ece1778b3cfee32ab59
+BEFORE omp unconfined: filesystem=lexical devices=denied
+BEFORE omp confined: filesystem=lexical devices=denied protected-write=EPERM unchanged
+BEFORE claude unconfined: filesystem=lexical devices=denied
+BEFORE claude confined: filesystem=lexical devices=denied protected-write=EPERM unchanged
+EXIT=0

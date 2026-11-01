@@ -1,0 +1,51 @@
+$ FM_DURATION_FILE=off python3 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-duration.py run test.tests/fm-jev-guard-audit.test.sh -- bash bin/fm-test-run.sh tests/fm-jev-guard-audit.test.sh
+root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A4VZS35S1MHFBV6FGDZ7FE head=d2c51045c8f3d4843b346ece1778b3cfee32ab59
+calibration: "0 of 5 samples for test.tests/fm-jev-guard-audit.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.tests/fm-jev-guard-audit.test.sh elapsed=1.0s output_bytes=0 tree_cpu=0.48s"
+FM_TEST_BEGIN 2026-11-01T00:50:26Z tests/fm-jev-guard-audit.test.sh family=unclassified expected_gate_skip=none
+✔ audit history merges legacy and task rows without reading unrelated state (9.070834ms)
+✔ write: deterministic admission records no request, piece or cost (115.243791ms)
+✔ call: invalid tool input fails before planning and invents no piece (144.420334ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (1202.844875ms)
+✔ T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body (2459.797375ms)
+✔ T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission (81.149083ms)
+✔ T4(b): paid find requires a task grant and records exactly one content-free decision (500.534584ms)
+✔ omp github read ops need a remote-storage grant while write ops refuse under every grant (4261.395709ms)
+✔ T4(d): an installed tool absent from the policy table is rejected, not silently ignored (160.601875ms)
+✔ T4(d): an added Claude host tool fails coverage at the adapter boundary (1311.863917ms)
+✔ an unclassified tool elsewhere in the host registry does not refuse a classified call (208.204416ms)
+✔ Claude native WebSearch retains its outbound character at the CLI boundary (1893.214959ms)
+✔ observed Claude signed-in artifact tools require provider grants at the CLI boundary (2968.638417ms)
+✔ coverage and egress refusals hold in an inactive project scope (2348.0945ms)
+✔ tools that move no data or run no worker code are local; unscreened writers name T5 (3271.197916ms)
+✔ subagent dispatch needs no grant while the outbound tools a subagent calls still refuse (3012.844125ms)
+✔ memory operations need a provider grant unless the live worker settings prove them local (5072.108458ms)
+✔ S2 egress classes are permissions, never a bypass of existing write checks (3607.130792ms)
+✔ M4: each coverage and egress decision emits one content-free central guard event (7511.946291ms)
+✔ M4: an unrelated allow never clears a later deny in the real metrics reader (3516.072792ms)
+✔ Claude Monitor and PowerShell share Bash shell-command treatment without a grant (947.328209ms)
+✔ a removed execution class cannot authorize an otherwise valid web grant (259.074208ms)
+✔ worker brief shell commands are never refused for a missing egress grant (1667.509375ms)
+✔ S2(d): local read and bash stay unjudged, write/edit keep deterministic path checks (2924.075709ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49541.186459
+ok - offline guard settlement, cost completeness and S2 egress acceptance
+installed omp: 37 tools classified; injected unknown tool rejected; no model turn
+ok - installed omp registry coverage (no model turn submitted)
+installed omp: memory effects read from live global and --config overlay settings; no model turn
+progress: "test.tests/fm-jev-guard-audit.test.sh elapsed=61.4s output_bytes=2961 tree_cpu=41.92s"
+ok - installed omp live memory settings (no model turn submitted)
+installed Claude 2.1.316: 24 tools classified; injected unknown tool rejected; no model turn
+ok - installed Claude registry coverage (no model turn submitted)
+FM_TEST_END 2026-11-01T00:51:29Z tests/fm-jev-guard-audit.test.sh exit=0 duration_ms=62788 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=65130
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=62788 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard-audit.test.sh duration_ms=62788
+EXIT=0
