@@ -3447,6 +3447,8 @@ PY
         assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'refused sweep removed durable record'
         [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-events.jsonl" 2>/dev/null)" = 1 ] \
           || fail "refused sweep retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-events.jsonl" 2>/dev/null)"
+        jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .task == "task-x1" and .decision == "deny"' "$case_dir/sweep-events.jsonl" >/dev/null \
+          || fail "refused sweep retirement lost its rule or owner: $(cat "$case_dir/sweep-events.jsonl")"
         rm "$case_dir/called"
         rc=0
         FM_GUARD_EVENT_LOG="$case_dir/sweep-outer-events.jsonl" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
@@ -3455,6 +3457,8 @@ PY
         assert_grep 'next_step: verify Firstmate landing record' "$case_dir/sweep-outer.err" 'sweep outer refusal not reported'
         [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)" = 1 ] \
           || fail "sweep outer refusal did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)"
+        jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .decision == "deny"' "$case_dir/sweep-outer-events.jsonl" >/dev/null \
+          || fail "sweep outer refusal lost its rule: $(cat "$case_dir/sweep-outer-events.jsonl")"
         rc=0
         "${sweep[@]}" --apply > "$case_dir/apply" || rc=$?
         expect_code 1 "$rc" 'apply should report the unproven owner'
@@ -3506,6 +3510,8 @@ PY
           assert_grep retain_slot "$case_dir/out" 'next_step was lost'
           [ "$(grep -c '"teardown-unlanded"' "$case_dir/guard-events.jsonl" 2>/dev/null)" = 1 ] \
             || fail "$variant refused retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+          jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .task == "task-x1" and .decision == "deny"' "$case_dir/guard-events.jsonl" >/dev/null \
+            || fail "$variant refused retirement lost its rule or task: $(cat "$case_dir/guard-events.jsonl")"
         else
           assert_absent "$case_dir/called" 'unproven owner called retire'
         fi

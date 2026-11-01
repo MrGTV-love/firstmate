@@ -4988,7 +4988,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
       teardown_retire_slot_manifest "$teardown_slot" || {
-        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
         exit 1
       }
       if [ "$branch" != "HEAD" ]; then
@@ -6617,7 +6617,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
     teardown_retire_slot_manifest "$WT" || {
-      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --rule landed-work --task "$ID" --source-ok true 2>/dev/null || true
       exit 1
     }
     if [ "$branch" != "HEAD" ]; then
