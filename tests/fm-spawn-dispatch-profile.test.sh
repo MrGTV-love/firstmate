@@ -270,9 +270,9 @@ test_relative_home_overrides_launch_with_absolute_cross_process_paths() {
   status=$?
   expect_code 0 "$status" "spawn with relative home overrides should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "-e '$home_real/state/$id.pi-ext.ts'" \
+  assert_launch_contains "$launch" "-e '$home_real/state/$id.pi-ext.ts'" \
     "relative FM_STATE_OVERRIDE leaked into Pi's cross-process extension path"
-  assert_contains "$launch" "< '$home_real/data/$id/launch-brief.md'" \
+  assert_launch_contains "$launch" "< '$home_real/data/$id/launch-brief.md'" \
     "relative FM_DATA_OVERRIDE leaked into the cross-process brief path"
   pass "relative home overrides ignore CDPATH and become absolute before spawn launch construction"
 }
@@ -299,9 +299,9 @@ test_home_defaults_preserve_absolute_or_resolve_relative_paths() {
   status=$?
   expect_code 0 "$status" "spawn with relative FM_HOME defaults should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "-e '$home_real/state/$relative_id.pi-ext.ts'" \
+  assert_launch_contains "$launch" "-e '$home_real/state/$relative_id.pi-ext.ts'" \
     "relative FM_HOME leaked into Pi's default cross-process extension path"
-  assert_contains "$launch" "< '$home_real/data/$relative_id/launch-brief.md'" \
+  assert_launch_contains "$launch" "< '$home_real/data/$relative_id/launch-brief.md'" \
     "relative FM_HOME leaked into the default cross-process brief path"
 
   linked_home="$CASE_DIR/home-link"
@@ -319,9 +319,9 @@ test_home_defaults_preserve_absolute_or_resolve_relative_paths() {
   status=$?
   expect_code 0 "$status" "spawn with absolute symlink-spelled FM_HOME defaults should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "-e '$linked_home/state/$absolute_id.pi-ext.ts'" \
+  assert_launch_contains "$launch" "-e '$linked_home/state/$absolute_id.pi-ext.ts'" \
     "absolute FM_HOME spelling changed in Pi's default cross-process extension path"
-  assert_contains "$launch" "< '$linked_home/data/$absolute_id/launch-brief.md'" \
+  assert_launch_contains "$launch" "< '$linked_home/data/$absolute_id/launch-brief.md'" \
     "absolute FM_HOME spelling changed in the default cross-process brief path"
   pass "FM_HOME defaults resolve relative paths and preserve absolute spellings"
 }
@@ -347,9 +347,9 @@ test_absolute_override_spelling_is_preserved_in_launch_paths() {
   status=$?
   expect_code 0 "$status" "spawn with absolute symlink-spelled overrides should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "-e '$linked_home/state/$id.pi-ext.ts'" \
+  assert_launch_contains "$launch" "-e '$linked_home/state/$id.pi-ext.ts'" \
     "absolute FM_STATE_OVERRIDE spelling changed in Pi's cross-process extension path"
-  assert_contains "$launch" "< '$linked_home/data/$id/launch-brief.md'" \
+  assert_launch_contains "$launch" "< '$linked_home/data/$id/launch-brief.md'" \
     "absolute FM_DATA_OVERRIDE spelling changed in the cross-process brief path"
   pass "absolute override spellings are preserved in spawn launch paths"
 }
@@ -444,7 +444,7 @@ test_active_dispatch_profile_allows_explicit_harness() {
   assert_contains "$out" "spawned $id harness=codex" "spawn did not report explicit codex harness"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
+  assert_launch_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
     "explicit harness launch did not thread model and effort"
   pass "active crew-dispatch profile allows an explicit resolved harness"
 }
@@ -495,7 +495,10 @@ test_chained_raw_launch_strips_ai_trailer_in_every_step() {
   (
     cd "$WT_DIR" || exit 1
     unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-    fm_git_identity 'Captain Tests' 'captain@example.invalid'
+    # The launch boundary drops a pane-only GIT_AUTHOR_*/GIT_COMMITTER_*
+    # identity; the pane's kept GIT_CONFIG_GLOBAL carries it instead.
+    printf '[user]\n\tname = Captain Tests\n\temail = captain@example.invalid\n' > "$HOME_DIR/pane-gitconfig"
+    export GIT_CONFIG_GLOBAL="$HOME_DIR/pane-gitconfig"
     bash -c "$launch"
   ) || fail "executing the chained raw launch failed"$'\n'"launch: $launch"
   body=$(git -C "$WT_DIR" log -1 --format=%B)
@@ -537,7 +540,7 @@ test_codex_threads_model_and_effort() {
   expect_code 0 "$status" "codex spawn with profile flags should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
+  assert_launch_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
     "codex launch did not thread model and reasoning effort config"
   pass "codex receives --model and model_reasoning_effort profile flags"
 }
@@ -553,7 +556,7 @@ test_codex_threads_model_and_max_effort() {
   expect_code 0 "$status" "codex Luna spawn with max effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5.6-luna max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5.6-luna' -c 'model_reasoning_effort=\"max\"' --dangerously-bypass-approvals-and-sandbox" \
+  assert_launch_contains "$launch" "codex --model 'gpt-5.6-luna' -c 'model_reasoning_effort=\"max\"' --dangerously-bypass-approvals-and-sandbox" \
     "codex launch did not thread Luna's max reasoning effort config"
   pass "codex Luna receives --model and model_reasoning_effort max profile flags"
 }
@@ -569,7 +572,7 @@ test_codex_omits_max_effort_for_unsupported_model() {
   expect_code 0 "$status" "codex spawn with an unsupported model max effort should omit the effort flag"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' --dangerously-bypass-approvals-and-sandbox" \
+  assert_launch_contains "$launch" "codex --model 'gpt-5' --dangerously-bypass-approvals-and-sandbox" \
     "codex launch did not preserve the model flag when max effort was omitted"
   assert_not_contains "$launch" "model_reasoning_effort" "codex launch must omit unsupported model max reasoning effort"
   pass "codex omits max for models without the catalog capability"
@@ -630,7 +633,7 @@ test_grok_threads_model_and_reasoning_effort() {
   expect_code 0 "$status" "grok spawn with profile flags should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" grok grok-4 high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "grok --always-approve --model 'grok-4' --reasoning-effort 'high'" \
+  assert_launch_contains "$launch" "grok --always-approve --model 'grok-4' --reasoning-effort 'high'" \
     "grok launch did not thread model and reasoning-effort flags"
   assert_not_contains "$launch" "--effort" "grok launch must use --reasoning-effort, not --effort"
   pass "grok receives --model and --reasoning-effort profile flags"
@@ -647,7 +650,7 @@ test_grok_omits_invalid_max_reasoning_effort() {
   expect_code 0 "$status" "grok spawn with unsupported max reasoning effort should omit the effort flag"
   assert_meta_profile "$HOME_DIR/state/$id.meta" grok grok-4 max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "grok --always-approve --model 'grok-4' \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < " \
+  assert_launch_contains "$launch" "grok --always-approve --model 'grok-4' \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < " \
     "grok launch did not preserve the model flag and typed brief when max effort was omitted"
   assert_not_contains "$launch" "--reasoning-effort" "grok launch must omit unsupported max reasoning effort"
   assert_not_contains "$launch" "--effort" "grok launch must not fall back to --effort for reasoning effort"
@@ -666,7 +669,7 @@ test_grok_omits_invalid_xhigh_reasoning_effort() {
   expect_code 0 "$status" "grok spawn with unsupported xhigh reasoning effort should omit the effort flag"
   assert_meta_profile "$HOME_DIR/state/$id.meta" grok grok-4 xhigh
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "grok --always-approve --model 'grok-4' \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < " \
+  assert_launch_contains "$launch" "grok --always-approve --model 'grok-4' \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < " \
     "grok launch did not preserve the model flag and typed brief when xhigh effort was omitted"
   assert_not_contains "$launch" "--reasoning-effort" "grok launch must omit unsupported xhigh reasoning effort"
   assert_not_contains "$launch" "--effort" "grok launch must not fall back to --effort for reasoning effort"
@@ -685,7 +688,7 @@ test_cursor_threads_model_workspace_and_omits_effort_axis() {
   expect_code 0 "$status" "cursor spawn with a model-qualified reasoning class should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" cursor cursor-grok-4.5-high high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "--trust --yolo --model 'cursor-grok-4.5-high' --workspace '$WT_DIR'" \
+  assert_launch_contains "$launch" "--trust --yolo --model 'cursor-grok-4.5-high' --workspace '$WT_DIR'" \
     "cursor launch did not carry trust, autonomy, model, and exact workspace flags"
   # The executable is RESOLVED, never named: `cursor` is not the CLI, so a
   # literal `cursor agent` command cannot run on a machine that has only the
@@ -737,7 +740,7 @@ test_cursor_failed_catalog_probe_does_not_block_spawn() {
   status=$?
   expect_code 0 "$status" "cursor spawn should fail open when the bounded catalog query fails"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "--model 'cursor-catalog-unreachable'" \
+  assert_launch_contains "$launch" "--model 'cursor-catalog-unreachable'" \
     "failed catalog lookup incorrectly removed the requested model"
   assert_meta_profile "$HOME_DIR/state/$id.meta" cursor cursor-catalog-unreachable default
   pass "cursor preserves the requested model when its live catalog is unreachable"
@@ -758,7 +761,7 @@ test_opencode_threads_model_and_effort_variant() {
   # agent.<name>.variant, so the effort rides the OPENCODE_CONFIG_CONTENT JSON
   # the launch already writes, keyed to the resolved model on the default
   # build agent, never as a launch flag.
-  assert_contains "$launch" \
+  assert_launch_contains "$launch" \
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"},\"agent\":{\"build\":{\"model\":\"anthropic/claude-sonnet-4-5\",\"variant\":\"high\"}}}' opencode --model 'anthropic/claude-sonnet-4-5' --prompt" \
     "opencode launch did not write the effort as the build agent's variant in its config"
   assert_not_contains "$launch" "--effort" "opencode launch must not pass unsupported --effort"
@@ -778,7 +781,7 @@ test_opencode_without_effort_keeps_launch_config_unchanged() {
   expect_code 0 "$status" "opencode spawn without effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" opencode anthropic/claude-sonnet-4-5 default
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" \
+  assert_launch_contains "$launch" \
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' opencode --model 'anthropic/claude-sonnet-4-5' --prompt" \
     "opencode launch without effort must keep the permission-only config byte-identical"
   assert_not_contains "$launch" '"variant"' "opencode launch without effort must not write a variant"
@@ -796,7 +799,7 @@ test_opencode_emits_variant_for_openai_family_effort() {
   expect_code 0 "$status" "opencode spawn with an openai model and effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" opencode openai/gpt-5.6-sol xhigh
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" \
+  assert_launch_contains "$launch" \
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"},\"agent\":{\"build\":{\"model\":\"openai/gpt-5.6-sol\",\"variant\":\"xhigh\"}}}' opencode --model 'openai/gpt-5.6-sol' --prompt" \
     "opencode launch did not write the openai family effort as the build agent's variant"
   pass "opencode emits the variant for an effort the openai family exposes"
@@ -813,7 +816,7 @@ test_opencode_omits_variant_when_model_family_lacks_effort() {
   expect_code 0 "$status" "opencode spawn with an unsupported family effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" opencode anthropic/claude-sonnet-4-5 medium
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" \
+  assert_launch_contains "$launch" \
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' opencode --model 'anthropic/claude-sonnet-4-5' --prompt" \
     "opencode must keep the permission-only config when the model family lacks the effort"
   assert_not_contains "$launch" '"variant"' "opencode must omit the variant when the model family lacks the effort"
@@ -844,9 +847,9 @@ test_native_pi_ultra_is_explicit_and_model_scoped() {
       expect_code 0 "$?" "native Ultra spawn failed: $out"
       assert_meta_profile "$HOME_DIR/state/$id.meta" "$harness" codex-native/gpt-6-astra ultra
       launch=$(cat "$LAUNCH_LOG")
-      assert_contains "$launch" "--model 'codex-native/gpt-6-astra' --codex-effort 'ultra'" "native Ultra flag missing"
+      assert_launch_contains "$launch" "--model 'codex-native/gpt-6-astra' --codex-effort 'ultra'" "native Ultra flag missing"
       assert_not_contains "$launch" "--thinking" "native Ultra was converted into Pi thinking"
-      assert_not_contains "$launch" "'max'" "native Ultra was aliased to max"
+      assert_launch_not_contains "$launch" "'max'" "native Ultra was aliased to max"
     done
   done
   for native_profile in 'claude:codex-native/gpt-6-astra' 'codex:codex-native/gpt-6-astra' 'pi:openai-codex/gpt-6-astra' 'pi:default' 'pi:codex-native/'; do
@@ -883,8 +886,8 @@ test_batch_preserves_native_ultra() {
   assert_meta_profile "$HOME_DIR/state/$id1.meta" pi codex-native/gpt-6-astra ultra
   assert_meta_profile "$HOME_DIR/state/$id2.meta" pi codex-native/gpt-6-astra ultra
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "--codex-effort 'ultra'" "batch dropped native effort"
-  assert_not_contains "$launch" "--thinking 'ultra'" "batch passed an invalid Pi level"
+  assert_launch_contains "$launch" "--codex-effort 'ultra'" "batch dropped native effort"
+  assert_launch_not_contains "$launch" "--thinking 'ultra'" "batch passed an invalid Pi level"
   pass "batch dispatch preserves native Ultra in metadata and launch flags"
 }
 
@@ -917,11 +920,11 @@ test_pi_threads_model_and_max_effort() {
   expect_code 0 "$status" "pi spawn with max effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" pi openai-codex/gpt-5.6-sol max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
+  assert_launch_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
     "pi launch did not force the regular TUI while threading the requested model and max thinking level"
   assert_not_contains "$launch" "FM_FIRSTMATE_PI_LAUNCH_BRIEF=" \
     "pi launch still exports the removed Calm input-reroute binding"
-  assert_contains "$launch" "fm-operational-input.sh' encode launch-brief" \
+  assert_launch_contains "$launch" "fm-operational-input.sh' encode launch-brief" \
     "pi launch lost the canonical typed launch-brief envelope"
   pass "pi receives --model and --thinking max profile flags"
 }
@@ -939,9 +942,9 @@ test_pi_signed_threads_shared_pi_profile_and_preserves_identity() {
   assert_contains "$out" "spawned $id harness=pi-signed" "pi-signed spawn did not preserve its visible identity"
   assert_meta_profile "$HOME_DIR/state/$id.meta" pi-signed openai-codex/gpt-5.6-sol max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
+  assert_launch_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
     "pi-signed launch did not force the regular TUI with Pi's model, thinking, and extension semantics"
-  assert_contains "$launch" "fm-operational-input.sh' encode launch-brief" \
+  assert_launch_contains "$launch" "fm-operational-input.sh' encode launch-brief" \
     "pi-signed launch lost the canonical typed launch-brief envelope"
   assert_present "$HOME_DIR/state/$id.pi-ext.ts" "pi-signed launch did not install Pi's turn-end extension"
   assert_present "$HOME_DIR/state/$id.busy-gen" "pi-signed spawn did not arm the busy-state contract"
@@ -964,7 +967,7 @@ test_pi_tui_mode_probe_is_safe_for_old_and_new_pi() {
       status=$?
       expect_code 0 "$status" "$harness $version spawn should succeed"
       launch=$(cat "$LAUNCH_LOG")
-      assert_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
+      assert_launch_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
         "$harness $version launch must use the executable selected for probing"
       assert_not_contains "$launch" "FM_PI_HARNESS=$harness $harness" \
         "$harness $version launch must not re-resolve a bare executable in the worker"
@@ -972,7 +975,7 @@ test_pi_tui_mode_probe_is_safe_for_old_and_new_pi() {
         assert_not_contains "$launch" "--tui-mode" \
           "$harness $version launch must omit unsupported --tui-mode"
       else
-        assert_contains "$launch" "'$FAKEBIN_DIR/$harness' --tui-mode regular" \
+        assert_launch_contains "$launch" "'$FAKEBIN_DIR/$harness' --tui-mode regular" \
           "$harness $version launch must preserve the regular TUI"
       fi
     done
@@ -1025,8 +1028,8 @@ test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity() {
   cmp -s "$CASE_DIR/charter-before" "$sm/data/charter.md" || fail "secondmate launch rewrote the charter"
   assert_absent "$HOME_DIR/data/$id/launch-brief.md" "secondmate launch received a worker overlay"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "< '$sm/data/charter.md'" "secondmate launch lost its original charter"
-  assert_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --approve -e '$sm/.pi/extensions/fm-primary-turnend-guard.ts' -e '$sm/.pi/extensions/fm-primary-pi-watch.ts'" \
+  assert_launch_contains "$launch" "< '$sm/data/charter.md'" "secondmate launch lost its original charter"
+  assert_launch_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --approve -e '$sm/.pi/extensions/fm-primary-turnend-guard.ts' -e '$sm/.pi/extensions/fm-primary-pi-watch.ts'" \
     "pi-signed secondmate did not force the regular TUI with Pi's primary extension launch shape and seeded-home --approve"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# evidence begin: persistent secondmate\n%s\n' "$out"
@@ -1052,11 +1055,11 @@ test_pi_seeded_secondmate_preapproves_project_trust() {
     status=$?
     expect_code 0 "$status" "$harness seeded secondmate spawn should succeed"
     launch=$(cat "$LAUNCH_LOG")
-    assert_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
+    assert_launch_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
       "$harness secondmate must launch the probed executable"
     assert_contains "$launch" "--approve" \
       "$harness seeded secondmate must pre-approve project trust when help advertises --approve"
-    assert_contains "$launch" "-e '$sm/.pi/extensions/fm-primary-turnend-guard.ts'" \
+    assert_launch_contains "$launch" "-e '$sm/.pi/extensions/fm-primary-turnend-guard.ts'" \
       "$harness secondmate lost its turn-end extension"
   done
   pass "seeded Pi/pi-signed secondmate launches carry session --approve when advertised"
@@ -1072,7 +1075,7 @@ test_pi_worker_launch_omits_seeded_home_approve() {
   status=$?
   expect_code 0 "$status" "pi ship spawn should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular" \
+  assert_launch_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular" \
     "pi worker launch lost its regular TUI probe"
   assert_not_contains "$launch" "--approve" \
     "ordinary Pi worker launches must not receive secondmate seeded-home --approve"
@@ -1095,7 +1098,7 @@ test_pi_approve_probe_omits_unsupported_flag() {
     status=$?
     expect_code 0 "$status" "$harness without --approve must still spawn"
     launch=$(cat "$LAUNCH_LOG")
-    assert_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
+    assert_launch_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
       "$harness without --approve must still launch the probed executable"
     assert_not_contains "$launch" "--approve" \
       "$harness without advertised --approve must omit the flag"
@@ -1129,7 +1132,7 @@ test_pi_exclude_tools_reach_ship_and_scout_launches() {
       status=$?
       expect_code 0 "$status" "$harness $kindflag spawn with exclusions should succeed"$'\n'"$out"
       launch=$(cat "$LAUNCH_LOG")
-      assert_contains "$launch" "--exclude-tools 'mcp__tracker__editIssue,mcp__tracker__createPage,mcp__other-srv__tool.v2' " \
+      assert_launch_contains "$launch" "--exclude-tools 'mcp__tracker__editIssue,mcp__tracker__createPage,mcp__other-srv__tool.v2' " \
         "$harness $kindflag launch must carry the comma-joined, quoted exclusion list"
     done
   done
@@ -1409,7 +1412,7 @@ test_pi_exclude_tools_do_not_leak_across_homes_or_to_secondmates() {
   write_exclude_file "$HOME_DIR" 'mcp__srv__writeTool'
   run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id_a" "$PROJ_DIR" >/dev/null
   expect_code 0 "$?" "home A spawn should succeed"
-  assert_contains "$(cat "$LAUNCH_LOG")" "--exclude-tools 'mcp__srv__writeTool'" "home A lost its own exclusions"
+  assert_launch_contains "$(cat "$LAUNCH_LOG")" "--exclude-tools 'mcp__srv__writeTool'" "home A lost its own exclusions"
 
   # A second home running the same code, with no file of its own, inherits nothing.
   rec_b=$(make_spawn_case excl-home-b pi "$id_b")
@@ -1500,9 +1503,9 @@ test_lavish_absent_config_preserves_destination_ambient() {
   read_case_record "$rec"
   pane_log="$CASE_DIR/pane.log"
   seen="$CASE_DIR/lavish-seen"
-  cat > "$FAKEBIN_DIR/claude" <<'SH'
+  cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
-printf '%s\n' "${LAVISH_AXI_HOST-unset}" > "$FM_LAVISH_SEEN"
+printf '%s\n' "\${LAVISH_AXI_HOST-unset}" > '$seen'
 SH
   chmod +x "$FAKEBIN_DIR/claude"
   out=$(FM_FAKE_PANE_LOG="$pane_log" \
@@ -1512,7 +1515,7 @@ SH
   launch=$(cat "$LAUNCH_LOG")
   assert_not_contains "$(cat "$pane_log")" "LAVISH_AXI_HOST" \
     "an absent configuration changed the host in the destination pane"
-  FM_LAVISH_SEEN="$seen" LAVISH_AXI_HOST=destination.example PATH="$FAKEBIN_DIR:$PATH" \
+  LAVISH_AXI_HOST=destination.example PATH="$FAKEBIN_DIR:$PATH" \
     bash -c "$launch" || fail "the destination-pane launch command failed"
   assert_grep 'destination.example' "$seen" \
     "the worker launch did not retain the destination pane's Lavish host"
@@ -1896,15 +1899,84 @@ SH
       FM_TEST_AMBIENT_SENTINEL=synthetic-unrelated FM_TEST_ALLOWED="$value" FM_TEST_EMPTY='' \
       "$pane_shell" -c "$launch") || fail "allowlist=$setting emitted launch failed in $pane_shell"
       case "$setting" in
-        absent|missing-config) expected=$(printf '%s\n' synthetic-unrelated "$value" '' unset) ;;
         enabled) expected=$(printf '%s\n' unset "$value" '' unset) ;;
-        empty) expected=$(printf '%s\n' unset unset unset unset) ;;
+        absent|missing-config|empty) expected=$(printf '%s\n' unset unset unset unset) ;;
       esac
       expected="$expected"$'\n'"$HOME_DIR/user-home"$'\n'"$pane_path"$'\nxterm\nsynthetic-pane\n/synthetic/gotmp'
       [ "$result" = "$expected" ] || fail "allowlist=$setting worker environment mismatch: $result"
     done
-    pass "allowlist=$setting preserves the operational floor and filters only when opted in"
+    pass "allowlist=$setting preserves the operational floor and filters the ambient environment"
   done
+}
+
+# With no allowlist file, the real generated launch keeps the harness's store
+# selector, the work plumbing and the pane's numbered GIT_CONFIG entries, while
+# env, Python and a child shell all lose every fake provider credential.
+test_default_launch_keeps_only_the_harness_route() {
+  local id rec out status launch observed pane_shell mode name python_bin nonidentifier_proved=0
+  id=env-default-codex
+  rec=$(make_spawn_case "$id" codex "$id")
+  read_case_record "$rec"
+  observed="$CASE_DIR/observed"
+  python_bin=$(python3 -c 'import sys; print(sys.executable)')
+  printf '#!%s\n' "$python_bin" > "$FAKEBIN_DIR/codex"
+  cat >> "$FAKEBIN_DIR/codex" <<PY
+import json, os, subprocess, sys
+names = ('FM_TEST_FAKE_API_KEY', 'FM_TEST_FAKE_API_KEY-BAD')
+assert not any(name in os.environ for name in names), 'Python received a fake credential'
+dumped = subprocess.run(['/usr/bin/env'], capture_output=True, check=True).stdout
+assert not any((name + '=').encode() in dumped for name in names), 'env received a fake credential'
+child = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-c', 'exec "\$1" -c "\$2"', 'probe', sys.executable,
+                        'import os; assert not any(k in os.environ for k in ' + repr(names) + ')'], capture_output=True)
+assert child.returncode == 0, 'child Bash received a fake credential'
+expected = {'CODEX_HOME': '/synthetic/codex', 'SSH_AUTH_SOCK': '/synthetic/agent.sock',
+            'HTTPS_PROXY': 'http://proxy.invalid:3128', 'TERM': 'xterm', 'FM_TASK_ID': '$id',
+            'GIT_CONFIG_KEY_0': 'user.name', 'GIT_CONFIG_VALUE_0': 'synthetic user',
+            'GIT_CONFIG_KEY_1': 'core.hooksPath', 'DISABLE_AUTOUPDATER': '1', 'JAVA_HOME': '/synthetic/jdk',
+            'TRACEPARENT': '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01'}
+missing = [key for key, value in expected.items() if os.environ.get(key) != value]
+assert not missing, 'worker lost operational carriers: ' + ','.join(missing)
+assert 'GOROOT' not in os.environ, 'an unset toolchain name must stay unset'
+with open('$observed', 'w') as result:
+    json.dump({'credential_absent': True, 'operational_values_retained': True}, result)
+PY
+  chmod +x "$FAKEBIN_DIR/codex"
+  out=$(FM_TEST_PANE_LOG="$CASE_DIR/pane-log" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex 2>&1)
+  status=$?
+  expect_code 0 "$status" "default codex spawn should succeed: $out"
+  launch=$(cat "$CASE_DIR/pane-log" "$LAUNCH_LOG")
+  for pane_shell in /bin/bash /bin/zsh; do
+    [ -x "$pane_shell" ] || continue
+    for mode in mutable readonly non-identifier; do
+      name=FM_TEST_FAKE_API_KEY
+      [ "$mode" != non-identifier ] || name=FM_TEST_FAKE_API_KEY-BAD
+      rm -f "$observed"
+      # The fake-only pane must really contain the candidate before the launch.
+      # shellcheck disable=SC2016 # The destination shell expands the probe.
+      if env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+        SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 CODEX_HOME=/synthetic/codex \
+        GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='synthetic user' \
+        DISABLE_AUTOUPDATER=1 TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01 \
+        JAVA_HOME=/synthetic/jdk "$name=sentinel-not-a-secret" "$pane_shell" -c '
+          if [ "$1" = readonly ]; then readonly FM_TEST_FAKE_API_KEY; fi
+          "$4" -c "import os,sys; assert sys.argv[1] in os.environ" "$2" || exit 97
+          eval "$3"
+        ' probe "$mode" "$name" "$launch" "$python_bin" > "$CASE_DIR/probe-output" 2> "$CASE_DIR/probe-error"; then
+        status=0
+      else
+        status=$?
+      fi
+      if [ "$status" -eq 97 ] && [ "$mode" = non-identifier ]; then
+        printf '# %s removes non-identifier entries before the production launch; not counted as boundary proof\n' "$pane_shell"
+        continue
+      fi
+      expect_code 0 "$status" "default codex $mode launch failed in $pane_shell: $(cat "$CASE_DIR/probe-error")"
+      [ -s "$observed" ] || fail "default codex $mode probe did not execute in $pane_shell"
+      [ "$mode" != non-identifier ] || nonidentifier_proved=1
+      pass "default codex $mode export absent from env, Python and child Bash in $pane_shell; task, TERM and operational carriers kept"
+    done
+  done
+  [ "$nonidentifier_proved" -eq 1 ] || fail 'no pane exercised the non-identifier credential through the production boundary'
 }
 
 test_launch_environment_invalid_config_refuses() {
@@ -2074,7 +2146,9 @@ SH
   done
 }
 
+fm_test_only
 test_launch_environment_allowlist
+test_default_launch_keeps_only_the_harness_route
 test_launch_environment_invalid_config_refuses
 test_launch_environment_inaccessible_config_refuses
 test_launch_environment_inherited_by_secondmate
@@ -2111,9 +2185,10 @@ test_worker_launch_delivers_role_scope() {
       printf '%s\n' "$content" > "$brief"
     fi
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"
-    cat > "$FAKEBIN_DIR/codex" <<'SH'
+    envelope="$CASE_DIR/prompt-envelope"
+    cat > "$FAKEBIN_DIR/codex" <<SH
 #!/usr/bin/env bash
-printf '%s\n' "$@" > "$FM_ROLE_PROMPT"
+printf '%s\n' "\$@" > '$envelope'
 SH
     chmod +x "$FAKEBIN_DIR/codex"
     if [ "$kind" = scout ]; then
@@ -2123,10 +2198,9 @@ SH
     fi
     expect_code 0 "$?" "$kind worker spawn failed: $out"
     launch=$(cat "$LAUNCH_LOG")
-    envelope="$CASE_DIR/prompt-envelope"
     encoded="$CASE_DIR/encoded-prompt"
     prompt="$CASE_DIR/prompt"
-    FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
+    PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
     sed -n '/FIRSTMATE_OP: v1 launch-brief:/,$p' "$envelope" > "$encoded"
     "$ROOT/bin/fm-operational-input.sh" body < "$encoded" > "$prompt" ||
       fail "could not decode $kind launch-brief envelope"
@@ -2174,12 +2248,13 @@ claude_launch_arg() {  # <launch> <settings|brief|config-dir|permissions|model|e
   probe=$(fm_test_tmproot fm-claude-launch-arg)
   cat > "$probe/claude" <<'SH'
 #!/bin/sh
-: > "${FM_ARG_EXECUTED:?}"
-if [ "$FM_ARG_KIND" = config-dir ]; then
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
+: > "${FM_FAKE_ARG_EXECUTED:?}"
+if [ "$FM_FAKE_ARG_KIND" = config-dir ]; then
   printf '%s' "${CLAUDE_CONFIG_DIR-}"
   exit
 fi
-case "$FM_ARG_KIND" in
+case "$FM_FAKE_ARG_KIND" in
   model) flag=--model ;;
   effort) flag=--effort ;;
   control-channel) flag=--append-system-prompt ;;
@@ -2196,7 +2271,7 @@ if [ -n "$flag" ]; then
   done
   exit
 fi
-if [ "$FM_ARG_KIND" = permissions ]; then
+if [ "$FM_FAKE_ARG_KIND" = permissions ]; then
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --permission-mode)
@@ -2210,7 +2285,7 @@ if [ "$FM_ARG_KIND" = permissions ]; then
   done
   exit
 fi
-if [ "$FM_ARG_KIND" = settings ]; then
+if [ "$FM_FAKE_ARG_KIND" = settings ]; then
   while [ "$#" -gt 0 ]; do
     if [ "$1" = --settings ]; then
       case "$2" in
@@ -2228,7 +2303,7 @@ printf '%s' "$last"
 SH
   chmod +x "$probe/claude"
   fm_eval_launch "$launch" "$WT_DIR" "$probe" \
-    FM_ARG_KIND="$kind" "FM_ARG_EXECUTED=$probe/executed" "$@" || return $?
+    FM_FAKE_ARG_KIND="$kind" "FM_FAKE_ARG_EXECUTED=$probe/executed" "$@" || return $?
   [ -f "$probe/executed" ]
 }
 
@@ -2340,7 +2415,7 @@ test_model_index_resolves_launch_and_refuses_retired_literals() {
   expect_code 0 "$status" "role-based spawn should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex current-sol default
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "--model 'current-sol'" "spawn must launch the resolved concrete id"
+  assert_launch_contains "$launch" "--model 'current-sol'" "spawn must launch the resolved concrete id"
   assert_not_contains "$launch" "role:strong" "a role reference must not reach the harness"
   out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" retired-model-z25 "$PROJ_DIR" --harness codex --model prior-sol 2>&1)
   status=$?
@@ -2599,7 +2674,8 @@ make_config_sensitive_teamclaude() {
   local fakebin=$1
   cat > "$fakebin/teamclaude" <<'SH'
 #!/usr/bin/env bash
-config=$FM_TEST_TC_DEFAULT
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
+config=$FM_FAKE_TC_DEFAULT
 if [ -n "${TEAMCLAUDE_CONFIG:-}" ]; then
   config=$TEAMCLAUDE_CONFIG
 elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
@@ -2671,7 +2747,7 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
       unset XDG_CONFIG_HOME TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
       [ "$xdg_presence" != set ] || export XDG_CONFIG_HOME="$xdg_value"
       [ "$tc_presence" != set ] || export TEAMCLAUDE_CONFIG="$tc_value"
-      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$preflight" \
+      FM_FAKE_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$preflight" \
         FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
         fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
           "${launch_args[@]}" --mode no-mistakes --yolo off
@@ -2685,12 +2761,12 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
     : > "$pane_log"
     : > "$env_out"
     bash_dir=$(fm_test_bash_only_dir "$CASE_DIR")
+    fm_fake_config "$FAKEBIN_DIR" FM_FAKE_TC_DEFAULT="$CASE_DIR/default-config" \
+      FM_FAKE_TEAMCLAUDE_ENV_LOG="$pane_log" FM_FAKE_CLAUDE_ENV_LOG="$env_out"
     env -i HOME="$CASE_DIR/pane-home" PATH="$FAKEBIN_DIR:$bash_dir:/usr/bin:/bin" \
       XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
       FM_TC_CONFIG_SNAPSHOT=stale FM_TC_XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" \
       FM_TC_TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
-      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$pane_log" \
-      FM_FAKE_CLAUDE_ENV_LOG="$env_out" \
       /bin/sh -c "$(cat "$LAUNCH_LOG")" </dev/null > "$CASE_DIR/pane-output" 2>&1
     status=$?
     expect_code 0 "$status" "$scenario: recorded $launch_kind command must run in the stale pane"
@@ -2702,8 +2778,8 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
       || fail "$scenario: Claude must receive the caller-selected CA"
     grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/pane-xdg" "$env_out" \
       || fail "$scenario: Claude must retain the pane's XDG_CONFIG_HOME"
-    grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/pane-config" "$env_out" \
-      || fail "$scenario: Claude must retain the pane's TEAMCLAUDE_CONFIG"
+    ! grep -q '^TEAMCLAUDE_CONFIG=' "$env_out" \
+      || fail "$scenario: the launch boundary must not keep the pane's TEAMCLAUDE_CONFIG"
     ! grep -q '^FM_TC_' "$env_out" \
       || fail "$scenario: private snapshot variables must not reach Claude"
     if [ "$launch_kind" = raw ]; then

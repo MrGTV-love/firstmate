@@ -16,6 +16,7 @@
     "git-push-credential-shapes",
     "spawn-confinement-coverage",
     "spawn-write-confinement",
+    "spawn-shell-startup-confinement",
     "status-log-size-cap",
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
@@ -110,11 +111,41 @@
       "status": "active"
     },
     {
+      "id": "spawn-shell-startup-confinement",
+      "version": "1",
+      "owner": "bin/fm-write-confinement.py",
+      "sites": [
+        {"file": "bin/fm-spawn.sh", "match": "spawn-shell-startup-confinement deny", "count": 1},
+        {"file": "bin/fm-worker-env.py", "match": "worker startup confinement refused:", "count": 1}
+      ],
+      "emitters": ["bin/fm-spawn.sh", "bin/fm-worker-env.py"],
+      "invariant": "a supported Darwin worker or reader cannot reload operator credentials through the named standard shell startup files",
+      "layer": "impossible-by-construction",
+      "source": "Darwin Seatbelt, canonical HOME and ZDOTDIR startup paths, BASH_ENV and ENV selectors, standard system shell startup paths, the existing task profile or reader --startup profile",
+      "trigger": "Darwin omp/claude task launch or relaunch, or an explicit fm-worker-env.py --startup reader launch",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "preserve the task worktree; ask Main to separate required operational initialization from credential-loading shell startup, then retry bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off> or python3 bin/fm-worker-env.py --startup -- <reader-command>",
+      "budget": 1,
+      "budget_reason": "one admission per launch; no retry or unconfined fallback; Main owns missing OS support and initialization repair",
+      "telemetry": "state/guard-events.jsonl; one launch admission event with source_ok, elapsed_ms and cleared_by; kernel startup read denials enforce the installed profile and are not individually instrumented tool decisions",
+      "test": "tests/fm-write-confinement.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
+    },
+    {
       "id": "spawn-write-confinement",
       "version": "1",
       "owner": "bin/fm-write-confinement.py",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "spawn-write-confinement deny", "count": 2}
+        {"file": "bin/fm-spawn.sh", "match": "spawn-write-confinement deny", "count": 2},
+        {"file": "bin/fm-spawn.sh", "match": "confinement_refuse false \"cannot derive the protected-asset write profile\"", "count": 1}
       ],
       "emitters": ["bin/fm-spawn.sh"],
       "invariant": "a macOS omp or Claude task worker launches with writes to every named protected asset denied",
@@ -649,8 +680,8 @@
       ],
       "invariant": "a worker never silently bills an Anthropic or third-party API instead of the subscription login",
       "layer": "runtime-block",
-      "source": "ANTHROPIC_* variables in the environment and tmux session, plus the explicit --allow-api-key opt-in",
-      "trigger": "an API key or auth token is present in the launch environment without the opt-in",
+      "source": "ANTHROPIC_* variables listed in config/launch-env-allowlist and set in the environment or tmux session, plus the explicit --allow-api-key opt-in",
+      "trigger": "config/launch-env-allowlist lists an API key or auth token that is set, without the opt-in",
       "remedy": "env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> ... (or pass --allow-api-key to bill the API deliberately)",
       "budget": 1,
       "test": "tests/fm-api-key-guard-lib.test.sh",

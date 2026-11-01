@@ -706,7 +706,8 @@ claude_launch_value() {  # <launch command> <pane path> <brief|config-dir>
   probe=$(fm_test_tmproot fm-claude-trust-launch)
   cat > "$probe/claude" <<'SH'
 #!/bin/sh
-if [ "$FM_PROBE_KIND" = config-dir ]; then
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
+if [ "$FM_FAKE_PROBE_KIND" = config-dir ]; then
   printf '%s' "${CLAUDE_CONFIG_DIR-}"
 else
   for arg do last=$arg; done
@@ -714,7 +715,7 @@ else
 fi
 SH
   chmod +x "$probe/claude"
-  fm_eval_launch "$launch" "$pane" "$probe" FM_PROBE_KIND="$kind"
+  fm_eval_launch "$launch" "$pane" "$probe" FM_FAKE_PROBE_KIND="$kind"
 }
 
 # The spawn half: a real fm-spawn of a claude worker must pre-register the

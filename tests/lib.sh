@@ -1163,9 +1163,10 @@ SH
 # --add-dir argument to real paths, then fails with "would prompt" unless each
 # required Firstmate channel path lies within one of them - the launch record
 # its own doorbell argument names, plus every path listed one per line in the
-# file FM_FAKE_CLAUDE_REQUIREMENTS names (absent file or unset var: doorbell
-# record only). Paths need not exist; a nonexistent leaf resolves through its
-# parent so a lazily created channel dir is still checked. Evaluating the
+# file FM_FAKE_CLAUDE_REQUIREMENTS names, directly or through fm_fake_config
+# (absent file or unset var: doorbell record only). Paths need not exist; a
+# nonexistent leaf resolves through its parent so a lazily created channel dir
+# is still checked. Evaluating the
 # captured launch command under this binary exercises the real spawn output
 # the way Claude Code's working-directory check would consume it.
 fm_fake_claude_outside_read_gate() {
@@ -1173,6 +1174,7 @@ fm_fake_claude_outside_read_gate() {
   cat > "$fakebin/claude" <<'SH'
 #!/usr/bin/env bash
 set -u
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 cwd=$(pwd -P) || exit 3
 allowed=$cwd
 argv=("$@")
@@ -1229,24 +1231,52 @@ SH
 # fm_fake_claude_recording <fakebin>
 # Records the harness's actual environment and argv after the pane evaluates a
 # launch. NUL separators preserve argument boundaries, including prompt newlines.
+# The log path is FM_FAKE_CLAUDE_ENV_LOG, directly or through fm_fake_config.
 fm_fake_claude_recording() {
   local fakebin=$1
   cat > "$fakebin/claude" <<'SH'
 #!/bin/sh
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 env > "${FM_FAKE_CLAUDE_ENV_LOG:?}"
 printf '%s\0' "$@" > "$FM_FAKE_CLAUDE_ENV_LOG.args"
 SH
   chmod +x "$fakebin/claude"
 }
 
+# fm_fake_config <fakebin> [FM_FAKE_NAME=value ...]
+# Replaces the configuration a fake reads from .fm-fake-config beside itself.
+# A launch starts its worker through the names-only env -i boundary, which keeps
+# no test-only pane variable, so a fake reached through a launch loads this file
+# with the line
+#   [ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
+# A value already in the fake's environment wins, so a fake that a spawn preflight
+# runs directly keeps the value the test gave that preflight.
+fm_fake_config() {
+  local fakebin=$1 assignment value quote="'" escaped_quote="'\\''"
+  shift
+  : > "$fakebin/.fm-fake-config"
+  for assignment do
+    value=${assignment#*=}
+    # shellcheck disable=SC2016 # expanded by the child shell that sources the file
+    printf '[ -n "${%s+x}" ] || %s=%s\n' "${assignment%%=*}" "${assignment%%=*}" \
+      "'${value//$quote/$escaped_quote}'" >> "$fakebin/.fm-fake-config"
+  done
+}
+
 # fm_eval_launch <launch-command> <pane-path> <fakebin> [VAR=val ...]
 # Runs a captured launch command the way the destination pane would: from the
 # pane's cwd with the fakebin on PATH and any extra environment assignments.
 # The command is text the suite already received from the spawn, so bash -c
-# reproduces the pane's shell read of it.
+# reproduces the pane's shell read of it. FM_FAKE_* assignments configure the
+# fake rather than the pane, so they also go to fm_fake_config.
 fm_eval_launch() {
-  local launch=$1 pane=$2 fakebin=$3
+  local launch=$1 pane=$2 fakebin=$3 assignment
+  local -a fake_config=()
   shift 3
+  for assignment do
+    case "$assignment" in FM_FAKE_*=*) fake_config+=("$assignment") ;; esac
+  done
+  fm_fake_config "$fakebin" ${fake_config[@]+"${fake_config[@]}"}
   (cd "$pane" && env "$@" PATH="$fakebin:${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c "$launch")
 }
 
@@ -1509,6 +1539,29 @@ assert_not_contains() {
     *"$2"*) fail "$3 (unexpected: '$2')"$'\n'"--- output ---"$'\n'"$1" ;;
     *) : ;;
   esac
+}
+
+# fm_launch_holds <launch-text> <token>: the launch holds <token> as written or
+# nested in single-quoted levels. The launch boundary runs the launch as one
+# quoted -c argument, a confined launch adds a sandbox-exec level, and a launcher
+# or raw launch adds its own.
+fm_launch_holds() {
+  local quote="'" nested_quote="'\\''" token=$2
+  for _ in 0 1 2 3; do
+    case "$1" in *"$token"*) return 0 ;; esac
+    token=${token//$quote/$nested_quote}
+  done
+  return 1
+}
+
+# assert_launch_contains <launch-text> <expected> <msg>
+assert_launch_contains() {
+  fm_launch_holds "$1" "$2" || fail "$3 (missing: '$2')"$'\n'"--- output ---"$'\n'"$1"
+}
+
+# assert_launch_not_contains <launch-text> <unexpected> <msg>
+assert_launch_not_contains() {
+  ! fm_launch_holds "$1" "$2" || fail "$3 (unexpected: '$2')"$'\n'"--- output ---"$'\n'"$1"
 }
 
 # expect_code <expected> <actual> <label>

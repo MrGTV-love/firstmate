@@ -1800,7 +1800,7 @@ The launcher refuses again in the pane, rather than start Claude unproxied, if T
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
 Firstmate requires any nonempty override to be an absolute path.
-The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked; Claude and the rest of the worker get only the [launch environment](#worker-launch-environment-configlaunch-env-allowlist), which does not keep `TEAMCLAUDE_CONFIG` by default.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
 A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs through the launcher's `--exec`, so it receives the same proxy environment; ancestor-memory settings enforcement is owned by [`bin/fm-claude-memory-lib.sh`](../bin/fm-claude-memory-lib.sh), not bypassed by raw commands.
@@ -1948,8 +1948,26 @@ The text is static and never executed or expanded; secondmate charters never tak
 
 ## Worker launch environment (config/launch-env-allowlist)
 
-The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
-With no file, ambient inheritance remains unfiltered except for harness-specific shedding, including the [Claude API key guard](#claude-api-key-guard); the provider, long-lived terminal daemon, and shell initialization determine the remaining inherited variables.
+Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries), the non-secret toolchain home paths (`JAVA_HOME`, `GOROOT`, `GOPATH`, `CARGO_HOME`, `RUSTUP_HOME`, `PNPM_HOME`, `BUN_INSTALL`, `NVM_DIR`) and the selected harness's non-secret store selectors.
+Each retained name is passed only when the pane sets it.
+The launch uses `/usr/bin/env -i` with names-only retained entries, so unlisted readonly exports and non-identifier environment names are absent from the new process.
+The default starts the pane's own shell without user startup loading (`zsh -f`, or noninteractive Bash/sh without BASH_ENV/ENV), preserving its raw-command syntax.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors, the `TOOLCHAIN` home paths and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
+[`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
+Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`; without it the default launch drops both, and the [Claude API key guard](#claude-api-key-guard) refuses only an allowlist that lists one.
+
+DSH keeps the one credential its launch patch names, `DEEPSEEK_API_KEY` (`bin/fm-dsh.py api-key-env` owns the name).
+That key reaches the dsh-tui process, so it is a retained credential, not an isolated one.
+The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKEN` names, this one included, from the base environment of the commands it starts, but an explicit per-command environment can restore an entry, and no live DSH tool run has proved this yet.
+
+The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
+Other names outside the default set stop reaching the worker the same way.
+That includes `VIRTUAL_ENV`, `PYTHONPATH` and `NODE_OPTIONS`, which the default deliberately omits because they are pane-specific or can inject code.
+A raw launch command runs inside this boundary, so a pane variable it expands is empty unless it is kept.
+The remedy is the optional local, gitignored `config/launch-env-allowlist`.
+That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
+A credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -1976,9 +1994,11 @@ SSH_AUTH_SOCK
 ### Variables retained and where values come from
 
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the retained environment floor and destination-side execution; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns allowlist selection and parsing.
+Main-run readers can invoke the same helper directly without fm-spawn, using its default clean environment and its `--startup` option on Darwin.
+An explicit `--keep` retains a named existing authentication route; it does not isolate that credential from the harness's tools.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
+In an allowlist file, every other ambient name must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -2001,10 +2021,13 @@ Choose the minimum additions for the authentication method actually in use:
 ### Validation and security limits
 
 Verify the selected provider login and Git transport after opting in; Firstmate does not infer credentials from model names or install a secret manager.
-Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when this option is enabled, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
+Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when an allowlist file is present, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
-This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
+Herdr's native restore is outside this boundary: a restored pane resumes the agent from its recorded session without the clean-environment prefix or the Seatbelt profile, so that agent's tools can see what the pane shell loaded ([Herdr restart behavior](herdr-backend.md#husks-after-a-server-restart)).
+The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
+The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks; kept harness credentials, dotenv reads or imports, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), alternate credential loaders and unconfined platforms remain outside that boundary.
+A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
 
@@ -2024,7 +2047,7 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+compact-adviser has no key route on fm-spawn launches until a home-`.env` key route like the guard hook's lands (follow-up fm-compact-adviser-key-source).
 Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
 For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
 Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
@@ -2083,7 +2106,8 @@ Per-machine Cursor `cli-config.json` attribution-off is not this contract: it do
 
 ### Claude API key guard
 
-Every claude worker Firstmate launches is refused before creation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through ambient environment inheritance or an explicit allowlist entry.
+Every claude worker Firstmate launches is refused before creation when `config/launch-env-allowlist` lists `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` and that variable is set where the worker would inherit it.
+Without an allowlist file the default [launch environment](#worker-launch-environment-configlaunch-env-allowlist) keeps neither variable unless `--allow-api-key` is passed, so an ambient, tmux session or tmux global value is dropped from the launch and does not refuse it.
 Claude Code prefers an API key over a claude.ai subscription login and silently bills the API, so this guard prevents accidental API charges when the captain intends subscription billing.
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
@@ -2095,7 +2119,7 @@ A direct `fm-spawn.sh --relaunch` without the flag drops the line.
 
 When `config/launch-env-allowlist` is active, a variable name the allowlist does not list is filtered out of the worker environment; the guard does not refuse for a filtered-out variable, because it cannot reach the worker.
 
-On the tmux backend the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
+On the tmux backend, for a variable the allowlist lists, the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
 The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
@@ -2832,6 +2856,13 @@ Dispatch is separate from this tool-call guard: its [typed resolution contract](
 On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
 The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
 It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+Both profiles include read-denial rules for standard user/system Bash and Zsh startup files, their canonical symlink targets and the resolved `ZDOTDIR`, `BASH_ENV` and `ENV` selectors, intended to stop child login and interactive shells from re-running those credential loaders.
+A selector present only in a stale destination pane, an arbitrary alternate loader and a selector changed after launch are outside this named-path boundary.
+The launch already supplies PATH; if additional operational initialization is needed, ask Main to separate it from credential-loading startup rather than sourcing a different secret-bearing file.
+Neither profile provides dotenv read isolation; project and foreign-home dotenv files remain readable where ordinary filesystem permissions permit it.
+The executable acceptance test must run from an unconfined Darwin process; `sandbox_apply: Operation not permitted` from an already-confined worker does not prove the new rules enforce or that native authentication remains compatible.
+The named startup rules do not protect renamed copies, hard-link aliases, arbitrary alternate loaders or same-user process inspection.
+Guard events record one launch admission, not each kernel read denial; [`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) exercises the actual profiles with fake-only files.
 Writes are allowed by default; the profile denies writes to these named protected assets:
 
 - the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;

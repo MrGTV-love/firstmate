@@ -1936,19 +1936,19 @@ test_spawn_backend_refusal_names_spawn_capable_backends_and_invocation() {
   pass "fm-spawn: the backend refusal names the spawn-capable backends and the invocation"
 }
 
-# The ambient API-billing refusal prints the exact env-u relaunch and the
-# deliberate --allow-api-key alternative.
+# The allowlist-listed API-billing refusal prints the exact env-u relaunch and
+# the deliberate --allow-api-key alternative.
 test_api_key_refusal_carries_the_billing_repair() {
   local out status
   out=$(
     exec 2>&1
     # shellcheck source=bin/fm-api-key-guard-lib.sh
     . "$ROOT/bin/fm-api-key-guard-lib.sh"
-    ANTHROPIC_API_KEY=sk-ant-test-key fm_api_key_guard claude 0 '' 0 '' ''
+    ANTHROPIC_API_KEY=sk-ant-test-key fm_api_key_guard claude 0 '' 1 ANTHROPIC_API_KEY ''
   )
   status=$?
-  expect_code 1 "$status" "the API-key guard must still refuse an ambient key"
-  assert_contains "$out" "ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance" \
+  expect_code 1 "$status" "the API-key guard must still refuse an allowlist-listed key"
+  assert_contains "$out" "ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist" \
     "the refusal lost its fault and route"
   assert_contains "$out" "repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>" \
     "the refusal did not print the env-u relaunch"

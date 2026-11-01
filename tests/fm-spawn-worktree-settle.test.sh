@@ -283,11 +283,11 @@ test_nonmeasured_harness_stays_unconfined_and_audited() {
   FM_COMPAT_MARKER="$HOME_DIR/foreign-write-proof"
   FM_EXPECT_INBOX="$HOME_DIR/state/$id.inbox"
   export FM_COMPAT_LAUNCH_LOG FM_COMPAT_MARKER FM_EXPECT_INBOX
-  cat > "$FAKEBIN_DIR/codex" <<'SH'
+  cat > "$FAKEBIN_DIR/codex" <<SH
 #!/usr/bin/env bash
-if [ "${1:-}" = --version ]; then printf 'codex-cli 1.0.0\n'; exit 0; fi
-if [ "${FM_TASK_INBOX:-}" = "${FM_EXPECT_INBOX:?}" ]; then
-  printf 'unconfined\n' > "${FM_COMPAT_MARKER:?}"
+if [ "\${1:-}" = --version ]; then printf 'codex-cli 1.0.0\\n'; exit 0; fi
+if [ "\${FM_TASK_INBOX:-}" = '$FM_EXPECT_INBOX' ]; then
+  printf 'unconfined\\n' > '$FM_COMPAT_MARKER'
 fi
 SH
   chmod +x "$FAKEBIN_DIR/codex"

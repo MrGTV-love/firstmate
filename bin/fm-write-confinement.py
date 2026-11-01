@@ -35,7 +35,11 @@ come from the state/<id>.meta
 records of this home and every --protect home. The caller wraps its final
 launch with sandbox-exec -f FILE. Linux launch selection belongs to
 fm-spawn.sh and deliberately does not invoke this builder. No credentials are
-copied.
+copied. Both profiles also deny reads of the named standard user/system shell
+startup files, including canonical symlink targets, so child login/interactive
+shells cannot reload operator secret exports through those named paths.
+Neither profile denies reads of dotenv files, alternate credential loaders,
+renamed copies or hard-link aliases of secret files.
 """
 import argparse
 import hashlib
@@ -81,6 +85,24 @@ def regex(pattern):
 
 def under(root, pattern):
     return regex("^" + re.escape(root) + "/" + pattern + "$")
+
+
+def startup_read_rules(home):
+    """Keep child login/interactive shells from re-running operator loaders.
+
+    PATH is inherited from the launch; this does not return early from or edit
+    the operator's profile. Resolve symlinks as well as denying original names.
+    Alternate explicit loader files are not a general read-isolation guarantee.
+    """
+    roots = {str(Path(home)), os.environ.get("ZDOTDIR", str(Path(home)))}
+    names = (".profile", ".bash_profile", ".bash_login", ".bashrc",
+             ".zshenv", ".zprofile", ".zshrc", ".zlogin")
+    paths = {str(Path(root) / name) for root in roots if root for name in names}
+    paths.update("/etc/" + name for name in (
+        "profile", "bashrc", "zshenv", "zprofile", "zshrc", "zlogin"))
+    paths.update(value for name in ("BASH_ENV", "ENV") if (value := os.environ.get(name)))
+    paths.update(canonical(path) for path in tuple(paths))
+    return [f"(deny file-read-data (literal {quoted(path)}))" for path in sorted(paths)]
 
 
 def worktrees(primary):
@@ -358,6 +380,7 @@ def build(args):
         path = Path(anchor)
         fixed += ([str(path)] if path.is_dir() else []) + [str(parent) for parent in path.parents if str(parent) != "/"]
     lines += [f"(deny file-write* (literal {quoted(path)}))" for path in dict.fromkeys(fixed)]
+    lines += startup_read_rules(home)
     Path(args.profile).write_text("\n".join(lines) + "\n")
 
 

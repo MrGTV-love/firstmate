@@ -3,6 +3,7 @@
 set -euo pipefail
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+python3 "$ROOT/tests/fm-worker-env.py" "$ROOT"
 if [ "$(uname -s)" != Darwin ]; then
   printf 'skip: macOS Seatbelt acceptance; Linux remains unconfined\n'
   exit 0
