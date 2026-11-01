@@ -712,24 +712,23 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # lease as a remedy. A registered local home
 # that cannot be read is named in one warning line and skipped: one broken home
 # must not stop every allocation for a project.
-# A recovered lease is not durable custody for teardown, but Treehouse retains
-# it until the slot is idle, clean and landed. Defer that verdict until the
-# caller supplies the actual allocated slot, before any claim, seeding or worker
-# launch: a different recovered slot cannot stop a free-slot start. Both
-# allocation callers must run this check before get and again with its result.
-fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state> [<allocated-slot>]
-  local project=$1 record_state=$2 allocated_slot=${3:-} state_dir meta copy slot skipped id home remedy
-  local boundary='before treehouse get' source_ok=true started=$SECONDS
+# A recovered lease that is not on a local Firstmate home also refuses, with
+# the owning task's completing step as the remedy. Treehouse 3.1.7-fm refuses to
+# lease over it while the slot is busy, dirty or unlanded, and once the slot is
+# idle, clean and landed every pool command (get, lease and status included)
+# first moves its untracked contents, nested copies included, into a retained
+# backup; so no Treehouse command can hold it in place, and only this pre-get
+# refusal keeps the spawn's own get from evicting the copy.
+fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
+  local source_ok=true started=$SECONDS
   local -a homes=()
-  [ -z "$allocated_slot" ] || boundary='before assigning the allocated slot'
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_local_firstmate_state_dirs "$record_state" tolerant
-  if [ -z "$allocated_slot" ]; then
-    for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
-      echo "warning: $skipped; its task records were not checked for a current copy inside a Treehouse pool slot" >&2
-    done
-  fi
+  for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
+    echo "warning: $skipped; its task records were not checked for a current copy inside a Treehouse pool slot" >&2
+  done
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     home=$(fm_task_copy_canonical_dir "${state_dir%/*}") && homes+=("$home")
   done
@@ -739,9 +738,6 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state> [<a
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
-      if [ -n "$allocated_slot" ] && [ "$slot" != "$allocated_slot" ] && [ ! "$slot" -ef "$allocated_slot" ]; then
-        continue
-      fi
       fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
       id=$(basename "$meta" .meta)
       case "$FM_TASK_COPY_SLOT_STATE" in
@@ -759,8 +755,7 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state> [<a
           remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
           ;;
         recovered)
-          [ -n "$allocated_slot" ] || continue
-          remedy="Land and finish task '$id', then run: FM_HOME='${state_dir%/*}' bin/fm-teardown.sh '$id'; retry only after that completing step releases its current copy. Do not return, reap or re-lease the held slot to unblock another spawn."
+          remedy="Land and finish task '$id', then run: FM_HOME='${state_dir%/*}' bin/fm-teardown.sh '$id'; retry only after that completing step releases its current copy. Do not return, reap or re-lease the held slot, or run pool commands to inspect it: once it is idle, clean and landed, any Treehouse pool command moves its untracked contents, this copy included, into a retained backup."
           ;;
         escaped|relative)
           remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
@@ -772,7 +767,7 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state> [<a
           remedy="A lease does not clear this refusal; inspect the pool with: (cd '$project' && treehouse status)"
           ;;
       esac
-      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation $boundary" >&2
+      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
       echo "$remedy" >&2
       case "$FM_TASK_COPY_SLOT_STATE" in missing-jq|unknown) source_ok=false ;; esac
       "$FM_TASK_COPY_LIB_DIR/fm-guard-event.sh" spawn-retained-current-copy deny --log "$record_state/guard-events.jsonl" --source-ok "$source_ok" --elapsed-ms "$(((SECONDS - started) * 1000))"

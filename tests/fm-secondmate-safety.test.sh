@@ -395,9 +395,9 @@ test_home_seed_refuses_slot_holding_live_nested_copy_before_lease() {
   pass "home seed refuses a slot holding a live record's nested copy before lease acquisition"
 }
 
-test_home_seed_refuses_selected_recovered_slot() {
+test_home_seed_refuses_recovered_slot_before_lease() {
   local nested out rc=0
-  make_home_seed_retained_case recovered-selected
+  make_home_seed_retained_case recovered-live
   nested="$SEED_CASE_SLOT/.claude/worktrees/recovered-holder"
   git -C "$SEED_CASE_HOME" worktree add --quiet -b recovered-holder "$nested"
   fm_write_meta "$SEED_CASE_HOME/state/holder.meta" \
@@ -405,20 +405,24 @@ test_home_seed_refuses_selected_recovered_slot() {
   printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}]}\n' \
     "$SEED_CASE_SLOT" > "$SEED_CASE_DIR/pool/treehouse-state.json"
   home_seed_retained_fingerprint "$SEED_CASE_SLOT" > "$SEED_CASE_DIR/before-copy"
+  cp "$SEED_CASE_DIR/pool/treehouse-state.json" "$SEED_CASE_DIR/before-pool"
   cp "$SEED_CASE_HOME/state/holder.meta" "$SEED_CASE_DIR/before-holder-meta"
   cp "$SEED_CASE_HOME/data/secondmates.md" "$SEED_CASE_DIR/before-registry"
   out=$(run_home_seed_retained_case 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "home seed accepted a recovered slot holding another task"
-  assert_contains "$out" 'before assigning the allocated slot' "home seed lost selected-slot denial"
+  [ "$rc" -ne 0 ] || fail "home seed leased a pool while a recovered slot held another task's copy"
+  assert_contains "$out" "carries Treehouse's recovered-state lease" "home seed lost the recovered-state reason"
+  assert_contains "$out" 'refusing allocation before treehouse get' "home seed did not refuse before lease acquisition"
   assert_contains "$out" "bin/fm-teardown.sh 'holder'" "home seed lost the completing step"
-  grep -F 'treehouse get --lease' "$SEED_CASE_LOG" >/dev/null || fail "home seed did not reach allocation"
-  ! grep -E 'treehouse return|reset' "$SEED_CASE_LOG" >/dev/null || fail "home seed returned or reset the held recovered slot"
+  assert_not_contains "$out" "treehouse status" "home seed named a pool command that can move the copy"
+  assert_not_contains "$out" "treehouse lease" "home seed named a lease that cannot replace the recovered lease"
+  ! grep -F 'treehouse' "$SEED_CASE_LOG" >/dev/null || fail "home seed sent a Treehouse command"
   home_seed_retained_fingerprint "$SEED_CASE_SLOT" | cmp -s - "$SEED_CASE_DIR/before-copy" \
     || fail "home seed changed the recovered slot"
+  cmp -s "$SEED_CASE_DIR/before-pool" "$SEED_CASE_DIR/pool/treehouse-state.json" || fail "home seed changed the recovered lease"
   cmp -s "$SEED_CASE_DIR/before-holder-meta" "$SEED_CASE_HOME/state/holder.meta" || fail "home seed changed the holder"
   cmp -s "$SEED_CASE_DIR/before-registry" "$SEED_CASE_HOME/data/secondmates.md" || fail "home seed changed the registry"
   [ ! -e "$SEED_CASE_SLOT/.fm-secondmate-home" ] || fail "home seed marked the held recovered slot"
-  pass "home seed rejects a selected recovered slot without returning or seeding it"
+  pass "home seed refuses before lease acquisition while a recovered slot holds another task's copy"
 }
 
 test_home_seed_left_slot_allows_lease_and_propagates_get_failure() {
@@ -3457,7 +3461,7 @@ test_home_seed_validate_rejects_duplicate_homes
 test_home_seed_validate_rejects_duplicate_ids
 test_home_seed_validate_rejects_nested_homes
 test_home_seed_uses_treehouse_acquired_home
-test_home_seed_refuses_selected_recovered_slot
+test_home_seed_refuses_recovered_slot_before_lease
 test_home_seed_refuses_slot_holding_live_nested_copy_before_lease
 test_home_seed_left_slot_allows_lease_and_propagates_get_failure
 test_home_seed_returns_treehouse_acquired_home_on_assignment_failure

@@ -6184,7 +6184,6 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     exit 1
   fi
 
-  fm_task_copy_pool_slots_hold_no_current_copy "$PROJ_ABS" "$STATE" "$WT" || exit 1
   validate_spawn_worktree "treehouse get" "$T"
 
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
