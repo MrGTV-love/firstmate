@@ -219,7 +219,7 @@ launch, so the cut threshold for reversible guards is cost 5, not cost 1.
 One JSON line per rule decision, appended to `state/guard-events.jsonl`:
 
 ```json
-{"ts":"2026-10-31T12:00:00Z","guard":"spawn-worktree-isolation","rule":"isolated-worktree","task":"task-a","version":"1","system":"firstmate","session":"task-a","decision":"deny","source_ok":true,"elapsed_ms":14,"cleared_by":"","repeat":1,"override":false,"head":"","base":""}
+{"ts":"2026-10-31T12:00:00Z","guard":"spawn-worktree-isolation","rule":"isolated-worktree","task":"task-a","version":"1","system":"firstmate","session":"task-a","decision":"deny","source_ok":true,"elapsed_ms":14,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
 ```
 
 `bin/fm-guard-event.sh` is the single best-effort writer; its header owns the CLI.
@@ -231,13 +231,15 @@ Merge refusals record `head` and `base` for the read-only detector; empty fields
 
 A guard records allows as well as denies so opportunities are observable.
 An existing waiver or force records `override: true`; a skipped check records decision `bypass` and its activation rule.
+`actor` is the class of the caller: `gate`, `worker` (it has `FM_TASK_ID`) or `main`.
+An operation that writes one row per rule counts as one opportunity at guard level; its extra rule rows carry `opportunity: false`.
 A bypass is an escape record, not an additional inspected opportunity, and an override is a reassessment signal rather than proof of a false positive.
 The manual-backlog skip is selected by `config/backlog-backend`; `FM_BACKLOG_TRANSITION_SKIP` is its output reason, not an environment switch.
 The registry also names existing optional surfaces whose bypasses are visible but whose ordinary decisions remain uninstrumented.
 Telemetry failures, unavailable writers and nonregular log targets must never prevent the guarded action or change its verdict.
 
 `bin/fm-guard-metrics.sh` owns guard/rule metrics and the retirement rule; its header owns the CLI and output fields.
-It groups repeated denies by task and rule across harness sessions, and an allow for another task or rule cannot clear a refusal.
+It groups repeated denies by task and rule across harness sessions, and an allow for another task, rule or actor class cannot clear a refusal.
 The refusal-to-bypass ratio is escape records plus distinct workaround signatures divided by denies, with a record carrying both `bypass` and `override` counted once.
 The ratio is undefined (`null`) when there are no denies, rather than zero evidence of escapes.
 Deny-only rows and guards with no recorded events in the selected window remain visible without inventing opportunities.

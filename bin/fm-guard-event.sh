@@ -10,6 +10,9 @@
 #   --cleared-by <word>     retry, captain, waiver, env, or caller-owned token
 #   --repeat <n>            caller's consecutive decision count (default 1)
 #   --override              existing waiver, force or escape was used
+#   --actor <class>         gate, worker or main (default: worker with FM_TASK_ID,
+#                           else main); an allow clears only its own class's denies
+#   --no-opportunity        one more rule row for an operation already counted
 #   --system <name>         default firstmate
 #   --guard-version <v>     default 1
 #   --head <sha>            refused/allowed commit, for read-only detection
@@ -21,18 +24,20 @@
 # Callers must also use || true so an unavailable writer never changes policy.
 set -u
 
-usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; }
 case "${1:-}" in ''|-h|--help) usage; exit 0 ;; esac
 GUARD=$1 DECISION=${2:-}
 case "$DECISION" in deny|warn|allow|error|bypass) ;; *) exit 0 ;; esac
 shift 2
 SOURCE_OK=true ELAPSED_MS=0 CLEARED_BY='' REPEAT=1 OVERRIDE=false
 SYSTEM=firstmate GUARD_VERSION=1 SESSION='' LOG='' RULE=$GUARD TASK=${FM_TASK_ID:-}
-HEAD='' BASE=''
+HEAD='' BASE='' ACTOR=${FM_TASK_ID:+worker} OPPORTUNITY=true
+ACTOR=${ACTOR:-main}
 while [ $# -gt 0 ]; do
   case "$1" in
     --override) OVERRIDE=true; shift; continue ;;
-    --source-ok|--elapsed-ms|--cleared-by|--repeat|--system|--guard-version|--session|--log|--rule|--task|--head|--base)
+    --no-opportunity) OPPORTUNITY=false; shift; continue ;;
+    --source-ok|--elapsed-ms|--cleared-by|--repeat|--system|--guard-version|--session|--log|--rule|--task|--head|--base|--actor)
       [ $# -ge 2 ] || exit 0 ;;
     *) shift; continue ;;
   esac
@@ -49,6 +54,7 @@ while [ $# -gt 0 ]; do
     --task) TASK=$2 ;;
     --head) HEAD=$2 ;;
     --base) BASE=$2 ;;
+    --actor) ACTOR=$2 ;;
   esac
   shift 2
 done
@@ -80,10 +86,11 @@ LINE=$(jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg version "$GUARD_VERSION" --arg system "$SYSTEM" --arg decision "$DECISION" \
   --argjson source_ok "$SOURCE_OK" --arg elapsed_ms "$ELAPSED_MS" \
   --arg cleared_by "$CLEARED_BY" --arg repeat "$REPEAT" --argjson override "$OVERRIDE" \
-  --arg head "$HEAD" --arg base "$BASE" \
+  --arg head "$HEAD" --arg base "$BASE" --arg actor "$ACTOR" --argjson opportunity "$OPPORTUNITY" \
   '{ts:$ts,guard:$guard,rule:$rule,task:$task,version:$version,system:$system,
     session:$session,decision:$decision,source_ok:$source_ok,elapsed_ms:($elapsed_ms|tonumber),
-    cleared_by:$cleared_by,repeat:($repeat|tonumber),override:$override,head:$head,base:$base}' 2>/dev/null) || exit 0
+    cleared_by:$cleared_by,repeat:($repeat|tonumber),override:$override,head:$head,base:$base,
+    actor:$actor,opportunity:$opportunity}' 2>/dev/null) || exit 0
 # Never open a pipe or device: best-effort telemetry must not wait for a reader.
 if [ -e "$LOG" ] && [ ! -f "$LOG" ]; then exit 0; fi
 LOG_DIR=${LOG%/*}

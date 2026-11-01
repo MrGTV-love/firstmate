@@ -2053,8 +2053,9 @@ case "$PROVIDER" in
         esac
       fi
     fi
-    for guard_rule in checks-green required-reported base-containment; do
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule "$guard_rule" --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule checks-green --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
+    for guard_rule in required-reported base-containment; do
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule "$guard_rule" --no-opportunity --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
     done
     if [ "${#ALLOW_RED[@]}" -gt 0 ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head bypass --rule checks-green --task "$ID" --override --cleared-by allow-red 2>/dev/null || true

@@ -177,7 +177,7 @@ fm_refuse_if_gate_agent() {
     return 0
   fi
   if fm_gate_lab_permitted; then
-    fm_gate_refuse_event allow
+    fm_gate_refuse_event allow --actor gate
     echo "fm-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
     return 0
   fi
@@ -189,6 +189,6 @@ fm_refuse_if_gate_agent() {
   # shellcheck disable=SC2016 # Print the command for the caller to expand, not this process.
   echo 'error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME' >&2
   echo 'error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.' >&2
-  fm_gate_refuse_event
+  fm_gate_refuse_event deny --actor gate
   exit "$FM_GATE_REFUSE_EXIT"
 }

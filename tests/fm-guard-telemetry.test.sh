@@ -18,6 +18,8 @@
 #   - a recurrence after a clear cuts even an irreversible guard
 #   - a dated decision stands until the evidence changes, not on its date alone
 #   - a missing log reports every guard unmeasured and exits 0
+#   - one guarded operation counts as one guard-level opportunity
+#   - only an allow from the same actor class clears a deny
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -238,6 +240,17 @@ dated_rows "$ERRWIN" 2026-03-10 30
 got=$(undecided_for "$ERRWIN" "$TMP/dated-keep.json")
 [ -z "$got" ] || fail "an error in the judged window is not a fire, so a quiet window after it must not re-nominate, got '$got'"
 
+BYPASSWIN="$TMP/bypass-window.jsonl"
+: >"$BYPASSWIN"
+for k in deny allow deny allow; do
+  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$BYPASSWIN"
+done
+dated_rows "$BYPASSWIN" 2026-01-10 26
+dated_rows "$BYPASSWIN" 2026-01-11 30 bypass
+dated_rows "$BYPASSWIN" 2026-03-10 30
+got=$(undecided_for "$BYPASSWIN" "$TMP/dated-keep.json")
+[ "$got" = gquiet ] || fail "a bypass is not an opportunity, so it must not push a fire out of the judged window, got '$got'"
+
 decided_with "keep: no date recorded" "$TMP/undated.json"
 got=$(undecided_for "$ZERO" "$TMP/undated.json")
 [ "$got" = gquiet ] || fail "a decision without an outcome and date must not retire a nomination, got '$got'"
@@ -348,9 +361,79 @@ jq -e '.rules[] | select(.rule == "checks") | .denies == 0 and .refusal_to_bypas
   || fail "zero-deny ratio must be undefined, not fabricated"
 pass "per-rule metrics count cross-session task repeats and refusal-to-bypass ratios"
 
+# A green merge writes three rule rows for one guarded operation. The guard row
+# counts one opportunity; each rule row keeps its own allow and its own clear.
+OPS="$TMP/operations.jsonl"
+"$EVENT" gops deny --rule checks-green --task task-a --log "$OPS"
+"$EVENT" gops allow --rule checks-green --task task-a --log "$OPS"
+"$EVENT" gops allow --rule required-reported --no-opportunity --task task-a --log "$OPS"
+"$EVENT" gops allow --rule base-containment --no-opportunity --task task-a --log "$OPS"
+"$METRICS" --log "$OPS" --json > "$TMP/operations.json"
+jq -e '.guards[] | select(.id == "gops") | .opportunities == 2 and .allows == 1 and .denies == 1
+  and .median_clear_attempts == 1 and .recurrences == 0' "$TMP/operations.json" >/dev/null \
+  || fail "one operation must be one guard-level opportunity, with its clear intact"
+jq -e '[.rules[] | select(.id == "gops")] | length == 3 and all(.[]; .allows == 1)
+  and (map(select(.rule == "checks-green"))[0].opportunities == 2)
+  and (map(select(.rule == "required-reported"))[0].opportunities == 1)' "$TMP/operations.json" >/dev/null \
+  || fail "each rule row must keep its own allow"
+pass "one guarded operation counts once at guard level and once per rule"
+
+# A clearing allow comes from the deny's actor class, through the real gate check.
+ACTOR_LAB=$("$ROOT/bin/fm-lab-home.sh" create "$TMP/actor-lab") || fail "could not create the actor lab home"
+gate_check_as() {  # <log> <gate|main|lab>
+  (
+    cd "$TMP" || exit 111
+    for override in "${!FM_@}"; do
+      case "$override" in *_OVERRIDE) unset "$override" ;; esac
+    done
+    unset FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE FM_TASK_ID FM_HOME ID
+    # shellcheck disable=SC2030 # This subshell owns its own gate environment.
+    export FM_GUARD_EVENT_LOG="$1" FM_GATE_EVENT_TASK=actor-task
+    # shellcheck disable=SC2030
+    case "$2" in
+      gate) export NO_MISTAKES_GATE=1 ;;
+      lab) export NO_MISTAKES_GATE=1 FM_HOME="$ACTOR_LAB" ;;
+    esac
+    # shellcheck source=bin/fm-gate-refuse-lib.sh
+    . "$ROOT/bin/fm-gate-refuse-lib.sh"
+    fm_refuse_if_gate_agent
+  ) >/dev/null 2>&1
+}
+recurrences_of() {  # <log> <guard>
+  "$METRICS" --log "$1" --json | jq -e --arg guard "$2" '.guards[] | select(.id == $guard) | .recurrences'
+}
+CROSS="$TMP/cross-actor.jsonl"
+rc=0; gate_check_as "$CROSS" gate || rc=$?
+[ "$rc" = 3 ] || fail "a gate call must be refused, got exit $rc"
+gate_check_as "$CROSS" main || fail "a call by Main must be allowed"
+rc=0; gate_check_as "$CROSS" gate || rc=$?
+[ "$rc" = 3 ] || fail "a repeated gate call must be refused, got exit $rc"
+jq -se '[.[].decision] == ["deny","allow","deny"] and [.[].actor] == ["gate","main","gate"]
+  and all(.[]; .task == "actor-task")' "$CROSS" >/dev/null || fail "gate decisions lost their actor class: $(cat "$CROSS")"
+[ "$(recurrences_of "$CROSS" gate-agent-containment)" = 0 ] \
+  || fail "an allow by Main must not clear a gate agent's deny"
+SAME="$TMP/same-actor.jsonl"
+rc=0; gate_check_as "$SAME" gate || rc=$?
+[ "$rc" = 3 ] || fail "a gate call must be refused, got exit $rc"
+gate_check_as "$SAME" lab || fail "a gate call against a marked lab home must be allowed"
+rc=0; gate_check_as "$SAME" gate || rc=$?
+[ "$rc" = 3 ] || fail "a repeated gate call must be refused, got exit $rc"
+[ "$(recurrences_of "$SAME" gate-agent-containment)" = 1 ] \
+  || fail "an allow by the same actor class must still clear a deny"
+WORKER="$TMP/worker-actor.jsonl"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+"$EVENT" gsend allow --rule explicit-home --task target --log "$WORKER"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+[ "$(recurrences_of "$WORKER" gsend)" = 0 ] || fail "an allow by Main must not clear a worker's deny"
+FM_TASK_ID=worker-task "$EVENT" gsend allow --rule explicit-home --task target --log "$WORKER"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+[ "$(recurrences_of "$WORKER" gsend)" = 1 ] || fail "an allow by the same worker class must still clear a deny"
+pass "only an allow from the same actor class clears a deny"
+
 # Exercise real library entrypoints. No credential contents enter the log.
 EMITTERS="$TMP/emitters.jsonl"
 (
+  # shellcheck disable=SC2031 # Each subshell sets its own log.
   export FM_GUARD_EVENT_LOG="$EMITTERS" FM_TASK_ID=emitter-task
   # shellcheck source=bin/fm-api-key-guard-lib.sh
   . "$ROOT/bin/fm-api-key-guard-lib.sh"

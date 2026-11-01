@@ -1663,6 +1663,8 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
       > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "guard-events: the green merge should have proceeded: $(cat "$case_dir/stderr")"
   jq -se '[.[] | select(.guard == "merge-green-head" and .decision == "allow") | .rule] | sort == ["base-containment","checks-green","required-reported"]' "$case_dir/allowed-guard-events.jsonl" >/dev/null || fail "green merge did not record each checked rule"
+  assert_equals 1 "$("$ROOT/bin/fm-guard-metrics.sh" --log "$case_dir/allowed-guard-events.jsonl" --guards merge-green-head --json | jq '.guards[0].opportunities')" \
+    "guard-events: a green merge must be one merge-green-head opportunity"
   assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-held-task allow)" \
     "guard-events: a green merge must append one merge-held-task allow"
   assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-green-head" and .decision == "allow")][0].cleared_by' \
