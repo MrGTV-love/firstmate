@@ -261,24 +261,19 @@ The instrumentation example above describes the existing event shape; detection 
 
 ### Events
 
-`bin/fm-guard-event.sh` must add `rule` and `task` to the event schema.
-The session key must be the task id or the home plus the harness session, never `pid-$$`.
-Every waiver and force must pass `--override`, including `--allow-red`, `--allow-missing`, `--attended-override`, teardown `--force` and `--allow-api-key`.
-Each bypass switch must emit a `bypass` event.
-Deny-only emitters must also emit allow decisions so opportunities can be measured.
-These requirements expose existing escapes; they do not authorize their use or new bypass flags.
+[Instrumentation](#instrumentation) owns the implemented event schema, session key, override, bypass and allow contract.
+These records expose existing escapes; they do not authorize their use or new bypass flags.
 
 ### Metrics
 
-`bin/fm-guard-metrics.sh` must report per rule, with refusal-to-bypass ratio defined as `(overrides + workaround signatures) / denies`.
-It must count repeated denies per task across sessions and flag "deny-only" and "zero events in N days".
+[Instrumentation](#instrumentation) owns the implemented per-rule, refusal-to-bypass, repeated-deny, deny-only and zero-event metrics.
 
 ### Workaround detection
 
-Heartbeat detection must be read-only and flag:
+[Instrumentation](#instrumentation) owns the implemented tree-equal merge and base-merge-only detectors.
+Heartbeat detection must stay read-only and must also flag:
 
-- A merge commit on a PR branch or train whose tree equals its first parent's.
-- A PR head changed only by a base merge after a merge refusal.
+- A tree-equal merge on a train branch, because the heartbeat scan reads only ship and scout task records.
 - A widening PR, identified by the review record's `--widens-guard yes`.
 
 ### Lint
