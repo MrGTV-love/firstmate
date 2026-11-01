@@ -1,9 +1,6 @@
 #!/usr/bin/env perl
 # fm-lint-cache.pl - private dependency selection, success cache, and host-slot gate for fm-lint.sh.
-# Usage: perl fm-lint-cache.pl select <root> [<cache-refusals-file>] <NUL-separated changes on stdin>
-# The optional file receives NUL-separated selected roots with unknown imports;
-# FM_LINT_INTERNAL_CACHE_REFUSALS carries only those negative hints to check.
-# It suppresses redundant key discovery, never a real analysis or a diagnostic.
+# Usage: perl fm-lint-cache.pl select <root> <NUL-separated changes on stdin>
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 #             [--execute <cold-command...>]
 # ShellCheck retains source-aware extended analysis; only identical successful checks
@@ -404,6 +401,7 @@ if (defined $mode && $mode eq 'check') {
 }
 die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
+$root = abs_path(".") // $root;
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
 my @source_candidates = @inventory;
 my (%text, %edges, %unknown);
@@ -682,7 +680,10 @@ sub scan_program {
             } else {
                 $bindings = command_aliases(\@words, $bindings, $can_bind);
                 command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
-                $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
+                if (@cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/) {
+                    $cases[-1] = 'pattern';
+                    $bindings = {};
+                }
             }
             if ($separator ne ';' && $separator ne "\n") {
                 $bindings = {};
@@ -720,7 +721,7 @@ sub scan_program {
         scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$word->{subs}};
         if (!@words && $word->{raw} eq 'case') { push @cases, 'header'; next; }
         if (@cases && $cases[-1] eq 'header') { $cases[-1] = 'pattern' if $word->{raw} eq 'in'; next; }
-        if (@cases && $word->{raw} eq 'esac' && !@words) { pop @cases; next; }
+        if (@cases && $word->{raw} eq 'esac' && !@words) { pop @cases; $bindings = {}; next; }
         next if @cases && $cases[-1] eq 'pattern';
         push @words, $word;
     }
@@ -765,16 +766,6 @@ if ($mode eq 'select') {
         $selected{$path} = 1 if $policy_changed || $changed{$path}
             || (grep { $changed{$_} } keys %$seen)
             || ($source_changed && (grep { $unknown{$_} } keys %$seen));
-    }
-    # This is a negative hint, never permission to reuse a result: workers can
-    # avoid rediscovering an already-known refusal, but still run ShellCheck.
-    # A file that changes after discovery can only miss a cache opportunity.
-    if (defined $args[0]) {
-        open(my $fh, '>', $args[0]) or die "fm-lint-cache: cache refusal manifest: $!\n";
-        print {$fh} "$_\0" for grep {
-            $selected{$_} && (grep { $unknown{$_} } keys %{$closures{$_}})
-        } @inventory;
-        close $fh or die "fm-lint-cache: cache refusal manifest: $!\n";
     }
     print "$_\0" for grep { $selected{$_} } @inventory;
     exit 0;
@@ -829,17 +820,7 @@ sub duration_outcome {
         warn "fm-lint: cannot record cache queue time: $!\n";
     }
 }
-my $selection_refused = 0;
-if (defined $ENV{FM_LINT_INTERNAL_CACHE_REFUSALS}
-    && open(my $fh, '<', $ENV{FM_LINT_INTERNAL_CACHE_REFUSALS})) {
-    local $/ = "\0";
-    while (my $entry = <$fh>) {
-        chomp $entry;
-        if ($entry eq $path) { $selection_refused = 1; last; }
-    }
-    close $fh;
-}
-my $key = $cache eq 'off' || $selection_refused ? undef : fingerprint();
+my $key = $cache eq 'off' ? undef : fingerprint();
 my ($lock, $passed);
 if (defined $key) {
     # An unavailable cache is an optimization failure, not a lint failure.

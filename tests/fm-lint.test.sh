@@ -298,6 +298,7 @@ SH
   pass "adjacent source aliases omit unrelated roots without hiding transitive diagnostics"
 }
 
+# shellcheck disable=SC2016 # Single quotes are deliberate: each fixture script must keep its literal expansions.
 test_alias_uncertainty_keeps_conservative_selection() {
   local tmp repo fakebin diff_file listed root
   tmp=$(fm_test_tmproot fm-lint-alias-boundaries)
@@ -316,13 +317,47 @@ test_alias_uncertainty_keeps_conservative_selection() {
   printf '#!/usr/bin/env bash\nlib=bin/library.sh other=$((lib=1))\n. "$lib"\n' > "$repo/bin/effectful.sh"
   printf '#!/usr/bin/env bash\nlib=bin/library.sh\nother=$((lib=1)) . "$lib"\n' > "$repo/bin/expansion.sh"
   printf '#!/usr/bin/env bash\nlib=bin/library.sh > "$output"\n. "$lib"\n' > "$repo/bin/redirection.sh"
+  printf '#!/usr/bin/env bash\ncase "$1" in\n  x) lib=bin/other.sh ;;\n  y) lib=bin/library.sh ;;\nesac\n. "$lib"\n' > "$repo/bin/case-arm.sh"
+  printf '#!/usr/bin/env bash\ncase "$1" in x) lib=bin/library.sh ;; esac; . "$lib"\n' > "$repo/bin/inline-case.sh"
+  printf '#!/usr/bin/env bash\ncase "$1" in\n  x) lib=bin/library.sh\nesac\n. "$lib"\n' > "$repo/bin/last-arm.sh"
   fm_lint_write_diff_file "$diff_file" unrelated.sh
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "uncertain alias selection failed"
-  for root in conditional intervening nameref dynamic prefix scope splitting effectful expansion redirection; do
+  for root in conditional intervening nameref dynamic prefix scope splitting effectful expansion redirection \
+    case-arm inline-case last-arm; do
     assert_contains "$listed" "bin/$root.sh" "an unproved $root alias lost conservative selection"
   done
-  pass "conditional, effectful, mutable, scoped, and splitting aliases retain unknown-read fallback"
+  pass "conditional, case-arm, effectful, mutable, scoped, and splitting aliases retain unknown-read fallback"
+}
+
+test_selection_ignores_root_spelling() {
+  local tmp repo link
+  tmp=$(fm_test_tmproot fm-lint-root-spelling)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cat > "$repo/bin/fm-backend.sh" <<'SH'
+#!/usr/bin/env bash
+fm_backend_source() {
+  local adapter="$ROOT/bin/backends/$1.sh"
+  # shellcheck disable=SC1090
+  . "$adapter"
+}
+SH
+  printf '#!/usr/bin/env bash\n. bin/fm-backend.sh\n' > "$repo/bin/backend-caller.sh"
+  link="$tmp/link"
+  ln -s "$repo" "$link"
+  for root in "$repo" "$link"; do
+    printf 'bin/unrelated.sh\0' | perl "$repo/bin/fm-lint-cache.pl" select "$root" > "$tmp/selection" \
+      || fail "selection through $root failed"
+    if tr '\0' '\n' < "$tmp/selection" | grep -qx bin/backend-caller.sh; then
+      fail "selection through $root lost the finite backend import set"
+    fi
+  done
+  printf 'bin/backends/tmux.sh\0' | perl "$repo/bin/fm-lint-cache.pl" select "$link" > "$tmp/selection" \
+    || fail "selection through the symlinked root failed"
+  tr '\0' '\n' < "$tmp/selection" | grep -qx bin/backend-caller.sh \
+    || fail "a changed backend adapter did not select its caller through a symlinked root"
+  pass "a symlinked root spelling keeps the finite backend import set"
 }
 
 test_nonprogram_heredocs_remain_inert() {
@@ -560,21 +595,7 @@ SH
     "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
     && fail "runtime consumer hid a changed imported argument requirement"
   assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
-  # Discovery's refusal must remain negative even when the graph changes
-  # before a worker starts. It is not a cached pass or a source snapshot.
-  printf 'bin/library.sh\0' | perl "$repo/bin/fm-lint-cache.pl" select "$repo" "$tmp/refused" \
-    > "$tmp/selection" || fail "runtime refusal discovery failed"
-  cat > "$repo/bin/runtime.sh" <<'SH'
-#!/usr/bin/env bash
-. bin/library.sh
-needs_argument
-SH
-  out=$(FM_LINT_INTERNAL_CACHE_REFUSALS="$tmp/refused" \
-    perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
-    "$(command -v shellcheck)" --norc --external-sources -- bin/transitive.sh 2>&1) \
-    && fail "a stale refusal hint hid the changed imported argument requirement"
-  assert_contains "$out" SC2119 "a stale refusal hint lost the transitive call-site finding"
-  pass "unproved transitive runtime closures and stale refusal hints never reuse successful analysis"
+  pass "unproved transitive runtime closures never reuse successful analysis"
 }
 
 test_source_spellings_keep_changed_and_cached_dataflow_findings() {
@@ -1163,6 +1184,7 @@ test_child_shell_imports_select_and_invalidate_callers
 test_stdin_heredoc_imports_select_and_invalidate_callers
 test_adjacent_aliases_keep_transitive_diagnostics
 test_alias_uncertainty_keeps_conservative_selection
+test_selection_ignores_root_spelling
 test_nonprogram_heredocs_remain_inert
 test_production_fixture_stdin_imports_invalidate_cache
 test_production_nested_sources_and_pending_reply_cache

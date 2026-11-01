@@ -47,11 +47,7 @@
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
-#     of every caller; the cache only reuses identical inputs. Selection passes
-#     its known cache refusals to this run's workers, avoiding repeated source
-#     discovery merely to refuse the same unknown-import cache key. This is
-#     negative information only: those roots still run real analysis, and a
-#     subsequent graph change can only forgo reuse, never authorize a hit.
+#     of every caller; the cache only reuses identical inputs.
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
@@ -1034,7 +1030,6 @@ fm_lint_changed_base_ref() {
 
 CHANGED_MODE=0
 EXPLICIT_PATHS=0
-CACHE_REFUSED_ROOTS=()
 # Until a complete cold run proves otherwise, this invocation is not evidence
 # for the canonical cold ceiling (including a zero-target changed selection).
 if [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && [ "${FM_DURATION_MANAGED_KEY:-}" = "lint.$ANALYSIS_MODE.${PARTITION:-whole}" ]; then
@@ -1075,21 +1070,17 @@ else
     ROOTS=()
     changed_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-changes.XXXXXX") || exit 1
     selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || { rm -f "$changed_list"; exit 1; }
-    refused_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-refusals.XXXXXX") || { rm -f "$changed_list" "$selected_list"; exit 1; }
     if ! git diff --name-only --no-renames -z "$merge_base" -- > "$changed_list" \
       || ! git ls-files --others --exclude-standard -z >> "$changed_list" \
-      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" "$refused_list" < "$changed_list" > "$selected_list"; then
-      rm -f "$changed_list" "$selected_list" "$refused_list"
+      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" < "$changed_list" > "$selected_list"; then
+      rm -f "$changed_list" "$selected_list"
       printf 'fm-lint.sh: could not select changed roots and source dependencies.\n' >&2
       exit 2
     fi
     while IFS= read -r -d '' changed_path; do
       ROOTS+=("$changed_path")
     done < "$selected_list"
-    while IFS= read -r -d '' changed_path; do
-      CACHE_REFUSED_ROOTS+=("$changed_path")
-    done < "$refused_list"
-    rm -f "$changed_list" "$selected_list" "$refused_list"
+    rm -f "$changed_list" "$selected_list"
   fi
 fi
 # Stable largest-first packing uses measured durations across CI runners and
@@ -1953,11 +1944,6 @@ trap 'exit 143' TERM
 WEIGHTS="$TMP_ROOT/weights"
 OUTPUT_DIR="$TMP_ROOT/output"
 mkdir -p "$OUTPUT_DIR"
-CACHE_REFUSALS="$TMP_ROOT/cache-refusals"
-: > "$CACHE_REFUSALS"
-if [ "${#CACHE_REFUSED_ROOTS[@]}" -gt 0 ]; then
-  printf '%s\0' "${CACHE_REFUSED_ROOTS[@]}" > "$CACHE_REFUSALS"
-fi
 
 # The roots log is the retained per-root lifecycle sidecar; beside --telemetry
 # it survives as ${TELEMETRY%.tsv}.roots.tsv even when a run is killed
@@ -2075,7 +2061,6 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
     FM_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
-    FM_LINT_INTERNAL_CACHE_REFUSALS="$CACHE_REFUSALS"
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
