@@ -1,0 +1,72 @@
+# fm-pr-merge.sh on the REAL PR 343 head with REAL GitHub reads. Rig blocks gh pr merge; no write reaches GitHub.
+live main: ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+compare main...head: ahead=5 behind=19
+GitHub's own test merge commit: 8c0cb09884bc470b4bd83510e00503425be8b573, tree: 9dc22732a785788368fb4ae49fe031c5c14b4944
+
+=== AFTER (this change, --squash, no cache)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --squash
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/rig-task.check.sh
+verified: https://github.com/MrGTV-love/firstmate/pull/343 at head abb8fb21831ae0abe1d874031dc3873595191be6 lands tested tree 9dc22732a785788368fb4ae49fe031c5c14b4944 on current main tip ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+review: captain-word
+test rig: gh pr merge blocked; nothing was sent to GitHub
+error: GitHub merge outcome was not successful: state=OPEN, merged=false, isInMergeQueue=false
+exit=1
+merge call reached: 1; BLOCKED-MERGE pr merge 343 --repo MrGTV-love/firstmate --match-head-commit abb8fb21831ae0abe1d874031dc3873595191be6 --squash
+non-read gh calls refused by rig: 0; 
+Actions reads: 46; compare reads: 2
+guard events: merge-held-task:allow merge-checks-green:allow merge-required-reported:allow merge-landing-tree-tested:allow 
+
+=== AFTER (this change, --merge)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --merge
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/rig-task.check.sh
+verified: https://github.com/MrGTV-love/firstmate/pull/343 at head abb8fb21831ae0abe1d874031dc3873595191be6 lands tested tree 9dc22732a785788368fb4ae49fe031c5c14b4944 on current main tip ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+review: captain-word
+test rig: gh pr merge blocked; nothing was sent to GitHub
+error: GitHub merge outcome was not successful: state=OPEN, merged=false, isInMergeQueue=false
+exit=1
+merge call reached: 1; BLOCKED-MERGE pr merge 343 --repo MrGTV-love/firstmate --match-head-commit abb8fb21831ae0abe1d874031dc3873595191be6 --merge
+non-read gh calls refused by rig: 0; 
+Actions reads: 46; compare reads: 2
+guard events: merge-held-task:allow merge-checks-green:allow merge-required-reported:allow merge-landing-tree-tested:allow 
+
+=== BEFORE (base commit ec8b5ccfc code, --squash)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --squash
+env: /tmp/fm-tt-rig.IhsjnJ/base-code/bin/fm-pr-merge.sh: No such file or directory
+exit=127
+merge call reached: ; 
+non-read gh calls refused by rig: ; 
+Actions reads: ; compare reads: 
+guard events: 
+
+=== AFTER (this change, --rebase stays on ancestry)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --rebase
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/rig-task.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/343
+  - head abb8fb21831ae0abe1d874031dc3873595191be6 lacks the current tip ec8b5ccfca57e3dbee4683ee67372b2788023c2b of base branch main (19 commits behind): it was built on main at 3948d62ffa86123d35baeb84746ed7639d948a02, so no check ran on the tree this merge would land
+Update the branch so its head contains main at ec8b5ccfca57e3dbee4683ee67372b2788023c2b (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-pr-me
+exit=1
+merge call reached: 0; 
+non-read gh calls refused by rig: 0; 
+Actions reads: 0; compare reads: 1
+guard events: merge-held-task:allow merge-landing-tree-tested:deny 

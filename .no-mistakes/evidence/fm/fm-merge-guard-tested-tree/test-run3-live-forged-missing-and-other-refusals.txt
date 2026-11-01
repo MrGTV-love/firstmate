@@ -1,0 +1,40 @@
+# Real PR reads through the rig (Actions job, run, artifact and check-run reads cached after their first real read; pr view, rollup, rules are always real). gh pr merge is blocked. Each case edits ONE real response to make the bad state. X0=b3528ab8db4ed48cb9d1f385f9daa3f20317d0f7 stacked tip (landing=tested). X1=7d59910481a8cda355741362040f440f0fb7eeca disjoint tip (landing 20720ec50aa1cc015de38a01e064fa305c2130cb).
+
+=== FORGED record: claims tested tree = disjoint landing tree, real base (recompute differs)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --squash
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/rig-task.check.sh
+note: tested-tree records unavailable (the tested-tree record for base ec8b5ccfca57e3dbee4683ee67372b2788023c2b does not match its merge); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/343
+  - head abb8fb21831ae0abe1d874031dc3873595191be6 lacks the current tip 7d59910481a8cda355741362040f440f0fb7eeca of base branch main (20 commits behind): it was built on main at 3948d62ffa86123d35baeb84746ed7639d948a02, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 7d59910481a8cda355741362040f440f0fb7eeca (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-pr-me
+exit=1
+merge call reached: 0; 
+non-read gh calls refused by rig: 0; 
+Actions reads: 46; compare reads: 1
+guard events: merge-held-task:allow merge-landing-tree-tested:deny 
+
+=== SPLIT records: CI run says base X1, compliance runs say real base (each self-consistent; trees differ)
+$ bin/fm-pr-merge.sh rig-task https://github.com/MrGTV-love/firstmate/pull/343 --squash
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/rig-task.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/343
+  - head abb8fb21831ae0abe1d874031dc3873595191be6 lacks the current tip 7d59910481a8cda355741362040f440f0fb7eeca of base branch main (20 commits behind): it was built on main at 3948d62ffa86123d35baeb84746ed7639d948a02, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 7d59910481a8cda355741362040f440f0fb7eeca (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BGN0JVBZ69X7N7T9AR9GW9/bin/fm-pr-me
+exit=1
+merge call reached: 0; 
+non-read gh calls refused by rig: 0; 
+Actions reads: 46; compare reads: 1
+guard events: merge-held-task:allow merge-landing-tree-tested:deny 

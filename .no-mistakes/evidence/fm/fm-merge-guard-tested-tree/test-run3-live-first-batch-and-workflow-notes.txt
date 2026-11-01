@@ -1,0 +1,40 @@
+# Copied from this session's tool output. Long lines are cut, as the session showed them.
+# Why a copy: the spaced rerun script overwrote the first-batch transcript file.
+# These three cases ran live in this run, with real gh reads. The rig blocked gh pr merge.
+
+=== MISSING record on an otherwise stacked tree: stays on ancestry
+note: tested-tree records unavailable (run 41300995657 attempt 1 has no single tested-tree record); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/343
+  - head abb8fb21831ae0abe1d874031dc3873595191be6 lacks the current tip b3528ab8db4ed48cb9d1f385f9daa3f20317d0f7 of base branch main (20 commits behind): it was built on main at 3948d62ffa86123d35baeb84746ed7639d948a02, so no check ran on the tree this merge would land
+exit=1
+merge call reached: 0;
+guard events: merge-held-task:allow merge-landing-tree-tested:deny
+
+=== HELD task on a stacked tree: still refused
+error: task rig-task is still held for the captain; nothing was merged
+exit=1
+merge call reached: 0;
+guard events: merge-held-task:deny
+
+=== REAL PR 346, no record, tip X1 it lacks: refused with ancestry text
+note: tested-tree records unavailable (run 41310882052 attempt 1 has no single tested-tree record); the ancestry rule applies
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/346
+  - head 0f07b896d9ac08562647d49ae59619445899f0a8 lacks the current tip 7d59910481a8cda355741362040f440f0fb7eeca of base branch main (3 commits behind): it was built on main at 3948d62ffa86123d35baeb84746ed7639d948a02, so no check ran on the tree this merge would land
+exit=1
+merge call reached: 0;
+guard events: merge-held-task:allow merge-landing-tree-tested:deny
+
+# Workflow parse, base ec8b5ccfc against this change (python yaml, semantic compare):
+.github/workflows/ci.yml top perms same: True {'contents': 'read'}
+ triggers same: True ['push', 'pull_request']
+ job lint perms same True name same True if same True new steps ['Record tested merge tree', 'Upload tested merge tree']
+ all other ci.yml jobs: perms same, name same, if same, no new steps
+ jobs same set: True
+.github/workflows/no-mistakes-required.yml top perms same: True {'contents': 'read', 'pull-requests': 'read'}
+ triggers same: True ['pull_request']
+ job check perms same True name same True if same True new steps ['actions/checkout@v6', 'Record tested merge tree', 'Upload tested merge tree']
+ jobs same set: True
+
+# Registry read with jq:
+merge-checks-green active; merge-required-reported active; merge-landing-tree-tested active; merge-auto-not-armed active
+merge-green-head: 1 entry at base, 0 entries now
