@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Slow scheduling must not exhaust a cumulative Slack request budget.
 # Fake HTTP responses and a local socketpair exercise the real shell check.
+# Drives bin/fm-slack-check.sh, bin/fm_slack_watch.py and bin/fm_slack.py through tests/fm_slack_deadline_test.py.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

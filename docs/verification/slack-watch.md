@@ -41,7 +41,8 @@ This separate regression drives the real shell check and transport with fake HTT
 It verifies four mirrored cards remain four on repeat, real failures report once per episode, and recovery permits a new failure report.
 It does not contact Slack or require credentials.
 
-The 2026-11-01 UTC registered-shim run with Python 3.13.6 on macOS arm64 ran the test as of implementation commit `9c4ac32b`, before its hang-case check moved from total check time to each silent read.
+The 2026-11-01 UTC registered-shim run with Python 3.13.6 on macOS arm64 ran the test as of implementation commit `fbb999a6`, before its hang-case check moved from total check time to each silent read.
+That run was recorded as `9c4ac32b` before the rebase, and `tests/fm_slack_deadline_test.py`, `tests/fm-slack-deadline.test.sh`, and `bin/fm_slack.py` have identical bytes in both commits.
 It printed `ok - slow standing check completes after 44.270s; four cards remain four on repeat`, passed the hang case with one report per failure episode, and ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=198406`.
 The fake successful requests each completed within the retained ten-second timeout; the two recorded silent socket reads ended after 10.006 and 10.002 seconds, each well below the watcher's 30-second no-progress bound.
 
