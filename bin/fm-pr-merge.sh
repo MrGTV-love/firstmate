@@ -2094,7 +2094,9 @@ case "$PROVIDER" in
         merge_state=$(gh pr view "$URL" --json mergeStateStatus 2>/dev/null \
           | jq -er '.mergeStateStatus | select(type == "string" and . != "")' 2>/dev/null) || merge_state=
         case "$merge_state" in
-          CLEAN|HAS_HOOKS|UNSTABLE) ;;
+          CLEAN|HAS_HOOKS|UNSTABLE)
+            "$SCRIPT_DIR/fm-guard-event.sh" merge-auto-not-armed allow --cleared-by retry 2>/dev/null
+            ;;
           *)
             "$SCRIPT_DIR/fm-guard-event.sh" merge-auto-not-armed deny --source-ok "$([ -n "$merge_state" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
             printf 'error: refusing to merge %s: --auto on base branch %s, which has no proven merge queue, needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is %s, so GitHub would arm auto-merge instead, and that can land later on a base tip no check ran with; clear what holds the pull request, then re-run this merge: %s %s %s\n' \
@@ -2107,7 +2109,6 @@ case "$PROVIDER" in
     "$SCRIPT_DIR/fm-guard-event.sh" merge-checks-green allow --cleared-by retry 2>/dev/null
     "$SCRIPT_DIR/fm-guard-event.sh" merge-required-reported allow --cleared-by retry 2>/dev/null
     "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested allow --cleared-by retry 2>/dev/null
-    "$SCRIPT_DIR/fm-guard-event.sh" merge-auto-not-armed allow --cleared-by retry 2>/dev/null
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?

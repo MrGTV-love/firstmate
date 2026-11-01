@@ -1671,6 +1671,8 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     "guard-events: a green merge must append one merge-landing-tree-tested allow"
   assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-held-task allow)" \
     "guard-events: a green merge must append one merge-held-task allow"
+  assert_equals 0 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-auto-not-armed allow)" \
+    "guard-events: a merge without --auto must not record a pass for the --auto rule it never ran"
   assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-landing-tree-tested" and .decision == "allow")][0].cleared_by' \
     "$case_dir/allowed-guard-events.jsonl")" \
     "guard-events: the allow did not record cleared-by retry"
@@ -2091,10 +2093,13 @@ test_off_queue_auto_merges_only_where_github_merges_at_once() {
   case_dir=$(make_case github-off-queue-auto-clean)
   add_gh_mocks "$case_dir" "$head"
 
-  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
-    --attended-override -- --auto --squash \
-    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+      --attended-override -- --auto --squash \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "off-queue-auto-clean: --auto on a CLEAN pull request must merge"$'\n'"$(cat "$case_dir/stderr")"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-auto-not-armed allow)" \
+    "off-queue-auto-clean: the passed --auto check did not record one merge-auto-not-armed allow"
   assert_logged_gh_merge "$case_dir" 188 example/repo --auto --squash
   assert_no_grep '--disable-auto' "$case_dir/gh.log" \
     "off-queue-auto-clean: a merged pull request was disarmed"
