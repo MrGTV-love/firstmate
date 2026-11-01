@@ -26,6 +26,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 
 DEFAULT_DIRS = ('bin', '.claude', '.codex', '.cursor', '.dsh', '.grok', '.omp', '.opencode', '.pi')
 SKIP_DIRS = {'tests', 'test', 'node_modules', '__pycache__', '.git', 'fixtures'}
@@ -301,7 +302,8 @@ def embedded_kind(opener_line, tag):
     return None
 
 
-def scan_file(root, rel, helpers, hook_names):
+def scan_file(root, rel, helpers, hook_names, heredocs=None):
+    """Sites of one file; each closed heredoc is appended to heredocs as (opener, terminator, body kind)."""
     path = os.path.join(root, rel)
     kind = kind_of(rel)
     if kind == 'other':
@@ -310,6 +312,7 @@ def scan_file(root, rel, helpers, hook_names):
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
     heredoc = None
+    heredoc_opener = None
     heredoc_stderr = False
     body_kind = None
     triple = None
@@ -321,6 +324,8 @@ def scan_file(root, rel, helpers, hook_names):
         eff = kind
         if heredoc is not None:
             if stripped == heredoc:
+                if heredocs is not None:
+                    heredocs.append((heredoc_opener, number, body_kind))
                 heredoc = None
                 body_kind = None
                 triple = None
@@ -372,6 +377,7 @@ def scan_file(root, rel, helpers, hook_names):
             # An opener with no terminator below it is a shift or an awk string, not a heredoc.
             if opener and any(row.strip() == opener.group(2) for row in lines[number:]):
                 heredoc = opener.group(2)
+                heredoc_opener = number
                 heredoc_stderr = '>&2' in line
                 body_kind = embedded_kind(line, heredoc)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
@@ -421,6 +427,14 @@ def diagnostic_statement(lines, index):
     return text, start, index + 1
 
 
+PY_MESSAGE = (ast.Expr, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Return, ast.Raise)
+SH_PREFIX = ('then', 'else', 'do', '!', 'export', 'local', 'if', 'elif', 'while', 'until')
+SH_ASSIGNMENT = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=')
+EMITTER = re.compile(r'(?:echo|printf|die|fail|log|cat|fm_refuse|raise|throw|return)\b|print\(|sys\.(?:exit|stderr\.write)\('
+                     r'|console\.\w+\(|process\.std(?:err|out)\.write\(')
+JS_CALLEE = re.compile(r'([A-Za-z_$][\w$.]*)\s*$')
+
+
 def literal_message(value):
     if isinstance(value, ast.Constant) and isinstance(value.value, str):
         return value.value
@@ -428,51 +442,146 @@ def literal_message(value):
         return ''.join(part.value for part in value.values if isinstance(part, ast.Constant))
     if isinstance(value, ast.BinOp) and isinstance(value.op, ast.Add):
         return literal_message(value.left) + literal_message(value.right)
+    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.Mod):
+        return literal_message(value.left)
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute) and value.func.attr == 'format':
+        return literal_message(value.func.value)
+    if isinstance(value, (ast.Tuple, ast.List)):
+        return ' '.join(filter(None, (literal_message(item) for item in value.elts)))
+    if isinstance(value, ast.Dict):
+        return ' '.join(filter(None, (literal_message(item) for item in value.values)))
     return ''
 
 
+def python_arguments(nodes):
+    """A call's positional literals, or a bare, returned or assigned literal, per statement."""
+    for node in nodes:
+        value = node.exc if isinstance(node, ast.Raise) else getattr(node, 'value', None)
+        if isinstance(value, ast.Call) and not literal_message(value):
+            func = value.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, 'attr', None)
+            yield name, ' '.join(filter(None, (literal_message(arg) for arg in value.args)))  # file= is not text
+        elif value is not None and literal_message(value):
+            yield None, literal_message(value)
+
+
+def js_string(text, index, quote):
+    """The value of the string whose quote precedes index, and the index after its close."""
+    value = []
+    while index < len(text) and text[index] not in (quote, '\n'):
+        if text[index] == '\\' and index + 1 < len(text):
+            index += 1
+        value.append(text[index])
+        index += 1
+    return ''.join(value), index + 1
+
+
+def js_template(text, index):
+    """The literal text of the template whose backtick precedes index, without its interpolations."""
+    value = []
+    while index < len(text) and text[index] != '`':
+        if text.startswith('${', index):
+            index = js_skip_interpolation(text, index + 2)
+            continue
+        if text[index] == '\\' and index + 1 < len(text):
+            index += 1
+        value.append(text[index])
+        index += 1
+    return ''.join(value), index + 1
+
+
+def js_skip_interpolation(text, index):
+    depth = 0
+    while index < len(text):
+        char = text[index]
+        if char in '"\'':
+            index = js_string(text, index + 1, char)[1]
+            continue
+        if char == '`':
+            index = js_template(text, index + 1)[1]
+            continue
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            if depth == 0:
+                return index + 1
+            depth -= 1
+        index += 1
+    return index
+
+
+def js_arguments(text):
+    """(callee, literal text) per argument of each JavaScript bracket group, and where the scan stopped.
+
+    Concatenated literals in one argument join; an interpolation, comment or nested group adds nothing
+    to its parent, and a call is reported even when its argument holds no literal. The statement ends at a newline outside every string, parenthesis and bracket.
+    """
+    out, stack, index = [], [[None, [], '']], 0
+
+    def flush(group):
+        if group[0] or ''.join(group[1]).strip():
+            out.append((group[0], ''.join(group[1])))
+        group[1] = []
+
+    while index < len(text):
+        char = text[index]
+        if char in '"\'`':
+            value, index = js_template(text, index + 1) if char == '`' else js_string(text, index + 1, char)
+            stack[-1][1].append(value)
+            continue
+        if text.startswith(('//', '/*'), index):
+            end = text.find('\n' if text[index + 1] == '/' else '*/', index + 2)
+            index = len(text) if end < 0 else (end if text[index + 1] == '/' else end + 2)
+            continue
+        if char in '([{':
+            callee = JS_CALLEE.search(text[max(0, index - 200):index]) if char == '(' else None
+            stack.append([callee.group(1) if callee else None, [], char])
+        elif char in ')]}':
+            if len(stack) > 1:
+                flush(stack.pop())
+        elif char in ',;':
+            flush(stack[-1])
+        elif char == '\n' and not any(group[2] in ('(', '[') for group in stack):
+            break
+        index += 1
+    while stack:
+        flush(stack.pop())
+    return out, index
+
+
 def diagnostic_arguments(statement):
-    """Literal output arguments only, excluding comments and neighboring commands."""
+    """Literal output arguments only, excluding comments and test operands."""
     try:
         program = ast.parse(statement)
     except SyntaxError:
         program = None
     if program is not None:
-        for node in program.body:
-            value = node.value if isinstance(node, (ast.Expr, ast.Assign, ast.AnnAssign)) else None
-            if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) \
-                    and (value.func.id in ('print', 'die') or is_helper_name(value.func.id)):
-                name = value.func.id
-                values = value.args  # file= and other keyword arguments are not message text
-            elif isinstance(value, (ast.Constant, ast.JoinedStr)):
-                name, values = None, [value]
-            else:
-                continue
-            yield name, ' '.join(literal_message(value) for value in values)
+        yield from python_arguments(node for node in ast.walk(program) if isinstance(node, PY_MESSAGE))
         return
     remainder = statement
     while remainder:
         words, remainder = command_words(remainder, with_remainder=True)
-        while words and words[0] in ('then', 'else', 'do', '!', 'export', 'local'):
+        while words and (words[0] in SH_PREFIX or (len(words) > 1 and SH_ASSIGNMENT.match(words[0]))):
             words = words[1:]
-        if not words:
+        if not words or words[0] in ('[', '[[', 'test'):
             continue
         if words[0] == 'fm_refuse':
-            # The shared formatter owns this argument's printed envelope.
-            text = 'completing-command: ' + words[5] if len(words) >= 6 and words[4] == 'machine' else ''
-            yield words[0], text
-        elif words[0] in ('echo', 'printf', 'die', 'return') or is_helper_name(words[0]):
-            yield words[0], ' '.join(words[1:])
-        elif len(words) == 1 and re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', words[0]):
+            # The shared formatter prints the missing text and owns the machine command's envelope.
+            yield words[0], words[3] if len(words) > 3 else ''
+            if len(words) >= 6 and words[4] == 'machine':
+                yield words[0], 'completing-command: ' + words[5]
+        elif len(words) == 1 and SH_ASSIGNMENT.match(words[0]):
             yield None, words[0].split('=', 1)[1]
+        else:
+            yield words[0], ' '.join(words[1:])
 
 
-def statement_has_remedy(statement, root):
-    # A second command cannot lend its footer to a refusal that lacks one.
+def statement_has_remedy(arguments, root):
+    # A second command cannot lend its footer to a refusal, or a refusal-helper call, that lacks one.
     # This syntactic lint still leaves remedy safety/sufficiency to fixtures and review.
-    arguments = [text for _, text in diagnostic_arguments(statement)]
-    refusals = [text for text in arguments if MARKER.search(text) or WORD.search(text)]
-    for text in refusals or arguments:
+    refusals = [text for _, text in arguments if MARKER.search(text) or WORD.search(text)]
+    calls = [text for name, text in arguments if name and is_helper_name(name)]
+    for text in refusals or calls or [text for _, text in arguments]:
         marker = re.search(r'\b(?:Remedy|completing-command):', text)
         if marker and remedy_has_command(text[marker.end():], root):
             return True
@@ -489,8 +598,44 @@ def remedy_has_command(remedy, root):
     return bool(re.search(REPO_BIN + r'[A-Za-z0-9_.-]+|\bgit\s+|\bherdr\s+|\benv\s+-u\s+', remedy))
 
 
-def site_remedies(root, lines, discovered, helpers):
+def site_remedies(root, rel, lines, discovered, helpers, heredocs):
     """Retain diagnostic/helper spans even when their remedy has been removed."""
+    kind = kind_of(rel) if kind_of(rel) != 'other' else (shebang_kind(os.path.join(root, rel)) or 'other')
+    python = {}
+
+    def python_statements(first, last):
+        if first not in python:
+            try:
+                tree = ast.parse(textwrap.dedent('\n'.join(lines[first - 1:last])))
+            except (SyntaxError, ValueError):
+                tree = None
+            python[first] = [] if tree is None else [
+                (node.lineno + first - 1, node.end_lineno + first - 1, node)
+                for node in ast.walk(tree) if isinstance(node, PY_MESSAGE)]
+        return python[first]
+
+    def arguments_at(index):
+        """The emitted literal arguments of the statement holding a line, and its inclusive span."""
+        number, region, first, last = index + 1, kind, 1, len(lines)
+        for opener, terminator, body_kind in heredocs:
+            if body_kind is None and opener <= number < terminator:
+                named = [name for name, _ in diagnostic_arguments(lines[opener - 1]) if name]
+                return [(named[0] if named else None, '\n'.join(lines[opener:terminator - 1]))], opener, terminator
+            if opener < number < terminator:
+                region, first, last = body_kind, opener + 1, terminator - 1
+                break
+        if region == 'py':
+            covering = [entry for entry in python_statements(first, last) if entry[0] <= number <= entry[1]]
+            if covering:
+                return (list(python_arguments(node for _, _, node in covering)),
+                        min(entry[0] for entry in covering), max(entry[1] for entry in covering))
+        if region == 'js':
+            text = '\n'.join(lines[index:last])
+            arguments, stop = js_arguments(text)
+            return arguments, number, number + text[:stop].count('\n')
+        statement, start, end = diagnostic_statement(lines, index)
+        return list(diagnostic_arguments(statement)), start, end
+
     helper_remedies, helper_spans = set(), {}
     names = set().union(*helpers.values())
     for index, line in enumerate(lines):
@@ -500,6 +645,9 @@ def site_remedies(root, lines, discovered, helpers):
         name = next((group for group in definition.groups() if group), '')
         if name not in names:
             continue
+        arrow = line[definition.end():].partition('=>')[2].strip() if definition.re is JS_DEF else ''
+        if arrow and not arrow.startswith('{') and statement_has_remedy(js_arguments(arrow)[0], root):
+            helper_remedies.add(name)  # a one-line arrow helper returns its expression
         indent = len(line) - len(line.lstrip())
         end = index + 1
         for body_index in range(index + 1, len(lines)):
@@ -507,16 +655,14 @@ def site_remedies(root, lines, discovered, helpers):
             if body.strip() and len(body) - len(body.lstrip()) <= indent:
                 break
             end = body_index + 1
-            if body.lstrip().startswith(('echo ', 'printf ', 'print(')):
-                statement, _, _ = diagnostic_statement(lines, body_index)
-                if statement_has_remedy(statement, root):
-                    helper_remedies.add(name)
+            if EMITTER.match(body.lstrip()) and statement_has_remedy(arguments_at(body_index)[0], root):
+                helper_remedies.add(name)
         helper_spans[name] = [index + 1, end]
     result = {}
     for number, sig, _ in discovered:
-        statement, start, end = diagnostic_statement(lines, number - 1)
-        called = {name for name, _ in diagnostic_arguments(statement)}
-        direct = statement_has_remedy(statement, root)
+        arguments, start, end = arguments_at(number - 1)
+        called = {name for name, _ in arguments}
+        direct = statement_has_remedy(arguments, root)
         call = bool(called.intersection(helper_remedies))
         spans = [[start, end]] + [helper_spans[name] for name in sorted(called - {None}) if name in helper_spans]
         result[number] = (direct or ('C' in sig.split(',') and call), spans)
@@ -644,8 +790,9 @@ def main(argv):
     sites = []
     for rel in files:
         seen = {}
-        discovered = scan_file(root, rel, helpers, hook_names)
-        remedies = site_remedies(root, read_lines(os.path.join(root, rel)), discovered, helpers)
+        heredocs = []
+        discovered = scan_file(root, rel, helpers, hook_names, heredocs)
+        remedies = site_remedies(root, rel, read_lines(os.path.join(root, rel)), discovered, helpers, heredocs)
         for number, sig, text in discovered:
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
                           'text': text[:200], 'text_full': text, 'entry': None, 'touched': False,
