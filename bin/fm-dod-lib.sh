@@ -854,6 +854,9 @@ fm_brief_verification_plan() {  # <brief>
   printf '\n## Out-of-scope list%s\n' "$context"
   if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$scope"
+  elif fm_brief_heading_parse - "### Out of scope" present <<<"$(fm_brief_heading_body "$brief" "# Task")"; then
+    # A blank exclusion heading states no exclusions, the same as None.
+    printf "Out-of-scope list: stated: none (the \`### Out of scope\` subsection is blank).\n"
   else
     printf "Out-of-scope list: no recognized \`### Out of scope\` subsection or column-0 \`Out of scope:\` paragraph was found in this brief; check the Firstmate spec for inline exclusions.\n"
   fi

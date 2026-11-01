@@ -820,7 +820,7 @@ If your findings reveal work that should ship (e.g. you reproduced a bug and the
 $DOD_TASK
 EOF
 append_brief_include
-echo "scaffolded: $BRIEF (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
+echo "scaffolded: $BRIEF (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})"
 exit 0
 fi
 
@@ -909,9 +909,9 @@ $DOD_TASK
 EOF
 append_brief_include
 if [ "$FORGE" = none ]; then
-  echo "scaffolded: $BRIEF (ship, mode=$MODE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})"
 elif [ "$FORGE" = gerrit ]; then
-  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE shape=$SHAPE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE shape=$SHAPE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})"
 else
-  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)"
+  echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})"
 fi
