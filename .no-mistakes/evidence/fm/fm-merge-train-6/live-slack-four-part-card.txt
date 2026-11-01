@@ -1,0 +1,35 @@
+### hold reason given (labels deliberately out of order; one invalid Evidence value):
+Alternatives: Serial trains - slower catch-up.
+Recommendation: Run disjoint trains in parallel - only the final merge is serial.
+Brief: Five PRs wait behind the stale-base guard.
+Decision sought: Run train 7 in parallel with train 6?
+Evidence: relative/not-a-pointer.md
+Evidence: /tmp/train-evidence.md
+Option 1: Parallel (par) - start train 7 now
+Option 2: Serial (ser) - wait for train 6
+
+### real bin/fm-slack-mirror.sh --replay output:
+rc=0
+
+### card text posted to Slack replay for train-demo:
+Task: train-demo
+Decision sought: Run train 7 in parallel with train 6?
+Brief description of issue: Five PRs wait behind the stale-base guard.
+Recommendation and key reasons: Run disjoint trains in parallel - only the final merge is serial.
+Alternatives considered: Serial trains - slower catch-up.
+Evidence: /tmp/train-evidence.md
+Evidence: relative/not-a-pointer.md
+Option 1: Parallel (par) - start train 7 now
+Option 2: Serial (ser) - wait for train 6
+Type your answer in this thread.
+
+### sentinel check:
+0
+body sentinel absent from all Slack calls
+
+### second mirror run (refresh in place; threads for train-demo):
+rc=0
+1
+
+### note
+Option lines inside a hold reason are plain lines on four-part cards and create no answer binding (docs/configuration.md four-part contract), so the footer is the no-options answer line. The invalid relative Evidence value shows as a plain line; only /tmp/train-evidence.md is the evidence pointer.

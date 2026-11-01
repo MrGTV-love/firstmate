@@ -1,0 +1,34 @@
+lab FM_HOME=<tmp>/fm-lab.RoV0QO (marked disposable lab home)
+### 1. Real macOS host facts: sample
+{"schema": "fm-memory-reading.v1", "source": "sample", "platform": "darwin", "fixture": null, "errors": [], "pressure_level": 1, "admission": "admit", "reasons": []}
+rc=0
+### 2. Real macOS host facts: admit
+{"schema": "fm-memory-reading.v1", "source": "admit", "platform": "darwin", "fixture": null, "errors": [], "pressure_level": 1, "admission": "admit", "reasons": []}
+rc=0
+### 3. Fixture pressure 1 (normal): admit
+{"schema": "fm-memory-reading.v1", "source": "admit", "platform": "darwin", "fixture": "<tmp>/fm-memfx.4QefPq", "errors": [], "pressure_level": 1, "admission": "admit", "reasons": []}
+rc=0
+### 4. Fixture pressure 2 (warn): admit must refuse 75
+{"schema": "fm-memory-reading.v1", "source": "admit", "platform": "darwin", "fixture": "<tmp>/fm-memfx.4QefPq", "errors": [], "pressure_level": 2, "admission": "defer", "reasons": ["native memory pressure level 2 (2 or higher defers)"]}
+rc=75
+### 5. Fixture pressure 2: run -- touch marker must NOT run the new work
+{"schema": "fm-memory-reading.v1", "source": "admit", "platform": "darwin", "fixture": "<tmp>/fm-memfx.4QefPq", "errors": [], "pressure_level": 2, "admission": "defer", "reasons": ["native memory pressure level 2 (2 or higher defers)"]}
+rc=75
+marker absent: new work did not start
+### 6. Fixture pressure 1: run -- touch marker runs
+rc=0
+marker present: new work started
+### 7. Adversarial: vm_stat fact unreadable -> admit refuses (fail closed)
+{"schema": "fm-memory-reading.v1", "source": "admit", "platform": "darwin", "fixture": "<tmp>/fm-memfx.4QefPq", "errors": ["memory: [Errno 2] No such file or directory: '<tmp>/fm-memfx.4QefPq/vm_stat'"], "pressure_level": 1, "admission": "defer", "reasons": ["memory: [Errno 2] No such file or directory: '<tmp>/fm-memfx.4QefPq/vm_stat'"]}
+rc=75
+### readings log in lab state
+       7
+{'admission': 'admit', 'fixture': None, 'errors': []}
+{'admission': 'admit', 'fixture': None, 'errors': []}
+{'admission': 'admit', 'fixture': '<tmp>/fm-memfx.4QefPq', 'errors': []}
+{'admission': 'defer', 'fixture': '<tmp>/fm-memfx.4QefPq', 'errors': []}
+{'admission': 'defer', 'fixture': '<tmp>/fm-memfx.4QefPq', 'errors': []}
+{'admission': 'admit', 'fixture': '<tmp>/fm-memfx.4QefPq', 'errors': []}
+{'admission': 'defer', 'fixture': '<tmp>/fm-memfx.4QefPq', 'errors': ["memory: [Errno 2] No such file or directory: '<tmp>/fm-memfx.4QefPq/vm_stat'"]}
+
+(Redacted: real-host readings keep only the admission fields; host name, process lists and run names were removed before publishing.)

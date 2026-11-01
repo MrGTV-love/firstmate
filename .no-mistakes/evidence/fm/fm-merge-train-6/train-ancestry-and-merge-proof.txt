@@ -1,0 +1,49 @@
+## Ancestry
+ancestor-of-HEAD(6a778c4a9) ok: a32b67fbafa93cc3778ee9507d1b0e06cb4675f0
+ancestor-of-HEAD(6a778c4a9) ok: 3f3534d25850d9ae1dce1e362cd751d5b03a09cd
+ancestor-of-HEAD(6a778c4a9) ok: 3948d62ffa86123d35baeb84746ed7639d948a02
+## Merge trees vs fresh automatic merge
+7ec999984 p1=3c750632e88113254e14d012ea6240e66ecde1df p2=a32b67fbafa93cc3778ee9507d1b0e06cb4675f0 tree=98ae5b8529903381713b6b1725a03a83723fad1d merge-tree=98ae5b8529903381713b6b1725a03a83723fad1d MATCH
+dc5938296 p1=2981cadf25c69915bfa74cd9006e439dcf19a923 p2=3948d62ffa86123d35baeb84746ed7639d948a02 tree=9a3500540e7f4e15205bee9b2345d2bbaa1fb7d3 merge-tree=9a3500540e7f4e15205bee9b2345d2bbaa1fb7d3 MATCH
+6a778c4a9 p1=dc59382967a8aa9e628fb4656d4dc32c404a5959 p2=3f3534d25850d9ae1dce1e362cd751d5b03a09cd tree=b1fb37863a365abce9120b98e6d10100f9b934eb merge-tree=b1fb37863a365abce9120b98e6d10100f9b934eb MATCH
+## .gitignore
+.gitignore at HEAD == origin/main 3948d62f
+## Train-only commits (Main 1972 corrections) between merge 7ec999984 and HEAD first-parent
+2981cadf2 no-mistakes(document): Add host memory state files to state inventory
+bba5e1d1d no-mistakes(test): Use new wait-helper form in memory-alarm watcher test
+ docs/configuration.md                  | 1 +
+ tests/fm-watch-typesafe-health.test.sh | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+## Component code untouched: diff of component-head files vs HEAD limited to PR 328 files
+(empty above = PR 328 files identical to its head)
+## PR 292 component files: diff from component head a32b67fba to HEAD
+ bin/fm-spawn.sh                        | 501 +++++++++++++++++++++++++++++++--
+ bin/fm-watch.sh                        | 283 +++++++++++++++----
+ docs/guards/registry.json              | 201 ++++++++++++-
+ tests/fm-project-capacity.test.sh      |  11 +
+ tests/fm-watch-typesafe-health.test.sh |  13 +-
+ tests/lib.sh                           | 382 ++++++++++++++++++++++---
+ 6 files changed, 1276 insertions(+), 115 deletions(-)
+## Attribution: PR 292 fork point on main = 2492dddd707ac7ac06aa3ad42312b4839e1755b6
+PR 292 own change = diff 2492dddd707ac7ac06aa3ad42312b4839e1755b6..a32b67fba; the train should add exactly that change on top of main 3948d62f plus train corrections.
+Check: diff of (main 3948d62f + PR 292 change) vs HEAD, PR 292 files only:
+ tests/fm-watch-typesafe-health.test.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+(only the Main 1972 correction tests/fm-watch-typesafe-health.test.sh should appear above)
+diff --git a/tests/fm-watch-typesafe-health.test.sh b/tests/fm-watch-typesafe-health.test.sh
+index 6a785974e..4b7e41aec 100755
+--- a/tests/fm-watch-typesafe-health.test.sh
++++ b/tests/fm-watch-typesafe-health.test.sh
+@@ -146,7 +146,7 @@ test_memory_observation_wakes_with_the_process_identity() {
+   start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
+     FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+   pid=$!
+-  fm_test_wait_until 100 grep -q 'xprotectd PID 101' "$out" || {
++  fm_test_wait_until --while-alive "$pid" --progress-file "$out" -- grep -q 'xprotectd PID 101' "$out" || {
+     stop_owned_watcher "$pid"
+     fail "the watcher failed to present the identifying memory alarm: $(cat "$out") $(cat "$out.err")"
+   }
+## Remote heads (read-only ls-remote)
+3948d62ffa86123d35baeb84746ed7639d948a02	refs/heads/main
+a32b67fbafa93cc3778ee9507d1b0e06cb4675f0	refs/pull/292/head
+3f3534d25850d9ae1dce1e362cd751d5b03a09cd	refs/pull/328/head

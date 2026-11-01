@@ -1,0 +1,12 @@
+ok - a stale model without a pin is refused and the newer model is named
+ok - a captain pin naming the stale model admits the launch
+ok - a pin naming another model cannot admit a stale launch
+ok - a current model launches without a pin and without a stale warning
+ok - a batch forwards its one captain pin to every pair
+ok - a relaunch of a captain-pinned stale task is not refused and keeps its pin marker
+ok - a relaunch of a model that went stale after launch is not refused and records the finding
+ok - a relaunch onto a different stale model is still refused and leaves the record unchanged
+ok - a secondmate respawn on its recorded stale model is not refused and keeps its pin marker
+ok - a secondmate respawn onto a different stale model is still refused and leaves the record unchanged
+ok - native memory pressure defers a new secondmate but never its recovery respawn
+rc=0
