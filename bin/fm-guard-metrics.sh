@@ -208,7 +208,7 @@ judged() {  # <id> <rows-json-array> <harm>
   [ "${v##* }" != cut ] && return 0
   printf '%s' "$2" | jq -e --arg after "$after" --argjson n "$MIN_OPPS" '
     [.[] | select((.ts // "") <= $after)] | sort_by(.ts) | .[-$n:]
-    | all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1
+    | any(.[]; .decision == "deny" or .decision == "warn") | not' >/dev/null 2>&1
 }
 
 guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''

@@ -185,6 +185,23 @@ done
 dated_rows "$RATE" 2026-06-11 1 deny
 got=$(undecided_for "$RATE" "$TMP/rejudged2.json")
 [ "$got" = gquiet ] || fail "a new deny after a keep must re-nominate, got '$got'"
+decided_with "keep 2026-06-11: judged the deny of that day" "$TMP/same-day.json"
+got=$(undecided_for "$RATE" "$TMP/same-day.json")
+[ -z "$got" ] || fail "a deny on the same date as a keep belongs to the judged window, got '$got'"
+dated_rows "$RATE" 2026-06-12 1 deny
+got=$(undecided_for "$RATE" "$TMP/same-day.json")
+[ "$got" = gquiet ] || fail "a deny on a later date than a keep must re-nominate, got '$got'"
+
+ERRWIN="$TMP/error-window.jsonl"
+: >"$ERRWIN"
+for k in deny allow deny allow; do
+  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$ERRWIN"
+done
+dated_rows "$ERRWIN" 2026-01-10 29
+dated_rows "$ERRWIN" 2026-01-10 1 error
+dated_rows "$ERRWIN" 2026-03-10 30
+got=$(undecided_for "$ERRWIN" "$TMP/dated-keep.json")
+[ -z "$got" ] || fail "an error in the judged window is not a fire, so a quiet window after it must not re-nominate, got '$got'"
 
 decided_with "keep: no date recorded" "$TMP/undated.json"
 got=$(undecided_for "$ZERO" "$TMP/undated.json")
