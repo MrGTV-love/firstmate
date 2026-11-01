@@ -28,7 +28,10 @@ before any candidate command, then executes each command itself in a fresh
 exact-commit export and its own process group. It captures output through its
 own pipe and the exit code from its own wait, never from a file a command wrote,
 ends the command's process group before continuing, and creates the evidence
-directory only after the last command. Candidate tests are candidate code: the
+directory only after the last command. Draining the output pipe once that group
+has ended takes milliseconds, so a pipe still held open 5 seconds later by a
+process that left the group fails the run by name instead of waiting for the
+job timeout or recording incomplete output. Candidate tests are candidate code: the
 weakened-test detector and the independent reviewer cover their quality. The
 commands share the recorder's runner account, so a command that deliberately
 escapes its process group could still reach that account's files; a separate
@@ -101,6 +104,7 @@ def digest(data):
 
 
 BIN = Path(__file__).resolve().parent
+DRAIN_SECONDS = 5
 SEMANTICS = "unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome"
 
 
@@ -188,14 +192,18 @@ def execute(command, cwd, sha):
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                start_new_session=True)
     captured = []
-    reader = threading.Thread(target=lambda: captured.append(process.stdout.read()))
+    reader = threading.Thread(target=lambda: captured.append(process.stdout.read()), daemon=True)
     reader.start()
     code = process.wait()
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
-    reader.join()
+    reader.join(DRAIN_SECONDS)
+    if reader.is_alive():
+        raise CheckError(f"recorder output pipe still held open {DRAIN_SECONDS}s after the command and its "
+                         "process group ended: a process that left the group kept its stdout, so the "
+                         "recorded output would be incomplete")
     process.stdout.close()
     print(f"exit: {code}", flush=True)
     return code, f"command: {command}\ncommit: {sha}\n".encode() + b"".join(captured) + f"\nexit: {code}\n".encode()

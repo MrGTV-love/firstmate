@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -122,13 +123,36 @@ print('ok - exact-head gate runs and overlaid new regression fails on base, pass
 manifest, _ = run('nonzero', criteria(command='exit 7'), 1)
 assert manifest['items'][0]['exit'] == 7 and manifest['passed'] is False
 # The recorder's own wait supplies the exit, whatever the command prints, and a
-# command's background writer ends with it before any evidence is written.
+# background writer in the command's process group ends with it. Its target
+# directory already exists, so only that kill keeps the write from landing.
 boundary = temp / 'recorder-boundary'
-manifest, _ = run('recorder-boundary', criteria(command=f"(sleep 3; printf forged > {boundary / 'gate-C1.log'}) & printf 'exit: 0\\n'; exit 7"), 1)
+escaped = temp / 'escaped-writer'
+manifest, _ = run('recorder-boundary', criteria(command=f"(exec >/dev/null 2>&1; sleep 2; printf forged > {escaped}) & printf 'exit: 0\\n'; exit 7"), 1)
 assert manifest['items'][0]['exit'] == 7 and manifest['passed'] is False
 time.sleep(4)
+assert not escaped.exists(), 'a background writer outlived its command'
 assert hashlib.sha256((boundary / 'gate-C1.log').read_bytes()).hexdigest() == manifest['items'][0]['sha256']
 assert (boundary / 'gate-C1.log').read_text().endswith('\nexit: 7\n')
+print('ok - the recorder records its own exit and ends the command group before a background writer lands')
+
+# A process that leaves the group but keeps the inherited stdout open fails the
+# run by name within the drain bound, never by waiting for the job timeout.
+holder = temp / 'pipe-holder.pid'
+dod.write_text(criteria(command=f"python3 -c \"import os,sys; os.setsid(); open(sys.argv[1],'w').write(str(os.getpid())); os.execvp('sleep',['sleep','30'])\" {holder} & while [ ! -s {holder} ]; do sleep 0.05; done; exit 0"))
+started = time.monotonic()
+try:
+    held = call(sys.executable, checker, 'run', '--dod', dod, '--repo', repo, '--base', base,
+                '--head', head, '--output', temp / 'pipe-held', expected=1)
+    elapsed = time.monotonic() - started
+finally:
+    if holder.exists():
+        try:
+            os.kill(int(holder.read_text()), signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+assert 'recorder output pipe still held open' in held and elapsed < 20, (held, elapsed)
+assert not (temp / 'pipe-held').exists()
+print('ok - an output pipe held open outside the command group fails the run by name within the drain bound')
 manifest, _ = run('pipefail', criteria(command='false | true'), 1)
 assert manifest['items'][0]['exit'] != 0
 print('ok - nonzero commands and failed pipeline components make the check fail')
