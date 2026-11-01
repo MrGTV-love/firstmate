@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Behavioral observer regressions with labeled local process/quota inputs only."""
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -157,7 +158,7 @@ wait
         db.execute("CREATE TABLE unrelated(value)")
         db.commit()
         db.close()
-        self.assertNotEqual(self.cli("start", check=False).returncode, 0)
+        self.assertEqual(self.cli("start", check=False).returncode, 1)
         self.assertIn("operation unavailable", (root / "owner.log").read_text())
         self.assertEqual(json.loads(self.cli("status").stdout)["state"], "stopped")
 
@@ -181,13 +182,53 @@ wait
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(4)]
         try:
             replies = [(start.communicate(), start.returncode) for start in starts]
-            self.assertEqual([code for _, code in replies], [0, 0, 0, 0], replies)
+            codes = [code for _, code in replies]
+            self.assertIn(0, codes, replies)
+            self.assertLessEqual(set(codes), {0, 75}, replies)
             running = json.loads(self.cli("status").stdout)
             self.assertEqual(running["state"], "running")
         finally:
             self.cli("stop")
         owners = self.records("owner")
         self.assertEqual([row["run_id"] for row in owners if row["action"] == "start"], [running["run_id"]])
+
+    def test_start_during_a_real_read_is_busy_never_stale_running(self):
+        first = json.loads(self.cli("start").stdout)
+        self.cli("stop")
+        db = sqlite3.connect(self.state / "github-accounting/observations.sqlite")
+        db.executemany("INSERT INTO observations VALUES (?,?,?)",
+                       ((time.time() + row, "fixture", json.dumps({"row": row, "padding": "x" * 200})) for row in range(2000)))
+        db.commit()
+        db.close()
+        # An unread pipe keeps this real reader inside its result loop, holding the lock.
+        reader = subprocess.Popen([sys.executable, str(OWNER), "records"], env=self.env, text=True,
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            self.assertTrue(reader.stdout.readline())
+            reply = self.cli("start", check=False)
+            self.assertEqual(reply.returncode, 75, (reply.stdout, reply.stderr))
+            self.assertNotIn("running", reply.stdout)
+            self.assertNotIn("operation unavailable", reply.stderr)
+            self.assertEqual(json.loads(self.cli("status").stdout)["state"], "stopped")
+        finally:
+            reader.kill()
+            reader.communicate()
+        try:
+            second = json.loads(self.cli("start").stdout)
+            self.assertEqual(second["state"], "running")
+            self.assertNotEqual(second["run_id"], first["run_id"])
+        finally:
+            self.cli("stop")
+
+    def test_start_meeting_a_held_start_or_claimed_owner_lock_is_busy(self):
+        root = self.state / "github-accounting"
+        root.mkdir()
+        for name in ("start.lock", "owner.lock"):
+            with open(root / name, "w") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                reply = self.cli("start", check=False)
+                self.assertEqual(reply.returncode, 75, (name, reply.stdout, reply.stderr))
+                self.assertEqual(reply.stdout, "")
 
     def test_symlink_and_foreign_database_are_not_modified(self):
         root = self.state / "github-accounting"

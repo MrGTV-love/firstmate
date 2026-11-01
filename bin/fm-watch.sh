@@ -3432,7 +3432,8 @@ lavish_auto_retire_tick() {
 # The standing GitHub accounting owner is host-wide evidence, so only a primary
 # home keeps it running, never a secondmate or a disposable lab. Each cycle asks
 # the owner's own idempotent start, detached and single-flight, so a reboot or a
-# crash recovers at the next cycle and a running owner is left alone. A failed
+# crash recovers at the next cycle and a running owner is left alone. A busy start
+# (exit 75, a held lock) changes nothing and the next cycle asks again. A failed
 # start wakes once; the marker holds later attempts to one per retry interval and
 # keeps them silent, across watcher restarts, until a start succeeds.
 GITHUB_ACCOUNTING_PID=
@@ -3446,6 +3447,8 @@ github_accounting_tick() {
     GITHUB_ACCOUNTING_PID=
     if [ "$status" -eq 0 ]; then
       rm -f -- "$failed"
+    elif [ "$status" -eq 75 ]; then
+      :
     elif [ -e "$failed" ]; then
       touch -- "$failed"
     else

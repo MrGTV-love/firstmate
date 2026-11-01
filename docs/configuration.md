@@ -1082,7 +1082,8 @@ Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test
 It does not wrap, throttle, or change GitHub callers or the sweep quota floor above.
 A primary home's watcher runs the owner's idempotent `start` as a detached, single-flight helper on each cycle (`github_accounting_tick` in `bin/fm-watch.sh`), so a reboot or a crash recovers at the next cycle and a running owner is left alone; a secondmate or disposable lab home never starts it.
 A plain `stop` therefore lasts until the next cycle: set `FM_GITHUB_ACCOUNTING=0` in the watcher's environment first to keep the observer off.
-A failed `start` raises one `check: github-accounting owner failed to start` wake.
+A `start` that meets a held lock, such as a running `records` or `prune` or another `start`, starts nothing and exits 75 (busy); the watcher raises no wake, leaves the marker below unchanged, and asks again at its next cycle.
+Any other failed `start` raises one `check: github-accounting owner failed to start` wake.
 `state/.github-accounting-start-failed` then holds further attempts to one per hour, without another wake, until a `start` succeeds and removes it.
 An owner that starts and then dies is restarted at the next cycle and raises no wake; `start` reports only a failure to reach readiness.
 A detached owner's stderr appends to `state/github-accounting/owner.log`, which `start` trims to its newest 32 KiB before a launch once it passes 64 KiB.

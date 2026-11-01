@@ -17,6 +17,9 @@ A primary home's watcher runs start each cycle (github_accounting_tick in
 bin/fm-watch.sh), so a reboot, a crash or a plain stop recovers at its next cycle.
 A detached owner's stderr appends to owner.log, which start trims to its newest
 bytes before a launch once it passes LOG_LIMIT.
+Only run holds owner.lock exclusively, so an exclusive holder is a live owner;
+records and prune hold it shared. Any command that meets a held lock exits BUSY
+(75), started nothing and may retry; start exits 1 only for another failure.
 
 Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
 every 15 seconds. Records identify REST resources.graphql, not GraphQL response
@@ -58,6 +61,7 @@ PROCESS_INTERVAL = 0.2
 RETENTION = 48 * 60 * 60
 APPLICATION_ID = 0x464D4748
 LOG_LIMIT = 64 * 1024
+BUSY = 75
 QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
 QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null) remaining=(\d+|null)["']?$''', re.MULTILINE)
 ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
@@ -100,13 +104,17 @@ def owner_log(root):
     return descriptor
 
 
+class OwnerLockHeld(RuntimeError):
+    pass
+
+
 @contextmanager
-def ownership(root):
+def ownership(root, mode):
     with open_private(root / "owner.lock") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, mode | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError("observer already running") from None
+            raise OwnerLockHeld from None
         yield lock
 
 
@@ -224,7 +232,7 @@ def process_records(rows, seen):
 def owner_status(root):
     with open_private(root / "owner.lock") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError:
             try:
                 lock.seek(0)
@@ -257,12 +265,11 @@ def run(root, duration=None, ready=None, *, process_source=None):
     # Root-home execution uses ps; deterministic callers inject the same table
     # shape without changing filtering, ancestry, identity or storage behavior.
     source = process_table if process_source is None else process_source
-    with ownership(root) as lock:
+    with ownership(root, fcntl.LOCK_EX) as lock:
+        lock.truncate(0)
         db = database(root)
         run_id = uuid.uuid4().hex
         metadata = {"state": "running", "pid": os.getpid(), "run_id": run_id, "started_at": time.time()}
-        lock.seek(0)
-        lock.truncate()
         json.dump(metadata, lock)
         lock.flush()
         stopped = False
@@ -376,9 +383,10 @@ def main():
             try:
                 fcntl.flock(starting, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
-                print(json.dumps({"state": "starting"}))
-                return
+                raise OwnerLockHeld from None
             status = owner_status(root)
+            if status["state"] == "starting":
+                raise OwnerLockHeld
             if status["state"] != "stopped":
                 print(json.dumps(status))
                 return
@@ -391,7 +399,8 @@ def main():
                 os.close(write_fd)
                 write_fd = None
                 if os.read(read_fd, 32) != b"ready\n":
-                    child.wait()
+                    if child.wait() == BUSY:
+                        raise OwnerLockHeld
                     raise RuntimeError("observer failed to start")
             finally:
                 os.close(log)
@@ -412,7 +421,7 @@ def main():
             raise RuntimeError("owner is starting; retry stop after readiness")
         print(json.dumps({"state": "stopped"}))
     else:
-        with ownership(root):
+        with ownership(root, fcntl.LOCK_SH):
             db = database(root)
             try:
                 if args.command == "prune":
@@ -432,6 +441,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except OwnerLockHeld:
+        print("fm-github-accounting: busy (owner lock held); retry", file=sys.stderr)
+        sys.exit(BUSY)
     except (OSError, RuntimeError, sqlite3.Error):
         # No exception text: command output/path arguments can contain secrets.
         print("fm-github-accounting: operation unavailable (check owner status/state permissions)", file=sys.stderr)
