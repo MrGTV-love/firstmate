@@ -1113,7 +1113,7 @@ model_freshness_sweep() {
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved index_notes projects='{}' typed_active=false inherited=false
+  local file err verified_harnesses resolved index_notes registry projects='{}' typed_active=false inherited=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1142,10 +1142,14 @@ crew_dispatch_validate() {
   # material, so its project selectors may name fleet projects this home does
   # not register; every other home's own policy must name registered projects.
   ! fm_root_is_secondmate_home "$FM_HOME" || inherited=true
-  if $typed_active && ! $inherited && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
-    if ! projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "$PROJECTS" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>&1); then
-      echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $projects"
-      return 0
+  if $typed_active && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
+    registry="${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md"
+    if ! projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "$PROJECTS" "$registry" 2>&1); then
+      if ! $inherited || { [ "$projects" != 'project registry has no project ids' ] && { [ -e "$registry" ] || [ -L "$registry" ]; }; }; then
+        echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $projects"
+        return 0
+      fi
+      projects='{}'
     fi
   fi
   err=$(jq -r --argjson projects "$projects" --argjson inherited "$inherited" --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '

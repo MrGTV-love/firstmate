@@ -72,7 +72,7 @@ Its promoted-Vernant-ship case retains the original scout marker and appends the
 Fenced, non-authoritative ship and scout declarations exercise neighboring boundaries.
 On the same host and date, `bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh` exited 0 and the suite ended with `# all fm-dispatch-resolve tests passed`.
 The optional fast-clock case reported `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
-The focused inherited-bootstrap regression also exercises subset, empty and absent secondmate registries, keeps a home-owned policy strict, and retains malformed-profile diagnostics through the real bootstrap entry point.
+The focused inherited-bootstrap regression also exercises subset, empty and absent secondmate registries, reports a duplicate-id secondmate registry, keeps a home-owned policy strict, and retains malformed-profile diagnostics through the real bootstrap entry point.
 
 ## Verification boundary
 
