@@ -9,6 +9,9 @@ record (state/<owner>.meta), this home's backlog Done entry for the owner
 records a PR (read through bin/fm-tasks-axi.sh show), the forge reports that PR
 merged from the record's branch, and the slot's HEAD has no commit outside
 origin/main; every other record is listed and kept.
+Limit: tasks-axi show reads only the live backlog. An owner whose Done entry
+done_keep pruned into the archive has no readable Done entry, so its record is
+listed UNPROVEN and kept; the fail direction is always keep.
 For teardown: --slot PATH --owner-id ID --owner-branch BRANCH --prove-to FILE
 builds the forge proof before project custody; then --apply --proof-file FILE
 after its landed-work proof runs only the local entry point with that file.
@@ -59,7 +62,7 @@ def done_pr(owner):
     show = Path(__file__).resolve().parent / "fm-tasks-axi.sh"
     result = subprocess.run([str(show), "show", owner], text=True, capture_output=True, check=False)
     if result.returncode:
-        raise Refusal("no backlog Done entry for the owner; landing unproven")
+        raise Refusal("no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven")
     fields = {}
     for line in result.stdout.splitlines():
         if line.startswith("  ") and not line.startswith("   ") and ": " in line:
