@@ -384,11 +384,11 @@ PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
 FOCUS=$(fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")
 : > "$TEST_DIR/mutation-owners"
 spawn() { # <home> <task-id> <lane>
-  exec env FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 \
+  exec env FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" FM_SPAWN_NO_GUARD=1 \
     bash "$ROOT/bin/fm-spawn.sh" "$2" "$TEST_DIR/project-$3" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
 }
 teardown() { # <home> <task-id>
-  exec env PATH="$TEST_DIR/teardownbin:$PATH" FIXTURE_REAP_LANE="${FIXTURE_REAP_LANE:-}" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
+  exec env PATH="$TEST_DIR/teardownbin:$PATH" FIXTURE_REAP_LANE="${FIXTURE_REAP_LANE:-}" FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$TEST_DIR/home-$1/state" FM_DATA_OVERRIDE="$TEST_DIR/home-$1/data" FM_CONFIG_OVERRIDE="$TEST_DIR/home-$1/config" \
     bash "$ROOT/bin/fm-teardown.sh" "$2" --force --drop-file "$(fm_test_drop_file)"
 }
@@ -681,7 +681,7 @@ FORCED_NESTED_PANE=$(field "$FORCED_HOME/state/$FORCED_NESTED_ID.meta" herdr_pan
 FORCED_CHILD_PANE=$(field "$FORCED_NESTED_HOME/state/$FORCED_CHILD_ID.meta" herdr_pane_id)
 cp "$FORCED_NESTED_HOME/state/$FORCED_CHILD_ID.meta" "$TEST_DIR/forced-child-before.meta"
 touch "$TEST_DIR/hold-return-forced-child"
-env PATH="$TEST_DIR/teardownbin:$PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-primary" \
+env PATH="$TEST_DIR/teardownbin:$PATH" FM_HOME="$TEST_DIR/home-primary" \
   FM_ROOT_OVERRIDE="$TEST_DIR/forced-code-root" bash "$ROOT/bin/fm-teardown.sh" "$FORCED_PARENT_ID" --force --drop-file "$(fm_test_drop_file)" >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
 # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
 TEARDOWN_PID=$!
@@ -744,7 +744,7 @@ assert_siblings
 echo 'ok - recovery and fresh/reclaimed abort cleanup complete beside a held forced-secondmate recursive child return, preserving descendant task/meta custody and exact sibling focus'
 
 bootstrap_primary() {
-  env PATH="$TEST_DIR/teardownbin:$PATH" FM_GATE_REFUSE_BYPASS=1 FM_BOOTSTRAP_NETWORK=skip \
+  env PATH="$TEST_DIR/teardownbin:$PATH" FM_BOOTSTRAP_NETWORK=skip \
     FM_HOME="$TEST_DIR/home-primary" FM_ROOT_OVERRIDE="$ROOT" TASKS_AXI_BACKEND=markdown \
     bash "$ROOT/bin/fm-bootstrap.sh"
 }

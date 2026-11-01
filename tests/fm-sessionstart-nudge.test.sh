@@ -941,7 +941,7 @@ SH
   chmod +x "$fixture/bin/"*.sh
 
   out=$(EXT="$fixture/.pi/extensions/fm-primary-turnend-guard.ts" \
-    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" FM_GATE_REFUSE_BYPASS=1 \
+    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" \
     node --input-type=module 2>&1 <<'JS'
 import { pathToFileURL } from "node:url";
 const handlers = new Map();

@@ -2395,7 +2395,7 @@ test_guard_workaround_heartbeat() {
   printf 'kind=ship\nworktree=%s\nbranch=feature\n' "$repo" > "$state/task.meta"
   watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_GUARD_EVENT_LOG="$state/guard-events.jsonl"
   pid=$!
-  wait_for_exit "$pid" 300 || { reap "$pid"; fail "workaround evidence did not wake heartbeat"; }
+  wait_for_exit "$pid" 900 || { reap "$pid"; fail "workaround evidence did not wake heartbeat"; }
   [ "$(cat "$out")" = heartbeat ] || fail "workaround detection did not retain fleet scope"
   grep -F "tree-equal-merge:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted the tree-equal signature"
   grep -F "base-merge-only-after-refusal:$merged" "$state/.wake-queue" >/dev/null || fail "heartbeat omitted refusal correlation"
@@ -2403,7 +2403,15 @@ test_guard_workaround_heartbeat() {
   set_mtime "$(( $(date +%s) - 60 ))" "$state/.last-heartbeat"
   watch_bg "$state" "$fakebin" "$dir/quiet.out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_GUARD_EVENT_LOG="$state/guard-events.jsonl"
   pid=$!
-  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "unchanged workaround signatures woke twice"; }
+  # The unchanged report is compared at the heartbeat after a run publishes it, so
+  # wait for a run to publish, then for a later run to replace it, then assert.
+  fm_test_wait_until --while-alive "$pid" --cycles 600 "$(watch_polls_file "$state" "$pid")" -- test -f "$state/.guard-workarounds-next" \
+    || { reap "$pid"; fail "the detached detector never published a run"; }
+  ln "$state/.guard-workarounds-next" "$dir/first-run" || { reap "$pid"; fail "could not pin the first detector run"; }
+  # shellcheck disable=SC2016 # The probe expands its own arguments.
+  fm_test_wait_until --while-alive "$pid" --cycles 600 "$(watch_polls_file "$state" "$pid")" -- \
+    bash -c '[ -f "$1" ] && [ ! "$1" -ef "$2" ]' _ "$state/.guard-workarounds-next" "$dir/first-run" \
+    || { reap "$pid"; fail "unchanged workaround signatures woke twice or the detector stopped"; }
   [ ! -s "$dir/quiet.out" ] || { reap "$pid"; fail "unchanged workaround signatures were presented again"; }
   reap "$pid"
   pass "heartbeat presents read-only workaround evidence once and deduplicates unchanged signatures"

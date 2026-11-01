@@ -53,6 +53,7 @@ test_claude_session_attribution() {
   # fake ancestry function. The native Claude classifier remains its owner.
   ln -sf /bin/bash "$named"
   for session in claude-one claude-two; do
+    # shellcheck disable=SC2016 # The named process expands its own arguments.
     env -u FM_TASK_ID -u FM_SESSION_ID -u CLAUDE_SESSION_ID \
       -u CODEX_THREAD_ID -u PI_SESSION_ID -u OMP_SESSION_ID -u GROK_SESSION_ID \
       FM_HOME="$TMP" "$named" -c '
@@ -378,6 +379,26 @@ jq -e '[.rules[] | select(.id == "gops")] | length == 3 and all(.[]; .allows == 
   || fail "each rule row must keep its own allow"
 pass "one guarded operation counts once at guard level and once per rule"
 
+# fixture homes pass the real check as marked labs, and that check records no bypass.
+FIXTURE_LAB="$TMP/fixture-lab"
+fm_test_lab_home "$FIXTURE_LAB" || fail "the shared lab fixture could not mark an empty directory"
+if fm_test_lab_home "$FIXTURE_LAB" 2>/dev/null; then fail "the shared lab fixture marked a populated directory"; fi
+(
+  cd "$TMP" || exit 111
+  for override in "${!FM_@}"; do
+    case "$override" in *_OVERRIDE) unset "$override" ;; esac
+  done
+  # shellcheck disable=SC2030 # This subshell owns its own gate environment.
+  export NO_MISTAKES_GATE=1 FM_HOME="$FIXTURE_LAB" FM_GUARD_EVENT_LOG="$TMP/fixture-lab.jsonl" FM_GATE_EVENT_TASK=lab-task
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  fm_refuse_if_gate_agent
+) 2>/dev/null || fail "the real gate check refused a fixture lab home"
+jq -se 'length == 1 and .[0].decision == "allow" and .[0].actor == "gate" and .[0].override == false' "$TMP/fixture-lab.jsonl" >/dev/null \
+  || fail "a fixture lab home did not record one real gate allow: $(cat "$TMP/fixture-lab.jsonl")"
+[ -z "${FM_GATE_REFUSE_BYPASS+x}" ] || fail "the shared test library left the gate bypass set"
+pass "the shared lab fixture passes the real gate check with no bypass"
+
 # A clearing allow comes from the deny's actor class, through the real gate check.
 ACTOR_LAB=$("$ROOT/bin/fm-lab-home.sh" create "$TMP/actor-lab") || fail "could not create the actor lab home"
 gate_check_as() {  # <log> <gate|main|lab>
@@ -387,9 +408,9 @@ gate_check_as() {  # <log> <gate|main|lab>
       case "$override" in *_OVERRIDE) unset "$override" ;; esac
     done
     unset FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE FM_TASK_ID FM_HOME ID
-    # shellcheck disable=SC2030 # This subshell owns its own gate environment.
+    # shellcheck disable=SC2030,SC2031 # This subshell owns its own gate environment.
     export FM_GUARD_EVENT_LOG="$1" FM_GATE_EVENT_TASK=actor-task
-    # shellcheck disable=SC2030
+    # shellcheck disable=SC2030,SC2031
     case "$2" in
       gate) export NO_MISTAKES_GATE=1 ;;
       lab) export NO_MISTAKES_GATE=1 FM_HOME="$ACTOR_LAB" ;;
@@ -439,13 +460,18 @@ EMITTERS="$TMP/emitters.jsonl"
   . "$ROOT/bin/fm-api-key-guard-lib.sh"
   unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
   fm_api_key_guard claude 0 '' 0 '' '' || fail "clean billing environment was refused"
-  fm_api_key_guard claude 1 '' 0 '' '' || fail "existing explicit billing option was refused"
+  fm_api_key_guard claude 1 '' 0 '' '' || fail "an unused billing option was refused"
+  [ "$(jq -s '[.[] | select(.guard == "claude-api-billing" and .override == true)] | length' "$EMITTERS")" = 0 ] \
+    || fail "an unused --allow-api-key recorded an escape"
+  ANTHROPIC_API_KEY=fixture-not-a-credential fm_api_key_guard claude 1 '' 0 '' '' \
+    || fail "existing explicit billing option was refused"
   # shellcheck source=bin/fm-gate-refuse-lib.sh
   . "$ROOT/bin/fm-gate-refuse-lib.sh"
   FM_GATE_REFUSE_BYPASS=1 fm_refuse_if_gate_agent
   # shellcheck source=bin/fm-compact-adviser-lib.sh
   . "$ROOT/bin/fm-compact-adviser-lib.sh"
   [ "$(FM_COMPACT_ADVISER_DISABLE=' True ' fm_compact_adviser_force_off)" = 1 ] || fail "compact disable result changed"
+  fm_compact_adviser_bypass_event emitter-task
   # shellcheck source=bin/fm-tasks-axi-lib.sh
   . "$ROOT/bin/fm-tasks-axi-lib.sh"
   # shellcheck source=bin/fm-backlog-transition-lib.sh
@@ -508,6 +534,21 @@ jq -se 'length == 1 and .[0].kind == "tree-equal-merge"' "$TMP/other-task-result
 git -C "$REPO" branch -f main "$merged"
 python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/inherited-result.jsonl"
 jq -se 'length == 0' "$TMP/inherited-result.jsonl" >/dev/null || fail "base history was misreported as a task workaround"
+# A pooled copy may hold the base only as a fetched ref, and a local branch may
+# be stale. The origin ref wins for the exclusion and for the correlation.
+git -C "$REPO" branch -f main "$refused"
+git -C "$REPO" update-ref refs/remotes/origin/main "$merged"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/origin-first.jsonl"
+jq -se 'length == 0' "$TMP/origin-first.jsonl" >/dev/null || fail "a stale local base hid the fetched origin base"
+git -C "$REPO" update-ref refs/remotes/origin/release-1 "$merged"
+git -C "$REPO" update-ref -d refs/remotes/origin/main
+printf 'kind=ship\nworktree=%s\nbranch=feature\nbase_branch=release-1\n' "$REPO" > "$STATE_DIR/merge-task.meta"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/origin-only.jsonl"
+jq -se 'length == 0' "$TMP/origin-only.jsonl" >/dev/null || fail "a base held only as an origin ref did not exclude its history"
+git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse "$merged^2")"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/stale-local-correlation.jsonl"
+jq -se 'any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/stale-local-correlation.jsonl" >/dev/null \
+  || fail "a stale local base hid a real base-merge-only change"
 pass "real tree-equal/base-only merges are detected read-only without blaming actual implementation or inherited base history"
 
 printf 'ok - fm-guard-telemetry\n'

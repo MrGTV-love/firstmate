@@ -106,7 +106,7 @@ run_send() {  # <harness> <busy-at> [env=val ...]
   log="$dir/sleep.log"; : > "$log"
   fm_write_meta "$dir/state/agyw.meta" "window=sess:win" "harness=$harness"
   (
-    export FM_GATE_REFUSE_BYPASS=1 FM_SEND_SETTLE=0
+    export FM_SEND_SETTLE=0
     export PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_HOME="$dir" FM_SLEEP_LOG="$log"
     for a in "$@"; do eval "export $a"; done
     "$SEND" sess:win 'Append steer1 line to notes.md' 2>"$dir/err"

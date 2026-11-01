@@ -3288,6 +3288,29 @@ review_agent_select_detached() {
   REVIEW_SELECT_PID=$!
 }
 
+# Read-only guard workaround detection runs detached and single-flight for the
+# same reason: a slow worktree read must never hold the poll or its beacon.
+# A run publishes its report by rename, so a later heartbeat of this or the next
+# watcher reads only a complete report. Each heartbeat leaves that report in
+# GUARD_WORKAROUND_REPORT for the caller to deduplicate and starts the next run,
+# so a report arrives one heartbeat after its evidence.
+GUARD_WORKAROUND_PID=
+GUARD_WORKAROUND_REPORT=
+guard_workarounds_detached() {
+  local out="$STATE/.guard-workarounds-next"
+  GUARD_WORKAROUND_REPORT=
+  if [ -n "$GUARD_WORKAROUND_PID" ]; then
+    kill -0 "$GUARD_WORKAROUND_PID" 2>/dev/null && return 0
+    wait "$GUARD_WORKAROUND_PID" 2>/dev/null || true
+    GUARD_WORKAROUND_PID=
+  fi
+  GUARD_WORKAROUND_REPORT=$(cat "$out" 2>/dev/null || true)
+  rm -f "$out"
+  { python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" </dev/null >"$out.$$" 2>/dev/null \
+      && mv -f "$out.$$" "$out"; } &
+  GUARD_WORKAROUND_PID=$!
+}
+
 # Finished-session cleanup, detached for the same reason as the ledgers above: a
 # sweep that runs teardown can take minutes, and the poll must keep advancing the
 # beacon. The sweep is single-flight on its own lock, and it only ever asks
@@ -4571,12 +4594,11 @@ while :; do
   [ "$hb" -gt "$HEARTBEAT_MAX" ] && hb=$HEARTBEAT_MAX
   if [ "$(age_of "$STATE/.last-heartbeat")" -ge "$hb" ]; then
     review_agent_select_detached
-    # Detection is read-only; the watcher owns presentation deduplication.
-    guard_workaround_report=$(python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" 2>/dev/null) || guard_workaround_report=
-    if [ -n "$guard_workaround_report" ] \
-      && [ "$guard_workaround_report" != "$(cat "$STATE/.guard-workarounds-presented" 2>/dev/null || true)" ]; then
-      fm_wake_append heartbeat heartbeat "$guard_workaround_report" || exit 1
-      printf '%s\n' "$guard_workaround_report" > "$STATE/.guard-workarounds-presented"
+    guard_workarounds_detached
+    if [ -n "$GUARD_WORKAROUND_REPORT" ] \
+      && [ "$GUARD_WORKAROUND_REPORT" != "$(cat "$STATE/.guard-workarounds-presented" 2>/dev/null || true)" ]; then
+      fm_wake_append heartbeat heartbeat "$GUARD_WORKAROUND_REPORT" || exit 1
+      printf '%s\n' "$GUARD_WORKAROUND_REPORT" > "$STATE/.guard-workarounds-presented"
       touch "$STATE/.last-heartbeat"
       wake "heartbeat"
     fi

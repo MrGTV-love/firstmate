@@ -7,6 +7,7 @@ The home scan inspects only local ship/scout metadata and the recorded branch
 (or HEAD in its isolated copy). No fetch, checkout, ref update or event write.
 The most recent --limit first-parent commits are inspected (default 100),
 excluding the recorded base lineage in a home scan (--base in explicit mode).
+A bare base name resolves to refs/remotes/origin/<name> first, then the local branch.
 A tree-equal merge is a signature, not proof that a refusal caused the merge.
 A base-merge-only change additionally requires a task/head-bound merge denial,
 a later commit time, and second parents reachable from that denial's base ref.
@@ -33,6 +34,17 @@ def git(repo, *args):
     return result.stdout.strip() if result.returncode == 0 else ''
 
 
+def resolve_base(repo, ref):
+    # A bare branch name is the base as the forge sees it, so the fetched
+    # origin ref wins over a possibly stale or absent local branch.
+    candidates = [ref] if ref.startswith('refs/') else ['refs/remotes/origin/' + ref, 'refs/heads/' + ref]
+    for candidate in candidates:
+        sha = git(repo, 'rev-parse', '--verify', '--end-of-options', candidate + '^{commit}')
+        if SHA.fullmatch(sha):
+            return sha
+    return ''
+
+
 def events(path):
     try:
         with open(path, encoding='utf-8') as stream:
@@ -52,10 +64,9 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
     if not SHA.fullmatch(tip):
         return []
     exclude = []
-    if base_ref:
-        base_tip = git(repo, 'rev-parse', '--verify', '--end-of-options', base_ref + '^{commit}')
-        if SHA.fullmatch(base_tip):
-            exclude = ['--not', base_tip]
+    base_tip = resolve_base(repo, base_ref) if base_ref else ''
+    if base_tip:
+        exclude = ['--not', base_tip]
     commits = [line.split() for line in git(
         repo, 'log', '--first-parent', f'--max-count={limit}',
         '--format=%H %T %ct %P', tip, *exclude, '--').splitlines()]
@@ -89,10 +100,8 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
             chain.append((commit, parents))
         else:
             continue
-        base = git(repo, 'rev-parse', '--verify', '--end-of-options', event['base'] + '^{commit}')
-        if not SHA.fullmatch(base):
-            base = git(repo, 'rev-parse', '--verify', '--end-of-options', 'refs/remotes/origin/' + event['base'] + '^{commit}')
-        if not SHA.fullmatch(base):
+        base = resolve_base(repo, event['base'])
+        if not base:
             continue
         try:
             refused_at = datetime.datetime.fromisoformat(event['ts'].replace('Z', '+00:00')).timestamp()
@@ -145,9 +154,7 @@ def main():
             if not repo or not Path(repo).is_dir():
                 continue
             branch = metadata.get('branch')
-            base = metadata.get('base_branch') or git(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD')
-            if not base:
-                base = 'refs/heads/main' if git(repo, 'rev-parse', '--verify', 'refs/heads/main') else 'refs/remotes/origin/main'
+            base = metadata.get('base_branch') or git(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD') or 'main'
             targets.append((repo, 'refs/heads/' + branch if branch else 'HEAD', path.stem, base))
     seen = set()
     for repo, head, task, base in targets:

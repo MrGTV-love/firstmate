@@ -10,9 +10,13 @@ fm_compact_adviser_force_off() {
   value=${value#"${value%%[![:space:]]*}"}
   value=${value%"${value##*[![:space:]]}"}
   case "$value" in
-  1 | [Tt][Rr][Uu][Ee] | [Yy][Ee][Ss] | [Oo][Nn])
-    "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" compact-adviser bypass --rule FM_COMPACT_ADVISER_DISABLE --task "${FM_TASK_ID:-${ID:-}}" --override 2>/dev/null || true
-    printf '1\n' ;;
+  1 | [Tt][Rr][Uu][Ee] | [Yy][Ee][Ss] | [Oo][Nn]) printf '1\n' ;;
   *) printf '0\n' ;;
   esac
+}
+
+# fm_compact_adviser_bypass_event <task>: record one operator activation of the
+# switch for the launched task. Telemetry never changes the launch.
+fm_compact_adviser_bypass_event() {
+  "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" compact-adviser bypass --rule FM_COMPACT_ADVISER_DISABLE --task "${1:-}" --override 2>/dev/null || true
 }

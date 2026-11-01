@@ -1326,9 +1326,6 @@ elif [ -n "$DROP_FILE" ]; then
   echo "error: --drop-file is only valid with --force" >&2
   exit 2
 fi
-if [ "$FORCE" = --force ]; then
-  "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
-fi
 # Retiring a persistent secondmate is main's alone in both postures; the kind
 # is read under the metadata lock (role partition: bin/fm-lease-lib.sh).
 [ "$TEARDOWN_META_KIND" != secondmate ] || fm_lease_forbid_branch "secondmate retirement (fm-teardown)"
@@ -3408,14 +3405,10 @@ require_worktree_teardown_safety() {
   local safety_rc=0
   [ "$FORCE" != "--force" ] || return 0
   validate_worktree_teardown_safety || safety_rc=$?
-  if [ "$safety_rc" -eq 0 ]; then
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
-    return 0
-  fi
+  [ "$safety_rc" -ne 0 ] || return 0
   if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ]; then
     cleanup_stale_lock_for_safety_check "$WT" || exit 1
     validate_worktree_teardown_safety || exit 1
-    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
     return 0
   fi
   exit 1
@@ -6323,6 +6316,11 @@ if [ -n "$X_REQUEST" ]; then
 fi
 
 require_worktree_teardown_safety
+if [ "$FORCE" = --force ]; then
+  "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded bypass --rule landed-work --task "$ID" --override --cleared-by force 2>/dev/null || true
+else
+  "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded allow --rule landed-work --task "$ID" 2>/dev/null || true
+fi
 
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
