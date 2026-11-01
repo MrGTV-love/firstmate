@@ -754,7 +754,14 @@ pass "S3 follows multiline diagnostic spans and local helper edits/deletions wit
 # S3's remedy boundary does not widen S1: a helper edit leaves its unchanged,
 # allowlisted callers unregistered, yet deleting the helper's remedy fails S3.
 HELPER_EDIT=$(fixture site_helper_edit)
-printf 'refuse() {\n  echo "$1. Remedy: run bin/gguard.sh --clear" >&2\n  return 1\n}\nrefuse "legacy caller one"\nrefuse "legacy caller two"\n' >"$HELPER_EDIT/bin/gnew.sh"
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1. Remedy: run bin/gguard.sh --clear" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
 HELPER_IDS=$(site_ids "$HELPER_EDIT")
 [ "$(printf '%s\n' "$HELPER_IDS" | grep -c .)" -eq 2 ] || fail "expected two legacy helper callers, got: $HELPER_IDS"
 jq -n --arg ids "$HELPER_IDS" '{schema_version: 2, allowed: ($ids | split("\n") | map(select(length > 0) | {id: ., rule: "S1"}))}' \
@@ -762,10 +769,24 @@ jq -n --arg ids "$HELPER_IDS" '{schema_version: 2, allowed: ($ids | split("\n") 
 git -C "$HELPER_EDIT" init -q
 git -C "$HELPER_EDIT" -c user.email=t@example.invalid -c user.name=t add -A
 git -C "$HELPER_EDIT" -c user.email=t@example.invalid -c user.name=t commit -qm base
-printf 'refuse() {\n  echo "$1. Remedy: run bin/gguard.sh --clear, then retry" >&2\n  return 1\n}\nrefuse "legacy caller one"\nrefuse "legacy caller two"\n' >"$HELPER_EDIT/bin/gnew.sh"
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1. Remedy: run bin/gguard.sh --clear, then retry" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
 out=$("$LINT" --root "$HELPER_EDIT" --mode new-or-touched --base HEAD 2>&1) \
   || fail "a helper-body edit forced registration of its unchanged allowlisted callers: $out"
-printf 'refuse() {\n  echo "$1" >&2\n  return 1\n}\nrefuse "legacy caller one"\nrefuse "legacy caller two"\n' >"$HELPER_EDIT/bin/gnew.sh"
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
 out=$("$LINT" --root "$HELPER_EDIT" --mode new-or-touched --base HEAD 2>&1) && fail "deleting a helper's remedy escaped S3: $out"
 [ "$(printf '%s\n' "$out" | grep -c '^VIOLATION S3 ')" -eq 2 ] || fail "both unchanged callers must fail S3 when their helper loses its remedy: $out"
 assert_not_contains "$out" 'VIOLATION S1 ' "a helper edit must not newly force S1 registration of unchanged callers"
