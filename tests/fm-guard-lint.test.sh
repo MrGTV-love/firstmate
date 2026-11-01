@@ -647,17 +647,34 @@ SH
 assert_mapped "moving identical refusal blocks keeps every site mapped" "$KEYED" 2
 [ "$(site_owners "$KEYED")" = "$(printf '2 gother\n5 gguard')" ] \
   || fail "a moved identical line must keep its owner: $(site_owners "$KEYED")"
-{ printf 'if [ -n "$third" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\n'; cat "$KEYED/bin/a.sh"; } >"$KEYED/a.tmp"
+{ cat <<'SH'
+if [ -n "$third" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+  cat "$KEYED/bin/a.sh"; } >"$KEYED/a.tmp"
 mv "$KEYED/a.tmp" "$KEYED/bin/a.sh"
 assert_fails_with "a new identical refusal in another block is S1" "$KEYED" S1
 [ "$(site_owners "$KEYED")" = "$(printf '2 null\n5 gother\n8 gguard')" ] \
   || fail "a new identical line above mapped ones must stay unmapped while they keep their owners: $(site_owners "$KEYED")"
-printf 'if [ -n "$first" ]; then\n  echo "REFUSED: repeated line" >&2\n  echo "REFUSED: repeated line" >&2\nfi\n' >"$KEYED/bin/a.sh"
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+  echo "REFUSED: repeated line" >&2
+fi
+SH
 assert_fails_with "a new identical refusal in a mapped block changes its marker count" "$KEYED" S2
-printf 'if [ -n "$first" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\nif [ -n "$second" ]; then\n  echo "REFUSED: repeated line" >&2\nfi\n' >"$KEYED/bin/a.sh"
-mutate "$KEYED" '.guards[1].sites[0].within = "$first"'
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$first\""
 assert_fails_with "a block context still cannot give a site two owners" "$KEYED" S2
-mutate "$KEYED" '.guards[1].sites[0].within = "$second" | .guards[1].sites[0].match = "missing text"'
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$second\" | .guards[1].sites[0].match = \"missing text\""
 assert_fails_with "a valid key and context do not bypass marker text" "$KEYED" S2
 mutate "$KEYED" '.guards[1].sites[0].match = "REFUSED: repeated line" | .guards[1].sites[0].key = "site:missing"'
 assert_fails_with "a missing site key is stale" "$KEYED" S2
@@ -667,7 +684,7 @@ mutate "$KEYED" '.guards[1].sites[0].key = 1'
 assert_fails_with "a non-string site key is invalid" "$KEYED" S2
 mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY\" | .guards[1].sites[0].within = 1"
 assert_fails_with "a non-string block context is invalid" "$KEYED" S2
-mutate "$KEYED" '.guards[1].sites[0].within = "$second"'
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$second\""
 assert_mapped "the restored block contexts map both identical lines" "$KEYED" 2
 
 # --- computed unregistered count ---------------------------------------------
