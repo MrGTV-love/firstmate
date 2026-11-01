@@ -5,7 +5,8 @@
 #   [--workarounds <jsonl>] [--days <n>]
 # --workarounds accepts fm-guard-workarounds.py --json output, without modifying
 # the event log. Distinct signatures count once per task, head, rule and kind.
-# Opportunities exclude bypasses; refusal_to_bypass_ratio is
+# Opportunities exclude bypasses, and a guard row counts one per guarded
+# operation, not one per rule row; refusal_to_bypass_ratio is
 # (override/bypass events + workaround signatures) / denies, null if no denies.
 # Repeat denies count additional denies per task across sessions, per rule.
 # Session-only legacy events cannot establish task attribution.
@@ -16,7 +17,7 @@
 # that day and stands until the evidence changes: later events nominate the guard
 # again only when they hold a deny, warn, override or other non-allow decision,
 # or meet the threshold on their own as a quiet window after a judged window (the
-# last --min-opportunities events through that day) that held a fire.
+# last --min-opportunities opportunities through that day) that held a fire.
 set -u
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -75,23 +76,26 @@ cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days
 def metric(guard, events, rule=None):
     denies = sum(e.get('decision') == 'deny' for e in events)
     warns = sum(e.get('decision') == 'warn' for e in events)
-    allows = sum(e.get('decision') == 'allow' for e in events)
+    # A guard row skips the extra rule rows of one operation. A rule row keeps its own.
+    counted = [e for e in events if rule is not None or e.get('opportunity') is not False]
+    allows = sum(e.get('decision') == 'allow' for e in counted)
     bypasses = sum(e.get('decision') == 'bypass' for e in events)
     overrides = sum(e.get('override') is True for e in events)
     escapes = sum(e.get('override') is True or e.get('decision') == 'bypass' for e in events)
     workarounds = len({(e.get('task'), e.get('head'), e.get('rule'), e.get('kind'))
                        for e in signatures if e['guard'] == guard
                        and (rule is None or e.get('rule', guard) == rule)})
-    opportunities = sum(e.get('decision') in ('deny', 'warn', 'allow', 'error') for e in events)
+    opportunities = sum(e.get('decision') in ('deny', 'warn', 'allow', 'error') for e in counted)
     rate = round(overrides / (denies + warns), 3) if denies + warns else 0
     attempts, recurrences = [], 0
     sessions = collections.defaultdict(list)
     tasks = collections.Counter()
     for event in events:
         # Keep rules separate even in the aggregate: one rule's allow does not
-        # clear another rule's refusal. Task identity survives harness restarts.
+        # clear another rule's refusal, and one actor class's allow does not
+        # clear another's. Task identity survives harness restarts.
         identity = event.get('task') or event.get('session', '')
-        sessions[(event.get('rule') or guard, identity)].append(event)
+        sessions[(event.get('rule') or guard, identity, event.get('actor', ''))].append(event)
         if event.get('task') and event.get('decision') == 'deny':
             tasks[(event.get('rule') or guard, event['task'])] += 1
     for session in sessions.values():
@@ -142,7 +146,8 @@ def judged(guard, events):
         return False
     if metric(guard, fresh)['verdict'] != 'cut':
         return True
-    window = sorted((e for e in events if e.get('ts', '') <= after), key=lambda e: e.get('ts', ''))
+    window = sorted((e for e in events if e.get('ts', '') <= after and e.get('opportunity') is not False
+                     and e.get('decision') in ('deny', 'warn', 'allow', 'error')), key=lambda e: e.get('ts', ''))
     return not any(e.get('decision') in ('deny', 'warn') for e in window[-a.min_opportunities:])
 
 
