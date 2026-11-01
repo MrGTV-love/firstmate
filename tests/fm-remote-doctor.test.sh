@@ -1039,6 +1039,21 @@ esac
 assert_not_contains "$DOCTOR_OUT" "did not come up" "a refusal was reported as a failed start"
 
 new_case Linux with-herdr no-gui
+printf '"unknown"\n' > "$CASE_HERDR_RUNNING"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "a server with malformed status was reported ready"
+[ "$(cat "$CASE_HERDR_RUNNING")" = '"unknown"' ] || fail "a malformed status still started a herdr server"
+fix_line=$(printf '%s\n' "$DOCTOR_OUT" | grep '^fix herdr-server=failed: ' || true)
+assert_contains "$fix_line" "refused to start the herdr server for session $DOCTOR_SESSION" \
+  "a malformed status refusal was not reported as a refusal"
+remedy_count=$(printf '%s\n' "$fix_line" | grep -o 'Remedy:' | wc -l | tr -d ' ')
+[ "$remedy_count" = 1 ] || fail "a malformed status refusal must name exactly one completing step: $fix_line"
+case "$fix_line" in
+  *"is unknown"*"Remedy:"*) ;;
+  *) fail "the malformed status cause must precede its completing step: $fix_line" ;;
+esac
+
+new_case Linux with-herdr no-gui
 touch "$CASE_STATE/herdr-server-fails"
 doctor --fix
 expect_code 1 "$DOCTOR_RC" "a server that failed to start was reported ready"
