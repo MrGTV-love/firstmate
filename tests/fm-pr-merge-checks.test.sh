@@ -2423,6 +2423,43 @@ test_tested_tree_repo_case_differs_from_url() {
   pass 'tested-tree records match the repository case-insensitively'
 }
 
+# A check run from an app other than GitHub Actions carries no tested-tree
+# record. It counts only when GitHub reports it ran at the head being merged;
+# a run at another head, or a head with no Actions record at all, keeps the
+# ancestry rule.
+test_tested_tree_non_actions_check_run_must_see_the_head() {
+  local variant case_dir head tip
+  for variant in same-head other-head only-non-actions; do
+    case_dir=$(make_case "tested-tree-non-actions-$variant")
+    make_tested_train "$case_dir"
+    head=$(cat "$case_dir/github-head")
+    tip=$(jq -r .base_commit.sha "$case_dir/compare-responses/final")
+    case "$variant" in
+      same-head) jq '.total_count = 2 | .check_runs += [{"id":9,"name":"Socket Security: Project Report","head_sha":.check_runs[0].head_sha,"details_url":"https://socket.dev/report/9","app":{"id":156372,"slug":"socket-security"}}]' ;;
+      other-head) jq '.total_count = 2 | .check_runs += [{"id":9,"name":"Socket Security: Project Report","head_sha":"0000000000000000000000000000000000000000","details_url":"https://socket.dev/report/9","app":{"id":156372,"slug":"socket-security"}}]' ;;
+      only-non-actions) jq '.check_runs[0] |= (.name = "Socket Security: Project Report" | .details_url = "https://socket.dev/report/7" | .app = {"id":156372,"slug":"socket-security"})' ;;
+    esac < "$case_dir/github-runs.json" > "$case_dir/runs.tmp"
+    mv "$case_dir/runs.tmp" "$case_dir/github-runs.json"
+    run_required_case "$case_dir" 188
+    case "$variant" in
+      same-head)
+        expect_code 0 "$RC" "a non-Actions check run at the head should not block the tested tree: $(cat "$case_dir/stderr")"
+        assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+        assert_final_read_is_offline "$case_dir" 'non-Actions run at the head'
+        ;;
+      *)
+        expect_code 1 "$RC" "$variant must not land a tree no record proves"
+        assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" "$variant must keep the ancestry refusal"
+        assert_grep 'note: tested-tree records unavailable (' "$case_dir/stderr" "$variant must say why the ancestry rule applies"
+        assert_no_grep 'pr merge' "$case_dir/gh.log" "$variant reached the forge merge"
+        ;;
+    esac
+    [ "$variant" != other-head ] \
+      || assert_grep 'check run 9 did not run at head' "$case_dir/stderr" 'other-head must name the run that missed the head'
+    pass "tested-tree non-Actions check run $variant"
+  done
+}
+
 # A definite refusal already fails the attempt, so the record reads wait for a
 # later run instead of costing forge calls now, and no tree verdict is claimed.
 test_tested_tree_waits_for_a_definite_refusal() {
@@ -2550,6 +2587,7 @@ test_tested_tree_refusals_and_fallbacks
 test_reverted_ancestor_compares_trees_not_ancestry
 test_stacked_train_lands_without_new_head
 test_tested_tree_repo_case_differs_from_url
+test_tested_tree_non_actions_check_run_must_see_the_head
 test_tested_tree_rechecks_a_check_run_added_during_retry
 test_tested_tree_waits_for_a_definite_refusal
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head

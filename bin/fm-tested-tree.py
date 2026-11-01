@@ -4,7 +4,9 @@
 Usage: fm-tested-tree.py <owner/repo> <head> <tip> <scratch> <worktree> [--offline]
 
 Called by fm-pr-merge.sh, not a waiver interface. Exit 0 proves every check run
-has a verified matching tree, 1 means evidence unavailable (ancestry fallback,
+ran at the head, every GitHub Actions check run has a verified matching tree,
+and at least one does; a check run from another app needs no record, since
+GitHub's head_sha is all it can show. 1 means evidence unavailable (ancestry fallback,
 with a one-line reason on stderr), 2 means complete verified records prove a
 different tree (refuse even if the head contains the tip). Artifact metadata is
 read only through gh. Names bind HEAD^{tree}, HEAD^1 (the actual merge parent,
@@ -63,8 +65,13 @@ def read_records(repo, head, runs):
     records = []
     cache = {}
     for check in runs:
-        if check['head_sha'] != head or check['app']['slug'] != 'github-actions':
-            raise Unavailable(f'check run {check["id"]} is not a GitHub Actions run at head {head}')
+        if check['head_sha'] != head:
+            raise Unavailable(f'check run {check["id"]} did not run at head {head}')
+        if check['app']['slug'] != 'github-actions':
+            # Not an Actions run: it saw the head being merged, and that is all
+            # it can show, so it needs no record. Actions runs test GitHub's
+            # merge ref, a tree other than the head, so they need the record.
+            continue
         match = re.fullmatch(r'https://github\.com/' + re.escape(repo)
                              + r'/actions/runs/(\d+)/job/(\d+)', check['details_url'],
                              re.IGNORECASE)
@@ -97,6 +104,8 @@ def read_records(repo, head, runs):
                 raise Unavailable(f'run {run_id} attempt {attempt} has no single tested-tree record')
             cache[key] = found.pop()
         records.append(cache[key])
+    if not records:
+        raise Unavailable(f'no GitHub Actions check run at head {head} recorded a tested tree')
     return records
 
 
