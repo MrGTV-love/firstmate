@@ -2,8 +2,9 @@
 # Watcher integration for the standing GitHub accounting owner
 # (bin/fm-github-accounting.py): a primary home's poll loop starts an absent owner
 # through its own idempotent start, leaves a running one alone, recovers a crash at
-# the next cycle, and reports a failed start once instead of looping on it. The
-# owner's own behavior is covered by tests/fm-github-accounting.test.sh.
+# the next cycle, retries a busy start at the next cycle without a wake, and reports
+# a failed start once instead of looping on it. The owner's own behavior is covered
+# by tests/fm-github-accounting.test.sh.
 set -u
 
 # shellcheck source=tests/wake-helpers.sh
@@ -14,16 +15,21 @@ OWNER="$ROOT/bin/fm-github-accounting.py"
 TMP_ROOT=$(fm_test_tmproot fm-watch-github-accounting-tests)
 count_watch_polls
 
-# Start a watcher with every other cadence switched off, so only the owner's start
-# can fire. The fake gh-axi keeps a real owner away from the account.
-start_watcher() {  # <dir> [extra env...]
-  local dir=$1
-  shift
-  cat > "$dir/fakebin/gh-axi" <<'SH'
+# The fake gh-axi keeps a real owner away from the account.
+install_fake_gh_axi() {  # <dir>
+  cat > "$1/fakebin/gh-axi" <<'SH'
 #!/bin/sh
 printf 'api_response:\n  body: used=1 reset=1794000000 limit=5000 remaining=4999\n'
 SH
-  chmod +x "$dir/fakebin/gh-axi"
+  chmod +x "$1/fakebin/gh-axi"
+}
+
+# Start a watcher with every other cadence switched off, so only the owner's start
+# can fire.
+start_watcher() {  # <dir> [extra env...]
+  local dir=$1
+  shift
+  install_fake_gh_axi "$dir"
   PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 \
     FM_OPEN_LOOPS_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
@@ -79,6 +85,10 @@ polled_at_least() {  # <state> <watcher-pid> <cycles>
   file=$(watch_polls_file "$1" "$2")
   [ ! -e "$file" ] || count=$(cat "$file" 2>/dev/null) || count=0
   [ "${count:-0}" -ge "$3" ]
+}
+
+mtime_ns() {  # <file>
+  python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_mtime_ns)' "$1"
 }
 
 wake_rows() {  # <state>
@@ -158,6 +168,62 @@ test_failed_start_is_reported_once_not_looped() {
   pass "a failed start wakes once, retries only on the long interval, and clears on success"
 }
 
+test_busy_start_retries_next_cycle_with_no_wake_and_no_marker_change() {
+  local dir state pid marker before calls
+  dir=$(make_case busy-start); state="$dir/state"; marker="$state/.github-accounting-start-failed"
+  install_fake_owner "$dir" 'exit 75'
+  start_watcher "$dir" FM_GITHUB_ACCOUNTING_BIN="$dir/fakebin/fake-owner"
+  pid=$!
+  fm_test_wait_until --while-alive "$pid" --cycles 8 "$(watch_polls_file "$state" "$pid")" -- owner_called_at_least "$state" 3 \
+    || { stop_owned_watcher "$pid"; fail "a busy start must be retried at the next cycles: $(cat "$dir/watch.out")"; }
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a busy start must not wake firstmate: $(cat "$state/.wake-queue")"; }
+  [ ! -e "$marker" ] || { stop_owned_watcher "$pid"; fail "a busy start must not start a hold"; }
+
+  touch -t 200001010000 "$marker"
+  before=$(mtime_ns "$marker")
+  calls=$(owner_calls "$state")
+  fm_test_wait_until --while-alive "$pid" --cycles 8 "$(watch_polls_file "$state" "$pid")" -- owner_called_at_least "$state" "$((calls + 3))" \
+    || { stop_owned_watcher "$pid"; fail "a busy retry must not end at an old marker"; }
+  [ "$(mtime_ns "$marker")" = "$before" ] \
+    || { stop_owned_watcher "$pid"; fail "a busy start must leave an existing marker unchanged"; }
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a busy retry must not wake firstmate"; }
+  stop_owned_watcher "$pid"
+  pass "a busy start retries at the next cycle with no wake, no hold, and no marker change"
+}
+
+test_real_owner_lock_holder_is_busy_then_the_next_cycle_starts_the_owner() {
+  local dir state pid first holder
+  dir=$(make_case real-busy); state="$dir/state"
+  install_fake_gh_axi "$dir"
+  first=$(owner "$dir" start | python3 -c 'import json, sys; print(json.load(sys.stdin)["run_id"])') \
+    || fail "the seed owner did not start"
+  owner "$dir" stop >/dev/null || fail "the seed owner did not stop"
+  python3 -c 'import fcntl, sys, time
+lock = open(sys.argv[1], "r+")
+fcntl.flock(lock, fcntl.LOCK_SH)
+open(sys.argv[2], "w").close()
+time.sleep(300)' "$state/github-accounting/owner.lock" "$dir/holding" &
+  holder=$!
+  fm_test_wait_until --while-alive "$holder" -- test -e "$dir/holding" \
+    || { kill "$holder"; fail "the labeled lock holder never took the lock"; }
+  start_watcher "$dir"
+  pid=$!
+  fm_test_wait_until --while-alive "$pid" --cycles 8 "$(watch_polls_file "$state" "$pid")" -- polled_at_least "$state" "$pid" 3 \
+    || { kill "$holder"; stop_owned_watcher "$pid"; fail "the watcher stopped polling behind a held lock: $(cat "$dir/watch.out")"; }
+  [ "$(published_run_id "$dir")" = "$first" ] \
+    || { kill "$holder"; stop_owned_watcher "$pid"; owner "$dir" stop >/dev/null; fail "no owner may start behind a held lock"; }
+  [ ! -e "$state/.github-accounting-start-failed" ] \
+    || { kill "$holder"; stop_owned_watcher "$pid"; fail "a held lock must not start a hold"; }
+  [ ! -s "$state/.wake-queue" ] \
+    || { kill "$holder"; stop_owned_watcher "$pid"; fail "a held lock must not wake firstmate: $(cat "$state/.wake-queue")"; }
+  kill "$holder"
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- owner_runs "$dir" "$first" \
+    || { stop_owned_watcher "$pid"; fail "the next cycle must start the owner once the lock is free"; }
+  stop_owned_watcher "$pid"
+  owner "$dir" stop >/dev/null || fail "the owner did not stop"
+  pass "a real lock holder reads as busy, and the next cycle starts the owner once it is free"
+}
+
 test_real_failed_start_leaves_its_reason_in_the_owner_log() {
   local dir state pid
   dir=$(make_case real-failure); state="$dir/state"
@@ -216,6 +282,8 @@ test_hung_start_is_never_doubled() {
 
 test_cycle_starts_absent_owner_leaves_running_one_and_recovers_a_crash
 test_failed_start_is_reported_once_not_looped
+test_busy_start_retries_next_cycle_with_no_wake_and_no_marker_change
+test_real_owner_lock_holder_is_busy_then_the_next_cycle_starts_the_owner
 test_real_failed_start_leaves_its_reason_in_the_owner_log
 test_only_a_primary_home_with_the_switch_on_starts_the_owner
 test_hung_start_is_never_doubled
