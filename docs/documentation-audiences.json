@@ -453,6 +453,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/objectives.md",
+      "audience": "operator-current"
+    },
+    {
       "path": "docs/review-rubric.md",
       "audience": "agent-runtime"
     },

@@ -446,6 +446,34 @@ Completion refuses to report success until the item is closed, and session start
 
 When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/fm-spawn.sh`](../bin/fm-spawn.sh); [`tests/fm-backlog-atomicity.test.sh`](../tests/fm-backlog-atomicity.test.sh)).
 
+### Backlog intake and closing proofs
+
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) judges every `add` before tasks-axi runs, so a backlog that grows by filing stays current and unduplicated.
+The script header owns the flags, the refusals, and their exit status; [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) owns the overlap threshold, the Done window, and the owner-filed heuristic.
+
+- **Objective.**
+  An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
+  An unknown id, or `none` with no reason, is refused.
+  The objective, its reason, and any `--not-dup` neighbour are recorded in `data/backlog-review.tsv` (`id`, `review-by`, `objective`, `reason`, `not-dup`; `review-by` stays empty), because tasks-axi has no field for them.
+- **Duplicate check.**
+  An add whose title overlaps a Queued or In flight item, or one of the 50 newest Done items, at the helper's threshold is refused with the top three neighbours and the two overrides.
+  `--dup-of <kept-id>` appends the new title and body to that open item and files nothing.
+  `--not-dup <neighbour-id>` files the item and records which neighbour was judged different.
+  The check shows neighbours and forces a choice; it cannot decide whether two titles are the same work.
+  A title with too few significant words to judge, and an id that already exists, are never judged.
+  `tasks-axi list` cuts titles at 80 characters, so the comparison uses that many.
+- **Closing proofs.**
+  `done <id> --duplicate-of <kept-id>` closes a duplicate once its title and body are appended to a Queued or In flight kept item.
+  `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered in `data/secondmates.md` that holds `<item-id>` open.
+  A home on another host cannot be read from here and is refused.
+  Both proofs refuse an item the owner filed, an item held for the captain, an item with a live task record, and a closed item.
+  The closing note records the proof, and `--pr`, `--report`, and `--drop-file` behave as before.
+- **Where the values live.**
+  `bin/fm-backlog-intake.py` defines the overlap threshold, the minimum words, the Done window, and the owner-filed pattern once, and its header documents them.
+
+No flag or environment variable waives these checks.
+The Done window reads the rows beyond `done_keep` from the markdown archive when the home keeps one.
+
 ### Which backlog receives a transition
 
 Automatic transitions run from the configured data directory's parent, letting that home's effective tasks-axi configuration address its selected adapter while keeping relative scout-report links rooted there.

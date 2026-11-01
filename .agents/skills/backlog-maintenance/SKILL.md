@@ -8,7 +8,7 @@ metadata:
 
 # Backlog maintenance
 
-A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it and `--owner captain` in a secondmate home; a call the main firstmate owns is never held (`captain-hold-lifecycle` owns that rule).
+A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` (with `--objective`, below) when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it and `--owner captain` in a secondmate home; a call the main firstmate owns is never held (`captain-hold-lifecycle` owns that rule).
 When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
 
@@ -18,6 +18,10 @@ Name the actual captain-held task with `--hold TASK_ID` rather than treating tha
 `.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax.
 Use compatible `tasks-axi` when the configured backend selects it, always through `bin/fm-tasks-axi.sh` so the call reaches this home's backlog from any directory, and the documented manual path otherwise; keep only the configured recent Done entries.
 `secondmate-provisioning` and `bin/fm-backlog-handoff.sh` own cross-home handoff safety.
+Every `bin/fm-tasks-axi.sh add` names the objective it serves with `--objective O1` to `O7`, or `--objective none --objective-reason "<why>"`.
+An add whose title overlaps an open or recently closed item is refused with its neighbours; answer with `--dup-of <kept-id>` when the work is the same, or `--not-dup <neighbour-id>` when it is different.
+A duplicate or moved item closes with `done <id> --duplicate-of <kept-id>` or `done <id> --moved-to <home> <item-id>` on checked proof, but an item that quotes the captain still needs `--drop-file` with the captain's own words.
+`docs/configuration.md` ("Backlog intake and closing proofs") owns both contracts.
 
 Keep free-form notes free of temporary paths, moving versions, ephemeral identifiers, and copied state that will rot.
 Inspect the current task note before replacing its considered body, and archive the superseded body when recoverability matters rather than appending by default.

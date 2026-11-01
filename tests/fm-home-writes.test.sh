@@ -54,11 +54,11 @@ export FM_HOME="$home"
 run_home() { bash "$ROOT/bin/$1" "${@:2}"; }
 
 for id in archive-1 archive-2; do
-  run_home fm-tasks-axi.sh add "$id" "home-owned backlog row" >/dev/null
+  run_home fm-tasks-axi.sh add --objective O7 "$id" "row $id" >/dev/null
   run_home fm-tasks-axi.sh start "$id" >/dev/null
   run_home fm-tasks-axi.sh 'done' "$id" >/dev/null
 done
-run_home fm-tasks-axi.sh add pending-1 "waiting for an answer" >/dev/null
+run_home fm-tasks-axi.sh add --objective O7 pending-1 "waiting for an answer" >/dev/null
 run_home fm-tasks-axi.sh hold pending-1 --reason 'home write proof' --kind captain >/dev/null
 run_home fm-tasks-axi.sh unhold pending-1 >/dev/null
 run_home fm-tasks-axi.sh prune --keep 1 >/dev/null
@@ -137,7 +137,7 @@ chmod +x "$fakebin/tmux"
 export PATH="$fakebin:$PATH" TMUX='fixture,1,0' FM_SPAWN_NO_GUARD=1
 # Minimal filled task content, following fixtures.sh's spawn brief convention.
 fm_test_spawn_brief "$home" cwd-task 'Investigate home-owned writes.'
-run_home fm-tasks-axi.sh add cwd-task 'Investigate home-owned writes' >/dev/null
+run_home fm-tasks-axi.sh add --objective O7 cwd-task 'Investigate home-owned writes' >/dev/null
 run_home fm-spawn.sh cwd-task "$project" --scout > "$TMP_ROOT/spawn.out" 2>&1 \
   || fail "foreign-directory spawn failed: $(cat "$TMP_ROOT/spawn.out")"
 assert_grep "worktree=$copy" "$home/state/cwd-task.meta" "spawn metadata missed the home"

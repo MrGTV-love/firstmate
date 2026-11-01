@@ -541,7 +541,13 @@ def own_timeout(key, milliseconds, event_id=None):
     body += '. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.'
     # Inspect before retrying an interrupted publication, using the deterministic id.
     if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
-        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', filing_project(), '--body', body], capture_output=True, text=True, env=env)
+        add = cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', filing_project(), '--body', body, '--objective', 'O7']
+        result = subprocess.run(add, capture_output=True, text=True, env=env)
+        # The wrapper refuses a title that overlaps another item and prints a --not-dup override.
+        # This title carries the command key, so a neighbour under another key is different work.
+        override = re.search(r'--not-dup (\S+)', result.stderr) if result.returncode == 2 else None
+        if override:
+            result = subprocess.run(add + ['--not-dup', override.group(1)], capture_output=True, text=True, env=env)
         if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
             raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
     with ledger() as (handle, rows):
