@@ -43,6 +43,15 @@ class ObserverTests(unittest.TestCase):
     def records(self, kind):
         return [json.loads(line) for line in self.cli("records", "--kind", kind).stdout.splitlines()]
 
+    def assertProcessGone(self, pid):
+        # A killed orphan can briefly remain a zombie; /proc on Linux or the
+        # existing native identity table on Darwin distinguishes it from live.
+        import runpy
+        from types import SimpleNamespace
+        shared = SimpleNamespace(**runpy.run_path(str(OWNER.with_name("fm-proc-budget-tree.py"))))
+        rows = shared.Table().read()
+        self.assertTrue(pid not in rows or rows[pid][3], f"process {pid} survived")
+
     def test_reused_pid_ancestry_and_private_arguments(self):
         self.tool("ps", '''n=0
 [ ! -e "$FIXTURE_ROOT/count" ] || n=$(cat "$FIXTURE_ROOT/count")
@@ -98,6 +107,103 @@ owner["run"](owner["private_root"](),duration=0.8,process_source=source)
             self.assertEqual(row["ancestor_end"], "cycle")
         self.assertNotIn("fixture-secret", json.dumps(rows))
 
+    def test_interpreter_flags_keep_script_names_and_withhold_payloads(self):
+        launcher = self.root / "injected-forms.py"
+        launcher.write_text('''import runpy,sys
+owner=runpy.run_path(sys.argv[1])
+forms=[
+  ["/Library/Developer/MacOS/Python","/fixture/fm-caller.py","fixture-secret"],
+  ["/fixture/bin/python","-u","/fixture/fm-caller.py"],
+  ["/bin/bash","-eu","/fixture/fm-caller.sh"],
+  ["/bin/bash","-eu","-c","fixture-secret"],
+  ["/bin/bash","-ec","fixture-secret"],
+  ["python3.11","-m","fixture-secret"],
+  ["node","-e","fixture-secret"],
+  ["perl","-E","fixture-secret"],
+  ["ruby","-I","fixture-secret","/fixture/caller.rb"],
+  ["bash","-s","fixture-secret"],
+]
+table={50:(100,"fixture-start",["node","--no-warnings","/opt/homebrew/bin/gh-axi","api","graphql"]),
+       60:(0,"fixture-noncaller",["node","-e","gh-axi"]),
+       61:(0,"fixture-noncaller",["python3","-c","gh"]),
+       62:(0,"fixture-noncaller",["node","--inspect=9229","/fixture/gh"])}
+for index,form in enumerate(forms):
+    table[100+index]=(101+index if index+1<len(forms) else 0,"fixture-start",form)
+owner["run"](owner["private_root"](),duration=0.5,process_source=lambda:table)
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        rows = self.records("process")
+        self.assertEqual([row["pid"] for row in rows], [50])
+        self.assertEqual(rows[0]["argv"], ["node", "--no-warnings", "gh-axi", "api", "graphql"])
+        self.assertEqual([item["argv"] for item in rows[0]["ancestors"]], [
+            ["Python", "fm-caller.py", "[REDACTED]"],
+            ["python", "-u", "fm-caller.py"],
+            ["bash", "-eu", "fm-caller.sh"],
+            ["bash", "-eu", "-c", "[REDACTED]"],
+            ["bash", "[REDACTED]", "[REDACTED]"],
+            ["python3.11", "-m", "[REDACTED]"],
+            ["node", "[REDACTED]", "[REDACTED]"],
+            ["perl", "[REDACTED]", "[REDACTED]"],
+            ["ruby", "[REDACTED]", "[REDACTED]", "[REDACTED]"],
+            ["bash", "[REDACTED]", "[REDACTED]"],
+        ])
+        self.assertNotIn("fixture-secret", json.dumps(rows))
+
+    def test_hung_quota_request_is_killed_and_the_next_tick_sends_a_new_one(self):
+        self.tool("gh-axi", '''n=0
+[ ! -e "$FIXTURE_ROOT/count" ] || n=$(cat "$FIXTURE_ROOT/count")
+n=$((n+1)); printf '%s' "$n" > "$FIXTURE_ROOT/count"
+if [ -e "$FIXTURE_ROOT/request-pid" ] && kill -0 "$(cat "$FIXTURE_ROOT/request-pid")" 2>/dev/null; then
+  : > "$FIXTURE_ROOT/overlap"
+fi
+printf '%s' "$$" > "$FIXTURE_ROOT/request-pid"
+if [ "$n" = 1 ]; then
+  sleep 600 &
+  printf '%s' "$!" > "$FIXTURE_ROOT/quota-child"
+  wait
+fi
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        # A labeled scaled clock runs the real 15 s and 30 s constants twenty times faster.
+        launcher = self.root / "scaled-clock.py"
+        launcher.write_text('''import runpy,sys,time
+scale=20.0
+real_monotonic,real_sleep=time.monotonic,time.sleep
+base=real_monotonic()
+time.monotonic=lambda: base+(real_monotonic()-base)*scale
+time.sleep=lambda seconds: real_sleep(seconds/scale)
+owner=runpy.run_path(sys.argv[1])
+owner["run"](owner["private_root"](),duration=100,process_source=lambda:{})
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True, timeout=120)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        rows = self.records("quota")
+        expired = [index for index, row in enumerate(rows) if row.get("reason") == "timeout"]
+        self.assertEqual(len(expired), 1, rows)
+        timeout = rows[expired[0]]
+        self.assertEqual((timeout["status"], timeout["graphql"], timeout["exit_code"]), ("unavailable", {}, -9))
+        self.assertIn("pending", [row["status"] for row in rows[:expired[0]]])
+        later = rows[expired[0] + 1:]
+        self.assertEqual(later[0]["status"], "observed", rows)
+        self.assertGreaterEqual(later[0]["request_started_at"] - timeout["request_started_at"], 30 / 20)
+        self.assertFalse((self.root / "overlap").exists(), "a new request overlapped the timed-out one")
+        self.assertProcessGone(int((self.root / "quota-child").read_text()))
+
+    def test_hung_ps_is_killed_and_does_not_stop_the_quota_stream(self):
+        self.tool("ps", '''printf '%s' "$$" > "$FIXTURE_ROOT/ps-pid"
+exec sleep 600
+''')
+        self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "6"], env=self.env,
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        self.assertGreaterEqual(sum(row["failures"] for row in self.records("sampling")), 1)
+        self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
+        self.assertProcessGone(int((self.root / "ps-pid").read_text()))
+
     def test_malformed_quota_is_unavailable_not_zero(self):
         self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")
         self.cli("run", "--duration", "0.8")
@@ -143,13 +249,7 @@ wait
         finally:
             self.cli("stop")
         self.assertEqual(json.loads(self.cli("status").stdout)["state"], "stopped")
-        # A killed orphan can briefly remain a zombie; /proc on Linux or the
-        # existing native identity table on Darwin distinguishes it from live.
-        import runpy
-        from types import SimpleNamespace
-        shared = SimpleNamespace(**runpy.run_path(str(OWNER.with_name("fm-proc-budget-tree.py"))))
-        rows = shared.Table().read()
-        self.assertTrue(sleeper not in rows or rows[sleeper][3], "private quota descendant survived stop")
+        self.assertProcessGone(sleeper)
 
     def test_detached_failure_reaches_the_owner_log(self):
         root = self.state / "github-accounting"
