@@ -2046,14 +2046,19 @@ test_task_consent_does_not_authorize_a_landing() {
   git -C "$case_dir/wt" remote add origin https://github.com/example/repo
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
+  landing_home_config "$case_dir/wt"
   printf 'upstream_consent=github.com/example/repo\n' >> "$case_dir/state/task-x1.meta"
+  # The primary home merges its own consent task with no maintainer grant, so
+  # a matching consent is the only authority on offer.
   rc=0
-  FM_TEST_CODE_ROOT="$case_dir/wt" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
+  FM_TEST_CODE_ROOT="$case_dir/wt" FM_TEST_HOME="$case_dir/wt" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" 'one-task consent must not land the PR'
   assert_no_grep 'pr merge ' "$case_dir/gh.log" 'one-task consent never reaches forge merge'
   assert_absent "$case_dir/state/task-x1.check.sh" 'one-task consent arms no merge poll'
-  assert_grep 'authorizes a contribution (push and PR), not a landing' "$case_dir/stderr" 'the refusal states the consent limit'
+  assert_grep 'outside its Main home, the home whose config/firstmate-role grants maintainer github.com/example/repo;' \
+    "$case_dir/stderr" 'the primary home with consent but no grant is refused for the missing maintainer grant'
+  assert_no_grep "$case_dir/" "$case_dir/stderr" 'the consent refusal names no path it cannot prove'
   pass 'one-task consent authorizes a contribution, not a landing'
 }
 
