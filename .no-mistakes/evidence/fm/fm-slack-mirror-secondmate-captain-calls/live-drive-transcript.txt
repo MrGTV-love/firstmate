@@ -1,0 +1,93 @@
+
+=== S1 mirror: main + registered local lane + registered remote home
+[exit 0]
+--- card ts=900.000001
+Task: main-call
+Decision: Main release
+Question: Which main release?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- card ts=901.000001
+Task: lane-call
+Decision: Lane schema
+About: Secondmate lane (<lab>/lane)
+Question: Which schema for the lane?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- card ts=902.000001
+Task: remote-call
+Decision: Remote deploy
+About: Secondmate far (<lab>/remote-home)
+Question: Deploy remote now?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+thread key=main-call owner=main ts=900.000001
+thread key=lane-call owner=lane ts=901.000001
+thread key=remote-call owner=far ts=902.000001
+
+=== S1b repeat mirror: no new cards
+[exit 0]
+thread count: 3
+
+=== S2 typed answer to the local lane card
+before: lane open rc=0 main open rc=0
+typed reply in thread 901.000001 (lane): use schema v2
+closed: lane-call
+[exit 0]
+after: lane open rc=1 (1=closed)  main main-call rc=0 (0=open)
+5:- [x] lane-call - Lane schema (repo: firstmate) (kind: captain) (done 2026-11-01) (hold: fm-hold-v1:V2hpY2ggc2NoZW1hIGZvciB0aGUgbGFuZT8=) (hold-kind: captain)
+6-  Resolution recorded by fm-captain-hold.
+7-  Decision digest: 28bf90d7c5090d6e4589473194e8dd1483837221004b93c7adda282353e00fd8
+8-  Resolution mode: answered
+--
+15:  Task: lane-call
+
+=== S3 typed answer to the remote card
+before: remote open rc=0
+typed reply in thread 902.000001 (far): deploy tomorrow
+closed: remote-call
+[exit 0]
+after: remote open rc=1 (1=closed)
+5:- [x] remote-call - Remote deploy (repo: firstmate) (kind: captain) (done 2026-11-01) (hold: fm-hold-v1:RGVwbG95IHJlbW90ZSBub3c/) (hold-kind: captain)
+6-  Resolution recorded by fm-captain-hold.
+7-  Decision digest: 99b90908c09ae5ce00352be0214c5af6527526a6a5af52155a4b293d61ce1162
+8-  Resolution mode: answered
+--
+15:  Task: remote-call
+main backlog byte-identical after both secondmate answers
+remote routes used:
+  {'host': 'far-host', 'home': '<lab>/remote-home', 'argv': ['fm-captain-hold.sh', 'answers'], 'slack_env': False}
+  {'host': 'far-host', 'home': '<lab>/remote-home', 'argv': ['fm-captain-hold.sh', 'open'], 'slack_env': False}
+  {'host': 'far-host', 'home': '<lab>/remote-home', 'argv': ['fm-fleet-snapshot.sh', '--contribution-input'], 'slack_env': False}
+  {'host': 'far-host', 'home': '<lab>/remote-home', 'argv': ['fm-remote-file.sh', 'get'], 'slack_env': False}
+
+=== S4 unreadable registered local home (exists, chmod 000) and missing remote home
+slack: transport failure: secondmate_registry_unavailable: unresolvable secondmate home for locked: <lab>/locked
+[exit 1]
+lane-two cards: 0
+
+=== S5 main-home answer still works with the unreadable homes still registered
+typed reply in thread 900.000001 (main): ship main
+closed: main-call
+slack: transport failure: secondmate_home_unavailable: gone (<lab>/gone)
+[exit 1]
+main main-call open rc=1 (1=closed)
+
+=== S6 no token or env leak
+token absent from all output, state and data
+no SLACK_ variable reached the remote transport

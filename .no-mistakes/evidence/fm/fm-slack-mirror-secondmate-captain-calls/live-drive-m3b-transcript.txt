@@ -1,0 +1,4 @@
+=== mirror with bad lane backlog unreadable (registered first)
+slack: transport failure: secondmate_home_unavailable: bad (<lab>/bad)
+[exit 1]
+card: ok-call owner= ok

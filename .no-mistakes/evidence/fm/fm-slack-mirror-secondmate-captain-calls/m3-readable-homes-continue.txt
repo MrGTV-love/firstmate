@@ -1,0 +1,4 @@
+registry order: ghost (missing) first, then local, remote
+mirror exit=1 output: slack: transport failure: secondmate_home_unavailable: ghost ($TMP/ghost)
+new-local-call cards=1 owner=['local']
+new-remote-call cards=1 owner=['remote']

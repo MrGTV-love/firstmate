@@ -1,0 +1,104 @@
+== M1: mirror from main with local+remote registered ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  exit=0
+thread key=main-call owner=main
+thread key=dup-call owner=main
+thread key=lane-call owner=local
+thread key=dup-call owner=local
+thread key=remote-call owner=remote
+--- CARD ---
+Task: main-call
+Decision: Decide main-call
+Question: Ship v2 or wait for QA?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- CARD ---
+Task: dup-call
+Decision: Decide dup-call
+Question: Main dup decision?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- CARD ---
+Task: lane-call
+Decision: Decide lane-call
+About: Secondmate local ($TMP/local)
+Question: Use Postgres or SQLite for the lane store?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- CARD ---
+Task: dup-call
+Decision: Decide dup-call
+About: Secondmate local ($TMP/local)
+Question: Local dup decision?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- CARD ---
+Task: remote-call
+Decision: Decide remote-call
+About: Secondmate remote ($TMP/remote)
+Question: Deploy to us-east or eu-west?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+== M1: repeat mirror (must add no card) ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  exit=0
+thread count before/after: 5 5
+== M2 local: typed answer to local dup-call card ==
+before: local dup-call open=True main dup-call open=True
+$ fm-slack-poll.sh --replay $TMP/transcript.json   [home=main]
+  | closed: dup-call
+  exit=0
+after: local dup-call open=False main dup-call open=True main backlog byte-identical=True
+local backlog has answer text: True
+== M2 remote: typed answer to remote-call card ==
+before: remote remote-call open=True
+$ fm-slack-poll.sh --replay $TMP/transcript.json   [home=main]
+  | closed: remote-call
+  exit=0
+after: remote remote-call open=False; main backlog byte-identical=True
+ssh route argv[0:2] seen: ['fm-captain-hold.sh answers', 'fm-captain-hold.sh open', 'fm-fleet-snapshot.sh --contribution-input', 'fm-remote-file.sh get']
+SLACK_* env leaked to ssh child: False
+== M3a: registered local home that does not exist ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  | slack: transport failure: secondmate_home_unavailable: ghost ($TMP/ghost)
+  exit=1
+== M3b: registered local home that exists but is permission-denied (chmod 000) ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  | slack: transport failure: secondmate_registry_unavailable: unresolvable secondmate home for locked: $TMP/locked
+  exit=1
+== M3c: registered remote home that is missing on the remote ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  | slack: transport failure: secondmate_home_unavailable: far ($TMP/far-missing)
+  exit=1
+== M3 + M4: main answer still lands while a secondmate home is unreadable ==
+$ fm-slack-poll.sh --replay $TMP/transcript.json   [home=main]
+  | closed: main-call
+  exit=1
+main main-call open after answer: False
+== secret check: token value in any output/state? ==
+token "fixture" as SLACK token in main state: False

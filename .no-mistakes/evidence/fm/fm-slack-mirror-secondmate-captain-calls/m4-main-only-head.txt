@@ -1,0 +1,36 @@
+== main-only mirror ==
+$ fm-slack-mirror.sh --replay $TMP/transcript.json   [home=main]
+  exit=0
+--- CARD ---
+Task: main-call
+Decision: Decide main-call
+Question: Ship v2 or wait for QA?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+== main-only poll after typed reply ==
+$ fm-slack-poll.sh --replay $TMP/transcript.json   [home=main]
+  | closed: main-call
+  exit=0
+main-call open after answer: False
+== all bot messages in DM ==
+--- MSG ---
+Task: main-call
+Decision: Decide main-call
+Question: Ship v2 or wait for QA?
+Recommendation: none recorded
+Evidence: none recorded
+Affordance: text
+Reply in this thread with your answer.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- MSG ---
+Answer recorded.
+--- MSG ---
+Resolved: main-call
+The decision is no longer open. Full resolution remains in the local backlog.

@@ -1,0 +1,20 @@
+head=508300830f52fcb58f0ce534db4d36e7c6c0d8e3
+M1: main/local/remote shared-call each has one four-part card; repeat mirror adds none
+M2: local shared-call open -> closed after persisted-answer reload; main shared-call open and byte-identical
+M2: remote shared-call open -> closed after persisted-answer reload; main shared-call open and byte-identical
+M2: remote answers used existing fm-on route and fm-captain-hold.sh answers
+M3 local: slack: transport failure: secondmate_home_unavailable: unreadable (/Users/charlesabrooker/tmp/fm-slack-secondmates.Cdgs7u/missing)
+M3 remote: slack: transport failure: secondmate_home_unavailable: remote-unreadable (/Users/charlesabrooker/tmp/fm-slack-secondmates.Cdgs7u/remote-missing)
+M4: main answer still closes main despite unreadable registered remote home
+F3 root move: one moved-call card; its answer closed remote through the moved code root
+F3 removed home: answer refused, local orphan-call still open, one orphan report beside the unreadable-home refusal
+F3 orphan: reported once; later polls succeed without a lasting error
+R2-1: readable local and remote homes without data/backlog.md have no calls, not a refusal
+R2-2: failed main snapshot is reported and the readable local snapshot-call still gets its card
+F2: an fm-on.sh routing refusal left routed-call held and tracked; a later answer closed it in remote
+F1 registry: refused registry kept the local answer journaled, main answer closed; answer delivered after repair
+F1 intake: failed remote intake kept its answer journaled, main answer closed; answer delivered after recovery
+R3-1: SSH banner stderr on a closed remote probe still resolves and retires banner-call
+R3-2: a Slack response without ts is reported as itself, not as an unreadable local home
+ok - registered-home cards and crash/reload owner-home answer roundtrip
+exit=0
