@@ -1,0 +1,23 @@
+## PR 340 live: bin/fm-jev-guard.ts installJevGuard tool_call decisions (stub omp host, disposable home/worktree)
+### omp write to conflict://1
+BLOCK=true
+[jev-guard] Device "conflict://1" refused: jev-guard cannot prove the file path behind this conflict target. Resolve the conflict by editing the conflicted file at its real path in your own work copy with the normal edit tool; that edit is judged by the same path rules as any other write. Refused path: "conflict://1". REVIEW_ON_UNAVAILABLE_V1. Apart from the alternative this refusal names, do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+### omp edit to [conflict://1#ABCD] (hashline header spelling)
+BLOCK=true
+[jev-guard] Device "[conflict://1#ABCD]" refused: jev-guard cannot prove the file path behind this conflict target. Resolve the conflict by editing the conflicted file at its real path in your own work copy with the normal edit tool; that edit is judged by the same path rules as any other write. Refused path: "[conflict://1#ABCD]". REVIEW_ON_UNAVAILABLE_V1. Apart from the alternative this refusal names, do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+file unchanged after refusals: true
+
+### the named alternative: edit conflicted.txt at its real path in own worktree
+ALLOWED (no block)
+
+### adversarial: real-path edit outside the worktree (/etc/conflicted.txt)
+BLOCK=true
+[jev-guard] outside the repo: /etc/conflicted.txt Refused path: "/etc/conflicted.txt". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+### control: other scheme ssh://remote/file via write
+BLOCK=true
+[jev-guard] Device "ssh://remote/file" refused: omp routes this URI to a protocol handler, and no write rule is admitted for its scheme. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it. Refused path: "ssh://remote/file". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+rc=0

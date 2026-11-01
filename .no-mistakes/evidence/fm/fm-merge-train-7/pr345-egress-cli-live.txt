@@ -1,0 +1,35 @@
+## PR 345 live: bun bin/fm-jev-egress.ts launch interface on the combined tree
+--- brief Firstmate spec: Egress needs: ["web","semantic-search"] (intent section says provider: ignored)
+["semantic-search","web"]
+rc=0
+--- brief Firstmate spec: (no directive)
+[]
+rc=0
+--- brief Firstmate spec: Egress needs: ["unknown"] (adversarial)
+error: invalid or unreadable task egress input; use one unindented Egress needs: JSON array of recognized destination classes in Firstmate spec
+rc=2
+--- brief Firstmate spec: indented directive (adversarial)
+error: invalid or unreadable task egress input; use one unindented Egress needs: JSON array of recognized destination classes in Firstmate spec
+rc=2
+--- brief Firstmate spec: duplicate directive (adversarial)
+error: invalid or unreadable task egress input; use one unindented Egress needs: JSON array of recognized destination classes in Firstmate spec
+rc=2
+--- brief Firstmate spec: fenced provider + unfenced web
+["web"]
+rc=0
+--- record: state/t1.meta with egress=["web"]
+["web"]
+rc=0
+--- record: symlinked meta (adversarial)
+[]
+rc=0
+--- find grant=["semantic-search"] project=firstmate kind=ship
+on
+--- find grant=["web"] project=firstmate kind=ship
+off
+--- find grant=[] project=firstmate kind=ship
+off
+--- find grant=[] kind=secondmate
+on
+--- find grant=["semantic-search"] project=other
+off

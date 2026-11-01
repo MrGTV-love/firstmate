@@ -1,0 +1,16 @@
+## PR 348 live: bin/fm-cpu-pass.sh pipeline-start on the combined tree (disposable HOME + pool)
+### 1. readable host DB, 0 running runs -> admitted, command runs, its status returned
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 load5=19.48 ceiling=36 priority=merge-train
+COMMAND-RAN
+rc=7
+### 2. missing host DB -> refused 125, command never runs
+fm-cpu-pass: pipeline-start refused: unable to open database file
+rc=125
+### 3. garbage host DB -> refused 125, command never runs
+fm-cpu-pass: pipeline-start refused: file is not a database
+rc=125
+### 4. pool dir after runs (no leaked start lock holders)
+total 0
+drwxr-xr-x  3 charlesabrooker  staff   96 Nov  1 10:28 .
+drwx------  4 charlesabrooker  staff  128 Nov  1 10:28 ..
+-rw-------  1 charlesabrooker  staff    0 Nov  1 10:28 pipeline-start.lock

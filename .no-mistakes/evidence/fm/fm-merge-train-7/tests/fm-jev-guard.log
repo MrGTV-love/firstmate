@@ -1,0 +1,42 @@
+ok - pure write boundaries
+✔ omp T2(a), B68: remove own smoke.py (51.933375ms)
+✔ omp T2(b), B69: four-file probe cleanup (45.926916ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (97.492709ms)
+✔ omp: rm -f of HEAD-tracked files named in the brief passes without refusal (137.889792ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (85.445791ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (49.391334ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (123.497708ms)
+✔ claude T2(a), B68: remove own smoke.py (18.145625ms)
+✔ claude T2(b), B69: four-file probe cleanup (6.054417ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (43.44575ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (54.087959ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (8.304667ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (94.781625ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.132125ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (600.27425ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (222.120042ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1645.07875
+ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
+ok - Claude pre-tool allowed write roots, credential insertion deferred to commit time, removals and deterministic device refusal
+ok - active writes need no provider, never-send check or model key and send nothing; inactive scopes send nothing and keep path checks
+ok - bounded service retries: a later answer succeeds, repeated outages stop after three tries, contract failures and answers are not retried; a failed ledger write denies
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool credential tails and large writes send nothing, audit failure, inactive independence, provider-independent writes and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - conflict URI refusal names an exempt real-path edit while outside edits stay refused
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+ok - actual stalled requests produce a typed service timeout inside the decision budget and before a host deadline
+ok - oversized, unplannable and never-send write content is admitted locally with no request, size refusal or friction event
+ok - every pre-tool refusal mirrors one digest-only fm-friction.v1 event keyed by its audit branch; allows, repeated identities and writer failures write nothing and never change the refusal
+ok - private terminal audit keeps admissions, usage and cost certainty without payloads, answers or provider extensions

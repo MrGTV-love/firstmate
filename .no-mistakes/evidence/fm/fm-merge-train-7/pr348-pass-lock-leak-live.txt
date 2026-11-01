@@ -1,0 +1,13 @@
+## PR 348 live: pass locks do not leak into a surviving child
+### COMMAND starts a background survivor (sleep 20) holding inherited fds, then exits
+survivor pid 56399
+held in child: FM_CPU_PASS_HELD=2
+0 1 2 3 4 
+run rc=0
+### status right after COMMAND exited, while the survivor still runs:
+survivor still alive: yes
+pool=18 held=0 free=18 dir=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.oT1ukDZbdO/pool
+### a new run can take every pass at once (pool size passes):
+pool size 18
+got all 18 passes
+rc=0

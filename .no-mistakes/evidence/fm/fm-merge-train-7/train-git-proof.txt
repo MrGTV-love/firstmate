@@ -1,0 +1,13 @@
+## git train proof
+HEAD 8153acf22983be6a769ad10d778ec73a092f684a tree aaf75101f39ba17d6b37af0523801b73ae67ed2b
+ancestor-of-HEAD: ff15a3d585b692587c8ef095c84168457f16c7c5
+ancestor-of-HEAD: 6dd4ff3a3dfb9511274cd04eb0b7a5af8af62660
+ancestor-of-HEAD: 2c87c3b1191522c963e473fa3dc9113e6d4f4814
+ancestor-of-HEAD: 763204fc200f3d7cdba9b371b057997d130d983a
+ancestor-of-HEAD: 609fddb87a4b17c4b33f79c1df720b0bdded64a5
+7356e6c2e tree=b4fc792c1409636bef79026bcb79538526ddeb7e fresh-merge-tree=b4fc792c1409636bef79026bcb79538526ddeb7e
+ccee45f72 tree=f9195621c9a4107f23ce990b095f38174fc1910d fresh-merge-tree=f9195621c9a4107f23ce990b095f38174fc1910d
+9ad346e9c tree=f99c0f9044d2d8648335b80abfa64bce8660ef8a fresh-merge-tree=f99c0f9044d2d8648335b80abfa64bce8660ef8a
+8153acf22 tree=aaf75101f39ba17d6b37af0523801b73ae67ed2b fresh-merge-tree=aaf75101f39ba17d6b37af0523801b73ae67ed2b
+.gitignore diff lines vs base:        0
+non-merge commits on first-parent path:        0

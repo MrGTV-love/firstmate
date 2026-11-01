@@ -1,0 +1,12 @@
+### 5. adversarial: host already at the start limit (6 counted running runs) -> start waits in queue, then admits when a run finishes
+after 8s while full, output so far:
+fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 load5=19.07 ceiling=36 priority=merge-train
+waiter files:
+pipeline-start.lock
+pipeline-waiter-zhhfzaek.lock
+mark run r0 completed at 1793550534
+final output:
+fm-cpu-pass: pipeline-start waiting: counted=6 limit=6 load5=19.07 ceiling=36 priority=merge-train
+fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 load5=19.15 ceiling=36 priority=merge-train
+COMMAND-RAN-AT 1793550535
+rc=0

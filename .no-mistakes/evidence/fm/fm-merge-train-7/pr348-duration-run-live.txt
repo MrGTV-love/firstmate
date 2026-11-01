@@ -1,0 +1,30 @@
+## PR 348 live: fm-duration.py run routes fresh no-mistakes starts through pipeline-start (shim no-mistakes; real no-mistakes never run)
+### fresh axi run with --intent, priority merge-train -> admitted before the command
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 load5=17.51 ceiling=36 priority=merge-train
+calibration: "0 of 5 samples for probe-key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+SHIM no-mistakes invoked: axi run --intent x
+progress: "probe-key elapsed=0.1s output_bytes=45 tree_cpu=0.00s"
+rc=0
+### rerun -> admitted
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 load5=17.46 ceiling=36 priority=other
+calibration: "1 of 5 samples for probe-key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+SHIM no-mistakes invoked: rerun
+progress: "probe-key elapsed=0.0s output_bytes=32 tree_cpu=0.00s"
+rc=0
+### reattach (axi run without fresh inputs) -> no admission line, runs directly
+calibration: "2 of 5 samples for probe-key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+SHIM no-mistakes invoked: axi run
+progress: "probe-key elapsed=0.0s output_bytes=34 tree_cpu=0.00s"
+rc=0
+### adversarial: fresh start with host DB missing -> 125 refusal, shim never runs
+fm-cpu-pass: pipeline-start refused: unable to open database file
+rc=125
+### reattach with DB missing -> still runs (reattachments unchanged)
+calibration: "3 of 5 samples for probe-key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+SHIM no-mistakes invoked: axi run
+progress: "probe-key elapsed=0.0s output_bytes=34 tree_cpu=0.00s"
+rc=0
