@@ -121,7 +121,8 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   It follows one module-local function wrapper that forwards a positional decision parameter to that writer, including calls that supply the decision by keyword.
   The call site, not the wrapper's forwarding statement, is enumerated; a conditional decision is excluded only when both branches are exactly `allow`.
   Wrapper calls must resolve to the module's function in Python's symbol table; parameter, local-import, local-variable, closure and comprehension bindings that shadow its name are not event calls.
-  A lambda or comprehension without exactly one symbol table on its line (a comprehension Python 3.12 and later inlines, or two of one kind on one line) is judged by its parameters, loop targets and assignment-expression targets, and then by the enclosing scope.
+  A lambda or comprehension without exactly one symbol table on its line (a comprehension Python 3.12 and later inlines, or two of one kind on one line) is judged by its own parameters, loop targets and assignment-expression targets, and then by the enclosing scope.
+  Assignment expressions in a nested lambda's defaults or in a comprehension bind in the enclosing lambda, unlike assignments in the nested lambda's body.
   A call in a default argument, decorator, base class or a comprehension's first iterable belongs to the enclosing scope, and a class body binds no name for the functions, lambdas and comprehensions inside it.
   Unrelated functions named `record`, comments, strings and allow-only events are not Python event sites.
   Python event discovery does not execute the source or resolve imports, arbitrary path builders, additional wrapper layers or embedded heredoc code; if parsing fails, the existing line-based signatures still apply.

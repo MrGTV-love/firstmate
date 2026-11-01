@@ -510,6 +510,33 @@ mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''class-fixture'\''"}]'
 assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 16
 
+SIG=$(fixture sig_python_nested_lambda_binding)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['fm-guard-event.sh', guard, decision])
+
+def emit():
+    f = lambda: (record('nested-fixture', 'deny'), (lambda: (record := None))); f()
+PY
+assert_site "S1 finds an outer wrapper deny beside a same-line nested lambda binding" "$SIG" 'E'
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/a.py","match":"record('\''nested-fixture'\''"}]'
+assert_mapped "a nested lambda binding cannot hide the outer wrapper refusal" "$SIG" 1
+
+SIG=$(fixture sig_python_nested_lambda_outer_shadow)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['fm-guard-event.sh', guard, decision])
+
+def ordinary():
+    f = lambda record: (record('shadowed-data', 'deny'), (lambda: (record := None))); f(lambda *args: None)
+PY
+[ -z "$(site_ids "$SIG")" ] || fail "a genuine outer lambda parameter must still shadow the wrapper"
+assert_clean "a genuine outer shadow stays excluded beside a same-line nested binding" "$SIG"
+
 SIG=$(fixture sig_python_unbound_record)
 cat >"$SIG/bin/a.py" <<'PY'
 import subprocess

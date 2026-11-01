@@ -370,7 +370,20 @@ def python_event_lines(lines):
         if isinstance(scope, ast.Lambda):
             if parameter(scope.args, name):
                 return True
-            targets = [part.target for part in ast.walk(scope.body) if isinstance(part, ast.NamedExpr)]
+            pending = [scope.body]
+            while pending:
+                part = pending.pop()
+                if isinstance(part, ast.NamedExpr) and part.target.id == name:
+                    return True
+                if isinstance(part, ast.Lambda):
+                    # A nested lambda owns its body bindings, but its defaults
+                    # still execute in this scope. Comprehension walruses also
+                    # bind here, so keep walking through comprehensions.
+                    pending.extend(value for value in part.args.defaults + part.args.kw_defaults
+                                   if value is not None)
+                else:
+                    pending.extend(ast.iter_child_nodes(part))
+            return False
         else:
             targets = [generator.target for generator in scope.generators]
         return any(isinstance(part, ast.Name) and isinstance(part.ctx, ast.Store) and part.id == name
