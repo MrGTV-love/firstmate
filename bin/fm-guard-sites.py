@@ -353,33 +353,42 @@ def python_event_lines(lines):
                          ast.SetComp: 'setcomp', ast.DictComp: 'dictcomp',
                          ast.GeneratorExp: 'genexpr'}
 
+    definitions = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+    def owns(scope, child, node):
+        if isinstance(scope, definitions):
+            return any(child is statement for statement in scope.body)
+        if isinstance(scope, ast.Lambda):
+            return child is scope.body
+        return not any(part is node for part in ast.walk(scope.generators[0].iter))
+
+    def binds(scope, name):
+        if isinstance(scope, ast.Lambda):
+            arguments = scope.args
+            if any(arg is not None and arg.arg == name for arg in arguments.posonlyargs + arguments.args
+                   + arguments.kwonlyargs + [arguments.vararg, arguments.kwarg]):
+                return True
+            targets = [part.target for part in ast.walk(scope.body) if isinstance(part, ast.NamedExpr)]
+        else:
+            targets = [generator.target for generator in scope.generators]
+        return any(isinstance(part, ast.Name) and isinstance(part.ctx, ast.Store) and part.id == name
+                   for target in targets for part in ast.walk(target))
+
     def module_wrapper(node):
-        scope = parents.get(node)
-        table = module_table
+        name = node.func.id
+        child, scope, nested = node, parents.get(node), False
         while scope is not None:
-            name = (scope.name if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                    else expression_scopes.get(type(scope)))
-            comprehension = isinstance(scope, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp))
-            if comprehension and any(child is node for child in ast.walk(scope.generators[0].iter)):
-                name = None
-            if name is not None:
-                candidates = tables.get((scope.lineno, name), [])
-                if not candidates and comprehension:
-                    if any(isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store)
-                           and target.id == node.func.id
-                           for generator in scope.generators for target in ast.walk(generator.target)):
-                        return False
-                    scope = parents.get(scope)
-                    continue
-                if len(candidates) != 1:
-                    return False  # Ambiguous same-line scopes are not proven wrapper calls.
-                table = candidates[0]
-                break
-            scope = parents.get(scope)
-        try:
-            return table.lookup(node.func.id).is_global()
-        except KeyError:
-            return False
+            kind = scope.name if isinstance(scope, definitions) else expression_scopes.get(type(scope))
+            if kind is not None and owns(scope, child, node) and not (nested and isinstance(scope, ast.ClassDef)):
+                candidates = tables.get((scope.lineno, kind), [])
+                if len(candidates) == 1:
+                    if name in candidates[0].get_identifiers():
+                        return candidates[0].lookup(name).is_global()
+                elif isinstance(scope, definitions) or binds(scope, name):
+                    return False
+                nested = True
+            child, scope = scope, parents.get(scope)
+        return name in module_table.get_identifiers() and module_table.lookup(name).is_global()
 
     sites = set()
     for node in ast.walk(tree):

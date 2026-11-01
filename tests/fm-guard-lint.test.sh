@@ -463,9 +463,27 @@ def shadowed_comprehensions(callbacks):
     {record: record('dict-data', 'deny') for record in callbacks}
     list(record('generator-data', 'deny') for record in callbacks)
     [record('nested-data', 'deny') for group in callbacks for record in group]
+
+def same_line(denied, other):
+    a, b = [record(item, 'deny') for item in denied], [x for x in other]
+    c = list(record(item, 'deny') for item in denied), list(x for x in other)
+    d = (lambda: record('lambda-fixture', 'deny')), (lambda: 0)
+
+def same_line_shadowed(denied, other):
+    a, b = [record('list-pair-data', 'deny') for record in denied], [x for x in other]
+    c = list(record('generator-pair-data', 'deny') for record in denied), list(x for x in other)
+    d = (lambda record: record('lambda-pair-data', 'deny')), (lambda: 0)
+    e = (lambda: (record := print) and record('walrus-pair-data', 'deny')), (lambda: 0)
+
+def defaulted(guard=record('default-fixture', 'deny')):
+    return guard
+
+class Holder:
+    record = None
+    calls = [record('class-fixture', 'deny') for guard in 'x']
 PY
 assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
-[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 9 ] \
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 14 ] \
   || fail "only conditional, keyword, direct and unshadowed function and comprehension deny calls may be sites: $(site_ids "$SIG")"
 mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
@@ -473,8 +491,12 @@ mutate "$SIG" '.guards[0].sites = [
   {"file":"bin/a.py","match":"subprocess.run(["},
   {"file":"bin/a.py","match":"record('\''function-fixture'\''"},
   {"file":"bin/a.py","match":"record(guard, '\''deny'\'')","count":4},
-  {"file":"bin/a.py","match":"record('\''iterable-fixture'\''"}]'
-assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 9
+  {"file":"bin/a.py","match":"record('\''iterable-fixture'\''"},
+  {"file":"bin/a.py","match":"record(item, ","count":2},
+  {"file":"bin/a.py","match":"record('\''lambda-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''default-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''class-fixture'\''"}]'
+assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 14
 
 SIG=$(fixture sig_python_unbound_record)
 cat >"$SIG/bin/a.py" <<'PY'

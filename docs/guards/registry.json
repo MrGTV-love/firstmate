@@ -1806,7 +1806,7 @@
       "owner": "bin/fm-bootstrap.sh",
       "invariant": "Operational record mutation never follows a redirected record outside its owning home.",
       "layer": "runtime-block",
-      "source": "the canonical state directory and real task, pending-close and Slack check/trust file paths; existing decision points: site:bin/fm-bootstrap.sh:7790ebdb39, site:bin/fm-spawn.sh:72505e7e0e, site:bin/fm_slack_watch.py:48851dec81",
+      "source": "the canonical state directory and real task, pending-close and Slack check/trust file paths; existing decision points: site:bin/fm-bootstrap.sh:7790ebdb39, site:bin/fm-spawn.sh:72505e7e0e within fm_backlog_record_present, site:bin/fm_slack_watch.py:48851dec81",
       "trigger": "backlog reconcile refuses state dir / task records / pending-close records that are not real files or resolve outside this home (symlink containment) / --relaunch whose task .meta is not a regular file or resolves outside this home's state dir (fm_backlog_record_present -> record_parent_authorized \"resolves outside this home\"); rechecked after the meta lock / Slack arm refuses a symlinked state dir, check shim or trust file, or a non-file shim",
       "decision": "deny",
       "fail_direction": "closed",

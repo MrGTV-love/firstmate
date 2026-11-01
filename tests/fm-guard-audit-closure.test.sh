@@ -20,7 +20,9 @@ REGISTRY="$ROOT/docs/guards/registry.json"
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
-pass "G-10 enforce-mode lint validates the audit arithmetic as registered families grow"
+printf '%s\n' "$out" | grep -Eq '^INFO inventory: .* excluded=1 .* audited=30 ' \
+  || fail "the audited population drifted from 30 guards with one prose exclusion: $out"
+pass "G-10 the registry accounts for all 30 audited Firstmate guards as registered families grow"
 
 # --- G-11: the nine rules are enforced, with a synthetic bad guard failing ---
 "$ROOT/tests/fm-guard-lint.test.sh" >/dev/null 2>&1 \
