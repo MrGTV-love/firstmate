@@ -791,7 +791,7 @@ waiting_record() {  # <copy>
 # hold no bytes of their own, and a socket is skipped because preservation never
 # copies one. Fails when any of it cannot be read or check's time runs out.
 tree_fingerprint() {  # <root> <find-args>...
-  local root=$1 rel want out='' sums hasher=(sha256sum) files=()
+  local root=$1 rel want out='' sums list rc=0 hasher=(sha256sum) files=()
   shift
   ! command -v shasum >/dev/null 2>&1 || hasher=(shasum -a 256)
   while IFS= read -r -d '' rel; do
@@ -813,7 +813,15 @@ tree_fingerprint() {  # <root> <find-args>...
     out="$out$rel"$'\t'"$want"$'\n'
   done < <(cd "$root" && bounded find "$@" ! -type d ! -type s -print0; printf '%s\0' "$?")
   if [ "${#files[@]}" != 0 ]; then
-    sums=$(cd "$root" && printf '%s\0' "${files[@]}" | bounded xargs -0 "${hasher[@]}") || return 1
+    list=$(mktemp "${TMPDIR:-/tmp}/fm-copy-fingerprint.XXXXXX") || return 1
+    if printf '%s\0' "${files[@]}" > "$list"; then
+      # shellcheck disable=SC2016 # The child shell expands its own arguments.
+      sums=$(bounded bash -c 'exec < "$0" && cd "$1" && shift && exec xargs -0 "$@"' "$list" "$root" "${hasher[@]}") || rc=1
+    else
+      rc=1
+    fi
+    rm -f -- "$list"
+    [ "$rc" = 0 ] || return 1
     out="$out$sums"$'\n'
   fi
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256

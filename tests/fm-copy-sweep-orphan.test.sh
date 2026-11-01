@@ -408,7 +408,7 @@ test_regenerable_class() {
 # A write to a regenerable directory is activity: it stops the release that sees
 # it, then keeps a locked copy WAITING until a run finds it unchanged.
 test_regenerable_write_keeps_waiting() {
-  local name locked unlocked real_cp key preserve
+  local name locked unlocked real_cp key preserve found
   CLASS_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
   real_cp=$(command -v cp)
   for name in .cache node_modules; do
@@ -450,13 +450,56 @@ SH
     assert_contains "$OUT" "REMOVED"$'\t'"$locked" "$name: the first quiet run did not release the copy"
     assert_absent "$locked" "$name: the first quiet run left the copy"
     key=$(printf '%s' "$locked" | shasum -a 256 | cut -d ' ' -f 1)
+    found=0
     for preserve in "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"; do
       [ -d "$preserve" ] || continue
+      found=$((found + 1))
       assert_equals 'keep unique bytes' "$(cat "$preserve/unique.dat")" "$name: unique bytes were not preserved"
       assert_equals '' "$(class_dirs_in "$preserve")" "$name: a preserve holds a regenerable directory"
     done
+    assert_equals 1 "$found" "$name: the release after WAITING needs exactly one concrete preserve"
   done
   pass 'a write inside .cache or node_modules stops a release and keeps a locked copy WAITING until it is quiet'
+}
+
+# check fingerprints under its time bound. That route must read the same file
+# bytes as report, or a quiet copy reads as still changing in the budget wake.
+assert_check_names_pending_driver() {  # <mechanism-label>
+  rm -f "$HOMED/state/copy-sweep.record"
+  FM_CHECK_TIMEOUT=120 sweep check
+  assert_contains "$OUT" 'GiB PENDING-DRIVER' "$1: check did not name the quiet copy PENDING-DRIVER"
+  assert_not_contains "$OUT" 'WAITING' "$1: check read a quiet copy as WAITING"
+}
+
+test_check_matches_report_for_quiet_waiting_copy() {
+  local locked real_cp key
+  CLASS_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
+  real_cp=$(command -v cp)
+  make_regenerable_world check-world
+  locked="$CLONE/.claude/worktrees/locked"
+  lock_with_gone_launcher "$locked"
+  put_file "$locked/.cache/tick" 'v0'
+  put_file "$locked/unique.dat" 'keep unique bytes'
+  cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+printf 'copy process %s\\n' "\$\$" > "$locked/.cache/tick"
+SH
+  chmod +x "$W/bin/cp"
+  sweep_status --apply
+  assert_equals 1 "$SWEEP_RC" 'a write during preservation must fail the run'
+  rm -f "$W/bin/cp"
+  key=$(printf '%s' "$locked" | shasum -a 256 | cut -d ' ' -f 1)
+  assert_present "$HOMED/data/copy-sweep/waiting/$key" 'the fixture needs a waiting record'
+  printf 'default-container 0\ndefault-pool off\nload-limit 100000\n' > "$HOMED/config/copy-budget"
+
+  sweep
+  assert_equals PENDING-DRIVER "$(class_of "$locked")" 'report did not read the quiet copy as PENDING-DRIVER'
+  assert_check_names_pending_driver default
+  FM_TIMEOUT_MECHANISM_OVERRIDE=bash assert_check_names_pending_driver bash
+  sweep
+  assert_equals PENDING-DRIVER "$(class_of "$locked")" 'report changed after check'
+  pass 'check and report give a quiet waiting copy with file bytes the same class'
 }
 
 test_ps_observation_diagnostics() {
@@ -524,4 +567,5 @@ test_confined_launcher_observation
 test_preserved_classes
 test_regenerable_class
 test_regenerable_write_keeps_waiting
+test_check_matches_report_for_quiet_waiting_copy
 test_ps_observation_diagnostics
