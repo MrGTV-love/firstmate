@@ -30,11 +30,13 @@ command -v git >/dev/null 2>&1 || { echo "skip: git not found"; exit 0; }
 unset FM_MODEL_CATALOG_DIR
 
 TMP=$(TMPDIR="$ROOT" fm_test_tmproot fm-remote-secondmate-relaunch)
+TMP=$(cd -P "$TMP" && pwd -P)
 HOME_DIR="$TMP/home"
 FAKEBIN=$(fm_fakebin "$TMP/fake")
-mkdir -p "$HOME_DIR/data" "$HOME_DIR/state" "$HOME_DIR/config"
+fm_test_lab_home "$HOME_DIR" || fail "could not mark the source home"
 DEST_HOME="$TMP/destination"
-mkdir -p "$DEST_HOME/config" "$DEST_HOME/state" "$DEST_HOME/data" "$TMP/tmp" "$TMP/user-home"
+fm_test_lab_home "$DEST_HOME" || fail "could not mark the destination home"
+mkdir -p "$TMP/tmp" "$TMP/user-home"
 export TMPDIR="$TMP/tmp"
 NUDGE_MARKER="$HOME_DIR/state/.secondmate-nudge-pending/ios.pending"
 
@@ -209,7 +211,7 @@ run_relaunch() {
 }
 
 run_bootstrap() {
-  fixture_env FM_ROOT_OVERRIDE="$TMP/primary" \
+  fixture_env FM_ROOT_OVERRIDE="$HOME_DIR/primary" \
     FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=0 \
     FM_BOOTSTRAP_VERBOSE_FACTS=1 "$ROOT/bin/fm-bootstrap.sh"
 }
@@ -354,7 +356,7 @@ printf 'fixture charter\n' > "$DEST_HOME/data/charter.md"
 git -C "$DEST_HOME" init -q -b main
 git -C "$DEST_HOME" add AGENTS.md bin
 git -C "$DEST_HOME" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture
-git clone -q "$DEST_HOME" "$TMP/primary"
+git clone -q "$DEST_HOME" "$HOME_DIR/primary"
 cat > "$FAKEBIN/gh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = auth ] && [ "${2:-}" = status ]
@@ -455,7 +457,7 @@ reset_native() {
 assert_survivor_reread() {
   local retry=${1:-} member out rc records head attempts
   head=$(git -C "$DEST_HOME" rev-parse HEAD)
-  [ "$head" = "$(git -C "$TMP/primary" rev-parse HEAD)" ] \
+  [ "$head" = "$(git -C "$HOME_DIR/primary" rev-parse HEAD)" ] \
     || fail "bootstrap fixture is not already at the primary tracked-file commit"
   cp "$DEST_HOME/AGENTS.md" "$TMP/agents-before-bootstrap"
   cp "$HOME_DIR/state/ios.meta" "$TMP/route-before-bootstrap"

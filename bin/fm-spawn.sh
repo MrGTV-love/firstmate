@@ -1532,10 +1532,11 @@ if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   case "$policy_harness" in *[[:space:]]*) policy_raw=1 ;; esac
   fm_session_launch_policy_check "$CONFIG" "$policy_harness" "$policy_raw" || exit 1
 fi
-# Skip the watcher guard when re-exec'd for one pair of a batch, whose parent
-# already ran it; only an operator's switch is an escape.
+# Skip the watcher guard when firstmate re-execs a spawn whose caller already
+# supervises it (a batch pair or a secondmate liveness relaunch, both marked
+# internal); any other value is an operator's switch and records an escape.
 if [ -n "${FM_SPAWN_NO_GUARD:-}" ]; then
-  [ "$FM_SPAWN_NO_GUARD" = batch ] \
+  [ "$FM_SPAWN_NO_GUARD" = internal ] \
     || "$SCRIPT_DIR/fm-guard-event.sh" guard-watcher-down-warning bypass --rule FM_SPAWN_NO_GUARD --task "$SPAWN_GUARD_TASK" --override 2>/dev/null || true
 else
   "$FM_ROOT/bin/fm-guard.sh" || true
@@ -2296,7 +2297,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_args=("${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}")
     [ "$KIND" != scout ] || pair_args+=(--scout)
     pair_rc=0
-    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=batch "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
+    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=internal "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
     if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
       echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - the spawn was deferred and stays queued" >&2
       [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT

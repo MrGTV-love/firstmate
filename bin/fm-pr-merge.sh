@@ -1939,15 +1939,21 @@ forgejo_confirm_merged() {
   [ "$merged" = true ]
 }
 
+# record_attended_override <forge-args...>: immediately before a forge merge,
+# record --attended-override once when it admitted an argument that would
+# otherwise refuse. Telemetry never changes the merge.
+record_attended_override() {
+  [ "$ATTENDED_OVERRIDE" = true ] || return 0
+  ATTENDED_OVERRIDE=false reject_protected_forge_args "$@" 2>/dev/null && return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-away-waiver bypass --rule attended-override --task "$ID" --override 2>/dev/null || true
+}
+
 # Record before either forge call. This arms the merge poll without claiming a
 # landed outcome, so even a provider read failure after a real merge cannot
 # leave teardown without the PR identity it needs to verify the result.
 away_status=0
 require_current_away_authority || away_status=$?
 [ "$away_status" -eq 0 ] || exit "$away_status"
-if [ "$ATTENDED_OVERRIDE" = true ] && ! ATTENDED_OVERRIDE=false reject_protected_forge_args "$@" 2>/dev/null; then
-  "$SCRIPT_DIR/fm-guard-event.sh" merge-away-waiver bypass --rule attended-override --task "$ID" --override 2>/dev/null || true
-fi
 require_recorded_pr_identity || exit 1
 record_pr_metadata || exit 1
 require_released_captain_hold || exit 1
@@ -2045,7 +2051,7 @@ case "$PROVIDER" in
           "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
         exit 1
       fi
-      passed_rules+=(base-tip-changed)
+      passed_rules+=(base-containment base-tip-changed)
       # Off a merge queue, --auto lands now only in a state where gh merges at
       # once; in any other state GitHub arms auto-merge, which can land later
       # on a base tip no check ran with.
@@ -2064,9 +2070,13 @@ case "$PROVIDER" in
         passed_rules+=(auto-not-armed)
       fi
     fi
-    "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule checks-green --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
-    for guard_rule in required-reported base-containment "${passed_rules[@]}"; do
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule "$guard_rule" --no-opportunity --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
+    opportunity_args=()
+    for guard_rule in checks-green required-reported "${passed_rules[@]}"; do
+      case "$guard_rule:$FM_PR_WAIVED_RED:$FM_PR_WAIVED_MISSING" in
+        checks-green:true:*|required-reported:*:true) continue ;;
+      esac
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule "$guard_rule" "${opportunity_args[@]+"${opportunity_args[@]}"}" --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
+      opportunity_args=(--no-opportunity)
     done
     if [ "$FM_PR_WAIVED_RED" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head bypass --rule checks-green --task "$ID" --override --cleared-by allow-red 2>/dev/null || true
@@ -2074,6 +2084,7 @@ case "$PROVIDER" in
     if [ "$FM_PR_WAIVED_MISSING" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head bypass --rule required-reported --task "$ID" --override --cleared-by allow-missing 2>/dev/null || true
     fi
+    record_attended_override "$@"
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?
@@ -2146,6 +2157,7 @@ case "$PROVIDER" in
       gitlab_merge_args=(--auto-merge=false)
     fi
     require_recorded_review || exit 1
+    record_attended_override "$@"
     GITLAB_HOST="$FM_PR_HOST" glab mr merge "$PR_NUMBER" -R "$PROJECT_URL" \
       --sha "$FM_PR_MERGE_HEAD" --yes "$@" "${gitlab_merge_args[@]+"${gitlab_merge_args[@]}"}" || merge_status=$?
     if [ "$merge_status" -ne 0 ]; then
@@ -2180,6 +2192,7 @@ case "$PROVIDER" in
     # exposes no such flag on its own merge subcommand, so the API is called
     # directly through "tea api" instead.
     require_recorded_review || exit 1
+    record_attended_override "$@"
     merge_output=$(tea api --login "$FORGEJO_LOGIN" --repo "$PR_OWNER/$PR_REPO" \
       -X POST "/repos/{owner}/{repo}/pulls/$PR_NUMBER/merge" \
       -f "Do=$forgejo_method" -f "head_commit_id=$FM_PR_MERGE_HEAD" 2>&1) || true

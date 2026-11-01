@@ -355,6 +355,10 @@ test_allow_red_still_waives_only_the_current_failure() {
     || fail "superseded-allow-red-named: the named waiver should merge"$'\n'"$(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 96 example/repo --squash
   jq -se 'any(.[]; .guard == "merge-green-head" and .rule == "checks-green" and .task == "task-x1" and .decision == "bypass" and .override == true and .cleared_by == "allow-red")' "$case_dir/guard-events.jsonl" >/dev/null || fail "accepted red-check waiver was not attributed"
+  jq -se '[.[] | select(.guard == "merge-green-head" and .rule == "checks-green" and .decision == "allow")] | length == 0' \
+    "$case_dir/guard-events.jsonl" >/dev/null || fail "a waived red check was recorded as cleared by retry"
+  assert_equals 1 "$("$ROOT/bin/fm-guard-metrics.sh" --log "$case_dir/guard-events.jsonl" --guards merge-green-head --json | jq '.guards[0].opportunities')" \
+    "superseded-allow-red-named: a waived merge must still be one merge-green-head opportunity"
   pass "fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure"
 }
 
@@ -1645,6 +1649,14 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     "guard-events: the deny did not record a readable source"
 
   jq -se --arg head "$head" 'any(.[]; .guard == "merge-green-head" and .decision == "deny" and .task == "task-x1" and .rule == "checks-green" and .head == $head and .base == "main")' "$case_dir/refused-guard-events.jsonl" >/dev/null || fail "merge refusal lacks rule/task/head/base attribution"
+
+  rc=0
+  FM_GUARD_EVENT_LOG="$case_dir/refused-override-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" --attended-override -- --admin \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "guard-events: an attended override must not admit a red check"
+  jq -se '[.[] | select(.guard == "merge-away-waiver")] | length == 0' "$case_dir/refused-override-events.jsonl" >/dev/null \
+    || fail "guard-events: an attended override on a refused merge recorded an escape"
 
   mkdir -p "$case_dir/guard-events-dir"
   rc=0

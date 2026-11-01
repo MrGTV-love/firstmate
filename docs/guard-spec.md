@@ -230,7 +230,7 @@ Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validati
 Merge refusals record `head` and `base` for the read-only detector; empty fields are missing evidence, not an inferred commit or branch.
 
 A guard records allows as well as denies so opportunities are observable.
-An existing waiver or force records `override: true` only when it changed the outcome, so an unused waiver or a force with nothing to skip writes no escape; a skipped check records decision `bypass` and its activation rule.
+A waiver records `override: true` only when it changed the outcome, so an unused `--allow-red`, `--allow-missing`, `--allow-api-key` or `--attended-override` writes no escape; teardown `--force` skips the landed-work check without reading it, so each forced teardown that reaches that check records one escape; a skipped check records decision `bypass` and its activation rule.
 `actor` is the class of the caller: `gate`, `worker` (it has `FM_TASK_ID`) or `main`.
 An operation that writes one row per rule counts as one opportunity at guard level; its extra rule rows carry `opportunity: false`.
 A bypass is an escape record, not an additional inspected opportunity, and an override is a reassessment signal rather than proof of a false positive.

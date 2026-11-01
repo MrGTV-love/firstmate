@@ -101,7 +101,8 @@ SH
 run_send() {  # <harness> <busy-at> [env=val ...]
   local harness=$1 busy_at=$2 dir fb log
   shift 2
-  dir="$TMP_ROOT/case-$RANDOM-$RANDOM"; mkdir -p "$dir/state"
+  dir="$TMP_ROOT/case-$RANDOM-$RANDOM"
+  fm_test_lab_home "$dir" || fail "could not mark the fixture home"
   fb=$(make_stubs "$dir" "$busy_at" "$harness")
   log="$dir/sleep.log"; : > "$log"
   fm_write_meta "$dir/state/agyw.meta" "window=sess:win" "harness=$harness"
