@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # fm-guard-metrics.sh - the single reader of guard decision events; it computes
-# the retirement nominations defined in docs/guard-spec.md.
+# the retirement nominations, and which of them a recorded decision already
+# judged, as defined in docs/guard-spec.md.
 #
 # docs/guard-spec.md defines the numbers. This script computes them from
 # state/guard-events.jsonl so a cut is decided by measurement, not by a static
@@ -37,9 +38,10 @@
 # With --undecided, print only the ids whose verdict is `cut` and whose registry
 # `retirement_decision` does not judge it, one per line: a nomination nobody has
 # judged yet. A decision starting `keep|redesign|cut YYYY-MM-DD` judges the
-# events through that day; the events after it are measured on their own and
-# nominate the guard again when they meet the threshold. It is the question a
-# session start asks, so the pass cannot sit unread in a log forever.
+# events through that day and stands until the evidence changes: the events after
+# it nominate the guard again only when they meet the threshold on their own and
+# the log holds a deny, warn, override or other non-allow decision. It is the
+# question a session start asks, so the pass cannot sit unread in a log forever.
 #
 # Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log
 # is not an error: every guard is simply unmeasured, because no evidence is not
@@ -55,7 +57,7 @@ JSON=0
 UNDECIDED=0
 ONLY=''
 
-usage() { sed -n '3,46p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
@@ -185,17 +187,20 @@ measure() {  # <rows-json-array> <harm>
   printf '%s %s %s %s %s %s %s\n' "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict"
 }
 
-# A recorded decision judges the evidence up to its date, so it retires a cut
-# nomination only while the events after that date do not meet the retirement
-# rule on their own. A decision without a leading `keep|redesign|cut YYYY-MM-DD`
-# judges nothing.
+# A recorded decision judges the evidence through its date and stands until that
+# evidence changes. The events after the date nominate the guard again only when
+# they meet the retirement rule on their own and the log holds new evidence: any
+# decision other than a plain allow (a deny, warn, override or bypass), or a fire
+# rate that changed to zero. An unchanged all-allow log never re-nominates. A
+# decision without a leading `keep|redesign|cut YYYY-MM-DD` judges nothing.
 judged() {  # <id> <rows-json-array> <harm>
   local day fresh v
   day=$(decision_of "$1" | jq -Rr 'capture("^(keep|redesign|cut) (?<d>[0-9]{4}-[0-9]{2}-[0-9]{2})").d // ""' 2>/dev/null)
   [ -n "$day" ] || return 1
   fresh=$(printf '%s' "$2" | jq -c --arg after "${day}T23:59:59Z" '[.[] | select((.ts // "") > $after)]')
   v=$(measure "$fresh" "$3")
-  [ "${v##* }" != cut ]
+  [ "${v##* }" != cut ] && return 0
+  printf '%s' "$2" | jq -e 'all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1
 }
 
 guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''
