@@ -3243,8 +3243,9 @@ SH
 # Vernant owns the lifecycle format and removal. Fixtures model its public CLI,
 # while teardown still runs its real landing, custody and branch-delete path.
 test_vernant_slot_manifest_retirement() {
-  local variant case_dir common digest records rc head merge
-  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged orca-success orca-refused; do
+  local variant case_dir common digest records rc head merge orig
+  local -a sweep
+  for variant in orca-forced-unlanded forced-landed success refused error absent unlanded no-record not-merged no-manifest scout local-only orca-success orca-refused; do
     case "$variant" in
       orca-*)
         case_dir=$(make_case "vernant-manifest-$variant")
@@ -3258,11 +3259,27 @@ test_vernant_slot_manifest_retirement() {
         printf '#!/usr/bin/env bash\nprintf '\''{"ok":true}\\n'\''\n' > "$case_dir/fakebin/orca"
         chmod +x "$case_dir/fakebin/orca"
         ;;
+      local-only)
+        make_nested_slot_case "vernant-manifest-$variant" enclosing .claude/worktrees/x local-only
+        case_dir=$NESTED_CASE
+        ;;
+      no-manifest)
+        make_nested_slot_case "vernant-manifest-$variant" slot .claude/worktrees/x
+        case_dir=$NESTED_CASE
+        ;;
       *)
         make_nested_slot_case "vernant-manifest-$variant" enclosing .claude/worktrees/x
         case_dir=$NESTED_CASE
         ;;
     esac
+    if [ "$variant" = scout ] || [ "$variant" = no-manifest ]; then
+      perl -pi -e 's/^kind=ship$/kind=scout/' "$case_dir/state/task-x1.meta"
+      mkdir -p "$case_dir/data/task-x1"
+      printf 'scout report\n' > "$case_dir/data/task-x1/report.md"
+      FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+        FM_CONFIG_OVERRIDE="$case_dir/config" "$ROOT/bin/fm-captain-hold.sh" complete task-x1 --none >/dev/null \
+        || fail 'could not record the scout captain-call inventory'
+    fi
     common=$(git -C "$NESTED_SLOT" rev-parse --path-format=absolute --git-common-dir)
     digest=$(printf '%s' "$NESTED_SLOT" | shasum -a 256 | cut -c1-16)
     records=$case_dir/lifecycle
@@ -3271,6 +3288,9 @@ test_vernant_slot_manifest_retirement() {
       '{owner_id:$owner,branch:$branch,worktree_path:$slot,repo_root:$repo}' > "$records/worktree-lifecycle/$digest.json"
     cp "$records/worktree-lifecycle/$digest.json" "$common/vernant-worktree-lifecycle/$digest.json"
     cp "$records/worktree-lifecycle/$digest.json" "$case_dir/manifest.json"
+    if [ "$variant" = no-manifest ]; then
+      rm "$records/worktree-lifecycle/$digest.json" "$common/vernant-worktree-lifecycle/$digest.json"
+    fi
     head=$(git -C "$NESTED_SLOT" rev-parse HEAD)
     git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit --allow-empty -qm fixture-merge
     merge=$(git -C "$case_dir/project" rev-parse HEAD)
@@ -3279,6 +3299,7 @@ test_vernant_slot_manifest_retirement() {
     fi
     cat > "$case_dir/fakebin/gh-axi" <<SH
 #!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$case_dir/gh-axi.log'
 if [ '$variant' = not-merged ]; then
   printf 'merged: false\nhead: $head\nmerge: $merge\n'
 else
@@ -3348,25 +3369,59 @@ PY
         cp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json"
         jq '.owner_id="unknown-owner"' "$case_dir/manifest.json" > "$common/vernant-worktree-lifecycle/unknown.json"
         rm "$case_dir/called"
-        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
-          PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
-          --project "$case_dir/project" --firstmate-state "$case_dir/state" > "$case_dir/report"
+        sweep=(env "CODEX_HOOK_STATE_DIR=$records" "WORKTREE_LIFECYCLE_STORE_DIR=$common/vernant-worktree-lifecycle"
+          "PATH=$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py"
+          --project "$case_dir/project" --firstmate-state "$case_dir/state")
+        "${sweep[@]}" > "$case_dir/report"
         expect_code 0 "$?" 'report failed'
         assert_absent "$case_dir/called" 'report invoked retirement'
         cmp "$case_dir/manifest.json" "$records/worktree-lifecycle/$digest.json" || fail 'report changed legacy bytes'
         cmp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json" || fail 'report changed durable bytes'
         assert_grep 'landing=MERGED recorded_pr=https://github.com/test/vernant/pull/42' "$case_dir/report" 'report omitted proven owner'
         assert_grep 'owner=unknown-owner landing=UNPROVEN' "$case_dir/report" 'report omitted unproven owner'
+        orig=$(git -C "$NESTED_SLOT" rev-parse HEAD)
+        git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit --allow-empty -qm advanced
+        printf 'pr=https://github.com/test/vernant/pull/42\n' > "$case_dir/state/task-x1.meta"
+        "${sweep[@]}" --apply > "$case_dir/apply-live" || true
+        assert_grep "$digest.json owner=task-x1 slot=$NESTED_SLOT landing=LIVE" "$case_dir/apply-live" 'sweep did not list the live owner'
+        assert_absent "$case_dir/called" 'sweep retired a live owner'
+        cmp "$case_dir/manifest.json" "$records/worktree-lifecycle/$digest.json" || fail 'sweep changed live legacy bytes'
+        cmp "$case_dir/manifest.json" "$common/vernant-worktree-lifecycle/$digest.json" || fail 'sweep changed live durable bytes'
+        rm "$case_dir/state/task-x1.meta"
+        "${sweep[@]}" --apply > "$case_dir/apply-unlanded" || true
+        assert_grep "$digest.json owner=task-x1 slot=$NESTED_SLOT landing=UNLANDED" "$case_dir/apply-unlanded" 'sweep did not list unlanded slot work'
+        assert_absent "$case_dir/called" 'sweep retired unlanded slot work'
+        assert_present "$records/worktree-lifecycle/$digest.json" 'sweep removed unlanded legacy record'
+        assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'sweep removed unlanded durable record'
+        git -C "$NESTED_SLOT" checkout -q --detach "$orig"
         rc=0
-        CODEX_HOOK_STATE_DIR="$records" WORKTREE_LIFECYCLE_STORE_DIR="$common/vernant-worktree-lifecycle" \
-          PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
-          --project "$case_dir/project" --firstmate-state "$case_dir/state" --apply > "$case_dir/apply" || rc=$?
+        "${sweep[@]}" --apply > "$case_dir/apply" || rc=$?
         expect_code 1 "$rc" 'apply should report the unproven owner'
         assert_absent "$records/worktree-lifecycle/$digest.json" 'apply left landed legacy copy'
         assert_absent "$common/vernant-worktree-lifecycle/$digest.json" 'apply left landed durable copy'
         assert_present "$common/vernant-worktree-lifecycle/unknown.json" 'apply touched unproven owner'
         ;;
 
+      no-record|not-merged|scout|local-only)
+        expect_code 0 "$rc" "$variant teardown changed behavior: $(cat "$case_dir/err")"
+        assert_absent "$case_dir/called" "$variant called retirement"
+        assert_present "$records/worktree-lifecycle/$digest.json" "$variant removed legacy record"
+        assert_present "$common/vernant-worktree-lifecycle/$digest.json" "$variant removed durable record"
+        assert_grep "$digest.json stayed: " "$case_dir/out" "$variant did not name the kept record"
+        if git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1; then
+          fail "$variant teardown did not delete its task branch"
+        fi
+        ;;
+      no-manifest)
+        expect_code 0 "$rc" "teardown without a record changed behavior: $(cat "$case_dir/err")"
+        assert_absent "$case_dir/called" 'teardown without a record called retirement'
+        if grep -q '^api ' "$case_dir/gh-axi.log" 2>/dev/null; then
+          fail 'teardown without a record asked the forge for a landing proof'
+        fi
+        if grep -q 'stayed: ' "$case_dir/out"; then
+          fail 'teardown without a record reported a kept record'
+        fi
+        ;;
       absent)
         expect_code 0 "$rc" 'missing entry point changed teardown behavior'
         assert_grep 'retire_slot_manifest.py; lifecycle records unchanged' "$case_dir/out" 'missing entry point not reported'
@@ -3385,7 +3440,7 @@ PY
         ;;
     esac
   done
-  pass 'Vernant retirement honors landing proof, both copies, refusals, and old checkouts'
+  pass 'Vernant retirement honors landing proof, kept records, live owners, both copies, refusals, and old checkouts'
 }
 
 teardown_test_cases=(

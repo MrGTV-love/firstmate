@@ -3,11 +3,15 @@
 
 Usage: fm-slot-manifest-retire.py --project PATH --firstmate-state PATH
        [--state-dir PATH] [--apply]
-Report-only by default. Lists durable and legacy records, including owners with
-no recorded PR. --apply changes only records with a recorded, forge-merged PR.
+Report-only by default. Lists durable and legacy records with owner and landing
+status. --apply retires a record only when its owner has no live Firstmate task
+record (state/<owner>.meta), its recorded PR is forge-merged, and the slot's
+HEAD has no commit outside origin/main; every other record is listed and kept.
 For teardown: add --slot PATH --owner-id ID --owner-branch BRANCH --apply after
-its landed-work proof. Missing entry points preserve the old teardown behavior.
-No record is removed here. The Vernant command owns locking and both removals.
+its landed-work proof, or --keep REASON to leave the slot's records in place.
+A slot with no record, no entry point, or no recorded merged PR keeps the old
+teardown behavior. No record is removed here. The Vernant command owns locking
+and both removals.
 """
 
 import argparse
@@ -32,10 +36,14 @@ def run(args, project):
     return result.stdout.strip()
 
 
-def recorded_pr(state, owner):
+def owner_meta(state, owner):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", owner):
         raise Refusal("invalid owner identity")
-    meta = state / (owner + ".meta")
+    return state / (owner + ".meta")
+
+
+def recorded_pr(state, owner):
+    meta = owner_meta(state, owner)
     if meta.is_file():
         urls = [line[3:] for line in meta.read_text().splitlines() if line.startswith("pr=")]
         if urls:
@@ -119,6 +127,30 @@ def retire(args, slot, owner, branch, paths, proof):
             raise Refusal("entry point returned success but an active record remains")
 
 
+def retire_slot(args):
+    slot = args.slot.resolve()
+    existing = []
+    try:
+        _, durable, legacy = stores(args.project, args.state_dir)
+        name = hashlib.sha256(str(slot).encode()).hexdigest()[:16] + ".json"
+        paths = {durable / name, legacy / name}
+        existing = sorted(str(path) for path in paths if os.path.lexists(path))
+        if not existing:
+            return 0
+        script = args.project / "scripts/git-stability/retire_slot_manifest.py"
+        if not script.is_file():
+            print(f"missing entry point: {script}; lifecycle records unchanged")
+            return 0
+        if args.keep:
+            raise Refusal(args.keep)
+        proof = landing_proof(args.project, args.firstmate_state, args.owner_id, fetch=True)
+    except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"lifecycle record {' and '.join(existing) or 'of ' + str(slot)} stayed: {exc}")
+        return 0
+    retire(args, slot, args.owner_id, args.owner_branch, paths, proof)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", type=Path, required=True)
@@ -128,24 +160,17 @@ def main():
     parser.add_argument("--slot", type=Path)
     parser.add_argument("--owner-id")
     parser.add_argument("--owner-branch")
+    parser.add_argument("--keep")
     args = parser.parse_args()
     args.project = args.project.resolve()
     if args.slot and not (args.owner_id and args.owner_branch and args.apply):
         parser.error("--slot requires --owner-id, --owner-branch and --apply")
+    if args.keep and not args.slot:
+        parser.error("--keep requires --slot")
     try:
-        common, durable, legacy = stores(args.project, args.state_dir)
         if args.slot:
-            slot = args.slot.resolve()
-            name = hashlib.sha256(str(slot).encode()).hexdigest()[:16] + ".json"
-            paths = {durable / name, legacy / name}
-            if not any(os.path.lexists(path) for path in paths):
-                return 0
-            if not (args.project / "scripts/git-stability/retire_slot_manifest.py").is_file():
-                print(f"missing entry point: {args.project}/scripts/git-stability/retire_slot_manifest.py; lifecycle records unchanged")
-                return 0
-            proof = landing_proof(args.project, args.firstmate_state, args.owner_id, fetch=True)
-            retire(args, slot, args.owner_id, args.owner_branch, paths, proof)
-            return 0
+            return retire_slot(args)
+        common, durable, legacy = stores(args.project, args.state_dir)
         names = sorted({p.name for directory in {durable, legacy} for p in directory.glob("*.json")})
         failed = False
         for name in names:
@@ -159,7 +184,14 @@ def main():
                 if source.parent != durable and Path(record["repo_root"]).resolve() != common.parent:
                     continue
                 owner, branch, slot = record["owner_id"], record["branch"], Path(record["worktree_path"])
+                if os.path.lexists(owner_meta(args.firstmate_state, owner)):
+                    print(f"{name} owner={owner} slot={slot} landing=LIVE: {owner}.meta is a live Firstmate task record; both copies kept")
+                    continue
                 proof = landing_proof(args.project, args.firstmate_state, owner, fetch=args.apply)
+                outside = run(["git", "-C", str(slot), "rev-list", "--count", "HEAD", "--not", "refs/remotes/origin/main"], args.project)
+                if outside != "0":
+                    print(f"{name} owner={owner} slot={slot} landing=UNLANDED: slot HEAD has {outside} commit(s) outside origin/main; both copies kept")
+                    continue
                 print(f"{name} owner={owner} slot={slot} landing=MERGED recorded_pr={proof['pr_url']}")
                 if args.apply:
                     retire(args, slot, owner, branch, paths, proof)

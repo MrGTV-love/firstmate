@@ -2745,25 +2745,26 @@ work_is_landed_proof() {
 }
 
 # Vernant owns slot declarations and their removal. Both runtime routes call
-# this before detaching/deleting the slot branch, never on a discard proof.
+# this before detaching/deleting the slot branch, after the route's own landed
+# work proof and never on a discard proof. Only a ship's recorded MERGED PR
+# retires the slot's record; every other task keeps it, as before.
 # The command header owns report-only recovery of earlier stale declarations.
 teardown_retire_slot_manifest() {
   [ "$FORCE" != "--force" ] || return 0
-  local slot=$1 branch=$2
+  local slot=$1 branch=$2 keep=
   if [ ! -f "$PROJ/scripts/git-stability/provision_existing_slot.py" ] \
      && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then
     return 0
   fi
-  local TEARDOWN_LANDED_DIR=$slot TEARDOWN_LANDED_REF=HEAD
-  if [ -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ]; then
-    work_is_landed "$branch" || {
-      echo "REFUSED: Vernant manifest retirement requires landed work in $slot; branch preserved" >&2
-      return 1
-    }
+  if [ "$KIND" != ship ]; then
+    keep="$KIND task records no merged PR"
+  elif [ "$MODE" = local-only ]; then
+    keep="local-only ship records no merged PR"
   fi
   python3 "$SCRIPT_DIR/fm-slot-manifest-retire.py" --project "$PROJ" \
     --firstmate-state "$STATE" --slot "$slot" --owner-id "$ID" \
-    --owner-branch "$branch" --state-dir "${CODEX_HOOK_STATE_DIR:-/tmp/vernant-codex-hooks-$(id -u)}" --apply
+    --owner-branch "$branch" --state-dir "${CODEX_HOOK_STATE_DIR:-/tmp/vernant-codex-hooks-$(id -u)}" --apply \
+    ${keep:+--keep "$keep"}
 }
 
 # Archive cleanup needs its own stricter proof, not the pipeline-input exception:
