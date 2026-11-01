@@ -4599,20 +4599,6 @@ fi
   echo "error: task $ID has no brief at inaccessible data path $BRIEF" >&2
   exit 1
 }
-if [ "$KIND" != secondmate ]; then
-  if [ "$RELAUNCH" = 1 ]; then
-    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || TASK_EGRESS=
-  else
-    TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
-  fi
-  case $TASK_EGRESS in
-    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
-    *)
-      echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
-      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
-      exit 1 ;;
-  esac
-fi
 # Print the single refusal a dispatch verdict produces: the brief path, every
 # problem in one list, and the repair that clears all of them, including the
 # alternative of pointing the section at a finished criteria file.
@@ -4710,6 +4696,20 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     echo "error: $BRIEF records a Base branch line but the spawn has no --base-branch; pass the brief's base with --base-branch or re-scaffold the brief without one" >&2
     exit 1
   fi
+  # Brief admission above owns malformed and incomplete input, so this decision
+  # judges only an admitted brief, before the launch brief declares its result.
+  if [ "$RELAUNCH" = 1 ]; then
+    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || TASK_EGRESS=
+  else
+    TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
+  fi
+  case $TASK_EGRESS in
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
+    *)
+      echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      exit 1 ;;
+  esac
   # Use the existing launch-brief overlay for every worker kind, including
   # pre-scope briefs and relaunches. Charters never enter this worker path.
   # It is rendered here so a contract problem refuses before any endpoint
