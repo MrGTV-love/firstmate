@@ -625,7 +625,7 @@ test_batch_reports_a_deferred_pair() {
   write_live "$home" live-a "$case_dir/project"
   out=$(run_spawn "$case_dir" "$home" "$case_dir/unused" "task-c=$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
   expect_code "$DEFER_EXIT" "$rc" "a batch whose only pair was deferred did not exit with the deferral status: $out"
-  assert_contains "$out" "batch: DEFERRED task-c ($case_dir/project) - its project is at capacity, so it stays queued" \
+  assert_contains "$out" "batch: DEFERRED task-c ($case_dir/project) - the spawn was deferred and stays queued" \
     "the batch did not report the deferral"
   assert_not_contains "$out" "batch: FAILED" "the batch reported a deferral as a failure"
   pass "a batch reports a capacity deferral as deferred, not failed"
@@ -2101,7 +2101,7 @@ test_cpu_baseline_follows_a_falling_total() {
 }
 
 test_memory_admission_defers_before_dispatch_then_admits_recovery() {
-  local case_dir home native rc out before worktrees
+  local case_dir home native rc out before worktrees batch_line
   case_dir=$(make_case memory-admission later)
   home="$case_dir/home"; native="$case_dir/native"
   mkdir -p "$native"
@@ -2120,6 +2120,13 @@ test_memory_admission_defers_before_dispatch_then_admits_recovery() {
   cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'memory deferral changed running work'
   jq -es '.[-1].pressure_level == 2 and .[-1].admission == "defer" and .[-1].source == "admit"' \
     "$home/state/memory-readings.jsonl" >/dev/null || fail 'actual spawn did not retain its pressured observation'
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" "later=$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 75 "$rc" "native pressure must defer a batch pair: $out"
+  batch_line=$(grep '^batch: DEFERRED' <<<"$out")
+  assert_equals "batch: DEFERRED later ($case_dir/project) - the spawn was deferred and stays queued" "$batch_line" \
+    "the batch line named a cause for a memory refusal"
   printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
   rc=0
   out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \

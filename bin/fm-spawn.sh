@@ -301,7 +301,8 @@
 #   every place held prints one `deferred:` line and exits 75 before any brief
 #   render, endpoint, worktree, record, or backlog move exists, so the task stays
 #   exactly as queued as it was; an unreadable declaration refuses with exit 1.
-#   A batch reports such a pair as `batch: DEFERRED` and exits 75 when nothing
+#   A batch reports a pair whose spawn exits 75, which means deferred (capacity
+#   or host memory admission), as `batch: DEFERRED` and exits 75 when nothing
 #   else failed. A relaunch and a --secondmate spawn are never counted against
 #   capacity.
 #   With no harness arg, a crewmate/scout spawn resolves the CREW harness only when
@@ -2284,7 +2285,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_rc=0
     FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
     if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
-      echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - its project is at capacity, so it stays queued" >&2
+      echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - the spawn was deferred and stays queued" >&2
       [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT
     elif [ "$pair_rc" -ne 0 ]; then
       echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
