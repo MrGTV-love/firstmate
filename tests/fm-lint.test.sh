@@ -76,6 +76,13 @@ SH
 #!/usr/bin/env bash
 . bin/child.sh
 SH
+  cat > "$repo/bin/child-alias.sh" <<'SH'
+#!/usr/bin/env bash
+child() {
+  local library=bin/library.sh
+  bash -c '. "$1"' _ "$library"
+}
+SH
   cat > "$repo/bin/substitution.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$(source bin/library.sh; printf ok)" "`source bin/library.sh; printf ok`"
@@ -95,7 +102,7 @@ SH
     fm_lint_write_diff_file "$diff_file" bin/library.sh
     listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --list-files) || fail "$state child import selection failed"
-    for root in bin/child.sh bin/child-caller.sh bin/substitution.sh bin/nested.sh bin/nested-caller.sh; do
+    for root in bin/child.sh bin/child-caller.sh bin/child-alias.sh bin/substitution.sh bin/nested.sh bin/nested-caller.sh; do
       assert_contains "$listed" "$root" "$state import did not select $root"
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
@@ -240,6 +247,82 @@ SH
     done
   done
   pass "executable stdin imports select direct and transitive callers and invalidate reusable closures"
+}
+
+test_adjacent_aliases_keep_transitive_diagnostics() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): adjacent source aliases"; return; }
+  local tmp repo fakebin diff_file out attempt
+  tmp=$(fm_test_tmproot fm-lint-adjacent-alias)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() { printf ok; }
+SH
+  cat > "$repo/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+main() {
+  local library=bin/library.sh
+  # shellcheck source=bin/library.sh
+  . "$library"
+  needs_argument
+}
+main
+SH
+  cat > "$repo/bin/caller.sh" <<'SH'
+#!/usr/bin/env bash
+. bin/consumer.sh
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" bin/caller.sh 2>&1) || fail "adjacent alias check failed: $out"
+  done
+  assert_contains "$out" 'cache hit bin/caller.sh' "a proven alias did not permit identical-input reuse"
+  fm_lint_write_diff_file "$diff_file" unrelated.sh
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "adjacent alias selection failed"
+  assert_not_contains "$out" bin/caller.sh "an unrelated change selected a proven transitive alias"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() { printf '%s\n' "$1"; }
+SH
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    FM_TEST_GIT_DIFF_FILE="$diff_file" "$repo/bin/fm-lint.sh" 2>&1) \
+    && fail "a proven alias reused stale success after its library changed"
+  assert_contains "$out" SC2119 "the alias lost the changed imported argument requirement"
+  assert_contains "$out" 'begin bin/caller.sh ' "the changed library lost its transitive caller"
+  pass "adjacent source aliases omit unrelated roots without hiding transitive diagnostics"
+}
+
+test_alias_uncertainty_keeps_conservative_selection() {
+  local tmp repo fakebin diff_file listed root
+  tmp=$(fm_test_tmproot fm-lint-alias-boundaries)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff"
+  printf '#!/usr/bin/env bash\nfalse &&\nlib=bin/library.sh\n. "$lib"\n' > "$repo/bin/conditional.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh\nmodify\n. "$lib"\n' > "$repo/bin/intervening.sh"
+  printf '#!/usr/bin/env bash\ndeclare -n lib=target\n. "$lib"\n' > "$repo/bin/nameref.sh"
+  printf '#!/usr/bin/env bash\nlib="$runtime"\n. "$lib"\n' > "$repo/bin/dynamic.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh . "$lib"\n' > "$repo/bin/prefix.sh"
+  printf '#!/usr/bin/env bash\nfn() { local lib=bin/library.sh; }\n. "$lib"\n' > "$repo/bin/scope.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh\n. $lib\n' > "$repo/bin/splitting.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh other=$((lib=1))\n. "$lib"\n' > "$repo/bin/effectful.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh\nother=$((lib=1)) . "$lib"\n' > "$repo/bin/expansion.sh"
+  printf '#!/usr/bin/env bash\nlib=bin/library.sh > "$output"\n. "$lib"\n' > "$repo/bin/redirection.sh"
+  fm_lint_write_diff_file "$diff_file" unrelated.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "uncertain alias selection failed"
+  for root in conditional intervening nameref dynamic prefix scope splitting effectful expansion redirection; do
+    assert_contains "$listed" "bin/$root.sh" "an unproved $root alias lost conservative selection"
+  done
+  pass "conditional, effectful, mutable, scoped, and splitting aliases retain unknown-read fallback"
 }
 
 test_nonprogram_heredocs_remain_inert() {
@@ -477,7 +560,21 @@ SH
     "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
     && fail "runtime consumer hid a changed imported argument requirement"
   assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
-  pass "unproved transitive runtime closures never reuse successful analysis"
+  # Discovery's refusal must remain negative even when the graph changes
+  # before a worker starts. It is not a cached pass or a source snapshot.
+  printf 'bin/library.sh\0' | perl "$repo/bin/fm-lint-cache.pl" select "$repo" "$tmp/refused" \
+    > "$tmp/selection" || fail "runtime refusal discovery failed"
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+. bin/library.sh
+needs_argument
+SH
+  out=$(FM_LINT_INTERNAL_CACHE_REFUSALS="$tmp/refused" \
+    perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+    "$(command -v shellcheck)" --norc --external-sources -- bin/transitive.sh 2>&1) \
+    && fail "a stale refusal hint hid the changed imported argument requirement"
+  assert_contains "$out" SC2119 "a stale refusal hint lost the transitive call-site finding"
+  pass "unproved transitive runtime closures and stale refusal hints never reuse successful analysis"
 }
 
 test_source_spellings_keep_changed_and_cached_dataflow_findings() {
@@ -1064,6 +1161,8 @@ fm_lint_test_cases=(
 test_command_words_exclude_inert_source_text
 test_child_shell_imports_select_and_invalidate_callers
 test_stdin_heredoc_imports_select_and_invalidate_callers
+test_adjacent_aliases_keep_transitive_diagnostics
+test_alias_uncertainty_keeps_conservative_selection
 test_nonprogram_heredocs_remain_inert
 test_production_fixture_stdin_imports_invalidate_cache
 test_production_nested_sources_and_pending_reply_cache

@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 # fm-lint-cache.pl - private dependency selection, success cache, and host-slot gate for fm-lint.sh.
-# Usage: perl fm-lint-cache.pl select <root> <NUL-separated changes on stdin>
+# Usage: perl fm-lint-cache.pl select <root> [<cache-refusals-file>] <NUL-separated changes on stdin>
+# The optional file receives NUL-separated selected roots with unknown imports;
+# FM_LINT_INTERNAL_CACHE_REFUSALS carries only those negative hints to check.
+# It suppresses redundant key discovery, never a real analysis or a diagnostic.
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 #             [--execute <cold-command...>]
 # ShellCheck retains source-aware extended analysis; only identical successful checks
@@ -450,6 +453,7 @@ sub balanced_text {
 sub shell_word {
     my ($body, $position, $parameters, $stop, $literal) = @_;
     my ($value, $quote, @subs) = ('', '');
+    my $effects = 0;
     my $raw_start = $$position;
     while ($$position < length $body) {
         my $char = substr($body, $$position, 1);
@@ -474,6 +478,7 @@ sub shell_word {
             my $start = $$position;
             $$position += 2;
             my $program = balanced_text($body, $position, '(', ')');
+            $effects = 1 if !$literal && $program =~ /^\(/;
             push @subs, $program unless $literal || $program =~ /^\(/;
             $value .= $literal ? substr($body, $start, $$position - $start) : "\x01";
             next;
@@ -509,15 +514,17 @@ sub shell_word {
             }
             if (substr($body, $$position, 2) eq '${') {
                 $$position += 2;
-                balanced_text($body, $position, '{', '}', \@subs);
+                my $expression = balanced_text($body, $position, '{', '}', \@subs);
+                $effects = 1 unless $expression =~ /\A(?:[A-Za-z_]\w*|[0-9]+)\z/;
                 $value .= "\x01";
                 next;
             }
+            $effects = 1 if substr($body, $$position, 2) eq '$[';
         }
         $value .= $char;
         $$position++;
     }
-    return {value => $value, raw => substr($body, $raw_start, $$position - $raw_start), subs => \@subs};
+    return {value => $value, raw => substr($body, $raw_start, $$position - $raw_start), subs => \@subs, effects => $effects};
 }
 sub source_dependency {
     my ($path, $word, $deps, $finite_backend) = @_;
@@ -587,9 +594,38 @@ sub command_dependencies {
         $stdin->{parameters} = \%child_parameters;
     }
 }
+# A preceding scalar declaration can retain an input's lexical identity through
+# one whole-word alias. Never infer values across another command or a control
+# boundary; source_dependency still refuses every value it cannot resolve.
+sub command_aliases {
+    my ($words, $bindings, $can_bind) = @_;
+    return $bindings unless @$words;
+    return {} if grep { $_->{effects} } @$words;
+    for my $word (@$words) {
+        my $raw = $word->{raw} // '';
+        next unless $raw =~ /\A"(.*)"\z/s;
+        my $reference = $1;
+        my ($braced, $plain) = $reference =~ /\A\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))\z/;
+        my $name = $braced // $plain;
+        $word->{value} = $bindings->{$name} if defined $name && exists $bindings->{$name};
+    }
+    my @declarations = @$words;
+    shift @declarations if @declarations && ($declarations[0]{raw} // '') =~ /\A(?:local|declare)\z/;
+    return {} unless $can_bind && @declarations
+        && !(grep { ($_->{raw} // '') !~ /\A[A-Za-z_]\w*=/
+            || $_->{raw} =~ /\$[({\[]|`/ } @declarations);
+    my %next;
+    for my $word (@declarations) {
+        my ($name, $value) = $word->{value} =~ /\A([A-Za-z_]\w*)=(.*)\z/s;
+        $next{$name} = $value if defined $name;
+    }
+    return \%next;
+}
 sub scan_program {
     my ($path, $body, $deps, $finite_backend, $parameters) = @_;
     my ($position, @words, @heredocs, @cases, $stdin);
+    my $bindings = {};
+    my $can_bind = 1;
     $position = 0;
     while ($position < length $body) {
         pos($body) = $position;
@@ -619,6 +655,8 @@ sub scan_program {
         if (substr($body, $position, 2) !~ /^[<>]\(/ && $body =~ /\G((?:[0-9]+)?(?:<<<|<<-|<<|>>|<&|>&|<>|>|<)|&>)/gc) {
             my $operator = $1;
             $position = pos($body);
+            $bindings = {};
+            $can_bind = 0;
             $position++ while substr($body, $position, 1) =~ /[ \t]/;
             my $heredoc = $operator =~ /^(?:[0-9]+)?<<-?$/;
             my $target = shell_word($body, \$position, $parameters, undef, $heredoc);
@@ -642,8 +680,17 @@ sub scan_program {
             if (@cases && $cases[-1] eq 'pattern') {
                 $cases[-1] = 'body' if $separator eq ')';
             } else {
+                $bindings = command_aliases(\@words, $bindings, $can_bind);
                 command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
                 $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
+            }
+            if ($separator ne ';' && $separator ne "\n") {
+                $bindings = {};
+            }
+            if ($separator eq '&' || $separator eq '|') {
+                $can_bind = 0;
+            } elsif (@words || ($separator ne ';' && $separator ne "\n")) {
+                $can_bind = 1;
             }
             @words = ();
             $stdin = undef;
@@ -677,6 +724,7 @@ sub scan_program {
         next if @cases && $cases[-1] eq 'pattern';
         push @words, $word;
     }
+    command_aliases(\@words, $bindings, $can_bind);
     command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
 }
 sub dependencies {
@@ -717,6 +765,16 @@ if ($mode eq 'select') {
         $selected{$path} = 1 if $policy_changed || $changed{$path}
             || (grep { $changed{$_} } keys %$seen)
             || ($source_changed && (grep { $unknown{$_} } keys %$seen));
+    }
+    # This is a negative hint, never permission to reuse a result: workers can
+    # avoid rediscovering an already-known refusal, but still run ShellCheck.
+    # A file that changes after discovery can only miss a cache opportunity.
+    if (defined $args[0]) {
+        open(my $fh, '>', $args[0]) or die "fm-lint-cache: cache refusal manifest: $!\n";
+        print {$fh} "$_\0" for grep {
+            $selected{$_} && (grep { $unknown{$_} } keys %{$closures{$_}})
+        } @inventory;
+        close $fh or die "fm-lint-cache: cache refusal manifest: $!\n";
     }
     print "$_\0" for grep { $selected{$_} } @inventory;
     exit 0;
@@ -771,7 +829,17 @@ sub duration_outcome {
         warn "fm-lint: cannot record cache queue time: $!\n";
     }
 }
-my $key = $cache eq 'off' ? undef : fingerprint();
+my $selection_refused = 0;
+if (defined $ENV{FM_LINT_INTERNAL_CACHE_REFUSALS}
+    && open(my $fh, '<', $ENV{FM_LINT_INTERNAL_CACHE_REFUSALS})) {
+    local $/ = "\0";
+    while (my $entry = <$fh>) {
+        chomp $entry;
+        if ($entry eq $path) { $selection_refused = 1; last; }
+    }
+    close $fh;
+}
+my $key = $cache eq 'off' || $selection_refused ? undef : fingerprint();
 my ($lock, $passed);
 if (defined $key) {
     # An unavailable cache is an optimization failure, not a lint failure.

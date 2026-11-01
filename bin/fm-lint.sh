@@ -40,11 +40,18 @@
 #     Discovery recognizes source/. command words, balanced substitutions, and
 #     executable bash/sh -c and program-stdin heredocs. Source annotations remain
 #     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
-#     Quoted child positional arguments are resolved; <<- strips leading tabs.
+#     Quoted child positional arguments and whole-word quoted aliases from an
+#     immediately preceding simple scalar declaration are resolved; intervening
+#     commands/control boundaries and effectful declarations remain unknown.
+#     Comments/blank lines do not execute commands; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
-#     of every caller; the cache only reuses identical inputs.
+#     of every caller; the cache only reuses identical inputs. Selection passes
+#     its known cache refusals to this run's workers, avoiding repeated source
+#     discovery merely to refuse the same unknown-import cache key. This is
+#     negative information only: those roots still run real analysis, and a
+#     subsequent graph change can only forgo reuse, never authorize a hit.
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
@@ -94,7 +101,7 @@
 # and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
 # positive decimal integer or lint exits 2 on every host). A root that crosses
 # it is ended and takes the memory retry described below, and the roots log's
-# last end-record column counts the samples each source gave (libproc, or ps
+# sample-count end-record column counts the samples each source gave (libproc, or ps
 # for a tick libproc did not answer in time) and names any attempt that gave
 # up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
@@ -158,9 +165,12 @@
 # timeout, memory, signal:<sig>, limit-unavailable, or error:<rc>.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
-# filename. In partition mode begin/end
-# lines also stream to stderr, and an abnormal root end is always reported
-# there.
+# filename. Begin/end lines stream to stderr in every mode, including local
+# changed-file lint and cache hits. End records append queue milliseconds
+# (cache-key plus host-slot waits) and the initial cache outcome; duration_ms
+# excludes that queue time but still includes scheduling delay and bookkeeping.
+# A memory retry retains its initial cache outcome and still checks the retry's
+# own inputs; it is never a source-following cache success.
 # Duration observations are appended through fm-duration.py in one batch from
 # the roots log when lint exits; cache-hit, partial selection and
 # memory-fallback successes are not cold calibration evidence.
@@ -415,10 +425,8 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" "$start_ms" \
       >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ]; then
-    printf 'fm-lint: begin %s (shard %s, %s mode)\n' \
-      "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-unknown}" >&2
-  fi
+  printf 'fm-lint: begin %s (shard %s, %s mode)\n' \
+    "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-unknown}" >&2
   fm_lint_exec_root "$path" "$root_out" "$root_err" "$rss_file" \
     "$root_seconds" "${FM_LINT_WORKER_ARGS[@]}"
   invocation_rc=$FM_LINT_LAST_RC
@@ -479,15 +487,14 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" \
+      "$queued_ms" "${cache_outcome:-unknown}" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
-    printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
-      "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" >&2
-  fi
+  printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s queue_ms=%s cache=%s rss_kib=%s\n' \
+    "$path" "$reason" "$invocation_rc" "$duration_ms" "$queued_ms" "${cache_outcome:-unknown}" "$rss_kib" >&2
   return "$invocation_rc"
 }
 
@@ -1027,6 +1034,7 @@ fm_lint_changed_base_ref() {
 
 CHANGED_MODE=0
 EXPLICIT_PATHS=0
+CACHE_REFUSED_ROOTS=()
 # Until a complete cold run proves otherwise, this invocation is not evidence
 # for the canonical cold ceiling (including a zero-target changed selection).
 if [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && [ "${FM_DURATION_MANAGED_KEY:-}" = "lint.$ANALYSIS_MODE.${PARTITION:-whole}" ]; then
@@ -1067,17 +1075,21 @@ else
     ROOTS=()
     changed_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-changes.XXXXXX") || exit 1
     selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || { rm -f "$changed_list"; exit 1; }
+    refused_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-refusals.XXXXXX") || { rm -f "$changed_list" "$selected_list"; exit 1; }
     if ! git diff --name-only --no-renames -z "$merge_base" -- > "$changed_list" \
       || ! git ls-files --others --exclude-standard -z >> "$changed_list" \
-      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" < "$changed_list" > "$selected_list"; then
-      rm -f "$changed_list" "$selected_list"
+      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" "$refused_list" < "$changed_list" > "$selected_list"; then
+      rm -f "$changed_list" "$selected_list" "$refused_list"
       printf 'fm-lint.sh: could not select changed roots and source dependencies.\n' >&2
       exit 2
     fi
     while IFS= read -r -d '' changed_path; do
       ROOTS+=("$changed_path")
     done < "$selected_list"
-    rm -f "$changed_list" "$selected_list"
+    while IFS= read -r -d '' changed_path; do
+      CACHE_REFUSED_ROOTS+=("$changed_path")
+    done < "$refused_list"
+    rm -f "$changed_list" "$selected_list" "$refused_list"
   fi
 fi
 # Stable largest-first packing uses measured durations across CI runners and
@@ -1881,11 +1893,6 @@ if [ "$SLOT_DIR" != off ]; then
   case "$NCPU" in ''|0*|*[!0-9]*) NCPU=1 ;; esac
 fi
 
-PROGRESS=0
-if [ -n "$PARTITION" ]; then
-  PROGRESS=1
-fi
-
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-lint.XXXXXX") || exit 1
 ACTIVE_PIDS=()
 # shellcheck disable=SC2329 # Registered by the EXIT and signal traps below.
@@ -1946,6 +1953,11 @@ trap 'exit 143' TERM
 WEIGHTS="$TMP_ROOT/weights"
 OUTPUT_DIR="$TMP_ROOT/output"
 mkdir -p "$OUTPUT_DIR"
+CACHE_REFUSALS="$TMP_ROOT/cache-refusals"
+: > "$CACHE_REFUSALS"
+if [ "${#CACHE_REFUSED_ROOTS[@]}" -gt 0 ]; then
+  printf '%s\0' "${CACHE_REFUSED_ROOTS[@]}" > "$CACHE_REFUSALS"
+fi
 
 # The roots log is the retained per-root lifecycle sidecar; beside --telemetry
 # it survives as ${TELEMETRY%.tsv}.roots.tsv even when a run is killed
@@ -2063,7 +2075,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
     FM_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
-    FM_LINT_INTERNAL_PROGRESS="$PROGRESS"
+    FM_LINT_INTERNAL_CACHE_REFUSALS="$CACHE_REFUSALS"
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )

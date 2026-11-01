@@ -306,7 +306,7 @@ SH
 
 test_roots_sidecar_records_per_root_lifecycle() {
   local tmp fakebin stub_log telemetry roots_log out rc
-  local alpha beta gamma
+  local alpha beta gamma fixture
   tmp=$(fm_test_tmproot fm-lint-roots-log)
   fakebin=$(fm_fakebin "$tmp")
   fm_lint_stub_shellcheck "$fakebin" "$tmp/stub.log"
@@ -323,6 +323,10 @@ test_roots_sidecar_records_per_root_lifecycle() {
     "$LINT" --telemetry "$telemetry" "$alpha" "$beta" "$gamma" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "a clean bounded run failed"$'\n'"$out"
   [ -f "$roots_log" ] || fail "the run wrote no per-root sidecar beside telemetry"
+  for fixture in "$alpha" "$beta" "$gamma"; do
+    assert_contains "$out" "begin $fixture " "local lint did not announce the selected root"
+    assert_contains "$out" "end $fixture " "local lint did not report the completed root"
+  done
   grep -q $'^format\tfm-lint-roots-v1$' "$roots_log" \
     || fail "the sidecar is missing its format header"
   grep -q $'^meta\tbounds_enforced\t0$' "$roots_log" \
