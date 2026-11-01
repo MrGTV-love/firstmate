@@ -101,9 +101,11 @@ An active guard added after the audit is named in the registry's
 `beyond_audit_retired`; both stay outside the audited inventory that
 `fm-guard-lint.sh --counts` balances against `audited`.
 
-`retirement_decision` records the outcome, date and reason for the [bad-guard decision](#who-decides): `keep`, `redesign` or `cut` (Remove).
+`retirement_decision` records the outcome, date and reason for the [bad-guard decision](#who-decides), in the form `<keep|redesign|cut> YYYY-MM-DD: <reason>` (`cut` is Remove).
 It is not limited to metrics nominations; any flag in that policy can require a decision.
-For a metrics-nominated guard, recording it retires the nomination; a nominated guard without one is still waiting for judgment.
+A decision judges the evidence through its date and retires a metrics nomination only for that evidence.
+`bin/fm-guard-metrics.sh --undecided` measures the events after that date on their own and nominates the guard again when they meet the [retirement rule](#retirement-rule), so a `keep` or `redesign` never hides a later nomination.
+A nominated guard with no decision, or with one that does not start with an outcome and a date, is still waiting for judgment.
 
 `remedy` is rendered text, not a pointer. Every remedy contains at least one
 executable token: a repository path that exists, a `bin/` invocation, or a shell

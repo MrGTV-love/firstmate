@@ -16,6 +16,7 @@
 #   - an override rate above 20% cuts a reversible guard
 #   - a median above three clear attempts cuts even an irreversible guard
 #   - a recurrence after a clear cuts even an irreversible guard
+#   - a dated decision retires a nomination only for the events through its date
 #   - a missing log reports every guard unmeasured and exits 0
 set -u
 # shellcheck source=tests/lib.sh
@@ -106,7 +107,7 @@ pass "an irreversible guard that never fires is kept"
 registry_with_harm "$TMP/undecided.json" gquiet reversible
 got=$("$METRICS" --log "$ZERO" --registry "$TMP/undecided.json" --min-opportunities 30 --undecided)
 [ "$got" = gquiet ] || fail "an undecided cut nomination must be reported, got '$got'"
-jq '.guards[0].retirement_decision = "keep 2026-10-26: recorded by the test"' \
+jq --arg d "keep $(date -u +%Y-%m-%d): recorded by the test" '.guards[0].retirement_decision = $d' \
   "$TMP/undecided.json" > "$TMP/decided.json"
 got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunities 30 --undecided)
 [ -z "$got" ] || fail "a recorded decision must retire the nomination, got '$got'"
@@ -114,6 +115,38 @@ got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunitie
 printf '%s\n' "$got" | grep -q '^METRIC gquiet .*verdict=cut' \
   || fail "--undecided must not change the measured verdict: $got"
 pass "an undecided nomination is reported and a recorded decision retires it"
+
+# A decision judges the evidence through its date. Events after it are measured
+# on their own, so a keep or redesign never hides a later cut nomination.
+dated_rows() {  # <log> <day> <count>
+  local n=0
+  while [ "$n" -lt "$3" ]; do
+    printf '{"ts":"%sT12:00:%02dZ","guard":"gquiet","session":"w%s-%s","decision":"allow","override":false}\n' \
+      "$2" "$((n % 60))" "$2" "$n" >>"$1"
+    n=$((n + 1))
+  done
+}
+decided_with() {  # <decision> <out>
+  jq --arg d "$1" '.guards[0].retirement_decision = $d' "$TMP/undecided.json" > "$2"
+}
+WINDOW="$TMP/window.jsonl"
+: >"$WINDOW"
+dated_rows "$WINDOW" 2026-01-10 30
+dated_rows "$WINDOW" 2026-03-10 5
+for outcome in keep redesign; do
+  decided_with "$outcome 2026-02-01: judged the January window" "$TMP/dated-$outcome.json"
+  got=$("$METRICS" --log "$WINDOW" --registry "$TMP/dated-$outcome.json" --min-opportunities 30 --undecided)
+  [ -z "$got" ] || fail "a dated $outcome must retire a nomination while later events stay below the threshold, got '$got'"
+done
+dated_rows "$WINDOW" 2026-03-11 25
+for outcome in keep redesign; do
+  got=$("$METRICS" --log "$WINDOW" --registry "$TMP/dated-$outcome.json" --min-opportunities 30 --undecided)
+  [ "$got" = gquiet ] || fail "a $outcome must not hide a cut nomination from events after its date, got '$got'"
+done
+decided_with "keep: no date recorded" "$TMP/undated.json"
+got=$("$METRICS" --log "$ZERO" --registry "$TMP/undated.json" --min-opportunities 30 --undecided)
+[ "$got" = gquiet ] || fail "a decision without an outcome and date must not retire a nomination, got '$got'"
+pass "a keep or redesign judges only its window and a later cut nomination is reported"
 
 # --- override rate ----------------------------------------------------------
 OVER="$TMP/override.jsonl"
