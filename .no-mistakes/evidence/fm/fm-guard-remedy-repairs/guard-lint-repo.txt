@@ -1,0 +1,9 @@
+$ bin/fm-guard-lint.sh --mode new-or-touched --base 3948d62f   # whole branch diff
+INFO guard-watcher-down-warning: exemptions=1
+LINT_SUMMARY mode=new-or-touched guards=53 violations=772 allowlisted=772 stale=0 shown=0 sites=928
+exit=0
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=53 retired=14 beyond_audit=12 excluded=1 unregistered=772 audited=30 beyond_audit_active=26 sites=928 mapped=156
+LINT_SUMMARY mode=enforce guards=53 violations=772 allowlisted=772 stale=0 shown=0 sites=928
+exit=0

@@ -1,0 +1,37 @@
+$ # baseline copy, no edits
+LINT_SUMMARY mode=new-or-touched guards=53 violations=772 allowlisted=772 stale=0 shown=0 sites=928
+exit=0
+$ # ATTACK 1: drop the Remedy from the fm-merge-local.sh dirty-tree refusal
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+VIOLATION S3 site:bin/fm-merge-local.sh:58ca1af84d: bin/fm-merge-local.sh:112 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=773 allowlisted=772 stale=0 shown=1 sites=928
+exit=1
+$ # ATTACK 2: replace the Kimi helper remedy with prose that names no command
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:2e3504c287: bin/fm-kimi-turnend-hook.sh:101 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:e4651c2dd4: bin/fm-kimi-turnend-hook.sh:114 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:1d43e9be52: bin/fm-kimi-turnend-hook.sh:116 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:7a17a7b8ec: bin/fm-kimi-turnend-hook.sh:124 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:81e70724b7: bin/fm-kimi-turnend-hook.sh:128 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:5e5de6b87b: bin/fm-kimi-turnend-hook.sh:131 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:be80339146: bin/fm-kimi-turnend-hook.sh:143 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:e537b52321: bin/fm-kimi-turnend-hook.sh:153 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:247dfe24a4: bin/fm-kimi-turnend-hook.sh:157 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:ac053f6b74: bin/fm-kimi-turnend-hook.sh:161 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:c5416fea04: bin/fm-kimi-turnend-hook.sh:165 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:67e8c67959: bin/fm-kimi-turnend-hook.sh:218 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:dcde35ef4b: bin/fm-kimi-turnend-hook.sh:220 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:c1db17344f: bin/fm-kimi-turnend-hook.sh:224 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:1eeb81633f: bin/fm-kimi-turnend-hook.sh:229 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:228318b77a: bin/fm-kimi-turnend-hook.sh:234 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:7a7a36c941: bin/fm-kimi-turnend-hook.sh:242 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:c1db17344f~2: bin/fm-kimi-turnend-hook.sh:248 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:61e1b13b52: bin/fm-kimi-turnend-hook.sh:256 has no executable Remedy: in its diagnostic or directly called local refusal helper
+VIOLATION S3 site:bin/fm-kimi-turnend-hook.sh:fe3eeb5c8e: bin/fm-kimi-turnend-hook.sh:287 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=792 allowlisted=772 stale=0 shown=20 sites=928
+exit=1
+$ # ATTACK 3: point the backlog-handoff remedy at a nonexistent repo command
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+VIOLATION S3 site:bin/fm-backlog-handoff.sh:f8adac5385: bin/fm-backlog-handoff.sh:985 has no executable Remedy: in its diagnostic or directly called local refusal helper
+LINT_SUMMARY mode=new-or-touched guards=53 violations=773 allowlisted=772 stale=0 shown=1 sites=928
+exit=1

@@ -1,0 +1,28 @@
+$ chmod 000 <homes>/mate/data/secondmates.md
+$ FM_HOME=<lab> bin/fm-teardown.sh uhdemo --force --drop-file <words>   # even force must refuse
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: local Firstmate registry cannot be read at <homes>/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore <lab>/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'uhdemo'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=
+meta kept: yes; worktree kept: yes
+$ # exit code of the refused run above (re-run, bash)
+exit=1
+$ # custody walk (fm_local_firstmate_state_dirs) while unreadable:
+refused: local Firstmate registry cannot be read at <homes>/mate/data/secondmates.md
+exit=1
+$ # follow Remedy: owner restores read access (chmod 600), walk again
+<lab>/state
+<homes>/mate/state
+<homes>/sibling/state
+<homes>/hidden/state
+exit=0
+$ bin/fm-teardown.sh uhdemo --force --drop-file <words>   # retry now passes the home walk
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.8
+Run "treehouse update" to update
+
+worktree <proj>-wt is not managed by treehouse
+error: treehouse return failed for worktree <proj>-wt; teardown aborted
+exit=1
+meta after: <lab>/state/uhdemo.meta

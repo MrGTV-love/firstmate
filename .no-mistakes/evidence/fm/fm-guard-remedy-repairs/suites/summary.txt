@@ -1,0 +1,11 @@
+tests/fm-guard-lint.test.sh exit=0 secs=222
+tests/fm-teardown-endpoint-safety.test.sh exit=0 secs=427
+tests/fm-backlog-handoff.test.sh exit=0 secs=552
+tests/fm-remote-reply.test.sh exit=0 secs=1549
+tests/fm-pending-reply.test.sh exit=0 secs=532
+tests/fm-remote-doctor.test.sh exit=0 secs=297
+tests/fm-kimi-harness.test.sh exit=0 secs=384
+tests/fm-api-key-guard-lib.test.sh exit=0 secs=50
+tests/fm-control-relaunch.test.sh exit=0 secs=2545
+tests/fm-task-delivery.test.sh exit=0 secs=1288
+tests/fm-open-loops.test.sh exit=0 secs=4157

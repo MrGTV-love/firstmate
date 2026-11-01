@@ -1,0 +1,14 @@
+$ ANTHROPIC_API_KEY=sk-ant-demo bin/fm-control.sh billdemo relaunch --note 'guarded'
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API
+error: refused before stopping billdemo: an Anthropic credential would reach the replacement worker. Remedy: remove ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN from the inherited environment and any configured replacement launch environment or backend session reported above, then retry bin/fm-control.sh 'billdemo' relaunch (--note <text> | --note-file <path>) with the same intended harness and account; do not change an account pin or enable API billing to bypass this refusal.
+error: relaunch of billdemo was refused before its agent was touched; nothing changed
+exit=1
+worker still original: claude; lifecycle input sent: none
+$ # follow Remedy: drop the credential, retry same relaunch
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+relaunched billdemo harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-billdemo worktree=<tmp>/billdemo-30603/wt
+exit=0
+harness=claude
+kind=ship

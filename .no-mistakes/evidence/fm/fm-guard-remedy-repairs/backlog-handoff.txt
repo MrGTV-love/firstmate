@@ -1,0 +1,23 @@
+$ bin/fm-backlog-handoff.sh design live-item old-item held-item q-item
+error: refusing to hand off in-flight backlog items: live-item. Remedy: keep these keys with their running owner; retry bin/fm-backlog-handoff.sh 'design' without these keys and with only genuinely queued work from <tmp>/main/data/backlog.md.
+error: refusing to hand off Done (historical) backlog items: old-item; handoffs move in-scope queued work only - Done records stay with their home and are pruned/archived. Remedy: retry bin/fm-backlog-handoff.sh 'design' without these historical keys; if new work is needed, file a distinct queued item instead of reopening Done history.
+error: refusing to hand off non-queued backlog items: held-item; handoffs move in-scope queued work only. Remedy: resolve each item's hold or prerequisite through its owner before it becomes genuinely queued in <tmp>/main/data/backlog.md, or retry bin/fm-backlog-handoff.sh 'design' without these keys; do not relabel held work merely to pass the guard.
+       nothing was moved.
+exit=1
+both backlogs unchanged: yes
+$ # follow Remedy: retry without rejected keys
+$ bin/fm-backlog-handoff.sh design q-item
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A613NV0QT5KAS5K62ZBCFP/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+exit=0
+receiver backlog now:
+## Queued
+- [ ] q-item - genuinely queued work (repo: alpha)
+
+## Done
+## In flight
+main backlog keeps live/held/done:
+- [ ] held-item - waiting on prerequisite (repo: alpha)
+- [ ] live-item - running elsewhere (repo: alpha)
+- [x] old-item - finished history (repo: alpha)

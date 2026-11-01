@@ -1,0 +1,17 @@
+$ # S-kimi: malformed config.toml
+$ HOME=$H bin/fm-kimi-turnend-hook.sh install
+fm-kimi-turnend-hook: refused: config.toml is malformed TOML: Expected ']' at the end of a table declaration (at line 1, column 7). Remedy: repair the named file or directory under /tmp/fmkimi.LWXqjZ/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh install; do not delete user files or registry tokens to bypass validation.
+exit=1
+config unchanged: yes
+config.toml
+$ # owner repairs TOML (follows Remedy), then retries same action
+exit=0
+2
+remove exit=0
+original bytes restored: yes
+$ # HOME unset
+fm-kimi-turnend-hook: refused: HOME is unset. Remedy: set HOME to the intended Kimi user home, then retry bin/fm-kimi-turnend-hook.sh with the same action.
+exit=1
+$ # jq missing on PATH for install
+fm-kimi-turnend-hook: refused: jq is required by the installed Kimi turn-end hook. Remedy: install jq on PATH, then retry bin/fm-kimi-turnend-hook.sh install.
+exit=1

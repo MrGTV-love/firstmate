@@ -1,0 +1,24 @@
+$ FM_HOME=<lab> bin/fm-teardown.sh epdemo   # meta binding names another task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+REFUSED: endpoint metadata belongs to task someone-else, not epdemo; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in <lab>/state/epdemo.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+meta preserved: endpoint_task_id=someone-else; worktree present: yes
+$ # follow Remedy: owning firstmate restores this task's record from verified launch evidence, retry
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A613NV0QT5KAS5K62ZBCFP/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: scout task epdemo has no report at <lab>/data/epdemo/report.md.
+The report is the work product. Have the crewmate write it, or use --force after explicit discard approval.
+exit=
+meta after: <lab>/state/epdemo.meta
+$ # scout report written; retry teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+fm-captain-hold: origin epdemo has no completed captain-call inventory
+REFUSED: scout task epdemo has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+exit=
+meta after: <lab>/state/epdemo.meta

@@ -1,0 +1,11 @@
+$ FM_HOME=<lab> bin/fm-spawn.sh omp-route-demo <proj> --scout --harness omp --model 'openai/gpt-5'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+REFUSED: omp openai/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ FM_HOME=<lab> bin/fm-spawn.sh omp-route-demo <proj> --scout --harness omp --model ' OpenRouter /x'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+REFUSED: omp OpenRouter/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+state after refusals:
+.fm-lab-tmux-dir
+openai-codex/gpt-5 route: admitted (exit 0)

@@ -1,0 +1,39 @@
+$ bin/fm-wake-drain.sh            # present the overdue rows
+exit=0; boundary --ack-through 0 --recovery-generation <gen>
+$ bin/fm-wake-drain.sh --ack-through ... --recovery-generation ...   # no action recorded yet
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-a","firstmate","job:row-a","obtain decision",7200,"decision pending",false
+  "row-'quoted","firstmate","job:row-'quoted","obtain decision",7200,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help.
+env 'FM_HOME=<home>' 'FM_STATE_OVERRIDE=<home>/state' FM_SUPERVISION_ACTOR=main bash <repo>/bin/fm-open-loops.sh action row-a "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+env 'FM_HOME=<home>' 'FM_STATE_OVERRIDE=<home>/state' FM_SUPERVISION_ACTOR=main bash <repo>/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+printed per-row commands: 2
+$ bash -c "<printed command for row-a>"   # ADVERSARIAL: no ACTION_KIND/ACTION_EVIDENCE set
+bash: ACTION_KIND: set the action actually performed
+exit=127; ledger unchanged: True
+$ ACTION_KIND=escalated ACTION_EVIDENCE="decision card delivered" bash -c "<printed command for row-a>"
+action: "row-a"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+$ bin/fm-wake-drain.sh --ack-through ...   # ADVERSARIAL: only one of two rows answered
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-'quoted","firstmate","job:row-'quoted","obtain decision",7200,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help.
+env 'FM_HOME=<home>' 'FM_STATE_OVERRIDE=<home>/state' FM_SUPERVISION_ACTOR=main bash <repo>/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+$ ACTION_KIND=escalated ACTION_EVIDENCE="second decision delivered" bash -c "<printed command for row-'quoted>"
+action: "row-'quoted"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+$ bin/fm-wake-drain.sh --ack-through ...   # both rows have real receipts
+
+exit=0
+recorded receipts: {"row-a": {"kind": "escalated", "evidence": "decision card delivered"}, "row-'quoted": {"kind": "escalated", "evidence": "second decision delivered"}}
+RESULT: PASS

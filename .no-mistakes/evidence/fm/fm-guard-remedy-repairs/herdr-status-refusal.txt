@@ -1,0 +1,13 @@
+$ # herdr status --json returns malformed running value
+error: herdr server status for 'fm-lab-statusdemo' is unknown; refusing startup. Remedy: run herdr --session 'fm-lab-statusdemo' status --json read-only, repair the reported client/socket access failure through its owner until status is readable, then retry the original operation; do not stop or restart a live or unknown server.
+exit=1
+herdr calls made: status --json --session fm-lab-statusdemo;
+$ # herdr status --json itself fails (client/socket access)
+error: herdr server status for 'fm-lab-statusdemo' is unknown; refusing startup. Remedy: run herdr --session 'fm-lab-statusdemo' status --json read-only, repair the reported client/socket access failure through its owner until status is readable, then retry the original operation; do not stop or restart a live or unknown server.
+exit=1
+herdr calls made: status --json --session fm-lab-statusdemo;
+$ # follow Remedy: status becomes readable (running=true), retry
+exit=0
+herdr calls made: status --json --session fm-lab-statusdemo;
+$ # refusal formatter used by doctor, with captured cause
+refused to start the herdr server for session fm-lab-statusdemo to protect a live or unknown server: the session socket still accepts connections. Remedy: run herdr --session fm-lab-statusdemo status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server

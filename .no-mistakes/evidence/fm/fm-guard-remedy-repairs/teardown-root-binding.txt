@@ -1,0 +1,10 @@
+$ printf "route=nowhere" > <lab>/.fm-secondmate-parent   # corrupt parent binding
+$ bin/fm-teardown.sh uhdemo --force --drop-file <words>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: cannot resolve the root Firstmate home; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore <lab>/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'uhdemo'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=1
+meta kept: yes
+$ # binding restored (this lab home is a root home: no binding file)
+walk-ok
+exit=0

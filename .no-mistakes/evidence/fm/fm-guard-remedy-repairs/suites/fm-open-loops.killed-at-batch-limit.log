@@ -1,0 +1,48 @@
+FM_TEST_BEGIN 2026-11-01T01:33:23Z tests/fm-open-loops.test.sh family=pr-forge expected_gate_skip=none
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion
+PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+PASS: interrupted teardown records bound to the current task record
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: local-path origins are disclosed without degrading the ledger
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: no-progress source failure owns resistant descendant cleanup
+PASS: live process-group EPERM still refuses and leaves the process running
+PASS: an all-zombie or vanished process group swallows the Darwin EPERM race
+PASS: no-progress expiry reports the configured interval and keeps captured output
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
+PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage
+PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates
+PASS: each actor gates only the rows its own drain presented
+PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns

@@ -1,0 +1,18 @@
+$ FM_HOME=<fixture>/home bin/fm-merge-local.sh dirty-demo   # primary is dirty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A613NV0QT5KAS5K62ZBCFP/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: <fixture>/proj has a dirty working tree; refusing to merge into it. Remedy: inspect git -C '<fixture>/proj' status --short, have the owner commit or move their changes to their own branch without discarding them, return this checkout to 'main' clean, then retry bin/fm-merge-local.sh 'dirty-demo'.
+exit=1
+HEAD still base: 27c1294 base
+owner bytes: base=owner edit untracked=owner note
+$ # follow Remedy: owner commits to own branch, checkout returns clean default
+$ FM_HOME=<fixture>/home bin/fm-merge-local.sh dirty-demo
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/dirty-demo into local main (27c1294 -> e1fbee4) in <fixture>/proj
+exit=0
+landed: yes; owner/wip base=owner edit

@@ -1,0 +1,13 @@
+staged corr=acf659ee1c174d90 with an attempted (unconfirmed) delivery marker
+$ FM_PENDING_REPLY_EXISTING_CORR=acf659ee1c174d90 bin/fm-send.sh lsm '/audit the ledger'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: pending-reply delivery for lsm is unresolved; refusing to resend correlation acf659ee1c174d90. Remedy: the owning firstmate must reconcile the original request with the secondmate and obtain its actual corr=acf659ee1c174d90 report in the parent status channel at <lab>/state/lsm.status; run bin/fm-crew-state.sh 'lsm' to inspect it, then let pending-reply reconciliation resolve it before sending new work. Do not clear delivery markers or resend unknown delivery.
+exit=1
+bytes typed into pane:        0
+attempt still unresolved: yes
+$ # follow Remedy: the secondmate's real corr report lands in the parent status channel
+$ bin/fm-crew-state.sh lsm
+state: done · source: status-log · ledger clean
+reconcile exit=0
+record after reconciliation: phase=resolved
