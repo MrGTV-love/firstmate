@@ -563,14 +563,15 @@
       "id": "merge-single-owner",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-single-owner deny"},
-        {"file": "bin/fm-pr-merge.sh", "match": "refusing a firstmate landing outside its Main home"}
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-single-owner deny", "count": 2},
+        {"file": "bin/fm-pr-merge.sh", "match": "refusing a firstmate landing outside its Main home"},
+        {"file": "bin/fm-pr-merge.sh", "match": "lineage cannot be determined"}
       ],
       "invariant": "a landing that can be Firstmate's own repository runs only in the unseeded primary home whose local maintainer scope records that publication target",
       "layer": "runtime-block",
       "source": "fm-role-lib.sh Git lineage and remote identity for candidate detection, Main's config/firstmate-role resolved local maintainer scope for authority, fm_firstmate_root_home parent-chain resolution, Git primary worktree registration, physical FM_HOME",
-      "trigger": "the task copy shares Firstmate's history or the PR repository is any remote of the code root, and FM_HOME is not an unseeded primary worktree, Main cannot be resolved locally, or that home's recorded local maintainer scope is absent, unreadable or another repository",
-      "remedy": "in the primary Main home with the recorded maintainer target, FM_HOME=<main-home> bin/fm-pr-merge.sh --register <source-home> <task-id> <pr-url>, record the exact-head review with bin/fm-review-record.py review, place it in Main's order, then FM_HOME=<main-home> bin/fm-pr-merge.sh <task-id> <pr-url>; registration preserves the source incarnation's model history; use the existing secondmate parent channel for a remote Main or repair .fm-secondmate-parent or git worktree registration for an unreadable Main; remotes never grant landing ownership",
+      "trigger": "task lineage is unknown and no code-root remote matches the PR repository; or the task copy shares Firstmate's history or the PR repository is any remote of the code root, and FM_HOME is not an unseeded primary worktree, Main cannot be resolved locally, or that home's recorded local maintainer scope is absent, unreadable or another repository",
+      "remedy": "for unknown lineage without a matching remote, git fetch --unshallow in the task copy and retry; otherwise in the primary Main home with the recorded maintainer target, FM_HOME=<main-home> bin/fm-pr-merge.sh --register <source-home> <task-id> <pr-url>, record the exact-head review with bin/fm-review-record.py review, place it in Main's order, then FM_HOME=<main-home> bin/fm-pr-merge.sh <task-id> <pr-url>; registration preserves the source incarnation's model history; use the existing secondmate parent channel for a remote Main or repair .fm-secondmate-parent or git worktree registration for an unreadable Main; remotes never grant landing ownership",
       "budget": 1,
       "test": "tests/fm-pr-merge.test.sh",
       "tier": "C",

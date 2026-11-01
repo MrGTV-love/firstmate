@@ -2048,6 +2048,48 @@ test_registered_models_keep_independent_review_coverage() {
   pass 'registration preserves current, launch-history and prior-relaunch author coverage'
 }
 
+test_shallow_task_lineage_routing() {
+  local case_dir root task head base url rc
+  case_dir=$(make_case shallow-task-landing)
+  root="$case_dir/wt"
+  task="$case_dir/shallow-task"
+  url=https://github.com/example/repo/pull/9
+  rm "$case_dir/fakebin/git"
+  base=$(git -C "$root" rev-parse HEAD)
+  printf '%s\n' "$base" > "$case_dir/github-base"
+  git -C "$root" commit -q --allow-empty -m 'ship shallow fixture implementation'
+  git clone -q --depth 2 "file://$root" "$task" || fail 'create shallow task copy'
+  head=$(git -C "$task" rev-parse HEAD)
+  git -C "$task" update-ref refs/remotes/origin/fm/fixture "$head"
+  fm_write_meta "$case_dir/state/task-x1.meta" "worktree=$task" "project=$task" \
+    'kind=ship' 'model=gpt-5.1-codex' 'branch=fm/fixture' 'mode=no-mistakes'
+  add_gh_mocks "$case_dir" "$head"
+
+  rc=0
+  FM_TEST_CODE_ROOT="$root" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'unknown task lineage must not take the unrelated-project merge path'
+  assert_grep 'lineage cannot be determined' "$case_dir/stderr" 'unknown lineage is the named refusal reason'
+  assert_grep "git -C $task fetch --unshallow" "$case_dir/stderr" 'the remedy names the shallow task copy'
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" 'unknown lineage never reaches forge merge'
+  assert_absent "$case_dir/state/task-x1.check.sh" 'unknown lineage never registers a merge poll'
+  assert_no_grep '^pr=' "$case_dir/state/task-x1.meta" 'unknown lineage changes no landed PR record'
+
+  # The same shallow copy is a candidate when the code-root remote identifies
+  # the PR repository; it must hand off to Main, not require a history fetch.
+  git -C "$root" remote add origin https://github.com/example/repo
+  rc=0
+  FM_TEST_CODE_ROOT="$root" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'the matching remote must route the shallow task to Main'
+  assert_grep "FM_HOME=$root $root/bin/fm-pr-merge.sh --register" "$case_dir/stderr" \
+    'the matching remote preserves the Main registration handoff'
+  assert_no_grep 'lineage cannot be determined' "$case_dir/stderr" 'a matching remote settles candidate detection'
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" 'the source home cannot merge through either route'
+  assert_absent "$case_dir/state/task-x1.check.sh" 'the source home arms no merge poll'
+  pass 'unknown shallow lineage refuses unless a matching remote establishes the Main route'
+}
+
 test_unrelated_project_keeps_home_local_merge() {
   local case_dir head rc root
   case_dir=$(make_case vernant-landing)
@@ -2190,6 +2232,7 @@ test_firstmate_landings_belong_to_main_home
 test_repair_clone_routes_to_main
 test_main_scope_routes_standalone_clones
 test_registered_models_keep_independent_review_coverage
+test_shallow_task_lineage_routing
 test_unrelated_project_keeps_home_local_merge
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids

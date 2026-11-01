@@ -15,6 +15,9 @@
 # only in an unseeded primary Git worktree whose config/firstmate-role records
 # a local maintainer scope for the PR's repository (resolved by fm-role-lib.sh).
 # Remotes identify candidate self-repository landings but never their owner.
+# Unknown task lineage without a matching code-root remote refuses before any
+# merge action; fetch full history with git fetch --unshallow in that task copy
+# before retrying. Only proven-unrelated copies keep the home-local merge path.
 # Other homes refuse before bookkeeping and name the next step: a seeded home's
 # parent chain names Main or requires a parent-channel handoff; a standalone
 # clone names <main-home> by its recorded maintainer target, never its remotes.
@@ -516,14 +519,21 @@ fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 . "$SCRIPT_DIR/fm-role-lib.sh"
 LANDING_REPO=$(fm_role_scope_norm "$PR_HOST/$PR_PATH")
 firstmate_landing_possible() {  # <task-worktree>
-  local remote url
-  if [ -n "$1" ] && fm_role_self_repo "$1" "$FM_ROOT"; then
-    return 0
+  local remote url lineage=1
+  if [ -n "$1" ]; then
+    lineage=0
+    fm_role_self_repo "$1" "$FM_ROOT" || lineage=$?
+    [ "$lineage" -ne 0 ] || return 0
   fi
   while IFS= read -r remote; do
     url=$(git -C "$FM_ROOT" remote get-url "$remote" 2>/dev/null) || continue
     [ "$(fm_role_remote_identity "$url" "$FM_ROOT")" != "$LANDING_REPO" ] || return 0
   done < <(git -C "$FM_ROOT" remote 2>/dev/null)
+  if [ "$lineage" -eq 2 ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
+    printf 'error: refusing merge: task copy %s lineage cannot be determined; fetch full history in that copy: git -C %q fetch --unshallow; then retry this merge\n' "$1" "$1" >&2
+    exit 1
+  fi
   return 1
 }
 
