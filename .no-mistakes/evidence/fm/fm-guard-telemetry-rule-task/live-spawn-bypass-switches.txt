@@ -1,0 +1,14 @@
+$ FM_SPAWN_NO_GUARD=1 bin/fm-spawn.sh Bad_ID! <throwaway-project> --mode no-mistakes --yolo off
+rc=2  stderr: error: invalid task id
+{"guard":"guard-watcher-down-warning","rule":"FM_SPAWN_NO_GUARD","task":"Bad_ID!","decision":"bypass","override":true}
+
+$ FM_SPAWN_NO_GUARD=internal bin/fm-spawn.sh Bad_ID! <throwaway-project> --mode no-mistakes --yolo off
+rc=2  stderr: error: invalid task id
+
+$ FM_COMPACT_ADVISER_DISABLE=1 bin/fm-spawn.sh Bad_ID! <throwaway-project> --mode no-mistakes --yolo off
+rc=2  stderr: error: invalid task id
+{"guard":"compact-adviser","rule":"FM_COMPACT_ADVISER_DISABLE","task":"Bad_ID!","decision":"bypass","override":true}
+
+$ <no switch> bin/fm-spawn.sh Bad_ID! <throwaway-project> --mode no-mistakes --yolo off
+rc=2  stderr: error: invalid task id
+

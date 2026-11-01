@@ -1,0 +1,47 @@
+##### log = /Users/charlesabrooker/tmp/fm-lab.jWvvVg/state/ok.jsonl 
+$ FM_HOME=<lab> bin/fm-send.sh probe-task hello
+rc=1 1 resolvable-error line(s); writer notes: 0
+$ FM_HOME=<unmarked> bin/fm-send.sh probe-task hello   (gate refusal)
+rc=3 (want 3)
+$ api-key guard: key present, no --allow-api-key   (must refuse)
+rc=1 (want nonzero)
+$ api-key guard: key present, --allow-api-key   (must allow)
+rc=0 (want 0)
+##### log = events.jsonl 
+$ FM_HOME=<lab> bin/fm-send.sh probe-task hello
+rc=1 1 resolvable-error line(s); writer notes: 0
+$ FM_HOME=<unmarked> bin/fm-send.sh probe-task hello   (gate refusal)
+rc=3 (want 3)
+$ api-key guard: key present, no --allow-api-key   (must refuse)
+rc=1 (want nonzero)
+$ api-key guard: key present, --allow-api-key   (must allow)
+rc=0 (want 0)
+##### log = fifo.jsonl 
+$ FM_HOME=<lab> bin/fm-send.sh probe-task hello
+rc=1 1 resolvable-error line(s); writer notes: 0
+$ FM_HOME=<unmarked> bin/fm-send.sh probe-task hello   (gate refusal)
+rc=3 (want 3)
+$ api-key guard: key present, no --allow-api-key   (must refuse)
+rc=1 (want nonzero)
+$ api-key guard: key present, --allow-api-key   (must allow)
+rc=0 (want 0)
+##### log = ro 
+$ FM_HOME=<lab> bin/fm-send.sh probe-task hello
+rc=1 1 resolvable-error line(s); writer notes: 0
+$ FM_HOME=<unmarked> bin/fm-send.sh probe-task hello   (gate refusal)
+rc=3 (want 3)
+$ api-key guard: key present, no --allow-api-key   (must refuse)
+rc=1 (want nonzero)
+$ api-key guard: key present, --allow-api-key   (must allow)
+rc=0 (want 0)
+
+##### rows in the working log (ok.jsonl)
+{"guard":"gate-agent-containment","rule":"gate-context","task":"probe-task","decision":"allow","override":false,"cleared_by":""}
+{"guard":"send-home-fail-closed","rule":"explicit-home","task":"probe-task","decision":"allow","override":false,"cleared_by":""}
+{"guard":"gate-agent-containment","rule":"gate-context","task":"probe-task","decision":"deny","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-task","decision":"deny","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-task","decision":"allow","override":true,"cleared_by":"allow-api-key"}
+##### nothing was created under the read-only dir:
+total 0
+dr-xr-xr-x  2 charlesabrooker  staff   64 Nov  1 05:18 .
+drwx------  9 charlesabrooker  staff  288 Nov  1 05:18 ..

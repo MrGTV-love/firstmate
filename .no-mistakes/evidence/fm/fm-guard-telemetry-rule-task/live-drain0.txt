@@ -1,0 +1,7 @@
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c13edf401074a8963f5825ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable; worker liveness small-task: worker liveness is inconclusive: not_checked; worker current state small-task: no backend target recorded; worker liveness train-5: worker liveness is inconclusive: not_checked; worker current state train-5: no backend target recorded; unlanded work train-5: default branch is unknown",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793531663	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 60138.1793531663.YgjiPA
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

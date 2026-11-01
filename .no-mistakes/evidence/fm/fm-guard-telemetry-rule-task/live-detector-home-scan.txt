@@ -1,0 +1,36 @@
+$ git -C <clone> show-ref (before)
+5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c refs/heads/train-5
+161033c766b2448145b33cd40ef41baf2ab3195e refs/heads/train-base
+dd0478829ee4d1acd2dd20059bc2eb4a49e0f805 refs/remotes/origin/fm/fm-cross-home-merge-invalidates-trains
+be87b3c96ba8314a350e429e1d00f132b0941ef1 refs/remotes/origin/fm/fm-merge-train-2-20261030
+30cc699e3fa19099d0845c274bdac96e7426094c refs/remotes/origin/fm/fm-merge-train-20261030
+b25efaefc193c16da0a73106e457cc3dae25aaae refs/remotes/origin/fm/fm-merge-train-3-20261030
+98bd3e78f3b823ea953a2baea1d980f87a6f596c refs/remotes/origin/fm/fm-merge-train-4-20261030
+8d6e3dd6e362f828e2fe9037a67ff24a61015480 refs/remotes/origin/fm/fm-merge-train-5
+196ef8c067e8381174ffb0ab2939a91ffeb6db8a refs/remotes/origin/fm/fm-merge-train-6
+05bd7dcbd03117e794a9338307195db05db57a64 refs/heads/feature
+0aff5295b25d8fc91305d871f2df437b38c31797 refs/heads/main
+
+$ python3 bin/fm-guard-workarounds.py   # home scan, FM_HOME=<lab>
+GUARD_WORKAROUND task=small-task signatures=tree-equal-merge:05bd7dcbd03117e794a9338307195db05db57a64,base-merge-only-after-refusal:05bd7dcbd03117e794a9338307195db05db57a64 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+rc=0
+
+$ python3 bin/fm-guard-workarounds.py --json
+{"guard": "merge-green-head", "rule": "base-containment", "task": "small-task", "head": "05bd7dcbd03117e794a9338307195db05db57a64", "kind": "tree-equal-merge"}
+{"guard": "merge-green-head", "rule": "base-containment", "task": "small-task", "head": "05bd7dcbd03117e794a9338307195db05db57a64", "refused_head": "c53f80f475a264f7416544130f4ca84fa5c2c540", "kind": "base-merge-only-after-refusal"}
+{"guard": "merge-green-head", "rule": "base-containment", "task": "train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}
+rc=0
+
+$ git show-ref (after; must equal before)
+5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c refs/heads/train-5
+161033c766b2448145b33cd40ef41baf2ab3195e refs/heads/train-base
+dd0478829ee4d1acd2dd20059bc2eb4a49e0f805 refs/remotes/origin/fm/fm-cross-home-merge-invalidates-trains
+be87b3c96ba8314a350e429e1d00f132b0941ef1 refs/remotes/origin/fm/fm-merge-train-2-20261030
+30cc699e3fa19099d0845c274bdac96e7426094c refs/remotes/origin/fm/fm-merge-train-20261030
+b25efaefc193c16da0a73106e457cc3dae25aaae refs/remotes/origin/fm/fm-merge-train-3-20261030
+98bd3e78f3b823ea953a2baea1d980f87a6f596c refs/remotes/origin/fm/fm-merge-train-4-20261030
+8d6e3dd6e362f828e2fe9037a67ff24a61015480 refs/remotes/origin/fm/fm-merge-train-5
+196ef8c067e8381174ffb0ab2939a91ffeb6db8a refs/remotes/origin/fm/fm-merge-train-6
+05bd7dcbd03117e794a9338307195db05db57a64 refs/heads/feature
+0aff5295b25d8fc91305d871f2df437b38c31797 refs/heads/main

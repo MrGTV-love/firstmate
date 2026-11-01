@@ -1,0 +1,1 @@
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.dRrsOu && rm -rf /Users/charlesabrooker/tmp/fm-lab.dRrsOu

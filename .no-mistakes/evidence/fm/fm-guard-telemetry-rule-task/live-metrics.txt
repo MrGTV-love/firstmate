@@ -1,0 +1,35 @@
+### A. More real-writer rows in lab2: repeated denies of one task across sessions, a waiver, a force, allows
+### B. Signature feed from the real detector (lab 1 home scan, --json)
+{"guard": "merge-green-head", "rule": "base-containment", "task": "small-task", "head": "05bd7dcbd03117e794a9338307195db05db57a64", "kind": "tree-equal-merge"}
+{"guard": "merge-green-head", "rule": "base-containment", "task": "small-task", "head": "05bd7dcbd03117e794a9338307195db05db57a64", "refused_head": "c53f80f475a264f7416544130f4ca84fa5c2c540", "kind": "base-merge-only-after-refusal"}
+{"guard": "merge-green-head", "rule": "base-containment", "task": "train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}
+
+$ bin/fm-guard-metrics.sh --workarounds <feed> --min-opportunities 1    # text
+METRIC gate-agent-containment opportunities=3 denies=2 warns=0 override_rate=0.5 median_clear_attempts=0 recurrences=0 verdict=keep allows=1 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=0.5 repeat_denies=1 deny_only=false zero_events_days=0
+METRIC lonely-guard opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=keep allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRIC merge-green-head opportunities=3 denies=3 warns=0 override_rate=0.333 median_clear_attempts=0 recurrences=0 verdict=cut allows=0 overrides=1 bypasses=1 workarounds=3 refusal_to_bypass_ratio=1.333 repeat_denies=2 deny_only=true zero_events_days=0
+METRIC send-home-fail-closed opportunities=2 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut allows=2 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC teardown-unlanded opportunities=1 denies=1 warns=0 override_rate=1.0 median_clear_attempts=0 recurrences=0 verdict=keep allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE gate-agent-containment rule=FM_GATE_REFUSE_BYPASS opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE gate-agent-containment rule=gate-context opportunities=3 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=keep allows=1 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=1 deny_only=false zero_events_days=0
+REPEAT gate-agent-containment rule=gate-context task=probe-task denies=2 repeat_denies=1
+RULE lonely-guard rule=only-rule opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=keep allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-green-head rule=checks-green opportunities=3 denies=3 warns=0 override_rate=0.333 median_clear_attempts=0 recurrences=0 verdict=cut allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=0.333 repeat_denies=2 deny_only=true zero_events_days=0
+REPEAT merge-green-head rule=checks-green task=task-red denies=3 repeat_denies=2
+RULE send-home-fail-closed rule=explicit-home opportunities=2 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut allows=2 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE teardown-unlanded rule=landed-work opportunities=1 denies=1 warns=0 override_rate=1.0 median_clear_attempts=0 recurrences=0 verdict=keep allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRICS_SUMMARY guards=5 measured=5 cut=2 unmeasured=0 malformed_rows=0
+rc=0
+
+$ bin/fm-guard-metrics.sh --json ... | jq .rules (selected fields)
+{"id":"gate-agent-containment","rule":"FM_GATE_REFUSE_BYPASS","denies":0,"bypasses":1,"workarounds":0,"refusal_to_bypass_ratio":null,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":false,"zero_events_days":0}
+{"id":"gate-agent-containment","rule":"gate-context","denies":2,"bypasses":0,"workarounds":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":1,"repeat_denies_per_task":[{"task":"probe-task","denies":2,"repeat_denies":1}],"deny_only":false,"zero_events_days":0}
+{"id":"lonely-guard","rule":"only-rule","denies":1,"bypasses":0,"workarounds":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":true,"zero_events_days":0}
+{"id":"merge-green-head","rule":"checks-green","denies":3,"bypasses":1,"workarounds":0,"refusal_to_bypass_ratio":0.333,"repeat_denies":2,"repeat_denies_per_task":[{"task":"task-red","denies":3,"repeat_denies":2}],"deny_only":true,"zero_events_days":0}
+{"id":"send-home-fail-closed","rule":"explicit-home","denies":0,"bypasses":0,"workarounds":0,"refusal_to_bypass_ratio":null,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":false,"zero_events_days":0}
+{"id":"teardown-unlanded","rule":"landed-work","denies":1,"bypasses":1,"workarounds":0,"refusal_to_bypass_ratio":1.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":true,"zero_events_days":0}
+
+$ ... | jq zero_event_guards (registry guards with no row in 30 days), count + first 5
+{"window_days":30,"quiet_count":44,"first":["api-billing-preflight","backlog-transition","captain-hold-withdraw-ruling","claude-api-billing","compact-adviser"]}
+$ log unchanged by metrics?
+      13

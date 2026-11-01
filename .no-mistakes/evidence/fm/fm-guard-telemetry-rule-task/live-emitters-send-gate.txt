@@ -1,0 +1,32 @@
+### 1. fm-send against a marked lab home (gate path signal active, home is marked)
+$ FM_HOME=<lab> bin/fm-send.sh probe-task hello
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab2>
+error: target 'probe-task' is not resolvable (tried meta=<lab2>/state/probe-task.meta; metadata window/terminal lookup; backend=none). Use fm-probe-task for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+rc=1
+
+### 2. fm-send with no FM_HOME (unchanged refusal), log pinned to the lab
+$ env -u FM_HOME FM_GUARD_EVENT_LOG=<lab log> bin/fm-send.sh probe-task hello
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+rc=3
+
+### 3. fm-send against an UNMARKED home from the gate worktree (guard must still refuse, exit 3)
+$ FM_HOME=<unmarked> FM_GUARD_EVENT_LOG=<lab log> bin/fm-send.sh probe-task hello
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+rc=3
+
+### 4. Same refusal with the bypass switch: the switch still works and now leaves a bypass row
+$ FM_GATE_REFUSE_BYPASS=1 FM_HOME=<unmarked> FM_GUARD_EVENT_LOG=<lab log> bin/fm-send.sh probe-task hello
+error: state dir '<unmarked>/state' is missing; fm-send cannot resolve targets for FM_HOME '<unmarked>'
+rc=1
+
+### event rows written (task, rule, decision, actor, override, session)
+{"guard":"gate-agent-containment","rule":"gate-context","task":"probe-task","decision":"allow","actor":"gate","override":false,"session":"probe-task"}
+{"guard":"send-home-fail-closed","rule":"explicit-home","task":"probe-task","decision":"allow","actor":"main","override":false,"session":"probe-task"}
+{"guard":"gate-agent-containment","rule":"gate-context","task":"probe-task","decision":"deny","actor":"gate","override":false,"session":"probe-task"}
+{"guard":"gate-agent-containment","rule":"gate-context","task":"probe-task","decision":"deny","actor":"gate","override":false,"session":"probe-task"}
+{"guard":"gate-agent-containment","rule":"FM_GATE_REFUSE_BYPASS","task":"probe-task","decision":"bypass","actor":"main","override":true,"session":"probe-task"}
+{"guard":"send-home-fail-closed","rule":"explicit-home","task":"probe-task","decision":"allow","actor":"main","override":false,"session":"probe-task"}

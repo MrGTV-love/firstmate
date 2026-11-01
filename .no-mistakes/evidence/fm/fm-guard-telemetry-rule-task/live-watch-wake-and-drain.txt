@@ -1,0 +1,14 @@
+$ cat state/.wake-queue   # after watcher run 2
+1793531777	2	check	guard-workarounds	GUARD_WORKAROUND task=small-task signatures=tree-equal-merge:05bd7dcbd03117e794a9338307195db05db57a64,base-merge-only-after-refusal:05bd7dcbd03117e794a9338307195db05db57a64 (read-only evidence; reassess the guard) GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+
+$ fm_wake_append heartbeat heartbeat heartbeat   # a later plain heartbeat
+rc=0
+1793531777	2	check	guard-workarounds	GUARD_WORKAROUND task=small-task signatures=tree-equal-merge:05bd7dcbd03117e794a9338307195db05db57a64,base-merge-only-after-refusal:05bd7dcbd03117e794a9338307195db05db57a64 (read-only evidence; reassess the guard) GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+1793531818	3	heartbeat	heartbeat	heartbeat
+
+$ bin/fm-wake-drain.sh
+1793531777	2	check	guard-workarounds	GUARD_WORKAROUND task=small-task signatures=tree-equal-merge:05bd7dcbd03117e794a9338307195db05db57a64,base-merge-only-after-refusal:05bd7dcbd03117e794a9338307195db05db57a64 (read-only evidence; reassess the guard) GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+1793531818	3	heartbeat	heartbeat	heartbeat
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 69232.1793531778.BBlReO
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+rc=0

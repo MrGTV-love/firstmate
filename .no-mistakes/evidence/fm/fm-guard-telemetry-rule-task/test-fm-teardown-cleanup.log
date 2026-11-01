@@ -1,0 +1,17 @@
+ok - fixture cleanup after a teardown leaves no home-summary refresh worker
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it
+ok - task teardown completes without reaping another home's abandoned worker
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal
+ok - process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay
+ok - manual and missing-backlog retries revoke old close authority before process refusal and restored replay
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+ok - a forced scout teardown records no landed-work escape
+ok - fm-pr-check publishes the PR-ready line on a secondmate's parent channel once
+ok - a secondmate home's teardown delivers the child's final line or refuses until it can
+ok - a secondmate home's teardown with an unknown done: acceptance keeps its records and asks for a retry
