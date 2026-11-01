@@ -1,0 +1,45 @@
+PASS | S1 undecided zero-fire reversible guard                                  | expect=NOMINATED got=NOMINATED out=gx
+PASS | S2a keep: 30 unchanged quiet events after date                           | expect=SILENT    got=SILENT    out=''
+PASS | S2b redesign: 30 unchanged quiet events after date                       | expect=SILENT    got=SILENT    out=''
+PASS | S2c cut: 30 unchanged quiet events after date                            | expect=SILENT    got=SILENT    out=''
+PASS | S2d keep: 60 unchanged quiet events after date                           | expect=SILENT    got=SILENT    out=''
+PASS | S3-control recurrence older than judged window, keep, 30 quiet after     | expect=SILENT    got=SILENT    out=''
+     writer row: {"ts":"2026-11-01T01:51:39Z","guard":"gx","version":"1","system":"firstmate","session":"live-writer","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+PASS | S3a keep 2026-02-01 then writer-made deny today                          | expect=NOMINATED got=NOMINATED out=gx
+PASS | S3b keep then writer-made allow with --override today                    | expect=NOMINATED got=NOMINATED out=gx
+PASS | S3c keep then writer-made warn today                                     | expect=NOMINATED got=NOMINATED out=gx
+PASS | S3d keep then a bypass row on a later date                               | expect=NOMINATED got=NOMINATED out=gx
+PASS | S3e keep then writer-made error today (non-allow is new evidence)        | expect=NOMINATED got=NOMINATED out=gx
+PASS | S4a deny at 23:00 on the SAME date as keep 2026-06-11                    | expect=SILENT    got=SILENT    out=''
+PASS | S4b deny at 00:00 on the NEXT date after keep 2026-06-11                 | expect=NOMINATED got=NOMINATED out=gx
+PASS | S5a deny in judged window, 30 quiet after keep (rate -> 0)               | expect=NOMINATED got=NOMINATED out=gx
+PASS | S5b warn in judged window, 30 quiet after keep (rate -> 0)               | expect=NOMINATED got=NOMINATED out=gx
+PASS | S5c re-judged keep 2026-03-20, then quiet                                | expect=SILENT    got=SILENT    out=''
+PASS | S5d historical deny + re-judged keep + 30 more quiet                     | expect=SILENT    got=SILENT    out=''
+PASS | S5e historical deny + re-judged keep + 90 more quiet                     | expect=SILENT    got=SILENT    out=''
+PASS | S6 error-only judged window, 30 quiet after keep                         | expect=SILENT    got=SILENT    out=''
+PASS | S7 malformed decision 'keep: no date'                                    | expect=NOMINATED got=NOMINATED out=gx
+PASS | S7 malformed decision 'Keep 2026-02-01: wrong case'                      | expect=NOMINATED got=NOMINATED out=gx
+PASS | S7 malformed decision 'keep 2026-2-1: short date'                        | expect=NOMINATED got=NOMINATED out=gx
+PASS | S7 malformed decision 'retain 2026-02-01: unknown outcome'               | expect=NOMINATED got=NOMINATED out=gx
+PASS | S7 malformed decision ' keep 2026-02-01: leading space'                  | expect=NOMINATED got=NOMINATED out=gx
+PASS | S8 keep + 29 quiet events with fired judged window? (quiet judged)       | expect=SILENT    got=SILENT    out=''
+PASS | S9 irreversible zero-fire guard, no decision                             | expect=SILENT    got=SILENT    out=''
+     METRIC gx opportunities=61 denies=1 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=keep
+PASS | S10 zero-fire guard + one new deny: verdict keep, not a nomination       | expect=SILENT    got=SILENT    out=''
+     help: fm-guard-metrics.sh - the single reader of guard decision events; it computes
+     help: the retirement nominations, and which of them a recorded decision already
+     help: judged, as defined in docs/guard-spec.md.
+     help: 
+     help: With --json, one object carries the same fields.
+     help: With --undecided, print only the ids whose verdict is `cut` and whose registry
+     help: `retirement_decision` does not judge it, one per line: a nomination nobody has
+     help: judged yet. A decision starting `keep|redesign|cut YYYY-MM-DD` judges the
+     help: events through that day and stands until the evidence changes: the events after
+     help: it nominate the guard again only when they hold a deny, warn, override or other
+     help: non-allow decision, or meet the threshold on their own as a quiet window after
+     help: a judged window (the last --min-opportunities events through that day) that
+     help: held a fire. It is the question a session start asks, so the pass cannot sit
+     help: unread in a log forever.
+     help: 
+     help: Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log

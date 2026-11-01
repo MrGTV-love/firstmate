@@ -1,0 +1,8 @@
+OK  review-rubric.md#review-outcomes
+OK  #policy-statement
+OK  #cut-procedure
+OK  #required-detection
+OK  #who-decides
+OK  #retirement-rule
+OK  #refusal-sites
+AGENTS.md unchanged
