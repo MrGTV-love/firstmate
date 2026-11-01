@@ -16,6 +16,7 @@
 #   - an override rate above 20% cuts a reversible guard
 #   - a median above three clear attempts cuts even an irreversible guard
 #   - a recurrence after a clear cuts even an irreversible guard
+#   - a dated decision stands until the evidence changes, not on its date alone
 #   - a missing log reports every guard unmeasured and exits 0
 set -u
 # shellcheck source=tests/lib.sh
@@ -106,7 +107,7 @@ pass "an irreversible guard that never fires is kept"
 registry_with_harm "$TMP/undecided.json" gquiet reversible
 got=$("$METRICS" --log "$ZERO" --registry "$TMP/undecided.json" --min-opportunities 30 --undecided)
 [ "$got" = gquiet ] || fail "an undecided cut nomination must be reported, got '$got'"
-jq '.guards[0].retirement_decision = "keep 2026-10-26: recorded by the test"' \
+jq --arg d "keep $(date -u +%Y-%m-%d): recorded by the test" '.guards[0].retirement_decision = $d' \
   "$TMP/undecided.json" > "$TMP/decided.json"
 got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunities 30 --undecided)
 [ -z "$got" ] || fail "a recorded decision must retire the nomination, got '$got'"
@@ -114,6 +115,98 @@ got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunitie
 printf '%s\n' "$got" | grep -q '^METRIC gquiet .*verdict=cut' \
   || fail "--undecided must not change the measured verdict: $got"
 pass "an undecided nomination is reported and a recorded decision retires it"
+
+# A decision judges the evidence through its date and stands until the evidence
+# changes. Unchanged zero-fire evidence after it never re-nominates; a new deny,
+# override, or a changed fire rate does, so a keep or redesign never hides it.
+dated_rows() {  # <log> <day> <count> [decision] [override]
+  local n=0
+  while [ "$n" -lt "$3" ]; do
+    printf '{"ts":"%sT12:00:%02dZ","guard":"gquiet","session":"w%s-%s-%s","decision":"%s","override":%s}\n' \
+      "$2" "$((n % 60))" "$2" "${4:-allow}" "$n" "${4:-allow}" "${5:-false}" >>"$1"
+    n=$((n + 1))
+  done
+}
+decided_with() {  # <decision> <out>
+  jq --arg d "$1" '.guards[0].retirement_decision = $d' "$TMP/undecided.json" > "$2"
+}
+undecided_for() {  # <log> <registry>
+  "$METRICS" --log "$1" --registry "$2" --min-opportunities 30 --undecided
+}
+for outcome in keep redesign; do
+  decided_with "$outcome 2026-02-01: judged the January window" "$TMP/dated-$outcome.json"
+done
+
+SAME="$TMP/same.jsonl"
+: >"$SAME"
+dated_rows "$SAME" 2026-01-10 30
+dated_rows "$SAME" 2026-03-10 5
+for outcome in keep redesign; do
+  got=$(undecided_for "$SAME" "$TMP/dated-$outcome.json")
+  [ -z "$got" ] || fail "a dated $outcome must retire a nomination while later events stay below the threshold, got '$got'"
+done
+dated_rows "$SAME" 2026-03-11 25
+for outcome in keep redesign; do
+  got=$(undecided_for "$SAME" "$TMP/dated-$outcome.json")
+  [ -z "$got" ] || fail "unchanged zero-fire evidence after a dated $outcome must not re-nominate, got '$got'"
+done
+
+OVERRIDES="$TMP/new-overrides.jsonl"
+: >"$OVERRIDES"
+dated_rows "$OVERRIDES" 2026-01-10 30
+dated_rows "$OVERRIDES" 2026-03-10 25
+dated_rows "$OVERRIDES" 2026-03-11 5 deny true
+for outcome in keep redesign; do
+  got=$(undecided_for "$OVERRIDES" "$TMP/dated-$outcome.json")
+  [ "$got" = gquiet ] || fail "a $outcome must not hide a cut nomination backed by new overrides, got '$got'"
+done
+
+RATE="$TMP/changed-rate.jsonl"
+: >"$RATE"
+for k in deny allow deny allow; do
+  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$RATE"
+done
+dated_rows "$RATE" 2026-01-10 26
+dated_rows "$RATE" 2026-03-10 30
+got=$(undecided_for "$RATE" "$TMP/dated-keep.json")
+[ "$got" = gquiet ] || fail "a fire rate that changed to zero after a keep is new evidence, got '$got'"
+
+decided_with "keep 2026-03-20: process fixed, guard is a quiet backstop" "$TMP/rejudged.json"
+dated_rows "$RATE" 2026-04-10 30
+got=$(undecided_for "$RATE" "$TMP/rejudged.json")
+[ -z "$got" ] || fail "a historical deny must not re-nominate a quiet window after a keep that judged a quiet window, got '$got'"
+decided_with "keep 2026-04-20: still a quiet backstop" "$TMP/rejudged2.json"
+dated_rows "$RATE" 2026-05-10 30
+dated_rows "$RATE" 2026-06-10 30
+for reg in rejudged rejudged2; do
+  got=$(undecided_for "$RATE" "$TMP/$reg.json")
+  [ -z "$got" ] || fail "unchanged quiet windows after $reg must not re-nominate, got '$got'"
+done
+dated_rows "$RATE" 2026-06-11 1 deny
+got=$(undecided_for "$RATE" "$TMP/rejudged2.json")
+[ "$got" = gquiet ] || fail "a new deny after a keep must re-nominate, got '$got'"
+decided_with "keep 2026-06-11: judged the deny of that day" "$TMP/same-day.json"
+got=$(undecided_for "$RATE" "$TMP/same-day.json")
+[ -z "$got" ] || fail "a deny on the same date as a keep belongs to the judged window, got '$got'"
+dated_rows "$RATE" 2026-06-12 1 deny
+got=$(undecided_for "$RATE" "$TMP/same-day.json")
+[ "$got" = gquiet ] || fail "a deny on a later date than a keep must re-nominate, got '$got'"
+
+ERRWIN="$TMP/error-window.jsonl"
+: >"$ERRWIN"
+for k in deny allow deny allow; do
+  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$ERRWIN"
+done
+dated_rows "$ERRWIN" 2026-01-10 29
+dated_rows "$ERRWIN" 2026-01-10 1 error
+dated_rows "$ERRWIN" 2026-03-10 30
+got=$(undecided_for "$ERRWIN" "$TMP/dated-keep.json")
+[ -z "$got" ] || fail "an error in the judged window is not a fire, so a quiet window after it must not re-nominate, got '$got'"
+
+decided_with "keep: no date recorded" "$TMP/undated.json"
+got=$(undecided_for "$ZERO" "$TMP/undated.json")
+[ "$got" = gquiet ] || fail "a decision without an outcome and date must not retire a nomination, got '$got'"
+pass "a dated decision stands until the evidence changes and new evidence re-nominates"
 
 # --- override rate ----------------------------------------------------------
 OVER="$TMP/override.jsonl"
