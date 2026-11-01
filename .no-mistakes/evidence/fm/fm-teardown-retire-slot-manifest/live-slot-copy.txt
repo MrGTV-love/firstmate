@@ -1,0 +1,45 @@
+
+$ Vernant provision_existing_slot.py (slot copy) for owner=lab-slotcopy branch=fm/guard-audit-current
+{
+  "base_sha": "32b712b9825d738700e9b87e197b7da2a9c06183",
+  "branch": "fm/guard-audit-current",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project/.git/vernant-worktree-lifecycle/711dda6fdbfa11b7.json",
+  "owned_paths": [
+    "scripts"
+  ],
+  "owner_id": "lab-slotcopy",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/pool/1/project"
+}
+
+$ project checkout entry point
+ls: /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project/scripts/git-stability/retire_slot_manifest.py: No such file or directory
+
+$ slot copy entry point
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/pool/1/project/scripts/git-stability/retire_slot_manifest.py
+
+$ bin/fm-teardown.sh lab-slotcopy   (FM_HOME=lab)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Lvhbmh
+{
+  "action": "retire",
+  "archive_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project/.git/vernant-worktree-lifecycle/retired/711dda6fdbfa11b7/841fb5fb550067b120e133d680416f873aa8ac514e77e421e6351201d6ccefb6.json",
+  "copy_path": null,
+  "detail": null,
+  "manifest_paths": {
+    "durable": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project/.git/vernant-worktree-lifecycle/711dda6fdbfa11b7.json",
+    "legacy": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/hooks/worktree-lifecycle/711dda6fdbfa11b7.json"
+  },
+  "next_step": null,
+  "reason": "retired",
+  "slot_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/pool/1/project",
+  "status": "retired"
+}
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project: recovered: re-attached main (already current)
+teardown lab-slotcopy complete (window firstmate:fm-lab-slotcopy, worktree /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/pool/1/project)
+Backlog: lab-slotcopy is closed in /Users/charlesabrooker/tmp/fm-lab.Lvhbmh/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+teardown exit=0
+
+$ after: records
+ABSENT  /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/project/.git/vernant-worktree-lifecycle/711dda6fdbfa11b7.json
+ABSENT  /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/slot-copy/hooks/worktree-lifecycle/711dda6fdbfa11b7.json
+branch fm/guard-audit-current: DELETED

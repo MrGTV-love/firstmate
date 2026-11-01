@@ -1,0 +1,13 @@
+$ ls $FM_HOME/state/lab-refused.meta
+/Users/charlesabrooker/tmp/fm-lab.Lvhbmh/state/lab-refused.meta
+$ Vernant provision: owner=lab-refused (live task) in slot 5
+  "owner_id": "lab-refused",
+  "state": "PASS",
+$ python3 bin/fm-slot-manifest-retire.py --project <refused project> --firstmate-state $FM_HOME/state --apply
+08d13872be6179a4.json owner=lab-refused slot=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/pool/5/project landing=LIVE: lab-refused.meta is a live Firstmate task record; both copies kept
+fa0c0d0748650bf3.json owner=someone-else landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+apply exit=1
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/hooks/worktree-lifecycle/08d13872be6179a4.json
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/hooks/worktree-lifecycle/fa0c0d0748650bf3.json
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/project/.git/vernant-worktree-lifecycle/08d13872be6179a4.json
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/project/.git/vernant-worktree-lifecycle/fa0c0d0748650bf3.json

@@ -1,0 +1,3 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Lvhbmh
+TMUX_TMPDIR=/tmp/fml.CSHe3L
+LAB_ROOT=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN

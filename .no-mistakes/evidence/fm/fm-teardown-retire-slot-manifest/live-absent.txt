@@ -1,0 +1,30 @@
+
+$ Vernant provision_existing_slot.py (slot copy) for owner=lab-absent branch=fm/guard-audit-current
+{
+  "base_sha": "5b0a1a5417792a35526caa7b517ce13b187bd923",
+  "branch": "fm/guard-audit-current",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/project/.git/vernant-worktree-lifecycle/8184cde0e1a70728.json",
+  "owned_paths": [
+    "scripts"
+  ],
+  "owner_id": "lab-absent",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/pool/1/project"
+}
+
+$ entry point in project / slot
+ls: /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/pool/1/project/scripts/git-stability/retire_slot_manifest.py: No such file or directory
+ls: /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/project/scripts/git-stability/retire_slot_manifest.py: No such file or directory
+
+$ bin/fm-teardown.sh lab-absent   (FM_HOME=lab)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Lvhbmh
+missing entry point: /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/project/scripts/git-stability/retire_slot_manifest.py; lifecycle records unchanged
+/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/project: recovered: re-attached main (already current)
+teardown lab-absent complete (window firstmate:fm-lab-absent, worktree /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/pool/1/project)
+Backlog: lab-absent is closed in /Users/charlesabrooker/tmp/fm-lab.Lvhbmh/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+teardown exit=0
+
+$ after: records
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/project/.git/vernant-worktree-lifecycle/8184cde0e1a70728.json
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/absent/hooks/worktree-lifecycle/8184cde0e1a70728.json
+branch fm/guard-audit-current: DELETED

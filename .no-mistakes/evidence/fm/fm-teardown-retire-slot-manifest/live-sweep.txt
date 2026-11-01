@@ -1,0 +1,104 @@
+
+$ setup: real Vernant records for three more owners in project /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project
+  "owner_id": "lab-sweep-done",
+  "state": "PASS",
+  "owner_id": "lab-sweep-unknown",
+  "state": "PASS",
+
+$ bin/fm-tasks-axi.sh show lab-sweep-done (lab backlog Done entry)
+task:
+  id: lab-sweep-done
+  title: "lab sweep owner lab-sweep-done https://github.com/MrGTV-love/vernant/pull/3537"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-01
+  deps: none
+  links: "pr:https://github.com/MrGTV-love/vernant/pull/3537"
+  body: ""
+
+$ store snapshot before report
+f0cdfcedb3049ee322867796449574ecc60cd24c  35f7ad58532e612c.json
+6d1d07bf14ff78ddc308a38cd9c8a0ab572f9c92  57287980a156767d.json
+88668928f239eda5ed5ce13629a78f332e692c16  bc02359c84bb4724.json
+ddd4949162677ce543ed1a4165d36db2cf987f38  35f7ad58532e612c.json
+26e69deb8f00befa496b8a631fd27447d350b5b9  57287980a156767d.json
+0bde11cbd7f08721d987f9ce4130a8bd7d73e190  bc02359c84bb4724.json
+
+$ python3 bin/fm-slot-manifest-retire.py --project <P> --firstmate-state $FM_HOME/state   (report only)
+35f7ad58532e612c.json owner=lab-nopr landing=UNPROVEN: the owner's backlog Done entry records no single PR; landing unproven
+57287980a156767d.json owner=lab-sweep-unknown landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+bc02359c84bb4724.json owner=lab-sweep-done slot=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/2/project landing=MERGED recorded_pr=https://github.com/MrGTV-love/vernant/pull/3537
+report exit=0
+report changed nothing: store bytes identical
+
+$ python3 bin/fm-slot-manifest-retire.py --project <P> --firstmate-state $FM_HOME/state --apply
+35f7ad58532e612c.json owner=lab-nopr landing=UNPROVEN: the owner's backlog Done entry records no single PR; landing unproven
+57287980a156767d.json owner=lab-sweep-unknown landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+bc02359c84bb4724.json owner=lab-sweep-done slot=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/2/project landing=MERGED recorded_pr=https://github.com/MrGTV-love/vernant/pull/3537
+{
+  "action": "retire",
+  "archive_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/retired/bc02359c84bb4724/448581d2c396302d4ec25d85b8788a00c95f7068fe639cab148aaa2cc312a5f9.json",
+  "copy_path": null,
+  "detail": null,
+  "manifest_paths": {
+    "durable": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/bc02359c84bb4724.json",
+    "legacy": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/bc02359c84bb4724.json"
+  },
+  "next_step": null,
+  "reason": "retired",
+  "slot_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/2/project",
+  "status": "retired"
+}
+apply exit=1
+
+$ store snapshot after apply
+f0cdfcedb3049ee322867796449574ecc60cd24c  35f7ad58532e612c.json
+6d1d07bf14ff78ddc308a38cd9c8a0ab572f9c92  57287980a156767d.json
+ddd4949162677ce543ed1a4165d36db2cf987f38  35f7ad58532e612c.json
+26e69deb8f00befa496b8a631fd27447d350b5b9  57287980a156767d.json
+ABSENT  /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/bc02359c84bb4724.json
+ABSENT  /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/bc02359c84bb4724.json
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/57287980a156767d.json
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/57287980a156767d.json
+
+$ adversarial: owner lab-sweep-disagree is Done with merged PR, but its two copies disagree
+
+$ slot 2 handed back: detach and delete its branch, as teardown does
+Deleted branch fm/guard-audit-current (was 32b712b98).
+  "owner_id": "lab-sweep-disagree",
+  "state": "PASS",
+35f7ad58532e612c.json owner=lab-nopr landing=UNPROVEN: the owner's backlog Done entry records no single PR; landing unproven
+57287980a156767d.json owner=lab-sweep-unknown landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+761dad22480eb3db.json owner=lab-sweep-disagree slot=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/4/project landing=MERGED recorded_pr=https://github.com/MrGTV-love/vernant/pull/3537
+{
+  "action": "retire",
+  "archive_path": null,
+  "copy_path": null,
+  "detail": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/761dad22480eb3db.json, /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/761dad22480eb3db.json",
+  "manifest_paths": {
+    "durable": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/761dad22480eb3db.json",
+    "legacy": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/761dad22480eb3db.json"
+  },
+  "next_step": "The durable and legacy records name different tasks. Ask the owner to inspect both records by hand.",
+  "reason": "manifest_records_disagree",
+  "slot_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/4/project",
+  "status": "refused"
+}
+761dad22480eb3db.json owner=lab-sweep-disagree slot=/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/pool/4/project landing=MERGED retire=REFUSED: Vernant retirement exited 2; resolve reason/next_step above
+apply exit=1
+teardown-unlanded events: before=1 after=2
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/project/.git/vernant-worktree-lifecycle/761dad22480eb3db.json
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/no-pr/hooks/worktree-lifecycle/761dad22480eb3db.json
+
+$ sweep on the refused case project: owner lab-refused still has a live .meta
+fa0c0d0748650bf3.json owner=someone-else landing=UNPROVEN: no live backlog Done entry for the owner (an entry pruned by done_keep is not readable); record kept; landing unproven
+apply exit=1

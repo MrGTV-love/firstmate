@@ -1,0 +1,31 @@
+$ git -C <slot> checkout -b fm/next-worker   (next worker takes the returned slot; done)
+fm/next-worker
+$ Vernant provision_existing_slot.py --owner-id next-worker --branch fm/next-worker
+{
+  "base_sha": "32b712b9825d738700e9b87e197b7da2a9c06183",
+  "branch": "fm/next-worker",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/landed/project/.git/vernant-worktree-lifecycle/4ac2af6049074ec7.json",
+  "owned_paths": [
+    "scripts"
+  ],
+  "owner_id": "next-worker",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/landed/pool/1/project"
+}
+provision exit=0
+$ retired archive proof (Vernant)
+{
+ "proofs": {
+  "caller_landing_proof": {
+   "merge_commit_sha": "8bb2abc324bb78ced2a353dc0d524d79b720866d",
+   "merged_pr_head_sha": "e1316bdaa7bcc08b32d01d03d530042fa9cfd449",
+   "pr_url": "https://github.com/MrGTV-love/vernant/pull/3537"
+  }
+ },
+ "previous_owner": "lab-landed"
+}
+$ forge cross-check: gh-axi api /repos/MrGTV-love/vernant/pulls/3537
+branch: fm/guard-audit-current
+head: e1316bdaa7bcc08b32d01d03d530042fa9cfd449
+merge: 8bb2abc324bb78ced2a353dc0d524d79b720866d
+merged: true

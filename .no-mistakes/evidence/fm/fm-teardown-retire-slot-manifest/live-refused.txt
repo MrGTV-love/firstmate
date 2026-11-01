@@ -1,0 +1,38 @@
+
+$ Vernant provision_existing_slot.py (slot copy) for owner=someone-else branch=fm/guard-audit-current
+{
+  "base_sha": "32b712b9825d738700e9b87e197b7da2a9c06183",
+  "branch": "fm/guard-audit-current",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/project/.git/vernant-worktree-lifecycle/fa0c0d0748650bf3.json",
+  "owned_paths": [
+    "scripts"
+  ],
+  "owner_id": "someone-else",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/pool/1/project"
+}
+
+$ bin/fm-teardown.sh lab-refused   (FM_HOME=lab)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Lvhbmh
+REFUSED: Vernant retirement exited 2; resolve reason/next_step above; branch preserved; next_step: verify Firstmate landing record and Vernant retirement output
+{
+  "action": "retire",
+  "archive_path": null,
+  "copy_path": null,
+  "detail": "manifest owner_id='someone-else', caller passed 'lab-refused'",
+  "manifest_paths": {
+    "durable": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/project/.git/vernant-worktree-lifecycle/fa0c0d0748650bf3.json",
+    "legacy": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/hooks/worktree-lifecycle/fa0c0d0748650bf3.json"
+  },
+  "next_step": "The manifest belongs to a different task. Pass the owner id the manifest names, or leave this slot alone.",
+  "reason": "owner_mismatch",
+  "slot_path": "/Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/pool/1/project",
+  "status": "refused"
+}
+teardown exit=1
+
+$ after: records
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/project/.git/vernant-worktree-lifecycle/fa0c0d0748650bf3.json
+PRESENT /Users/charlesabrooker/tmp/fm-vlab.9hPKHN/refused/hooks/worktree-lifecycle/fa0c0d0748650bf3.json
+branch fm/guard-audit-current: EXISTS
+teardown-unlanded events in lab guard log: 1
