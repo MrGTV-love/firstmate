@@ -37,10 +37,12 @@
 #     their static source annotations intentionally isolate adapter analysis.
 #     Unresolved runtime imports select possible callers on changed/deleted shell
 #     or known source inputs and disable cache reuse, regardless of annotations.
-#     Discovery recognizes source/. command words, balanced substitutions, and
-#     executable bash/sh -c and program-stdin heredocs. Source annotations remain
-#     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
-#     Quoted child positional arguments and whole-word quoted aliases from an
+#     Discovery follows the files ShellCheck itself reads: source/. command
+#     words, balanced substitutions, and substitutions in unquoted heredoc
+#     bodies. Source annotations remain inputs; ordinary comments, quoted
+#     strings, and heredoc data do not. Child-shell -c strings and heredocs fed
+#     to a shell are runtime data ShellCheck never parses, so they neither add
+#     imports nor make a root unknown. Whole-word quoted aliases from an
 #     immediately preceding simple scalar declaration are resolved; intervening
 #     commands/control boundaries and effectful declarations remain unknown.
 #     Comments/blank lines do not execute commands; <<- strips leading tabs.
@@ -56,7 +58,7 @@
 # backlog backend follows the same tasks-axi lifecycle path.
 # Successful source-aware checks are shared across worktrees via content hashes
 # of the root, its source closure, the analysis arguments, owner, helper, platform,
-# and ShellCheck binary. Identical concurrent misses share one check through flock.
+# and ShellCheck binary and reported version. Identical concurrent misses share one check through flock.
 # Only successful, input-stable results are retained; findings always run again.
 # FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
 # "off" disables reuse. CI always disables reuse so every canonical root is checked.
@@ -2062,6 +2064,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
     FM_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
+    FM_LINT_INTERNAL_SHELLCHECK_VERSION="$resolved"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
