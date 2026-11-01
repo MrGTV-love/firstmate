@@ -2582,7 +2582,7 @@ SH
       alarm-write) mkdir "$dir/state/.claude-autoarm-failure-alarmed" ;;
     esac
     for i in 1 2 3 4 5 6; do
-      out=$(PATH="$fakebin:$PATH" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
+      out=$(PATH="$fakebin:$BLIND_BIN:$PATH" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
       case "$scenario" in
         budget-lock|budget-write|budget-rename)
           expect_code 0 "$status" "$scenario stop $i must not block without a writable budget"

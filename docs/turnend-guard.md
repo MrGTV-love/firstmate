@@ -409,7 +409,8 @@ Claude drops that exit 2 when it terminated the hook at the configured timeout i
 
 The first fresh failed epoch preserves its handoff without consuming a blocked-stop count.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
-When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude Code's default cap of eight consecutive continuations).
+When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3).
+This is the guard's own block budget, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.
 In Claude mode, positive watcher recovery allows the stop and clears the block budget, failure notice, and attended alarm together under the existing budget lock; a contended or failed clear leaves that bookkeeping for a later retry and never blocks the supervised stop.
 
 The block budget is charged by two rules:
