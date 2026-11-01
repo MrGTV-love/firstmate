@@ -156,6 +156,9 @@
 # regenerable directories must equal what it was before preservation, before plain
 # `git worktree remove` from the parent clone. Missing, unreadable or differing
 # preservation or content leaves both copy and preserve; no forced removal is introduced.
+# A refused removal, or a copy no longer proven after preservation, leaves the copy
+# and discards this run's preserve while that same copy still holds every preserved
+# original unchanged, so a repeated refusal adds no preserve.
 # A locked copy first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
@@ -1513,13 +1516,24 @@ run_preserve_dir() {  # <copy> <release-id>
   printf '%s/%s/nested-copy-preserved/%s\n' "$DATA_DIR" "$2" "$key"
 }
 
-# Removes the preserve directory this run built for <copy> under <release-id>,
-# and its parents once empty, only while copy_still_holds proves nothing was
-# released and preserve_still_in_copy proves every preserved original is still in
-# the copy unchanged; a run that built none has nothing to discard. A preserve
-# from any other run is never touched. On refusal DISCARD_WHY says which check
-# refused.
+# Removes preserve <dir> of <copy> under <release-id>, and its parents once empty,
+# only while preserve_still_in_copy proves every preserved original is still in the
+# copy unchanged. On refusal DISCARD_WHY says which check refused.
 DISCARD_WHY=
+discard_preserve_dir() {  # <dir> <copy> <release-id>
+  DISCARD_WHY="it is not a plain directory"
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  DISCARD_WHY="not every preserved original is still unchanged in the copy"
+  preserve_still_in_copy "$1" "$2" || return 1
+  DISCARD_WHY="it could not be removed"
+  rm -rf -- "$1" || return 1
+  rmdir "${1%/*}" "$DATA_DIR/$3" 2>/dev/null || true
+}
+
+# Removes the preserve directory this run built for locked <copy> under
+# <release-id>, only while copy_still_holds proves nothing was released and
+# discard_preserve_dir's proof holds; a run that built none has nothing to discard.
+# A preserve from any other run is never touched.
 discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   local dir
   DISCARD_WHY="its path could not be hashed"
@@ -1527,13 +1541,17 @@ discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   [ -e "$dir" ] || [ -L "$dir" ] || return 0
   DISCARD_WHY="the copy's identity or creation-lock bytes changed"
   copy_still_holds "$1" "$2" "$3" || return 1
-  DISCARD_WHY="it is not a plain directory"
-  [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
-  DISCARD_WHY="not every preserved original is still unchanged in the copy"
-  preserve_still_in_copy "$dir" "$1" || return 1
-  DISCARD_WHY="it could not be removed"
-  rm -rf -- "$dir" || return 1
-  rmdir "${dir%/*}" "$DATA_DIR/$4" 2>/dev/null || true
+  discard_preserve_dir "$dir" "$1" "$4"
+}
+
+# The unlocked route's form: this run's preserve of a copy it did not remove goes
+# only while the same copy still holds every preserved original unchanged.
+discard_unlocked_preserve() {  # <copy> <identity> <release-id>
+  local dir actual
+  dir=$(run_preserve_dir "$1" "$3") || return 0
+  [ -e "$dir" ] || [ -L "$dir" ] || return 0
+  actual=$(copy_identity "$1") && [ "$actual" = "$2" ] || return 0
+  discard_preserve_dir "$dir" "$1" "$3" || true
 }
 
 # After a retryable refusal, discards this run's preserve as discard_run_preserve
@@ -1758,6 +1776,7 @@ apply_removals() {
       # directories go with the copy.
       release_id="$CHECK_ID/$stamp-$head"
       preserve_dir=$(run_preserve_dir "$copy" "$release_id") || preserve_dir=
+      identity=$(copy_identity "$copy") || identity=
       if [ -z "$preserve_dir" ] || ! activity=$(activity_fingerprint "$copy" all) \
         || ! err=$(DATA="$DATA_DIR" ID="$release_id" teardown_preserve_ignored "$copy" all 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
@@ -1769,8 +1788,9 @@ apply_removals() {
       scan_processes
       classify "$copy" "$clone" "$pool" "$container"
       if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
+        discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"copy changed after preservation; the copy and preserve were left"$'\n'
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"copy changed after preservation; the copy was left"$'\n'
         continue
       fi
       want=
@@ -1787,6 +1807,7 @@ apply_removals() {
         continue
       fi
       if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
+        discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
         continue

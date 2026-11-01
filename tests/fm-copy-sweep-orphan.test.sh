@@ -40,7 +40,7 @@ make_squash_world() {
   printf 'dirty\n' >> "$CLONE/.claude/worktrees/tracked/feature.txt"
   printf 'untracked bytes\n' > "$CLONE/.claude/worktrees/untracked/new.txt"
   for name in clean unique tracked untracked; do
-    git -C "$CLONE" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$CLONE/.claude/worktrees/$name"
+    lock_with_gone_launcher "$CLONE/.claude/worktrees/$name"
   done
   install_fixture_driver
 }
@@ -462,6 +462,90 @@ SH
   pass 'a write inside .cache or node_modules stops a release and keeps a locked copy WAITING until it is quiet'
 }
 
+make_refused_world() {
+  local name
+  W="$TMP_ROOT/refused"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/\nnode_modules/\n' > "$CLONE/.gitignore"
+  git -C "$CLONE" add .gitignore
+  git -C "$CLONE" commit -qm 'ignore payloads'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  # Git itself refuses to remove a worktree with an initialized submodule.
+  git -C "$CLONE" -c protocol.file.allow=always submodule --quiet add "$W/origin.git" vendored
+  git -C "$CLONE" commit -qm 'hold a submodule'
+  git -C "$CLONE" push -q origin main
+  git -C "$CLONE" fetch -q origin
+  for name in refused evidence changed dirty unique; do
+    git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/$name" origin/main
+    git -C "$CLONE/.claude/worktrees/$name" -c protocol.file.allow=always submodule --quiet update --init
+    put_file "$CLONE/.claude/worktrees/$name/.claude/keep.txt" "original $name bytes"
+    put_file "$CLONE/.claude/worktrees/$name/node_modules/pkg/index.js" "regenerable $name"
+  done
+  printf 'uncommitted\n' > "$CLONE/.claude/worktrees/dirty/untracked.txt"
+  put_file "$CLONE/.claude/worktrees/unique/unlanded.txt" 'unlanded bytes'
+  git -C "$CLONE/.claude/worktrees/unique" add unlanded.txt
+  git -C "$CLONE/.claude/worktrees/unique" commit -qm 'unlanded commit'
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/lsof"
+  chmod +x "$W/bin/lsof"
+}
+
+# The number of preserve directories <copy> holds across every run.
+preserve_count() {  # <copy>
+  local key preserve found=0
+  key=$(printf '%s' "$1" | shasum -a 256 | cut -d ' ' -f 1)
+  for preserve in "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"; do
+    [ -d "$preserve" ] && found=$((found + 1))
+  done
+  printf '%s\n' "$found"
+}
+
+test_refused_removal_adds_no_preserve() {
+  local run refused evidence changed dirty unique real_cp key
+  make_refused_world
+  refused="$CLONE/.claude/worktrees/refused"
+  evidence="$CLONE/.claude/worktrees/evidence"
+  changed="$CLONE/.claude/worktrees/changed"
+  dirty="$CLONE/.claude/worktrees/dirty"
+  unique="$CLONE/.claude/worktrees/unique"
+  real_cp=$(command -v cp)
+  # In the first run only: a preserved original changes in one copy, and a new
+  # uncommitted file ends the proof of another.
+  cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  $evidence/.claude) printf 'changed original\\n' > "$evidence/.claude/keep.txt" ;;
+  $changed/.claude) printf 'new uncommitted\\n' > "$changed/late.txt" ;;
+esac
+SH
+  chmod +x "$W/bin/cp"
+  for run in 1 2 3; do
+    sweep_status --apply
+    assert_equals 1 "$SWEEP_RC" "run $run: a refused removal must fail the run"
+    assert_contains "$OUT" "FAILED"$'\t'"$refused"$'\t'"git worktree remove refused" "run $run: git did not refuse the copy"
+    assert_equals 0 "$(preserve_count "$refused")" "run $run: a refused removal kept its preserve"
+    assert_equals 'original refused bytes' "$(cat "$refused/.claude/keep.txt")" "run $run: a refused copy lost an original"
+    assert_present "$refused/node_modules/pkg/index.js" "run $run: a refused copy lost a regenerable file"
+    assert_equals 1 "$(preserve_count "$evidence")" "run $run: a fingerprint mismatch lost its preserve, or a run added one"
+    assert_equals 0 "$(preserve_count "$changed")" "run $run: a copy that stopped being proven kept a redundant preserve"
+    assert_present "$changed/late.txt" "run $run: uncommitted work was lost"
+    assert_equals 'original changed bytes' "$(cat "$changed/.claude/keep.txt")" "run $run: a changed copy lost an original"
+    assert_equals 'uncommitted' "$(cat "$dirty/untracked.txt")" "run $run: a dirty copy changed"
+    assert_equals 0 "$(preserve_count "$dirty")" "run $run: a dirty copy was preserved"
+    assert_equals 'unlanded bytes' "$(cat "$unique/unlanded.txt")" "run $run: unlanded work changed"
+    assert_equals 0 "$(preserve_count "$unique")" "run $run: an unlanded copy was preserved"
+    rm -f "$W/bin/cp"
+  done
+  assert_contains "$OUT" "FAILED"$'\t'"$evidence"$'\t'"git worktree remove refused" 'the later runs did not reach the evidence copy'
+  key=$(printf '%s' "$evidence" | shasum -a 256 | cut -d ' ' -f 1)
+  assert_equals 'original evidence bytes' "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/.claude/keep.txt)" 'the mismatch preserve changed'
+  assert_equals 'changed original' "$(cat "$evidence/.claude/keep.txt")" 'the changed original was lost'
+  pass 'three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged'
+}
+
 # check fingerprints under its time bound. That route must read the same file
 # bytes as report, or a quiet copy reads as still changing in the budget wake.
 assert_check_names_pending_driver() {  # <mechanism-label>
@@ -568,4 +652,5 @@ test_preserved_classes
 test_regenerable_class
 test_regenerable_write_keeps_waiting
 test_check_matches_report_for_quiet_waiting_copy
+test_refused_removal_adds_no_preserve
 test_ps_observation_diagnostics
