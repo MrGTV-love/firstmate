@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Slack Web API transport only. Shell entry points own environment resolution."""
 import json
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,17 +22,11 @@ class Slack:
 
     def __init__(self, token):
         self.token = token
-        # measured: 10 seconds, 2026-10-18, operator host, conservative socket ceiling.
-        # The standing check additionally bounds the whole process.
-        self.deadline = time.monotonic() + 20
         self.scopes = set()
 
     def call(self, method, **fields):
         if not self.token:
             raise SlackError('missing_token')
-        remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
-            raise SlackError('request_budget_exhausted')
         encoded = {key: json.dumps(value) if isinstance(value, (dict, list, bool)) else value
                    for key, value in fields.items()}
         request = urllib.request.Request(self.base + method,
@@ -41,7 +34,10 @@ class Slack:
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
         try:
-            with urllib.request.urlopen(request, timeout=min(10, remaining)) as response:
+            # measured: 10 seconds, 2026-10-18, operator host, conservative socket ceiling.
+            # A hung check can starve supervision: fm-watch.sh owns its progress
+            # and absolute bounds. Time between requests is not a socket failure.
+            with urllib.request.urlopen(request, timeout=10) as response:
                 header = response.headers.get('x-oauth-scopes', '')
                 if header:
                     self.scopes = {s for s in header.replace(' ', '').split(',') if s}

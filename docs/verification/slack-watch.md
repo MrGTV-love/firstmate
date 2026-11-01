@@ -4,8 +4,8 @@ Date: 2026-10-31 for the four-part renderer and current-card refresh verificatio
 Host: macOS arm64, shared operator host.
 Current verification tools: Python 3.13.6, tasks-axi 0.2.6, ShellCheck 0.11.0.
 Earlier pipeline evidence used no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
-No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
-Every Slack response came from `--replay` transcripts under `tests/fixtures/slack/`.
+The replay runs recorded below opened no socket, created no real DM, bound no real source, armed no real poll, and posted nothing to Slack.
+Their Slack responses came from `--replay` transcripts under `tests/fixtures/slack/`; the scheduling regression separately described below uses fake HTTP bodies and a local socketpair.
 Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <tmpdir>`.
 
 ## Environment and commands
@@ -28,6 +28,22 @@ A later 2026-10-30 run of the same suite on the same host printed an `ok -` line
 The logs of both runs record the markers and the exit status but not the command line or the commit, so neither is quoted for either run.
 A third 2026-10-30 run, `bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-slack-watch.test.sh`, printed an `ok -` line for the same checks and for X1 through X43, then `ok - all Slack watch checks`, and exited 0; its log records the command and the exit status but not the host or the commit.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
+
+## Scheduling delay and hung requests
+
+The Slack transport retains the measured ten-second per-request socket timeout but has no cumulative client lifetime deadline.
+A client lifetime deadline counted scheduling delays and local work as transport failure even when every request completed promptly.
+The harm is a hung check blocking the supervision sweep; `bin/fm-watch.sh` owns that check's progress-aware and absolute bounds, while `bin/fm-check-run.py` owns its watcher-linked process lifetime.
+See those script owners for the bounds and override mechanics rather than duplicating their policy here.
+
+Refresh command: `bash bin/fm-test-run.sh tests/fm-slack-deadline.test.sh --jobs 1`.
+This separate regression drives the real shell check and transport with fake HTTP responses backed by the existing replay fixture, inserts a 21-second scheduling gap between completed requests, and blocks a local socketpair using the production request timeout.
+It verifies four mirrored cards remain four on repeat, real failures report once per episode, and recovery permits a new failure report.
+It does not contact Slack or require credentials.
+
+The 2026-11-01 UTC registered-shim run with Python 3.13.6 on macOS arm64 printed `ok - slow standing check completes after 44.270s; four cards remain four on repeat` and `ok - hung request ends after 25.421s, before owner no-progress bound 30s; one report per episode`.
+It ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=198406`.
+The fake successful requests each completed within the retained ten-second timeout; the two recorded silent socket reads ended after 10.006 and 10.002 seconds.
 
 ## Live read-only probe
 
