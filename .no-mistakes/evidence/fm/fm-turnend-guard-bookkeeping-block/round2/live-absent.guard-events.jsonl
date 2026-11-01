@@ -1,0 +1,4 @@
+{"ts":"2026-11-01T14:35:19Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-6314","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-01T14:35:51Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-48121","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":2,"override":false}
+{"ts":"2026-11-01T14:36:23Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-93848","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":3,"override":false}
+{"ts":"2026-11-01T14:36:54Z","guard":"turnend-supervision-block","version":"1","system":"firstmate","session":"pid-30600","decision":"warn","source_ok":true,"elapsed_ms":0,"cleared_by":"budget-exhausted","repeat":1,"override":false}

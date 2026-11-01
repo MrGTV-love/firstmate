@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Haiku 5.5 · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.1CfGm3/projects/primary
+
+
+❯ Lab test. Run exactly this one command with Bash, nothing else: bash bin/fm-guard.sh . Then reply with the one output line that contains WATCHER DOWN, or the word silent if it
+  printed nothing. Do not repair anything. If a stop hook says supervision needs repair, do not repair it and use no tools: reply with only the word ack.
+
+  Ran 1 shell command
+
+⏺ silent
+
+✻ Brewed for 11s · done 8:34 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 59k/1.0M main primary:a9ca566b
+  ⏵⏵ auto mode on (shift+tab to cycle)

@@ -1,0 +1,87 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.cXtg40 tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+t=5 events=1 stable=0
+t=10 events=1 stable=1
+t=15 events=1 stable=2
+t=20 events=1 stable=3
+t=26 events=1 stable=4
+t=31 events=1 stable=5
+t=36 events=1 stable=6
+--- stage 2: real status change wakes the watcher; pull-warning sampled read-only from outside
+before wake: lock= guard=[1]
+t=5 lock=65409 alive=y banner=1 reminder=0 busy=0
+t=10 lock=65409 alive=y banner=0 reminder=0 busy=0
+t=15 lock=65409 alive=y banner=0 reminder=0 busy=0
+t=20 lock=65409 alive=y banner=0 reminder=0 busy=0
+t=25 lock=65409 alive=y banner=0 reminder=0 busy=0
+t=30 lock=65409 alive=y banner=0 reminder=0 busy=0
+t=35 lock= alive=n banner=1 reminder=0 busy=0
+t=40 lock=9403 alive=y banner=0 reminder=0 busy=0
+t=45 lock=24472 alive=y banner=0 reminder=0 busy=0
+t=50 lock=37909 alive=y banner=0 reminder=0 busy=0
+t=55 lock= alive=n banner=1 reminder=0 busy=0
+t=60 lock=58558 alive=y banner=0 reminder=0 busy=0
+t=65 lock= alive=n banner=1 reminder=0 busy=0
+t=70 lock=74337 alive=y banner=0 reminder=0 busy=0
+t=75 lock=84412 alive=y banner=0 reminder=0 busy=0
+t=80 lock=91571 alive=y banner=0 reminder=0 busy=0
+t=85 lock=2666 alive=y banner=0 reminder=0 busy=0
+t=90 lock=13283 alive=y banner=1 reminder=0 busy=0
+t=95 lock=22548 alive=y banner=1 reminder=0 busy=0
+t=100 lock= alive=n banner=1 reminder=0 busy=0
+t=105 lock= alive=n banner=1 reminder=0 busy=0
+t=110 lock=50493 alive=y banner=0 reminder=0 busy=0
+t=115 lock=61060 alive=y banner=1 reminder=0 busy=0
+t=120 lock= alive=n banner=1 reminder=0 busy=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+epoch=18 owner_pid=66166 outcome=arming updated_at=1793541499
+Sun Nov  1 07:58:18 2026     bash /Users/charlesabrooker/tmp/fm-lab.cXtg40/projects/primary/bin/fm-claude-stop-autoarm.sh
+.
+..
+.claude-autoarm-epoch
+.claude-autoarm-output.KVqX5x
+.fm-lab-tmux-dir
+.guard-pass-checked
+.hb-surfaced-task1
+.heartbeat-streak
+.host-mirror.jsonl
+.idle-reap-next
+.inactive-outcome-reconcile
+.last-check
+.last-heartbeat
+.last-watcher-beat
+.lavish-auto-retire-next
+.lock
+.lock-monitor
+.lock-session
+.open-loops-resurfaced
+.open-loops-started
+.open-loops-surfaced
+.open-loops.lock
+.pr-ready-reconcile
+.secondmate-liveness-tick
+.seen-task1_status
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.supervision-host
+.supervision-host-arm.APMUNo
+.supervision-host-left
+.supervision-host.log
+.trace-context-effective
+.typesafe-health-next
+.wake-queue
+.wake-queue.seq
+.watch-arm-output.R8G0Ez
+.watch-cycle-exits.log
+.watch-deliveries.log
+.watcher-down
+guard-events.jsonl
+home-summary.json
+open-loops.json
+task1.meta
+task1.status
+terminal-outcomes

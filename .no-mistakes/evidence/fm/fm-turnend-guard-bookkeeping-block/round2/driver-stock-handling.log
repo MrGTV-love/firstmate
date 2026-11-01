@@ -1,0 +1,72 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.pDwN10 tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.pDwN10/state/guard-events.jsonl: No such file or directory
+--- stage 2: real status change wakes the watcher; pull-warning sampled read-only from outside
+before wake: lock=5498 guard=[0]
+t=5 lock=43628 alive=y banner=1 reminder=0 busy=0
+t=10 lock=43628 alive=y banner=0 reminder=0 busy=0
+t=15 lock=43628 alive=y banner=0 reminder=0 busy=0
+t=20 lock=43628 alive=y banner=0 reminder=0 busy=0
+t=25 lock=43628 alive=y banner=0 reminder=0 busy=0
+t=30 lock=43628 alive=y banner=0 reminder=0 busy=0
+t=35 lock= alive=n banner=1 reminder=0 busy=0
+t=40 lock=8129 alive=y banner=0 reminder=0 busy=0
+t=45 lock=8129 alive=y banner=0 reminder=0 busy=0
+t=50 lock=8129 alive=y banner=0 reminder=0 busy=0
+t=55 lock=57548 alive=y banner=0 reminder=0 busy=0
+t=60 lock=57548 alive=y banner=0 reminder=0 busy=0
+t=65 lock=84241 alive=y banner=0 reminder=0 busy=0
+t=70 lock=88647 alive=y banner=0 reminder=0 busy=0
+t=75 lock=88647 alive=y banner=0 reminder=0 busy=0
+t=80 lock=19926 alive=y banner=0 reminder=0 busy=0
+t=85 lock=19926 alive=y banner=0 reminder=0 busy=0
+t=90 lock=46906 alive=y banner=1 reminder=0 busy=0
+t=95 lock=55569 alive=y banner=0 reminder=0 busy=0
+t=100 lock= alive=n banner=1 reminder=0 busy=0
+t=105 lock=83285 alive=y banner=0 reminder=0 busy=0
+t=110 lock=83285 alive=y banner=0 reminder=0 busy=0
+t=115 lock=83285 alive=y banner=0 reminder=0 busy=0
+t=120 lock=27053 alive=y banner=0 reminder=0 busy=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+--- pane tail
+  I have not found the source of rearm-resurface. No drain output names it. I can check it next if you want.
+
+  Your choice unblocks the queue:
+  - Pick an action for the overdue row (steered, merged, escalated, deferred, or waiting), with evidence.
+  - Or tell me to send ack to task1.
+
+  Then I will run the acknowledgement through sequence 2.
+
+✻ Crunched for 4s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+  Searched for 1 pattern, ran 1 shell command
+
+⏺ Captain, I found the cause of the loop. It is not a new fault.
+
+  1. The watcher re-announces check: rearm-resurface when wake rows stay unacknowledged.
+  2. The acknowledgement is refused, so the rows stay unacknowledged.
+  3. The acknowledgement is refused because the overdue row 18ac509ac89875711eed287b has no action recorded.
+
+  The repo's own lab notes say the same thing. A rearm-resurface wake repeats about every 5 seconds while rows stay unacknowledged (docs/verification/supervision.md, line 350).
+
+  So the only way out is the choice I asked for before:
+  - Record an action for row 18ac509ac89875711eed287b. Options: steered, merged, escalated, deferred, or waiting. I need the evidence.
+  - Or tell me to answer task1's decision with ack.
+
+  I have not drained again. I will not drain again until you choose.
+
+✻ Churned for 11s · done 8:41 AM
+
+⏺ Stop hook feedback
+
+✽ Ionizing…
+  ⎿  Tip: Run claude --continue or claude --resume to resume a conversation
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 7% 75k/1.0M main primary:e874ea4b
+  ⏵⏵ auto mode on (shift+tab to cycle)

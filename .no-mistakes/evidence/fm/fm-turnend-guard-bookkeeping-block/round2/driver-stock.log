@@ -1,0 +1,72 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.ZtnEII tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.ZtnEII/state/guard-events.jsonl: No such file or directory
+--- stage 2: real status change wakes the watcher; pull-warning sampled read-only from outside
+before wake: lock=26736 guard=[0]
+t=5 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=10 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=15 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=20 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=25 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=30 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=35 lock=99519 alive=y banner=0 reminder=0 busy=0
+t=40 lock=16388 alive=y banner=0 reminder=0 busy=0
+t=45 lock=32270 alive=y banner=0 reminder=0 busy=0
+t=50 lock= alive=n banner=1 reminder=0 busy=0
+t=55 lock= alive=n banner=1 reminder=0 busy=0
+t=60 lock=64328 alive=y banner=0 reminder=0 busy=0
+t=65 lock=81287 alive=y banner=0 reminder=0 busy=0
+t=70 lock=98517 alive=y banner=1 reminder=0 busy=0
+t=75 lock=9588 alive=y banner=0 reminder=0 busy=0
+t=80 lock= alive=n banner=1 reminder=0 busy=0
+t=85 lock=29346 alive=y banner=0 reminder=0 busy=0
+t=90 lock=45986 alive=y banner=0 reminder=0 busy=0
+t=95 lock=62789 alive=y banner=0 reminder=0 busy=0
+t=100 lock=70050 alive=y banner=0 reminder=0 busy=0
+t=105 lock=90041 alive=y banner=1 reminder=0 busy=0
+t=110 lock=3746 alive=y banner=0 reminder=0 busy=0
+t=115 lock=17403 alive=y banner=0 reminder=0 busy=0
+t=120 lock= alive=n banner=1 reminder=0 busy=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+--- pane tail
+
+⏺ ack
+
+✻ Baked for 2s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Sautéed for 1s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Cogitated for 2s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Sautéed for 2s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Sautéed for 1s · done 8:41 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Worked for 1s · done 8:41 AM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 66k/1.0M main primary:34a00dfe
+  ⏵⏵ auto mode on (shift+tab to cycle)

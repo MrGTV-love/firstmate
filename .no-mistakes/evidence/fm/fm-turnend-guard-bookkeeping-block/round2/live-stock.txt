@@ -1,0 +1,92 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.ZtnEII tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+t=5 events=0 stable=0
+t=11 events=1 stable=0
+t=16 events=1 stable=1
+t=21 events=1 stable=2
+t=26 events=1 stable=3
+t=31 events=1 stable=4
+t=37 events=1 stable=5
+t=42 events=1 stable=6
+--- stage 2: real status change wakes the watcher; pull-warning sampled read-only from outside
+before wake: lock=26736 guard=[0]
+t=5 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=10 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=15 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=20 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=25 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=30 lock=37203 alive=y banner=0 reminder=0 busy=0
+t=35 lock=99519 alive=y banner=0 reminder=0 busy=0
+t=40 lock=16388 alive=y banner=0 reminder=0 busy=0
+t=45 lock=32270 alive=y banner=0 reminder=0 busy=0
+t=50 lock= alive=n banner=1 reminder=0 busy=0
+t=55 lock= alive=n banner=1 reminder=0 busy=0
+t=60 lock=64328 alive=y banner=0 reminder=0 busy=0
+t=65 lock=81287 alive=y banner=0 reminder=0 busy=0
+t=70 lock=98517 alive=y banner=1 reminder=0 busy=0
+t=75 lock=9588 alive=y banner=0 reminder=0 busy=0
+t=80 lock= alive=n banner=1 reminder=0 busy=0
+t=85 lock=29346 alive=y banner=0 reminder=0 busy=0
+t=90 lock=45986 alive=y banner=0 reminder=0 busy=0
+t=95 lock=62789 alive=y banner=0 reminder=0 busy=0
+t=100 lock=70050 alive=y banner=0 reminder=0 busy=0
+t=105 lock=90041 alive=y banner=1 reminder=0 busy=0
+t=110 lock=3746 alive=y banner=0 reminder=0 busy=0
+t=115 lock=17403 alive=y banner=0 reminder=0 busy=0
+t=120 lock= alive=n banner=1 reminder=0 busy=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+/Users/charlesabrooker/.claude/projects/-Users-charlesabrooker-tmp-fm-lab-ZtnEII-projects-primary
+epoch=16 owner_pid=24640 outcome=arming updated_at=1793544077
+Sun Nov  1 08:41:17 2026     bash /Users/charlesabrooker/tmp/fm-lab.ZtnEII/projects/primary/bin/fm-claude-stop-autoarm.sh
+.
+..
+.claude-autoarm-epoch
+.claude-autoarm-epoch.tmp.24640
+.claude-autoarm.lock
+.claude-autoarm.lock.owner.4zQoBK
+.fm-lab-tmux-dir
+.guard-pass-checked
+.guard-watcher-stale-banner
+.hb-surfaced-task1
+.heartbeat-streak
+.host-mirror.jsonl
+.idle-reap-next
+.inactive-outcome-reconcile
+.last-check
+.last-heartbeat
+.last-watcher-beat
+.lavish-auto-retire-next
+.lock
+.lock-monitor
+.lock-monitor.hold.f5zqXf
+.lock-session
+.open-loops-resurfaced
+.open-loops-started
+.open-loops-surfaced
+.open-loops.lock
+.pr-ready-reconcile
+.prelude-progress
+.secondmate-liveness-tick
+.seen-task1_status
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.delivered
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.supervision-host-left
+.supervision-host.log
+.trace-context-effective
+.typesafe-health-next
+.wake-queue
+.wake-queue.seq
+.watch-cycle-exits.log
+.watch-deliveries.log
+.watcher-down
+guard-events.jsonl
+home-summary.json
+open-loops.json
+task1.meta
+task1.status
+terminal-outcomes

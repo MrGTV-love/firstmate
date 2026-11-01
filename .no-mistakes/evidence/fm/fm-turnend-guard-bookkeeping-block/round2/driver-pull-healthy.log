@@ -1,0 +1,49 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.1CfGm3 tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+real watcher pid=52725
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.1CfGm3/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.1CfGm3/state/guard-events.jsonl: No such file or directory
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+--- pane tail
+
+⏺ silent
+
+✻ Brewed for 11s · done 8:34 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 59k/1.0M main primary:a9ca566b
+  ⏵⏵ auto mode on (shift+tab to cycle)

@@ -1,0 +1,67 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.VTtpFc tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+t=6 events=0 stable=0
+t=11 events=0 stable=1
+t=16 events=0 stable=1
+t=21 events=0 stable=1
+t=26 events=0 stable=1
+t=31 events=0 stable=1
+t=37 events=0 stable=1
+t=42 events=0 stable=1
+t=47 events=1 stable=0
+t=52 events=1 stable=1
+t=57 events=1 stable=1
+t=62 events=1 stable=1
+t=67 events=1 stable=1
+t=73 events=1 stable=1
+t=78 events=2 stable=0
+t=83 events=2 stable=1
+t=88 events=2 stable=1
+t=93 events=2 stable=1
+t=98 events=2 stable=1
+t=103 events=2 stable=1
+t=108 events=3 stable=0
+t=114 events=3 stable=1
+t=119 events=3 stable=1
+t=124 events=3 stable=1
+t=129 events=3 stable=1
+t=134 events=3 stable=1
+t=139 events=4 stable=0
+t=145 events=4 stable=1
+t=150 events=4 stable=2
+t=155 events=4 stable=3
+t=160 events=4 stable=4
+t=165 events=4 stable=5
+t=170 events=4 stable=6
+--- deny/warn/allow events
+{"decision":"deny","cleared_by":"","repeat":1}
+{"decision":"deny","cleared_by":"","repeat":2}
+{"decision":"deny","cleared_by":"","repeat":3}
+{"decision":"warn","cleared_by":"budget-exhausted","repeat":1}
+/Users/charlesabrooker/.claude/projects/-Users-charlesabrooker-tmp-fm-lab-VTtpFc-projects-primary
+-rw-r--r--@ 1 charlesabrooker  staff  60 Nov  1 08:36 /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/.turnend-claude-blocks
+session=a6bafd4a-cd55-4d97-bbbd-e55a285532fb
+count=4
+epoch=
+.
+..
+.fm-lab-tmux-dir
+.guard-pass-checked
+.guard-watcher-stale-banner
+.host-mirror.jsonl
+.inactive-outcome-reconcile
+.lock
+.lock-session
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.trace-context-effective
+.turnend-claude-blocks
+.wake-queue
+guard-events.jsonl
+home-summary.json
+task1.meta
+terminal-outcomes

@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Haiku 5.5 · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.TAjNId/projects/primary
+
+  Updated to latest. Got 13 features, 154 bugfixes, and 69 other changes.
+  code.claude.com/docs/en/changelog for details
+
+⚠ Deny rule Bash(rm -rf /*:*) reads its * literally · use Bash(rm -rf /*)
+⚠ Deny rule Bash(rm -rf ~/*:*) reads its * literally · use Bash(rm -rf ~/*)
+⚠ Deny rule Bash(dd if=* of=/dev/*:*) reads its * literally · use Bash(dd if=* of=/dev/*)
+⚠ Ask rule Bash(rm*/.claude/hooks/*:*) reads its * literally · use Bash(rm*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.claude/settings*:*) reads its * literally · use Bash(rm*/.claude/settings*)
+⚠ Ask rule Bash(mv*/.claude/hooks/*:*) reads its * literally · use Bash(mv*/.claude/hooks/*)
+⚠ Ask rule Bash(mv*/.claude/settings*:*) reads its * literally · use Bash(mv*/.claude/settings*)
+⚠ Ask rule Bash(*>*/.claude/settings*:*) reads its * literally · use Bash(*>*/.claude/settings*)
+⚠ Ask rule Bash(*>*/.claude/hooks/*:*) reads its * literally · use Bash(*>*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use Bash(*>*/.tac/governance/*)
+
+▎ Your Ultra plan includes $200 a month in API credits to power your apps and agents. Claim them at https://clau.de/api-credits
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                                                                                ◐ medium · /effort
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Try "create a util logging.py that..."
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 0% 0/0 main primary:2af493ab
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

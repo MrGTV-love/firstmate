@@ -1,0 +1,50 @@
+
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Worked for 2s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Cooked for 1s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Brewed for 1s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Sautéed for 2s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Baked for 1s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Worked for 1s · done 8:02 AM
+
+⏺ Stop hook feedback
+
+⏺ ack
+
+✻ Unfurling… (running Stop hooks… 3/4 · 1s · ↓ 4 tokens)
+  ⎿  Tip: Use /memory to view and manage Claude memory
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 8% 87k/1.0M main primary:98098c2e
+  ⏵⏵ auto mode on (shift+tab to cycle)

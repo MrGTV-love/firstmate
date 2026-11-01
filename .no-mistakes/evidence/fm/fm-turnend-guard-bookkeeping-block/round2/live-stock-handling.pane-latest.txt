@@ -1,0 +1,50 @@
+
+⏺ Stop hook feedback
+
+⏺ Captain, the same stop hook fired again for check: rearm-resurface. I did not drain again. Three drains in a row showed the same two items, so another run will not change
+  anything.
+
+  The blockers are unchanged:
+  1. Overdue row 18ac509ac89875711eed287b. No action is recorded.
+  2. task1 decision. Its status says "lab test wake, reply ack."
+
+  I have not found the source of rearm-resurface. No drain output names it. I can check it next if you want.
+
+  Your choice unblocks the queue:
+  - Pick an action for the overdue row (steered, merged, escalated, deferred, or waiting), with evidence.
+  - Or tell me to send ack to task1.
+
+  Then I will run the acknowledgement through sequence 2.
+
+✻ Crunched for 4s · done 8:40 AM
+
+⏺ Stop hook feedback
+
+  Searched for 1 pattern, ran 1 shell command
+
+⏺ Captain, I found the cause of the loop. It is not a new fault.
+
+  1. The watcher re-announces check: rearm-resurface when wake rows stay unacknowledged.
+  2. The acknowledgement is refused, so the rows stay unacknowledged.
+  3. The acknowledgement is refused because the overdue row 18ac509ac89875711eed287b has no action recorded.
+
+  The repo's own lab notes say the same thing. A rearm-resurface wake repeats about every 5 seconds while rows stay unacknowledged (docs/verification/supervision.md, line 350).
+
+  So the only way out is the choice I asked for before:
+  - Record an action for row 18ac509ac89875711eed287b. Options: steered, merged, escalated, deferred, or waiting. I need the evidence.
+  - Or tell me to answer task1's decision with ack.
+
+  I have not drained again. I will not drain again until you choose.
+
+✻ Churned for 11s · done 8:41 AM
+
+⏺ Stop hook feedback
+
+✽ Ionizing…
+  ⎿  Tip: Run claude --continue or claude --resume to resume a conversation
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 7% 75k/1.0M main primary:e874ea4b
+  ⏵⏵ auto mode on (shift+tab to cycle)

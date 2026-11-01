@@ -1,0 +1,53 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.lHZfr1 tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.lHZfr1/state/guard-events.jsonl: No such file or directory
+--- deny/warn/allow events
+{"decision":"warn","cleared_by":"budget-unavailable","repeat":1}
+--- pane tail
+     needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.lHZfr1/projects/primary/bin/fm-claude-stop-autoarm.sh, which owns continuity and
+     re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+
+✻ Sautéed for 38s · done 8:35 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 59k/1.0M main primary:88f95edf
+  ⏵⏵ auto mode on (shift+tab to cycle)

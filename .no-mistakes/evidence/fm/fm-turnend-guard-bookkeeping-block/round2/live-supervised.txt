@@ -1,0 +1,55 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.3pU50i tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+real watcher pid=52562
+t=5 events=0 stable=0
+t=10 events=1 stable=0
+t=16 events=1 stable=1
+t=21 events=1 stable=2
+t=26 events=1 stable=3
+t=31 events=1 stable=4
+t=36 events=1 stable=5
+t=41 events=1 stable=6
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+/Users/charlesabrooker/.claude/projects/-Users-charlesabrooker-tmp-fm-lab-3pU50i-projects-primary
+.
+..
+.claude-autoarm-failure-notified
+.fm-lab-tmux-dir
+.guard-pass-checked
+.heartbeat-streak
+.host-mirror.jsonl
+.idle-reap-next
+.inactive-outcome-reconcile
+.last-check
+.last-heartbeat
+.last-watcher-beat
+.lavish-auto-retire-next
+.lock
+.lock-monitor
+.lock-session
+.open-loops-resurfaced
+.open-loops-started
+.open-loops-surfaced
+.open-loops.lock
+.pr-ready-reconcile
+.prelude-progress
+.secondmate-liveness-tick
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.trace-context-effective
+.typesafe-health-next
+.wake-queue
+.wake-queue.seq
+.watch-cycle-exits.log
+.watch-deliveries.log
+.watcher-down
+guard-events.jsonl
+home-summary.json
+open-loops.json
+task1.meta
+terminal-outcomes

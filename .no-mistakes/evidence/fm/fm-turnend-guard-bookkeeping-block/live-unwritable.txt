@@ -1,0 +1,41 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.qIzwmf tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+t=5 events=0 stable=0
+t=10 events=0 stable=1
+t=15 events=0 stable=1
+t=21 events=0 stable=1
+t=26 events=0 stable=1
+t=31 events=0 stable=1
+t=36 events=0 stable=1
+t=41 events=1 stable=0
+t=46 events=1 stable=1
+t=51 events=1 stable=2
+t=57 events=1 stable=3
+t=62 events=1 stable=4
+t=67 events=1 stable=5
+t=72 events=1 stable=6
+--- deny/warn/allow events
+{"decision":"warn","cleared_by":"budget-unavailable","repeat":1}
+drwxr-xr-x@ 2 charlesabrooker  staff  64 Nov  1 07:53 /Users/charlesabrooker/tmp/fm-lab.qIzwmf/state/.turnend-claude-blocks
+.
+..
+.fm-lab-tmux-dir
+.guard-pass-checked
+.host-mirror.jsonl
+.inactive-outcome-reconcile
+.lock
+.lock-session
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.delivered
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.trace-context-effective
+.turnend-claude-blocks
+.wake-queue
+guard-events.jsonl
+home-summary.json
+task1.meta
+terminal-outcomes

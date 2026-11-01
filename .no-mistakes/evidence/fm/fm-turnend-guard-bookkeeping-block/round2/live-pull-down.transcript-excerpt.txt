@@ -1,0 +1,10 @@
+user TEXT Lab test. Run exactly this one command with Bash, nothing else: bash bin/fm-guard.sh . Then reply with the one output line that contains WATCHER DOWN, or the word silent if it printed nothing. Do not repair anything. If a stop hook says supervision needs repair, do not repair it and use no tools: reply with only the word ack.
+TOOL_USE {"command": "bash bin/fm-guard.sh", "description": "Run the guard script once"}
+TOOL_RESULT WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+assistant TEXT WATCHER DOWN: `WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.`
+user TEXT Stop hook feedback: | [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ | ●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never). | ●  The Stop-owned auto-arm did not claim this home either,
+assistant TEXT ack
+user TEXT Stop hook feedback: | [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ | ●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never). | ●  The Stop-owned auto-arm did not claim this home either,
+assistant TEXT ack
+user TEXT Stop hook feedback: | [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ | ●  TURN WOULD END BLIND - SUPERVISION IS OFF | ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never). | ●  The Stop-owned auto-arm did not claim this home either,
+assistant TEXT ack

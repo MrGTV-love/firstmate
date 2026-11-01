@@ -1,0 +1,38 @@
+watcher: started pid=21881 (beacon fresh)
+watcher: started pid=25302 (beacon fresh)
+watcher: started pid=29094 (beacon fresh)
+watcher: started pid=32940 (beacon fresh)
+mkdir: /Users/charlesabrooker/tmp/fm-lab.WzXpac/state/.pr-ready-reconcile: Permission denied
+watcher: started pid=36093 (beacon fresh)
+watcher: started pid=41883 (beacon fresh)
+watcher: started pid=45570 (beacon fresh)
+/Users/charlesabrooker/tmp/fm-lab.WzXpac/projects/primary/bin/fm-wake-lib.sh: line 2798: /Users/charlesabrooker/tmp/fm-lab.WzXpac/state/.wake-queue.seq: Permission denied
+watcher: started pid=49062 (beacon fresh)
+watcher: recovery state could not be persisted; retaining stale lock evidence
+mkdir: /Users/charlesabrooker/tmp/fm-lab.WzXpac/state/.pr-ready-reconcile: Permission denied
+watcher: started pid=12331 (beacon fresh)
+watcher: started pid=24545 (beacon fresh)
+watcher: started pid=43045 (beacon fresh)
+watcher: started pid=59144 (beacon fresh)
+watcher: started pid=72374 (beacon fresh)
+watcher: started pid=89746 (beacon fresh)
+watcher: started pid=17181 (beacon fresh)
+watcher: started pid=62658 (beacon fresh)
+watcher: started pid=66926 (beacon fresh)
+watcher: started pid=70951 (beacon fresh)
+watcher: started pid=76043 (beacon fresh)
+/Users/charlesabrooker/tmp/fm-lab.TI25kc/projects/base/bin/fm-watch.sh: line 3690: /Users/charlesabrooker/tmp/fm-lab.TI25kc/state/.prelude-progress.tmp.76043: Permission denied
+mkdir: /Users/charlesabrooker/tmp/fm-lab.TI25kc/state/.pr-ready-reconcile: Permission denied
+/Users/charlesabrooker/tmp/fm-lab.TI25kc/projects/base/bin/fm-watch-arm.sh: line 726: 76043 Terminated: 15          "$WATCH" > "$child_out"
+watcher: started pid=80032 (beacon fresh)
+watcher: started pid=83456 (beacon fresh)
+watcher: started pid=87165 (beacon fresh)
+watcher: started pid=90966 (beacon fresh)
+mkdir: /Users/charlesabrooker/tmp/fm-lab.TI25kc/state/.pr-ready-reconcile: Permission denied
+watcher: started pid=42982 (beacon fresh)
+watcher: started pid=60742 (beacon fresh)
+watcher: started pid=77704 (beacon fresh)
+watcher: started pid=94013 (beacon fresh)
+watcher: started pid=11888 (beacon fresh)
+watcher: started pid=31870 (beacon fresh)
+watcher: started pid=44924 (beacon fresh)

@@ -1,0 +1,48 @@
+implementation_root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B4VRKGX3315FZMQNN7CWJG head=068ee0d01384756a38816f8271f20eaa8fef3734 tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a lab=/Users/charlesabrooker/tmp/fm-lab.muMYYg
+A1 garbage budget count: stops stay inside the budget
+   rc=[2 2 2 0 0 0 ] budget=session=sess-a count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+A2 budget file is empty
+   rc=[2 2 2 0 0 0 ] budget=session=sess-a count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+A3 stale budget lock with a dead pid is reclaimed: normal count, not budget-unavailable
+   rc=[2 2 2 0 0 0 ] budget=session=sess-a count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+A4 budget lock path is a plain file
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/guard-adversarial.sh: line 17: /Users/charlesabrooker/tmp/fm-lab.muMYYg/state/.turnend-claude-blocks: No such file or directory
+   rc=[0 0 0 0 0 0 ] budget=
+   events:    6 ["warn","budget-unavailable"];
+A5 budget file is read-only (the guard's rename still replaces it)
+   rc=[2 2 0 0 0 ] budget=session=sess-a count=6 epoch= 
+   events:    2 ["deny",""];   3 ["warn","budget-exhausted"];
+A6 a new session gets its own three blocks; the old session does not reset the count to a lower one
+   rc=[2 2 2 0 0 ] budget=session=sess-a count=5 epoch= 
+   events:    3 ["deny",""];   2 ["warn","budget-exhausted"];
+   rc=[2 2 2 0 0 ] budget=session=sess-b count=5 epoch= 
+   events:    6 ["deny",""];   4 ["warn","budget-exhausted"];
+A7 budget override 1 and invalid override
+   rc=[2 0 0 ] budget=session=sess-a count=3 epoch= 
+   events:    1 ["deny",""];   2 ["warn","budget-exhausted"];
+   rc=[2 2 2 0 0 ] budget=session=sess-a count=5 epoch= 
+   events:    3 ["deny",""];   2 ["warn","budget-exhausted"];
+A8 twelve parallel Stops in one session never exceed three exit-2 blocks
+   exits:   10 0;   2 2; budget=session=sess-a count=2 epoch= 
+   events:    2 ["deny",""];  10 ["warn","budget-unavailable"];
+A9 state directory unreadable (chmod 000)
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/guard-adversarial.sh: line 17: /Users/charlesabrooker/tmp/fm-lab.muMYYg/state/.turnend-claude-blocks: Permission denied
+   rc=[0 0 0 ] budget=
+   events: 
+A10 state directory read-only, budget file exists with count already past budget
+   rc=[0 0 0 ] budget=session=sess-a count=9 epoch= 
+   events: 
+A11 exit output of a budget-unavailable stop is valid JSON for the harness
+   rc=0 json_ok=yes msg=FIRSTMATE SUPERVISION IS OFF and the turn-end block budget cannot be locked or written, so this stop is allowed instead of blocked. Repair: watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.muMYYg/pro
+A12 exit output of an exhausted stop is valid JSON
+   rc=0 json_ok=yes msg=FIRSTMATE SUPERVISION IS GENUINELY DOWN: 1 task(s) in flight, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkee
+A13 secondmate busy record: blocked Stop records busy, allowed Stop records idle
+   sm busy stop-blocked
+   sm busy stop-blocked
+   sm busy stop-blocked
+   sm idle stop
+   sm idle stop
+done

@@ -1,0 +1,15 @@
+1793544036	pass-through	attended	main-only	check: rearm-resurface
+1793544040	start	gen=host-38934-1793544040	primary=claude
+1793544040	take-over	arm=29257
+1793544043	pass-through	attended	main-only	check: rearm-resurface
+1793544049	start	gen=host-58763-1793544049	primary=claude
+1793544049	take-over	arm=45929
+1793544053	pass-through	attended	main-only	check: rearm-resurface
+1793544058	start	gen=host-82521-1793544058	primary=claude
+1793544058	take-over	arm=69901
+1793544067	pass-through	attended	main-only	check: rearm-resurface
+1793544070	start	gen=host-9705-1793544070	primary=claude
+1793544070	take-over	arm=3640
+1793544074	pass-through	attended	main-only	check: rearm-resurface
+1793544078	start	gen=host-25705-1793544078	primary=claude
+1793544078	take-over	arm=17350

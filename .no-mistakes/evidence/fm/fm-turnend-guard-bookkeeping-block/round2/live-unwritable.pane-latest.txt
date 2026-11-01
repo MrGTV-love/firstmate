@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Haiku 5.5 · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.lHZfr1/projects/primary
+
+
+❯ Lab test. Reply with only the word ack. Use no tools. If a stop hook says supervision needs repair, do not repair it and use no tools: reply with only the word ack again.
+
+⏺ ack
+  ⎿  Stop says: FIRSTMATE SUPERVISION IS OFF and the turn-end block budget cannot be locked or written, so this stop is allowed instead of blocked. Repair: watcher supervision
+     needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.lHZfr1/projects/primary/bin/fm-claude-stop-autoarm.sh, which owns continuity and
+     re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+
+✻ Sautéed for 38s · done 8:35 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 59k/1.0M main primary:88f95edf
+  ⏵⏵ auto mode on (shift+tab to cycle)

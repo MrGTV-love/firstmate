@@ -1,0 +1,1 @@
+arm_pid=52416	watcher_pid=52562	origin=started	started_at=1793543678	ended_at=1793543697	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:52562|identity:Sun Nov  1 08:34:38 2026     bash /Users/charlesabrooker/tm

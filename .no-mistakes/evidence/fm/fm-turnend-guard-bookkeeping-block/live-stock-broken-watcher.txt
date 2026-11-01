@@ -1,0 +1,237 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.pUnxvg tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+t=5 events=1 stable=0
+t=10 events=2 stable=0
+t=15 events=3 stable=0
+t=20 events=5 stable=0
+t=26 events=6 stable=0
+t=31 events=7 stable=0
+t=36 events=8 stable=0
+t=41 events=10 stable=0
+t=46 events=11 stable=0
+t=52 events=13 stable=0
+t=57 events=14 stable=0
+t=62 events=16 stable=0
+t=67 events=17 stable=0
+t=72 events=19 stable=0
+t=77 events=20 stable=0
+t=83 events=21 stable=0
+t=88 events=23 stable=0
+t=93 events=24 stable=0
+t=98 events=25 stable=0
+t=103 events=27 stable=0
+t=108 events=28 stable=0
+t=113 events=29 stable=0
+t=119 events=31 stable=0
+t=124 events=32 stable=0
+t=129 events=34 stable=0
+t=134 events=35 stable=0
+t=139 events=37 stable=0
+t=144 events=38 stable=0
+t=150 events=40 stable=0
+t=155 events=41 stable=0
+t=160 events=43 stable=0
+t=165 events=44 stable=0
+t=170 events=46 stable=0
+t=175 events=47 stable=0
+t=181 events=48 stable=0
+t=186 events=50 stable=0
+t=191 events=51 stable=0
+t=196 events=52 stable=0
+t=201 events=53 stable=0
+t=206 events=54 stable=0
+t=212 events=55 stable=0
+t=217 events=56 stable=0
+t=222 events=57 stable=0
+t=227 events=58 stable=0
+t=232 events=59 stable=0
+t=237 events=61 stable=0
+t=243 events=62 stable=0
+t=248 events=63 stable=0
+t=253 events=64 stable=0
+t=258 events=66 stable=0
+t=263 events=67 stable=0
+t=268 events=69 stable=0
+t=274 events=70 stable=0
+t=279 events=72 stable=0
+t=284 events=73 stable=0
+t=289 events=74 stable=0
+t=294 events=75 stable=0
+t=299 events=77 stable=0
+t=305 events=78 stable=0
+t=310 events=80 stable=0
+t=315 events=81 stable=0
+t=320 events=82 stable=0
+t=325 events=84 stable=0
+t=330 events=86 stable=0
+t=336 events=87 stable=0
+t=341 events=89 stable=0
+t=346 events=90 stable=0
+t=351 events=92 stable=0
+t=356 events=93 stable=0
+t=361 events=95 stable=0
+t=367 events=96 stable=0
+t=372 events=97 stable=0
+t=377 events=98 stable=0
+t=382 events=100 stable=0
+t=387 events=101 stable=0
+t=392 events=102 stable=0
+t=398 events=104 stable=0
+t=403 events=105 stable=0
+t=408 events=107 stable=0
+t=413 events=108 stable=0
+t=418 events=110 stable=0
+t=423 events=111 stable=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+-rw-r--r--@ 1 charlesabrooker  staff  65 Nov  1 08:02 /Users/charlesabrooker/tmp/fm-lab.pUnxvg/state/.turnend-claude-blocks
+session=98098c2e-44cb-4066-8970-faecf1d4a288
+count=112
+epoch=112
+epoch=112 owner_pid=7110 outcome=arming updated_at=1793541757
+Sun Nov  1 08:02:37 2026     bash /Users/charlesabrooker/tmp/fm-lab.pUnxvg/projects/primary/bin/fm-claude-stop-autoarm.sh
+.
+..
+.claude-autoarm-epoch
+.claude-autoarm-failure-notified
+.claude-autoarm-output.oxoRvR
+.fm-lab-tmux-dir
+.guard-pass-checked
+.host-mirror.jsonl
+.inactive-outcome-reconcile
+.lock
+.lock-monitor.hold.yIsFZJ
+.lock-monitor.hold.zE4mFI
+.lock-session
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.delivered
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.supervision-host
+.supervision-host-arm.hfEtP9
+.supervision-host.log
+.trace-context-effective
+.turnend-claude-blocks
+.turnend-claude-blocks.lock
+.turnend-claude-blocks.lock.owner.kpA3RO
+.wake-queue
+.watch-arm-output.AfuUxC
+.watch-cycle-exits.lock
+.watch-cycle-exits.lock.owner.Z1YV1o
+.watch-cycle-exits.log
+guard-events.jsonl
+home-summary.json
+task1.meta
+terminal-outcomes

@@ -1,0 +1,123 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.fEEEBk tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+ready=1 after 2 polls
+t=5 events=0 stable=0
+t=11 events=1 stable=0
+t=16 events=2 stable=0
+t=21 events=3 stable=0
+t=26 events=4 stable=0
+t=31 events=5 stable=0
+t=37 events=6 stable=0
+t=42 events=7 stable=0
+t=47 events=8 stable=0
+t=52 events=9 stable=0
+t=57 events=10 stable=0
+t=62 events=11 stable=0
+t=68 events=12 stable=0
+t=73 events=13 stable=0
+t=78 events=14 stable=0
+t=83 events=15 stable=0
+t=88 events=16 stable=0
+t=93 events=17 stable=0
+t=99 events=19 stable=0
+t=104 events=20 stable=0
+t=109 events=21 stable=0
+t=114 events=22 stable=0
+t=119 events=23 stable=0
+t=124 events=25 stable=0
+t=130 events=25 stable=1
+t=135 events=26 stable=0
+t=140 events=27 stable=0
+t=145 events=28 stable=0
+t=150 events=29 stable=0
+t=156 events=29 stable=1
+t=161 events=30 stable=0
+t=166 events=31 stable=0
+t=171 events=32 stable=0
+t=176 events=33 stable=0
+t=181 events=34 stable=0
+t=187 events=35 stable=0
+t=192 events=36 stable=0
+t=197 events=37 stable=0
+t=202 events=38 stable=0
+t=207 events=38 stable=1
+t=213 events=39 stable=0
+--- deny/warn/allow events
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+{"decision":"allow","cleared_by":"continue","repeat":1}
+/Users/charlesabrooker/.claude/projects/-Users-charlesabrooker-tmp-fm-lab-fEEEBk-projects-primary
+-rw-r--r--@ 1 charlesabrooker  staff  63 Nov  1 08:41 /Users/charlesabrooker/tmp/fm-lab.fEEEBk/state/.turnend-claude-blocks
+session=ed896e86-21b5-4a4f-8cca-d665bf224850
+count=38
+epoch=39
+epoch=39 owner_pid=87925 outcome=arming updated_at=1793544117
+Sun Nov  1 08:41:56 2026     bash /Users/charlesabrooker/tmp/fm-lab.fEEEBk/projects/primary/bin/fm-claude-stop-autoarm.sh
+.
+..
+.claude-autoarm-epoch
+.claude-autoarm-failure-notified
+.claude-autoarm-output.dlIOfR
+.fm-lab-tmux-dir
+.guard-pass-checked
+.guard-watcher-stale-banner
+.host-mirror.jsonl
+.inactive-outcome-reconcile
+.lock
+.lock-monitor.hold.XqSQyN
+.lock-session
+.session-start-agents-baseline
+.session-start-complete
+.startup-network.delivered
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.supervision-host
+.supervision-host-arm.mFuxiH
+.supervision-host.log
+.trace-context-effective
+.turnend-claude-blocks
+.wake-queue
+.watch-arm-output.MGiA26
+.watch-cycle-exits.lock
+.watch-cycle-exits.lock.owner.EQQJkP
+.watch-cycle-exits.log
+guard-events.jsonl
+home-summary.json
+task1.meta
+terminal-outcomes

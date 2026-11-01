@@ -1,0 +1,2 @@
+watcher: started pid=52562 (beacon fresh)
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)

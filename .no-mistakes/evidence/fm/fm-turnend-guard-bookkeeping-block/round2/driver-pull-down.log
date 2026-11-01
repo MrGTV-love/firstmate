@@ -1,0 +1,57 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.VTtpFc tree=195e08c509f4954d79e2438850eeb275b91aad7a expected=195e08c509f4954d79e2438850eeb275b91aad7a target=068ee0d01384756a38816f8271f20eaa8fef3734
+settings: Stop hooks now: ["fm-turnend-guard.sh","fm-host-mirror.sh"]
+ready=1 after 2 polls
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M6B4VRKGX3315FZMQNN7CWJG/round2/live-claude.sh: line 63: /Users/charlesabrooker/tmp/fm-lab.VTtpFc/state/guard-events.jsonl: No such file or directory
+--- deny/warn/allow events
+{"decision":"deny","cleared_by":"","repeat":1}
+{"decision":"deny","cleared_by":"","repeat":2}
+{"decision":"deny","cleared_by":"","repeat":3}
+{"decision":"warn","cleared_by":"budget-exhausted","repeat":1}
+--- pane tail
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+⏺ ack
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook error: [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.VTtpFc/projects/primary/bin/fm-claude-stop-autoarm.sh,
+  which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+⏺ ack
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook error: [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude]:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+  ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.VTtpFc/projects/primary/bin/fm-claude-stop-autoarm.sh,
+  which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+⏺ ack
+  ⎿  Stop says: FIRSTMATE SUPERVISION IS GENUINELY DOWN: 1 task(s) in flight, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this
+     session attended and diagnose the automatic Stop-hook and watcher startup, including episode bookkeeping, before relying on unattended supervision.
+
+✻ Sautéed for 2m 19s · done 8:36 AM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 61k/1.0M main primary:a6bafd4a
+  ⏵⏵ auto mode on (shift+tab to cycle)

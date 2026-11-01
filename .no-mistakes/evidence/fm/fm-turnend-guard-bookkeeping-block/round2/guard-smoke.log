@@ -1,0 +1,168 @@
+implementation_root=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B4VRKGX3315FZMQNN7CWJG head=068ee0d01384756a38816f8271f20eaa8fef3734
+lab=/Users/charlesabrooker/tmp/fm-lab.bPsdyI plain_tree=/Users/charlesabrooker/tmp/fm-lab.bPsdyI/projects/primary tree=195e08c509f4954d79e2438850eeb275b91aad7a expected_tree=195e08c509f4954d79e2438850eeb275b91aad7a
+base_tree=cd372787e0521415c7566678f5dd9f33438157bf expected_base=cd372787e0521415c7566678f5dd9f33438157bf
+
+=== S1 live watcher + failed episode bookkeeping (BASE vs TARGET) ===
+base/notice-dir: exit=2 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+base/budget-lock-live: exit=2 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+base/budget-dir: exit=2 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+base/state-readonly: exit=2 blocked_banner=0 out_len=0 events=
+target/notice-dir: exit=0 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+target/budget-lock-live: exit=0 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+target/budget-dir: exit=0 blocked_banner=0 out_len=0 events=   1 ["allow","continue"];
+target/state-readonly: exit=0 blocked_banner=0 out_len=0 events=
+
+=== S2 genuine absent supervision, normal writable budget, every exit path (6 stops) ===
+absent:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+clean-epoch:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=7 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+stale-rewake:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=7 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+failed-notice:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=3 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+away-dead-daemon:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[0 0 0 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+alarmed:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+alarm-unwritable:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+owner-lock-live:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch= 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+observe-init-missing-budget:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=3 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+observe-init-prev-session:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=3 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+BASE failed-notice with notice removed mid-episode (uncapped-path comparison):
+2 2 2 2 2 2 budget=session=sess-smoke count=5 epoch=3 
+TARGET failed-notice with notice removed mid-episode:
+2 2 2 0 0 0 budget=session=sess-smoke count=6 epoch=3 
+
+=== S3 budget cannot be locked or written, no supervision (6 stops each) ===
+base/budget-dir:
+   rc=[2 2 2 2 2 2 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=6 unavailable_warnings=0 exhausted_diagnostics=0 budget=<non-file>
+   events:    6 ["deny",""];
+   elapsed=4s
+base/budget-symlink-to-dir:
+   rc=[2 2 2 2 2 2 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=6 unavailable_warnings=0 exhausted_diagnostics=0 budget=<non-file>
+   events:    6 ["deny",""];
+   elapsed=4s
+base/budget-lock-live:
+   rc=[2 2 2 2 2 2 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=6 unavailable_warnings=0 exhausted_diagnostics=0 budget=<absent>
+   events:    6 ["deny",""];
+   elapsed=4s
+base/state-readonly-log-writable:
+   rc=[2 2 2 2 2 2 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=6 unavailable_warnings=0 exhausted_diagnostics=0 budget=<absent>
+   events:    6 ["deny",""];
+   elapsed=3s
+base/state-readonly-no-log:
+   rc=[2 2 2 2 2 2 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=6 unavailable_warnings=0 exhausted_diagnostics=0 budget=<absent>
+   events: 
+   elapsed=4s
+target/budget-dir:
+   rc=[0 0 0 0 0 0 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=0 unavailable_warnings=6 exhausted_diagnostics=0 budget=<non-file>
+   events:    6 ["warn","budget-unavailable"];
+   elapsed=4s
+target/budget-symlink-to-dir:
+   rc=[0 0 0 0 0 0 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=0 unavailable_warnings=6 exhausted_diagnostics=0 budget=<non-file>
+   events:    6 ["warn","budget-unavailable"];
+   elapsed=3s
+target/budget-lock-live:
+   rc=[0 0 0 0 0 0 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=0 unavailable_warnings=6 exhausted_diagnostics=0 budget=<absent>
+   events:    6 ["warn","budget-unavailable"];
+   elapsed=4s
+target/state-readonly-log-writable:
+   rc=[0 0 0 0 0 0 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=0 unavailable_warnings=6 exhausted_diagnostics=0 budget=<absent>
+   events:    6 ["warn","budget-unavailable"];
+   elapsed=4s
+target/state-readonly-no-log:
+   rc=[0 0 0 0 0 0 ] repair_cmd_count=[1 1 1 1 1 1 ] block_banners=0 unavailable_warnings=6 exhausted_diagnostics=0 budget=<absent>
+   events: 
+   elapsed=3s
+
+=== S4 recovery: exhausted episode, real watcher returns, next outage gets a fresh budget ===
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=3 
+   events:    3 ["deny",""];   3 ["warn","budget-exhausted"];
+   before recovery: budget=session=sess-smoke count=6 epoch=3  notice=present alarm=present
+   real watcher pid=95208 tree=/Users/charlesabrooker/tmp/fm-lab.bPsdyI/projects/primary
+   with real watcher: exit=0 out_len=0 budget=<absent> notice=absent alarm=absent
+   next outage:
+   rc=[2 2 2 0 0 0 ] repair_cmd_count=[1 1 1 0 0 0 ] block_banners=3 unavailable_warnings=0 exhausted_diagnostics=3 budget=session=sess-smoke count=6 epoch=3 
+   events:    1 ["allow","continue"];   6 ["deny",""];   6 ["warn","budget-exhausted"];
+
+=== S5 idle stops: episode kept with notice, block budget cleared without notice ===
+no need + notice: exit=0 budget=session=sess-smoke count=4 epoch=2  notice=present
+no need + no notice: exit=0 budget=<absent>
+
+=== S6 one predicate: pull warning vs turn-end, same state (BASE vs TARGET) ===
+tree     model       state                  pull-warning   turnend-exit   agree
+base     persistent  healthy                silent         0              yes (guard_exit=0)
+base     persistent  claude-rewake-handoff  WARN           2              yes (guard_exit=0)
+base     persistent  pi-extension-handoff   WARN           2              yes (guard_exit=0)
+base     persistent  missing-lock           WARN           2              yes (guard_exit=0)
+base     persistent  stale-beacon           WARN           2              yes (guard_exit=0)
+base     persistent  wrong-identity         WARN           2              yes (guard_exit=0)
+base     persistent  away-live-daemon       WARN           0              no (guard_exit=0)
+base     persistent  away-dead-daemon       WARN           2              yes (guard_exit=0)
+base     persistent  idle                   silent         0              yes (guard_exit=0)
+base     autoarm     healthy                silent         0              yes (guard_exit=0)
+base     autoarm     claude-rewake-handoff  silent         2              no (guard_exit=0)
+base     autoarm     pi-extension-handoff   silent         2              no (guard_exit=0)
+base     autoarm     missing-lock           silent         2              no (guard_exit=0)
+base     autoarm     stale-beacon           WARN           2              yes (guard_exit=0)
+base     autoarm     wrong-identity         silent         2              no (guard_exit=0)
+base     autoarm     away-live-daemon       silent         0              yes (guard_exit=0)
+base     autoarm     away-dead-daemon       silent         2              no (guard_exit=0)
+base     autoarm     idle                   silent         0              yes (guard_exit=0)
+base     extension   healthy                silent         0              yes (guard_exit=0)
+base     extension   claude-rewake-handoff  WARN           2              yes (guard_exit=0)
+base     extension   pi-extension-handoff   silent         2              no (guard_exit=0)
+base     extension   missing-lock           WARN           2              yes (guard_exit=0)
+base     extension   stale-beacon           WARN           2              yes (guard_exit=0)
+base     extension   wrong-identity         WARN           2              yes (guard_exit=0)
+base     extension   away-live-daemon       WARN           0              no (guard_exit=0)
+base     extension   away-dead-daemon       WARN           2              yes (guard_exit=0)
+base     extension   idle                   silent         0              yes (guard_exit=0)
+target   persistent  healthy                silent         0              yes (guard_exit=0)
+target   persistent  claude-rewake-handoff  WARN           2              yes (guard_exit=0)
+target   persistent  pi-extension-handoff   WARN           2              yes (guard_exit=0)
+target   persistent  missing-lock           WARN           2              yes (guard_exit=0)
+target   persistent  stale-beacon           WARN           2              yes (guard_exit=0)
+target   persistent  wrong-identity         WARN           2              yes (guard_exit=0)
+target   persistent  away-live-daemon       silent         0              yes (guard_exit=0)
+target   persistent  away-dead-daemon       WARN           2              yes (guard_exit=0)
+target   persistent  idle                   silent         0              yes (guard_exit=0)
+target   autoarm     healthy                silent         0              yes (guard_exit=0)
+target   autoarm     claude-rewake-handoff  WARN           2              yes (guard_exit=0)
+target   autoarm     pi-extension-handoff   WARN           2              yes (guard_exit=0)
+target   autoarm     missing-lock           WARN           2              yes (guard_exit=0)
+target   autoarm     stale-beacon           WARN           2              yes (guard_exit=0)
+target   autoarm     wrong-identity         WARN           2              yes (guard_exit=0)
+target   autoarm     away-live-daemon       silent         0              yes (guard_exit=0)
+target   autoarm     away-dead-daemon       WARN           2              yes (guard_exit=0)
+target   autoarm     idle                   silent         0              yes (guard_exit=0)
+target   extension   healthy                silent         0              yes (guard_exit=0)
+target   extension   claude-rewake-handoff  WARN           2              yes (guard_exit=0)
+target   extension   pi-extension-handoff   WARN           2              yes (guard_exit=0)
+target   extension   missing-lock           WARN           2              yes (guard_exit=0)
+target   extension   stale-beacon           WARN           2              yes (guard_exit=0)
+target   extension   wrong-identity         WARN           2              yes (guard_exit=0)
+target   extension   away-live-daemon       silent         0              yes (guard_exit=0)
+target   extension   away-dead-daemon       WARN           2              yes (guard_exit=0)
+target   extension   idle                   silent         0              yes (guard_exit=0)
+
+=== S7 non-Claude path keeps per-turn loop guard and ignores the Claude budget ===
+no flag, first stop: exit=2 banner=1 events=   1 ["deny",""];
+no flag, stop_hook_active: exit=0 out_len=0
+
+smoke complete
