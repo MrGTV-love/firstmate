@@ -157,6 +157,7 @@ fm_api_key_guard_launch_env_config() {
 }
 
 fm_api_key_guard_event() {
+  [ -z "${fm_api_key_guard_quiet:-}" ] || return 0
   "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" claude-api-billing "$1" --rule inherited-credential --task "${ID:-${FM_TASK_ID:-}}" "${@:2}" 2>/dev/null || true
 }
 
@@ -173,7 +174,14 @@ fm_api_key_guard() {
   # Only claude workers are affected.
   [ "$harness" = claude ] || return 0
   if [ "$allow_api_key" -ne 0 ]; then
-    fm_api_key_guard_event allow --override --cleared-by allow-api-key
+    local fm_api_key_guard_quiet=1
+    if fm_api_key_guard "$harness" 0 "$worker_account" "$launch_env_enabled" "$launch_env_names" "$backend" 2>/dev/null; then
+      fm_api_key_guard_quiet=
+      fm_api_key_guard_event allow
+    else
+      fm_api_key_guard_quiet=
+      fm_api_key_guard_event allow --override --cleared-by allow-api-key
+    fi
     return 0
   fi
 

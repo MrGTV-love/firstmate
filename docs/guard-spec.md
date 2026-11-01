@@ -230,7 +230,7 @@ Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validati
 Merge refusals record `head` and `base` for the read-only detector; empty fields are missing evidence, not an inferred commit or branch.
 
 A guard records allows as well as denies so opportunities are observable.
-An existing waiver or force records `override: true`; a skipped check records decision `bypass` and its activation rule.
+An existing waiver or force records `override: true` only when it changed the outcome, so an unused waiver or a force with nothing to skip writes no escape; a skipped check records decision `bypass` and its activation rule.
 `actor` is the class of the caller: `gate`, `worker` (it has `FM_TASK_ID`) or `main`.
 An operation that writes one row per rule counts as one opportunity at guard level; its extra rule rows carry `opportunity: false`.
 A bypass is an escape record, not an additional inspected opportunity, and an override is a reassessment signal rather than proof of a false positive.
@@ -247,7 +247,8 @@ Deny-only rows and guards with no recorded events in the selected window remain 
 `bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
 Its header owns the bounded first-parent scan, local metadata scope and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
 A tree-equal merge is a signature, not proof that a guard caused it, and a base-merge-only signature requires every intervening commit to be a merge from the recorded base lineage.
-The watcher presents new signatures at heartbeat in one line per task and suppresses an unchanged report.
+The watcher runs the detector detached and single-flight, so a slow worktree read cannot hold its poll; it presents a finished run's new signatures at the next heartbeat in one line per task and suppresses an unchanged report.
+A bare base name resolves through `refs/remotes/origin/<name>` first, then the local branch.
 Neither detection nor metrics changes refs, waives a refusal or disables a guard.
 The behavior entry points are `tests/fm-guard-telemetry.test.sh` and the focused `test_guard_workaround_heartbeat` case in `tests/fm-watch-triage.test.sh`.
 Turns-to-clear and tool-calls-to-clear remain the real cost unit because an agent clears the block.

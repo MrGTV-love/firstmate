@@ -1117,6 +1117,8 @@ github_verify_mergeable() {
   local lacks_tip='' queued=false queue_status
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
+  FM_PR_WAIVED_RED=false
+  FM_PR_WAIVED_MISSING=false
   FM_PR_GUARD_RULE=mergeability
   FM_PR_GUARD_HEAD=
   FM_PR_GUARD_BASE=
@@ -1213,7 +1215,10 @@ FIELDS
         [ "$check" = "$name" ] && covered=1
       done
     fi
-    [ "$covered" -eq 1 ] && continue
+    if [ "$covered" -eq 1 ]; then
+      FM_PR_WAIVED_RED=true
+      continue
+    fi
     if [ "$required_known" = true ] \
       && printf '%s' "$required" | jq -e --arg name "$name" 'any(.[]; .context == $name)' >/dev/null 2>&1; then
       req_text="required by base branch $base"
@@ -1281,7 +1286,10 @@ EOF
   else
     while IFS= read -r name; do
       [ -n "$name" ] || continue
-      [ "${#ALLOW_MISSING[@]}" -gt 0 ] && [ "${ALLOW_MISSING[0]}" = "$name" ] && continue
+      if [ "${#ALLOW_MISSING[@]}" -gt 0 ] && [ "${ALLOW_MISSING[0]}" = "$name" ]; then
+        FM_PR_WAIVED_MISSING=true
+        continue
+      fi
       refusals="$refusals  - required check '$name' has not reported at head $live_head
 "
       unwaived_missing+=("$name")
@@ -1937,7 +1945,7 @@ forgejo_confirm_merged() {
 away_status=0
 require_current_away_authority || away_status=$?
 [ "$away_status" -eq 0 ] || exit "$away_status"
-if [ "$ATTENDED_OVERRIDE" = true ]; then
+if [ "$ATTENDED_OVERRIDE" = true ] && ! ATTENDED_OVERRIDE=false reject_protected_forge_args "$@" 2>/dev/null; then
   "$SCRIPT_DIR/fm-guard-event.sh" merge-away-waiver bypass --rule attended-override --task "$ID" --override 2>/dev/null || true
 fi
 require_recorded_pr_identity || exit 1
@@ -2014,6 +2022,7 @@ case "$PROVIDER" in
     # and a tip that moved since the verify read refuses. A tip that lands in
     # the seconds between this read and GitHub applying the merge is not closed.
     merge_enters_queue=false
+    passed_rules=(base-read)
     queue_status=0
     github_merge_enters_queue "$FM_PR_GITHUB_BASE" || queue_status=$?
     [ "$queue_status" -ne 0 ] || merge_enters_queue=true
@@ -2036,6 +2045,7 @@ case "$PROVIDER" in
           "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
         exit 1
       fi
+      passed_rules+=(base-tip-changed)
       # Off a merge queue, --auto lands now only in a state where gh merges at
       # once; in any other state GitHub arms auto-merge, which can land later
       # on a base tip no check ran with.
@@ -2051,16 +2061,17 @@ case "$PROVIDER" in
             exit 1
             ;;
         esac
+        passed_rules+=(auto-not-armed)
       fi
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule checks-green --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
-    for guard_rule in required-reported base-containment; do
+    for guard_rule in required-reported base-containment "${passed_rules[@]}"; do
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --rule "$guard_rule" --no-opportunity --task "$ID" --head "$FM_PR_MERGE_HEAD" --base "$FM_PR_GITHUB_BASE" --cleared-by retry 2>/dev/null || true
     done
-    if [ "${#ALLOW_RED[@]}" -gt 0 ]; then
+    if [ "$FM_PR_WAIVED_RED" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head bypass --rule checks-green --task "$ID" --override --cleared-by allow-red 2>/dev/null || true
     fi
-    if [ "${#ALLOW_MISSING[@]}" -gt 0 ]; then
+    if [ "$FM_PR_WAIVED_MISSING" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head bypass --rule required-reported --task "$ID" --override --cleared-by allow-missing 2>/dev/null || true
     fi
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \

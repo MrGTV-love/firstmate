@@ -987,7 +987,7 @@ fi
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
 SPAWN_GUARD_TASK=${1:-}
 case "$SPAWN_GUARD_TASK" in -*|*=*) SPAWN_GUARD_TASK= ;; esac
-COMPACT_ADVISER_FORCE_OFF=$(FM_TASK_ID="$SPAWN_GUARD_TASK" fm_compact_adviser_force_off)
+COMPACT_ADVISER_FORCE_OFF=$(fm_compact_adviser_force_off)
 # The override and an adviser-only hooks flag belong to this one invocation, so
 # no backend server or pane started below may inherit them.
 [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
@@ -1532,9 +1532,11 @@ if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   case "$policy_harness" in *[[:space:]]*) policy_raw=1 ;; esac
   fm_session_launch_policy_check "$CONFIG" "$policy_harness" "$policy_raw" || exit 1
 fi
-# Skip the watcher guard when re-exec'd for one pair of a batch.
+# Skip the watcher guard when re-exec'd for one pair of a batch, whose parent
+# already ran it; only an operator's switch is an escape.
 if [ -n "${FM_SPAWN_NO_GUARD:-}" ]; then
-  "$SCRIPT_DIR/fm-guard-event.sh" guard-watcher-down-warning bypass --rule FM_SPAWN_NO_GUARD --task "$SPAWN_GUARD_TASK" --override 2>/dev/null || true
+  [ "$FM_SPAWN_NO_GUARD" = batch ] \
+    || "$SCRIPT_DIR/fm-guard-event.sh" guard-watcher-down-warning bypass --rule FM_SPAWN_NO_GUARD --task "$SPAWN_GUARD_TASK" --override 2>/dev/null || true
 else
   "$FM_ROOT/bin/fm-guard.sh" || true
 fi
@@ -2294,7 +2296,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_args=("${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}")
     [ "$KIND" != scout ] || pair_args+=(--scout)
     pair_rc=0
-    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
+    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=batch "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
     if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
       echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - the spawn was deferred and stays queued" >&2
       [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT
@@ -2306,6 +2308,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   exit "$rc"
 fi
 ID=${POS[0]}
+[ "$COMPACT_ADVISER_FORCE_OFF" = 0 ] || fm_compact_adviser_bypass_event "$ID"
 fm_task_id_creation_valid "$ID" || {
   echo "error: invalid task id" >&2
   exit 2

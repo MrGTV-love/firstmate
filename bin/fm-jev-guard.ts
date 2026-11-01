@@ -181,7 +181,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
 
   const guardEvent = async (guard: string, subject: string, decision: "allow" | "deny", started: number, remainingMs: () => number, sourceOk = true): Promise<void> => {
     try {
-      await runWriter("bash", [GUARD_EVENT_WRITER, guard, decision, "--task", c.task, "--rule", subject, "--source-ok", String(sourceOk), "--elapsed-ms", String(Math.round(performance.now() - started))], {
+      await runWriter("bash", [GUARD_EVENT_WRITER, guard, decision, "--task", c.task, "--actor", "worker", "--rule", subject, "--source-ok", String(sourceOk), "--elapsed-ms", String(Math.round(performance.now() - started))], {
         env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FM_HOME: c.home,
           ...(process.env.FM_GUARD_EVENT_LOG ? { FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG } : {}) },
         timeout: remainingMs(),

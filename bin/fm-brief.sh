@@ -390,6 +390,7 @@ if [ "$UPSTREAM_CONSENT_SET" -eq 1 ]; then
   }
   UPSTREAM_CONSENT=$(fm_role_scope_norm "$UPSTREAM_CONSENT")
 fi
+ID=${POS[0]}
 # Self-repository pre-gate for a publishing ship brief: detectable only when
 # --project was passed, so the check runs here only then. bin/fm-spawn.sh
 # repeats it at launch with the resolved project path.
@@ -409,7 +410,6 @@ if [ "$KIND" = ship ] && [ "$MODE" != local-only ] && [ "$PROJECT_DIR_SET" -eq 1
       ;;
   esac
 fi
-ID=${POS[0]}
 BRANCH="$BRANCH_PREFIX$ID"
 if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
   echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2

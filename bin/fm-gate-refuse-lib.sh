@@ -53,22 +53,17 @@
 # This boundary layers above no-mistakes' separately-shipping HEAD-continuity
 # guard, which remains the adversarial/residual backstop.
 #
-# TEST-HARNESS ESCAPE HATCH (FM_GATE_REFUSE_BYPASS=1): firstmate's own test suite
-# must exercise the real fleet entrypoints, but the no-mistakes gate
-# runs that suite FROM a gate worktree (cwd git-common-dir under
-# .no-mistakes/repos/*.git, and possibly NO_MISTAKES_GATE set) - the exact
-# environment this guard refuses. So both signals would fire during firstmate's
-# own validation and break unrelated tests. FM_GATE_REFUSE_BYPASS=1 makes the
-# guard a no-op; firstmate's shared test helpers (tests/lib.sh and the backend
-# safety helpers) export it for temp-sandbox fleet tests. The disposable lab
-# primary recipe in .no-mistakes.yaml uses the marked-home allowance instead.
-# This does NOT weaken the boundary against the real hazard: the threat is a
-# CONFUSED-not-adversarial gate agent that runs bin/fm-spawn.sh directly after
-# adopting firstmate's identity outside a lab - it never sources firstmate's
-# test helpers or sets the bypass; and the adversarial
-# case (an agent that would deliberately set it) is covered by no-mistakes'
-# neutral-execution-context and the HEAD-continuity guard. The dedicated
-# tests/fm-gate-refuse.test.sh strips the bypass so it still verifies real refusal.
+# THE RECORDED ESCAPE (FM_GATE_REFUSE_BYPASS=1): the switch skips the check and
+# every activation writes a gate-agent-containment bypass event, so any use is
+# visible in the guard metrics. Nothing in firstmate sets it: firstmate's own
+# test suite runs the real check, and tests/lib.sh clears an inherited value.
+# Outside a gate the check finds neither signal. Inside a gate, where the
+# no-mistakes test step runs the suite, the check admits a fixture home only when
+# fm_test_lab_home (tests/lib.sh) marked it and it meets the lab rules above; any
+# other fleet test run there is refused like any other gate call.
+# The threat stays a CONFUSED gate agent; an agent that would deliberately set
+# the switch is the adversarial case no-mistakes' neutral-execution-context and
+# the HEAD-continuity guard own.
 #
 # Sourced by the fleet lifecycle entrypoints, session-start hooks,
 # bin/fm-lab-home.sh, and the tests.
@@ -169,8 +164,8 @@ fm_gate_refuse_event() {
 # fm_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
 # this process looks like a no-mistakes gate agent without a permitted lab home.
 # Call before any fleet mutation. No-ops (returns 0) for a normal firstmate
-# session, a permitted lab home, or when firstmate's own test harness sets
-# FM_GATE_REFUSE_BYPASS=1 (see the header).
+# session, a permitted lab home, or the recorded FM_GATE_REFUSE_BYPASS=1 escape
+# (see the header).
 fm_refuse_if_gate_agent() {
   if ! fm_is_gate_agent "${1:-.}"; then
     [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ] || fm_gate_refuse_event allow
