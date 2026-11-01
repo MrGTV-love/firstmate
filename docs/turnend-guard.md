@@ -208,7 +208,7 @@ On that proof the arm reports a typed stalled-holder failure so its owner's retr
 The auto-arm hook additionally exports its resolved `FM_GUARD_GRACE` when it forks `bin/fm-watch-arm.sh`.
 The arm wrapper and the watcher it may start then judge staleness with the exact same value the hook just judged it with, whether that value came from an operator override or the poll-derived default.
 
-`bin/fm-turnend-guard.sh`'s daemon-ownership branch (`fm_afk_daemon_owns_supervision`, above, covering both away and quiet mode) also derives its beacon grace from `fm_poll_derived_grace` rather than falling back to the bare 300-second default.
+The daemon-ownership branch of `fm_supervision_liveness` (`fm_afk_daemon_owns_supervision`, above, covering both away and quiet mode), which the turn-end guard and the pull warning share, also derives its beacon grace from `fm_poll_derived_grace` rather than falling back to the bare 300-second default.
 The reason is the same.
 The daemon's watcher-restart cadence there is not a fixed poll loop, so a flat grace misreads a daemon that is genuinely still cycling as down.
 
@@ -408,7 +408,8 @@ The foreground arm legitimately follows a healthy watcher until its next wake.
 The hook therefore catches HUP, TERM, and INT from host timeout or teardown and commits the ordinary durable failed outcome and failure-notice marker before exiting 2 for a recovery turn.
 Claude drops that exit 2 when it terminated the hook at the configured timeout itself, so a park that outlives the timeout ends without a rewake (`bin/fm-claude-stop-autoarm.sh` header).
 
-The first fresh failed epoch preserves its handoff without consuming a blocked-stop count.
+The first fresh `failed` epoch preserves its handoff without consuming a blocked-stop count.
+A first fresh `failed-suppressed` epoch has no handoff to preserve, so the Stop it blocks is charged.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
 When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3).
 This is the guard's own block budget for the Claude Stop-hook path, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.

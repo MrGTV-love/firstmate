@@ -29,8 +29,8 @@
 #   unreadable    the state directory cannot be read, so the source is unknown
 #
 # Fail direction: every caller decides what an `unknown` source means. The
-# turn-end guard blocks within its budget, the pull warning fails loud
-# (it warns), exactly as each guard did before this file existed.
+# turn-end guard blocks (on the Claude Stop-hook path, only inside its budget),
+# and the pull warning fails loud (it warns).
 
 FM_SUP_LIVENESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_SUP_LIVE=unknown
