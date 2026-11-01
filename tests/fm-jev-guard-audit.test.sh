@@ -713,9 +713,10 @@ SH
   if [ "$posture" = failed-record ]; then
     cp "$home/state/$id.meta" "$world/before-failed-relaunch.meta"
     if fake_egress_helper "$fakebin" record 2; then
-      out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
-        FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
-      [ $? -ne 0 ] || fail "relaunch without a resolvable recorded grant was accepted: $out"
+      if out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
+        FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch); then
+        fail "relaunch without a resolvable recorded grant was accepted: $out"
+      fi
       assert_contains "$out" 'egress policy returned no grant' 'failed record refusal'
       assert_equals "$id:dispatch-grant deny false" "$(egress_events "$world/relaunch-events.jsonl")" \
         'relaunch refusal must emit exactly one egress deny event'
