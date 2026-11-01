@@ -1,0 +1,3 @@
+$ FM_TEST_ONLY=test_home_summary_reads_changed_decisions_and_ownership bash tests/fm-fleet-snapshot-view.test.sh   # head 7421298d
+ok - summary rereads appended/replaced decisions, ownership, unavailable endpoints and removed tasks
+exit=0

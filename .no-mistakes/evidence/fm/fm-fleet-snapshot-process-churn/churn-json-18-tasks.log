@@ -1,0 +1,18 @@
+work=/Users/charlesabrooker/tmp/fm-churn.MoRGgd
+host=GTT-CB uptime_load=87.62 72.60 59.17 mode=--json tasks=18 reps=2 base=3948d62ffa86123d35baeb84746ed7639d948a02 head=7421298d98909cfe58fbce8f26bde0f261a360b1
+base processes per run: 2302 2291
+head processes per run: 2097 2089
+base min=2291 median=2291
+head min=2089 median=2089
+base exec targets (last run): ps=399 env=306 tmux=108 grep=92 readlink=76 pyenv-hooks=76 stat=72 jq=53 sort=39 python3=38 pyenv-version-name=38 pyenv-version-file-read=38 pyenv-version-file=38 perl=37 head=36 sleep=32 rm=21 pyenv-which=19 pyenv-versions=19 pyenv-prefix=19 pyenv-latest=19 pyenv-exec=19 pyenv=19 basename=19 tail=18 sed=18 cp=18 uname=4 mktemp=3 dirname=3 date=2 rmdir=1 mkdir=1 fm-contributions.sh=1 find=1 
+head exec targets (last run): ps=397 env=306 tmux=108 grep=92 readlink=76 pyenv-hooks=76 jq=53 sort=39 python3=38 pyenv-version-name=38 pyenv-version-file-read=38 pyenv-version-file=38 perl=37 head=36 sleep=32 rm=21 stat=19 pyenv-which=19 pyenv-versions=19 pyenv-prefix=19 pyenv-latest=19 pyenv-exec=19 pyenv=19 basename=19 tail=18 sed=18 cp=18 uname=4 mktemp=3 dirname=3 date=2 rmdir=1 mkdir=1 fm-contributions.sh=1 find=1 
+base stderr: rc=0 
+head stderr: rc=0 
+output: DIFFERENT
+757c757
+<     "fm_root": "/Users/charlesabrooker/tmp/fm-churn.MoRGgd/base",
+---
+>     "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6ABF58EB7GF8NBCZD17RMM5",
+head output sample:
+{"valid":null,"state":null,"decisions_open":[],"active_children":0}
+note: the only JSON difference is fm_root, which names the tree that ran (base copy vs head worktree); it is expected.

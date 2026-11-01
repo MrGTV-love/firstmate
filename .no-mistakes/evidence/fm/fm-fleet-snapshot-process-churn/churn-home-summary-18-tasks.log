@@ -1,0 +1,13 @@
+work=/Users/charlesabrooker/tmp/fm-churn.nDq1K8
+host=GTT-CB uptime_load=91.08 59.14 48.54 mode=--secondmate-home-summary tasks=18 reps=3 base=3948d62ffa86123d35baeb84746ed7639d948a02 head=7421298d98909cfe58fbce8f26bde0f261a360b1
+base processes per run: 2261 2279 2284
+head processes per run: 2076 2073 2083
+base min=2261 median=2279
+head min=2073 median=2076
+base exec targets (last run): ps=399 env=306 tmux=108 grep=91 readlink=76 pyenv-hooks=76 stat=72 jq=44 sleep=40 sort=38 python3=38 pyenv-version-name=38 pyenv-version-file-read=38 pyenv-version-file=38 perl=37 head=36 rm=21 pyenv-which=19 pyenv-versions=19 pyenv-prefix=19 pyenv-latest=19 pyenv-exec=19 pyenv=19 basename=19 tail=18 sed=18 cp=18 uname=4 mktemp=3 dirname=3 date=2 rmdir=1 mkdir=1 fm-contributions.sh=1 
+head exec targets (last run): ps=399 env=306 tmux=108 grep=91 readlink=76 pyenv-hooks=76 jq=44 sort=38 python3=38 pyenv-version-name=38 pyenv-version-file-read=38 pyenv-version-file=38 perl=37 head=36 sleep=35 rm=21 stat=19 pyenv-which=19 pyenv-versions=19 pyenv-prefix=19 pyenv-latest=19 pyenv-exec=19 pyenv=19 basename=19 tail=18 sed=18 cp=18 uname=4 mktemp=3 dirname=3 date=2 rmdir=1 mkdir=1 fm-contributions.sh=1 
+base stderr: rc=0 
+head stderr: rc=0 
+output: base and head JSON identical after dropping clock fields
+head output sample:
+{"valid":true,"state":"captain_decision","decisions_open":["k01","k03","k05","k07","k09","k11","k13","k15","k17"],"active_children":9}

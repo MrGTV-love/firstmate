@@ -1,0 +1,13 @@
+work=/Users/charlesabrooker/tmp/fm-churn.KopFLN
+host=GTT-CB uptime_load=69.12 46.94 43.60 mode=--secondmate-home-summary tasks=1 reps=3 base=3948d62ffa86123d35baeb84746ed7639d948a02 head=7421298d98909cfe58fbce8f26bde0f261a360b1
+base processes per run: 244 238 237
+head processes per run: 235 234 221
+base min=237 median=238
+head min=221 median=234
+base exec targets (last run): ps=25 env=17 jq=10 readlink=8 pyenv-hooks=8 tmux=6 grep=6 uname=4 stat=4 sort=4 rm=4 python3=4 pyenv-version-name=4 pyenv-version-file-read=4 pyenv-version-file=4 perl=3 mktemp=3 dirname=3 pyenv-which=2 pyenv-versions=2 pyenv-prefix=2 pyenv-latest=2 pyenv-exec=2 pyenv=2 head=2 date=2 basename=2 tail=1 sed=1 rmdir=1 fm-contributions.sh=1 cp=1 
+head exec targets (last run): env=17 jq=10 readlink=8 pyenv-hooks=8 tmux=6 grep=6 ps=5 uname=4 sort=4 rm=4 python3=4 pyenv-version-name=4 pyenv-version-file-read=4 pyenv-version-file=4 perl=3 mktemp=3 dirname=3 stat=2 pyenv-which=2 pyenv-versions=2 pyenv-prefix=2 pyenv-latest=2 pyenv-exec=2 pyenv=2 head=2 date=2 basename=2 tail=1 sed=1 rmdir=1 fm-contributions.sh=1 cp=1 
+base stderr: rc=0 
+head stderr: rc=0 
+output: base and head JSON identical after dropping clock fields
+head output sample:
+{"valid":true,"state":"captain_decision","decisions_open":["k1"],"active_children":0}

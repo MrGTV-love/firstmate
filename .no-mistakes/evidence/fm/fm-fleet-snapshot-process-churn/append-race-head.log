@@ -1,0 +1,10 @@
+run 1 rc=0 valid=true open_decisions=5 live_lines=11
+run 2 rc=0 valid=true open_decisions=14 live_lines=24
+run 3 rc=0 valid=true open_decisions=29 live_lines=37
+run 4 rc=0 valid=true open_decisions=39 live_lines=45
+run 5 rc=0 valid=true open_decisions=48 live_lines=55
+run 6 rc=0 valid=true open_decisions=59 live_lines=66
+run 7 rc=0 valid=true open_decisions=69 live_lines=76
+run 8 rc=0 valid=true open_decisions=80 live_lines=87
+after writer stopped: written=87 shown=87
+RESULT: PASS
