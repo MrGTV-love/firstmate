@@ -22,21 +22,28 @@ records and prune hold it shared. start, run, records and prune exit BUSY (75)
 when the lock they need is unavailable; a busy start started nothing and may
 retry, and any other failed start exits 1. A stop during startup exits 1. A second
 concurrent reader can exit 1 after the SQLite wait.
+records needs the observer stopped; a records call held open during start makes
+start report busy (75), not a running owner.
 
 Quota source: gh-axi api rate_limit --full, unchanged inherited authentication,
 every 15 seconds. Records identify REST resources.graphql, not GraphQL response
 headers. This observer intentionally uses the REST counter rather than spending
 points on a GraphQL accounting query. REST shard agreement is not established.
 A slow request is not overlapped or retried in a burst; pending ticks are recorded.
+A request still running after QUOTA_TIMEOUT has its private process group killed
+and is recorded unavailable with reason=timeout; the next normal tick sends a new one.
 
 Process source: one LC_ALL=C ps table every 0.2 seconds in the root home's
-watcher context, not a confined worker. run's process_source callable is a test
+watcher context, not a confined worker. A ps past PS_TIMEOUT is killed and counts
+as a sampling failure. run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
 Injected rows prove output behavior, not actual host observations. New gh/gh-axi
 PID/start identities retain sanitized argv and the observed ancestor chain. Payloads and
 arbitrary argument values are withheld, as in the process census's safe logging
-convention. Executable/script basenames, command words and recognized option
-names are retained; no environment, headers, prompts or free text is logged.
+convention. Executable/script basenames, an interpreter's known no-value flags,
+command words and recognized option names are retained. A flag not known to take no
+value ends the script search, so -c, -e and -m payloads stay withheld. No
+environment, headers, prompts or free text is logged.
 ps does not preserve argv boundaries, so recorded argv is explicitly a sanitized
 command-line projection, not a lossless reconstruction. Missing, unreadable,
 short-lived, non-gh and off-host callers remain unknown. Temporal correlation
@@ -59,6 +66,8 @@ import time
 import uuid
 
 QUOTA_INTERVAL = 15.0
+QUOTA_TIMEOUT = 30.0
+PS_TIMEOUT = 5.0
 PROCESS_INTERVAL = 0.2
 RETENTION = 48 * 60 * 60
 APPLICATION_ID = 0x464D4748
@@ -69,7 +78,13 @@ QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null
 ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
 COMMANDS = frozenset("api graphql rate_limit pr issue run workflow repo release gist auth view list checks status create edit comment merge close reopen ready checkout diff watch download upload delete search get POST GET PATCH PUT HEAD DELETE".split())
 OPTIONS = frozenset("--repo -R --hostname --json --jq --template --field -f -F --header -H --input --body --body-file --title --message -m -c --eval --paginate --include -i --full --state --limit -L --head --base --author --label --help -h --version".split())
-INTERPRETERS = frozenset(("bash", "sh", "zsh", "dash", "python", "python3", "node", "ruby", "perl"))
+SHELL_FLAGS = re.compile(r"-[BEelux]+|--login|--noprofile|--norc|--posix")
+NO_VALUE_FLAGS = {
+    "bash": SHELL_FLAGS, "sh": SHELL_FLAGS, "zsh": SHELL_FLAGS, "dash": SHELL_FLAGS,
+    "python": re.compile(r"-[BEIOPSqsuv]+"),
+    "node": re.compile(r"--no-warnings|--no-deprecation|--trace-warnings|--trace-uncaught|--enable-source-maps"),
+    "ruby": re.compile(r"-w"), "perl": re.compile(r"-w"),
+}
 
 
 def state_root():
@@ -161,24 +176,31 @@ def words(command):
 
 def executable(argv):
     if not argv:
-        return "", None
+        return "", [], None
     name = Path(argv[0]).name
-    script = None
-    if (name in INTERPRETERS or re.fullmatch(r"python\d+(?:\.\d+)*", name)) and len(argv) > 1 and not argv[1].startswith("-"):
-        script = Path(argv[1]).name
-    return name, script
+    flags, script = [], None
+    allowed = NO_VALUE_FLAGS.get(re.sub(r"[\d.]+$", "", name.lower()))
+    if allowed is not None:
+        for word in argv[1:]:
+            if allowed.fullmatch(word):
+                flags.append(word)
+                continue
+            if not word.startswith("-"):
+                script = Path(word).name
+            break
+    return name, flags, script
 
 
 def safe_argv(argv):
     """Withhold arbitrary values, including unknown options and shell fragments."""
-    name, script = executable(argv)
+    name, flags, script = executable(argv)
     if not name:
         return []
-    result = [name]
-    start = 1
+    result = [name, *flags]
+    start = 1 + len(flags)
     if script:
         result.append(script)
-        start = 2
+        start += 1
     command_prefix = (script or name) in ("gh", "gh-axi")
     for word in argv[start:]:
         if command_prefix and word in COMMANDS:
@@ -196,7 +218,8 @@ def safe_argv(argv):
 def process_table():
     reply = subprocess.run(["ps", "-axo", "pid=,ppid=,lstart=,command="],
                            env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
-                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True,
+                           timeout=PS_TIMEOUT)
     rows = {}
     for line in reply.stdout.splitlines():
         match = ROW.fullmatch(line)
@@ -212,7 +235,7 @@ def process_records(rows, seen):
     current = set()
     found = []
     for pid, (ppid, start, argv) in rows.items():
-        name, script = executable(argv)
+        name, _flags, script = executable(argv)
         if (script or name) not in ("gh", "gh-axi"):
             continue
         identity = (pid, start)
@@ -244,12 +267,23 @@ def owner_status(root):
     return {"state": "stopped"}
 
 
-def quota_result(db, child, stream, began, run_id):
+def end_quota_child(child):
+    if child.poll() is None:
+        # The unreaped quota child owns a fresh session/group, so its numeric
+        # group cannot be reused by an unrelated caller.
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    child.wait()
+
+
+def quota_result(db, child, stream, began, run_id, timed_out):
     stream.seek(0)
     try:
         projection = stream.read(1024 * 1024).decode("utf-8", "replace")
         match = QUOTA_BODY.search(projection)
-        if child.returncode or match is None:
+        if timed_out or child.returncode or match is None:
             raise ValueError("unavailable")
         fields = {key: int(value) for key, value in zip(("used", "reset", "limit", "remaining"), match.groups())
                   if value != "null"}
@@ -259,7 +293,8 @@ def quota_result(db, child, stream, began, run_id):
     record(db, "quota", {"run_id": run_id, "status": status, "source": "REST rate_limit resources.graphql",
                          "endpoint": "rate_limit", "host": os.environ.get("GH_HOST", "github.com"),
                          "request_started_at": began, "request_pid": child.pid,
-                         "exit_code": child.returncode, "graphql": fields})
+                         "exit_code": child.returncode, "graphql": fields,
+                         **({"reason": "timeout"} if timed_out else {})})
     stream.close()
 
 
@@ -305,10 +340,14 @@ def run(root, duration=None, ready=None, *, process_source=None):
                         break
                 except FileNotFoundError:
                     pass
-                if child is not None and child.poll() is not None:
-                    quota_result(db, child, stream, began, run_id)
-                    child = stream = None
-                    db.commit()
+                if child is not None:
+                    timed_out = child.poll() is None and now - requested >= QUOTA_TIMEOUT
+                    if timed_out:
+                        end_quota_child(child)
+                    if child.returncode is not None:
+                        quota_result(db, child, stream, began, run_id, timed_out)
+                        child = stream = None
+                        db.commit()
                 if now >= next_process:
                     if previous is not None:
                         max_gap = max(max_gap, now - previous)
@@ -330,6 +369,7 @@ def run(root, duration=None, ready=None, *, process_source=None):
                     prune(db, time.time())
                     if child is None:
                         began = time.time()
+                        requested = time.monotonic()
                         stream = tempfile.TemporaryFile(dir=root)
                         try:
                             child = subprocess.Popen(["gh-axi", "api", "rate_limit", "--jq", QUOTA_JQ, "--full"],
@@ -350,11 +390,7 @@ def run(root, duration=None, ready=None, *, process_source=None):
             if ready is not None:
                 os.close(ready)
             if child is not None:
-                if child.poll() is None:
-                    # The unreaped quota child owns a fresh session/group, so
-                    # its numeric group cannot be reused by an unrelated caller.
-                    os.killpg(child.pid, signal.SIGKILL)
-                child.wait()
+                end_quota_child(child)
                 stream.close()
             record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
                                      "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
