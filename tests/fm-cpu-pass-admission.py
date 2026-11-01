@@ -104,6 +104,17 @@ def held(env):
     return json.loads(subprocess.check_output(cli + ['status', '--json'], env=env, text=True))['held']
 
 
+def clean_stop(db, writer):
+    """Leave the state a real last writer leaves: all checkpointed, no side files.
+
+    Some SQLite builds keep the files on close, so the fixture removes them.
+    """
+    writer.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall()
+    writer.close()
+    for side in ('-wal', '-shm'):
+        Path(str(db) + side).unlink(missing_ok=True)
+
+
 worker = root / 'start.py'
 worker.write_text('''import pathlib, sqlite3, sys, time
 folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
@@ -211,6 +222,56 @@ try:
     child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'bad-load')], env, folder / 'bad-load')
     finish(child, 125)
     assert not (folder / 'bad-load').exists()
+
+    # The host database is in WAL mode. After its last writer stops cleanly it has
+    # no side files, and mode=ro alone cannot read it. A fresh start still reads
+    # the count, and a queued start keeps its place through the stop. The private
+    # HOME holds the database at the fixed host path, where the -wal check looks.
+    folder, db, env = case('wal', cores=3)
+    host = folder / 'home/.no-mistakes/state.sqlite'
+    host.parent.mkdir(parents=True)
+    db.replace(host)
+    db = host
+    env.update(HOME=str(folder / 'home'), CASE_DB=str(db))
+    writer = sqlite3.connect(db, isolation_level=None)
+    writer.execute('PRAGMA journal_mode=WAL').fetchall()
+    clean_stop(db, writer)
+    before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
+    marker, log = folder / 'stopped.marker', folder / 'stopped.stderr'
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'stopped'))
+    assert marker.exists() and 'admitted: counted=0 limit=1 ' in log.read_text(), log.read_text()
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == before_hash
+    # The live writer's row is in the WAL file only, so this queue also proves a
+    # live database is not read from its main file alone.
+    writer = sqlite3.connect(db, isolation_level=None)
+    writer.execute("INSERT INTO runs (id, status) VALUES ('wal-active', 'running')")
+    marker, log = folder / 'queued.marker', folder / 'queued.stderr'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'queued')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=1 limit=1 ' in log.read_text(), 'queued at full count on a live WAL database')
+    clean_stop(db, writer)
+    # Longer than two maximum poll delays: the queue reads the stopped state.
+    time.sleep(1.2)
+    assert child.poll() is None and not marker.exists(), log.read_text()
+    writer = sqlite3.connect(db, isolation_level=None)
+    writer.execute("UPDATE runs SET status='completed'")
+    clean_stop(db, writer)
+    finish(child)
+    assert marker.exists() and 'admitted: counted=0 limit=1 ' in log.read_text(), log.read_text()
+    # A -wal file can hold rows that the main file does not. If it exists but
+    # cannot be read, no start may proceed from the main file alone.
+    writer = sqlite3.connect(db, isolation_level=None)
+    writer.execute('PRAGMA wal_autocheckpoint=0').fetchall()
+    writer.execute("INSERT INTO runs (id, status) VALUES ('wal-unread', 'running')")
+    wal = Path(str(db) + '-wal')
+    wal.chmod(0)
+    marker, log = folder / 'unread.marker', folder / 'unread.stderr'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'unread')
+    # A superuser can still read the file, so that start queues instead of refusing.
+    wait_for(lambda: child.poll() is not None or 'waiting: counted=1 ' in log.read_text(), 'unread WAL outcome')
+    assert not marker.exists() and child.poll() in (125, None), log.read_text()
+    wal.chmod(0o600)
+    writer.close()
 
     # Queue interruption cannot launch work, strand priority, or release another
     # request's CPU reservation. Failed commands preserve their actual status.

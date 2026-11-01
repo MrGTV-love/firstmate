@@ -51,7 +51,8 @@ Pipeline starts:
   - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
     priority waiter files. The start policy, core scaling and class order are
     owned by docs/cpu-pass-pool.md. The counted runs always come from the host's
-    ~/.no-mistakes/state.sqlite, opened only with mode=ro: status = 'running'
+    ~/.no-mistakes/state.sqlite, opened only with mode=ro (plus immutable=1 when
+    mode=ro cannot open a stopped WAL database with no -wal file): status = 'running'
     AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Notices go to stderr.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
@@ -371,10 +372,21 @@ def running_runs() -> dict:
 
     Reads host execution state without creating or changing its database.
     """
-    uri = Path(HOST_STATE_DB).expanduser().resolve().as_uri() + "?mode=ro"
-    with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
-        return {row[0]: bool(row[1]) for row in connection.execute(
-            "SELECT id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
+    path = Path(HOST_STATE_DB).expanduser().resolve()
+
+    def read(query: str) -> dict:
+        with contextlib.closing(sqlite3.connect(path.as_uri() + query, uri=True)) as connection:
+            return {row[0]: bool(row[1]) for row in connection.execute(
+                "SELECT id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
+
+    try:
+        return read("?mode=ro")
+    except sqlite3.OperationalError as exc:
+        # A cleanly stopped WAL database has no side files and mode=ro cannot
+        # create them. With no -wal file, the main file holds every committed row.
+        if str(exc) != "unable to open database file" or os.path.lexists(str(path) + "-wal"):
+            raise
+    return read("?mode=ro&immutable=1")
 
 
 def pipeline_observation() -> Tuple[dict, int, float, int]:
