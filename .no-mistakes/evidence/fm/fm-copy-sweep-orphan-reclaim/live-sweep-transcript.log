@@ -1,0 +1,773 @@
+
+=== world squash ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.MmDjT3 (marker: 1)
+Squash commit -- not updating HEAD
+Automatic merge went well; stopped before committing as requested
+Squash commit -- not updating HEAD
+PASS  tip is no ancestor of origin/main: a true squash merge
+
+## scenario: report is a dry run and predicts apply
+objects before: 32
+--- report (no flag): exit 0
+copy-sweep: mode=report containers=1 copies=17
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain	clean, no process, no record, content already in the default branch, Vernant launcher 69185 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and not in the default branch
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses	clean, no process, no record, content already in the default branch, Vernant launcher 69069 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock	worktree lock: some other tool holds this (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:69239 launcher=69239 (launcher 69239 is alive; start age=4s; lock mtime=1793567762)
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task	task live-task's active record names it as its worktree
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean	clean, no process, no record, content already in the default branch, Vernant launcher 68606 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid	clean, no process, no record, content already in the default branch, Vernant launcher 999999 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside	process 69291 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted	1 commit(s) are on no remote and not in the default branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message	4 commit(s) are on no remote and not in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and not in the default branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean	clean, no process, no record, content already in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=4
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=5
+summary: HELD-DIRTY=3
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.MmDjT3: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+--- end report (no flag)
+objects after: 38
+PASS  report exits 0 [0]
+PASS  report moved no ref, worktree, index, lock, copy file, data or state file [f5337aee9a6e0688b98ab60156a8cb1759297cea commit	refs/heads/fm/feature
+c3ada1fd5ee7b151224fa7043e18a2837e68a85b commit	refs/heads/fm/revert
+3bbafa68cb4243f944e3d6080372fb7d257874f6 commit	refs/heads/main
+3bbafa68cb4243f944e3d6080372fb7d257874f6 commit	refs/remotes/origin/main
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example
+HEAD 3bbafa68cb4243f944e3d6080372fb7d257874f6
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:69185 launcher=69185
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict
+HEAD 778a226cb6bb0a5f70e6d8da3dfecb67584134f7
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:69069 launcher=69069
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked some other tool holds this
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:69239 launcher=69239
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:68606 launcher=68606
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:999999 launcher=999999
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+locked vernant-session-active owner=launcher:68952 launcher=68952
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique
+HEAD c8de8b47f2418a48ea286e9c7954137262bde416
+detached
+locked vernant-session-active owner=launcher:68886 launcher=68886
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted
+HEAD c3ada1fd5ee7b151224fa7043e18a2837e68a85b
+branch refs/heads/fm/revert
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message
+HEAD adbe6c4d1188493ac0d5c731b667f84f1e64de2b
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique
+HEAD c8de8b47f2418a48ea286e9c7954137262bde416
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked
+HEAD f5337aee9a6e0688b98ab60156a8cb1759297cea
+detached
+
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/archive-retain/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/archive-retain/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/archive-retain/locked 1793567762 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/archive-retain/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/conflict/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/conflict/index 1793567760 297
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/conflict/logs/HEAD 1793567760 279
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/driver-refuses/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/driver-refuses/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/driver-refuses/locked 1793567762 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/driver-refuses/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/foreign-lock/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/foreign-lock/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/foreign-lock/locked 1793567762 27
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/foreign-lock/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-launcher/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-launcher/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-launcher/locked 1793567762 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-launcher/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-task/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-task/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/live-task/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-clean/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-clean/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-clean/locked 1793567761 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-clean/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-impossible-pid/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-impossible-pid/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-impossible-pid/locked 1793567762 61
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-impossible-pid/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-tracked/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-tracked/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-tracked/locked 1793567761 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-tracked/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-unique/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-unique/index 1793567760 457
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-unique/locked 1793567761 59
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/locked-unique/logs/HEAD 1793567760 282
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/proc-inside/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/proc-inside/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/proc-inside/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/reverted/HEAD 1793567759 26
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/reverted/index 1793567759 369
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/reverted/logs/HEAD 1793567759 420
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/similar-message/HEAD 1793567761 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/similar-message/index 1793567761 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/similar-message/logs/HEAD 1793567761 437
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/tracked/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/tracked/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/tracked/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unique/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unique/index 1793567760 457
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unique/logs/HEAD 1793567760 282
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unlocked-clean/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unlocked-clean/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/unlocked-clean/logs/HEAD 1793567760 125
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/untracked/HEAD 1793567760 41
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/untracked/index 1793567760 377
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.git/worktrees/untracked/logs/HEAD 1793567760 125
+41cba73e77218b0a6ec1a55fa7a2c8823cfdde92ca33dfd3af54f49517a7352d  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain/.claude/channel-outbox/a.jsonl
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict/README.md
+546728d01ee4f22fcc3172cbe1372d5a5f1cdee84c8f6eedb193affc1175179b  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked/README.md
+d26dafa8b3a556409a484b15dba2b1635470fb29e5e1c2567c0fd8572c99b77e  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique/shared.txt
+54a1e3f543b270f9ceca7a1f0262c18472620be2426cb5d416d1fa01df49c6a0  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique/unique.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted/README.md
+5f6d6b2e9fcb0fad53975b0a14b1b4dd667aa8b5451c1c391b02839372526a43  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted/r.txt
+b4c395cc55a76980dcc23b596801da4dce057b3b21dc632998cb7b0fc6c23b01  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message/README.md
+671bf4eed8c3b3a2f75a9c40ccbfe5f2e078e894fb85d63bfd98dc5ab232933c  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked/README.md
+d26dafa8b3a556409a484b15dba2b1635470fb29e5e1c2567c0fd8572c99b77e  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique/shared.txt
+54a1e3f543b270f9ceca7a1f0262c18472620be2426cb5d416d1fa01df49c6a0  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique/unique.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean/feature.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean/shared.txt
+70bd8edd25c1b519325e6c7ac9ee082c433fe56e667e3068463d8a0c3eaac09a  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked/.gitignore
+4a6689419b00b11700c9b6246bcfa8936c8f5e1e824db3a7e57030e2d1c1a684  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked/README.md
+480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked/feature.txt
+c5a41cdf66877ca6d16f0afbc5b573a89d40494ca738e0b85b297d33b26059d8  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked/new.txt
+53c7c750c082a6039bcbb08ebb23982718d67e4c93bc4ee7ef987fe48fca74b4  /Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked/shared.txt
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/state/.fm-lab-tmux-dir
+/Users/charlesabrooker/tmp/fm-lab.MmDjT3/state/live-task.meta]
+PASS  report never called the closeout driver [0]
+PASS  report prints a total
+PASS  report names the squash content proof
+PASS  report prints a regenerable total line
+PASS  report: unlocked squash copy [REAPABLE-PROVEN]
+PASS  report: locked squash copy [PENDING-DRIVER]
+PASS  report: lock naming an impossible PID [PENDING-DRIVER]
+PASS  report: plan not asked yet [PENDING-DRIVER]
+PASS  report: plan not asked yet [PENDING-DRIVER]
+PASS  report: unique commit [HELD-UNPUSHED]
+PASS  report: locked unique commit [HELD-UNPUSHED]
+PASS  report: conflicting commit [HELD-UNPUSHED]
+PASS  report: landed then reverted [HELD-UNPUSHED]
+PASS  report: same message, other bytes [HELD-UNPUSHED]
+PASS  report: tracked edit [HELD-DIRTY]
+PASS  report: locked tracked edit [HELD-DIRTY]
+PASS  report: untracked file [HELD-DIRTY]
+PASS  report: live launcher [HELD-LOCKED]
+PASS  report: foreign lock [HELD-LOCKED]
+PASS  report: active task record [HELD-LIVE-TASK]
+PASS  report: process inside [HELD-LIVE-TASK]
+
+## scenario: hourly apply reaps only the proven copies
+--- hourly apply (bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply): exit 0
+copy-sweep: mode=apply containers=1 copies=14
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and not in the default branch
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses	its closeout driver would not release it (exit 0): fixture driver refuses this copy: {"allowed": false, "reason": "fixture driver refuses this copy"}
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock	worktree lock: some other tool holds this (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:69239 launcher=69239 (launcher 69239 is alive; start age=15s; lock mtime=1793567762)
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task	task live-task's active record names it as its worktree
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside	process 69291 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted	1 commit(s) are on no remote and not in the default branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message	4 commit(s) are on no remote and not in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and not in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unlocked-clean	branch detached at f5337aee9a6e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-impossible-pid	branch detached at f5337aee9a6e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 999999 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-clean	branch detached at f5337aee9a6e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 68606 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=5
+summary: HELD-DIRTY=3
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.MmDjT3: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=17 GiB=0.00 reaped=3 freed=0.00
+--- end hourly apply (bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply)
+PASS  hourly apply exits 0 with refused plans (they hold, they do not fail) [0]
+PASS  M1: squash-merged clean unlocked orphan is reaped (absent)
+PASS  P1: squash-merged clean locked orphan is reaped through the driver (absent)
+PASS  a lock naming an impossible PID is proved gone (exact macOS not-found line) and released (absent)
+PASS  apply reports the unlocked removal
+PASS  apply reports the locked removal
+PASS  M1: same copy with one unique commit is held (present)
+PASS  P1: locked copy with one unique commit is held (present)
+PASS  conflicting unlanded commit is held (present)
+PASS  work landed then reverted on main is held (present)
+PASS  same PR message with other bytes is held (present)
+PASS  tracked edit is held (present)
+PASS  locked tracked edit is held (present)
+PASS  untracked file is held (present)
+PASS  live launcher is held (present)
+PASS  driver refusal is held (present)
+PASS  archive_then_retain_tree stays held (Main2323 scope) (present)
+PASS  foreign lock is held (present)
+PASS  active task record is held (present)
+PASS  process cwd inside is held (present)
+PASS  apply: unique commit [HELD-UNPUSHED]
+PASS  apply: locked unique commit [HELD-UNPUSHED]
+PASS  apply: conflicting commit [HELD-UNPUSHED]
+PASS  apply: landed then reverted [HELD-UNPUSHED]
+PASS  apply: same message, other bytes [HELD-UNPUSHED]
+PASS  apply: tracked edit [HELD-DIRTY]
+PASS  apply: locked tracked edit [HELD-DIRTY]
+PASS  apply: untracked file [HELD-DIRTY]
+PASS  apply: live launcher [HELD-LOCKED]
+PASS  apply: foreign lock [HELD-LOCKED]
+PASS  apply: active task record [HELD-LIVE-TASK]
+PASS  apply: process inside [HELD-LIVE-TASK]
+PASS  apply: driver refused [HELD-LOCKED]
+PASS  apply: archive_then_retain_tree [HELD-LOCKED]
+PASS  held copy keeps its bytes [second]
+PASS  tracked edit bytes kept [dirty]
+driver calls:
+plan locked-impossible-pid
+execute locked-impossible-pid
+plan locked-clean
+execute locked-clean
+plan driver-refuses
+plan archive-retain
+PASS  driver was planned for the locked copy
+PASS  driver executed for the locked copy
+PASS  refused plan got no execute
+PASS  archive-retain plan got no execute
+PASS  unique locked copy never reached the driver
+PASS  dirty locked copy never reached the driver
+PASS  live launcher never reached the driver
+PASS  the sweep wrote no archive tar [0]
+PASS  archive-retain got no preserve [0]
+PASS  live launcher reason names it alive
+PASS  refused plan row shows the driver words
+
+## scenario: repeat apply is stable
+--- second apply: exit 0
+copy-sweep: mode=apply containers=1 copies=14
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/archive-retain	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and not in the default branch
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/driver-refuses	its closeout driver would not release it (exit 0): fixture driver refuses this copy: {"allowed": false, "reason": "fixture driver refuses this copy"}
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/foreign-lock	worktree lock: some other tool holds this (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:69239 launcher=69239 (launcher 69239 is alive; start age=44s; lock mtime=1793567762)
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/live-task	task live-task's active record names it as its worktree
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/locked-unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/proc-inside	process 69291 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/reverted	1 commit(s) are on no remote and not in the default branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/similar-message	4 commit(s) are on no remote and not in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and not in the default branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MmDjT3/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=5
+summary: HELD-DIRTY=3
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.MmDjT3: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=14 GiB=0.00 reaped=0 freed=0.00
+--- end second apply
+PASS  second apply exits 0 [0]
+PASS  second apply reaps nothing more
+PASS  apply2: unique commit [HELD-UNPUSHED]
+PASS  apply2: locked unique commit [HELD-UNPUSHED]
+PASS  apply2: conflicting commit [HELD-UNPUSHED]
+PASS  apply2: landed then reverted [HELD-UNPUSHED]
+PASS  apply2: same message, other bytes [HELD-UNPUSHED]
+PASS  apply2: tracked edit [HELD-DIRTY]
+PASS  apply2: locked tracked edit [HELD-DIRTY]
+PASS  apply2: untracked file [HELD-DIRTY]
+PASS  apply2: live launcher [HELD-LOCKED]
+PASS  apply2: foreign lock [HELD-LOCKED]
+PASS  apply2: active task record [HELD-LIVE-TASK]
+PASS  apply2: process inside [HELD-LIVE-TASK]
+PASS  apply2: driver refused [HELD-LOCKED]
+PASS  apply2: archive_then_retain_tree [HELD-LOCKED]
+registered worktrees after apply: 15
+
+=== world preserved ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.vn25Xs (marker: 1)
+
+## scenario: report on preserved classes
+--- report: exit 0
+copy-sweep: mode=report containers=1 copies=9
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/cache	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/generated	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/log	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/missing	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/regen	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.01 GiB removed with it, not preserved
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/regen-build	it holds ignored files that exist nowhere else: build
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/scratch	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+summary: REAPABLE-PROVEN=7
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.vn25Xs: 0.01 GiB of 20 GiB, ok
+regenerable: 0.01 GiB in 1 proven copies, 0 proven copies not sized
+--- end report
+PASS  report: cache [REAPABLE-PROVEN]
+PASS  report: scratch [REAPABLE-PROVEN]
+PASS  report: log [REAPABLE-PROVEN]
+PASS  report: generated [REAPABLE-PROVEN]
+PASS  report: missing [REAPABLE-PROVEN]
+PASS  report: mismatch [REAPABLE-PROVEN]
+PASS  report: regen [REAPABLE-PROVEN]
+PASS  report: unique non-cache ignored file [HELD-DIRTY]
+PASS  report: regenerable bytes never release a copy with unique ignored work [HELD-DIRTY]
+PASS  report row names regenerable bytes
+PASS  held row stays unchanged
+PASS  report total names regenerable bytes
+
+## scenario: apply with hash-preserved bytes and injected preservation faults
+--- apply: exit 1
+copy-sweep: mode=apply containers=1 copies=4
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/missing	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/regen-build	it holds ignored files that exist nowhere else: build
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/scratch	branch detached at ec97fb9437ff, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/regen	branch detached at ec97fb9437ff, copy 0.01 GiB, preserved 0.00 GiB, net freed 0.01 GiB (clean, no process, no record, HEAD contained in a remote branch)
+FAILED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/missing	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/mismatch	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/log	branch detached at ec97fb9437ff, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/generated	branch detached at ec97fb9437ff, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vn25Xs/projects/example/.claude/worktrees/cache	branch detached at ec97fb9437ff, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.vn25Xs: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=9 GiB=0.01 reaped=5 freed=0.01
+--- end apply
+PASS  a failed preservation fails the apply run [1]
+PASS  M2/PC1: preserved cache payload does not hold the copy (absent)
+PASS  cache has exactly one preserve [1]
+PASS  cache preserved bytes hash equals the source hash [fa79d967af0593c97499391be636afa263a3600cf8654741750c66ae6b9a7b44]
+PASS  cache manifest records the actual hash
+class=cache source_sha256=fa79d967af0593c97499391be636afa263a3600cf8654741750c66ae6b9a7b44 preserved=/Users/charlesabrooker/tmp/fm-lab.vn25Xs/data/copy-sweep/20261101T211719Z.31152-ec97fb9437ff65aac561acfbd5e0936a085a94c4/nested-copy-preserved/5cd32aafbb7e0e2cccf9ea2c365aabc42553d9e28f00849eb4b1e5daaf68fdd3/.import_linter_cache/payload
+PASS  M2/PC1: preserved scratch payload does not hold the copy (absent)
+PASS  scratch has exactly one preserve [1]
+PASS  scratch preserved bytes hash equals the source hash [57f21ea0f4ffde511211240a89a46ab14a678f4eb9b9b06e58a7453f175de923]
+PASS  scratch manifest records the actual hash
+class=scratch source_sha256=57f21ea0f4ffde511211240a89a46ab14a678f4eb9b9b06e58a7453f175de923 preserved=/Users/charlesabrooker/tmp/fm-lab.vn25Xs/data/copy-sweep/20261101T211719Z.31152-ec97fb9437ff65aac561acfbd5e0936a085a94c4/nested-copy-preserved/23b27347cb1d7c07e13c1c6acbd27e8bdc68dc3a0cf821fee3e08c7f54f4b407/.tac/tmp/payload
+PASS  M2/PC1: preserved log payload does not hold the copy (absent)
+PASS  log has exactly one preserve [1]
+PASS  log preserved bytes hash equals the source hash [e01842556da34ab2b752ab0e123d03238ae0a80f65a6ed9d45b098d613759de4]
+PASS  log manifest records the actual hash
+class=log source_sha256=e01842556da34ab2b752ab0e123d03238ae0a80f65a6ed9d45b098d613759de4 preserved=/Users/charlesabrooker/tmp/fm-lab.vn25Xs/data/copy-sweep/20261101T211719Z.31152-ec97fb9437ff65aac561acfbd5e0936a085a94c4/nested-copy-preserved/e88357f3e697947bb365eb6cc5257fcdd52818d7c61a08265ba4e32927e0990d/.claude/logs/payload
+PASS  M2/PC1: preserved generated payload does not hold the copy (absent)
+PASS  generated has exactly one preserve [1]
+PASS  generated preserved bytes hash equals the source hash [af1226cc146f19fac876fb97e900a6c6a1c0e11e7e540249579ee7c465605081]
+PASS  generated manifest records the actual hash
+class=generated source_sha256=af1226cc146f19fac876fb97e900a6c6a1c0e11e7e540249579ee7c465605081 preserved=/Users/charlesabrooker/tmp/fm-lab.vn25Xs/data/copy-sweep/20261101T211719Z.31152-ec97fb9437ff65aac561acfbd5e0936a085a94c4/nested-copy-preserved/1a86062a9bacc47c5fccc89e7864ca7d53c1d0f5bb18e6e00e7d17d1518e4d96/graft/payload
+PASS  M2: unique non-cache ignored file still holds the copy (present)
+PASS  apply: unique ignored file class [HELD-DIRTY]
+PASS  missing preserve keeps the original [missing-case bytes]
+PASS  mismatched preserve keeps the original [mismatch-case bytes]
+PASS  missing preserve is reported as a failure
+PASS  mismatched preserve is reported as a failure
+PASS  regenerable bytes do not hold a proven copy (absent)
+PASS  other ignored bytes survive by preserve [keep scratch output]
+PASS  held copy keeps unique ignored bytes [unique build output]
+PASS  held copy keeps its regenerable bytes (present)
+PASS  preserve holds no regenerable directory [0]
+PASS  removal line shows freed space
+copy-sweep.log lines: 5
+
+=== world refused ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.vqSKyT (marker: 1)
+
+## scenario: three failed applies on one refused copy
+--- apply 1: exit 1
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.vqSKyT: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- end apply 1
+PASS  run 1 exits 1 on the refusal [1]
+PASS  run 1: git really refused
+PASS  run 1: at most one preserve [0]
+PASS  run 1: original bytes kept [original bytes]
+PASS  run 1: regenerable bytes kept (present)
+--- apply 2: exit 1
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.vqSKyT: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- end apply 2
+PASS  run 2 exits 1 on the refusal [1]
+PASS  run 2: git really refused
+PASS  run 2: at most one preserve [0]
+PASS  run 2: original bytes kept [original bytes]
+PASS  run 2: regenerable bytes kept (present)
+--- apply 3: exit 1
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-lab.vqSKyT/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.vqSKyT: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- end apply 3
+PASS  run 3 exits 1 on the refusal [1]
+PASS  run 3: git really refused
+PASS  run 3: at most one preserve [0]
+PASS  run 3: original bytes kept [original bytes]
+PASS  run 3: regenerable bytes kept (present)
+data dir KiB before=0 after=0
+<lab>/data
+<lab>/data/copy-sweep
+
+=== world fetchfail ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.14fA5N (marker: 1)
+Squash commit -- not updating HEAD
+
+## scenario: origin cannot be reached in apply
+--- report with origin gone: exit 0
+copy-sweep: mode=report containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.14fA5N/projects/example/.claude/worktrees/squashed	clean, no process, no record, content already in the default branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.14fA5N: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+--- end report with origin gone
+PASS  report reads local refs only [REAPABLE-PROVEN]
+--- apply with origin gone: exit 0
+copy-sweep: mode=apply containers=1 copies=1
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.14fA5N/projects/example/.claude/worktrees/squashed	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.14fA5N: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- end apply with origin gone
+PASS  failed fetch holds the content-proved copy (present)
+PASS  failed fetch class [HELD-UNPUSHED]
+PASS  failed fetch leaves no preserve [0]
+
+## scenario: local proof is stale: origin main rewound without the squash
+--- report on stale ref: exit 0
+copy-sweep: mode=report containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.14fA5N/projects/example/.claude/worktrees/squashed	clean, no process, no record, content already in the default branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.14fA5N: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+--- end report on stale ref
+--- apply after main lost the squash: exit 0
+copy-sweep: mode=apply containers=1 copies=1
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.14fA5N/projects/example/.claude/worktrees/squashed	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.14fA5N: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+--- end apply after main lost the squash
+PASS  apply refetched and held a copy main no longer contains (present)
+PASS  class after the refetch [HELD-UNPUSHED]
+
+=== world observe ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.POSvRz (marker: 1)
+
+## scenario: unknown process observation holds; exit 126 uses fm-proc-info.py
+--- apply with injected ps results: exit 0
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.POSvRz/projects/example/.claude/worktrees/confined-live	worktree lock: vernant-session-active owner=launcher:80252 launcher=80252 (launcher 80252 is alive; start age=unknowns; lock mtime=1793567900)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.POSvRz/projects/example/.claude/worktrees/diag	worktree lock: vernant-session-active owner=launcher:80255 launcher=80255 (launcher 80255 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.POSvRz/projects/example/.claude/worktrees/sevenstate	worktree lock: vernant-session-active owner=launcher:80538 launcher=80538 (launcher 80538 cannot be observed; absence is not proved)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.POSvRz/projects/example/.claude/worktrees/confined-gone	branch detached at a7946949227a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 80807 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.POSvRz: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=1 freed=0.00
+--- end apply with injected ps results
+PASS  ps exit 1 with a diagnostic is unknown, so held [HELD-LOCKED]
+PASS  reason says absence is not proved
+PASS  ps exit 2 is unknown, so held [HELD-LOCKED]
+PASS  exit 126 + real helper sees the live launcher [HELD-LOCKED]
+PASS  exit 126 live reason
+PASS  diag copy kept (present)
+PASS  exit 2 copy kept (present)
+PASS  live launcher copy kept under exit 126 (present)
+PASS  exit 126 + real helper proves a gone launcher absent, driver releases (absent)
+driver calls:
+plan confined-gone
+execute confined-gone
+PASS  unknown launcher never reached the driver
+PASS  live launcher never reached the driver
+
+=== world drytotal ===
+lab home: /Users/charlesabrooker/tmp/fm-lab.niV9tj (marker: 1)
+Squash commit -- not updating HEAD
+
+## scenario: dry run on a pool slot and home lists what would be freed
+--- report on a pool slot: exit 0
+copy-sweep: mode=report containers=1 copies=2
+REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-squashed	clean, no process, no record, content already in the default branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-unique	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a: 0.01 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo: 0.01 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+--- end report on a pool slot
+PASS  dry run exits 0 [0]
+PASS  dry run moved nothing [d89cd17586783646c060eec6da0c29b443eb8036 commit	refs/heads/fm/y
+4066db9df80cde4bbd16d00d9a2b418eef0df790 commit	refs/heads/main
+4066db9df80cde4bbd16d00d9a2b418eef0df790 commit	refs/remotes/origin/HEAD
+4066db9df80cde4bbd16d00d9a2b418eef0df790 commit	refs/remotes/origin/main
+worktree /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo
+HEAD 4066db9df80cde4bbd16d00d9a2b418eef0df790
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-squashed
+HEAD d89cd17586783646c060eec6da0c29b443eb8036
+branch refs/heads/fm/y
+
+worktree /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-unique
+HEAD 2246d6c9736c9c1a53132f1201e7b7e25ad08928
+detached]
+PASS  pool slot squash orphan class [REAPABLE-PROVEN]
+PASS  pool slot unique orphan class [HELD-UNPUSHED]
+PASS  report counts the candidate
+PASS  row names its proof
+PASS  dry run removed nothing (present)
+size line: REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-squashed	clean, no process, no record, content already in the default branch
+size line: HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo/.claude/worktrees/orphan-unique	1 commit(s) are on no remote and not in the default branch
+size line: summary: REAPABLE-PROVEN=1
+size line: budget pool /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a: 0.01 GiB of 60 GiB, ok
+size line: budget container /Users/charlesabrooker/tmp/fm-lab.niV9tj/scratch-treehouse/pool-a/1/repo: 0.01 GiB of 20 GiB, ok
+size line: regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+
+RESULT scenarios=[squash preserved refused fetchfail observe drytotal] passes=167 fails=0
+driver exit=0
