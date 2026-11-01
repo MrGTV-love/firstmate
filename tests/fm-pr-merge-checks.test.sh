@@ -1349,7 +1349,8 @@ test_required_producer_identity() {
       fi
       case "$variant" in
         unreadable|malformed|stale)
-          assert_grep 'required check producers at head' "$case_dir/stderr" "producer read error not reported" ;;
+          assert_grep 'required check producers at head' "$case_dir/stderr" "producer read error not reported"
+          assert_equals 5 "$(cat "$case_dir/rollup-calls")" "$variant producer read did not use the bounded retry" ;;
       esac
     done
   done
@@ -2400,6 +2401,8 @@ test_tested_tree_rechecks_a_check_run_added_during_retry() {
   FM_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" run_required_case "$case_dir" 188
   expect_code 1 "$RC" "a check run added during the retry must not reuse the earlier verdict: $(cat "$case_dir/stderr")"
   assert_grep "head $head lacks the current tip $tip" "$case_dir/stderr" 'the added check run must fall back to the ancestry rule'
+  assert_equals 2 "$(cat "$case_dir/rollup-calls")" 'verify did not run a second attempt'
+  assert_equals 2 "$(cat "$case_dir/github-runs-calls")" 'each verify attempt must list the check runs once'
   assert_grep 'actions/runs/13/artifacts' "$case_dir/gh.log" 'the added check run was never checked for a record'
   assert_no_grep 'pr merge' "$case_dir/gh.log" 'a merge landed on a verdict that missed a check run'
   pass 'a kept tested-tree verdict is reused only for the same check runs'
