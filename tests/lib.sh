@@ -41,7 +41,7 @@ umask 022
 # The suite runs the real gate-lifecycle check (bin/fm-gate-refuse-lib.sh) with no
 # exemption, so an operator's bypass must not leak in and write bypass events.
 # Inside a no-mistakes gate the check admits only a marked lab home; a fixture
-# home gets that through fm_test_lab_home below.
+# home gets that through fm_test_lab_home (tests/lab-home-fixture.sh).
 unset FM_GATE_REFUSE_BYPASS
 
 # Arms the test-only seams bin/ scripts expose (e.g. fm-afk-launch.sh's
@@ -160,21 +160,8 @@ TOML
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export FM_GUARD_AUDIT_READER="$ROOT/bin/fm-jev-audit-read.mjs"
 
-# fm_test_lab_home <dir>: make an absent or empty <dir> a marked disposable lab
-# home in the stock layout, so the real gate check admits fleet commands driven
-# against it from inside a no-mistakes gate. The gate library owns the marker.
-# It records no owner on purpose: the test's own temp root owns this directory,
-# so bin/fm-test-reap-orphans.sh must not reap it as a separate lab.
-fm_test_lab_home() {
-  local lab_home=$1
-  mkdir -p "$lab_home" || return 1
-  (
-    # shellcheck source=bin/fm-gate-refuse-lib.sh
-    . "$ROOT/bin/fm-gate-refuse-lib.sh"
-    fm_gate_lab_mark "$lab_home"
-  ) || return 1
-  mkdir -p "$lab_home/state" "$lab_home/config" "$lab_home/data" "$lab_home/projects"
-}
+# shellcheck source=tests/lab-home-fixture.sh
+. "$ROOT/tests/lab-home-fixture.sh"
 
 # --- reporters --------------------------------------------------------------
 

@@ -11,6 +11,7 @@ TMP_ROOT=$(fm_test_tmproot fm-watch-checkpoint)
 make_home() {
   local name=$1 home
   home="$TMP_ROOT/$name"
+  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   mkdir -p "$home/state" "$home/data" "$home/config"
   printf '%s\n' "$home"
 }

@@ -518,6 +518,13 @@ python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_D
 jq -se --arg head "$merged" 'length == 2 and all(.[]; .head == $head and .task == "merge-task")
   and any(.[]; .kind == "tree-equal-merge") and any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/signatures.jsonl" >/dev/null \
   || fail "redundant base merge did not produce both signatures"
+# Malformed matching refusals ahead of a valid one are skipped, not fatal.
+jq -c '.ts = null, (.base = 7 | .ts = "2000-01-01T00:00:00Z"), .' \
+  "$STATE_DIR/guard-events.jsonl" > "$TMP/malformed-first.jsonl"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$TMP/malformed-first.jsonl" --json > "$TMP/malformed-first-result.jsonl" \
+  || fail "a malformed refusal aborted the workaround scan"
+jq -se --arg head "$merged" 'any(.[]; .kind == "base-merge-only-after-refusal" and .head == $head)' "$TMP/malformed-first-result.jsonl" >/dev/null \
+  || fail "a malformed refusal hid a valid base-merge-only signature"
 [ "$(git -C "$REPO" show-ref)" = "$before_refs" ] && [ "$(git -C "$REPO" status --porcelain)" = "$before_status" ] \
   || fail "workaround detection changed repository state"
 printf 'real work\n' > "$REPO/work.txt"

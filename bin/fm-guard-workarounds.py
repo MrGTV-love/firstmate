@@ -11,7 +11,8 @@ A bare base name resolves to refs/remotes/origin/<name> first, then the local br
 A tree-equal merge is a signature, not proof that a refusal caused the merge.
 A base-merge-only change additionally requires a task/head-bound merge denial,
 a later commit time, and second parents reachable from that denial's base ref.
-Legacy events without a task, head or base cannot establish that second claim.
+Legacy events without a task, head or base cannot establish that second claim,
+and a refusal whose ts or base is not a string is skipped, not fatal.
 Text output is one line per task; --json emits one object per signature, suitable
 for fm-guard-metrics.sh --workarounds. Nothing is disabled or automatically fixed.
 """
@@ -89,7 +90,8 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
         if event.get('task') != task or not SHA.fullmatch(str(event.get('head', ''))):
             continue
         old = event['head']
-        if old == tip or not event.get('base'):
+        if old == tip or not isinstance(event.get('base'), str) or not event['base'] \
+                or not isinstance(event.get('ts'), str):
             continue
         # --ancestry-path alone would include merges along non-first parents.
         # The first-parent path must actually end at the refused head.
@@ -105,7 +107,7 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
             continue
         try:
             refused_at = datetime.datetime.fromisoformat(event['ts'].replace('Z', '+00:00')).timestamp()
-        except (KeyError, TypeError, ValueError):
+        except ValueError:
             continue
         base_lineage = set(git(repo, 'log', '--first-parent', f'--max-count={limit}',
                                '--format=%H', base, '--').splitlines())

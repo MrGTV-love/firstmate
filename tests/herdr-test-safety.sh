@@ -6,6 +6,10 @@ set -u
 
 # shellcheck source=tests/git-config-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/git-config-helpers.sh"
+# Herdr suites drive the real fleet entrypoints through the real gate check, so
+# their homes come from the shared marked lab-home fixture.
+# shellcheck source=tests/lab-home-fixture.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lab-home-fixture.sh"
 
 HERDR_TEST_SAFETY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null

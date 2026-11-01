@@ -352,7 +352,7 @@ The tracked `.no-mistakes.yaml` sets `disable_project_settings: true`; no-mistak
 Independently, the fleet lifecycle entrypoints use `bin/fm-gate-refuse-lib.sh` to refuse gate calls against the real fleet, while permitting validation against a disposable lab home minted by `bin/fm-lab-home.sh`.
 The refusal names one command, `bin/fm-lab-home.sh env`, which mints the marked lab home and exports `FM_HOME` together with its private tmux socket directory, and the gate's own Test instructions use that same command instead of composing the setup themselves.
 A normal primary checkout or crewmate worktree remains unaffected.
-The refusal library's header owns the gate detection, lab-home exception, test-harness bypass, and relationship to no-mistakes' HEAD-continuity guard; the lab helper's header owns its usage.
+The refusal library's header owns the gate detection, lab-home containment rule, recorded bypass switch, and relationship to no-mistakes' HEAD-continuity guard; the lab helper's header owns its usage.
 
 ## Two task shapes
 

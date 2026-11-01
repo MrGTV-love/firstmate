@@ -645,6 +645,7 @@ LAB_READY=1
 HOME_DIR="$TMP_ROOT/home"
 PROJECT_DIR="$TMP_ROOT/project"
 RECOVERY_PROJECT_DIR="$TMP_ROOT/recovery-project"
+fm_test_lab_home "$HOME_DIR" || fail "could not mark the primary home"
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/config" \
   "$HOME_DIR/data/anchor" "$HOME_DIR/data/shape" \
   "$HOME_DIR/data/order-a" "$HOME_DIR/data/order-b" \
@@ -1109,6 +1110,8 @@ pass "real Herdr lab: three repeated concurrent create/order/cleanup waves have 
 # ------------------------------------------------------------------
 SECOND_HOME_A="$TMP_ROOT/home-2ndmate-alpha"
 SECOND_HOME_B="$TMP_ROOT/home-2ndmate-bravo"
+fm_test_lab_home "$SECOND_HOME_A" || fail "could not mark the alpha secondmate home"
+fm_test_lab_home "$SECOND_HOME_B" || fail "could not mark the bravo secondmate home"
 mkdir -p "$SECOND_HOME_A/state" "$SECOND_HOME_A/config" "$SECOND_HOME_A/data" \
   "$SECOND_HOME_B/state" "$SECOND_HOME_B/config" "$SECOND_HOME_B/data"
 printf 'alpha\n' > "$SECOND_HOME_A/.fm-secondmate-home"

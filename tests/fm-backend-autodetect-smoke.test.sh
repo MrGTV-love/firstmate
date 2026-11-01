@@ -89,8 +89,10 @@ trap on_exit EXIT
 
 # --- scratch world: FM_HOME with NO backend config, one throwaway project ---
 
-STATE="$TMP_ROOT/state"; DATA="$TMP_ROOT/data"; CONFIG="$TMP_ROOT/config"
-mkdir -p "$STATE" "$DATA/$ID" "$CONFIG"
+LAB_HOME="$TMP_ROOT/home"
+fm_test_lab_home "$LAB_HOME" || fail "could not mark the scratch home"
+STATE="$LAB_HOME/state"; DATA="$LAB_HOME/data"; CONFIG="$LAB_HOME/config"
+mkdir -p "$DATA/$ID"
 # Backend auto-detection is what is under test here, so opt out of the default-on
 # presentation projection and keep the assertions on the flat per-home workspace.
 printf 'off\n' > "$CONFIG/herdr-presentation-spaces"
@@ -116,8 +118,8 @@ git -C "$PROJ" remote add origin "file://$PROJ.origin.git"
 
 OUT_FILE="$TMP_ROOT/spawn.out"; ERR_FILE="$TMP_ROOT/spawn.err"
 env -u TMUX -u FM_BACKEND PATH="$PATH" HERDR_ENV=1 \
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-  FM_CONFIG_OVERRIDE="$CONFIG" FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" \
+  FM_HOME="$LAB_HOME" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+  FM_CONFIG_OVERRIDE="$CONFIG" FM_PROJECTS_OVERRIDE="$LAB_HOME/projects" \
   FM_SPAWN_NO_GUARD=1 \
   "$ROOT/bin/fm-spawn.sh" "$ID" "$PROJ" "sh -c 'echo autodetect-smoke-ok'" --mode no-mistakes --yolo off \
   >"$OUT_FILE" 2>"$ERR_FILE"
@@ -167,7 +169,7 @@ pass "real herdr: the auto-detected spawn's launch command actually ran in the h
 # --- teardown completes the trivial spawn/teardown cycle --------------------
 
 TEARDOWN_OUT="$TMP_ROOT/teardown.out"
-FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+FM_HOME="$LAB_HOME" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
   FM_CONFIG_OVERRIDE="$CONFIG" \
   "$ROOT/bin/fm-teardown.sh" "$ID" >"$TEARDOWN_OUT" 2>&1
 status=$?

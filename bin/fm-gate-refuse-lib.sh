@@ -36,10 +36,15 @@
 # lifecycle against an FM_HOME that carries the FM_GATE_LAB_MARKER file, because
 # bin/fm-lab-home.sh stamps it only on an empty directory
 # (fm_gate_lab_mark refuses a populated dir, so the helper cannot mark a real home).
-# The allowance accepts only the production branch's redundant overrides:
-# the tracked code root and the marked home's stock state/config directories.
-# All paths must be canonical, with no symlinked stock directories or marker;
-# every other nonempty override refuses. The threat model stays a CONFUSED
+# The allowance is containment (data/fm-guard-telemetry-rule-task/report.md,
+# "Current fix-review decision"): FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE must
+# be the marked home's stock state/config directories, FM_ROOT_OVERRIDE must be
+# the code root under test or resolve inside the marked home, and
+# FM_DATA_OVERRIDE and FM_PROJECTS_OVERRIDE must resolve inside the marked home.
+# Resolution follows symlinks, so neither a symlink nor a sibling path that
+# shares the home's prefix escapes it, and a missing target refuses.
+# The home and its stock directories must be canonical, with no symlinked stock
+# directory or marker; every other nonempty override refuses. The threat model stays a CONFUSED
 # agent: a hostile agent that would hand-forge the marker file is the
 # adversarial case no-mistakes' neutral-execution-context and the
 # HEAD-continuity guard already own, so authorization checks only the first-line
@@ -59,8 +64,9 @@
 # test suite runs the real check, and tests/lib.sh clears an inherited value.
 # Outside a gate the check finds neither signal. Inside a gate, where the
 # no-mistakes test step runs the suite, the check admits a fixture home only when
-# fm_test_lab_home (tests/lib.sh) marked it and it meets the lab rules above; any
-# other fleet test run there is refused like any other gate call.
+# fm_test_lab_home (tests/lab-home-fixture.sh) marked it and its overrides meet
+# the containment rule above; any other fleet test run there is refused like any
+# other gate call.
 # The threat stays a CONFUSED gate agent; an agent that would deliberately set
 # the switch is the adversarial case no-mistakes' neutral-execution-context and
 # the HEAD-continuity guard own.
@@ -97,8 +103,15 @@ fm_gate_lab_mark() {
   printf '%s\n' "$FM_GATE_LAB_TOKEN" > "$home/$FM_GATE_LAB_MARKER"
 }
 
-# fm_gate_lab_permitted: allow only the marked stock home and the redundant
-# root/state/config overrides injected by production supervision.
+# fm_gate_lab_permitted: allow only the marked stock home and overrides that
+# stay inside it (see the header); fm_gate_lab_contains resolves one path.
+fm_gate_lab_contains() {  # <canonical-home> <path>
+  local target
+  target=$(cd -P -- "$2" 2>/dev/null && pwd -P) || return 1
+  case "$target" in "$1"|"$1"/*) return 0 ;; esac
+  return 1
+}
+
 fm_gate_lab_permitted() {
   local v home code_root dir expected
   fm_gate_lab_home "${FM_HOME:-}" || return 1
@@ -115,12 +128,13 @@ fm_gate_lab_permitted() {
       *_OVERRIDE)
         [ -n "${!v}" ] || continue
         case "$v" in
-          FM_ROOT_OVERRIDE) expected=$code_root ;;
-          FM_STATE_OVERRIDE) expected="$home/state" ;;
-          FM_CONFIG_OVERRIDE) expected="$home/config" ;;
+          FM_STATE_OVERRIDE) [ "${!v}" = "$home/state" ] || return 1 ;;
+          FM_CONFIG_OVERRIDE) [ "${!v}" = "$home/config" ] || return 1 ;;
+          FM_ROOT_OVERRIDE)
+            [ "${!v}" = "$code_root" ] || fm_gate_lab_contains "$home" "${!v}" || return 1 ;;
+          FM_DATA_OVERRIDE|FM_PROJECTS_OVERRIDE) fm_gate_lab_contains "$home" "${!v}" || return 1 ;;
           *) return 1 ;;
         esac
-        [ "${!v}" = "$expected" ] || return 1
         ;;
     esac
   done

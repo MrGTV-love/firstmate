@@ -47,26 +47,27 @@ export FM_BACKEND=tmux
 # --- world builders --------------------------------------------------------
 
 # new_world <name>: a PRIMARY firstmate repo on `main` with one commit (the
-# instruction surface seeded) and a home dir with state/ and data/. NO origin
+# instruction surface seeded) inside a marked lab home, so the real gate check
+# admits a root that stays inside that home. NO origin
 # remote: the local-HEAD sync never needs one. Echoes the world dir.
 new_world() {
   local name=$1 w
   w="$TMP_ROOT/$name"
-  mkdir -p "$w/home/state" "$w/home/data"
+  fm_test_lab_home "$w/home" || fail "could not mark the fixture home"
   # Fresh watcher beacon keeps fm-guard quiet for the spawn path.
   touch "$w/home/state/.last-watcher-beat"
 
-  git init -q -b main "$w/main"
+  git init -q -b main "$w/home/main"
   # Mirror the real repo: the gitignored operational dirs never dirty a worktree,
   # so a secondmate home's data/state/projects can never block its fast-forward.
-  printf 'projects/\nstate/\ndata/\n.no-mistakes/\nconfig/crew-harness\nscratchpad*\n' > "$w/main/.gitignore"
-  printf 'v1\n' > "$w/main/AGENTS.md"
-  printf 'r1\n' > "$w/main/README.md"
-  mkdir -p "$w/main/bin" "$w/main/.agents/skills"
-  printf 'echo a\n' > "$w/main/bin/tool.sh"
-  printf 's1\n' > "$w/main/.agents/skills/note.md"
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm c1
+  printf 'projects/\nstate/\ndata/\n.no-mistakes/\nconfig/crew-harness\nscratchpad*\n' > "$w/home/main/.gitignore"
+  printf 'v1\n' > "$w/home/main/AGENTS.md"
+  printf 'r1\n' > "$w/home/main/README.md"
+  mkdir -p "$w/home/main/bin" "$w/home/main/.agents/skills"
+  printf 'echo a\n' > "$w/home/main/bin/tool.sh"
+  printf 's1\n' > "$w/home/main/.agents/skills/note.md"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm c1
   printf '%s\n' "$w"
 }
 
@@ -75,7 +76,7 @@ new_world() {
 # (a window= makes it a running direct report).
 add_sm_worktree() {
   local w=$1 id=$2 commit=$3
-  git -C "$w/main" worktree add -q --detach "$w/$id" "$commit"
+  git -C "$w/home/main" worktree add -q --detach "$w/$id" "$commit"
   printf '%s\n' "$id" > "$w/$id/.fm-secondmate-home"
   {
     printf 'window=firstmate:fm-%s\n' "$id"
@@ -90,17 +91,17 @@ add_sm_worktree() {
 # readme changes only README. No push - the sync follows the primary's local HEAD.
 bump_primary() {
   local w=$1 mode=$2
-  printf 'r-%s\n' "$mode" >> "$w/main/README.md"
+  printf 'r-%s\n' "$mode" >> "$w/home/main/README.md"
   if [ "$mode" = instr ]; then
-    printf 'v-%s\n' "$mode" > "$w/main/AGENTS.md"
-    printf 'echo %s\n' "$mode" > "$w/main/bin/tool.sh"
-    printf 's-%s\n' "$mode" > "$w/main/.agents/skills/note.md"
+    printf 'v-%s\n' "$mode" > "$w/home/main/AGENTS.md"
+    printf 'echo %s\n' "$mode" > "$w/home/main/bin/tool.sh"
+    printf 's-%s\n' "$mode" > "$w/home/main/.agents/skills/note.md"
   fi
   if [ "$mode" = bin ]; then
-    printf 'echo %s-%s\n' "$mode" "$RANDOM" > "$w/main/bin/tool.sh"
+    printf 'echo %s-%s\n' "$mode" "$RANDOM" > "$w/home/main/bin/tool.sh"
   fi
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm "bump-$mode"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm "bump-$mode"
 }
 
 head_of() { git -C "$1" rev-parse HEAD; }
@@ -112,9 +113,9 @@ head_of() { git -C "$1" rev-parse HEAD; }
 # read as a dirty working tree to any `git status --porcelain` dirtiness check.
 ignore_marker_commit() {
   local w=$1
-  printf '.fm-secondmate-home\n' >> "$w/main/.gitignore"
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm "gitignore seed marker"
+  printf '.fm-secondmate-home\n' >> "$w/home/main/.gitignore"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm "gitignore seed marker"
 }
 
 # seed_marked_home <w> <id> <commit>: a secondmate home matching what
@@ -144,10 +145,10 @@ run_ff() {
 test_ff_updated() {
   local w c1 base
   w=$(new_world ff-updated)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"
 
@@ -167,8 +168,8 @@ test_ff_current() {
   local w base
   w=$(new_world ff-current)
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$base"
+  base=$(primary_head_commit "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$base"
 
   run_ff "$w/sm" "$base"
 
@@ -183,10 +184,10 @@ test_ff_current() {
 test_ff_dirty() {
   local w c1 base before
   w=$(new_world ff-dirty)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
   printf 'uncommitted local edit\n' >> "$w/sm/AGENTS.md"
   before=$(head_of "$w/sm")
 
@@ -203,12 +204,12 @@ test_ff_dirty() {
 test_scratchpad2_does_not_dirty_home() {
   local w c1 base
   w=$(new_world scratchpad2-clean)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   mkdir -p "$w/sm/scratchpad2"
   printf 'notes\n' > "$w/sm/scratchpad2/notes.txt"
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"
 
@@ -222,14 +223,14 @@ test_scratchpad2_does_not_dirty_home() {
 test_ff_diverged() {
   local w c1 base before
   w=$(new_world ff-diverged)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   printf 'fork work\n' > "$w/sm/AGENTS.md"
   git -C "$w/sm" add -A
   git -C "$w/sm" commit -qm local-work
   before=$(head_of "$w/sm")
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"
 
@@ -245,14 +246,14 @@ test_ff_diverged() {
 test_ff_inflight_feature_branch() {
   local w c1 base before
   w=$(new_world ff-inflight)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q -b feature/wip "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q -b feature/wip "$w/sm" "$c1"
   printf 'work in progress\n' >> "$w/sm/README.md"
   git -C "$w/sm" add -A
   git -C "$w/sm" commit -qm wip
   before=$(head_of "$w/sm")
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"
 
@@ -270,10 +271,10 @@ test_ff_inflight_feature_branch() {
 test_no_fetch_in_local_path() {
   local w c1 base fakebin log real_git
   w=$(new_world ff-nofetch)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   fakebin="$w/fakebin"
   log="$w/fetch.log"
@@ -299,12 +300,12 @@ SH
 test_sweep_nudge_requires_instruction_change() {
   local w c1 base
   w=$(new_world sweep-gate)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-r "$c1"
   bump_primary "$w" readme
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
-  FM_ROOT="$w/main" FM_HOME="$w/home"
+  FM_ROOT="$w/home/main" FM_HOME="$w/home"
   FF_NUDGE_WINDOWS=""
   FF_SEEN_HOMES=""
   sweep_live_secondmate_metas "$w/home/state" "$base" yes >/dev/null
@@ -410,21 +411,21 @@ SH
 test_bootstrap_sweep_nudges_only_instruction_change() {
   local w c1 c2 c3 fakebin out info_line log marker_dir
   w=$(new_world boot-sweep)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"        # behind by an instruction change
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
+  c2=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-readme "$c2"       # behind by a readme-only change
   bump_primary "$w" readme
-  c3=$(head_of "$w/main")
+  c3=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-current "$c3"      # already on the primary's HEAD
   # A home with NO live meta must never be swept (live = a running direct report).
-  git -C "$w/main" worktree add -q --detach "$w/sm-nonlive" "$c1"
+  git -C "$w/home/main" worktree add -q --detach "$w/sm-nonlive" "$c1"
   printf 'sm-nonlive\n' > "$w/sm-nonlive/.fm-secondmate-home"
 
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
@@ -458,7 +459,7 @@ test_bootstrap_sweep_nudges_only_instruction_change() {
 test_bootstrap_nudge_send_uses_state_override() {
   local w c1 fakebin out log override_state marker
   w=$(new_world nudge-state-override)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"
   bump_primary "$w" instr
   override_state="$w/override-state"
@@ -468,7 +469,7 @@ test_bootstrap_nudge_send_uses_state_override() {
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_STATE_OVERRIDE="$override_state" FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
@@ -486,9 +487,9 @@ test_bootstrap_nudge_send_uses_state_override() {
 test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
   local w c1 fakebin out marker log evil
   w=$(new_world nudge-malformed-id)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   evil="$w/evil"
-  git -C "$w/main" worktree add -q --detach "$evil" "$c1"
+  git -C "$w/home/main" worktree add -q --detach "$evil" "$c1"
   printf '../escape\n' > "$evil/.fm-secondmate-home"
   mkdir -p "$w/home/state/.secondmate-nudge-pending"
   marker="$w/home/state/.secondmate-nudge-pending/bad.pending"
@@ -508,7 +509,7 @@ test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
@@ -524,7 +525,7 @@ test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
 test_bootstrap_nudge_failure_records_retry_marker() {
   local w c1 fakebin out marker
   w=$(new_world nudge-failure)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"
   bump_primary "$w" instr
   fakebin=$(make_fake_toolchain "$w")
@@ -532,7 +533,7 @@ test_bootstrap_nudge_failure_records_retry_marker() {
   # (a keystroke failure alone no longer fails a durably enqueued nudge).
   : > "$w/home/state/sm-instr.inbox"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
@@ -549,13 +550,13 @@ test_bootstrap_nudge_failure_records_retry_marker() {
 test_bootstrap_nudge_retry_is_idempotent() {
   local w c1 fakebin out marker out2
   w=$(new_world nudge-retry)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"
   bump_primary "$w" instr
   fakebin=$(make_fake_toolchain "$w")
   : > "$w/home/state/sm-instr.inbox"   # block the steer record: a real local failure
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
@@ -564,13 +565,13 @@ test_bootstrap_nudge_retry_is_idempotent() {
   assert_present "$marker" "precondition: failed nudge should leave marker"
 
   rm -f "$w/home/state/sm-instr.inbox"   # unblock: the steer record can be written again
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "BOOTSTRAP_INFO: nudged fm-sm-instr with" \
     "retry should send the pending nudge once the endpoint works"
   assert_absent "$marker" "successful retry should clear the marker"
 
-  out2=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out2=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   [ -z "$out2" ] || fail "idempotent retry should converge to silence, got: $out2"
   pass "T8d bootstrap nudge retry is idempotent after success"
@@ -579,13 +580,13 @@ test_bootstrap_nudge_retry_is_idempotent() {
 test_bootstrap_nudge_retry_refuses_changed_home() {
   local w c1 fakebin marker out other
   w=$(new_world nudge-retry-home-change)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"
   bump_primary "$w" instr
   fakebin=$(make_fake_toolchain "$w")
   : > "$w/home/state/sm-instr.inbox"   # block the steer record: a real local failure
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
@@ -594,13 +595,13 @@ test_bootstrap_nudge_retry_refuses_changed_home() {
   assert_present "$marker" "precondition: failed nudge should leave marker"
 
   other="$w/sm-other"
-  git -C "$w/main" worktree add -q --detach "$other" "$(head_of "$w/sm-instr")"
+  git -C "$w/home/main" worktree add -q --detach "$other" "$(head_of "$w/sm-instr")"
   printf '%s\n' sm-instr > "$other/.fm-secondmate-home"
   sed -i.bak "s|^home=.*|home=$other|" "$w/home/state/sm-instr.meta" 2>/dev/null || \
     sed -i "s|^home=.*|home=$other|" "$w/home/state/sm-instr.meta"
   rm -f "$w/home/state/sm-instr.meta.bak"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed: retry target home changed" \
     "retry must not infer a nudge target outside the recorded failed home"
@@ -675,7 +676,7 @@ test_nudge_retry_uses_fresh_herdr_endpoint_after_respawn() {
   stale=default:w9:pY
   fresh=default:wA:p2
   w=$(new_world nudge-herdr-rotate)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-instr "$c1"
   bump_primary "$w" instr
 
@@ -701,7 +702,7 @@ rm -f "\$meta.bak"
 exit 0
 SH
   chmod +x "$spawn_stub"
-  cp "$spawn_stub" "$w/main/bin/fm-spawn.sh"
+  cp "$spawn_stub" "$w/home/main/bin/fm-spawn.sh"
 
   herdrfb=$(make_nudge_herdr_fake "$w/herdr" "$stale" "$fresh")
   toolchain=$(make_fake_toolchain "$w")
@@ -711,7 +712,7 @@ SH
   fi
   out=$(PATH="$herdrfb:$toolchain:$BASE_PATH" HERDR_ENV=1 FM_BACKEND=herdr \
     FM_SEND_SETTLE=0 FM_HERDR_PS_BIN="$herdrfb/herdr-ps" \
-    FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
   # The nudge now rides the durable inbox: a stale endpoint can only swallow
@@ -750,22 +751,22 @@ SH
 test_bootstrap_sweep_surfaces_skipped_home() {
   local w c1 base before fakebin out skip_line
   w=$(new_world boot-skip)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_sm_worktree "$w" sm-dirty "$c1"
   bump_primary "$w" instr
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
   printf 'uncommitted local edit\n' >> "$w/sm-dirty/AGENTS.md"
   before=$(head_of "$w/sm-dirty")
 
   fakebin=$(make_fake_toolchain "$w")
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/home/main" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
 
   skip_line=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate sm-dirty: skipped:' || true)
   [ -n "$skip_line" ] || fail "no SECONDMATE_SYNC skip line emitted (got: $out)"
   assert_contains "$skip_line" "dirty working tree" "dirty skipped home reports the actionable reason"
   [ "$(head_of "$w/sm-dirty")" = "$before" ] || fail "dirty home HEAD moved"
-  [ "$(head_of "$w/main")" = "$base" ] || fail "primary HEAD changed during bootstrap"
+  [ "$(head_of "$w/home/main")" = "$base" ] || fail "primary HEAD changed during bootstrap"
   grep -q 'uncommitted local edit' "$w/sm-dirty/AGENTS.md" || fail "dirty edit was discarded"
   pass "T9 bootstrap surfaces a skipped dirty live secondmate home"
 }
@@ -774,13 +775,13 @@ test_bootstrap_sweep_surfaces_skipped_home() {
 test_spawn_fast_forwards_before_launch() {
   local w c1 c2 fakebin
   w=$(new_world spawn-ff)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   printf 'sm\n' > "$w/sm/.fm-secondmate-home"
   mkdir -p "$w/sm/data"
   printf 'charter\n' > "$w/sm/data/charter.md"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
+  c2=$(head_of "$w/home/main")
   [ "$(head_of "$w/sm")" = "$c1" ] || fail "precondition: home should start behind the primary"
 
   # tmux stub: accept every subcommand, print nothing (so no window pre-exists).
@@ -793,7 +794,7 @@ SH
   chmod +x "$fakebin/tmux"
 
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_ROOT_OVERRIDE="$w/home/main" FM_HOME="$w/home" \
     FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
     FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
     FM_SPAWN_NO_GUARD=1 \
@@ -805,7 +806,7 @@ SH
   # suppresses a second sync/inheritance pass. Record that existing behavior.
   bump_primary "$w" instr
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_ROOT_OVERRIDE="$w/home/main" FM_HOME="$w/home" \
     FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
     FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
     FM_GUARD_EVENT_LOG="$w/skip-events.jsonl" FM_SKIP_SECONDMATE_SYNC=1 \
@@ -822,8 +823,8 @@ SH
 test_spawn_warns_when_sync_skipped_before_launch() {
   local w c1 before fakebin err
   w=$(new_world spawn-skip)
-  c1=$(head_of "$w/main")
-  git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
+  c1=$(head_of "$w/home/main")
+  git -C "$w/home/main" worktree add -q --detach "$w/sm" "$c1"
   printf 'sm\n' > "$w/sm/.fm-secondmate-home"
   mkdir -p "$w/sm/data"
   printf 'charter\n' > "$w/sm/data/charter.md"
@@ -841,7 +842,7 @@ SH
   chmod +x "$fakebin/tmux"
 
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_ROOT_OVERRIDE="$w/home/main" FM_HOME="$w/home" \
     FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
     FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
     FM_SPAWN_NO_GUARD=1 \
@@ -864,7 +865,7 @@ test_seed_marker_clean_when_gitignored() {
   local w base
   w=$(new_world marker-clean)
   ignore_marker_commit "$w"                 # primary now ignores the marker
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
   seed_marked_home "$w" sm "$base"          # fresh home at the post-fix HEAD
 
   # The exact dirtiness signal bin/fm-fleet-sync.sh reads (its line: dirty=yes when
@@ -887,12 +888,12 @@ test_seed_marker_clean_when_gitignored() {
 test_seed_marker_converges_existing_home() {
   local w c0 base
   w=$(new_world marker-converge)            # primary does NOT ignore the marker yet
-  c0=$(head_of "$w/main")
+  c0=$(head_of "$w/home/main")
   seed_marked_home "$w" sm "$c0"            # existing home predates the fix
   [ -n "$(git -C "$w/sm" status --porcelain)" ] \
     || fail "precondition: the untracked marker should dirty a pre-fix home"
   ignore_marker_commit "$w"                 # THE FIX lands as a later commit
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"                     # the marker-tolerant convergence sweep
 
@@ -910,12 +911,12 @@ test_seed_marker_converges_existing_home() {
 test_seed_marker_does_not_mask_real_dirt() {
   local w c0 base before
   w=$(new_world marker-real-dirt)
-  c0=$(head_of "$w/main")
+  c0=$(head_of "$w/home/main")
   seed_marked_home "$w" sm "$c0"
   printf 'real local change\n' >> "$w/sm/AGENTS.md"   # genuine tracked-file edit + the marker
   before=$(head_of "$w/sm")
   ignore_marker_commit "$w"
-  base=$(primary_head_commit "$w/main")
+  base=$(primary_head_commit "$w/home/main")
 
   run_ff "$w/sm" "$base"
 
@@ -941,18 +942,18 @@ test_seed_marker_does_not_mask_real_dirt() {
 new_remote_world() {
   local name=$1 w
   w="$TMP_ROOT/$name"
-  mkdir -p "$w/home/state" "$w/home/data"
-  git init -q -b main "$w/main"
-  printf 'projects/\nstate/\ndata/\nconfig/\n.no-mistakes/\n.fm-secondmate-home\n' > "$w/main/.gitignore"
-  printf 'v1\n' > "$w/main/AGENTS.md"
-  mkdir -p "$w/main/bin" "$w/main/.agents/skills"
-  printf 'echo a\n' > "$w/main/bin/tool.sh"
-  printf 's1\n' > "$w/main/.agents/skills/note.md"
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm c1
+  fm_test_lab_home "$w/home" || fail "could not mark the fixture home"
+  git init -q -b main "$w/home/main"
+  printf 'projects/\nstate/\ndata/\nconfig/\n.no-mistakes/\n.fm-secondmate-home\n' > "$w/home/main/.gitignore"
+  printf 'v1\n' > "$w/home/main/AGENTS.md"
+  mkdir -p "$w/home/main/bin" "$w/home/main/.agents/skills"
+  printf 'echo a\n' > "$w/home/main/bin/tool.sh"
+  printf 's1\n' > "$w/home/main/.agents/skills/note.md"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm c1
   git init -q --bare "$w/forge.git"
-  git -C "$w/main" remote add origin "$w/forge.git"
-  git -C "$w/main" push -q -u origin main
+  git -C "$w/home/main" remote add origin "$w/forge.git"
+  git -C "$w/home/main" push -q -u origin main
   git --git-dir="$w/forge.git" symbolic-ref HEAD refs/heads/main
   git clone -q "$w/forge.git" "$w/coderoot"
   printf '%s\n' "$w"
@@ -1027,12 +1028,12 @@ remote_sync() {
 test_remote_sync_targets_primary_not_host_copy() {
   local w c1 c2 c3 coderoot_before
   w=$(new_remote_world remote-target)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
+  c2=$(head_of "$w/home/main")
   bump_primary "$w" instr
-  c3=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c3=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
   add_remote_home "$w" sm "$w/forge.git" "$c2"
   [ "$(head_of "$w/coderoot")" = "$c1" ] || fail "precondition: the host copy should still be behind"
   coderoot_before=$(head_of "$w/coderoot")
@@ -1056,27 +1057,27 @@ test_remote_sync_targets_primary_not_host_copy() {
 test_remote_sync_reports_the_changed_instruction_surface() {
   local w c_instr c_bin c_readme
   w=$(new_remote_world remote-instr)
-  add_remote_home "$w" sm "$w/coderoot" "$(head_of "$w/main")"
+  add_remote_home "$w" sm "$w/coderoot" "$(head_of "$w/home/main")"
 
   bump_primary "$w" instr
-  c_instr=$(head_of "$w/main")
-  git -C "$w/coderoot" fetch -q --no-tags "$w/main" "$c_instr"
+  c_instr=$(head_of "$w/home/main")
+  git -C "$w/coderoot" fetch -q --no-tags "$w/home/main" "$c_instr"
   remote_sync "$w" sm "$c_instr"
   [ "$REMOTE_SYNC_RC" -eq 0 ] || fail "the instruction advance did not sync: $REMOTE_SYNC_OUT"
   assert_contains "$REMOTE_SYNC_OUT" "instr=AGENTS.md,bin,.agents/skills" \
     "the sync result did not name the changed instruction paths"
 
   bump_primary "$w" bin
-  c_bin=$(head_of "$w/main")
-  git -C "$w/coderoot" fetch -q --no-tags "$w/main" "$c_bin"
+  c_bin=$(head_of "$w/home/main")
+  git -C "$w/coderoot" fetch -q --no-tags "$w/home/main" "$c_bin"
   remote_sync "$w" sm "$c_bin"
   [ "$REMOTE_SYNC_RC" -eq 0 ] || fail "the bin-only advance did not sync: $REMOTE_SYNC_OUT"
   assert_contains "$REMOTE_SYNC_OUT" "instr=bin" "a bin-only advance must be reported as bin only"
   assert_not_contains "$REMOTE_SYNC_OUT" "AGENTS.md" "a bin-only advance must not claim AGENTS.md changed"
 
   bump_primary "$w" readme
-  c_readme=$(head_of "$w/main")
-  git -C "$w/coderoot" fetch -q --no-tags "$w/main" "$c_readme"
+  c_readme=$(head_of "$w/home/main")
+  git -C "$w/coderoot" fetch -q --no-tags "$w/home/main" "$c_readme"
   remote_sync "$w" sm "$c_readme"
   [ "$REMOTE_SYNC_RC" -eq 0 ] || fail "the README-only advance did not sync: $REMOTE_SYNC_OUT"
   assert_contains "$REMOTE_SYNC_OUT" "instr=" "an advance with no instruction change must still report the field"
@@ -1087,12 +1088,12 @@ test_remote_sync_reports_the_changed_instruction_surface() {
 test_remote_sync_imports_from_host_copy() {
   local w c1 c2 coderoot_before
   w=$(new_remote_world remote-import-host)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/coderoot" "$c1"
   # The primary's new commit never reaches the forge, so only the host's copy has it.
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/coderoot" fetch -q --no-tags "$w/main" "$c2"
+  c2=$(head_of "$w/home/main")
+  git -C "$w/coderoot" fetch -q --no-tags "$w/home/main" "$c2"
   coderoot_before=$(head_of "$w/coderoot")
   # Strip the home's origin so the host's own copy is the only possible source.
   git -C "$w/sm" remote remove origin
@@ -1112,11 +1113,11 @@ test_remote_sync_imports_from_host_copy() {
 test_remote_sync_imports_from_origin() {
   local w c1 c2
   w=$(new_remote_world remote-import-origin)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/forge.git" "$c1"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c2=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
   git -C "$w/sm" cat-file -e "$c2^{commit}" 2>/dev/null \
     && fail "precondition: the home should not already hold the target"
   git -C "$w/coderoot" cat-file -e "$c2^{commit}" 2>/dev/null \
@@ -1133,11 +1134,11 @@ test_remote_sync_imports_from_origin() {
 test_remote_sync_uses_present_objects() {
   local w c1 c2
   w=$(new_remote_world remote-present)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/coderoot" "$c1"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/sm" fetch -q --no-tags "$w/main" "$c2"
+  c2=$(head_of "$w/home/main")
+  git -C "$w/sm" fetch -q --no-tags "$w/home/main" "$c2"
   # Strand the home: no origin and a host copy that never saw the commit, so an
   # advance can only come from what the home already holds.
   git -C "$w/sm" remote remove origin
@@ -1155,10 +1156,10 @@ test_remote_sync_uses_present_objects() {
 test_remote_sync_skips_unimportable_target() {
   local w c1 c2 before
   w=$(new_remote_world remote-unimportable)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/coderoot" "$c1"
   bump_primary "$w" instr          # never pushed, never given to the host copy
-  c2=$(head_of "$w/main")
+  c2=$(head_of "$w/home/main")
   before=$(head_of "$w/sm")
 
   remote_sync "$w" sm "$c2"
@@ -1176,10 +1177,10 @@ test_remote_sync_skips_unimportable_target() {
 test_remote_sync_skips_dirty_diverged_and_feature_branch() {
   local w c1 c2 before
   w=$(new_remote_world remote-skips)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c2=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
 
   # dirty: a real uncommitted edit refuses and survives
   add_remote_home "$w" dirty "$w/forge.git" "$c1"
@@ -1221,11 +1222,11 @@ test_remote_sync_skips_dirty_diverged_and_feature_branch() {
 test_remote_sync_without_target_follows_host_copy() {
   local w c1 c2
   w=$(new_remote_world remote-updatefirstmate)
-  c1=$(head_of "$w/main")
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/coderoot" "$c1"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c2=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
   git -C "$w/coderoot" pull -q --ff-only        # what /updatefirstmate does first
   [ "$(head_of "$w/coderoot")" = "$c2" ] || fail "precondition: the host copy should be refreshed"
 
@@ -1246,15 +1247,15 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   w=$(new_remote_world remote-bootstrap)
   # fm-on.sh only routes commands this primary checkout genuinely tracks, so the
   # fixture primary carries the real tooling the parent legs invoke.
-  cp "$ROOT"/bin/fm-remote-*.sh "$w/main/bin/"
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm "primary tooling"
-  git -C "$w/main" push -q origin main
-  c1=$(head_of "$w/main")
+  cp "$ROOT"/bin/fm-remote-*.sh "$w/home/main/bin/"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm "primary tooling"
+  git -C "$w/home/main" push -q origin main
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/forge.git" "$c1"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c2=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
   coderoot_before=$(head_of "$w/coderoot")
   home="$w/home"
   mkdir -p "$home/config" "$home/projects"
@@ -1271,7 +1272,7 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   fakebin=$(make_remote_leg_ssh_stub "$w")
   fm_fake_exit0 "$fakebin" gh treehouse tmux node
   out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_BOOTSTRAP_NETWORK=only \
     FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
     FM_TEST_REPO_ROOT="$ROOT" \
@@ -1293,11 +1294,11 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
 test_bootstrap_reports_outdated_host_actionably() {
   local w c1 home fakebin out
   w=$(new_remote_world remote-outdated)
-  cp "$ROOT"/bin/fm-remote-*.sh "$w/main/bin/"
-  git -C "$w/main" add -A
-  git -C "$w/main" commit -qm "primary tooling"
-  git -C "$w/main" push -q origin main
-  c1=$(head_of "$w/main")
+  cp "$ROOT"/bin/fm-remote-*.sh "$w/home/main/bin/"
+  git -C "$w/home/main" add -A
+  git -C "$w/home/main" commit -qm "primary tooling"
+  git -C "$w/home/main" push -q origin main
+  c1=$(head_of "$w/home/main")
   add_remote_home "$w" sm "$w/forge.git" "$c1"
   home="$w/home"
   mkdir -p "$home/config" "$home/projects"
@@ -1309,7 +1310,7 @@ test_bootstrap_reports_outdated_host_actionably() {
   fakebin=$(make_remote_leg_ssh_stub "$w")
   fm_fake_exit0 "$fakebin" gh treehouse tmux node
   out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/home/main" \
     FM_BOOTSTRAP_NETWORK=only \
     FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
     FM_TEST_REPO_ROOT="$ROOT" FM_TEST_REMOTE_LEG_REJECT_SYNC=1 \
@@ -1332,11 +1333,11 @@ test_bootstrap_reports_outdated_host_actionably() {
 test_remote_launch_does_not_retarget_host_copy() {
   local w c1 c2 herdrbin fakebin launch_out control_out
   w=$(new_remote_world remote-launch)
-  c1=$(head_of "$w/main")           # the parent primary stays here
-  git -C "$w/coderoot" fetch -q --no-tags "$w/main" "$c1"
+  c1=$(head_of "$w/home/main")           # the parent primary stays here
+  git -C "$w/coderoot" fetch -q --no-tags "$w/home/main" "$c1"
   bump_primary "$w" instr
-  c2=$(head_of "$w/main")
-  git -C "$w/main" push -q origin main
+  c2=$(head_of "$w/home/main")
+  git -C "$w/home/main" push -q origin main
   git -C "$w/coderoot" pull -q --ff-only   # the host's copy is now AHEAD of the parent
   [ "$(head_of "$w/coderoot")" = "$c2" ] || fail "precondition: the host copy should be ahead"
   add_remote_home "$w" launched "$w/forge.git" "$c1"
