@@ -2529,7 +2529,7 @@ test_hook_claude_mode_stale_rewake_epoch_blocks() {
 }
 
 test_hook_claude_mode_all_absent_recovery_paths_obey_budget() {
-  local dir out status i expected scenario count lock fakebin
+  local dir out status i expected scenario count lock fakebin events
   for scenario in absent clean stale-rewake failed-notice away alarmed owner-lock budget-lock budget-write budget-rename alarm-write; do
     dir=$(make_primary_dir "$TMP_ROOT/hook-claude-budget-$scenario")
     : > "$dir/state/task1.meta"
@@ -2561,9 +2561,15 @@ SH
       out=$(PATH="$fakebin:$PATH" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
       case "$scenario" in
         budget-lock|budget-write|budget-rename)
-          expect_code 2 "$status" "$scenario stop $i must refuse a blind stop when the budget cannot be charged"
-          assert_contains "$out" 'TURN WOULD END BLIND' "$scenario stop $i omitted the repair banner"
-          assert_not_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "$scenario stop $i allowed without a charged budget"
+          expect_code 0 "$status" "$scenario stop $i must not block without a writable budget"
+          assert_not_contains "$out" 'TURN WOULD END BLIND' "$scenario stop $i blocked without a writable budget"
+          assert_contains "$out" 'block budget cannot be locked or written' "$scenario stop $i omitted the unwritable-budget warning"
+          [ "$(grep -o 'bin/fm-claude-stop-autoarm.sh' <<<"$out" | wc -l | tr -d ' ')" = 1 ] \
+            || fail "$scenario stop $i must print the repair command exactly once: $out"
+          events="$dir/state/guard-events.jsonl"
+          [ "$(jq -c 'select(.guard == "turnend-supervision-block" and .decision == "warn" and .cleared_by == "budget-unavailable")' "$events" | wc -l | tr -d ' ')" = "$i" ] \
+            || fail "$scenario stop $i did not record one reasoned warn event per stop: $(cat "$events" 2>/dev/null)"
+          [ -z "$(jq -c 'select(.decision == "deny")' "$events")" ] || fail "$scenario stop $i recorded a deny"
           continue ;;
       esac
       expected=2
@@ -2582,7 +2588,7 @@ SH
         [ "$count" -eq 4 ] || fail "$scenario must saturate the exhausted count at 4, got $count" ;;
     esac
   done
-  pass "fm-turnend-guard --claude: absent recovery never exceeds three charged blocks, and an uncharged budget keeps refusing"
+  pass "fm-turnend-guard --claude: absent recovery never exceeds three charged blocks, and an unwritable budget allows with one repair warning and a warn event"
 }
 
 test_hook_claude_mode_verified_failure_stays_loud_after_budget() {

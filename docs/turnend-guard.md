@@ -326,7 +326,7 @@ Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and 
 
 - Every Claude exit-2 decision must charge the same persisted budget, capped at three blocks per session failure episode by default.
 - The fourth unsupervised Stop allows with an attended failure diagnostic, even without an auto-arm failure notice, in away mode, or after the episode alarm was already recorded.
-- If the budget cannot be locked or written, the guard keeps refusing the unsupervised Stop with the repair banner and never allows it; only Claude Code's own consecutive-continuation cap then bounds the blocks (see the Stop input section of the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks)).
+- If the budget cannot be locked or written, no bound on another block can be proved, so the guard never blocks that Stop: it allows it, prints the repair command once as a warning, and records a `warn` guard event with `cleared_by` `budget-unavailable`.
 - A proven live supervisor always allows; failed episode-reset bookkeeping remains for a later retry and never changes that verdict.
 
 Budget exhaustion never reports supervision as restored.

@@ -923,7 +923,7 @@ test_pi_harness_uses_shared_strict_liveness() {
 
 test_warning_and_turnend_share_liveness() {
   local dir home root model scenario pid out status expected identity
-  sleep 60 &
+  sleep 600 &
   pid=$!
   for model in persistent autoarm extension; do
     for scenario in healthy handoff missing-lock stale-beacon wrong-identity away-daemon; do

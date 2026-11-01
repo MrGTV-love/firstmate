@@ -87,9 +87,9 @@
 #      (default 3) consecutive blocks per session - safely below Claude Code's
 #      hard 8-consecutive-block override - then allow one loud attended
 #      fail-open. A missing failure notice or failed bookkeeping cannot extend
-#      that budget; a budget that cannot be locked or written keeps refusing,
-#      bounded by Claude Code's cap. Positive supervision allows even if
-#      episode reset fails.
+#      that budget; a budget that cannot be locked or written proves no bound,
+#      so that stop allows with one repair warning and a warn guard event.
+#      Positive supervision allows even if episode reset fails.
 #      The budget
 #      charges each event epoch once, and it also charges every re-block
 #      against an epoch the auto-arm never advanced past the previous
@@ -278,14 +278,19 @@ if [ "$FM_SUP_LIVE" = live ]; then
   allow_supervised_stop
 fi
 
-block_stop() {
-  local afk x_mode reason rule repeat source_ok
+repair_line() {
+  local afk x_mode
   afk=0
   [ -e "$STATE/.afk" ] && afk=1
   x_mode=0
   [ -f "$CONFIG/x-mode.env" ] && x_mode=1
-  reason=$("$SCRIPT_DIR/fm-supervision-instructions.sh" --afk "$afk" --x-mode "$x_mode" --repair-line 2>/dev/null \
-    || printf '%s\n' 'tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn')
+  "$SCRIPT_DIR/fm-supervision-instructions.sh" --afk "$afk" --x-mode "$x_mode" --repair-line 2>/dev/null \
+    || printf '%s\n' 'tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn'
+}
+
+block_stop() {
+  local reason rule repeat source_ok
+  reason=$(repair_line)
   rule='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
   {
     printf '●%s\n' "$rule"
@@ -570,10 +575,16 @@ if autoarm_owns_recovery; then
 fi
 
 # No automatic recovery was proved: every re-block consumes the same budget.
-# A budget that cannot be locked or written still refuses the blind stop; only
-# Claude Code's own consecutive-continuation cap then bounds the re-blocks
-# (https://code.claude.com/docs/en/hooks, Stop input).
-budget_account_current_epoch block || block_stop
+# A budget that cannot be locked or written cannot prove a bound on another
+# block, and an unbounded repair/Stop loop is the worse harm, so that stop
+# allows with the repair command once as a warning and a reasoned warn event.
+allow_unbudgeted_stop() {
+  jq -cn --arg repair "$(repair_line)" \
+    '{systemMessage: ("FIRSTMATE SUPERVISION IS OFF and the turn-end block budget cannot be locked or written, so this stop is allowed instead of blocked. Repair: " + $repair)}'
+  guard_event warn --source-ok "${FM_SUP_SOURCE_OK:-true}" --cleared-by budget-unavailable
+  exit 0
+}
+budget_account_current_epoch block || allow_unbudgeted_stop
 [ "$COUNT" -gt "$BLOCK_BUDGET" ] || block_stop
 terminal_fail_open
 terminal_status=$?
