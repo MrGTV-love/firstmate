@@ -972,13 +972,14 @@
       "id": "jev-egress-grant",
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
-        {"file": "bin/fm-jev-guard.ts", "match": "branch: \"egress\""}
+        {"file": "bin/fm-jev-guard.ts", "match": "branch: \"egress\""},
+        {"file": "bin/fm-spawn.sh", "match": "egress policy returned no", "count": 2}
       ],
       "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class",
       "layer": "runtime-block",
       "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta; a skill-bearing learn retains its independently recorded T5 write owner even when its memory effect is refused",
       "trigger": "egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked",
-      "remedy": "Firstmate records explicit Egress needs in the brief before stopped-task dispatch; fm-spawn atomically publishes the canonical egress= line before launch and omits native find without semantic-search authorization; relaunch and promotion preserve existing authorization, never enlarge a live grant; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove",
+      "remedy": "Firstmate records an explicit `Egress needs: [\"<class>\"]` line in the brief before stopped-task dispatch; fm-spawn atomically publishes the canonical egress= line before launch and omits native find without semantic-search authorization; relaunch and promotion preserve existing authorization, never enlarge a live grant; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove",
       "budget": 1,
       "test": "tests/fm-jev-guard-audit.test.sh",
       "tier": "C",
@@ -1034,7 +1035,7 @@
       "layer": "impossible-by-construction",
       "source": "omp's fetch.enabled setting, set false in .omp/fm-worker-overlay.yml, which bin/fm-spawn.sh passes to every omp ship and scout launch",
       "trigger": "an omp worker calls read, grep or ast-grep with an http or https URL path",
-      "remedy": "use a web-classed tool under a task grant instead: Firstmate records egress=[\"web\"] in state/<task>.meta and the worker calls web_search; omp's own error reads URL reads are disabled by settings.",
+      "remedy": "use a web-classed tool under a task grant instead: Firstmate records `Egress needs: [\"web\"]` in the brief before a stopped-task dispatch, fm-spawn publishes the grant, and the worker calls web_search; omp's own error reads URL reads are disabled by settings.",
       "budget": 1,
       "test": "tests/fm-jev-guard-omp-live-e2e.test.sh",
       "tier": "C",

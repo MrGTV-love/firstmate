@@ -27,8 +27,11 @@ await test('dispatch grants are explicit unfenced needs, never inferred consent'
   assert.deepEqual(egress.briefEgress(brief), []);
   write('```\nEgress needs: ["provider"]\n```\nEgress needs: ["web","semantic-search","web"]');
   assert.deepEqual(egress.briefEgress(brief), ['semantic-search', 'web']);
+  write('```\n  Egress needs: ["provider"]\n```\nEgress needs: ["web"]');
+  assert.deepEqual(egress.briefEgress(brief), ['web'], 'an indented fenced example is not a directive');
   for (const body of ['Egress needs: invalid', 'Egress needs: null', 'Egress needs: [1]', 'Egress needs: ["unknown"]',
-    'Egress needs: []\nEgress needs: ["web"]', 'Egress needs: []\0']) {
+    'Egress needs: []\nEgress needs: ["web"]', 'Egress needs: []\0', ' Egress needs: ["semantic-search"]',
+    '   Egress needs: []', '\tEgress needs: ["web"]', 'Build it.\n  Egress needs: ["semantic-search"]\nEgress needs: []']) {
     write(body);
     assert.throws(() => egress.briefEgress(brief), undefined, body);
   }
@@ -64,6 +67,17 @@ await test('recorded launch authorization fails closed without changing or repla
   writeFileSync(`${meta}.target`, 'egress=["semantic-search"]\n');
   symlinkSync(`${meta}.target`, meta);
   assert.deepEqual(record(), [], 'symlinked authorization never exposes find');
+});
+await test('the launch interface answers when node reaches it through a symlinked root', () => {
+  const linked = `${state}/linked-bin`;
+  symlinkSync(`${process.env.AUDIT_ROOT}/bin`, linked);
+  const run = (...args) => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', `${linked}/fm-jev-egress.ts`, ...args], { encoding: 'utf8' });
+  assert.equal(run('find', '["semantic-search"]', 'firstmate', '0', 'ship'), 'on\n');
+  assert.equal(run('find', '[]', 'firstmate', '0', 'ship'), 'off\n');
+  writeFileSync(`${state}/linked.meta`, 'egress=["web"]\n');
+  assert.deepEqual(JSON.parse(run('record', state, 'linked')), ['web']);
+  writeFileSync(`${state}/linked-brief.md`, '# Task\n## Firstmate spec\nBuild it.\nEgress needs: ["semantic-search"]\n');
+  assert.deepEqual(JSON.parse(run('brief', `${state}/linked-brief.md`)), ['semantic-search']);
 });
 await test('audit history merges legacy and task rows without reading unrelated state', () => {
   const dir = `${state}/reader`;
@@ -566,7 +580,7 @@ pass 'offline guard settlement, cost completeness and S2 egress acceptance'
 # installed omp below consumes these actual generated overlays, not a copied policy.
 export AUDIT_DISPATCH_CASES="$TMP_ROOT/dispatch-cases"
 : > "$AUDIT_DISPATCH_CASES"
-for posture in directive-only absent granted other-class no-helpers other-project invalid; do
+for posture in directive-only absent granted other-class no-helpers other-project invalid indented silent-runtime silent-find; do
   world="$TMP_ROOT/dispatch-$posture"
   home="$world/home"
   project="$world/firstmate"
@@ -580,12 +594,16 @@ for posture in directive-only absent granted other-class no-helpers other-projec
   grant='[]'
   expected=off
   case "$posture" in
-    granted) grant='["semantic-search"]'; expected=on ;;
+    granted|silent-find) grant='["semantic-search"]'; expected=on ;;
     no-helpers|other-project) grant='["semantic-search"]' ;;
     other-class) grant='["web","provider"]' ;;
     invalid) grant='["semantic-search","unknown"]' ;;
   esac
-  [ "$posture" = absent ] || printf '\nEgress needs: %s\n' "$grant" >> "$home/data/$id/brief.md"
+  if [ "$posture" = indented ]; then
+    printf '\n  Egress needs: ["semantic-search"]\n' >> "$home/data/$id/brief.md"
+  elif [ "$posture" != absent ]; then
+    printf '\nEgress needs: %s\n' "$grant" >> "$home/data/$id/brief.md"
+  fi
   if [ "$posture" = directive-only ]; then
     cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
@@ -609,13 +627,31 @@ esac
 exec "${0%/*}/tmux-base" "$@"
 SH
   chmod +x "$fakebin/tmux"
+  case "$posture" in
+    silent-runtime|silent-find)
+      real_bun=$(command -v bun) || { printf 'skip - %s needs bun for the rest of spawn\n' "$posture"; continue; }
+      silent=$([ "$posture" = silent-find ] && echo find || echo '*')
+      cat > "$fakebin/bun" <<SH
+#!/usr/bin/env bash
+case "\$1|\$2" in
+  */fm-jev-egress.ts\|$silent) exit 0 ;;
+esac
+exec "$real_bun" "\$@"
+SH
+      chmod +x "$fakebin/bun" ;;
+  esac
   extra=()
   [ "$posture" != no-helpers ] || extra=(--omp-no-helpers)
   out=$(FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
   status=$?
-  if [ "$posture" = invalid ] || [ "$posture" = directive-only ]; then
+  if [ "$posture" = invalid ] || [ "$posture" = directive-only ] || [ "$posture" = indented ] || [ "$posture" = silent-runtime ] || [ "$posture" = silent-find ]; then
     [ "$status" -ne 0 ] || fail "$posture dispatch input was accepted: $out"
+    case "$posture" in
+      indented) assert_contains "$out" 'invalid or unreadable task egress input' 'indented directive refusal' ;;
+      silent-runtime) assert_contains "$out" 'egress policy returned no grant' 'silent grant refusal' ;;
+      silent-find) assert_contains "$out" 'egress policy returned no find capability' 'silent find refusal' ;;
+    esac
     [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid dispatch input provisioned a worker'
     continue
   fi

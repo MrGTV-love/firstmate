@@ -1,6 +1,6 @@
 // Deterministic worker tool coverage and outbound-call policy. No model or network
 // requests occur here. docs/configuration.md "Jev guard" owns the grant contract.
-import { lstatSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -133,7 +133,9 @@ export function briefEgress(brief: string): DestinationClass[] {
   if (content.includes("\0")) throw new Error("Egress brief must not contain NUL bytes");
   const headingOwner = resolve(dirname(fileURLToPath(import.meta.url)), "fm-brief-heading-lib.sh");
   const body = execFileSync("bash", ["-c", '. "$1"; task=$(fm_brief_heading_body "$2" "# Task") || exit; fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"$task"', "_", headingOwner, brief], { encoding: "utf8" });
-  const entries = body.split("\n").filter(line => line.startsWith("Egress needs:"));
+  const lines = body.split("\n");
+  if (lines.some(line => /^\s+Egress needs:/.test(line))) throw new Error("Egress needs must start its line");
+  const entries = lines.filter(line => line.startsWith("Egress needs:"));
   if (entries.length === 0) return [];
   if (entries.length !== 1) throw new Error("Egress needs must appear at most once in Firstmate spec");
   const requested = decodeGrant(JSON.parse(entries[0].slice("Egress needs:".length)));
@@ -212,7 +214,12 @@ export function memoryEgress(tool: string, setting: ((id: string) => unknown) | 
 
 // Launch interface: <runtime> bin/fm-jev-egress.ts brief <brief> | record <state> <task>
 // | find <grant-json> <project> <no-helpers:0|1> <kind>. Never prints input on failure.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+function invokedAsCli(): boolean {
+  try {
+    return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch { return false; }
+}
+if (invokedAsCli()) {
   try {
     const [command, ...args] = process.argv.slice(2);
     if (command === "brief" && args.length === 1) console.log(JSON.stringify(briefEgress(args[0])));
@@ -220,7 +227,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (command === "find" && args.length === 4) console.log(nativeFindEnabled(decodeGrant(JSON.parse(args[0])), args[1], args[2] !== "0", args[3]) ? "on" : "off");
     else throw new Error("Invalid egress command");
   } catch {
-    console.error("error: invalid or unreadable task egress input; use one Egress needs: JSON array of recognized destination classes in Firstmate spec");
+    console.error("error: invalid or unreadable task egress input; use one unindented Egress needs: JSON array of recognized destination classes in Firstmate spec");
     process.exitCode = 2;
   }
 }

@@ -1300,6 +1300,9 @@ EOF
   instructions=$(fm_brief_spec_instructions "$brief")
   assert_contains "$instructions" 'Egress needs: ["semantic-search"]' 'a fenced metadata example was removed from build instructions'
   assert_not_contains "$instructions" 'Egress needs: []' 'unfenced authorization metadata remained build instructions'
+  printf '  Egress needs: ["web"]\n' >> "$brief"
+  instructions=$(fm_brief_spec_instructions "$brief")
+  assert_contains "$instructions" '  Egress needs: ["web"]' 'an indented directive was hidden as metadata the grant reader refuses'
   pass "spec content survives the exclusion list"
 }
 

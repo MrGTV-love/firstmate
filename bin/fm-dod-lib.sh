@@ -958,7 +958,7 @@ fm_brief_spec_instructions() {  # <file>
           fenced = 0
         }
       }
-      if (!was_fenced && !fenced && scan ~ /^Egress needs:/) next
+      if (!was_fenced && !fenced && $0 ~ /^Egress needs:/) next
       if (!was_fenced && !fenced && scan ~ /^#+([[:space:]]|$)/) {
         if ($0 == "### Out of scope") { skip = 1; next }
         if (match(scan, /^#+/) && RLENGTH <= 3) skip = 0
