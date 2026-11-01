@@ -1735,7 +1735,7 @@ remote_secondmate_teardown() {
   if [ "$FORCE" != --force ]; then
     secondmate_unresolved_pending_replies_refuse || return 1
   fi
-  "$SCRIPT_DIR/fm-procevent-remote-reply.sh" retire-quiesce-locked "$ID" "$FORCE" >/dev/null 2>&1 || {
+  "$SCRIPT_DIR/fm-procevent-remote-reply.sh" retire-quiesce-locked "$ID" "$FORCE" >/dev/null || {
     echo "REFUSED: remote secondmate $ID still has an unhandled captured reply" >&2
     return 1
   }
@@ -1761,7 +1761,7 @@ remote_secondmate_teardown() {
     echo "error: remote home retired but local recovery paths changed; preserving the local route for retry" >&2
     return 1
   }
-  "$SCRIPT_DIR/fm-procevent-remote-reply.sh" retire-finalize-locked "$ID" "$FORCE" >/dev/null 2>&1 || {
+  "$SCRIPT_DIR/fm-procevent-remote-reply.sh" retire-finalize-locked "$ID" "$FORCE" >/dev/null || {
     echo "error: remote home retired but reply-source cleanup is incomplete; preserving the local route for retry" >&2
     return 1
   }
@@ -3626,7 +3626,7 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
   done
   [ -z "$PROJ" ] || task_lane_source_add "$PROJ"
   fm_local_firstmate_state_dirs "$STATE" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed. Remedy: have that home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records, then retry bin/fm-teardown.sh '$ID'; do not delete registrations or skip the unreadable home." >&2
     return 1
   }
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
@@ -3886,7 +3886,7 @@ teardown_docker_stacks() {
   WT=$(meta_value "$META" worktree)
   PROJ=$(meta_value "$META" project)
   fm_local_firstmate_state_dirs "$STATE" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed. Remedy: have that home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records, then retry bin/fm-teardown.sh '$ID'; do not delete registrations or skip the unreadable home." >&2
     return 1
   }
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
@@ -4081,7 +4081,7 @@ require_cleanup_copy_clearance() {
        && [ "$skipped" = "registered local Firstmate home is unavailable: ${HOME_PATH:-$WT}" ]; then
       continue
     fi
-    echo "REFUSED: $skipped; nothing was changed" >&2
+    echo "REFUSED: $skipped; nothing was changed. Remedy: have that home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records, then retry bin/fm-teardown.sh '$ID'; do not delete registrations or skip the unreadable home." >&2
     return 1
   done
   for state_dir in "${DESCENDANT_TASK_STATES[@]+"${DESCENDANT_TASK_STATES[@]}"}"; do
@@ -4289,7 +4289,7 @@ require_shared_task_worktree_slot() {
     slot=$(fm_task_copy_enclosing_pool_slot "$PROJ" "$copy") || return 0
   }
   fm_local_firstmate_state_dirs "$STATE" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed. Remedy: have that home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records, then retry bin/fm-teardown.sh '$ID'; do not delete registrations or skip the unreadable home." >&2
     return 1
   }
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do

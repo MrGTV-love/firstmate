@@ -1934,7 +1934,7 @@ fm_local_firstmate_unproved() {  # <tolerant|''> <what>
     FM_LOCAL_FIRSTMATE_SKIPPED+=("$2")
     return 0
   fi
-  FM_LOCAL_FIRSTMATE_ERROR="$2 (local-home walk from ${FM_HOME:-unset}). Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; then retry the original bin/fm-teardown.sh or custody-check operation without --force. Do not delete registrations or skip unreadable homes to clear custody proof."
+  FM_LOCAL_FIRSTMATE_ERROR=$2
   return 1
 }
 

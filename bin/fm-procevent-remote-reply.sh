@@ -767,7 +767,7 @@ cmd_handle() {
 }
 
 retirement_capture_scan() {
-  local id=$1 sid inbox path base seq pending=0
+  local id=$1 sid inbox path base seq pending=0 remedy remedies=
   sid=$(source_id "$id")
   inbox="$STATE/procevent-inbox"
   [ -e "$inbox" ] || return 1
@@ -785,11 +785,13 @@ retirement_capture_scan() {
       || die "remote reply capture has no safe adapter record: $path"
     if [ ! -e "$base.handled" ]; then
       pending=$((pending + 1))
-      printf 'Remedy: FM_HOME=%q bash %q handle %q %q %q\n' \
-        "$FM_HOME" "$SCRIPT_DIR/fm-procevent-remote-reply.sh" "$id" "$seq" "$path" >&2
+      printf -v remedy 'FM_HOME=%q FM_STATE_OVERRIDE=%q FM_DATA_OVERRIDE=%q bash %q handle %q %q %q' \
+        "$FM_HOME" "$STATE" "$DATA" "$SCRIPT_DIR/fm-procevent-remote-reply.sh" "$id" "$seq" "$path"
+      remedies+=$'\n'$remedy
     fi
   done
   RETIREMENT_PENDING=$pending
+  RETIREMENT_REMEDIES=$remedies
   RETIREMENT_INBOX=$inbox
   return 0
 }
@@ -801,9 +803,10 @@ cmd_retire_quiesce_locked() {
   sid=$(source_id "$id")
   "$SCRIPT_DIR/fm-procevent.sh" retire "$sid" || return 1
   RETIREMENT_PENDING=0
+  RETIREMENT_REMEDIES=
   retirement_capture_scan "$id" || true
   if [ "$force" != --force ] && [ "$RETIREMENT_PENDING" -gt 0 ]; then
-    die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command printed above to ingest and acknowledge every capture, then retry retirement; do not remove capture files or force retirement."
+    die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command below to ingest and acknowledge every capture, then retry the refused retirement or bin/fm-teardown.sh; do not remove capture files or force retirement.$RETIREMENT_REMEDIES"
   fi
 }
 
@@ -813,9 +816,10 @@ cmd_retire_finalize_locked() {
   [ -z "$force" ] || [ "$force" = --force ] || die "invalid retirement option: $force"
   sid=$(source_id "$id")
   RETIREMENT_PENDING=0
+  RETIREMENT_REMEDIES=
   if retirement_capture_scan "$id"; then
     if [ "$force" != --force ] && [ "$RETIREMENT_PENDING" -gt 0 ]; then
-      die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command printed above to ingest and acknowledge every capture, then retry retirement; do not remove capture files or force retirement."
+      die "remote reply retirement refused with $RETIREMENT_PENDING unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command below to ingest and acknowledge every capture, then retry the refused retirement or bin/fm-teardown.sh; do not remove capture files or force retirement.$RETIREMENT_REMEDIES"
     fi
     if [ "$force" = --force ]; then
       for path in "$RETIREMENT_INBOX/$sid".*.result "$RETIREMENT_INBOX/$sid".*.adapter "$RETIREMENT_INBOX/$sid".*.handled; do

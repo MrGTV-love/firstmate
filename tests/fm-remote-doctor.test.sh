@@ -1028,9 +1028,14 @@ doctor --fix
 kill "$listener" 2>/dev/null || true
 wait "$listener" 2>/dev/null || true
 expect_code 1 "$DOCTOR_RC" "a refused server start was reported ready"
-assert_contains "$DOCTOR_OUT" "fix herdr-server=failed: refused to start the herdr server for session $DOCTOR_SESSION to protect a live or unknown server: " \
+fix_line=$(printf '%s\n' "$DOCTOR_OUT" | grep '^fix herdr-server=failed: ' || true)
+assert_contains "$fix_line" "refused to start the herdr server for session $DOCTOR_SESSION" \
   "a refusal that protects a live socket was not reported as a refusal"
-assert_contains "$DOCTOR_OUT" "the session socket still accepts connections" "the refusal reason was discarded"
+assert_contains "$fix_line" "the session socket still accepts connections" "the refusal reason was discarded"
+case "$fix_line" in
+  *"the session socket still accepts connections"*"Remedy:"*) ;;
+  *) fail "the refusal cause must precede its completing step: $fix_line" ;;
+esac
 assert_not_contains "$DOCTOR_OUT" "did not come up" "a refusal was reported as a failed start"
 
 new_case Linux with-herdr no-gui

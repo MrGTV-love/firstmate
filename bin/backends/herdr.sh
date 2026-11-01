@@ -1701,12 +1701,15 @@ fm_backend_herdr_server_ensure() {  # <session>
 # fm_backend_herdr_server_ensure for <session>. Status 1 is a refusal that
 # protects a live or unknown server and 3 is a launched server that exited
 # before reporting running (bin/backends/herdr-server-start.py owns both); any
-# other status is a failure of the start helper itself.
-fm_backend_herdr_server_ensure_failure() {  # <status> <session>
+# other status is a failure of the start helper itself. A given <detail> is the
+# caller's captured cause, placed right after the description and before the
+# refusal's completing step.
+fm_backend_herdr_server_ensure_failure() {  # <status> <session> [<detail>]
+  local detail=${3+": $3"}
   case "$1" in
-    1) printf 'refused to start the herdr server for session %s to protect a live or unknown server. Remedy: run herdr --session %q status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server' "$2" "$2" ;;
-    3) printf 'the herdr server for session %s was launched but did not come up' "$2" ;;
-    *) printf 'the server start helper failed (exit %s) for session %s' "$1" "$2" ;;
+    1) printf 'refused to start the herdr server for session %s to protect a live or unknown server%s. Remedy: run herdr --session %q status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server' "$2" "$detail" "$2" ;;
+    3) printf 'the herdr server for session %s was launched but did not come up%s' "$2" "$detail" ;;
+    *) printf 'the server start helper failed (exit %s) for session %s%s' "$1" "$2" "$detail" ;;
   esac
 }
 
