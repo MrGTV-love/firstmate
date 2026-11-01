@@ -316,7 +316,9 @@ EOF
 
 # The sweep's closed regenerable class: directories rebuilt from tracked lockfiles
 # and sources. A release of a proven copy removes them with it unpreserved. This
-# list decides no hold and adds no pattern.
+# list decides only what preservation leaves out: it adds no pattern, and the
+# sweep's activity fingerprints still read these directories, so a write inside one
+# still holds a copy WAITING.
 TEARDOWN_REGENERABLE_NAMES=(node_modules .venv venv __pycache__ .pytest_cache .mypy_cache .ruff_cache .next .turbo .cache)
 
 # Prints each outermost directory at or under <root> whose name is in the class.
@@ -329,14 +331,18 @@ teardown_regenerable_dirs() {  # <root>
   find "$1" -type d \( "${args[@]:1}" \) -print -prune 2>/dev/null
 }
 
-# Prints the class's outermost directories inside the ignored entries of <copy>.
+# Prints, relative to <copy>, the class's outermost directories inside its ignored
+# entries.
 teardown_regenerable_ignored() {  # <copy>
-  local copy=$1 listing entry rc=0
+  local copy=$1 listing entry found dir rc=0
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
     while IFS= read -r -d '' entry; do
-      teardown_regenerable_dirs "$copy/${entry%/}" || { rc=1; break; }
+      found=$(teardown_regenerable_dirs "$copy/${entry%/}") || { rc=1; break; }
+      while IFS= read -r dir; do
+        [ -z "$dir" ] || printf '%s\n' "${dir#"$copy"/}"
+      done <<< "$found"
     done <"$listing"
   fi
   rm -f "$listing"

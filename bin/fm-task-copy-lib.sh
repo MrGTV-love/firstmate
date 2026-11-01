@@ -45,8 +45,9 @@ fm_task_copy_confined_launcher_state() {  # <pid>
 }
 
 # Interpret one completed ps observation without executing a process probe.
-# Exit 1 proves absence only with both output channels empty; any diagnostic
-# makes that failed read unknown. The acquisition owner handles exit 126.
+# Exit 1 proves absence only with empty stdout and either empty stderr or exactly
+# macOS's not-found line for this PID; any other diagnostic makes that failed read
+# unknown. The acquisition owner handles exit 126.
 fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   local pid=$1 rc=$2 observed=$3 diagnostic=$4
   case "$rc" in
@@ -55,7 +56,11 @@ fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
       [ "$observed" = "$pid" ] || return 2
       return 0
       ;;
-    1) [ -z "$observed" ] && [ -z "$diagnostic" ] && return 1; return 2 ;;
+    1)
+      [ -z "$observed" ] || return 2
+      [ -z "$diagnostic" ] || [ "$diagnostic" = "ps: process id too large: $pid"$'\n' ] || return 2
+      return 1
+      ;;
     *) return 2 ;;
   esac
 }

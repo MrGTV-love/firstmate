@@ -63,7 +63,8 @@
 #                      content is not already in the default branch.
 #   WAITING            it passes every REAPABLE-DRIVER proof, but its waiting
 #                      record (see below) holds a different fingerprint of its
-#                      preservable ignored content: that content is still
+#                      preservable ignored content and regenerable directories:
+#                      that content is still
 #                      changing, so the copy is not idle. It gets no new preserve
 #                      and no driver call, and each run reports it with the reason,
 #                      until a run sees the same fingerprint as the run before.
@@ -134,24 +135,27 @@
 # by the closeout script's own liveness check; the sweep cannot close that race.
 # Every ownership, process, cleanliness and remote-content proof is re-read
 # after the driver plan and after preservation, immediately before execution;
-# HEAD and the complete lock's SHA-256 must still match what the plan saw, and
+# HEAD and the complete lock's SHA-256 must still match what the plan saw,
 # the copy's preservable ignored content must still match this run's preserve,
-# or the earlier preserve a run reused. A mismatch runs no execute, uses no slot
+# or the earlier preserve a run reused, and that content with the copy's regenerable
+# directories must still match what it was before preservation. A mismatch runs no execute, uses no slot
 # and takes the reproof-failure route.
 # The regenerable class is this closed list of directory names, matched by name at
 # any depth inside a proven copy: node_modules, .venv, venv, __pycache__,
 # .pytest_cache, .mypy_cache, .ruff_cache, .next, .turbo, .cache. Those directories
 # are rebuilt from tracked lockfiles and sources, so a release removes them with
-# the copy and never hashes or preserves them. The class never proves a copy
-# releasable, and a held copy stays held exactly as before. A report row of a proven
+# the copy and never preserves them. They stay in every activity fingerprint, so a
+# write inside one still stops a release and keeps a copy WAITING. The class never
+# proves a copy releasable, and a held copy stays held exactly as before. A report row of a proven
 # copy names its regenerable bytes, and the report's "regenerable:" line totals them.
 # An unlocked copy first preserves every other ignored entry, including the teardown
 # owner's existing disposable cache/scratch/log/generated machinery, through its
 # SHA256SUMS storage contract. Unique non-cache ignored files still hold it.
 # After custody and HEAD are rechecked, the actual preserved tree fingerprint
-# must equal the source fingerprint before plain `git worktree remove` from the
-# parent clone. Missing, unreadable or differing preservation leaves both copy
-# and preserve; no forced removal is introduced.
+# must equal the source fingerprint, and the copy's ignored content with its
+# regenerable directories must equal what it was before preservation, before plain
+# `git worktree remove` from the parent clone. Missing, unreadable or differing
+# preservation or content leaves both copy and preserve; no forced removal is introduced.
 # A locked copy first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
@@ -200,9 +204,9 @@
 # bytes or target; when any original is missing, different or cannot be compared, or the
 # copy's identity or lock changed, the preserve stays and is the copy's latest
 # preserve. Its fingerprint and the fingerprint of the copy's current preservable
-# ignored content (each the SHA-256 over the path, type and bytes or link target
-# of every file, symlink and FIFO; a socket, which preservation never copies, is
-# skipped) go to a waiting record under
+# ignored content and regenerable directories (each the SHA-256 over the path, type
+# and bytes or link target of every file, symlink and FIFO; a socket, which
+# preservation never copies, is skipped) go to a waiting record under
 # data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. A content
 # check just before execute that finds a mismatch but keeps no preserve of this
 # run, as when only new content appeared, records the copy's current fingerprint
@@ -787,8 +791,9 @@ waiting_record() {  # <copy>
 # hold no bytes of their own, and a socket is skipped because preservation never
 # copies one. Fails when any of it cannot be read or check's time runs out.
 tree_fingerprint() {  # <root> <find-args>...
-  local root=$1 rel want out=''
+  local root=$1 rel want out='' sums hasher=(sha256sum) files=()
   shift
+  ! command -v shasum >/dev/null 2>&1 || hasher=(shasum -a 256)
   while IFS= read -r -d '' rel; do
     case "$rel" in
       ./*) ;;
@@ -800,28 +805,48 @@ tree_fingerprint() {  # <root> <find-args>...
     elif [ -p "$root/$rel" ]; then
       want=p
     elif [ -f "$root/$rel" ]; then
-      want=f$(set -o pipefail; bounded cat "$root/$rel" | teardown_ignored_sha256) || return 1
+      files+=("$rel")
+      continue
     else
       return 1
     fi
     out="$out$rel"$'\t'"$want"$'\n'
   done < <(cd "$root" && bounded find "$@" ! -type d ! -type s -print0; printf '%s\0' "$?")
+  if [ "${#files[@]}" != 0 ]; then
+    sums=$(cd "$root" && printf '%s\0' "${files[@]}" | bounded xargs -0 "${hasher[@]}") || return 1
+    out="$out$sums"$'\n'
+  fi
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
-# The fingerprint of every entry a release of proven <copy> preserves: the locked
-# route's by default, the unlocked route's when all mode is requested.
-content_fingerprint() {  # <copy> [all]
-  local entries entry paths=()
-  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
+# The fingerprint of the newline-separated entries of <copy>.
+entries_fingerprint() {  # <copy> <entries>
+  local entry paths=()
   while IFS= read -r entry; do
     [ -z "$entry" ] || paths+=("./$entry")
-  done <<< "$entries"
+  done <<< "$2"
   if [ "${#paths[@]}" = 0 ]; then
     printf '' | teardown_ignored_sha256
     return
   fi
   tree_fingerprint "$1" "${paths[@]}"
+}
+
+# The fingerprint of every entry a release of proven <copy> preserves: the locked
+# route's by default, the unlocked route's when all mode is requested.
+content_fingerprint() {  # <copy> [all]
+  local entries
+  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
+  entries_fingerprint "$1" "$entries"
+}
+
+# What shows whether <copy> is idle: those same entries and its regenerable
+# directories, which only preservation leaves out.
+activity_fingerprint() {  # <copy> [all]
+  local entries dirs
+  entries=$(teardown_preservable_ignored "$1" "${2:-releasable}") || return 1
+  dirs=$(teardown_regenerable_ignored "$1") || return 1
+  entries_fingerprint "$1" "$entries"$'\n'"$dirs"
 }
 
 # The fingerprint of preserve <dir>, without the library's metadata.
@@ -858,7 +883,7 @@ read_waiting() {  # <record> <copy> <identity>
   [[ ! $preserved =~ ^[0-9a-f]{64}$ ]] || WAIT_PRESERVED=$preserved
 }
 
-# Returns 1 with WAIT_WHY set while the preservable ignored content of <copy>
+# Returns 1 with WAIT_WHY set while the activity fingerprint of <copy>
 # differs from the fingerprint its waiting record holds; --apply then records the
 # new fingerprint, so the next run can see the content quiet. A copy with no
 # record for this same copy is quiet. Quiet content that equals the latest
@@ -866,19 +891,20 @@ read_waiting() {  # <record> <copy> <identity>
 WAIT_WHY=
 CONTENT_PRESERVED=0
 content_quiet() {  # <copy>
-  local record identity now
+  local record identity now preserved
   WAIT_WHY=
   CONTENT_PRESERVED=0
   record=$(waiting_record "$1") || return 2
   [ -e "$record" ] || [ -L "$record" ] || return 0
   identity=$(copy_identity "$1") || return 2
   read_waiting "$record" "$1" "$identity" || return 0
-  now=$(content_fingerprint "$1") || return 2
+  now=$(activity_fingerprint "$1") || return 2
   if [ "$now" = "$WAIT_FINGERPRINT" ]; then
-    [ "$now" != "$WAIT_PRESERVED" ] || CONTENT_PRESERVED=1
+    preserved=$(content_fingerprint "$1") || return 2
+    [ "$preserved" != "$WAIT_PRESERVED" ] || CONTENT_PRESERVED=1
     return 0
   fi
-  WAIT_WHY="content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged"
+  WAIT_WHY="content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged"
   if [ "$APPLY" = 1 ] && ! record_waiting "$1" "$identity" "$now" "$WAIT_PRESERVED"; then
     WAIT_WHY="$WAIT_WHY; its new fingerprint could not be recorded"
   fi
@@ -1177,7 +1203,7 @@ note_regenerable() {  # <copy>
   [ -n "$dirs" ] || return 0
   while IFS= read -r dir; do
     SIZE_KIB=
-    [ "$SIZING" != 1 ] || du_kib "$dir"
+    [ "$SIZING" != 1 ] || du_kib "$1/$dir"
     if [ -n "$SIZE_KIB" ]; then total=$((total + SIZE_KIB)); else unmeasured=1; fi
   done <<< "$dirs"
   if [ "$unmeasured" = 1 ]; then
@@ -1517,7 +1543,7 @@ retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   if dir=$(run_preserve_dir "$1" "$4") && [ -d "$dir" ] && [ ! -L "$dir" ]; then
     preserved=$(preserve_fingerprint "$dir") || preserved=
   fi
-  if ! now=$(content_fingerprint "$1") || ! record_waiting "$1" "$2" "$now" "$preserved"; then
+  if ! now=$(activity_fingerprint "$1") || ! record_waiting "$1" "$2" "$now" "$preserved"; then
     RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
   fi
   return 1
@@ -1534,7 +1560,7 @@ retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # built from the release id, which is no task id. Returns 2 when it stopped
 # before the driver's execute ran.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved want now dir
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved want now dir activity
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 2
   preserved=$CONTENT_PRESERVED
@@ -1543,7 +1569,9 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
     return 2
   fi
-  if [ "$preserved" != 1 ]; then
+  if ! activity=$(activity_fingerprint "$copy"); then
+    rc=1
+  elif [ "$preserved" != 1 ]; then
     DATA=$DATA_DIR
     ID=$3
     teardown_preserve_ignored "$copy" releasable || rc=$?
@@ -1569,8 +1597,9 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
       fi
     fi
   fi
-  if [ -z "$want" ] || ! now=$(content_fingerprint "$copy") || [ "$now" != "$want" ]; then
-    if retry_after_preserve "$copy" "$identity" "$7" "$3" && [ -n "$now" ]; then
+  if [ -z "$want" ] || ! now=$(content_fingerprint "$copy") || [ "$now" != "$want" ] \
+    || ! now=$(activity_fingerprint "$copy") || [ "$now" != "$activity" ]; then
+    if retry_after_preserve "$copy" "$identity" "$7" "$3" && now=$(activity_fingerprint "$copy"); then
       read_waiting "$(waiting_record "$copy")" "$copy" "$identity" || true
       record_waiting "$copy" "$identity" "$now" "$WAIT_PRESERVED" \
         || RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
@@ -1640,7 +1669,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1721,7 +1750,8 @@ apply_removals() {
       # directories go with the copy.
       release_id="$CHECK_ID/$stamp-$head"
       preserve_dir=$(run_preserve_dir "$copy" "$release_id") || preserve_dir=
-      if [ -z "$preserve_dir" ] || ! err=$(DATA="$DATA_DIR" ID="$release_id" teardown_preserve_ignored "$copy" all 2>&1); then
+      if [ -z "$preserve_dir" ] || ! activity=$(activity_fingerprint "$copy" all) \
+        || ! err=$(DATA="$DATA_DIR" ID="$release_id" teardown_preserve_ignored "$copy" all 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload could not be preserved; the copy was left"$'\n'
         continue
@@ -1742,9 +1772,10 @@ apply_removals() {
         want=$(printf '' | teardown_ignored_sha256) || want=
         preserve_dir=
       fi
-      if [ -z "$want" ] || ! now=$(content_fingerprint "$copy" all) || [ "$now" != "$want" ]; then
+      if [ -z "$want" ] || ! now=$(content_fingerprint "$copy" all) || [ "$now" != "$want" ] \
+        || ! now=$(activity_fingerprint "$copy" all) || [ "$now" != "$activity" ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload preservation is missing, unreadable or differs by hash; the copy was left"$'\n'
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left"$'\n'
         continue
       fi
       if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
@@ -2110,7 +2141,7 @@ print_report() {  # <mode>
     printf '%s\n' "$line"
   done <<< "$BUDGET_REPORT"
   if [ "$1" = report ]; then
-    printf 'regenerable: %s GiB in %s proven copies, %s proven copies unmeasured\n' "$(kib_to_gib "$REGENERABLE_KIB")" "$REGENERABLE_COPIES" "$REGENERABLE_UNMEASURED"
+    printf 'regenerable: %s GiB in %s proven copies, %s proven copies not sized\n' "$(kib_to_gib "$REGENERABLE_KIB")" "$REGENERABLE_COPIES" "$REGENERABLE_UNMEASURED"
   fi
   if [ "$1" = apply ]; then
     printf 'sizes: %s scanned copies unmeasured, %s removed copies unmeasured\n' "$SCANNED_UNMEASURED" "$FREED_UNMEASURED"
