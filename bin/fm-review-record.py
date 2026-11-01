@@ -11,13 +11,12 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--machine-checked] [--json]
 
---dod-evidence copies per-item pointers and explicit weakened-test rulings into
-this append-only review record, never just the mutable input file's path.
+--dod-evidence copies per-item pointers into this append-only review record,
+never just the mutable input file's path.
 The JSON format and resolver are owned by bin/fm-dod-check.py --help.
 --machine-checked applies only to the independent-review basis of a task whose
 meta carries the dispatch-time dod_sha256: that exact-head PASS's pointers must
-all resolve, and any weakened-test ruling needs a reader whose family is not an
-author family. A refusal names the dispatch and claims commands. The
+all resolve. A refusal names the dispatch and claims commands. The
 captain-word basis keeps its existing route. A task without dod_sha256 keeps the
 existing contract, and verify prints "not machine-checked: no dispatch-time DoD
 digest" on stderr. Evidence that cannot be reached is unavailable, not
@@ -578,7 +577,7 @@ def main():
             command.add_argument("--task", required=True)
             command.add_argument("--base", required=True)
         if name == "review":
-            command.add_argument("--dod-evidence", type=Path, help="JSON items pointers and explicit weakened-test rulings, copied into this immutable review record")
+            command.add_argument("--dod-evidence", type=Path, help="JSON items pointers, copied into this immutable review record")
             command.add_argument("--covered-groups", help='JSON list of groups read, or ["all"]; defaults to author-groups keys')
             for flag in ("verdict", "reader-model", "author-groups", "report", *(t.replace("_", "-") for t in TRIGGERS)):
                 command.add_argument("--" + flag, required=True)
@@ -658,16 +657,9 @@ def main():
                         checker = str(BIN / "fm-dod-check.py")
                         repair = (f"; dispatch the default-branch DoD workflow with: {shlex.join([checker, 'dispatch', '--meta', meta_path, '--pr', pr])}"
                                   f"; after that run finishes, build its claims with: {shlex.join([checker, 'claims', '--meta', meta_path, '--run', 'RUN_ID'])}"
-                                  " > CLAIMS.json, add an accept ruling with a reason for each named weakened-test flag,"
-                                  " and record the PASS again with --dod-evidence CLAIMS.json")
+                                  " > CLAIMS.json, and record the PASS again with --dod-evidence CLAIMS.json")
                         if evidence["head"] != args.head or evidence["verdict"] != "PASS":
                             raise VerificationError("machine-checked DoD requires an exact-head PASS with per-item evidence" + repair)
-                        if evidence.get("dod_evidence", {}).get("rulings"):
-                            _, authors = derived_authors(home, pr, args.head, args.task, args.base)
-                            reader = model(evidence["reader_model"], "reader_model")
-                            families = {a["family"] for values in authors.values() for a in values}
-                            if reader == "unknown" or "unknown" in families or reader in families:
-                                raise VerificationError("weakened-test rulings require an independently qualified reviewer, not the implementation author")
                         resolved = subprocess.run([sys.executable, checker, "verify", "--meta", meta_path,
                                                    "--pr", pr, "--head", args.head, "--base", args.base],
                                                   input=json.dumps(evidence.get("dod_evidence", {})),

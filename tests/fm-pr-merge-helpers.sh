@@ -819,8 +819,7 @@ call(sys.executable, root / 'bin/fm-dod-check.py', 'run', '--dod', frozen,
 flags = json.loads((artifact / 'weakening.json').read_text())['flags']
 if not existing:
     assert flags and flags[0]['file'] == 'fixtures/rows.txt'
-claims = {'items': [{'id': 'C1', 'run_id': '123', 'commit': head}],
-          'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Obsolete row removed; retained behavior reviewed.'} for f in flags]}
+claims = {'items': [{'id': 'C1', 'run_id': '123', 'commit': head}]}
 (case / 'machine-claims.json').write_text(json.dumps(claims))
 (case / 'machine-run.json').write_text(json.dumps({'id': 123, 'event': 'workflow_dispatch',
     'path': '.github/workflows/dod-evidence.yml', 'head_branch': 'main', 'head_sha': base, 'run_attempt': 1,

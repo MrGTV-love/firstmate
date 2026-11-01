@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Flag potential test weakening for an independent reviewer's explicit ruling.
+"""Print potential test weakening as advisory output for an independent reviewer.
 
 Usage: fm-test-weakening.py --repo DIR --base SHA --head SHA [--output FILE]
+
+Advisory only: flags inform the reviewer, no flag needs a ruling, and no DoD
+consumer refuses on them. Exit 0 means the diff was read, with or without flags,
+and 2 means invalid input/unreadable diff.
 
 Reads the git diff from the merge base of the exact base and head commits to
 the head, so later base-branch changes are never reported as PR removals, with
@@ -9,10 +13,17 @@ renames disabled so a move cannot hide a removed test. Deliberately conservative
 line is flagged, including data rows and test bodies without an assert keyword.
 Assertion removals in other files and increased numeric time/retry/iteration
 bounds are also flagged. This is a review signal, not a design-quality verdict.
-Flags identify the base file:line and old/new content digest, so a ruling for a
-different line or revision cannot cover them. JSON is only the artifact format;
-stdout lists actionable file:line flags. Exit 1 means review rulings are needed,
-2 means invalid input/unreadable diff, and 0 means no suspicious changes.
+Flags identify the base file:line and old/new content digest. JSON is only the
+artifact format; stdout lists every flagged file:line.
+
+Known limits, because bounds are matched by name:
+- False flag: a diff that only lowers bounds can read as an increase when a
+  removed line pairs with another added line of the same kind, for example
+  TIMEOUT_SECONDS 10->5 with CONNECT_TIMEOUT 30->20, retries 3->2 with
+  retry_delay 10->5, or sleep 10 and 30 lowered to 5 and 20.
+- Miss: outside test paths, a raised bound renamed to another kind is not
+  flagged, for example timeout=5->poll_timeout=50, max_attempts=3->max_retries=9,
+  timeout=5->deadline=50, or seq 1 3->range(30).
 """
 import argparse
 import hashlib
@@ -152,7 +163,7 @@ def main():
         print(f"flags: {len(flags)}")
         for flag in flags:
             print(f"flag: {json.dumps(flag['file'] + ':' + str(flag['line']))}\nreason: {json.dumps(flag['reason'])}\nid: {flag['id']}")
-        return 1 if flags else 0
+        return 0
     except (OSError, ValueError) as exc:
         print(f"error: {json.dumps(str(exc))}\nhelp: Supply readable repository and exact base/head commits.")
         return 2

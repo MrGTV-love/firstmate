@@ -23,8 +23,8 @@ default branch without that workflow is reported, never bootstrapped.
 verify refuses a run whose workflow ref is not the default branch or whose
 workflow commit is not in that branch's history.
 Recorder boundary: run is the trusted default-branch recorder. It plans one
-task per gate command and per fail-first phase, runs the weakened-test detector
-before any candidate command, then executes each command itself in a fresh
+task per gate command and per fail-first phase, runs the advisory weakened-test
+detector before any candidate command, then executes each command itself in a fresh
 exact-commit export and its own process group. It captures output through its
 own pipe and the exit code from its own wait, never from a file a command wrote,
 ends the command's process group before continuing, and creates the evidence
@@ -32,8 +32,8 @@ directory only after the last command. Draining the output pipe once that group
 has ended takes milliseconds, so a pipe still held open 5 seconds later by a
 process that left the group fails the run by name instead of waiting for the
 job timeout or recording incomplete output. Candidate tests are candidate code: the
-weakened-test detector and the independent reviewer cover their quality. The
-commands share the recorder's runner account, so a command that deliberately
+independent reviewer covers their quality, and the advisory detector only informs
+that review. The commands share the recorder's runner account, so a command that deliberately
 escapes its process group could still reach that account's files; a separate
 OS account on the runner is the missing prerequisite to exclude that.
 Semantic limit: criteria pair a natural-language Expected with an arbitrary
@@ -47,20 +47,20 @@ tests, the fail-first base tree and the weakened-test diff use the merge base of
 that base and the head. verify accepts that recorded base while it is in the
 live base's history, so an unrelated base advance never invalidates evidence.
 claims prints the minimal claims JSON for a finished run: one id/run_id pointer
-per frozen mandatory item. The reviewer adds an accept ruling with a reason for
-each weakened-test flag that verify names.
+per frozen mandatory item.
 verify accepts JSON copied into the independent PASS record by --dod-evidence:
   {"items":[{"id":"C1","run_id":"123","commit":"<exact head>",
     "file":"bin/example.sh","line":7,"log":"gate-C1.log",
-    "log_sha256":"<sha256>"}],
-   "rulings":[{"id":"<flag digest>","decision":"accept","reason":"<reviewer ruling>"}]}
+    "log_sha256":"<sha256>"}]}
 Every mandatory id needs exactly one pointer, and every pointer names its own
 run_id; the minimal pointer is id/run_id. Supplied commit, file/line or log
 digest refinements must all resolve; omitted commit and log are derived from
 the exact-head manifest, never from mutable branch refs.
 Gate pointers name their exact command log; other authorities may point at a passing test log or summary.log,
 which proves automated execution, not design quality. The reviewer still grades
-semantic adequacy. Each weakened-test flag needs an explicit accept with a reason.
+semantic adequacy. The weakened-test detector is advisory and never a gate: run
+prints its output and stores any report as weakening.json, a detector error omits
+that file without failing the run, and verify never reads it.
 CI's exact-head artifact, run attempt, successful default-branch run,
 DoD digest, all gate commands, fail-first results, logs and file:line must resolve.
 The resolver requires GitHub's successful default-branch run record and its
@@ -231,10 +231,9 @@ def run(args, raw, items):
         detected = subprocess.run([sys.executable, str(BIN / "fm-test-weakening.py"), "--repo", str(repo),
                                    "--base", base, "--head", head, "--output", str(scratch / "weakening.json")],
                                   capture_output=True, text=True, check=False)
-        if detected.returncode not in (0, 1):
-            raise CheckError(f"weakened-test detector failed: {detected.stdout.strip()}")
-        print(detected.stdout, end="", flush=True)
-        weakening = (scratch / "weakening.json").read_bytes()
+        print(f"advisory weakened-test detector, never a gate:\n{detected.stdout}{detected.stderr}", end="", flush=True)
+        report = scratch / "weakening.json"
+        weakening = report.read_bytes() if report.exists() else None
         for task in tasks:
             # Each command receives a fresh exact-commit export of its own.
             tree = scratch / task["name"]
@@ -280,7 +279,8 @@ def run(args, raw, items):
     (output / "summary.log").write_text(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {result}\n"
                                         f"semantics: {SEMANTICS}\n")
     (output / "dod.md").write_bytes(raw)
-    (output / "weakening.json").write_bytes(weakening)
+    if weakening is not None:
+        (output / "weakening.json").write_bytes(weakening)
     print(f"result: {result}\nsemantics: {SEMANTICS}", flush=True)
     return 0 if passed else 1
 
@@ -441,26 +441,6 @@ def verify_evidence(args, claims):
                         raise CheckError("CI log digest does not resolve")
                 summary = safe_artifact(directory, 'summary.log')
                 logs['summary.log'] = digest(summary)
-                weakening = json.loads(safe_artifact(directory, 'weakening.json'))
-                if weakening.get('schema') != 'fm-test-weakening.v1' or weakening.get('head') != head or weakening.get('base') != recorded:
-                    raise CheckError("weakened-test evidence does not match this PR diff")
-                # Recompute flags with trusted local detector too: the reviewer
-                # must explicitly accept each exact removed/raised line.
-                detected = subprocess.run([sys.executable, str(BIN / 'fm-test-weakening.py'), '--repo', str(worktree),
-                                           '--base', recorded, '--head', head, '--output', str(Path(scratch) / 'weakening.json')],
-                                          capture_output=True, check=False)
-                if detected.returncode not in (0, 1) or json.loads((Path(scratch) / 'weakening.json').read_text()) != weakening:
-                    raise CheckError("CI weakened-test flags do not resolve against the exact diff")
-                rulings = claims.get('rulings', [])
-                if not isinstance(rulings, list) or any(not isinstance(r, dict) for r in rulings):
-                    raise CheckError("reviewer rulings must be a list")
-                ruling_ids = [r.get('id') for r in rulings]
-                if any(not isinstance(value, str) for value in ruling_ids) or len(set(ruling_ids)) != len(ruling_ids):
-                    raise CheckError("each flagged line needs one unambiguous reviewer ruling")
-                accepted = {r.get('id') for r in rulings if r.get('decision') == 'accept' and isinstance(r.get('reason'), str) and r['reason'].strip()}
-                for flag in weakening['flags']:
-                    if flag['id'] not in accepted:
-                        raise CheckError(f"{flag['file']}:{flag['line']} ({flag['id']}): weakened-test line needs an explicit accept ruling and reason in the independent PASS record")
                 runs[run_id] = (gates, logs)
             gates, logs = runs[run_id]
             default_log = gates[item['id']]['log'] if item['fields']['Authority'] == 'gate' else 'summary.log'

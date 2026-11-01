@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Flag real diff weakening cases through the detector's public CLI.
+# Print real diff weakening cases as advisory output through the detector's public CLI.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -41,15 +41,17 @@ git('add', '.')
 git('commit', '-qm', 'initial checks')
 base = git('rev-parse', 'HEAD')
 
-def inspect(name, expected):
+def inspect(name):
     git('add', '.')
     git('commit', '-qm', name)
     head = git('rev-parse', 'HEAD')
     output = temp / (name + '.json')
+    # Advisory: exit 0 with or without flags, and every flag stays visible.
     stdout = call(sys.executable, detector, '--repo', repo, '--base', base,
-                  '--head', head, '--output', output, expected=expected)
+                  '--head', head, '--output', output)
     record = json.loads(output.read_text())
     assert record['base'] == base and record['head'] == head
+    assert f"flags: {len(record['flags'])}" in stdout
     for flag in record['flags']:
         assert flag['file'] + ':' + str(flag['line']) in stdout
         assert len(flag['id']) == 64 and flag['id'] in stdout
@@ -61,7 +63,7 @@ put('bin/policy.py', 'timeout = 8\nretries = 5\nfor step in range(9):\n    check
 put('src/guard.py', '# removed\n')
 put('fixtures/space rows.csv', 'name\n')
 put('bin/loop.py', 'N = 8\n')
-flags = inspect('weakening', 1)
+flags = inspect('weakening')
 assert any(f['file'] == 'fixtures/space rows.csv' and f['line'] == 2 for f in flags)
 assert any(f['file'] == 'bin/loop.py' and f['line'] == 1 for f in flags)
 assert any(f['file'] == 'tests/subject.test.sh' and f['line'] == 2 for f in flags)
@@ -71,42 +73,55 @@ assert any(f['file'] == 'src/guard.py' for f in flags)
 for line in (1, 2, 3):
     assert any(f['file'] == 'bin/policy.py' and f['line'] == line and f['reason'] == 'increased time/retry/iteration bound' for f in flags)
 assert len({f['id'] for f in flags}) == len(flags)
-print('ok - assertion, test body, fixture row and raised time/retry/iteration bounds name exact lines')
+print('ok - assertion, test body, fixture row and raised time/retry/iteration bounds name exact lines and exit 0')
 
 # Restore committed base content without modifying unrelated work.
 for path in ('tests/subject.test.sh', 'fixtures/rows.csv', 'fixtures/space rows.csv', 'bin/policy.py', 'bin/loop.py', 'src/guard.py'):
     put(path, git('show', base + ':' + path) + '\n')
 put('tests/addition.test.sh', 'assert_equal 1 1\n')
 put('bin/new-feature.py', 'new_behavior = True\n')
-flags = inspect('additions', 0)
+flags = inspect('additions')
 assert flags == []
-print('ok - clean changes and added assertions do not need rulings')
+print('ok - clean changes and added assertions print no flags')
 
 # Each bound compares only with its own kind: lowering retries 3->2 and a
 # timeout 10->5 never pairs the old retries with the new timeout as a raise.
 put('bin/limits.py', 'retries = 3\nTIMEOUT_SECONDS = 10\n')
-flags = inspect('limits-base', 0)
+flags = inspect('limits-base')
 base_before_limits, base = base, git('rev-parse', 'HEAD')
 put('bin/limits.py', 'retries = 2\nTIMEOUT_SECONDS = 5\n')
-flags = inspect('lowered-bounds', 0)
+flags = inspect('lowered-bounds')
 assert flags == []
-print('ok - lowering different bounds together needs no ruling')
+print('ok - lowering different bounds together prints no flag')
 
 # A real increase of one bound, even rewritten into a new shape, still flags.
 put('bin/limits.py', 'max_retries = 9\nTIMEOUT_SECONDS = 5\n')
-flags = inspect('raised-retries', 1)
+flags = inspect('raised-retries')
 assert [(f['file'], f['line'], f['reason'], f['new']) for f in flags] == [
     ('bin/limits.py', 1, 'increased time/retry/iteration bound', 'max_retries = 9')]
 put('bin/limits.py', 'retries = 2\nTIMEOUT_SECONDS = min(60, 5)\n')
-flags = inspect('raised-timeout', 1)
+flags = inspect('raised-timeout')
 assert [(f['file'], f['line'], f['reason']) for f in flags] == [
     ('bin/limits.py', 2, 'increased time/retry/iteration bound')]
 print('ok - a raised bound is flagged against its own kind, even in a new shape')
+
+# The limits --help discloses: name matching reports a lowered-only diff as an
+# increase and misses a raised bound renamed to another kind. Both stay advisory.
+put('bin/limits.py', 'TIMEOUT_SECONDS = 10\nCONNECT_TIMEOUT = 30\ntimeout = 5\n')
+inspect('known-limits-base')
+base = git('rev-parse', 'HEAD')
+put('bin/limits.py', 'TIMEOUT_SECONDS = 5\nCONNECT_TIMEOUT = 20\ntimeout = 5\n')
+flags = inspect('lowered-only')
+assert [(f['file'], f['line'], f['reason']) for f in flags] == [
+    ('bin/limits.py', 1, 'increased time/retry/iteration bound')]
+put('bin/limits.py', 'TIMEOUT_SECONDS = 10\nCONNECT_TIMEOUT = 30\npoll_timeout = 50\n')
+assert inspect('renamed-raised') == []
+print('ok - the lowered-only false flag and the renamed raised-bound miss behave as disclosed')
 base = base_before_limits
 
-# A renamed test still removes its original identity and needs a ruling.
+# A renamed test still removes its original identity, so it still prints a flag.
 (repo / 'tests/subject.test.sh').rename(repo / 'tests/renamed.test.sh')
-flags = inspect('renamed-test', 1)
+flags = inspect('renamed-test')
 assert any(f['file'] == 'tests/subject.test.sh' for f in flags)
 print('ok - renaming cannot hide removal of a test')
 

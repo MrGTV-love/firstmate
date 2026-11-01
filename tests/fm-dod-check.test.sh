@@ -231,6 +231,20 @@ repaired = oracle_run('oracle-repaired', 'tests/output.test.sh', repaired_head, 
 assert repaired['passed'] is True and repaired['tests'][0]['base']['exit'] != 0 and repaired['tests'][0]['head']['exit'] == 0
 print('ok - a marker-file proxy passes fail-first on a wrong app, the real output test rejects it and accepts the repair, and evidence states semantics unassessed')
 
+# The detector cannot decode this diff. Its error stays visible, and an advisory
+# detector failure never stops the recorder.
+(oracle / 'latin1.txt').write_bytes(b'caf\xe9\n')
+ogit('add', '.')
+ogit('commit', '-qm', 'text that is not UTF-8')
+undecodable = ogit('rev-parse', 'HEAD')
+dod.write_text(criteria(command='true'))
+stdout = call(sys.executable, checker, 'run', '--dod', dod, '--repo', oracle, '--base', oracle_base,
+              '--head', undecodable, '--output', temp / 'detector-error')
+assert 'advisory weakened-test detector' in stdout and 'error:' in stdout
+assert json.loads((temp / 'detector-error' / 'results.json').read_text())['passed'] is True
+assert not (temp / 'detector-error' / 'weakening.json').exists()
+print('ok - an advisory detector error is printed and does not fail the recorder run')
+
 # Freeze through the same public interface spawn uses, outside the PR repo.
 home = temp / 'home'
 state = home / 'state'
@@ -273,9 +287,10 @@ assert manifest['passed'] is True and manifest['items'][0]['commit'] == head
 assert f"command: {json.dumps(manifest['items'][0]['command'])}" in recorded and 'exit: 0' in recorded
 flags = json.loads((artifact / 'weakening.json').read_text())['flags']
 assert flags
+assert f"flag: {json.dumps(flags[0]['file'] + ':' + str(flags[0]['line']))}" in recorded
 pointer = {'id': 'C1', 'run_id': '123', 'commit': head, 'file': 'value', 'line': 1,
            'log': manifest['items'][0]['log'], 'log_sha256': manifest['items'][0]['sha256']}
-claims = {'items': [pointer], 'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Replaced unconditional exit with a real regression.'} for f in flags]}
+claims = {'items': [pointer]}
 run_record = {'id': 123, 'event': 'workflow_dispatch', 'path': '.github/workflows/dod-evidence.yml',
               'status': 'completed', 'conclusion': 'success', 'repository': {'full_name': 'example/repo'},
               'head_branch': 'main', 'head_sha': base, 'run_attempt': 2}
@@ -331,9 +346,6 @@ assert 'evidence: resolved' in resolve()
 resolve({**claims, 'items': [{'id': 'C1', 'run_id': '123'}]})
 resolve({**claims, 'run_id': '123', 'items': [{'id': 'C1', 'commit': head}]}, 1)
 resolve({'items': []}, 1)
-unruled = resolve({**claims, 'rulings': []}, 1)
-assert flags[0]['file'] + ':' + str(flags[0]['line']) in unruled
-resolve({**claims, 'rulings': claims['rulings'] * 2}, 1)
 for change in ({'commit': base}, {'line': 99}, {'file': 'absent'}, {'log_sha256': '0' * 64}, {'run_id': 'bad'}):
     resolve({**claims, 'items': [{**pointer, **change}]}, 1)
 run_file.write_text(json.dumps({**run_record, 'conclusion': 'failure'}))
@@ -356,7 +368,20 @@ original_log = (artifact / pointer['log']).read_bytes()
 (artifact / pointer['log']).write_text('fabricated pass\n')
 resolve(expected=1)
 (artifact / pointer['log']).write_bytes(original_log)
-print('ok - real machine proof resolves across an unrelated base advance; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, non-default workflow refs or commits, foreign base history and missing exact-line rulings refuse, and unreachable evidence exits 3')
+print('ok - real machine proof resolves across an unrelated base advance; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, non-default workflow refs or commits and foreign base history refuse, and unreachable evidence exits 3')
+
+# Otherwise-valid evidence resolves whatever the advisory detector reported: the
+# claims above carry no ruling for its flags, and its report is not evidence.
+assert flags and 'rulings' not in claims
+assert 'evidence: resolved' in resolve({**claims, 'rulings': [{'id': 'different-line'}]})
+report_file = artifact / 'weakening.json'
+original_report = report_file.read_bytes()
+report_file.write_text('{"flags": [{"id": "changed"}]}\n')
+assert 'evidence: resolved' in resolve()
+report_file.unlink()
+assert 'evidence: resolved' in resolve()
+report_file.write_bytes(original_report)
+print('ok - advisory detector output alone never refuses otherwise-valid evidence')
 
 call(sys.executable, checker, 'dispatch', '--meta', meta, '--pr', 'https://github.com/example/repo/pull/9', env=forge_env)
 dispatched = json.loads((temp / 'dispatched.json').read_text())
@@ -364,7 +389,7 @@ assert dispatched[dispatched.index('--ref') + 1] == 'main'
 assert f'head={head}' in dispatched and f'dod={text}' in dispatched
 generated = json.loads(call(sys.executable, checker, 'claims', '--meta', meta, '--run', '123'))
 assert generated == {'items': [{'id': 'C1', 'run_id': '123'}]}
-assert 'evidence: resolved' in resolve({**generated, 'rulings': claims['rulings']})
+assert 'evidence: resolved' in resolve(generated)
 call(sys.executable, checker, 'claims', '--meta', meta, '--run', 'latest', expected=1)
 print('ok - dispatch targets the default-branch workflow with the exact head, and a finished run id becomes resolving claims')
 

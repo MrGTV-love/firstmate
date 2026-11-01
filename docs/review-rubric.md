@@ -4,7 +4,8 @@ This file owns the review criteria for Firstmate-dispatched no-mistakes runs and
 It does not change the selected delivery path, review authority, or merge policy.
 
 - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
-- Grade every DoD mandatory item by its dispatch-frozen id as pass, fail, or unresolved, with the evidence for that grade; GitHub PASS evidence uses the machine-resolving pointers and explicit weakened-test rulings owned by `bin/fm-dod-check.py --help` and recorded through `bin/fm-review-record.py --help`.
+- Grade every DoD mandatory item by its dispatch-frozen id as pass, fail, or unresolved, with the evidence for that grade; GitHub PASS evidence uses the machine-resolving pointers owned by `bin/fm-dod-check.py --help` and recorded through `bin/fm-review-record.py --help`.
+- Read the flags from `bin/fm-test-weakening.py --help` as advisory input to the review, never as a gate or a substitute for reading the tests.
 - Machine evidence shows that the frozen commands ran at the exact head with the exit codes the trusted recorder observed, and that each fail-first test's own assertions failed on base and held at head; it is not proof that a test establishes the item's Expected outcome. Grade each such test against Expected: a test that checks only a proxy, such as a file's existence or printed text, does not establish it.
 - Identify missing criteria or evidence explicitly rather than inventing requirements.
 - Grade an item fail only on demonstrated noncompliance; grade an item that could not be assessed unresolved, and name the missing evidence or decision.
