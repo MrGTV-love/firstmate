@@ -318,7 +318,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   printf 'zsh' > "$dir/fake/command"
   out=$(run_spawn "$dir" tc1 --relaunch --harness claude); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-spawn --relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launch")" \
     "tmux fm-spawn --relaunch"
 
   dir=$(new_case tc-tmux-control tc2)
@@ -326,7 +326,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc2 relaunch --note "resume under TeamClaude"); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-control relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launch")" \
     "tmux fm-control relaunch"
 
   dir=$(new_case tc-tmux-session-end tc3)
@@ -338,7 +338,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   expect_code 0 "$rc" "the session-end scan should succeed"$'\n'"$out"
   assert_contains "$out" "tc3 auto-relaunched after session-end" \
     "the session-end scan should relaunch the ended worker"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launch")" \
     "tmux session-end auto-relaunch"
   pass "config/claude-launcher=teamclaude: tmux fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
 }
@@ -428,7 +428,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc7 relaunch); rc=$?
   expect_code 0 "$rc" "a TeamClaude tmux secondmate relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launch")" \
     "tmux secondmate respawn"
 
   recovery_case_or_skip tc-herdr-secondmate tc8 || {

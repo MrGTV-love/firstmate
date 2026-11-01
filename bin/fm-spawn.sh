@@ -179,15 +179,16 @@
 #   socket, or unsupported secondmate mode) is terminal for that selected backend;
 #   callers must surface it instead of silently retrying another backend.
 #   --allow-api-key opts in to deliberate Anthropic API billing for this
-#   claude worker launch. Without this flag, a claude worker REFUSES to launch
-#   when ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would reach the worker
-#   through ambient environment inheritance, config/launch-env-allowlist, or
-#   (tmux backend) the tmux session or global environment the new window
-#   inherits, because Claude Code prefers an API key over a claude.ai
-#   subscription login and silently bills the API. A config/claude-account pin
-#   strips both variables, so a pinned launch is not refused. The refusal prints
-#   the exact `env -u` relaunch that clears an ambient value and this flag as
-#   the deliberate alternative. The opt-in is
+#   claude worker launch. Without this flag the default launch boundary keeps
+#   neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN, so an ambient, tmux
+#   session or tmux global value is dropped, not refused. A claude worker
+#   REFUSES to launch only when config/launch-env-allowlist lists one of them
+#   and it is set in this process or (tmux backend) the tmux session or global
+#   environment the new window inherits, because Claude Code prefers an API
+#   key over a claude.ai subscription login and silently bills the API. A
+#   config/claude-account pin strips both variables, so a pinned launch is not
+#   refused. The refusal prints the exact `env -u` relaunch that clears a
+#   process value and this flag as the deliberate alternative. The opt-in is
 #   recorded as api_key=allow in the task metadata and carried by fm-control
 #   relaunch. Does not apply to non-claude harnesses.
 #   A herdr crewmate or scout is placed in the exact workspace of the firstmate
@@ -3777,9 +3778,10 @@ fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
 # key would reach the worker, unless the caller explicitly opts in with
-# --allow-api-key. A key set in the spawning environment silently redirects
-# Claude Code to API billing even when the user has a valid claude.ai
-# subscription (issue #5723). The worker-account pin shed
+# --allow-api-key. A key the worker receives silently redirects Claude Code to
+# API billing even when the user has a valid claude.ai subscription (issue
+# #5723). Only a config/launch-env-allowlist entry can carry one past the
+# launch boundary without the opt-in. The worker-account pin shed
 # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
 # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
 # refuse when a pin is active: the key cannot reach the worker.

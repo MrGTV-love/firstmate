@@ -141,6 +141,7 @@ test_lock_identity_and_liveness_classification() {
 make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
 #!/usr/bin/env bash
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 if [ -n "${FM_FAKE_OMP_ENV_LOG:-}" ]; then
   printf '%s:%s\n' "${1:-launch}" "${PI_CODING_AGENT_DIR:-}" >> "$FM_FAKE_OMP_ENV_LOG"
 fi
@@ -1163,6 +1164,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   status=$?
   expect_code 0 "$status" "the selected agent dir must supply the global default, preserving model-id colons: $out"
   assert_present "$HOME_DIR/state/$id.meta" "a listed agent-dir default must publish the task"
+  fm_fake_config "$FAKEBIN_DIR" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log"
   HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$CASE_DIR/pane-agent" \
     PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
     bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
@@ -1214,6 +1216,9 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
     command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
     # shellcheck disable=SC2016 # The pane expands this variable when executing the raw command.
     [ "$mode" != uncertain ] || command='PI_CODING_AGENT_DIR="$PANE_AGENT_DIR" omp --auto-approve'
+    # A raw command runs inside the launch boundary, so a pane variable it
+    # expands must be listed.
+    [ "$mode" != uncertain ] || printf 'PANE_AGENT_DIR\n' > "$HOME_DIR/config/launch-env-allowlist"
     case "$mode" in
       stderr) command="$command 2>'$CASE_DIR/errors.log'" ;;
       stdin) command="$command <'$launch_dir/config.yml'" ;;
@@ -1247,6 +1252,7 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
         ;;
       listed | uncertain)
         expect_code 0 "$status" "raw omp must launch with a listed or uncertain directory ($mode): $out"
+        fm_fake_config "$FAKEBIN_DIR" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log"
         HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$caller_dir" PANE_AGENT_DIR="$launch_dir" \
           PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
           bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
@@ -1321,6 +1327,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
         env-omp | env-pi) ;;
         *) assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
       esac
+      fm_fake_config "$FAKEBIN_DIR" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log"
       HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$launch_dir" \
         OMP_PROFILE="$omp_profile" PI_PROFILE="$pi_profile" \
         PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
@@ -1392,6 +1399,13 @@ input
 EOF" ;;
         punctuation) command="$command --auto-approve input!" ;;
       esac
+      # A raw command runs inside the launch boundary, so a pane variable it
+      # expands must be listed.
+      case "$mode" in
+        profile | after-delimiter | redirect)
+          printf '%s\n' PROFILE_FLAG ERROR_LOG > "$HOME_DIR/config/launch-env-allowlist"
+          ;;
+      esac
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
@@ -1424,6 +1438,7 @@ EOF" ;;
         pane_home="$CASE_DIR/pane-home"
         mkdir -p "$pane_home"
       fi
+      fm_fake_config "$FAKEBIN_DIR" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log"
       HOME="$pane_home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
         PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1

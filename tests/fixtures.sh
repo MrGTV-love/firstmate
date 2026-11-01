@@ -401,11 +401,12 @@ FM_TEST_TEAMCLAUDE_CA=/fm-test/teamclaude-ca.pem
 # `teamclaude env` prints the forward-proxy export lines the real command prints.
 # teamclaude appends its environment to FM_FAKE_TEAMCLAUDE_ENV_LOG, and claude
 # to FM_FAKE_CLAUDE_ENV_LOG (and its arguments to <that>.args), when those are
-# set.
+# set directly or through fm_fake_config.
 fm_test_fake_teamclaude() {
   local fakebin=$1
   cat > "$fakebin/teamclaude" <<SH
 #!/usr/bin/env bash
+[ ! -f "\${0%/*}/.fm-fake-config" ] || . "\${0%/*}/.fm-fake-config"
 [ -z "\${FM_FAKE_TEAMCLAUDE_ENV_LOG:-}" ] || env >> "\$FM_FAKE_TEAMCLAUDE_ENV_LOG"
 case "\${1:-}" in
   status) exit "\${FM_FAKE_TEAMCLAUDE_STATUS:-0}" ;;
@@ -420,6 +421,7 @@ esac
 SH
   cat > "$fakebin/claude" <<'SH'
 #!/usr/bin/env bash
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 [ -z "${FM_FAKE_CLAUDE_ENV_LOG:-}" ] || {
   env >> "$FM_FAKE_CLAUDE_ENV_LOG"
   printf '%s\n' "$@" >> "$FM_FAKE_CLAUDE_ENV_LOG.args"
@@ -427,17 +429,6 @@ SH
 exit 0
 SH
   chmod +x "$fakebin/teamclaude" "$fakebin/claude"
-}
-
-# assert_launch_contains <launch-text> <expected> <msg>: the launch holds
-# <expected> as written or nested in one more single-quoted level, the form a
-# confined launch takes inside its sandbox-exec wrapper.
-assert_launch_contains() {
-  local quote="'" nested_quote="'\\''"
-  case "$1" in
-    *"$2"* | *"${2//$quote/$nested_quote}"*) ;;
-    *) fail "$3 (missing: '$2')" ;;
-  esac
 }
 
 # fm_test_claude_session_args <args-file> <task-meta>
@@ -472,8 +463,8 @@ fm_test_teamclaude_launch_env() {
   bash_dir=$(fm_test_bash_only_dir "$(dirname "$out")")
   : > "$out"
   : > "$out.teamclaude"
+  fm_fake_config "$fakebin" FM_FAKE_CLAUDE_ENV_LOG="$out" FM_FAKE_TEAMCLAUDE_ENV_LOG="$out.teamclaude"
   env -i HOME="$(dirname "$fakebin")" PATH="$fakebin:$bash_dir:/usr/bin:/bin" \
-    FM_FAKE_CLAUDE_ENV_LOG="$out" FM_FAKE_TEAMCLAUDE_ENV_LOG="$out.teamclaude" \
     /bin/sh -c "$launch" </dev/null >/dev/null 2>&1
 }
 

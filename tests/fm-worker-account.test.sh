@@ -263,7 +263,7 @@ test_pi_pin_selects_the_root_and_the_declared_provider() {
   [ "$(cat "$CASE/pi-checks")" = "$CASE/pi-work openai-codex" ] \
     || fail "the sign-in check should ask the pinned root about the model's provider: $(cat "$CASE/pi-checks")"
   launch=$(cat "$CASE/launch.log")
-  assert_contains "$launch" "--provider 'openai-codex' --model 'openai-codex/gpt-5.5'" \
+  assert_launch_contains "$launch" "--provider 'openai-codex' --model 'openai-codex/gpt-5.5'" \
     "the launch should confine Pi's model lookup to the declared provider"
   run_pane
   assert_grep "PI_CODING_AGENT_DIR=$CASE/pi-work" "$CASE/pi-worker" "the worker should run under the pinned Pi root"
@@ -432,7 +432,7 @@ test_model_index_catalog_follows_the_pinned_account() {
     > "$HOME_DIR/config/model-index.json"
   out=$(PI_CODING_AGENT_DIR="$CASE/ambient-pi" spawn_ship "$id-pi-pinned" --model role:pinned); rc=$?
   expect_code 0 "$rc" "a Pi role listed only by the pinned root's catalog should launch: $out"
-  assert_contains "$(cat "$CASE/launch.log")" "--model 'openai-codex/gpt-pinned'" "the pinned Pi spawn should launch the resolved id"
+  assert_launch_contains "$(cat "$CASE/launch.log")" "--model 'openai-codex/gpt-pinned'" "the pinned Pi spawn should launch the resolved id"
   out=$(PI_CODING_AGENT_DIR="$CASE/ambient-pi" spawn_ship "$id-pi-ambient" --model role:ambient); rc=$?
   expect_code 1 "$rc" "a Pi role listed only by the ambient root's catalog must refuse under the pin"
   assert_refused_before_launch "$id-pi-ambient" "$out" "id 'openai-codex/gpt-ambient' absent or retired in pi catalog"
@@ -640,7 +640,7 @@ test_configured_secondmate_inherits_frozen_routing_pair() {
     assert_not_contains "$out" "catalog unavailable" "configured selection must have readable pinned catalog evidence"
     assert_present "$CASE/mutated" "configured model did not exercise mutation"
     assert_grep 'model=openai/current' "$HOME_DIR/state/$id.meta" "configured model lost its frozen selection"
-    assert_contains "$(cat "$CASE/launch.log")" "--model 'openai/current'" "configured launch used later routing"
+    assert_launch_contains "$(cat "$CASE/launch.log")" "--model 'openai/current'" "configured launch used later routing"
     for member in model-index.json crew-dispatch.json; do
       cmp -s "$CASE/original-$member" "$sm/config/$member" \
         || fail "local secondmate inherited later $member at $boundary"
@@ -673,7 +673,7 @@ test_spawn_routing_pair_survives_account_boundaries() {
       model=openai/current
       [ "$selector" != stand-in:chosen ] || model=openai/standby
       assert_grep "model=$model" "$HOME_DIR/state/$id.meta" "spawn changed its frozen selection"
-      assert_contains "$(cat "$CASE/launch.log")" "--model '$model'" "spawn launched a later model generation"
+      assert_launch_contains "$(cat "$CASE/launch.log")" "--model '$model'" "spawn launched a later model generation"
       assert_grep "$root" "$CASE/pi-catalogs" "frozen selection bypassed the pinned native catalog"
       printf 'openai unrelated 128K 32K yes no\n' > "$root/listed"
       printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/current","stand_in":"openai/standby"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"

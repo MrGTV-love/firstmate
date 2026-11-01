@@ -73,6 +73,9 @@ case "${1:-}" in
       esac
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
+        *'Firstmate operational input waiting: read'*) printf '%s\n' "$payload" > "$D/launch" ;;
+      esac
+      case "$payload" in
         /exit|/quit)
           if [ ! -e "$D/remote-relaunch-end" ]; then
             : > "$D/local-relaunch-before-remote-end"
@@ -684,7 +687,7 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
   expect_code 0 "$rc" "native local restart failed: $out"
   assert_contains "$out" "restarted: sm1 (pi)" "native local restart did not complete"
   assert_contains "$(cat "$dir/home/state/sm1.meta")" "effort=ultra" "local restart dropped native effort"
-  assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "local restart dropped native launch flag"
+  assert_launch_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "local restart dropped native launch flag"
 
   dir=$(new_case native-remote)
   setup_remote_case "$dir" sm2 ok
@@ -966,8 +969,7 @@ test_teamclaude_restart_reaches_claude_through_the_proxy() {
 
   expect_code 0 "$rc" "a TeamClaude restart should succeed"$'\n'"$out"
   assert_contains "$out" "restarted: sm1 (claude)" "the mate should be restarted on claude"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" \
-    "$(grep -F 'Firstmate operational input waiting: read' "$dir/fake/literal" | tail -1)" \
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launch")" \
     "secondmate restart"
   pass "T12 a TeamClaude home restarts its Claude mate through the TeamClaude proxy"
 }

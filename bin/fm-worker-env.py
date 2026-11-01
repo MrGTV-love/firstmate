@@ -5,8 +5,8 @@ Usage: python3 bin/fm-worker-env.py [--harness ID] [--keep NAME ...] [--startup]
        python3 bin/fm-worker-env.py --shell-prefix [--harness ID] [--keep NAME ...]
 
 The default is the launch-env-allowlist operational floor. --keep adds
-validated names, never values. --harness adds the non-secret WORK plumbing and
-that harness's own HARNESS_ROUTES store selectors; fm-spawn passes it on every
+validated names, never values. --harness adds the non-secret WORK plumbing,
+the TOOLCHAIN selectors and that harness's own HARNESS_ROUTES store selectors; fm-spawn passes it on every
 launch without config/launch-env-allowlist, and an allowlist file replaces it
 with exactly the listed names. No secret-valued name is kept by default: a
 credential kept through --keep or the allowlist still reaches that harness's
@@ -46,6 +46,11 @@ XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 SSL_CERT_FILE SSL_CERT_DIR NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE
 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS DISABLE_AUTOUPDATER TRACEPARENT
+""".split())
+# Non-secret project toolchain selectors a worker build may need.
+TOOLCHAIN = frozenset("""
+JAVA_HOME GOROOT GOPATH CARGO_HOME RUSTUP_HOME PNPM_HOME BUN_INSTALL NVM_DIR
+VIRTUAL_ENV PYTHONPATH NODE_OPTIONS
 """.split())
 GIT_CONFIG = re.compile(r"GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)\Z")
 # Each harness's non-secret store selectors. Provider API keys and tokens are
@@ -87,7 +92,7 @@ def main():
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     names = FLOOR.union(args.keep)
     if args.harness is not None:
-        names |= WORK.union(HARNESS_ROUTES.get(args.harness, ()))
+        names |= WORK.union(TOOLCHAIN, HARNESS_ROUTES.get(args.harness, ()))
     git_config = args.harness is not None
     if args.shell_prefix:
         if command or args.startup:

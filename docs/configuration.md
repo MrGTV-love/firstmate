@@ -1799,7 +1799,7 @@ The launcher refuses again in the pane, rather than start Claude unproxied, if T
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
 Firstmate requires any nonempty override to be an absolute path.
-The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked; Claude and the rest of the worker get only the [launch environment](#worker-launch-environment-configlaunch-env-allowlist), which does not keep `TEAMCLAUDE_CONFIG` by default.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
 A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs through the launcher's `--exec`, so it receives the same proxy environment; ancestor-memory settings enforcement is owned by [`bin/fm-claude-memory-lib.sh`](../bin/fm-claude-memory-lib.sh), not bypassed by raw commands.
@@ -1948,12 +1948,13 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
-With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries) and the selected harness's non-secret store selectors.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries), the non-secret project toolchain selectors (`JAVA_HOME`, `GOROOT`, `GOPATH`, `CARGO_HOME`, `RUSTUP_HOME`, `PNPM_HOME`, `BUN_INSTALL`, `NVM_DIR`, `VIRTUAL_ENV`, `PYTHONPATH`, `NODE_OPTIONS`) and the selected harness's non-secret store selectors.
+Each retained name is passed only when the pane sets it.
 The launch uses `/usr/bin/env -i` with names-only retained entries, so unlisted readonly exports and non-identifier environment names are absent from the new process.
 The default starts the pane's own shell without user startup loading (`zsh -f`, or noninteractive Bash/sh without BASH_ENV/ENV), preserving its raw-command syntax.
-[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors, the `TOOLCHAIN` selectors and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
 [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
-Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
+Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`; without it the default launch drops both, and the [Claude API key guard](#claude-api-key-guard) refuses only an allowlist that lists one.
 
 DSH keeps the one credential its launch patch names, `DEEPSEEK_API_KEY` (`bin/fm-dsh.py api-key-env` owns the name).
 That key reaches the dsh-tui process, so it is a retained credential, not an isolated one.
@@ -1961,6 +1962,7 @@ The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKE
 
 The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
 Other names outside the default set stop reaching the worker the same way.
+A raw launch command runs inside this boundary, so a pane variable it expands is empty unless it is kept.
 The remedy is the optional local, gitignored `config/launch-env-allowlist`.
 That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
 A credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
@@ -2101,7 +2103,8 @@ Per-machine Cursor `cli-config.json` attribution-off is not this contract: it do
 
 ### Claude API key guard
 
-Every claude worker Firstmate launches is refused before creation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through ambient environment inheritance or an explicit allowlist entry.
+Every claude worker Firstmate launches is refused before creation when `config/launch-env-allowlist` lists `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` and that variable is set where the worker would inherit it.
+Without an allowlist file the default [launch environment](#worker-launch-environment-configlaunch-env-allowlist) keeps neither variable unless `--allow-api-key` is passed, so an ambient, tmux session or tmux global value is dropped from the launch and does not refuse it.
 Claude Code prefers an API key over a claude.ai subscription login and silently bills the API, so this guard prevents accidental API charges when the captain intends subscription billing.
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
@@ -2113,7 +2116,7 @@ A direct `fm-spawn.sh --relaunch` without the flag drops the line.
 
 When `config/launch-env-allowlist` is active, a variable name the allowlist does not list is filtered out of the worker environment; the guard does not refuse for a filtered-out variable, because it cannot reach the worker.
 
-On the tmux backend the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
+On the tmux backend, for a variable the allowlist lists, the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
 The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.

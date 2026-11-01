@@ -323,8 +323,8 @@ assert_grep 'model=openai-codex/gpt-6.1-sol' "$PARENT/state/ios.meta" "remote me
 assert_grep 'effort=high' "$PARENT/state/ios.meta" "remote metadata lost the omp effort"
 LAUNCH=$(remote_launch_command) || fail "the remote pane received no omp launch command"
 assert_contains "$LAUNCH" 'FM_OMP_HARNESS=omp' "the remote pane did not receive an omp launch"
-assert_contains "$LAUNCH" "--model 'openai-codex/gpt-6.1-sol'" "the remote omp launch command lost the selected model"
-assert_contains "$LAUNCH" "--thinking 'high'" "the remote omp launch command lost the selected effort"
+assert_launch_contains "$LAUNCH" "--model 'openai-codex/gpt-6.1-sol'" "the remote omp launch command lost the selected model"
+assert_launch_contains "$LAUNCH" "--thinking 'high'" "the remote omp launch command lost the selected effort"
 pass "a remote second mate on omp is accepted and its launch command carries the model and effort"
 
 # The stale-model gate runs in the remote host's own spawn, so the captain pin
@@ -344,7 +344,7 @@ OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness omp \
   --model "$STALE_REMOTE_MODEL" --captain-model-pin "$STALE_REMOTE_MODEL" 2>&1) \
   || fail "a captain pin naming the stale model did not reach the remote host: $OUT"
 LAUNCH=$(remote_launch_command) || fail "the remote pane received no launch command for the pinned stale model"
-assert_contains "$LAUNCH" "--model '$STALE_REMOTE_MODEL'" "the pinned stale remote launch lost the selected model"
+assert_launch_contains "$LAUNCH" "--model '$STALE_REMOTE_MODEL'" "the pinned stale remote launch lost the selected model"
 pass "a captain pin crosses the transport so a remote second mate can launch the stale model the captain named"
 
 # The automatic respawn (`fm-spawn.sh <id> --secondmate`, model from
@@ -359,7 +359,7 @@ OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate 2>&1) \
 assert_not_contains "$OUT" 'refusing to launch a stale model' \
   "the remote respawn of the recorded model was gated again"
 LAUNCH=$(remote_launch_command) || fail "the remote pane received no launch command for the respawn"
-assert_contains "$LAUNCH" "--model '$STALE_REMOTE_MODEL'" "the remote respawn lost the recorded model"
+assert_launch_contains "$LAUNCH" "--model '$STALE_REMOTE_MODEL'" "the remote respawn lost the recorded model"
 assert_contains "$(grep '^model_stale=' "$REMOTE_HOME/state/parent-route/ios.meta")" '(admitted by captain pin)' \
   "the remote record lost the captain-pin marker on respawn"
 printf '%s\n' "$SM_HARNESS_SAVED" > "$PARENT/config/secondmate-harness"

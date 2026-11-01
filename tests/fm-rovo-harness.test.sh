@@ -199,12 +199,12 @@ test_rovo_launch_then_send_is_verified() {
   assert_contains "$out" "spawned $id harness=rovo" "rovo spawn did not report success"
 
   launch=$(cat "$CASE_DIR/launch.log")
-  assert_contains "$launch" "$FAKEBIN_DIR/rovo' run --yolo" \
+  assert_launch_contains "$launch" "$FAKEBIN_DIR/rovo' run --yolo" \
     "rovo launch did not use the resolved binary with the bare launch-then-send shape"
   assert_not_contains "$launch" "--startup-receipt" "rovo launch used the incompatible --startup-receipt flag"
   assert_not_contains "$launch" "encode launch-brief" "rovo launch carried a positional brief instead of launching bare"
   assert_not_contains "$launch" "brief for rovo" "rovo launch embedded the brief body as a positional argument"
-  assert_contains "$launch" "--model 'auto'" "rovo launch omitted the requested model"
+  assert_launch_contains "$launch" "--model 'auto'" "rovo launch omitted the requested model"
   assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS" \
     "rovo launch did not clear foreign primary markers"
   assert_contains "$launch" "env -u CURSOR_AGENT -u CURSOR_INVOKED_AS" \

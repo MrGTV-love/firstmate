@@ -145,22 +145,12 @@ def git(*args, **kwargs):
 
 def refused(path):
     path = Path(path)
-    def snapshot():
-        if not path.exists():
-            return None
-        try:
-            return path.read_bytes()
-        except PermissionError:
-            # Dotenv contents are now unreadable in Claude; a refused write
-            # must still preserve inode, size and modification metadata.
-            info = path.stat()
-            return info.st_ino, info.st_size, info.st_mtime_ns
-    before = snapshot()
+    before = path.read_bytes() if path.exists() else None
     try:
         with path.open("a") as stream:
             stream.write("replaced")
     except PermissionError:
-        return snapshot() == before
+        return (path.read_bytes() if path.exists() else None) == before
     return False
 
 
