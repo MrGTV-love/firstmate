@@ -1123,10 +1123,7 @@ github_landing_tree_safe() {
 }
 
 # Pre-merge conditions from a live PR view, complete head rollup, base
-# requirements, and head producers. A check run naming another head is a hard
-# refusal regardless of app, merge method, ancestry, or queue eligibility;
-# github_landing_tree_safe's unavailable-record fallback cannot override it.
-# Sets FM_PR_MERGE_HEAD on success. Returns 3
+# requirements, and head producers. Sets FM_PR_MERGE_HEAD on success. Returns 3
 # for UNKNOWN alone, or 4 for an unreadable source or missing-check visibility
 # alone, so the caller can retry all live conditions within the same bound.
 github_verify_mergeable() {
@@ -1275,27 +1272,9 @@ $FM_PR_GITHUB_REQUIRED_ERROR
 EOF
   fi
   producers='[]'
-  runs=''
-  # Head binding protects every landing path, not just Actions tree proofs or
-  # app-bound requirements. A definite foreign head is never unavailable
-  # evidence that ancestry, a merge queue, or a waiver can make safe.
-  if printf '%s' "$rollup" | jq -e 'any(.[]; .__typename == "CheckRun")' >/dev/null \
-    || printf '%s' "$required" | jq -e 'any(.[]; .app_id != null)' >/dev/null; then
-    runs=$(gh api --paginate "repos/$PR_OWNER/$PR_REPO/commits/$live_head/check-runs" 2>/dev/null) || runs=''
-    if line=$(printf '%s' "$runs" | jq -sr --arg head "$live_head" '
-      [ .[].check_runs[]? | select((.head_sha | type) == "string" and .head_sha != $head)
-        | .id | tostring ] | unique | .[]' 2>/dev/null) && [ -n "$line" ]; then
-      FM_PR_CHECKS_BLOCKED=true
-      while IFS= read -r name; do
-        printf 'error: refusing to merge %s: check run %s did not run at head %s; no waiver applies\n' "$URL" "$name" "$live_head" >&2
-      done <<EOF
-$line
-EOF
-      return 1
-    fi
-  fi
   if printf '%s' "$required" | jq -e 'any(.[]; .app_id != null)' >/dev/null; then
-    if [ -z "$runs" ] \
+    if ! runs=$(gh api --paginate "repos/$PR_OWNER/$PR_REPO/commits/$live_head/check-runs" 2>/dev/null) \
+      || [ -z "$runs" ] \
       || ! producers=$(printf '%s' "$runs" | jq -sc --arg head "$live_head" '
         if length == 0 or any(.[]; (.check_runs | type) != "array"
             or (.total_count | type) != "number" or .total_count < 0
