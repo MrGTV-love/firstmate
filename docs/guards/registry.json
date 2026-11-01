@@ -861,13 +861,14 @@
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
         {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3},
-        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1}
+        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1},
+        {"file": "bin/fm-jev-guard.ts", "match": "device.effect === \"uri\" && device.alternative", "count": 1}
       ],
       "invariant": "a filesystem write without proved active T5 confinement must pass the filesystem path/root gate; a native local device must prove its measured effect and scope",
       "layer": "runtime-block",
       "source": "bin/fm-jev-guard.ts deviceEffects and lspEffects tables; on Darwin the seatbelt-v1 launch marker plus bin/fm-write-confinement.py --check-active kernel membership and metadata data-write/unlink denials; absent that proof, plain-path regex and repository roots; for local devices, realpaths and session-owned running-job snapshot",
       "trigger": "without proved active confinement a filesystem target fails its path/root check; a local device has no measured effect or fails its scope proof, or another scheme:// URI has no admitted write rule, each classified on the target omp write routes (hashline header unwrapped, scheme:// only, URL-parsed and trimmed with a lower-case scheme) while local admission needs the exact spelling; outbound-device denials belong to jev-egress-grant",
-      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; for other scheme:// URIs report the intended target and effect to Firstmate without reading or fetching it; for xd/proc devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
+      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; conflict:// targets stay refused because their file path is unproved: resolve the conflict by editing the conflicted file at its real path in your own work copy with the normal edit tool, subject to the same path rules as any other write; this named alternative is not prohibited by the refusal's retry guidance; for other scheme:// URIs report the intended target and effect to Firstmate without reading or fetching it; for xd/proc devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
       "budget": 1,
       "test": "tests/fm-jev-guard.test.sh",
       "tier": "C",
