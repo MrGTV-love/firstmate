@@ -117,6 +117,24 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 ''')
 
 try:
+    # Native core scaling: 18 cores admit six counted runs and 10 cores three.
+    # One below the limit admits at once; at the limit the next start queues
+    # without running until a counted run is released.
+    for cores, limit in ((18, 6), (10, 3)):
+        folder, db, env = case('scaling-' + str(cores), cores=cores, running=limit - 1)
+        marker = folder / 'below.marker'
+        finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'below'))
+        assert marker.exists()
+        change(db, "INSERT INTO runs (id, status) VALUES ('at-limit', 'running')")
+        marker = folder / 'at.marker'
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'at')
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: ' in (folder / 'at.stderr').read_text(), str(cores) + '-core start queued at the limit')
+        assert not marker.exists() and child.poll() is None
+        change(db, "UPDATE runs SET status='completed' WHERE id='at-limit'")
+        finish(child)
+        assert marker.exists()
+
     # Count == limit blocks at the exact load boundary. Releasing count while
     # load is above the boundary still blocks; only both observations grant.
     folder, db, env = case('thresholds', running=6, load=36)
