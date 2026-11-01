@@ -17,8 +17,7 @@ if [ "${1:-}" = --registered-homes ]; then
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in '- '*) ;; *) continue ;; esac
     secondmate_registry_parse_line "$line"
-    printf '%s\0%s\0%s\0%s\0' "$SECONDMATE_REGISTRY_ID" "$SECONDMATE_REGISTRY_HOME" \
-      "$SECONDMATE_REGISTRY_HOST" "$SECONDMATE_REGISTRY_ROOT"
+    printf '%s\0%s\0%s\0' "$SECONDMATE_REGISTRY_ID" "$SECONDMATE_REGISTRY_HOME" "$SECONDMATE_REGISTRY_HOST"
   done < "$registry"
   exit 0
 fi

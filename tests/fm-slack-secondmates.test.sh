@@ -55,7 +55,7 @@ argv = base64.b64decode(args[i+4]).decode().rstrip('\\0').split('\\0')
 assert argv[0] in ('fm-fleet-snapshot.sh', 'fm-remote-file.sh', 'fm-captain-hold.sh'), argv
 assert not any(key.startswith('SLACK_') for key in os.environ)
 with open(Path(home).parent / 'routes.jsonl', 'a') as log:
-    log.write(json.dumps({'home': home, 'argv': argv}) + '\\n')
+    log.write(json.dumps({'root': root, 'home': home, 'argv': argv}) + '\\n')
 env = dict(os.environ, FM_HOME=home, FM_STATE_OVERRIDE=home+'/state',
            FM_DATA_OVERRIDE=home+'/data', FM_CONFIG_OVERRIDE=home+'/config')
 os.execve('/bin/bash', ['bash', root+'/bin/'+argv[0], *argv[1:]], env)
@@ -121,5 +121,62 @@ out = call(main, 'fm-slack-poll.sh', *args, code=1)
 assert 'closed: shared-call' in out, out
 call(main, 'fm-captain-hold.sh', 'open', 'shared-call', code=1)
 print('M4: main answer still closes main despite unreadable registered remote home')
+def owned(key, owner_id):
+    return [r for r in json.loads(state_path.read_text())['threads'].values()
+            if r['key'] == key and r.get('owner', {}).get('id') == owner_id]
+
+def reply(record, ts, text):
+    replay = json.loads(replay_path.read_text())
+    replay['messages'].append({'ts': ts, 'thread_ts': record['ts'], 'user': 'U0TESTOWNER', 'text': text})
+    replay_path.write_text(json.dumps(replay))
+
+def posted(needle):
+    return [m for m in json.loads(replay_path.read_text())['messages'] if needle in m.get('text', '')]
+
+registry.write_text(registered)
+call(remote, 'fm-captain-hold.sh', 'hold', 'moved-call', '--title', 'Pick the target',
+     '--reason', 'Which target?', extra={'FM_CAPTAIN_HOLD_NOW': '2026-10-02T00:00:00Z'})
+call(main, 'fm-slack-mirror.sh', *args)
+assert len(owned('moved-call', 'remote')) == 1, owned('moved-call', 'remote')
+moved_root = tmp / 'moved-root'
+moved_root.symlink_to(root)
+registry.write_text(registered.replace(f'root: {root};', f'root: {moved_root};'))
+call(main, 'fm-slack-mirror.sh', *args)
+moved = owned('moved-call', 'remote')
+assert len(moved) == 1 and len(posted('Task: moved-call')) == 1, ('root move duplicated the card', moved)
+reply(moved[0], '999.000004', 'target a')
+out = call(main, 'fm-slack-poll.sh', *args)
+assert 'closed: moved-call' in out, out
+call(remote, 'fm-captain-hold.sh', 'open', 'moved-call', code=1)
+routes = [json.loads(line) for line in (tmp / 'routes.jsonl').read_text().splitlines()]
+answer = [r for r in routes if r['argv'][:2] == ['fm-captain-hold.sh', 'answers']][-1]
+assert answer['root'] == str(moved_root) and answer['home'] == str(remote), answer
+print('F3 root move: one moved-call card; its answer closed remote through the moved code root')
+
+call(local, 'fm-captain-hold.sh', 'hold', 'orphan-call', '--title', 'Pick the lane',
+     '--reason', 'Which lane?', extra={'FM_CAPTAIN_HOLD_NOW': '2026-10-03T00:00:00Z'})
+call(main, 'fm-slack-mirror.sh', *args)
+orphan = owned('orphan-call', 'local')
+assert len(orphan) == 1, orphan
+reply(orphan[0], '999.000005', 'lane a')
+call(main, 'fm-slack-poll.sh', *args, extra={'FM_SLACK_FAULT': 'after-stage'}, code=75)
+pending = json.loads(state_path.read_text())['pending']
+assert pending and pending[0]['owner']['id'] == 'local', pending
+remote_line = next(line for line in registered.splitlines(True) if line.startswith('- remote '))
+main_before = (main / 'data/backlog.md').read_bytes()
+registry.write_text(remote_line + f'- unreadable - Missing lane (home: {tmp}/missing; scope: missing; projects: sample; added 2026-10-01)\n')
+out = call(main, 'fm-slack-poll.sh', *args, code=1)
+assert 'secondmate_home_unavailable: unreadable (%s/missing)' % tmp in out, out
+assert out.count('orphaned thread: orphan-call from unregistered secondmate local') == 1, out
+assert 'reply for an unregistered secondmate home: orphan-call' in out and 'closed: orphan-call' not in out, out
+assert not json.loads(state_path.read_text())['pending'], 'refused answer stayed journaled'
+assert posted('Answer not applied') and len(posted('Orphaned: orphan-call')) == 1, 'missing thread refusal'
+call(local, 'fm-captain-hold.sh', 'open', 'orphan-call')
+assert (main / 'data/backlog.md').read_bytes() == main_before, 'main record changed'
+print('F3 removed home: answer refused, local orphan-call still open, one orphan report beside the unreadable-home refusal')
+registry.write_text(remote_line)
+out = call(main, 'fm-slack-poll.sh', *args)
+assert 'orphaned thread' not in out and 'secondmate_home_unavailable' not in out, out
+print('F3 orphan: reported once; later polls succeed without a lasting error')
 print('ok - registered-home cards and crash/reload owner-home answer roundtrip')
 PY

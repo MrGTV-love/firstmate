@@ -315,10 +315,10 @@ class Watch:
             if result.returncode:
                 raise SlackError(flat(result.stderr).strip() or 'secondmate_registry_unavailable')
             fields = result.stdout.split('\0')[:-1]
-            if len(fields) % 4:
+            if len(fields) % 3:
                 raise SlackError('secondmate_registry_unavailable')
-            self._owners = [dict(zip(('id', 'home', 'host', 'root'), fields[i:i + 4]))
-                            for i in range(0, len(fields), 4)]
+            self._owners = [dict(zip(('id', 'home', 'host'), fields[i:i + 3]))
+                            for i in range(0, len(fields), 3)]
         return self._owners
 
     def owner_error(self, owner):
@@ -327,10 +327,6 @@ class Watch:
     def owner_run(self, owner, script, *args, text=None):
         if not owner:
             return run(script, *args, text=text)
-        # Persisted threads and pending answers are bound to the original placement,
-        # not just a route name that could now select a different home.
-        if owner not in self.owners():
-            raise self.owner_error(owner)
         if owner['host']:
             prefix = ('--stdin',) if text is not None else ()
             return run('fm-on.sh', *prefix, owner['id'], script, *args, text=text)
@@ -343,8 +339,13 @@ class Watch:
         return result.returncode, result.stdout.strip() or 'unknown'
 
     def hold(self, record):
-        """live, replaced, closed, or unknown for the call a thread mirrors."""
-        rc, identity = self.probe(record['key'], record.get('owner'))
+        """live, replaced, closed, orphaned, or unknown for the call a thread mirrors."""
+        owner = record.get('owner')
+        # Persisted threads and pending answers are bound to the original placement,
+        # not just a route name that could now select a different home.
+        if owner and owner not in self.owners():
+            return 'orphaned'
+        rc, identity = self.probe(record['key'], owner)
         if rc == 1:
             return 'closed'
         if rc == 0:
@@ -590,6 +591,10 @@ class Watch:
             if standing == 'replaced':
                 self.say('check: slack %s - reply for a replaced hold: %s' % (pending['thread'], pending['key']))
                 pending['accepted'] = False
+            elif standing == 'orphaned':
+                self.say('check: slack %s - reply for an unregistered secondmate home: %s' % (
+                    pending['thread'], pending['key']))
+                pending['accepted'] = False
             else:
                 row = '\t'.join([pending['key'], flat(pending['answer']), flat(pending['label']),
                                  pending.get('mode', 'done')]) + '\n'
@@ -720,6 +725,16 @@ class Watch:
                     self.post('superseded:' + occurrence,
                               'Superseded: ' + slack_escape(record['key']) + ' was held again. Answer in its newer thread.',
                               record['ts'])
+                elif standing == 'orphaned':
+                    owner = record['owner']
+                    self.post('orphaned:' + occurrence,
+                              'Orphaned: ' + slack_escape(record['key']) + '\nIts secondmate home '
+                              + slack_escape('%s (%s)' % (owner['id'], owner['home']))
+                              + ' is no longer registered, so answers here are not delivered.'
+                              ' Full decision remains in that home\'s backlog.',
+                              record['ts'])
+                    self.say('check: slack %s - orphaned thread: %s from unregistered secondmate %s (%s)' % (
+                        record['ts'], record['key'], owner['id'], owner['home']))
                 else:
                     self.post('resolved:' + occurrence,
                               'Resolved: ' + slack_escape(record['key'])
@@ -835,7 +850,8 @@ class Watch:
                 self.read_threads.discard(record['ts'])
                 remaining -= self.advanced - advanced
                 deferred = deferred or error
-        deferred = self.resolve() or deferred
+        resolved = self.resolve()
+        deferred = deferred or resolved
         if deferred:
             raise deferred
 

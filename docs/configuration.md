@@ -3471,7 +3471,8 @@ The poll has no stop of its own: `FM_MAIL_TIMEOUT` bounds each socket read and t
 The Slack plane mirrors this home's and every registered secondmate home's open captain-held tasks into one owner DM, one thread per owning home and hold occurrence, and returns answers through the existing keyed-answer intake.
 The existing `data/secondmates.md` registry supplies placement; local homes use their own data and state directories, while remote homes use `bin/fm-on.sh` and the existing remote file reader.
 Secondmate cards identify their owning home, and that placement stays with both the thread and any journaled answer, so identical task ids in different homes cannot redirect a reply into main.
-A removed or changed registration refuses delivery to the old card's owner rather than selecting a replacement home.
+The owner is the registered id, host, and home; a remote `root:` is only where `bin/fm-on.sh` runs, so moving the code root keeps the same card and thread.
+A removed or changed registration refuses delivery to the old card's owner rather than selecting a replacement home: a journaled answer is acknowledged as not applied, and the poll reports the orphaned thread once with a `check: slack <thread> - orphaned thread:` line and a thread reply, then stops tracking it, so it never masks a current unreadable-home refusal.
 An unreadable registered home is named in the mirror's failure output; readable homes and existing threads remain eligible for processing.
 Only the mirroring home's `slack-dm` binding and Slack configuration are needed; no second mirror or secondmate Slack credential is required.
 It does not create decisions, reconcile them, or change merge authority.
