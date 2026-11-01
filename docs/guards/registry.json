@@ -599,7 +599,7 @@
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
-        {"file": "bin/fm-teardown.sh", "match": "only recorded bundle $TEARDOWN_BUNDLE_ACCEPTED holds", "count": 2}
+        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $TEARDOWN_BUNDLE_ACCEPTED", "count": 2}
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",

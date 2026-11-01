@@ -107,9 +107,11 @@
 # result is cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
-# The returned slot keeps its ignored files. Any other task copy whose HEAD only
-# the bundle holds refuses while it holds an ignored file outside the
-# teardown_preservable_ignored allow-list: land that commit or move the file out.
+# The returned slot keeps its ignored files. On the ordinary bundle route, every
+# own copy cleanup sweeps (including anchored or landed prior copies) refuses
+# while it holds an ignored file outside teardown_preservable_ignored's allow-list:
+# land the task's commit to leave the bundle route, or move the file out.
+# Landed-only cleanup and --force keep their existing rules.
 # Those commits still go to the captain to land or drop, so the bundle route
 # also requires the captain's call to be filed already: this task's backlog row
 # must be held for the captain, and an open captain-held task in this home
@@ -3342,8 +3344,8 @@ validate_worktree_teardown_safety() {
       fi
       return 1
     fi
-    if [ -n "$TEARDOWN_BUNDLE_PROOF" ] && [ "$wt_real" != "$TEARDOWN_RETURN_SLOT" ]; then
-      teardown_bundle_ignored_kept "$wt_real" "teardown would remove task $ID's copy" || return 1
+    if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
+      teardown_bundle_swept_ignored_kept "$wt_real" || return 1
     fi
   fi
 }
@@ -4699,19 +4701,31 @@ teardown_remove_own_nested_copies() {  # <slot-label>
     }
   done
 }
-# A recorded bundle holds only commits: a copy it admits that teardown removes
-# still refuses while it holds ignored files that no hash record preserves.
+# A recorded bundle holds only commits: every own copy its cleanup removes
+# still needs an ignored-file proof, even when an anchor or landing holds HEAD.
 # The returned slot keeps its ignored files, so it needs no such proof.
 teardown_bundle_ignored_kept() {  # <copy> <refusal-subject> [proof-outcome]
   local unique
   if unique=$(teardown_preservable_ignored "$1"); then
     [ -n "$unique" ] || return 0
-    echo "REFUSED: $2 $1, whose HEAD only recorded bundle $TEARDOWN_BUNDLE_ACCEPTED holds, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $TEARDOWN_BUNDLE_ACCEPTED, but it holds ignored files no hash record preserves: $(printf '%s' "$unique" | paste -sd ' ' -)${3:+; $3}." >&2
   else
-    echo "REFUSED: $2 $1, whose HEAD only recorded bundle $TEARDOWN_BUNDLE_ACCEPTED holds, but its ignored files cannot be listed${3:+; $3}." >&2
+    echo "REFUSED: $2 $1, during cleanup admitted by recorded bundle $TEARDOWN_BUNDLE_ACCEPTED, but its ignored files cannot be listed${3:+; $3}." >&2
   fi
   echo "Land that commit, or move those ignored files out of the copy, then re-run teardown." >&2
   return 1
+}
+teardown_bundle_swept_ignored_kept() {  # <admitted-copy> [proof-outcome]
+  local copy
+  if [ "$1" != "$TEARDOWN_RETURN_SLOT" ] && [ -d "$1" ]; then
+    teardown_bundle_ignored_kept "$1" 'bundle-admitted teardown would remove copy' "${2:-}" || return 1
+  fi
+  # Preserve the existing force path, including its admitted-copy proof above.
+  [ "$FORCE" != "--force" ] || return 0
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    [ "$copy" != "$1" ] && [ "$copy" != "$TEARDOWN_RETURN_SLOT" ] && [ -d "$copy" ] || continue
+    teardown_bundle_ignored_kept "$copy" 'bundle-admitted teardown would remove copy' "${2:-}" || return 1
+  done
 }
 teardown_own_copy_disposable() {  # <canonical-copy>
   local copy=$1 what="recorded prior_worktree" rc=0
@@ -4723,9 +4737,8 @@ teardown_own_copy_disposable() {  # <canonical-copy>
     2)
       TEARDOWN_BUNDLE_ACCEPTED=
       if teardown_landed "$copy" HEAD ""; then
-        [ -n "$TEARDOWN_BUNDLE_ACCEPTED" ] && [ "$copy" != "$TEARDOWN_RETURN_SLOT" ] || return 0
-        teardown_bundle_ignored_kept "$copy" "returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what" \
-          "$TEARDOWN_PROOF_OUTCOME"
+        [ -n "$TEARDOWN_BUNDLE_ACCEPTED" ] || return 0
+        teardown_bundle_swept_ignored_kept "$copy" "$TEARDOWN_PROOF_OUTCOME"
         return
       fi
       echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; $TEARDOWN_PROOF_OUTCOME." >&2

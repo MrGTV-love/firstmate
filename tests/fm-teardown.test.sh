@@ -3592,6 +3592,54 @@ test_bundle_does_not_excuse_nested_copy_ignored_files() {
   pass 'a verified bundle never excuses a removed copy holding unpreserved ignored files'
 }
 
+# The bundle admits the task copy, not this other copy. Anchored or landed
+# commits do not preserve a swept prior copy's unique ignored bytes.
+# Ordinary landed-only cleanup is a separate pre-existing rule, not this test.
+test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files() {
+  local case_dir prior run proof bytes rc head
+  for run in anchored:unique anchored:clean landed:unique landed:clean; do
+    proof=${run%%:*}
+    bytes=${run#*:}
+    make_nested_slot_case "bundle-sweep-$proof-$bytes" enclosing nested/current
+    case_dir=$NESTED_CASE
+    printf 'task work\n' > "$NESTED_COPY/work.txt"
+    git -C "$NESTED_COPY" add work.txt
+    git -C "$NESTED_COPY" commit -qm 'unpublished task work'
+    record_preservation_bundle "$case_dir" "$NESTED_COPY" "$case_dir/bundles/work.bundle" --all \
+      || fail 'cannot create bundle fixture'
+    prior="$NESTED_SLOT/nested/prior"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-prior "$prior" main
+    if [ "$proof" = anchored ]; then
+      printf 'prior work\n' > "$prior/prior.txt"
+      git -C "$prior" add prior.txt
+      git -C "$prior" commit -qm 'anchored prior work outside the bundle'
+      head=$(git -C "$prior" rev-parse HEAD)
+      git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$head" "$head"
+    fi
+    printf 'prior_worktree=%s\n' "$prior" >> "$case_dir/state/task-x1.meta"
+    if [ "$bytes" = unique ]; then
+      printf 'unique-anchored.dat\n' >> "$(git -C "$prior" rev-parse --path-format=absolute --git-path info/exclude)"
+      printf 'only copy\n' > "$prior/unique-anchored.dat"
+    fi
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$bytes" = clean ]; then
+      expect_code 0 "$rc" "$run: a clean proved prior copy must not block the bundle route: $(cat "$case_dir/stderr")"
+      assert_absent "$prior" "$run: clean prior copy survived"
+      assert_absent "$NESTED_COPY" "$run: clean task copy survived"
+      continue
+    fi
+    expect_code 1 "$rc" "$run: bundle admission must not discard a different copy's ignored bytes: $(cat "$case_dir/stderr")"
+    assert_grep 'ignored files no hash record preserves: unique-anchored.dat' "$case_dir/stderr" "$run: ignored-file refusal missing"
+    assert_equals 'only copy' "$(cat "$prior/unique-anchored.dat")" "$run: prior ignored bytes lost"
+    assert_present "$prior/.git" "$run: prior copy removed before refusal"
+    assert_present "$NESTED_COPY/.git" "$run: task copy removed before refusal"
+    assert_present "$case_dir/state/task-x1.meta" "$run: task retired before refusal"
+    assert_absent "$case_dir/treehouse.log" "$run: slot returned before refusal"
+  done
+  pass 'bundle admission refuses before sweeping anchored or landed prior copies with unique ignored bytes'
+}
+
 test_foreign_bundle_preservation_keeps_other_proofs() {
   local shape rc head pid real_cp
   for shape in clean dirty ignored process; do
@@ -3787,6 +3835,7 @@ test_bundle_hint_skips_a_moved_head_at_final_custody
 test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
 test_bundle_does_not_excuse_nested_copy_ignored_files
+test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs
 )
 
