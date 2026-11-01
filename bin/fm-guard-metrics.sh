@@ -10,8 +10,9 @@
 # Opportunities exclude bypasses, and a guard row counts one per guarded
 # operation, not one per rule row; refusal_to_bypass_ratio is
 # (override/bypass events + supplied workaround signatures) / denies, null if no
-# denies. A row whose guard is not a string, or whose ts, rule or task is present
-# and not a string, is skipped like a torn line.
+# denies. A row whose guard is not a nonempty string, or whose ts, rule, task,
+# session, actor, decision, head or kind is present and not a string, is skipped
+# like a torn or undecodable line; the summary counts them as malformed_rows.
 # Repeat denies count additional denies per task across sessions, per rule.
 # Session-only legacy events cannot establish task attribution.
 # Retirement remains the guard-level rule in docs/guard-spec.md; rule rows are
@@ -50,17 +51,26 @@ if a.min_opportunities < 1 or a.days < 1:
     p.error('opportunities and days must be positive')
 
 
+STRING_FIELDS = ('ts', 'rule', 'task', 'session', 'actor', 'decision', 'head', 'kind')
+malformed = 0
+
+
 def json_lines(path):
+    global malformed
     try:
-        with open(path, encoding='utf-8') as stream:
+        with open(path, encoding='utf-8', errors='replace') as stream:
             for line in stream:
+                if not line.strip():
+                    continue
                 try:
                     row = json.loads(line)
-                except (ValueError, UnicodeError):
-                    continue  # A torn final event must not hide earlier evidence.
+                except ValueError:
+                    row = None  # A torn final event must not hide earlier evidence.
                 if (isinstance(row, dict) and isinstance(row.get('guard'), str) and row['guard']
-                        and all(isinstance(row.get(key, ''), str) for key in ('ts', 'rule', 'task'))):
+                        and all(isinstance(row.get(key, ''), str) for key in STRING_FIELDS)):
                     yield row
+                else:
+                    malformed += 1
     except FileNotFoundError:
         return
     except OSError as error:
@@ -168,7 +178,8 @@ present = Path(a.log).is_file()
 quiet = sorted(guard for guard in entries if guard not in grouped and (not only or guard in only)) if present else []
 summary = dict(guards=len(guards), measured=sum(g['verdict'] != 'unmeasured' for g in guards),
                cut=sum(g['verdict'] == 'cut' for g in guards),
-               unmeasured=sum(g['verdict'] == 'unmeasured' for g in guards))
+               unmeasured=sum(g['verdict'] == 'unmeasured' for g in guards),
+               malformed_rows=malformed)
 if a.undecided:
     for g in guards:
         if g['verdict'] == 'cut' and not judged(g['id'], grouped[g['id']]):

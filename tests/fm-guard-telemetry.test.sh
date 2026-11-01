@@ -370,12 +370,23 @@ printf '%s\n' \
   '{"guard":"gmalformed","rule":"base","task":"task-a","decision":"deny","ts":null}' \
   '{"guard":"gmalformed","rule":7,"task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
   '{"guard":7,"rule":"base","task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
-  '{"guard":"gmalformed","rule":"base","task":["task-a"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' >> "$MALFORMED"
+  '{"guard":"gmalformed","rule":"base","task":["task-a"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","session":["s"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","actor":["main"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' >> "$MALFORMED"
 "$EVENT" gmalformed allow --rule base --task task-a --log "$MALFORMED"
+printf '{"guard":"gmalformed","note":"\303' >> "$MALFORMED"
 "$METRICS" --log "$MALFORMED" --json > "$TMP/malformed-metrics.json" || fail "a malformed event row aborted the metrics report"
-jq -e '.guards[] | select(.id == "gmalformed") | .denies == 1 and .allows == 1 and .median_clear_attempts == 1
-  and .workarounds == null and .refusal_to_bypass_ratio == 0' "$TMP/malformed-metrics.json" >/dev/null \
-  || fail "malformed rows hid valid evidence or an absent feed was reported as measured: $(cat "$TMP/malformed-metrics.json")"
+jq -e '(.guards[] | select(.id == "gmalformed") | .denies == 1 and .allows == 1 and .median_clear_attempts == 1
+  and .workarounds == null and .refusal_to_bypass_ratio == 0) and .summary.malformed_rows == 7' "$TMP/malformed-metrics.json" >/dev/null \
+  || fail "malformed rows hid valid evidence, went uncounted, or an absent feed was reported as measured: $(cat "$TMP/malformed-metrics.json")"
+printf '%s\n' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":["abc"],"kind":"tree-equal-merge"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":"abd","kind":["tree-equal-merge"]}' > "$TMP/malformed-signatures.jsonl"
+"$METRICS" --log "$MALFORMED" --workarounds "$TMP/malformed-signatures.jsonl" --json > "$TMP/malformed-feed.json" \
+  || fail "a malformed signature row aborted the metrics report"
+jq -e '(.guards[] | select(.id == "gmalformed") | .workarounds == 1) and .summary.malformed_rows == 9' "$TMP/malformed-feed.json" >/dev/null \
+  || fail "malformed signature rows were counted as signatures or went uncounted: $(cat "$TMP/malformed-feed.json")"
 "$METRICS" --log "$MALFORMED" | grep -q '^METRIC gmalformed .*workarounds=null' \
   || fail "the text report did not mark workaround signatures as not measured"
 pass "malformed event rows are skipped and an absent workaround feed reads as not measured"
@@ -396,6 +407,19 @@ jq -e '[.rules[] | select(.id == "gops")] | length == 3 and all(.[]; .allows == 
   and (map(select(.rule == "required-reported"))[0].opportunities == 1)' "$TMP/operations.json" >/dev/null \
   || fail "each rule row must keep its own allow"
 pass "one guarded operation counts once at guard level and once per rule"
+
+# A relaunch child records no second gate allow for the operation its
+# fm-control parent already recorded.
+(
+  cd "$TMP" || exit 111
+  unset FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE FM_HOME
+  # shellcheck disable=SC2030 # This subshell owns its own gate environment.
+  export FM_GUARD_EVENT_LOG="$TMP/relaunch-child.jsonl" FM_CONTROL_RELAUNCH_TX=fixture-tx
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  fm_refuse_if_gate_agent
+) || fail "the relaunch child's gate check refused outside a gate"
+[ ! -s "$TMP/relaunch-child.jsonl" ] || fail "a relaunch child recorded a second gate allow: $(cat "$TMP/relaunch-child.jsonl")"
 
 # A clearing allow comes from the deny's actor class, through the real gate check.
 ACTOR_LAB=$("$ROOT/bin/fm-lab-home.sh" create "$TMP/actor-lab") || fail "could not create the actor lab home"
@@ -516,11 +540,16 @@ python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_D
 jq -se --arg head "$merged" 'length == 2 and all(.[]; .head == $head and .task == "merge-task")
   and any(.[]; .kind == "tree-equal-merge") and any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/signatures.jsonl" >/dev/null \
   || fail "redundant base merge did not produce both signatures"
-# Malformed matching refusals ahead of a valid one are skipped, not fatal.
-jq -c '.ts = null, (.base = 7 | .ts = "2000-01-01T00:00:00Z"), .' \
+# Malformed matching refusals ahead of a valid one are skipped and counted, not
+# fatal, and so is an undecodable torn final line.
+jq -c '.ts = null, (.base = 7 | .ts = "2000-01-01T00:00:00Z"), (.rule = ["x"]), .' \
   "$STATE_DIR/guard-events.jsonl" > "$TMP/malformed-first.jsonl"
-python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$TMP/malformed-first.jsonl" --json > "$TMP/malformed-first-result.jsonl" \
-  || fail "a malformed refusal aborted the workaround scan"
+printf '{"guard":"merge-green-head","note":"\303' >> "$TMP/malformed-first.jsonl"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$TMP/malformed-first.jsonl" --json \
+  > "$TMP/malformed-first-result.jsonl" 2> "$TMP/malformed-first.err" \
+  || fail "a malformed refusal aborted the workaround scan: $(cat "$TMP/malformed-first.err")"
+grep -q 'skipped 4 malformed event row' "$TMP/malformed-first.err" \
+  || fail "the detector did not count its skipped rows: $(cat "$TMP/malformed-first.err")"
 jq -se --arg head "$merged" 'any(.[]; .kind == "base-merge-only-after-refusal" and .head == $head)' "$TMP/malformed-first-result.jsonl" >/dev/null \
   || fail "a malformed refusal hid a valid base-merge-only signature"
 [ "$(git -C "$REPO" show-ref)" = "$before_refs" ] && [ "$(git -C "$REPO" status --porcelain)" = "$before_status" ] \
@@ -554,6 +583,34 @@ git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse "
 python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/stale-local-correlation.jsonl"
 jq -se 'any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/stale-local-correlation.jsonl" >/dev/null \
   || fail "a stale local base hid a real base-merge-only change"
+# A task whose base resolves to no commit is attributed nothing: its scan would
+# otherwise walk into the base's own history and blame the task for it.
+LEGACY="$TMP/unresolved-base-repo"
+git init -q -b master "$LEGACY"
+git -C "$LEGACY" commit -q --allow-empty -m seed
+git -C "$LEGACY" checkout -qb topic
+git -C "$LEGACY" commit -q --allow-empty -m topic
+git -C "$LEGACY" checkout -q master
+git -C "$LEGACY" merge -q --no-ff -s ours topic -m 'historic tree-equal merge'
+historic=$(git -C "$LEGACY" rev-parse HEAD)
+git -C "$LEGACY" checkout -qb feature-unresolved
+printf 'work\n' > "$LEGACY/work.txt"
+git -C "$LEGACY" add work.txt
+git -C "$LEGACY" commit -qm ordinary
+mkdir -p "$TMP/unresolved-state"
+printf 'kind=ship\nworktree=%s\nbranch=feature-unresolved\n' "$LEGACY" > "$TMP/unresolved-state/legacy-task.meta"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" > "$TMP/unresolved.txt" \
+  || fail "an unresolved base aborted the home scan"
+[ "$(cat "$TMP/unresolved.txt")" = 'GUARD_WORKAROUND task=legacy-task base=unresolved (nothing attributed; record base_branch in its metadata)' ] \
+  || fail "an unresolved base was not reported, or base history was attributed: $(cat "$TMP/unresolved.txt")"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" --json \
+  > "$TMP/unresolved.jsonl" 2> "$TMP/unresolved.err" || fail "an unresolved base aborted the JSON home scan"
+[ ! -s "$TMP/unresolved.jsonl" ] || fail "an unresolved base leaked a signature into the JSON feed: $(cat "$TMP/unresolved.jsonl")"
+grep -q 'task=legacy-task base=unresolved' "$TMP/unresolved.err" \
+  || fail "the JSON home scan did not report the unresolved base on stderr"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$LEGACY" --head master --task legacy-task --log "$TMP/none.jsonl" --json > "$TMP/explicit.jsonl"
+jq -se --arg head "$historic" 'length == 1 and .[0].head == $head' "$TMP/explicit.jsonl" >/dev/null \
+  || fail "explicit --repo mode no longer reports a tree-equal merge it is pointed at"
 pass "real tree-equal/base-only merges are detected read-only without blaming actual implementation or inherited base history"
 
 printf 'ok - fm-guard-telemetry\n'

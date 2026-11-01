@@ -46,6 +46,16 @@ test_batch_dispatches_every_pair() {
   printf '%s\n' "$out" | grep -F 'batch: FAILED to spawn nope-batch-b-z2 (projects/none-b)' >/dev/null \
     || fail "second pair was not dispatched/reported (loop stopped early?)"
   pass "batch dispatch re-execs and reports every id=repo pair"
+
+  # Each pair re-exec is internal: only the operator's own switch on the
+  # parent records a watcher-guard escape, and each pair still reaches the guard.
+  FM_GUARD_EVENT_LOG="$TMP_ROOT/batch-events.jsonl" \
+    run_ship_spawn nope-batch-c-z3=projects/none-c nope-batch-d-z4=projects/none-d >/dev/null
+  jq -se '([.[] | select(.rule == "FM_SPAWN_NO_GUARD")] | length == 1 and .[0].task == "" and .[0].override == true)
+    and ([.[] | select(.task == "nope-batch-c-z3")] | length > 0)
+    and ([.[] | select(.task == "nope-batch-d-z4")] | length > 0)' "$TMP_ROOT/batch-events.jsonl" >/dev/null \
+    || fail "batch pair re-execs were recorded as operator escapes: $(cat "$TMP_ROOT/batch-events.jsonl" 2>/dev/null)"
+  pass "batch pair re-execs are internal while the operator's switch is still recorded"
 }
 
 # Boundary cases for batch detection. Each row:

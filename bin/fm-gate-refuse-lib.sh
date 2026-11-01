@@ -174,7 +174,7 @@ fm_gate_refuse_event() {
 # FM_GATE_REFUSE_BYPASS=1 (see the header).
 fm_refuse_if_gate_agent() {
   if ! fm_is_gate_agent "${1:-.}"; then
-    [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ] || fm_gate_refuse_event allow
+    [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ] || [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ] || fm_gate_refuse_event allow
     return 0
   fi
   if fm_gate_lab_permitted; then
