@@ -1,0 +1,7 @@
+real repo HEAD 9566f0e8: sorted (key sig entry) per interpreter
+python3 Python 3.13.6: 928 sites, errors=0, mapped=638, sha256(keys)=e4fd69f52ef59f5c
+/usr/bin/python3 Python 3.9.6: 928 sites, errors=0, mapped=638, sha256(keys)=e4fd69f52ef59f5c
+python3.12 Python 3.12.12: 928 sites, errors=0, mapped=638, sha256(keys)=e4fd69f52ef59f5c
+python3.14 Python 3.14.0: 928 sites, errors=0, mapped=638, sha256(keys)=e4fd69f52ef59f5c
+pairwise diff against 3.13.6 (empty = identical):
+diff exit=0

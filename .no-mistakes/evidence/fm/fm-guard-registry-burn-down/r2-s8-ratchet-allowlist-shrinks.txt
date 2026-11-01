@@ -1,0 +1,13 @@
+$ (head 9566f0e8222b5b5a6c7e42e35ccbe0a6206d332a) bin/fm-guard-lint.sh --mode new-or-touched --base 3948d62ffa86123d35baeb84746ed7639d948a02 --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=164 retired=14 beyond_audit=12 excluded=1 unregistered=290 audited=30 beyond_audit_active=137 sites=928 mapped=638
+LINT_SUMMARY mode=new-or-touched guards=164 violations=290 allowlisted=290 stale=0 shown=0 sites=928
+exit=0
+
+== allowlist set comparison (base vs head)
+{
+  "base": 841,
+  "head": 290,
+  "added_at_head": 0,
+  "removed_at_head": 551
+}

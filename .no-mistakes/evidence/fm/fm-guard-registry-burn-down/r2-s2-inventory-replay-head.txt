@@ -1,0 +1,19 @@
+$ python3 -I verify-inventory.py --root /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6 --commit 9566f0e8222b5b5a6c7e42e35ccbe0a6206d332a --evidence <task-data-dir (read-only inputs)>
+{
+  "root": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6",
+  "commit": "9566f0e8222b5b5a6c7e42e35ccbe0a6206d332a",
+  "receipt_files_verified": 10,
+  "kept_families": 135,
+  "new_registry_ids": 120,
+  "already_registered_kept_families": 15,
+  "covered_sites": 113,
+  "historical_sites_mapped": 551,
+  "new_credential_sites_mapped": 1,
+  "runtime_owner_files_unchanged": 68,
+  "sites": 928,
+  "mapped": 638,
+  "allowlist_before": 841,
+  "allowlist_after": 290,
+  "excluded_redesign_families_preserved": 15
+}
+exit=0

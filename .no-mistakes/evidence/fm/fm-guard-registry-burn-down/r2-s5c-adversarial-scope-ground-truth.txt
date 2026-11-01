@@ -1,0 +1,459 @@
+Adversarial scope fixture: synthetic bin/a.py (R01-R12 unshadowed, N01-N16 shadowed) and bin/b.py (3.10+ match cases M01-M04). No credentials.
+Ground truth = execute each function with subprocess replaced by an in-memory stub; 'reaches wrapper' means the module record() really ran with that label.
+
+--- bin/a.py
+     1	import contextlib
+     2	import os
+     3	import subprocess
+     4	WRITER = os.path.join("/synthetic", "fm-guard-event.sh")
+     5	
+     6	def record(guard, decision):
+     7	    subprocess.run([WRITER, guard, decision])
+     8	
+     9	# ---- unshadowed: the deny call reaches the module wrapper. EXPECT SITE
+    10	def r01_sep_line(other, denied):
+    11	    names = [record for record in other]
+    12	    calls = [record("R01", "deny") for g in denied]
+    13	
+    14	def r02_same_line(other, denied):
+    15	    a = [record for record in other], [record("R02", "deny") for g in denied]
+    16	
+    17	def r03_set_after_list(other, denied):
+    18	    names = [record for record in other]
+    19	    calls = {record("R03", "deny") for g in denied}
+    20	
+    21	def r04_dict_sibling(other, denied):
+    22	    names = {record: 1 for record in other}
+    23	    calls = {g: record("R04", "deny") for g in denied}
+    24	
+    25	async def r05_async(other, denied):
+    26	    names = [record for record in other]
+    27	    return [record("R05", "deny") for g in denied]
+    28	
+    29	def r06_nested_comp(other, denied):
+    30	    names = [record for record in other]
+    31	    return [[record("R06", "deny") for g in grp] for grp in [denied]]
+    32	
+    33	class R07:
+    34	    def method(self, other, denied):
+    35	        names = [record for record in other]
+    36	        return [record("R07", "deny") for g in denied]
+    37	
+    38	def r08_two_siblings(other, denied):
+    39	    a = [record for record in other]
+    40	    b = {record for record in other}
+    41	    return [record("R08", "deny") for g in denied]
+    42	
+    43	def r09_lambda_holds_sibling(other, denied):
+    44	    f = lambda: [record for record in other]
+    45	    return [record("R09", "deny") for g in denied]
+    46	
+    47	def r10_genexpr_sibling(other, denied):
+    48	    names = list(record for record in other)
+    49	    return [record("R10", "deny") for g in denied]
+    50	
+    51	def r11_inner_sibling_in_outer(other, denied):
+    52	    names = [record for record in other]
+    53	    def inner():
+    54	        return [record("R11", "deny") for g in denied]
+    55	    return inner()
+    56	
+    57	def r12_ifs_sibling(other, denied):
+    58	    names = [record for record in other if record]
+    59	    return [record("R12", "deny") for g in denied if g]
+    60	
+    61	# ---- shadowed: the name is a real local or enclosing binding. EXPECT NO SITE
+    62	def n01_assign(other, denied):
+    63	    record = None
+    64	    names = [record for record in other]
+    65	    return [record("N01", "deny") for g in denied]
+    66	
+    67	def n02_for_loop(other, denied):
+    68	    for record in other:
+    69	        pass
+    70	    names = [record for record in other]
+    71	    return [record("N02", "deny") for g in denied]
+    72	
+    73	def n03_import_as(other, denied):
+    74	    import json as record
+    75	    names = [record for record in other]
+    76	    return [record("N03", "deny") for g in denied]
+    77	
+    78	def n04_with_as(other, denied):
+    79	    with contextlib.nullcontext(1) as record:
+    80	        pass
+    81	    names = [record for record in other]
+    82	    return [record("N04", "deny") for g in denied]
+    83	
+    84	def n05_except_as(other, denied):
+    85	    try:
+    86	        raise ValueError
+    87	    except ValueError as record:
+    88	        pass
+    89	    names = [record for record in other]
+    90	    return [record("N05", "deny") for g in denied]
+    91	
+    92	def n06_nested_def(other, denied):
+    93	    def record(*a):
+    94	        return None
+    95	    names = [record for record in other]
+    96	    return [record("N06", "deny") for g in denied]
+    97	
+    98	def n07_walrus_in_sibling_comp(other, denied):
+    99	    names = [(record := x) for x in other]
+   100	    return [record("N07", "deny") for g in denied]
+   101	
+   102	def n08_walrus_in_genexpr(other, denied):
+   103	    names = list((record := x) for x in other)
+   104	    return [record("N08", "deny") for g in denied]
+   105	
+   106	def n09_parameter(other, denied, record=None):
+   107	    names = [record for record in other]
+   108	    return [record("N09", "deny") for g in denied]
+   109	
+   110	def n10_enclosing_assign(other, denied):
+   111	    record = None
+   112	    def inner():
+   113	        names = [record for record in other]
+   114	        return [record("N10", "deny") for g in denied]
+   115	    return inner()
+   116	
+   117	def n11_annotation_only(other, denied):
+   118	    record: int
+   119	    names = [record for record in other]
+   120	    return [record("N11", "deny") for g in denied]
+   121	
+   122	def n12_star_target(other, denied):
+   123	    first, *record = [1, 2]
+   124	    names = [record for record in other]
+   125	    return [record("N12", "deny") for g in denied]
+   126	
+   127	def n13_kwonly_param(other, denied, *, record=None):
+   128	    names = [record for record in other]
+   129	    return [record("N13", "deny") for g in denied]
+   130	
+   131	def n14_own_target(other, denied):
+   132	    names = [record for record in other]
+   133	    return [record("N14", "deny") for record in denied]
+   134	
+   135	def n15_class_def(other, denied):
+   136	    class record:
+   137	        def __init__(self, *a):
+   138	            raise TypeError
+   139	    names = [record for record in other]
+   140	    return [record("N15", "deny") for g in denied]
+   141	
+   142	def n16_walrus_in_own_if(other, denied):
+   143	    return [record("N16", "deny") for g in denied if (record := g)]
+--- bin/b.py
+     1	import os
+     2	import subprocess
+     3	WRITER = os.path.join("/synthetic", "fm-guard-event.sh")
+     4	
+     5	def record(guard, decision):
+     6	    subprocess.run([WRITER, guard, decision])
+     7	
+     8	# 3.10+ match syntax; EXPECT NO SITE for M01-M03, SITE for M04
+     9	def m01_match_capture(other, denied):
+    10	    match other:
+    11	        case [record, *_]:
+    12	            pass
+    13	    names = [record for record in other]
+    14	    return [record("M01", "deny") for g in denied]
+    15	
+    16	def m02_match_rest(other, denied):
+    17	    match {}:
+    18	        case {**record}:
+    19	            pass
+    20	    names = [record for record in other]
+    21	    return [record("M02", "deny") for g in denied]
+    22	
+    23	def m03_match_star(other, denied):
+    24	    match [1]:
+    25	        case [*record]:
+    26	            pass
+    27	    names = [record for record in other]
+    28	    return [record("M03", "deny") for g in denied]
+    29	
+    30	def m04_match_unrelated(other, denied):
+    31	    match other:
+    32	        case [first, *_]:
+    33	            pass
+    34	    names = [record for record in other]
+    35	    return [record("M04", "deny") for g in denied]
+
+### HEAD scanner 9566f0e8
+== scanner=head  interpreter=/usr/bin/python3 Python 3.9.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  bin/b.py: interpreter cannot parse this file (invalid syntax (b.py, line 10)); skipped
+== scanner=head  interpreter=python3.12 Python 3.12.12
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+== scanner=head  interpreter=python3 Python 3.13.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+== scanner=head  interpreter=python3.14 Python 3.14.0
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+
+### Contrast: pre-fix scanner d965ff02
+== scanner=prefix  interpreter=/usr/bin/python3 Python 3.9.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  bin/b.py: interpreter cannot parse this file (invalid syntax (b.py, line 10)); skipped
+== scanner=prefix  interpreter=python3.12 Python 3.12.12
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R08: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 28 cases, mismatches=9
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/b.py: 4 cases, mismatches=1
+== scanner=prefix  interpreter=python3 Python 3.13.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R08: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 28 cases, mismatches=9
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/b.py: 4 cases, mismatches=1
+== scanner=prefix  interpreter=python3.14 Python 3.14.0
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R08: runtime reaches wrapper=True  scanner site=False MISMATCH
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 28 cases, mismatches=9
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/b.py: 4 cases, mismatches=1

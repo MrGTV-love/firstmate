@@ -1,0 +1,47 @@
+== fixture bin/a.py (synthetic, no credentials)
+     1	import os
+     2	import subprocess
+     3	WRITER = os.path.join("/synthetic", "fm-guard-event.sh")
+     4	
+     5	def record(guard, decision):
+     6	    subprocess.run([WRITER, guard, decision])
+     7	
+     8	def sibling_comprehension_then_call(other):
+     9	    names = [x for record in other]
+    10	    record("body-call", "deny")                        # BODY-CALL: real module wrapper deny, expect site
+    11	
+    12	def sibling_comprehension_then_comprehension(other, denied):
+    13	    names = [x for record in other]
+    14	    calls = [record(g, "deny") for g in denied]        # SEP-LINE-COMP: real module wrapper deny, expect site
+    15	
+    16	def control_no_sibling(denied):
+    17	    record("control", "deny")                          # CONTROL: expect site
+    18	
+    19	def control_generator_sibling(other):
+    20	    names = list(x for record in other)
+    21	    record("gen-sibling", "deny")                      # GEN-SIBLING: real module wrapper deny, expect site
+
+== HEAD scanner on python3 Python 3.13.6: E sites found
+line 10 [E] BODY-CALL: real module wrapper deny, expect site
+line 17 [E] CONTROL: expect site
+line 21 [E] GEN-SIBLING: real module wrapper deny, expect site
+== HEAD scanner on /usr/bin/python3 Python 3.9.6: E sites found
+line 10 [E] BODY-CALL: real module wrapper deny, expect site
+line 14 [E] SEP-LINE-COMP: real module wrapper deny, expect site
+line 17 [E] CONTROL: expect site
+line 21 [E] GEN-SIBLING: real module wrapper deny, expect site
+
+== symtable view of name 'record' in each function
+3.13.6 sibling_comprehension_then_call has record: True is_global: True is_local: False children: []
+3.13.6 sibling_comprehension_then_comprehension has record: True is_global: False is_local: True children: []
+3.13.6 control_no_sibling has record: True is_global: True is_local: False children: []
+3.13.6 control_generator_sibling has record: True is_global: True is_local: False children: ['genexpr']
+3.9.6 sibling_comprehension_then_call has record: True is_global: True is_local: False children: ['listcomp']
+3.9.6 sibling_comprehension_then_comprehension has record: False is_global: None is_local: None children: ['listcomp', 'listcomp']
+3.9.6 control_no_sibling has record: True is_global: True is_local: False children: []
+3.9.6 control_generator_sibling has record: True is_global: True is_local: False children: ['genexpr']
+
+== same-line MIXED case from s5 fixture (line 22), both interpreters
+    i = [x for record in other], [record("u", "deny") for x in denied]      # MIXED: first shadows, second does not -> expect site
+python3: []
+/usr/bin/python3: [22]

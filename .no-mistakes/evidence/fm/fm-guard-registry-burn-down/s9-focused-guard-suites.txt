@@ -1,0 +1,26 @@
+$ bin/fm-test-run.sh tests/fm-guard-refcheck.test.sh tests/fm-guard-audit-closure.test.sh
+FM_TEST_BEGIN 2026-11-01T01:53:01Z tests/fm-guard-refcheck.test.sh family=unclassified expected_gate_skip=none
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a registry spec path that resolves is clean
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+FM_TEST_END 2026-11-01T01:53:44Z tests/fm-guard-refcheck.test.sh exit=0 duration_ms=40988 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-01T01:53:45Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 18 instrumented guards call the event writer

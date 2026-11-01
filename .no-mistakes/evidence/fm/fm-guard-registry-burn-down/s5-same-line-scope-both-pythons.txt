@@ -1,0 +1,15 @@
+== python3 Python 3.13.6
+line 9 [E] LIST-PAIR expect site
+line 10 [E] SET-PAIR expect site
+line 11 [E] DICT-PAIR expect site
+line 12 [E] GENEXPR-PAIR expect site
+line 13 [E] LAMBDA-PAIR expect site
+line 14 [E] LAMBDA-SECOND expect site
+== /usr/bin/python3 Python 3.9.6
+line 9 [E] LIST-PAIR expect site
+line 10 [E] SET-PAIR expect site
+line 11 [E] DICT-PAIR expect site
+line 12 [E] GENEXPR-PAIR expect site
+line 13 [E] LAMBDA-PAIR expect site
+line 14 [E] LAMBDA-SECOND expect site
+line 22 [E] MIXED: first shadows, second does not -> expect site

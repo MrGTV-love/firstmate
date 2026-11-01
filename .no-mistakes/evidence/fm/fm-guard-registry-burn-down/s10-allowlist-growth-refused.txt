@@ -1,0 +1,6 @@
+Disposable copy of HEAD; base = copy before the change. Change: new identical refusal in a new block + new S1 allowlist entry for it.
+$ bin/fm-guard-lint.sh --root <copy> --mode new-or-touched --base <copy base>
+LINT_SUMMARY mode=new-or-touched guards=164 violations=291 allowlisted=291 stale=0 shown=0 sites=929
+VIOLATION S1 site:bin/fm-spawn.sh:72505e7e0e: bin/fm-spawn.sh:1002 [B] echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-spawn.sh:72505e7e0e: allowlist entry S1 is not in 6537b08658674d1565a80e6b2f9f17ff61e153d7; the allowlist may only shrink
+exit=1
