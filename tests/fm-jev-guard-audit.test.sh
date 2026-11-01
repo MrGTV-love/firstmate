@@ -435,12 +435,14 @@ await test('M4: each coverage and egress decision emits one content-free central
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github-write', true]]);
   await decide({ toolName: 'github', input: { op: 'repo_view', repo: 'private-event-canary' } },
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github-read', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
-  for (const path of ['xd://github', '[xd://github#ABCD]', '[xd://github]  ']) {
+  for (const path of ['xd://github', '[xd://github#ABCD]', '[xd://github]  ', 'xd://github ', 'XD://github', 'xd://git\thub']) {
     await decide({ toolName: 'write', input: { path, content: '{"op":"pr_push","body":"private-event-canary"}' } },
       [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://github', true]]);
   }
-  await decide({ toolName: 'write', input: { path: '[xd://report_issue#0aF9]', content: 'private-event-canary' } },
-    [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://report_issue', true]]);
+  for (const path of ['[xd://report_issue#0aF9]', 'XD://report_issue', 'xd://report_issue\t']) {
+    await decide({ toolName: 'write', input: { path, content: 'private-event-canary' } },
+      [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://report_issue', true]]);
+  }
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
   const log = `${state}/metrics-events.jsonl`;
@@ -522,6 +524,18 @@ await test('S2(d): local read and bash stay unjudged, write/edit keep determinis
     assert.equal(r.decision, 'allow');
     assert.equal(r.request_started, false);
   }
+  // Without proved confinement a colon filename keeps the plain-path refusal.
+  const colon = await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'notes:v2.md', content: 'fixture' } }, { cwd: state }));
+  assert.equal(colon.branch, 'deterministic');
+  assert.equal(colon.decision, 'block');
+  for (const path of ['ssh://remote/file', 'HTTPS://example.invalid/a', 'local://scratch.md']) {
+    const patch = await handlers.tool_call({ toolName: 'write', input: { path, content: 'fixture' } }, { cwd: state });
+    assert.equal(patch?.block, true, path);
+    assert.match(patch.reason, /no write rule is admitted for its scheme\. Report the intended target and effect to Firstmate; do not read or fetch this URI/, path);
+    assert.doesNotMatch(patch.reason, /Read the device documentation/, path);
+  }
+  const device = await handlers.tool_call({ toolName: 'write', input: { path: 'xd://future_device', content: '{}' } }, { cwd: state });
+  assert.match(device?.reason ?? '', /Read the device documentation with read xd:\/\/future_device/);
 });
 JS
 pass 'offline guard settlement, cost completeness and S2 egress acceptance'

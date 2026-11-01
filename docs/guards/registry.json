@@ -847,13 +847,14 @@
       "id": "jev-write-path-gate",
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
-        {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3}
+        {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3},
+        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1}
       ],
       "invariant": "a filesystem write without proved active T5 confinement must pass the filesystem path/root gate; a native local device must prove its measured effect and scope",
       "layer": "runtime-block",
       "source": "bin/fm-jev-guard.ts deviceEffects and lspEffects tables; on Darwin the seatbelt-v1 launch marker plus bin/fm-write-confinement.py --check-active kernel membership and metadata data-write/unlink denials; absent that proof, plain-path regex and repository roots; for local devices, realpaths and session-owned running-job snapshot",
-      "trigger": "without proved active confinement a filesystem target fails its path/root check; a local device has no measured effect or fails its scope proof, or another URI scheme has no admitted device rule, each classified on the path omp write routes after unwrapping a [PATH] or [PATH#XXXX] hashline header; outbound-device denials belong to jev-egress-grant",
-      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; for devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
+      "trigger": "without proved active confinement a filesystem target fails its path/root check; a local device has no measured effect or fails its scope proof, or another scheme:// URI has no admitted write rule, each classified on the target omp write routes (hashline header unwrapped, scheme:// only, URL-parsed and trimmed with a lower-case scheme) while local admission needs the exact spelling; outbound-device denials belong to jev-egress-grant",
+      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; for other scheme:// URIs report the intended target and effect to Firstmate without reading or fetching it; for xd/proc devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
       "budget": 1,
       "test": "tests/fm-jev-guard.test.sh",
       "tier": "C",
@@ -975,7 +976,7 @@
         {"file": "bin/fm-jev-guard.ts", "match": "branch: \"egress\""},
         {"file": "bin/fm-jev-guard.ts", "match": "No task egress grant admits this device.", "count": 1}
       ],
-      "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class; xd://report_issue and xd://github remain denied under every grant, including through the hashline header [PATH] or [PATH#XXXX] that omp write unwraps before routing",
+      "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class; xd://report_issue and xd://github remain denied under every grant, under every spelling omp write routes to them, including a [PATH] or [PATH#XXXX] hashline header, scheme case and surrounding whitespace",
       "layer": "runtime-block",
       "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta; DEVICE_EGRESS in the same module owns unconditional provider/report_issue and remote-storage/GitHub device denials; a skill-bearing learn retains its independently recorded T5 write owner even when its memory effect is refused",
       "trigger": "an omp write names xd://report_issue or xd://github; otherwise egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked",

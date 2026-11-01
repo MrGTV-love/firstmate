@@ -65,9 +65,15 @@ function plainPath(path: string): boolean {
 }
 
 // Measured omp write strips a hashline header ([PATH] or [PATH#XXXX], trailing
-// whitespace ignored) before routing; devices are classified on that path.
+// whitespace ignored), sends only scheme:// targets to a protocol handler, and
+// that handler sees the URL-parsed, trimmed spelling with a lower-case scheme.
+// Devices are classified on that key; local admission still needs the exact path.
 function routedPath(path: string): string {
-  return /^\[([^#]+)(?:#[0-9A-Fa-f]{4})?\]$/.exec(path.trimEnd())?.[1] ?? path;
+  const target = /^\[([^#]+)(?:#[0-9A-Fa-f]{4})?\]$/.exec(path.trimEnd())?.[1] ?? path;
+  if (!/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(target)) return target;
+  let href = target;
+  try { href = new URL(target).href; } catch { /* omp keeps the raw spelling when URL parsing fails. */ }
+  return href.trim().replace(/^[^:]+/, (scheme) => scheme.toLowerCase());
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -76,7 +82,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 type DeviceInput = { path?: unknown; content?: unknown };
 type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
-  | { effect: "unknown"; reason: string };
+  | { effect: "unknown" | "uri"; reason: string };
 
 function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
   if (typeof input.content !== "string" || typeof ctx.getAsyncJobSnapshot !== "function") return false;
@@ -121,7 +127,8 @@ const deviceEffects: Readonly<Record<string, DeviceRule>> = {
 function deviceRule(path: string): DeviceRule | undefined {
   if (Object.hasOwn(deviceEffects, path)) return deviceEffects[path];
   if (/^proc:\/\/[A-Za-z0-9][A-Za-z0-9._-]*\/kill$/.test(path)) return deviceEffects["proc://<job>/kill"];
-  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
+  if (/^(?:xd|proc):\/\//.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
+  if (/^[a-z][a-z0-9+.-]*:\/\//.test(path)) return { effect: "uri", reason: "omp routes this URI to a protocol handler, and no write rule is admitted for its scheme" };
 }
 
 function real(path: string): string[] {
@@ -234,6 +241,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
         if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
         if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
+        if (device.effect === "uri") return deny(`${device.reason}. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it.`);
         if (device.effect === "egress") {
           terminal.branch = "egress";
           terminal.destination_class = device.destination;
@@ -243,7 +251,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           return deny(`${device.reason}. No task egress grant admits this device.`, alternative);
         }
         let admitted = false;
-        try { admitted = device.prove({ ...input, path: routed }, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+        try { admitted = routed === path && device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
         return admitted ? finishCall(terminal) : deny(device.remedy);
       }
       if (path && process.platform === "darwin" && process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1") {
