@@ -479,7 +479,7 @@ While supervision is needed it PARKS:
 3. It returns an actionable close as one `watcher`-kind follow-up.
 
 It spends no model tokens while parked.
-This is the same between-turns shape as Claude's Stop auto-arm, so `fm_supervision_model` classifies Cursor as `autoarm` and the mid-turn pull guard accepts a fresh beacon without a live watcher.
+This is the same between-turns shape as Claude's Stop auto-arm, so `fm_supervision_model` classifies Cursor as `autoarm`; the mid-turn pull guard still requires the [shared strict liveness verdict](#pull-warning-verdict-by-supervision-model).
 
 #### Cursor park under a Pi host
 
@@ -590,9 +590,9 @@ It proves that a live foreign owner still prevents arming while repeated non-own
 
 `tests/fm-guard-stale-banner.test.sh` covers the pull-guard predicate for each supervision model:
 
-- The persistent model's fresh-leftover-beacon negative control.
-- The auto-arm model's healthy fresh-beacon-without-a-watcher case, session-and-recovery-bound long-turn rewake tolerance, independently broken tolerance signals, open-claim negative control, stale-beacon alarm, and isolation from other models.
-- The extension model's live-watcher path, ownership-qualified fresh hand-off, held-lock failures, independently broken ownership signals, stale-beacon alarm, queued-wake warning, and Pi and pi-signed harness routing.
+- Persistent, auto-arm, and extension primaries warning and turn-end guard agreeing on healthy, hand-off, missing-lock, stale-beacon, wrong-identity, and away-daemon cases.
+- Fresh leftover beacons, X-mode polling, auto-arm rewake ledgers, open claims, and extension hand-offs without a live watcher, each still alarming.
+- Legacy auto-arm and extension signals never replacing a live watcher, held-lock failures, the queued-wake warning, and Pi and pi-signed harness routing to the same strict verdict.
 
 It also covers true-reason banner wording and reason-keyed episode dedup surviving a beacon mtime change.
 

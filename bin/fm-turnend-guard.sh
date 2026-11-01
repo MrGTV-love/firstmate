@@ -84,9 +84,9 @@
 #      while later fresh failed epochs consume it instead of resetting it;
 #   4. only when neither materializes is the auto-arm genuinely absent: re-block
 #      with the repair banner, bounded to FM_CLAUDE_TURNEND_BLOCK_BUDGET
-#      (default 3) consecutive blocks per session - safely below Claude Code's
-#      hard 8-consecutive-block override - then allow one loud attended
-#      fail-open. A missing failure notice or failed bookkeeping cannot extend
+#      (default 3) consecutive blocks per session - below Claude Code's default
+#      cap of eight consecutive continuations - then allow with a loud attended
+#      diagnostic. A missing failure notice or failed bookkeeping cannot extend
 #      that budget; a budget that cannot be locked or written proves no bound,
 #      so that stop allows with one repair warning and a warn guard event.
 #      Positive supervision allows even if episode reset fails.
@@ -500,8 +500,8 @@ terminal_fail_open() {
     # longer matches the live pid, is not a concurrent owner to step aside
     # for. Stepping aside for one here allows the stop silently, and the
     # episode's one attended alarm would never fire, so clear the abandoned
-    # claim and let this decision finish instead. Failing to clear it
-    # re-blocks rather than allowing.
+    # claim and let this decision finish instead. Failing to clear it takes the
+    # loud attended diagnostic rather than a silent allow.
     if fm_pid_alive "$pid" && [ "$role" = autoarm ] \
       && ! fm_autoarm_claim_abandoned "$STATE" "$GRACE"; then
       return 2

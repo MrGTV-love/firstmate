@@ -7889,10 +7889,10 @@ if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh).
-  # docs/turnend-guard.md owns model-aware pull-warning health and hand-offs.
-  # Pi and pi-signed secondmates previously received persistent here and now
-  # receive extension to match fm_supervision_model's own table, so their pull
-  # guard tolerates the extension hand-off exactly as a Pi primary does.
+  # docs/turnend-guard.md owns the model-aware verdict's hand-offs.
+  # Pi and pi-signed secondmates receive extension to match
+  # fm_supervision_model's own table, so their model-aware consumers treat the
+  # extension hand-off exactly as a Pi primary's do.
   case "$HARNESS" in
   claude | cursor) supervision_model=autoarm ;;
   pi | pi-signed | omp) supervision_model=extension ;;
