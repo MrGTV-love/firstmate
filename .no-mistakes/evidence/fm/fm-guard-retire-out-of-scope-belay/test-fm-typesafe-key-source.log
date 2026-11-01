@@ -1,0 +1,6 @@
+ok - a home without .env resolves the key from the primary home
+ok - precedence is environment, then own .env, then primary .env
+ok - remote, malformed and absent bindings stay off
+ok - the OpenRouter fallback key resolves from own, then primary .env, never the environment
+ok - native omp command credentials reach the primary privately for firstmate only and stay unavailable with no helpers
+ok - the jev-guard service resolves the primary key and refuses unavailable remote-bound credentials without egress; the hook admits writes with no key

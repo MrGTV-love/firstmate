@@ -1,0 +1,7 @@
+== head registry --undecided
+rc=0
+== base registry --undecided
+git-commit-credential-shapes
+jev-belay-stop
+spawn-brief-out-of-scope
+rc=0

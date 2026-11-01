@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zMCruS
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 64s; no path/output progress for 64s; last path '/Users/charlesabrooker/tmp/fm-lab-side.C4XkbS/project' (it is the project checkout itself)
+skill selection for live-blank-scope: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned live-blank-scope harness=claude kind=scout window=primary:fm-live-blank-scope worktree=/Users/charlesabrooker/.treehouse/project-4857f5/1/project
+rc=0

@@ -1,0 +1,5 @@
+{"ts":"2026-10-31T22:54:18Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-25861","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-31T22:56:37Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-51506","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-31T23:00:13Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"live-blank-scope","decision":"allow","source_ok":true,"elapsed_ms":28000,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-31T23:00:18Z","guard":"spawn-confinement-coverage","version":"1","system":"firstmate","session":"live-blank-scope","decision":"allow","source_ok":true,"elapsed_ms":32000,"cleared_by":"recorded","repeat":1,"override":false}
+{"ts":"2026-10-31T23:05:01Z","guard":"jev-tool-coverage","version":"1","system":"firstmate","session":"live-blank-scope:read","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

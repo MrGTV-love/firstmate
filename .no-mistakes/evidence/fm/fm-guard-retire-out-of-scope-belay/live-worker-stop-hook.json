@@ -1,0 +1,10 @@
+[
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "touch '/Users/charlesabrooker/tmp/fm-lab.zMCruS/state/live-blank-scope.turn-ended'; '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1HMQEVQ8MQHFZN0RB60QX/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/tmp/fm-lab.zMCruS/state' 'live-blank-scope' idle --gen 'g1793487628.40318.15515' --source claude-hook --event stop 2>/dev/null || true"
+      }
+    ]
+  }
+]

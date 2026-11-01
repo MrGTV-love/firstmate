@@ -1,0 +1,6 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zMCruS
+error: /Users/charlesabrooker/tmp/fm-lab.zMCruS/data/live-placeholder/brief.md still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:
+  ## Captain's intent still holds {TASK}
+  ## Firstmate spec still holds {FIRSTMATE_SPEC}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.zMCruS/data/live-placeholder/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+rc=1
