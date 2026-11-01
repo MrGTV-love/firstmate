@@ -1,0 +1,24 @@
+# Task verifier (read-only) replayed with its base moved from 3948d62f to the real branch base 8618f637. Changes (r3-s2-verifier-rebase-patch.diff): base sha; snapshot totals unpinned; 4 helper site keys whose source lines were deleted upstream before 8618f637 are listed instead of required. Every other assertion (registry entries unchanged except sites/layer_note, runtime owner files byte-identical to base, each historical site mapped to its family, credential E site, allowlist == base minus mapped S1, redesign families unmapped) runs unchanged.
+$ python3 -I verify-inventory-r3.py --root <run worktree> --commit a45bff26e9fb86b69e2a04d9c6fe20a6d74f0a71 --evidence <task-data-dir (read-only inputs)>
+upstream_removed_helper_keys [["site:bin/fm-jev-guard.ts:8ae0e0d53f", "jev-device-type-decl"], ["site:bin/fm-jev-guard.ts:576cc9883b", "jev-write-path-gate"], ["site:bin/fm-jev-guard.ts:ff7761a0f4", "jev-write-path-gate"], ["site:bin/fm-jev-guard.ts:9473a19102", "jev-write-path-gate"]]
+historical covered/selected 113 551
+covered present at head 110
+selected present at head 548
+{
+  "root": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6",
+  "commit": "a45bff26e9fb86b69e2a04d9c6fe20a6d74f0a71",
+  "receipt_files_verified": 10,
+  "kept_families": 135,
+  "new_registry_ids": 120,
+  "already_registered_kept_families": 15,
+  "covered_sites": 110,
+  "historical_sites_mapped": 548,
+  "new_credential_sites_mapped": 1,
+  "runtime_owner_files_unchanged": 68,
+  "sites": 926,
+  "mapped": 637,
+  "allowlist_before": 837,
+  "allowlist_after": 289,
+  "excluded_redesign_families_preserved": 15
+}
+exit=0

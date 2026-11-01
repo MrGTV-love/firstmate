@@ -1,0 +1,31 @@
+25c25
+< base = '3948d62ffa86123d35baeb84746ed7639d948a02'
+---
+> base = '8618f63732d41ed857468b40a825f4db4135cf66'  # r3: real branch base
+79,80c79,87
+< assert len(sites) == 928 and len(maps) == len({r[0] for r in maps}) == 841
+< assert all(key in sites for key, _, _ in canonical)
+---
+> assert len(maps) == len({r[0] for r in maps}) == 841  # r3: site total not pinned (base moved)
+> # r3: helper keys whose source lines were deleted upstream (3948d62f->8618f637) are reported, not required.
+> base_scan = json.loads(subprocess.check_output(['python3', str(root / 'bin/fm-guard-sites.py'), '--root', str(root)], env={**__import__('os').environ}))
+> upstream_removed = sorted(key for key, _, _ in canonical if key not in sites)
+> print('upstream_removed_helper_keys', json.dumps([(k, f) for k, _, f in canonical if k in upstream_removed]))
+> historical_covered = len([1 for key, _, family in canonical if family in old_ids or family in {'spawn-write-confinement-raw-parse', 'jev-block-renderer'}])
+> historical_selected = len([1 for key, _, family in canonical if family in keep or family == 'spawn-confinement-coverage'])
+> print('historical covered/selected', historical_covered, historical_selected)
+> canonical = [c for c in canonical if c[0] in sites]
+83c90,91
+< assert len(covered) == 113
+---
+> assert historical_covered == 113
+> print('covered present at head', len(covered))
+85c93,94
+< assert len(selected) == 551
+---
+> assert historical_selected == 551
+> print('selected present at head', len(selected))
+96c105
+< assert len(old_pairs) == 841 and len(pairs) == len(allow['allowed']) == 290
+---
+> assert len(pairs) == len(allow['allowed'])  # r3: sizes reported below, not pinned

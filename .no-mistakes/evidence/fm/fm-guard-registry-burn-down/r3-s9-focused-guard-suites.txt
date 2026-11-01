@@ -1,0 +1,164 @@
+$ (head a45bff26) FM_LINT_ROOT_RSS_KIB=4194304 bin/fm-test-run.sh tests/fm-guard-lint.test.sh tests/fm-guard-refcheck.test.sh tests/fm-guard-audit-closure.test.sh
+FM_TEST_BEGIN 2026-11-01T04:17:29Z tests/fm-guard-lint.test.sh family=unclassified expected_gate_skip=none
+ok - a complete single-guard registry is clean
+ok - R1 fails a duplicate id
+ok - R1 fails a duplicate invariant
+ok - R2 fails a prose-only remedy
+ok - R2 fails a remedy naming a missing script
+ok - R2 fails an empty remedy
+ok - R3 fails a proxy source with no reason
+ok - R3 accepts a proxy source with a reason
+ok - R4 fails an undeclared fail direction
+ok - R5 fails a budget above three with no reason
+ok - R5 accepts a declared budget exception
+ok - R6 fails a post-write guard with no precheck_gap
+ok - R7 fails a nonexistent owner file
+ok - R7 fails a nonexistent test file
+ok - R8 fails a guard with no telemetry target
+ok - R8 accepts an instrumented guard that calls the writer
+ok - R8 fails an instrumented guard that never calls the writer
+ok - R9 fails an exemption with no derivation
+ok - a retired guard with a live retirement test is clean
+ok - a retired guard that is still registered fails
+ok - a guard registered after the audit balances the inventory only when it is named
+ok - post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory
+ok - a guard added after the audit fails the count until it is accounted for
+ok - a post-audit guard in beyond_audit_active keeps the audited size unchanged
+ok - a post-audit entry must name a registered guard
+ok - an allowlisted violation passes
+ok - a stale allowlist entry fails, so the allowlist can only shrink
+ok - report mode prints a violation and exits 0
+ok - new-or-touched ignores an unchanged offending guard
+ok - new-or-touched fails for a touched guard
+ok - a malformed registry fails
+ok - S1 finds a REFUSED: marker site
+ok - S1 finds a refusing message site
+ok - S1 finds a message split across lines
+ok - S1 finds a message built in a variable
+ok - S1 finds a call to a refuse helper whose message has no refusal word
+ok - a helper definition is not a site, only its call
+ok - S1 finds a refuse helper call inside a one-line function definition
+ok - a one-line wrapper's helper call is a site, the helper's own definition is not
+ok - S1 finds a refuse helper call after a case-arm pattern
+ok - S1 finds a refusal inside a runtime multiline string
+ok - a runtime multiline refusal passes once a registered entry maps it
+ok - multiline docstrings are not sites while the runtime multiline string beside them is
+ok - prefixed docstrings and docstrings after a commented header are not sites
+ok - S1 finds a deny event whose guard id contains the word allow
+ok - a deny event with allow in its guard id passes once a registered entry maps it
+ok - S1 finds a deny event whose trailing comment says allow
+ok - the event's own decision argument decides, not the words around it
+ok - S1 finds a deny event whose guard id is the word allow
+ok - a deny event whose guard id is allow passes once a registered entry maps it
+ok - S1 finds the deny event among allow events that end in shell punctuation
+ok - a shell separator after the decision does not turn an allow event into a deny
+ok - S1 finds a deny wrapper call beside an allow wrapper call
+ok - a wrapper that takes the decision first is judged by that decision
+ok - a hash inside a guard id does not start a comment
+ok - a quoted closing brace is an argument, not a command boundary
+ok - a quoted pipe is an argument, not an operator
+ok - S1 finds a guard event deny inside a one-line function definition
+ok - S1 finds the Python conditional credential event decision
+ok - Python event sites exclude allow calls and same-module lexical shadowing
+ok - an arbitrary Python record function is not a guard event
+ok - S1 finds a call to a Python refuse helper
+ok - S1 finds a hook permission deny
+ok - S1 finds the bare exit 2 of a hook script
+ok - a usage exit 2 in a hook script is not a deny
+ok - S1 fails an unmapped || exit 2 of a hook script
+ok - an argument-count exit 2 in a hook script is not a deny
+ok - a || exit 2 hook site passes once a registered entry maps it
+ok - S1 finds an unquoted refusal in a heredoc printed to stderr
+ok - S1 finds a refusal in a perl heredoc
+ok - a heredoc delimited by PERL or fed to perl is scanned as code
+ok - S1 finds a refusal in the .dsh adapter
+ok - S1 finds an opencode plugin throw
+ok - S1 finds a guard event deny
+ok - a guard event allow is not a site
+ok - comments, heredoc bodies, docstrings, test directories, variables, paths and compared values are not sites
+ok - S1 fails a refusal site that maps to no registry entry
+ok - a refusal site passes once a registered entry maps it with a sites marker
+ok - a site inside the owner file passes when its marker names it
+ok - S1 fails a new site added inside an already-mapped owner file
+ok - S2 fails a sites marker that matches no site
+ok - S2 fails a marker that matches more sites than its count declares
+ok - a group entry with a counted marker passes
+ok - S2 fails a site that two entries map
+ok - a block context distinguishes identical lines enforcing different invariants
+ok - moving identical refusal blocks keeps every site mapped
+ok - a new identical refusal in another block is S1
+ok - a new identical refusal in a mapped block changes its marker count
+ok - a block context still cannot give a site two owners
+ok - a valid key and context do not bypass marker text
+ok - a missing site key is stale
+ok - an occurrence-ordered key never selects a site
+ok - a non-string site key is invalid
+ok - a non-string block context is invalid
+ok - the restored block contexts map both identical lines
+ok - S4 fails a typed unregistered_ids list that disagrees with the scan
+ok - a typed unregistered_ids list of the computed length raises no S4
+ok - --counts prints the computed unregistered count
+ok - an allowlisted legacy site passes enforce
+ok - an allowlisted legacy site still counts as unregistered
+ok - deleting a site makes its allowlist entry stale, so the burn-down list only shrinks
+ok - a duplicate of an allowlisted line is a new site
+ok - new-or-touched ignores a legacy site on an unchanged line
+ok - new-or-touched fails a touched legacy site that is still unmapped
+ok - new-or-touched fails a touched legacy site under diff.noprefix
+ok - new-or-touched passes a touched legacy site once it is mapped
+ok - new-or-touched fails a new refusal site that maps to nothing
+ok - new-or-touched passes a new refusal site once its guard entry maps it
+ok - a git-ignored file is not a site while an untracked new file still is
+ok - new-or-touched fails a new site that an existing marker absorbs
+ok - S5 fails an allowlist that grew against the base
+ok - S5 fails an allowlist that drops back below the sealed schema
+ok - fm-guard-lint
+FM_TEST_END 2026-11-01T04:20:26Z tests/fm-guard-lint.test.sh exit=0 duration_ms=177016 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-01T04:20:27Z tests/fm-guard-refcheck.test.sh family=unclassified expected_gate_skip=none
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a registry spec path that resolves is clean
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+FM_TEST_END 2026-11-01T04:20:44Z tests/fm-guard-refcheck.test.sh exit=0 duration_ms=15850 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-01T04:20:45Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 18 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+FM_TEST_END 2026-11-01T04:29:40Z tests/fm-guard-audit-closure.test.sh exit=0 duration_ms=533681 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=740484
+FM_TEST_SUMMARY_FAMILY family=unclassified count=3 duration_ms=726547 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-guard-audit-closure.test.sh duration_ms=533681
+FM_TEST_SLOWEST rank=2 script=tests/fm-guard-lint.test.sh duration_ms=177016
+FM_TEST_SLOWEST rank=3 script=tests/fm-guard-refcheck.test.sh duration_ms=15850
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6A6FJW2CVMV8PWYDCQ1DDT6/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

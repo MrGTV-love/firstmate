@@ -1,0 +1,19 @@
+Registry source site refs resolved against the real scanner. Only refs into identical-line groups, or failing refs, are listed.
+### HEAD a45bff26, unmodified
+ok   state-record-home-containment: site:bin/fm-spawn.sh:72505e7e0e within fm_backlog_record_present -> 1491:state-record-home-containment, 2540:state-record-home-containment (group owners: ['backlog-dispatch-admission', 'state-record-home-containment'])
+refs=150 refs_into_multi_owner_groups=1 unresolved_or_foreign=0
+exit=0
+
+### Disposable copy with the fm_backlog_relaunch_admission block moved before both fm_backlog_record_present blocks
+moved lines 2616-2619 above line 1489:
+  fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" "$RECONCILE_ONLY" || {
+    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  }
+1490:    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+1495:      echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+2544:    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+5145:      echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+ok   state-record-home-containment: site:bin/fm-spawn.sh:72505e7e0e within fm_backlog_record_present -> 1495:state-record-home-containment, 2544:state-record-home-containment (group owners: ['backlog-dispatch-admission', 'state-record-home-containment'])
+refs=150 refs_into_multi_owner_groups=1 unresolved_or_foreign=0
+exit=0

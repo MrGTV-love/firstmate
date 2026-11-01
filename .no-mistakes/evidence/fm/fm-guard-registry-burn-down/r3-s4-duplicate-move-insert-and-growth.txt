@@ -1,0 +1,52 @@
+# head a45bff26e9fb86b69e2a04d9c6fe20a6d74f0a71: duplicate-line ownership under move/insert, and allowlist growth refusal, on a disposable git copy
+### 0. Unmodified HEAD copy: owners of the identical refusal lines
+line 1491  site:bin/fm-spawn.sh:72505e7e0e        -> state-record-home-containment
+line 2540  site:bin/fm-spawn.sh:72505e7e0e~2      -> state-record-home-containment
+line 2617  site:bin/fm-spawn.sh:72505e7e0e~3      -> backlog-dispatch-admission
+line 5145  site:bin/fm-spawn.sh:72505e7e0e~4      -> backlog-dispatch-admission
+LINT_SUMMARY mode=enforce guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926
+lint exit=0
+
+### 1. MOVE: cut the fm_backlog_relaunch_admission block and paste it above the first fm_backlog_record_present block
+  fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" "$RECONCILE_ONLY" || {
+    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  }
+line 1490  site:bin/fm-spawn.sh:72505e7e0e        -> backlog-dispatch-admission
+line 1495  site:bin/fm-spawn.sh:72505e7e0e~2      -> state-record-home-containment
+line 2544  site:bin/fm-spawn.sh:72505e7e0e~3      -> state-record-home-containment
+line 5145  site:bin/fm-spawn.sh:72505e7e0e~4      -> backlog-dispatch-admission
+LINT_SUMMARY mode=enforce guards=164 violations=289 allowlisted=289 stale=0 shown=0 sites=926
+lint exit=0
+
+### 2. INSERT: a new identical refusal in a new, unmapped block near the top of the file
+line 1001  site:bin/fm-spawn.sh:72505e7e0e        -> None
+line 1494  site:bin/fm-spawn.sh:72505e7e0e~2      -> backlog-dispatch-admission
+line 1499  site:bin/fm-spawn.sh:72505e7e0e~3      -> state-record-home-containment
+line 2548  site:bin/fm-spawn.sh:72505e7e0e~4      -> state-record-home-containment
+line 5149  site:bin/fm-spawn.sh:72505e7e0e~5      -> backlog-dispatch-admission
+VIOLATION S1 site:bin/fm-spawn.sh:72505e7e0e: bin/fm-spawn.sh:1001 [B] echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=164 violations=290 allowlisted=289 stale=0 shown=1 sites=927
+lint exit=1
+
+### 3. INSERT into a mapped block: restore, then add a second identical line inside the second fm_backlog_record_present block
+  fi
+  fm_backlog_record_present "$RELAUNCH_META" "task record" "$STATE" || {
+    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+line 1491  site:bin/fm-spawn.sh:72505e7e0e        -> state-record-home-containment
+line 2540  site:bin/fm-spawn.sh:72505e7e0e~2      -> state-record-home-containment
+line 2541  site:bin/fm-spawn.sh:72505e7e0e~3      -> state-record-home-containment
+line 2618  site:bin/fm-spawn.sh:72505e7e0e~4      -> backlog-dispatch-admission
+line 5146  site:bin/fm-spawn.sh:72505e7e0e~5      -> backlog-dispatch-admission
+VIOLATION S2 state-record-home-containment: site marker 'echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2' in bin/fm-spawn.sh matches 3 sites, the entry declares 2; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=164 violations=290 allowlisted=289 stale=0 shown=1 sites=927
+lint exit=1
+
+### 4. ALLOWLIST GROWTH: a new identical unmapped refusal plus a new S1 allowlist entry for it (ratchet vs base copy)
+allowlist entries now 290
+LINT_SUMMARY mode=new-or-touched guards=164 violations=290 allowlisted=290 stale=0 shown=0 sites=927
+VIOLATION S1 site:bin/fm-spawn.sh:72505e7e0e: bin/fm-spawn.sh:1001 [B] echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-spawn.sh:72505e7e0e: allowlist entry S1 is not in e238415367b3fe300a9b03dbd1e37faa34c7016d; the allowlist may only shrink
+lint exit=1

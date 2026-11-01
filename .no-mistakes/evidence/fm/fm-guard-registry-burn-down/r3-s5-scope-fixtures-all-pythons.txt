@@ -1,0 +1,326 @@
+# Head a45bff26 scanner bin/fm-guard-sites.py vs runtime ground truth (truth.py executes each fixture function with subprocess stubbed in-memory).
+## Fixture A: R2-1 same-line sibling scopes + T1 sibling-comprehension cases
+== scanner=head  interpreter=/usr/bin/python3 Python 3.9.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  S01: runtime reaches wrapper=True  scanner site=True  ok
+  S02: runtime reaches wrapper=True  scanner site=True  ok
+  S03: runtime reaches wrapper=True  scanner site=True  ok
+  S04: runtime reaches wrapper=True  scanner site=True  ok
+  S05: runtime reaches wrapper=True  scanner site=True  ok
+  S06: runtime reaches wrapper=True  scanner site=True  ok
+  S07: runtime reaches wrapper=True  scanner site=True  ok
+  T01: runtime reaches wrapper=True  scanner site=True  ok
+  T02: runtime reaches wrapper=True  scanner site=True  ok
+  T03: runtime reaches wrapper=True  scanner site=True  ok
+  T04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 15 cases, mismatches=0
+== scanner=head  interpreter=python3.12 Python 3.12.12
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  S01: runtime reaches wrapper=True  scanner site=True  ok
+  S02: runtime reaches wrapper=True  scanner site=True  ok
+  S03: runtime reaches wrapper=True  scanner site=True  ok
+  S04: runtime reaches wrapper=True  scanner site=True  ok
+  S05: runtime reaches wrapper=True  scanner site=True  ok
+  S06: runtime reaches wrapper=True  scanner site=True  ok
+  S07: runtime reaches wrapper=True  scanner site=True  ok
+  T01: runtime reaches wrapper=True  scanner site=True  ok
+  T02: runtime reaches wrapper=True  scanner site=True  ok
+  T03: runtime reaches wrapper=True  scanner site=True  ok
+  T04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 15 cases, mismatches=0
+== scanner=head  interpreter=python3 Python 3.13.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  S01: runtime reaches wrapper=True  scanner site=True  ok
+  S02: runtime reaches wrapper=True  scanner site=True  ok
+  S03: runtime reaches wrapper=True  scanner site=True  ok
+  S04: runtime reaches wrapper=True  scanner site=True  ok
+  S05: runtime reaches wrapper=True  scanner site=True  ok
+  S06: runtime reaches wrapper=True  scanner site=True  ok
+  S07: runtime reaches wrapper=True  scanner site=True  ok
+  T01: runtime reaches wrapper=True  scanner site=True  ok
+  T02: runtime reaches wrapper=True  scanner site=True  ok
+  T03: runtime reaches wrapper=True  scanner site=True  ok
+  T04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 15 cases, mismatches=0
+== scanner=head  interpreter=python3.14 Python 3.14.0
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  S01: runtime reaches wrapper=True  scanner site=True  ok
+  S02: runtime reaches wrapper=True  scanner site=True  ok
+  S03: runtime reaches wrapper=True  scanner site=True  ok
+  S04: runtime reaches wrapper=True  scanner site=True  ok
+  S05: runtime reaches wrapper=True  scanner site=True  ok
+  S06: runtime reaches wrapper=True  scanner site=True  ok
+  S07: runtime reaches wrapper=True  scanner site=True  ok
+  T01: runtime reaches wrapper=True  scanner site=True  ok
+  T02: runtime reaches wrapper=True  scanner site=True  ok
+  T03: runtime reaches wrapper=True  scanner site=True  ok
+  T04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 15 cases, mismatches=0
+## Fixture B: sibling comprehensions vs real local bindings
+== scanner=head  interpreter=/usr/bin/python3 Python 3.9.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  bin/b.py: interpreter cannot parse this file (invalid syntax (b.py, line 10)); skipped
+== scanner=head  interpreter=python3.12 Python 3.12.12
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+== scanner=head  interpreter=python3 Python 3.13.6
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+== scanner=head  interpreter=python3.14 Python 3.14.0
+  N01: runtime reaches wrapper=False scanner site=False ok
+  N02: runtime reaches wrapper=False scanner site=False ok
+  N03: runtime reaches wrapper=False scanner site=False ok
+  N04: runtime reaches wrapper=False scanner site=False ok
+  N05: runtime reaches wrapper=False scanner site=False ok
+  N06: runtime reaches wrapper=False scanner site=False ok
+  N07: runtime reaches wrapper=False scanner site=False ok
+  N08: runtime reaches wrapper=False scanner site=False ok
+  N09: runtime reaches wrapper=False scanner site=False ok
+  N10: runtime reaches wrapper=False scanner site=False ok
+  N11: runtime reaches wrapper=False scanner site=False ok
+  N12: runtime reaches wrapper=False scanner site=False ok
+  N13: runtime reaches wrapper=False scanner site=False ok
+  N14: runtime reaches wrapper=False scanner site=False ok
+  N15: runtime reaches wrapper=False scanner site=False ok
+  N16: runtime reaches wrapper=False scanner site=False ok
+  R01: runtime reaches wrapper=True  scanner site=True  ok
+  R02: runtime reaches wrapper=True  scanner site=True  ok
+  R03: runtime reaches wrapper=True  scanner site=True  ok
+  R04: runtime reaches wrapper=True  scanner site=True  ok
+  R05: runtime reaches wrapper=True  scanner site=True  ok
+  R06: runtime reaches wrapper=True  scanner site=True  ok
+  R07: runtime reaches wrapper=True  scanner site=True  ok
+  R08: runtime reaches wrapper=True  scanner site=True  ok
+  R09: runtime reaches wrapper=True  scanner site=True  ok
+  R10: runtime reaches wrapper=True  scanner site=True  ok
+  R11: runtime reaches wrapper=True  scanner site=True  ok
+  R12: runtime reaches wrapper=True  scanner site=True  ok
+  bin/a.py: 28 cases, mismatches=0
+  M01: runtime reaches wrapper=False scanner site=False ok
+  M02: runtime reaches wrapper=False scanner site=False ok
+  M03: runtime reaches wrapper=False scanner site=False ok
+  M04: runtime reaches wrapper=True  scanner site=True  ok
+  bin/b.py: 4 cases, mismatches=0
+## Fixture C: round-3 extra cases for assigns() (global, nonlocal, del, augassign, walrus in comp-if, lambda, genexpr)
+== scanner=head  interpreter=/usr/bin/python3 Python 3.9.6
+  N20: runtime reaches wrapper=False scanner site=False ok
+  N21: runtime reaches wrapper=False scanner site=False ok
+  N22: runtime reaches wrapper=False scanner site=False ok
+  N23: runtime reaches wrapper=False scanner site=False ok
+  N24: runtime reaches wrapper=False scanner site=False ok
+  N25: runtime reaches wrapper=False scanner site=False ok
+  R20: runtime reaches wrapper=True  scanner site=True  ok
+  R21: runtime reaches wrapper=True  scanner site=True  ok
+  R22: runtime reaches wrapper=True  scanner site=True  ok
+  R23: runtime reaches wrapper=True  scanner site=True  ok
+  R24: runtime reaches wrapper=True  scanner site=True  ok
+  R25: runtime reaches wrapper=True  scanner site=True  ok
+  R26: runtime reaches wrapper=True  scanner site=True  ok
+  R27: runtime reaches wrapper=True  scanner site=True  ok
+  bin/c.py: 14 cases, mismatches=0
+== scanner=head  interpreter=python3.12 Python 3.12.12
+  N20: runtime reaches wrapper=False scanner site=False ok
+  N21: runtime reaches wrapper=False scanner site=False ok
+  N22: runtime reaches wrapper=False scanner site=False ok
+  N23: runtime reaches wrapper=False scanner site=False ok
+  N24: runtime reaches wrapper=False scanner site=False ok
+  N25: runtime reaches wrapper=False scanner site=False ok
+  R20: runtime reaches wrapper=True  scanner site=True  ok
+  R21: runtime reaches wrapper=True  scanner site=True  ok
+  R22: runtime reaches wrapper=True  scanner site=True  ok
+  R23: runtime reaches wrapper=True  scanner site=True  ok
+  R24: runtime reaches wrapper=True  scanner site=True  ok
+  R25: runtime reaches wrapper=True  scanner site=True  ok
+  R26: runtime reaches wrapper=True  scanner site=True  ok
+  R27: runtime reaches wrapper=True  scanner site=True  ok
+  bin/c.py: 14 cases, mismatches=0
+== scanner=head  interpreter=python3 Python 3.13.6
+  N20: runtime reaches wrapper=False scanner site=False ok
+  N21: runtime reaches wrapper=False scanner site=False ok
+  N22: runtime reaches wrapper=False scanner site=False ok
+  N23: runtime reaches wrapper=False scanner site=False ok
+  N24: runtime reaches wrapper=False scanner site=False ok
+  N25: runtime reaches wrapper=False scanner site=False ok
+  R20: runtime reaches wrapper=True  scanner site=True  ok
+  R21: runtime reaches wrapper=True  scanner site=True  ok
+  R22: runtime reaches wrapper=True  scanner site=True  ok
+  R23: runtime reaches wrapper=True  scanner site=True  ok
+  R24: runtime reaches wrapper=True  scanner site=True  ok
+  R25: runtime reaches wrapper=True  scanner site=True  ok
+  R26: runtime reaches wrapper=True  scanner site=True  ok
+  R27: runtime reaches wrapper=True  scanner site=True  ok
+  bin/c.py: 14 cases, mismatches=0
+== scanner=head  interpreter=python3.14 Python 3.14.0
+  N20: runtime reaches wrapper=False scanner site=False ok
+  N21: runtime reaches wrapper=False scanner site=False ok
+  N22: runtime reaches wrapper=False scanner site=False ok
+  N23: runtime reaches wrapper=False scanner site=False ok
+  N24: runtime reaches wrapper=False scanner site=False ok
+  N25: runtime reaches wrapper=False scanner site=False ok
+  R20: runtime reaches wrapper=True  scanner site=True  ok
+  R21: runtime reaches wrapper=True  scanner site=True  ok
+  R22: runtime reaches wrapper=True  scanner site=True  ok
+  R23: runtime reaches wrapper=True  scanner site=True  ok
+  R24: runtime reaches wrapper=True  scanner site=True  ok
+  R25: runtime reaches wrapper=True  scanner site=True  ok
+  R26: runtime reaches wrapper=True  scanner site=True  ok
+  R27: runtime reaches wrapper=True  scanner site=True  ok
+  bin/c.py: 14 cases, mismatches=0
+
+## BEFORE: base 8618f637 scanner on fixture A (shows the scanner did not see these wrapper denies before the change)
+== scanner=base  interpreter=/usr/bin/python3 Python 3.9.6
+  S01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 15 cases, mismatches=11
+== scanner=base  interpreter=python3.12 Python 3.12.12
+  S01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 15 cases, mismatches=11
+== scanner=base  interpreter=python3 Python 3.13.6
+  S01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 15 cases, mismatches=11
+== scanner=base  interpreter=python3.14 Python 3.14.0
+  S01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S05: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S06: runtime reaches wrapper=True  scanner site=False MISMATCH
+  S07: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T01: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T02: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T03: runtime reaches wrapper=True  scanner site=False MISMATCH
+  T04: runtime reaches wrapper=True  scanner site=False MISMATCH
+  bin/a.py: 15 cases, mismatches=11
