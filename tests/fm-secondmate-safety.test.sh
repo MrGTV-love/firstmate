@@ -412,6 +412,7 @@ test_home_seed_refuses_recovered_slot_before_lease() {
   [ "$rc" -ne 0 ] || fail "home seed leased a pool while a recovered slot held another task's copy"
   assert_contains "$out" "carries Treehouse's recovered-state lease" "home seed lost the recovered-state reason"
   assert_contains "$out" 'refusing allocation before treehouse get' "home seed did not refuse before lease acquisition"
+  assert_contains "$out" "git does not report the slot clean" "home seed did not say why the firm lease was not attempted"
   assert_contains "$out" "bin/fm-teardown.sh 'holder'" "home seed lost the completing step"
   assert_not_contains "$out" "treehouse status" "home seed named a pool command that can move the copy"
   assert_not_contains "$out" "treehouse lease" "home seed named a lease that cannot replace the recovered lease"
@@ -422,7 +423,7 @@ test_home_seed_refuses_recovered_slot_before_lease() {
   cmp -s "$SEED_CASE_DIR/before-holder-meta" "$SEED_CASE_HOME/state/holder.meta" || fail "home seed changed the holder"
   cmp -s "$SEED_CASE_DIR/before-registry" "$SEED_CASE_HOME/data/secondmates.md" || fail "home seed changed the registry"
   [ ! -e "$SEED_CASE_SLOT/.fm-secondmate-home" ] || fail "home seed marked the held recovered slot"
-  pass "home seed refuses before lease acquisition while a recovered slot holds another task's copy"
+  pass "home seed refuses before lease acquisition, sending no Treehouse command, while a recovered slot holds another task's unignored copy"
 }
 
 test_home_seed_left_slot_allows_lease_and_propagates_get_failure() {

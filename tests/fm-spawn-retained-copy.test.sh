@@ -13,9 +13,13 @@
 #      state file, missing jq, conflicting records (including an unleased or
 #      recovered-lease alias of the slot's directory), a relative or
 #      TSV-escaped entry path, or Treehouse's recovered-state lease on a slot
-#      that is not a Firstmate home. A recovered-state refusal names the owning
-#      task's completing step, never a Treehouse command, and holds even when a
-#      free slot exists: no Treehouse command can hold that slot in place.
+#      that is not a Firstmate home and cannot be firmly leased.
+#   2a. A recovered-state slot that git reports fully clean, its nested copy
+#      ignored, is firmly leased to the task whose copy it holds by
+#      treehouse lease --path before get, and the spawn gets a free slot; when
+#      Treehouse refuses that lease, or the slot is not clean, the spawn refuses
+#      before get naming that task's completing step, and an unclean slot is
+#      sent no Treehouse command.
 #   3. A slot Treehouse's state durably leases does not block allocation even
 #      with a live record's nested copy inside it: treehouse get never hands it
 #      out, so the spawn proceeds into another slot and leaves it untouched.
@@ -74,6 +78,47 @@ add_nested_record() {  # <meta> <repo> <parent> <branch>
   git -C "$NESTED_COPY" commit -qm nested-unlanded
   fm_write_meta "$meta" "window=fmses:fm-$(basename "$meta" .meta)" \
     "worktree=$NESTED_COPY" "project=$repo" "kind=ship"
+}
+
+# Replaces the no-op treehouse with one that has lease --path: it records each
+# call, with whether treehouse get had already reached the pane, to
+# $CASE_DIR/treehouse-log, and leases the entry at the given path in the pool
+# state, or refuses as Treehouse does over a recovered lease when
+# $CASE_DIR/lease-refuse exists.
+install_fake_lease_treehouse() {
+  cat > "$FAKEBIN_DIR/treehouse" <<SH
+#!/usr/bin/env bash
+case "\$1 \${2:-}" in
+  "lease --help") printf 'Usage:\n  treehouse lease <name> | lease --path <slot path> [flags]\n      --lease-holder string\n      --path string\n'; exit 0 ;;
+  "lease --path") ;;
+  *) exit 0 ;;
+esac
+sent=no
+! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" || sent=yes
+printf '%s get-sent=%s\n' "\$*" "\$sent" >> "$CASE_DIR/treehouse-log"
+if [ -e "$CASE_DIR/lease-refuse" ]; then
+  printf 'worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")\n' >&2
+  exit 1
+fi
+jq --arg p "\$3" --arg h "\$5" '.worktrees |= map(if .path == \$p then (.leased = true | .lease_holder = \$h) else . end)' \
+  "$CASE_DIR/pool/treehouse-state.json" > "$CASE_DIR/pool/state.next" && mv "$CASE_DIR/pool/state.next" "$CASE_DIR/pool/treehouse-state.json"
+printf '%s\n' "\$3"
+SH
+  chmod +x "$FAKEBIN_DIR/treehouse"
+  : > "$CASE_DIR/treehouse-log"
+}
+
+# The d5 shape: slot 1 carries Treehouse's recovered-state lease and holds the
+# holder task's nested, unlanded current copy; slot 2 is free.
+make_recovered_case() {  # <name> <ignore-nested: yes|no>
+  make_retained_case "$1"
+  [ "$2" = no ] || printf '.claude/worktrees/\n' >> "$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$1"
+  add_free_second_slot ',"leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"'
+  install_fake_lease_treehouse
+  retained_fingerprint > "$CASE_DIR/before-copy"
+  cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
 }
 
 retained_fingerprint() {
@@ -496,34 +541,69 @@ test_unprovable_slot_hold_still_refuses() {
   pass "a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it"
 }
 
-test_recovered_slot_with_live_copy_refuses_before_get() {
-  local name=recovered-live out rc=0
-  make_retained_case "$name"
-  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
-  add_free_second_slot ',"leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"'
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
-  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+test_recovered_slot_is_firmly_leased_and_spawn_gets_free_slot() {
+  local name=recovered-firm out rc=0
+  make_recovered_case "$name" yes
   out=$(run_retained_spawn "$name") || rc=$?
   printf '%s\n' "$out"
-  [ "$rc" -ne 0 ] || fail "spawn sent treehouse get while a recovered slot held a live copy: $out"
-  assert_contains "$out" "Treehouse pool slot $SLOT_DIR contains task holder's current copy" "refusal did not name the held slot and its task"
-  assert_contains "$out" "carries Treehouse's recovered-state lease" "refusal lost its reason"
-  assert_contains "$out" "refusing allocation before treehouse get" "refusal did not run before treehouse get"
+  expect_code 0 "$rc" "a recovered slot holding a live ignored copy stopped a free-slot start"$'\n'"$out"
+  assert_equals "lease --path $SLOT_DIR --lease-holder holder get-sent=no" "$(cat "$CASE_DIR/treehouse-log")" \
+    "the recovered slot was not firmly leased to its owning task before treehouse get"
+  jq -e --arg p "$SLOT_DIR" '[.worktrees[] | select(.path == $p) | [.leased, .lease_holder]] == [[true, "holder"]]' \
+    "$CASE_DIR/pool/treehouse-state.json" >/dev/null || fail "pool state does not record the firm lease for the owning task"
+  grep -Fq 'treehouse get' "$CASE_DIR/pane-log" || fail "the spawn did not allocate after the firm lease"
+  assert_contains "$out" "spawned new-$name" "the free-slot worker did not launch"
+  assert_grep "worktree=$PANE_DIR" "$HOME_DIR/state/new-$name.meta" "the worker did not receive the free slot"
+  assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "the free slot was not claimed"
+  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "the firmly leased slot was claimed"
+  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "the firm lease changed the held slot"
+  [ -f "$NESTED_COPY/nested-owned.txt" ] || fail "the live nested copy left the held slot"
+  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "the existing task record changed"
+  ! grep -Eq 'treehouse return|reset' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "the spawn returned or reset a slot"
+  jq -se '[.[] | select(.guard == "spawn-retained-current-copy")] | last | .decision == "allow"' \
+    "$HOME_DIR/state/guard-events.jsonl" >/dev/null || fail "the allowed allocation was not recorded"
+  pass "a recovered slot holding a live ignored copy is firmly leased to its task before get, and a new worker gets a free slot"
+}
+
+assert_recovered_refusal_before_get() {  # <name> <reason>
+  local name=$1 reason=$2 out rc=0
+  out=$(run_retained_spawn "$name") || rc=$?
+  printf '%s\n' "$out"
+  [ "$rc" -ne 0 ] || fail "$name: spawn allocated while a recovered slot could not be firmly leased: $out"
+  assert_contains "$out" "Treehouse pool slot $SLOT_DIR contains task holder's current copy" "$name: refusal did not name the held slot and its task"
+  assert_contains "$out" "carries Treehouse's recovered-state lease" "$name: refusal lost its reason"
+  assert_contains "$out" "refusing allocation before treehouse get" "$name: refusal did not run before treehouse get"
+  assert_contains "$out" "$reason" "$name: refusal did not say why the firm lease failed"
   assert_contains "$out" "Land and finish task 'holder', then run: FM_HOME='$HOME_DIR' bin/fm-teardown.sh 'holder'" \
-    "refusal did not name the completing step"
-  assert_not_contains "$out" "treehouse status" "refusal named a pool command that can move the copy"
-  assert_not_contains "$out" "treehouse lease" "refusal named a lease that cannot replace the recovered lease"
-  ! grep -Fq 'treehouse' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refusal sent a Treehouse command"
-  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "refusal changed the held slot"
-  [ -f "$NESTED_COPY/nested-owned.txt" ] || fail "refusal moved the live nested copy"
-  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "refusal changed the existing task record"
-  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "refusal changed the recovered lease"
-  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] && [ ! -e "$CASE_DIR/pool/2/.fm-slot-owner" ] || fail "refusal claimed a slot"
-  [ ! -e "$HOME_DIR/state/new-$name.meta" ] || fail "refusal published a new task"
+    "$name: refusal did not name the completing step"
+  assert_not_contains "$out" "treehouse status" "$name: refusal named a pool command that can move the copy"
+  ! grep -Fq 'treehouse' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$name: refusal sent treehouse get"
+  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$name: refusal changed the held slot"
+  [ -f "$NESTED_COPY/nested-owned.txt" ] || fail "$name: refusal moved the live nested copy"
+  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$name: refusal changed the existing task record"
+  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$name: refusal changed the recovered lease"
+  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] && [ ! -e "$CASE_DIR/pool/2/.fm-slot-owner" ] || fail "$name: refusal claimed a slot"
+  [ ! -e "$HOME_DIR/state/new-$name.meta" ] || fail "$name: refusal published a new task"
   jq -se 'last | [.guard, .decision, .source_ok] == ["spawn-retained-current-copy", "deny", true]' \
-    "$HOME_DIR/state/guard-events.jsonl" >/dev/null || fail "the denial was not recorded"
-  pass "a recovered-lease slot holding a live nested copy refuses before treehouse get, even with a free slot, and stays untouched"
+    "$HOME_DIR/state/guard-events.jsonl" >/dev/null || fail "$name: the denial was not recorded"
+}
+
+test_recovered_slot_refused_lease_refuses_before_get() {
+  local name=recovered-refused
+  make_recovered_case "$name" yes
+  : > "$CASE_DIR/lease-refuse"
+  assert_recovered_refusal_before_get "$name" "treehouse lease --path refused (worktree 1 is already leased"
+  assert_equals "lease --path $SLOT_DIR --lease-holder holder get-sent=no" "$(cat "$CASE_DIR/treehouse-log")" \
+    "the refused firm lease was not attempted once before get"
+  pass "a recovered slot whose firm lease Treehouse refuses blocks allocation before get and stays untouched"
+}
+
+test_recovered_slot_unignored_copy_refuses_without_pool_command() {
+  local name=recovered-unignored
+  make_recovered_case "$name" no
+  assert_recovered_refusal_before_get "$name" "git does not report the slot clean"
+  [ ! -s "$CASE_DIR/treehouse-log" ] || fail "an unclean recovered slot was sent a Treehouse command: $(cat "$CASE_DIR/treehouse-log")"
+  pass "a recovered slot whose live copy git does not ignore refuses before get without any Treehouse command"
 }
 
 test_nested_copy_in_leased_slot_allows_allocation() {
@@ -688,7 +768,9 @@ test_unreadable_local_home_warns_and_proceeds() {
 
 fm_test_only
 
-test_recovered_slot_with_live_copy_refuses_before_get || exit 1
+test_recovered_slot_is_firmly_leased_and_spawn_gets_free_slot || exit 1
+test_recovered_slot_refused_lease_refuses_before_get || exit 1
+test_recovered_slot_unignored_copy_refuses_without_pool_command || exit 1
 test_conflicting_unleased_alias_refuses_before_allocation || exit 1
 test_unsupported_entry_paths_are_unproved || exit 1
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1

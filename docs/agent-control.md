@@ -457,9 +457,11 @@ An unleased entry spelled with trailing slashes, `/.` components, or repeated sl
 The same holds for an entry spelled that way that carries Treehouse's recovered-state holder on a slot that is not a local Firstmate home.
 The raw path-suffix prefilter skips only entries with an ordinary lease, so it cannot hide a conflicting unleased or recovered-lease alias; skipping an ordinary leased alias can still leave the slot unproved and refuse allocation.
 A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
-On Treehouse 3.1.7-fm, `treehouse lease --path` refuses such a slot as already leased while it is busy, dirty, or unlanded.
-Once it is idle, clean, and landed, any pool command, `treehouse get`, `treehouse lease`, and `treehouse status` included, first moves its untracked contents, a nested copy included, into a retained backup, and the slot is then leasable or handed out empty.
-No Treehouse command can therefore hold such a slot in place with its copy, so the check refuses before `treehouse get` and never returns, reaps, re-leases, inspects, or edits the slot.
+Before `treehouse get`, the check therefore replaces that recovered lease with a firm lease for the task whose current copy the slot holds, with `treehouse lease --path <slot> --lease-holder <task>`, and proves the new lease in Treehouse's state with the copy still in place; the get that follows skips the slot and allocates a free one.
+On Treehouse 3.1.7-fm, `treehouse lease --path` refuses a recovered slot as already leased while its HEAD is unlanded, it is tracked-dirty, or a process runs in it, and changes nothing.
+Once the slot is idle, clean, and landed, any pool command, `treehouse get`, `treehouse lease`, and `treehouse status` included, first moves its untracked contents that Git does not ignore into a retained backup.
+So the lease runs only when `git status --porcelain --untracked-files=normal` in the slot prints nothing, which also proves the nested copy is ignored there; a slot that fails this sends no pool command.
+When the lease cannot be taken or proved, including on an installed treehouse without `lease --path`, the check refuses before `treehouse get` and never returns, reaps, or forces a new lease on the slot.
 A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
 The check refuses to prove any slot held when any entry path is relative or escaped by the TSV transport, including paths containing backslashes, tabs, carriage returns, or newlines.
 It cannot safely exclude such an entry as unrelated without proving its directory identity, since even a different spelling can alias the requested slot.
@@ -470,9 +472,9 @@ For a singly recorded unleased slot with a unique state name, the refusal names 
 When an unleased entry's state name is duplicated or another entry names the same directory, the refusal instead requires `treehouse status` inspection and a repair report.
 Treehouse leases only the first entry with the requested name, so a lease cannot reliably clear a duplicate-entry refusal in either entry order, and the refusal does not describe a partly leased slot as unleased.
 No other refusal names a lease as its remedy.
-A refusal for a recovered-state slot names the existing task's completing step: land and finish that task, then run `FM_HOME=<owning-home> bin/fm-teardown.sh <existing-task>` before retrying.
-It names neither `treehouse lease` nor `treehouse status`: the first cannot replace that lease, and either can move the copy out of a releasable slot.
-While that task's copy stays current in the slot, every allocation for the project refuses, including one that `treehouse get` would place in a free slot.
+A refusal for a recovered-state slot says why the firm lease failed and names the existing task's completing step: land and finish that task, then run `FM_HOME=<owning-home> bin/fm-teardown.sh <existing-task>` before retrying.
+It does not suggest `treehouse status`, which can move unignored contents out of a releasable slot.
+While such a slot cannot be firmly leased, every allocation for the project refuses, including one that `treehouse get` would place in a free slot.
 An unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, does not stop a start, because `treehouse get` allocates from the current pool only; this is judged again at each start, so a folder that becomes current again is protected again.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.

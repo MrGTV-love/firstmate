@@ -695,6 +695,43 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
   return 1
 }
 
+# Replaces Treehouse's recovered-state lease on pool slot <slot>, which holds
+# <holder>'s current copy <copy>, with a firm lease for <holder> by the slot's
+# exact path, and proves it in Treehouse state with the copy still in place;
+# <home> arguments pass through to fm_task_copy_pool_slot_held. Treehouse
+# 3.1.7-fm refuses to lease over a recovered lease while the slot's HEAD is
+# unlanded, it is tracked-dirty, or a process runs in it, and changes nothing;
+# once the slot is idle, clean and landed, every pool command, this lease
+# included, first moves the slot's untracked, unignored contents into a
+# retained backup. So the lease runs only when git reports the slot fully clean
+# with untracked files shown, which also proves the copy is ignored there; a
+# slot that cannot be shown so is never sent a pool command. On failure sets
+# FM_TASK_COPY_FIRM_LEASE_REASON to a clause naming why.
+FM_TASK_COPY_FIRM_LEASE_REASON=
+fm_task_copy_firm_lease_recovered_slot() {  # <project> <slot> <holder> <copy> [<home>...]
+  local project=$1 slot=$2 holder=$3 copy=$4 status help err
+  shift 4
+  FM_TASK_COPY_FIRM_LEASE_REASON=
+  if ! status=$(git --no-optional-locks -C "$slot" status --porcelain --untracked-files=normal 2>/dev/null) || [ -n "$status" ]; then
+    FM_TASK_COPY_FIRM_LEASE_REASON="git does not report the slot clean with every untracked entry, this copy included, ignored, so a Treehouse pool command could move them into a retained backup"
+    return 1
+  fi
+  if ! help=$(treehouse lease --help 2>&1) || ! grep -Eq '(^|[^[:alnum:]_-])--path([^[:alnum:]_-]|$)' <<<"$help"; then
+    FM_TASK_COPY_FIRM_LEASE_REASON="the installed treehouse has no lease --path, which needs treehouse v3.1.7-fm or later"
+    return 1
+  fi
+  if ! err=$( (cd "$project" && treehouse lease --path "$slot" --lease-holder "$holder" </dev/null) 2>&1 >/dev/null); then
+    FM_TASK_COPY_FIRM_LEASE_REASON="treehouse lease --path refused (${err##*$'\n'}); Treehouse keeps a recovered lease while the slot's HEAD is unlanded, it is tracked-dirty, or a process runs in it"
+    return 1
+  fi
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  if ! fm_task_copy_pool_slot_held "$slot" "$@" || [ ! -d "$copy" ]; then
+    FM_TASK_COPY_FIRM_LEASE_REASON="after treehouse lease --path, Treehouse state does not prove a durable lease with the copy in place"
+    return 1
+  fi
+}
+
 # True when no pool slot of <project> that treehouse get could hand out strictly
 # contains the current copy (worktree=) of a task record in this home or any
 # locally registered Firstmate home. treehouse get resets and reassigns the slot
@@ -712,15 +749,13 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # lease as a remedy. A registered local home
 # that cannot be read is named in one warning line and skipped: one broken home
 # must not stop every allocation for a project.
-# A recovered lease that is not on a local Firstmate home also refuses, with
-# the owning task's completing step as the remedy. Treehouse 3.1.7-fm refuses to
-# lease over it while the slot is busy, dirty or unlanded, and once the slot is
-# idle, clean and landed every pool command (get, lease and status included)
-# first moves its untracked contents, nested copies included, into a retained
-# backup; so no Treehouse command can hold it in place, and only this pre-get
-# refusal keeps the spawn's own get from evicting the copy.
+# A slot carrying Treehouse's recovered-state lease that is not a local
+# Firstmate home is first firmly leased to the task whose copy it holds
+# (fm_task_copy_firm_lease_recovered_slot), so the get that follows skips it;
+# when that lease cannot be proved, the allocation refuses before get, naming
+# that task's completing step.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy reason
   local source_ok=true started=$SECONDS
   local -a homes=()
   FM_TASK_COPY_POOL_STATE_FILE=
@@ -755,7 +790,10 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
           remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
           ;;
         recovered)
-          remedy="Land and finish task '$id', then run: FM_HOME='${state_dir%/*}' bin/fm-teardown.sh '$id'; retry only after that completing step releases its current copy. Do not return, reap or re-lease the held slot, or run pool commands to inspect it: once it is idle, clean and landed, any Treehouse pool command moves its untracked contents, this copy included, into a retained backup."
+          reason=$FM_TASK_COPY_SLOT_REASON
+          fm_task_copy_firm_lease_recovered_slot "$project" "$slot" "$id" "$copy" ${homes[@]+"${homes[@]}"} && continue
+          FM_TASK_COPY_SLOT_REASON=$reason
+          remedy="It could not be firmly leased to task '$id' before treehouse get: $FM_TASK_COPY_FIRM_LEASE_REASON. Land and finish task '$id', then run: FM_HOME='${state_dir%/*}' bin/fm-teardown.sh '$id'; retry only after that completing step releases its current copy. Do not return, reap or force a new lease on the held slot, or run any Treehouse pool command, status included, against it: once the slot is idle, clean and landed, any Treehouse pool command moves its untracked contents into a retained backup."
           ;;
         escaped|relative)
           remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
