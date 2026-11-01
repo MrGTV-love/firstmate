@@ -107,7 +107,7 @@ case "${1:-}" in
         ". '"*"'") staged=${literal#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || literal=$(cat "$staged") ;;
       esac
       case "$literal" in
-        *' --auto')
+        *' --auto'*)
           printf '%s\n' "$literal" >> "$FM_FAKE_LAUNCH_LOG"
           printf 'launched\n' > "$FM_FAKE_KIMI_STATE"
           ;;

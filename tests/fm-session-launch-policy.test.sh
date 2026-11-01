@@ -119,6 +119,7 @@ SH
     cat > "$FAKEBIN/$executable" <<'SH'
 #!/usr/bin/env bash
 set -eu
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 if [ "${0##*/}" = omp ] && [ "${1:-}" = --version ]; then
   printf 'omp/18.1.20\n'
   exit 0
@@ -155,6 +156,10 @@ SH
 }
 
 run_cli() {
+  # The launch boundary keeps no FM_POLICY_* pane name, so the fake harnesses a
+  # launch reaches read them from their fake config.
+  fm_fake_config "$FAKEBIN" FM_POLICY_CASE="$CASE" FM_POLICY_ID="$ID" \
+    FM_POLICY_CHILD="$CHILD_HOME" FM_POLICY_EXPECT_ENABLED="$EXPECT_CHILD_POLICY"
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     FM_HOME="$HOME_DIR" HOME="$HOME_DIR/user-home" CLAUDE_CONFIG_DIR='' \

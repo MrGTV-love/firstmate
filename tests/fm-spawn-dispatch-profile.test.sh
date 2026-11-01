@@ -495,7 +495,10 @@ test_chained_raw_launch_strips_ai_trailer_in_every_step() {
   (
     cd "$WT_DIR" || exit 1
     unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-    fm_git_identity 'Captain Tests' 'captain@example.invalid'
+    # The launch boundary drops a pane-only GIT_AUTHOR_*/GIT_COMMITTER_*
+    # identity; the pane's kept GIT_CONFIG_GLOBAL carries it instead.
+    printf '[user]\n\tname = Captain Tests\n\temail = captain@example.invalid\n' > "$HOME_DIR/pane-gitconfig"
+    export GIT_CONFIG_GLOBAL="$HOME_DIR/pane-gitconfig"
     bash -c "$launch"
   ) || fail "executing the chained raw launch failed"$'\n'"launch: $launch"
   body=$(git -C "$WT_DIR" log -1 --format=%B)
