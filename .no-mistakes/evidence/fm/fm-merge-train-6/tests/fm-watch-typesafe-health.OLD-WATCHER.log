@@ -1,0 +1,12 @@
+ok - the real watcher presents its named non-fleet alarm once through the existing durable wake queue
+fm_test_wait_until: condition unmet after 5 peer cycles (0 -> 5 in /Users/charlesabrooker/tmp/fm-watch-typesafe-health-tests.tiMQ78/memory-health-marker/state/.test-poll-completed-36225)
+not ok - the watcher failed to present the third memory row after two:  awk: newline in string 1
+2... at source line 1
+awk: newline in string 1
+2... at source line 1
+awk: newline in string 1
+2... at source line 1
+awk: newline in string 1
+2... at source line 1
+awk: newline in string 1
+2... at source line 1

@@ -1,0 +1,27 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.k2Xx3y
+=== (b) real fm-brief.sh for a no-mistakes ship
+fm-brief rc=0
+145:Start each NEW run through `FM_HOME=<lab> <wt>/bin/fm-mem-guard.sh run -- no-mistakes axi run`, appending the unchanged intent and verification-plan arguments, not the bare run command.
+146:That path records a fresh host memory reading immediately before exec and refuses the new run with exit 75 while native memory pressure is high or its readings are unavailable; it never stops existing work.
+=== (a) real spawn on real host reading (pressure=1)
+spawned later harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-later worktree=<lab>/pool/.treehouse/labproj-1894a6/1/labproj
+exit=0
+backlog section: ## In flight :: - [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+worker told to exit; windows: sleep fm-later ; pane fg: zsh
+=== (a) relaunch under native pressure 2 is recovery, not new work
+spawned later harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-later worktree=<lab>/pool/.treehouse/labproj-1894a6/1/labproj
+exit=0; admission readings added: 0; windows: sleep fm-later 
+--- relaunched worker pane:
+ ▐▛███▛█   Claude Code v2.1.316
+⏺ RUNNING
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 2 agents
+=== (c) real root probes then real baseline
+{"source":"probe","pressure_level":1,"non_fleet_max_bytes":5180014592,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.k2Xx3y/state/.memory-baseline.j","fixture":null}
+{"source":"probe","pressure_level":1,"non_fleet_max_bytes":5168300032,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.k2Xx3y/state/.memory-baseline.j","fixture":null}
+{"source":"probe","pressure_level":1,"non_fleet_max_bytes":5168513024,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.k2Xx3y/state/.memory-baseline.j","fixture":null}
+{"source":"probe","pressure_level":1,"non_fleet_max_bytes":5168824320,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.k2Xx3y/state/.memory-baseline.j","fixture":null}
+{"source":"baseline","baseline":{"schema":"fm-memory-baseline.v1","checked_at":"2026-11-01T13:23:55.088914+00:00","host":"Mac-Studio.local","total_bytes":137438953472,"non_fleet_max_bytes":5180014592,"non_fleet_max_share":0.03768956661224365,"smallest_reading_max_bytes":5168300032,"samples":4,"first_checked_at":"2026-11-01T13:23:39.855870+00:00","last_checked_at":"2026-11-01T13:23:51.504221+00:00","incomplete_samples":3,"derivation":"largest non-fleet RSS observed across recorded healthy root pr
+baseline exit=0
+-rw-r--r--  1 charlesabrooker  staff  542 Nov  1 07:23 state/.memory-baseline.json
+{"schema":"fm-memory-baseline.v1","samples":4,"non_fleet_max_bytes":5180014592,"smallest_reading_max_bytes":5168300032}
+lab removed

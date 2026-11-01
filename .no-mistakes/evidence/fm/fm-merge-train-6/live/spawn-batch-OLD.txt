@@ -1,0 +1,4 @@
+=== 1. batch under native pressure 2 (no capacity declared)
+deferred: host memory admission refused new task later (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+batch: DEFERRED later (/Users/charlesabrooker/tmp/fm-lab.cjyLr6/projects/labproj) - its project is at capacity, so it stays queued
+exit=75

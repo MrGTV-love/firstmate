@@ -1,0 +1,18 @@
+HEAD b712469a4969c205cc0710928e37af864b894423
+origin/main-at-run ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+ancestor-of-HEAD a32b67fbafa93cc3778ee9507d1b0e06cb4675f0
+ancestor-of-HEAD 3f3534d25850d9ae1dce1e362cd751d5b03a09cd
+ancestor-of-HEAD ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+merge fbea856d17f54bde64d6a84de3db98a15b0aaba0 tree=8166424360735508cb0b361ad8bac3f779def0f7 auto=8166424360735508cb0b361ad8bac3f779def0f7 EQUAL Merge origin/main ec8b5ccf into train 6
+merge 6a778c4a9fe50a61c6481c6c6d20bcaa2b41e77e tree=b1fb37863a365abce9120b98e6d10100f9b934eb auto=b1fb37863a365abce9120b98e6d10100f9b934eb EQUAL Merge https://github.com/MrGTV-love/firstmate/pull/328 at head 3f3534d25850d9ae1dce1e362cd751d5b03a09cd
+merge dc59382967a8aa9e628fb4656d4dc32c404a5959 tree=9a3500540e7f4e15205bee9b2345d2bbaa1fb7d3 auto=9a3500540e7f4e15205bee9b2345d2bbaa1fb7d3 EQUAL Merge origin/main 3948d62f into train 6
+merge 7ec9999841dad84d9dc346517efd3686d8c95cc6 tree=98ae5b8529903381713b6b1725a03a83723fad1d auto=98ae5b8529903381713b6b1725a03a83723fad1d EQUAL Merge https://github.com/MrGTV-love/firstmate/pull/292 at head a32b67fbafa93cc3778ee9507d1b0e06cb4675f0
+gitignore-diff-lines-vs-ec8b5ccf: 0
+non-merge commits since fbea856d1:
+b712469a4 no-mistakes(review): Make batch exit-75 line name no deferral cause
+be090cfad no-mistakes(review): Read memory marker via ENVIRON; test multi-row surfacing
+ bin/fm-spawn.sh                        |  5 ++--
+ bin/fm-watch.sh                        |  4 ++--
+ tests/fm-project-capacity.test.sh      | 11 +++++++--
+ tests/fm-watch-typesafe-health.test.sh | 42 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 56 insertions(+), 6 deletions(-)

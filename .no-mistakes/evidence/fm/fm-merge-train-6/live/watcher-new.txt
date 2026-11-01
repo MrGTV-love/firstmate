@@ -1,0 +1,16 @@
+[new] lab home: /Users/charlesabrooker/tmp/fm-lab.kHwZFN  code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BG5F9156EQNDZ2PSHYV7AK
+[new] real probe: pressure=1 fixture=null alarms=4
+[new] queued memory rows after probe 1: 4
+[new] watcher 1 woke
+[new] watcher 1 wake rows: 4
+check: memory-health: non-fleet process mediaanalysisd PID 6378 RSS 1127923712 bytes exceeds the largest non-fleet RSS observed across 2 healthy readings (1073741824 bytes); see /Users/charlesabrooker/tmp/fm-lab.kHwZFN/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting any system daemon requires the captain's decision.; check: memory-health: non-fleet process com
+[new] marker lines after watcher 1: 4
+[new] watcher 1 stderr: 
+[new] hog pid=36736 rss_kib=2871152
+[new] queued memory rows after probe 2: 5
+[new] RESULT: a later watcher pass presented the third row
+check: memory-health: non-fleet process fmlabhog PID 36736 RSS 2940059648 bytes exceeds the largest non-fleet RSS observed across 2 healthy readings (1073741824 bytes); see /Users/charlesabrooker/tmp/fm-lab.kHwZFN/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting 
+[new] watcher 2 stderr: 
+[new] old rows repeated in watcher 2: 0  (rows in its wake mentioning other processes: 0)
+/Users/charlesabrooker/.no-mistakes/evidence/01M6BG5F9156EQNDZ2PSHYV7AK/live/drive-watcher.sh: line 27: 36736 Terminated: 15          nohup "$hb" -e 'open(F,">","pid");print F $$;close F;$x="a"x(1400*1024*1024); sleep 75' > /dev/null 2>&1
+[new] lab removed

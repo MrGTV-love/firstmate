@@ -1,0 +1,35 @@
+== posted card ts=900.000001 posts=3 updates=0
+Task: with-options
+Decision: Choose a deployment
+Question: Select the release approach
+Recommendation: ship
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+
+== after reason rewrite: poll printed: <nothing>
+updates to same ts: 1; new posts: 0; root cards: 1; ts unchanged: yes; options unchanged: yes; reactions unchanged: yes
+Task: with-options
+Decision sought: Wait for approval?
+Brief description of issue: Rollout lacks approval.
+Recommendation and key reasons: Wait because approval is required.
+Alternatives considered: Shipping now skips approval.
+Evidence: /tmp/evidence-with-options.md
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+Tap a number reaction or type the option number in this thread.
+If you both tap and type: disagreement records neither answer.
+
+== fresh processes on unchanged text: updates=1 (stays 1) posts delta=0
+
+== adversarial: a changed option set must not edit the card
+updates=1 (stays 1); posts delta=0; card text unchanged: yes; options unchanged: yes
+
+== the edited card still answers: captain types 2 in the thread
+poll printed: closed: with-options
+Answer: wait
+home removed

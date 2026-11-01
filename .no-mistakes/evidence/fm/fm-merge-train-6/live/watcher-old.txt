@@ -1,0 +1,21 @@
+[old] lab home: /Users/charlesabrooker/tmp/fm-lab.SUk4gY  code: /tmp/fm-oldcode.ZFMufU
+[old] real probe: pressure=1 fixture=null alarms=4
+[old] queued memory rows after probe 1: 4
+[old] watcher 1 woke
+[old] watcher 1 wake rows: 4
+check: memory-health: non-fleet process mediaanalysisd PID 6378 RSS 1127940096 bytes exceeds the largest non-fleet RSS observed across 2 healthy readings (1073741824 bytes); see /Users/charlesabrooker/tmp/fm-lab.SUk4gY/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting any system daemon requires the captain's decision.; check: memory-health: non-fleet process com
+[old] marker lines after watcher 1: 4
+[old] watcher 1 stderr: 
+[old] hog pid=55607 rss_kib=2871200
+[old] queued memory rows after probe 2: 5
+[old] watcher pass 1 wake without the row: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[old] watcher pass 2 wake without the row: 
+[old] watcher pass 3 wake without the row: 
+[old] watcher pass 4 wake without the row: 
+[old] RESULT: 4 watcher passes did NOT present the third row
+[old] watcher 2 stderr:  150 2
+ 150 3
+ 150 4... at source line 1
+ 150 awk: newline in string 1
+[old] old rows repeated in watcher 2: 0  (rows in its wake mentioning other processes: 0)
+[old] lab removed

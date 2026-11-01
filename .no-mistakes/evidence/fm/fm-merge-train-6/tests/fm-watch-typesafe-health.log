@@ -1,0 +1,7 @@
+ok - the real watcher presents its named non-fleet alarm once through the existing durable wake queue
+ok - the watcher presents two queued memory rows, then only a third new row
+ok - the poll loop starts the probe detached, on its interval, for this home, without a wake
+ok - a fresh watcher leaves session start alone: the first probe waits one full interval
+ok - FM_TYPESAFE_HEALTH_INTERVAL=0 turns the probe off
+ok - a failing probe is retried quietly and never stops the poll
+ok - a probe still running is never started twice, and the poll keeps running

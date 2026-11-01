@@ -1,0 +1,51 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.Ws39oP; TMUX_TMPDIR=/tmp/fml.o4MCj2
+--- before
+backlog: 4:- [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+meta: 0 brief: 0 windows: zsh  worktrees: 1
+
+=== 1. batch under native pressure 2 (no capacity declared)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+deferred: host memory admission refused new task later (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+batch: DEFERRED later (/Users/charlesabrooker/tmp/fm-lab.Ws39oP/projects/labproj) - the spawn was deferred and stays queued
+exit=75
+backlog: 4:- [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+meta: 0 brief: 0 windows: zsh  worktrees: 1
+last reading: {"source":"admit","pressure_level":2,"admission":"defer","fixture":true}
+
+=== 2. batch with the project at its declared capacity, healthy host
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6BG5F9156EQNDZ2PSHYV7AK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+deferred: project labproj admits 1 worker(s) at once on this machine (/Users/charlesabrooker/tmp/fm-lab.Ws39oP/config/project-capacity) and 1 already hold a place (running); task later was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is 
+batch: DEFERRED later (/Users/charlesabrooker/tmp/fm-lab.Ws39oP/projects/labproj) - the spawn was deferred and stays queued
+exit=75
+backlog: 5:- [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+meta: 1 brief: 0 windows: zsh  worktrees: 1
+
+=== 3. single spawn under pressure names memory, same refusal, exit 75
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+deferred: host memory admission refused new task later (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+exit=75
+backlog: 5:- [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+meta: 0 brief: 0 windows: zsh  worktrees: 1
+
+=== 4. fm-mem-guard run under pressure stops a new run, runs it when healthy
+pressured exit=75
+RUN-EXECUTED-REAL-HOST
+real host exit=0; real pressure=1; reading: {"source":"admit","pressure_level":1,"admission":"admit","fixture":null}
+
+=== 5. real host memory admits the same queued task; spawn goes past admission
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ws39oP
+error: task later has no brief at inaccessible data path /Users/charlesabrooker/tmp/fm-lab.Ws39oP/data/later/brief.md
+exit=1
+backlog: 5:- [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)
+meta: 0 brief: 0 windows: zsh  worktrees: 1
+last reading: {"source":"admit","pressure_level":1,"admission":"admit","fixture":null}
+lab removed

@@ -1,0 +1,60 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm
+=== pressured
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.gvA7Qm
+deferred: host memory admission refused new task later (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+exit=75
+backlog: - [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)  |  meta: 0  |  windows: zsh 
+=== real host reading: pressure=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.gvA7Qm
+warning: task later: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/data/later/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/data/later/launch-brief.md records no ship branch; defaulting to legacy branch fm/later
+notice: later ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for later: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned later harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-later worktree=/Users/charlesabrooker/tmp/fm-lab.gvA7Qm/pool/.treehouse/labproj-3b3de1/1/labproj
+exit=0
+backlog: - [ ] later - lab queued task (repo: labproj) (kind: ship) (since 2026-11-01)  |  meta: 1  |  windows: sleep fm-later 
+last reading: {"source":"admit","pressure_level":1,"admission":"admit","fixture":null}
+window=firstmate:fm-later
+worktree=<lab>/pool/.treehouse/labproj-3b3de1/1/labproj
+harness=claude
+mode=local-only
+--- worker pane fm-later:
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Opus 5.5 with high effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fm-lab.gvA7Qm/pool/.treehouse/labproj-3b3de1/1/labproj
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.gvA7Qm/state/operational-inbox/1793538858-719b663f29c5133b.msg' and handle
+  its contents as Firstmate operational input.
+  Read 1 file, ran 1 shell command
+⏺ ADMITTED
+✻ Cooked for 26s · done 7:14 AM
+  tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 33k/1.0M labproj:e0f740f9
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 2 agents
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state/later.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.gvA7Qm: Directory not empty
+lab removed
