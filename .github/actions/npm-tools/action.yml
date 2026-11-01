@@ -1,0 +1,53 @@
+name: Install npm tools
+description: >-
+  Installs global npm packages at their latest versions, restoring the npm
+  download cache keyed on those exact versions. A new release changes the key,
+  so a hit installs the same tarballs a miss would download and a stale cache
+  can never change what is installed. Nothing is pinned.
+inputs:
+  packages:
+    description: Space-separated package names to install globally.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Resolve the latest version of each package
+      id: versions
+      shell: bash
+      env:
+        FM_NPM_PACKAGES: ${{ inputs.packages }}
+      run: |
+        set -eu
+        dir="$RUNNER_TEMP/fm-npm-versions"
+        mkdir -p "$dir"
+        n=0
+        for pkg in $FM_NPM_PACKAGES; do
+          n=$((n + 1))
+          npm view "$pkg" version >"$dir/$n" &
+        done
+        wait
+        list=
+        n=0
+        for pkg in $FM_NPM_PACKAGES; do
+          n=$((n + 1))
+          version=$(cat "$dir/$n")
+          [ -n "$version" ] || { echo "::error::could not resolve the latest version of $pkg"; exit 1; }
+          list="$list $pkg@$version"
+        done
+        echo "latest:$list"
+        echo "key=$(printf '%s' "$list" | sha256sum | cut -c1-24)" >>"$GITHUB_OUTPUT"
+    - name: Restore the npm download cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: npm-tools-${{ runner.os }}-${{ steps.versions.outputs.key }}
+    - name: Install the packages
+      shell: bash
+      env:
+        FM_NPM_PACKAGES: ${{ inputs.packages }}
+      run: |
+        set -eu
+        # shellcheck disable=SC2086
+        npm install -g $FM_NPM_PACKAGES
+        # shellcheck disable=SC2086
+        npm ls -g --depth 0 $FM_NPM_PACKAGES

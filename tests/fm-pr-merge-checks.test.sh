@@ -2289,6 +2289,56 @@ test_an_unreadable_base_comparison_refuses() {
   pass "fm-pr-merge refuses when whether the head contains the base tip cannot be read"
 }
 
+# A change-based CI run leaves the behavior jobs a pull request cannot affect
+# out, and the forge reports each left-out job as a skipped check under its own
+# name (docs/fm-test-portable-shards.md "Change-based test selection"). A
+# skipped or neutral conclusion is therefore a completed, passing result, a check
+# still running or queued is not, and a required check that never reported still
+# refuses, so skipping a job can neither block a merge nor stand in for a test.
+test_skipped_and_neutral_checks_pass_and_a_pending_one_does_not() {
+  local case_dir head
+  head=b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1
+  case_dir=$(make_case github-skipped-neutral)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(check_run 'Test selection plan' COMPLETED SUCCESS)" \
+    "$(check_run 'Behavior portable serial 1' COMPLETED SUCCESS)" \
+    "$(check_run 'Behavior portable serial 2' COMPLETED SKIPPED)" \
+    "$(check_run 'Behavior tests (Herdr)' COMPLETED SKIPPED)" \
+    "$(check_run 'Behavior timing aggregate' COMPLETED NEUTRAL)"
+  write_github_required "$case_dir" classic:'Behavior portable serial 1' classic:'Behavior portable serial 2' classic:'Behavior tests (Herdr)' classic:'Behavior timing aggregate'
+  run_required_case "$case_dir" 190
+  expect_code 0 "$RC" "skipped-neutral: skipped and neutral checks are completed passing results: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 190 example/repo --squash
+
+  case_dir=$(make_case github-skipped-pending)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(check_run 'Test selection plan' COMPLETED SUCCESS)" \
+    "$(check_run 'Behavior portable serial 2' COMPLETED SKIPPED)" \
+    "$(check_run 'Behavior portable serial 1' IN_PROGRESS -)"
+  run_required_case "$case_dir" 191
+  expect_code 1 "$RC" "skipped-pending: a check still running beside a skipped one must refuse"
+  assert_grep "check 'Behavior portable serial 1' is not green" "$case_dir/stderr" \
+    "skipped-pending: the running check was not named"
+  assert_no_grep "check 'Behavior portable serial 2'" "$case_dir/stderr" \
+    "skipped-pending: the skipped check was called not green"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "skipped-pending: gh pr merge ran with a check still running"
+
+  case_dir=$(make_case github-skipped-unreported)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(check_run 'Behavior portable serial 2' COMPLETED SKIPPED)"
+  write_github_required "$case_dir" classic:'Behavior portable serial 1' classic:'Behavior portable serial 2'
+  run_required_case "$case_dir" 192
+  expect_code 1 "$RC" "skipped-unreported: a required check that never reported must refuse beside a skipped one"
+  assert_grep "required check 'Behavior portable serial 1' has not reported" "$case_dir/stderr" \
+    "skipped-unreported: the unreported required check was not named"
+  assert_no_grep "required check 'Behavior portable serial 2'" "$case_dir/stderr" \
+    "skipped-unreported: the skipped required check was called unreported"
+  pass "fm-pr-merge treats skipped and neutral checks as passing, and refuses a running or never-reported required check"
+}
+
 pr_merge_test_cases=(
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
 test_single_pr_task_with_a_local_only_head_is_still_refused
@@ -2358,5 +2408,6 @@ test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly
 test_a_head_that_lacks_the_tip_beside_an_unreadable_source_is_not_retried
 test_queue_auto_is_neither_held_to_merge_at_once_states_nor_disarmed
 test_an_unreadable_base_comparison_refuses
+test_skipped_and_neutral_checks_pass_and_a_pending_one_does_not
 )
 pr_merge_run "$@"

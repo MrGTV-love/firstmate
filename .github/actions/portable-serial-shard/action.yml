@@ -1,0 +1,91 @@
+name: Run one portable serial shard
+description: >-
+  Runs one separate-runner shard of the portable serial lane. The calling job
+  checks the repository out first and owns the job name, so the check context
+  stays "Behavior portable serial <shard>". Shard membership and the shard count
+  both belong to bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
+inputs:
+  shard:
+    description: This shard's number, 1-based.
+    required: true
+  total:
+    description: How many shards the plan runs (bin/fm-test-run.sh --plan-ci serial_count).
+    required: true
+  mode:
+    description: full, or selected when the plan narrowed the suite to a selection.
+    required: true
+  selection:
+    description: The selected tests, one tests/<name>.test.sh per line (mode selected only).
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Install pinned ShellCheck
+      shell: bash
+      run: |
+        set -eu
+        bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+    - name: Install pinned actionlint
+      shell: bash
+      run: |
+        set -eu
+        bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+    - name: Require tmux for e2e tests
+      shell: bash
+      run: |
+        set -eu
+        command -v tmux >/dev/null || {
+          echo "::error::tmux is required for real afk injection e2e coverage"
+          exit 1
+        }
+        tmux -V
+    # tasks-axi serves backlog-handoff delegation. The Pi extension tests read
+    # the installed Pi package's own types and runtime, so without it they
+    # gate-skip and pass silently; it is a public npm package and needs no
+    # credential, so CI can hold the real thing.
+    - name: Install tasks-axi and Pi
+      uses: ./.github/actions/npm-tools
+      with:
+        packages: tasks-axi @earendil-works/pi-coding-agent
+    - name: Check tasks-axi
+      shell: bash
+      run: tasks-axi --version
+    - name: Run portable serial shard ${{ inputs.shard }}
+      shell: bash
+      env:
+        FM_SHARD_MODE: ${{ inputs.mode }}
+        FM_SHARD_SELECTION: ${{ inputs.selection }}
+        # The planned total rather than a literal, which the runner always
+        # accepts; tests/fm-ci-workflow.test.sh, not this lane, catches a shard
+        # count the runner and the workflow's shard jobs disagree on.
+        FM_SERIAL_LANE: portable-serial-${{ inputs.shard }}of${{ inputs.total }}
+        FM_SERIAL_SHARD: ${{ inputs.shard }}
+      run: |
+        set -eu
+        mkdir -p "$RUNNER_TEMP/fm-test"
+        # A pull request that selected tests narrows the lane to them; the full
+        # suite (push, manual, ci-full, any doubt) passes no selection.
+        select_args=()
+        if [ "$FM_SHARD_MODE" = selected ]; then
+          mkdir -p "$RUNNER_TEMP/fm-plan"
+          printf '%s\n' "$FM_SHARD_SELECTION" >"$RUNNER_TEMP/fm-plan/selection"
+          select_args=(--select-file "$RUNNER_TEMP/fm-plan/selection")
+        fi
+        # Only Pi is installed above; the TypeScript compiler is installed on
+        # parallel 1, which runs the typecheck suite. The gate-skip flag guards
+        # against a typecheck member moving into this lane, where its missing
+        # prerequisite would otherwise skip and pass silently.
+        bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
+          --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
+          --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json" \
+          ${select_args[@]+"${select_args[@]}"}
+    - name: Upload portable serial shard ${{ inputs.shard }} timing artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fm-test-timing-portable-serial-${{ inputs.shard }}
+        path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ inputs.shard }}.json
+        if-no-files-found: warn

@@ -44,7 +44,9 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
-Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 25`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
+Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Test selection plan`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 25`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
+A pull request whose diff cannot affect a behavior job leaves that job out, and the forge reports it as skipped under its own name, which satisfies a required check; so the behavior contexts above stay required unchanged.
+`Test selection plan` is required because it is the job that decides which behavior jobs run: if it failed, every behavior job would be skipped, and only its own red result would stop the merge.
 The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
 The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.
 
@@ -138,6 +140,13 @@ Its header and `--help` own the flags, family labels, lanes, and changed-file ma
 Portable shard balance evidence lives in `docs/fm-test-portable-shards.md`.
 Family selection is the ordinary local path; `--all` is deliberate full regression only.
 CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+A pull request runs only the behavior tests its diff can affect: the `Test selection plan` job asks `bin/fm-test-select.py` which `tests/*.test.sh` can reach a changed file through the scripts they source, run, copy or read, and `bin/fm-test-run.sh --plan-ci` turns that into the behavior jobs that have work.
+A job with no selected test is skipped, and the serial lane packs the selected scripts into the fewest shards its work needs.
+Every push to `main` runs the full suite.
+To force a full run on one pull request, add the `ci-full` label and push, or start the workflow by hand on the branch.
+A manual run that gives `base` replays the selection for the diff from `base` to the commit being run instead, which previews what a pull request of that diff would run.
+Preview a selection locally with `bin/fm-test-select.py --base origin/main --explain`, which prints each selected test with the chain that reaches it.
+`docs/fm-test-portable-shards.md` "Change-based test selection" owns the rules, every case that forces the full suite, and what the selector cannot see.
 Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` coalesce so a newer push replaces a still-pending main run but never cancels the running one, and the workflow owns that contract and its rationale.
 Use `bin/fm-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.

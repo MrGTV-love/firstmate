@@ -75,8 +75,9 @@ puts YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1]).fetch("timeout-minutes
 # Tier membership is the executable inventory of the timeout policy: a new job
 # must join a tier, and a job-level value outside these tiers is exactly the
 # one-off number the policy removed.
-FAST_TIER_JOBS='test-coverage invariants tests-timing-aggregate'
-NORMAL_TIER_JOBS='lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial macos-stock-bash'
+FAST_TIER_JOBS='plan test-coverage invariants tests-timing-aggregate'
+SERIAL_JOBS=$(for n in $(seq 1 25); do printf 'tests-portable-serial-%s ' "$n"; done)
+NORMAL_TIER_JOBS="lint tests-portable-parallel-1 tests-portable-parallel-2 ${SERIAL_JOBS}macos-stock-bash"
 HEAVY_TIER_JOBS='tests-herdr'
 
 # Print the one timeout every listed job shares; fail on any disagreement.
@@ -227,20 +228,41 @@ puts steps[index].fetch("timeout-minutes", "none")
   pass "Herdr keeps a $step minute step tripwire under a $heavy minute job backstop"
 }
 
+# One job per serial shard (so a shard the plan skips still reports under its own
+# name). The jobs must be the same job but for their number, and together they
+# must be exactly the shard lanes the runner defines for the planned count, so a
+# CI job list and the runner cannot disagree about a shard.
 test_ci_matrices_match_executable_partitions() {
   ruby -ryaml -ropen3 - "$CI_WORKFLOW" "$ROOT" <<'RUBY' || fail "CI partition contract"
 jobs = YAML.load_file(ARGV[0]).fetch("jobs")
 root = ARGV[1]
-serial = jobs.fetch("tests-portable-serial").fetch("strategy")
-raise "serial failures must not cancel other shards" unless serial.fetch("fail-fast") == false
-matrix = serial.fetch("matrix")
-raise "unexpected serial dimensions" unless matrix.keys == ["shard"]
-shards = matrix.fetch("shard")
+plan, status = Open3.capture2(File.join(root, "bin/fm-test-run.sh"), "--plan-ci")
+raise "cannot plan the full suite" unless status.success?
+planned = plan.lines.map { |l| l.chomp.split("=", 2) }.to_h
+total = Integer(planned.fetch("serial_count"))
+serial = jobs.select { |id, _| id.match?(/\Atests-portable-serial-\d+\z/) }
+raise "expected #{total} serial shard jobs, found #{serial.length}" unless serial.length == total
+canonical = nil
+serial.each do |id, job|
+  n = Integer(id[/\d+\z/])
+  raise "#{id} must be named Behavior portable serial #{n}, got #{job["name"].inspect}" unless job["name"] == "Behavior portable serial #{n}"
+  raise "#{id} must need the plan" unless Array(job["needs"]) == ["plan"]
+  steps = job.fetch("steps")
+  shard = steps.find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
+  raise "#{id} must run the portable-serial-shard action" unless shard
+  raise "#{id} must pass its own shard number" unless shard.fetch("with").fetch("shard").to_i == n
+  normalized = Marshal.load(Marshal.dump(job))
+  normalized["name"] = nil
+  normalized["if"] = nil
+  normalized["steps"].each { |s| s.fetch("with", {})["shard"] = nil if s["uses"] == "./.github/actions/portable-serial-shard" }
+  canonical ||= normalized
+  raise "#{id} differs from the other serial shard jobs beyond its number" unless normalized == canonical
+end
 lanes, status = Open3.capture2(File.join(root, "bin/fm-test-run.sh"), "--list-lanes")
 raise "cannot list runner lanes" unless status.success?
 actual = lanes.lines.map(&:strip).select { |l| l.match?(/\Aportable-serial-\d+of\d+\z/) }
-expected = shards.map { |s| "portable-serial-#{s}of#{shards.length}" }
-raise "CI matrix and runner disagree" unless actual.sort == expected.sort
+expected = (1..total).map { |n| "portable-serial-#{n}of#{total}" }
+raise "CI jobs and runner disagree" unless actual.sort == expected.sort
 lint = jobs.fetch("lint").fetch("strategy")
 raise "lint failures must not cancel another partition" unless lint.fetch("fail-fast") == false
 matrix = lint.fetch("matrix")
@@ -251,10 +273,177 @@ roots = parts.flat_map do |p|
   raise "unsupported lint partition" unless result.success?
   output.lines.map(&:strip)
 end
-canonical, result = Open3.capture2({"CI" => "true"}, File.join(root, "bin/fm-lint.sh"), "--list-files")
-raise "lint matrix loses or duplicates canonical roots" unless result.success? && roots.sort == canonical.lines.map(&:strip).sort
+canonical_roots, result = Open3.capture2({"CI" => "true"}, File.join(root, "bin/fm-lint.sh"), "--list-files")
+raise "lint matrix loses or duplicates canonical roots" unless result.success? && roots.sort == canonical_roots.lines.map(&:strip).sort
 RUBY
-  pass "CI matrices cover every executable serial lane and canonical lint root exactly once"
+  pass "CI serial shard jobs match the executable lanes one to one and canonical lint roots are covered exactly once"
+}
+
+# Every behavior-test job waits for the plan and runs only when the plan asks for
+# it. A job the plan leaves out is skipped, which the forge reports as a skipped
+# check rather than a pending one, so no required result is left waiting. Each
+# job's `if` and each serial shard's planned total are evaluated against what
+# the runner plans for the full suite, an empty selection and a selection of one
+# portable parallel 1 script and one serial script, and the serial shards
+# against the full plan with every shard count from none to all of them; a
+# condition this evaluator does not understand fails the check rather than
+# passing it.
+test_every_behavior_test_job_is_planned() {
+  local scratch parallel serial
+  scratch=$(fm_test_tmproot fm-ci-planned)
+  parallel=$("$ROOT/bin/fm-test-run.sh" --list --lane portable-parallel-1 | head -n 1)
+  serial=$("$ROOT/bin/fm-test-run.sh" --list --lane portable-serial-1of25 | head -n 1)
+  [ -n "$parallel" ] && [ -n "$serial" ] || fail "could not list a portable parallel 1 and a serial script"
+  : >"$scratch/none"
+  printf '%s\n%s\n' "$parallel" "$serial" >"$scratch/two"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci >"$scratch/full.plan" || fail "cannot plan the full suite"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci --select-file "$scratch/none" >"$scratch/none.plan" || fail "cannot plan an empty selection"
+  "$ROOT/bin/fm-test-run.sh" --plan-ci --select-file "$scratch/two" >"$scratch/two.plan" || fail "cannot plan a two-script selection"
+  ruby -ryaml - "$CI_WORKFLOW" "$scratch/full.plan" "$scratch/none.plan" "$scratch/two.plan" <<'RUBY' || fail "behavior test jobs must be planned"
+jobs = YAML.load_file(ARGV[0]).fetch("jobs")
+OUTPUT = /\Aneeds\.plan\.outputs\.([a-z_0-9]+)\z/
+def output(ref, plan)
+  key = ref[OUTPUT, 1] or raise "unsupported reference #{ref.inspect}"
+  plan.fetch(key) { raise "the plan prints no #{key}" }
+end
+def holds(condition, plan)
+  condition.to_s.split(" && ").all? do |term|
+    case term.strip
+    when "always()" then true
+    when /\A(\S+) == '([^']*)'\z/ then output($1, plan) == $2
+    when /\AfromJSON\((\S+)\) >= ([0-9]+)\z/ then Integer(output($1, plan)) >= Integer($2)
+    else raise "unsupported condition #{term.inspect}"
+    end
+  end
+end
+def template(value, plan)
+  match = value.to_s.match(/\A\$\{\{\s*(\S+)\s*\}\}\z/) or raise "unsupported template #{value.inspect}"
+  output(match[1], plan)
+end
+behavior = %w[tests-portable-parallel-1 tests-portable-parallel-2 tests-herdr] + (1..25).map { |n| "tests-portable-serial-#{n}" }
+behavior.each { |name| raise "#{name} must need the plan" unless Array(jobs.fetch(name)["needs"]).include?("plan") }
+plans = ARGV[1..].map { |f| [File.basename(f, ".plan"), File.readlines(f, chomp: true).map { |l| l.split("=", 2) }.select { |p| p.length == 2 }.to_h] }
+expected = {
+  "full" => behavior + ["tests-timing-aggregate"],
+  "none" => [],
+  "two" => %w[tests-portable-parallel-1 tests-portable-serial-1 tests-timing-aggregate],
+}
+plans.each do |label, plan|
+  running = (behavior + ["tests-timing-aggregate"]).select { |name| holds(jobs.fetch(name)["if"], plan) }
+  raise "#{label} plan runs #{running.inspect}, expected #{expected.fetch(label).inspect}" unless running.sort == expected.fetch(label).sort
+  running.grep(/\Atests-portable-serial-/).each do |name|
+    shard = jobs.fetch(name).fetch("steps").find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
+    total = template(shard.fetch("with").fetch("total"), plan)
+    raise "#{name} gets total #{total} under the #{label} plan, expected #{plan["serial_count"]}" unless total == plan.fetch("serial_count")
+  end
+end
+serial = behavior.grep(/\Atests-portable-serial-/)
+full = plans.to_h.fetch("full")
+(0..serial.length).each do |count|
+  plan = full.merge("serial_count" => count.to_s)
+  running = serial.select { |name| holds(jobs.fetch(name)["if"], plan) }
+  want = (1..count).map { |n| "tests-portable-serial-#{n}" }
+  raise "serial_count=#{count} runs #{running.inspect}, expected #{want.inspect}" unless running.sort == want.sort
+  running.each do |name|
+    shard = jobs.fetch(name).fetch("steps").find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
+    total = template(shard.fetch("with").fetch("total"), plan)
+    raise "#{name} gets total #{total} when the plan has #{count} shards" unless total == count.to_s
+  end
+end
+%w[lint test-coverage invariants macos-stock-bash].each do |name|
+  raise "#{name} runs on every change and must not depend on the plan" if Array(jobs.fetch(name)["needs"]).include?("plan")
+end
+RUBY
+  pass "every behavior-test job runs exactly when the plan asks for it, shards 1..k run with total k for every planned count, and the always-on jobs do not wait for the plan"
+}
+
+# The plan step is the shell that decides full or selected. Run it as written
+# for every event that must run the whole suite, so a push to main or a manual
+# run can never fall into a partial selection.
+test_the_full_suite_runs_for_pushes_manual_runs_and_the_force_label() {
+  local script out event label lane
+  script=$(ruby -ryaml -e '
+steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("plan").fetch("steps")
+puts steps.find { |s| s["id"] == "plan" }.fetch("run")
+' "$CI_WORKFLOW") || fail "could not read the plan step"
+  for event in push workflow_dispatch pull_request; do
+    label=false
+    case "$event" in
+      pull_request)
+        # A labeled pull request is forced full; an unlabeled one whose checkout
+        # is not a merge commit is full too (the selector has no base to diff).
+        label=true
+        ;;
+    esac
+    out=$(run_plan_step "$script" "$event" "$label") || fail "the plan step failed for $event"
+    assert_equals full "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "$event must run the full suite"
+    assert_equals 25 "$(printf '%s\n' "$out" | sed -n 's/^serial_count=//p' | head -n 1)" "$event must plan every serial shard"
+    for lane in parallel_1 parallel_2 herdr any_lane; do
+      assert_equals true "$(printf '%s\n' "$out" | sed -n "s/^$lane=//p" | head -n 1)" "$event must plan $lane"
+    done
+  done
+  out=$(run_plan_step "$script" pull_request false) || fail "the plan step failed for an unmerged checkout"
+  assert_equals full "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a pull request checkout that is not a merge commit must run the full suite"
+  # A manual run that names a base replays the selection for that diff instead:
+  # HEAD..HEAD changes nothing, so the replay selects nothing and plans no job.
+  out=$(run_plan_step "$script" workflow_dispatch false HEAD) || fail "the plan step failed for a replay"
+  assert_equals selected "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a manual run with a base replays the selection"
+  assert_equals false "$(printf '%s\n' "$out" | sed -n 's/^any_lane=//p' | head -n 1)" "an empty diff plans no behavior job"
+  assert_equals 0 "$(printf '%s\n' "$out" | sed -n 's/^serial_count=//p' | head -n 1)" "and no serial shard"
+  pass "pushes, manual runs, the ci-full label and an unmergeable checkout plan the full suite, and a manual replay plans the diff it is given"
+}
+
+# A replay diffs the given base against the checked-out HEAD, builds the graph
+# from that same tree and plans the jobs that tree's runner owns. The checkout
+# here is a copy of this tree with one more commit that edits a file a few tests
+# read and deletes one of those tests: the deleted test must not be selected and
+# every other reader must be, whatever stale head value the environment holds.
+test_a_replay_diffs_graphs_and_plans_the_checked_out_head() {
+  local script checkout probe=.tasks.toml readers victim expected out
+  script=$(ruby -ryaml -e '
+steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("plan").fetch("steps")
+puts steps.find { |s| s["id"] == "plan" }.fetch("run")
+' "$CI_WORKFLOW") || fail "could not read the plan step"
+  checkout="$(fm_test_tmproot fm-ci-replay)/checkout"
+  mkdir -p "$checkout"
+  git -C "$ROOT" ls-files -z | tar -C "$ROOT" --null -T - -cf - 2>/dev/null | tar -C "$checkout" -xf -
+  assert_present "$checkout/bin/fm-test-select.py" "the checkout copy is missing the selector"
+  fm_git_identity
+  git -C "$checkout" init -q -b main
+  git -C "$checkout" add -A
+  git -C "$checkout" commit -q -m base || fail "could not commit the checkout's base"
+  readers=$(printf '%s\n' "$probe" | (cd "$checkout" && python3 bin/fm-test-select.py --paths-from -) | sed -n 's/^test=//p')
+  victim=$(printf '%s\n' "$readers" | grep -vx tests/fm-ci-workflow.test.sh | head -n 1)
+  [ -n "$victim" ] && [ "$(printf '%s\n' "$readers" | grep -c .)" -ge 2 ] \
+    || fail "$probe must be read by at least two tests for this check, got: $readers"
+  expected=$(printf '%s\n' "$readers" | grep -vx "$victim")
+  printf '\n' >>"$checkout/$probe"
+  git -C "$checkout" rm -q "$victim"
+  git -C "$checkout" commit -q -a -m head || fail "could not commit the checkout's head"
+  out=$(FM_REPLAY_HEAD=$(git -C "$checkout" rev-parse HEAD~1) \
+    run_plan_step "$script" workflow_dispatch false HEAD~1 "$checkout") || fail "the plan step failed for a replay"
+  assert_equals selected "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a replay of a one-file change is a partial selection"
+  assert_equals "$expected" "$(printf '%s\n' "$out" | sed -n '/^selection<</,/^FM_SELECTION_END$/p' | sed '1d;$d')" \
+    "the replay selects every remaining reader of $probe and not the test HEAD deleted"
+  assert_equals true "$(printf '%s\n' "$out" | sed -n 's/^any_lane=//p' | head -n 1)" "the checkout's runner plans the selected tests"
+  pass "a manual replay diffs, graphs and plans the checked-out HEAD"
+}
+
+# Run the plan step's script in a scratch output directory and print what it
+# would write to $GITHUB_OUTPUT. It runs from the repository root, as CI does,
+# or from the given checkout.
+run_plan_step() {  # <script> <event> <label> [<replay-base> [<checkout>]]
+  local scratch
+  scratch=$(fm_test_tmproot fm-ci-plan)
+  : >"$scratch/output"
+  : >"$scratch/summary"
+  (
+    cd "${5:-$ROOT}" || exit 1
+    RUNNER_TEMP="$scratch" FM_EVENT_NAME=$2 FM_FULL_LABEL=$3 FM_REPLAY_BASE=${4:-} \
+      GITHUB_OUTPUT="$scratch/output" GITHUB_STEP_SUMMARY="$scratch/summary" \
+      bash -c "$1" >/dev/null 2>&1
+  ) || return 1
+  cat "$scratch/output"
 }
 
 # Each parallel job's runner invocation is read from its parsed run step and
@@ -298,6 +487,9 @@ RUBY
 }
 
 test_ci_matrices_match_executable_partitions
+test_every_behavior_test_job_is_planned
+test_the_full_suite_runs_for_pushes_manual_runs_and_the_force_label
+test_a_replay_diffs_graphs_and_plans_the_checked_out_head
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
 test_main_pushes_coalesce_without_cancelling
