@@ -1215,6 +1215,85 @@ test_current_status_pr() {
   pass "PR discovery adds under 5s to a 200,000-line status snapshot (${base}s baseline, ${elapsed}s with discovery)"
 }
 
+test_home_summary_reads_changed_decisions_and_ownership() {
+  local home fakebin out
+  home=$(make_home summary-freshness)
+  fakebin=$(make_fakebin "$home")
+  mkdir -p "$home/projects/child"
+  printf '## In flight\n- [ ] child - Child (repo: alpha) (kind: scout) (since 2026-10-01)\n' \
+    > "$home/data/backlog.md"
+  fm_write_meta "$home/state/child.meta" \
+    'window=firstmate:fm-child' "worktree=$home/projects/child" \
+    'project=alpha' 'harness=claude' 'kind=scout' 'mode=scout' 'spawn_gen=first'
+  record_claude_idle "$home/state" child
+  printf 'needs-decision [key=first] [at=1791450000]: first question\n' > "$home/state/child.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'initial freshness summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid and .state == "captain_decision"
+    and [.decisions_open[].key] == ["first"]
+  ' >/dev/null || fail "initial decision missing: $out"
+
+  # Warm the live checkpoint, then append: a carried seed must not swallow the
+  # new question or retain the explicitly resolved old one.
+  bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
+    _ "$ROOT/bin/fm-classify-lib.sh" "$home/state/child.status" || fail 'checkpoint failed'
+  printf 'resolved [key=first]: answered\nneeds-decision [key=later] [at=1791450001]: later question\n' \
+    >> "$home/state/child.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'appended decision summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid and [.decisions_open[].key] == ["later"]
+    and .decisions_open[0].summary == "later question"
+  ' >/dev/null || fail "checkpoint hid changed decisions: $out"
+
+  # A replacement generation and atomically replaced log are not the old
+  # checkpoint, even when the prior mtime is preserved.
+  printf 'needs-decision [key=newer] [at=1791450002]: newer question\n' > "$home/replacement"
+  touch -r "$home/state/child.status" "$home/replacement"
+  mv "$home/replacement" "$home/state/child.status"
+  printf 'spawn_gen=second\n' >> "$home/state/child.meta"
+  record_claude_idle "$home/state" child
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'replacement summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid and [.decisions_open[].key] == ["newer"]
+    and .decisions_open[0].summary == "newer question"
+  ' >/dev/null || fail "replacement inherited an old decision: $out"
+
+  printf '## In flight\n' > "$home/data/backlog.md"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'ownership change summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid == false and .invalidity == {kind:"unowned_current",ids:["child"]}
+  ' >/dev/null || fail "changed ownership reused a valid summary: $out"
+
+  # Restore ownership so the unknown-child classification is independent of
+  # the inventory failure above. A failed endpoint must not reuse live evidence.
+  printf '## In flight\n- [ ] child - Child (repo: alpha) (kind: scout) (since 2026-10-01)\n' \
+    > "$home/data/backlog.md"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/tmux"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'unavailable child summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid == false and .state == "unknown"
+    and .invalidity == {kind:"child_current_unavailable",ids:["child"]}
+  ' >/dev/null || fail "unavailable child reused success: $out"
+
+  rm "$home/state/child.meta" "$home/state/child.status"
+  printf '## In flight\n' > "$home/data/backlog.md"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --secondmate-home-summary) \
+    || fail 'removed child summary failed'
+  printf '%s' "$out" | jq -e '
+    .valid and .state == "no_active_work"
+    and .active_children == [] and .decisions_open == [] and .endpoints == []
+  ' >/dev/null || fail "removed child or decisions survived: $out"
+  pass 'summary rereads appended/replaced decisions, ownership, unavailable endpoints and removed tasks'
+}
+
+fm_test_only
+
+test_home_summary_reads_changed_decisions_and_ownership
 test_current_status_pr
 test_empty_fleet_json
 test_fixture_snapshot_json

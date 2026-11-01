@@ -6,6 +6,11 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
        --harness {omp,claude} --profile FILE
        [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
        [--claude-session UUID]
+       fm-write-confinement.py --check-active STATE TASK
+
+--check-active exits 0 only on Darwin when the calling process tree is
+sandboxed and the kernel denies writes to the existing regular STATE/TASK.meta.
+It inspects policy without attempting a write; missing proof exits 1.
 
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
@@ -380,7 +385,32 @@ def build(args):
     Path(args.profile).write_text("\n".join(lines) + "\n")
 
 
+def check_active(state, task):
+    """The child inherits the guard's sandbox; an environment label alone proves nothing."""
+    if sys.platform != "darwin" or not re.fullmatch(TASK_ID, task):
+        return 1
+    try:
+        import ctypes
+        target = Path(state).resolve() / (task + ".meta")
+        if not stat.S_ISREG(target.lstat().st_mode):
+            return 1
+        library = ctypes.CDLL("/usr/lib/libsandbox.dylib", use_errno=True)
+        check = library.sandbox_check
+        check.restype = ctypes.c_int
+        # sandbox_check is variadic; declare only its three fixed arguments.
+        check.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+        if check(os.getpid(), None, 0) != 1:
+            return 1
+        # SANDBOX_FILTER_PATH = 1. Only an explicit deny is proof, not an error.
+        return 0 if all(check(os.getpid(), operation, 1, ctypes.c_char_p(os.fsencode(target))) == 1
+                        for operation in (b"file-write-data", b"file-write-unlink")) else 1
+    except (OSError, AttributeError, ValueError):
+        return 1
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--check-active":
+        return check_active(sys.argv[2], sys.argv[3])
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("worktree", "home", "config", "projects", "data", "state", "task", "profile"):
         parser.add_argument("--" + name, required=True)

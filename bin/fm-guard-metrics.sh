@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# fm-guard-metrics.sh - the single reader of guard decision events and the owner
-# of the retirement rule.
+# fm-guard-metrics.sh - the single reader of guard decision events; it computes
+# the retirement nominations, and which of them a recorded decision already
+# judged, as defined in docs/guard-spec.md.
 #
 # docs/guard-spec.md defines the numbers. This script computes them from
 # state/guard-events.jsonl so a cut is decided by measurement, not by a static
@@ -35,8 +36,13 @@
 # followed by METRICS_SUMMARY guards=<n> measured=<n> cut=<n> unmeasured=<n>.
 # With --json, one object carries the same fields.
 # With --undecided, print only the ids whose verdict is `cut` and whose registry
-# entry carries no `retirement_decision`, one per line: a nomination nobody has
-# judged yet. It is the question a session start asks, so the pass cannot sit
+# `retirement_decision` does not judge it, one per line: a nomination nobody has
+# judged yet. A decision starting `keep|redesign|cut YYYY-MM-DD` judges the
+# events through that day and stands until the evidence changes: the events after
+# it nominate the guard again only when they hold a deny, warn, override or other
+# non-allow decision, or meet the threshold on their own as a quiet window after
+# a judged window (the last --min-opportunities events through that day) that
+# held a fire. It is the question a session start asks, so the pass cannot sit
 # unread in a log forever.
 #
 # Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log
@@ -53,7 +59,7 @@ JSON=0
 UNDECIDED=0
 ONLY=''
 
-usage() { sed -n '3,44p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
@@ -131,13 +137,10 @@ decision_of() {  # <id>
   jq -r --arg id "$1" '.guards[]? | select(.id == $id) | (.retirement_decision // "")' "$REGISTRY" 2>/dev/null
 }
 
-guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''
-if [ "$JSON" -eq 1 ]; then : >"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl" || die "cannot write temp"; fi
-while IFS= read -r group; do
-  [ -n "$group" ] || continue
-  id=$(printf '%s' "$group" | jq -r '.id')
-  rows=$(printf '%s' "$group" | jq -c '.rows')
-  guards_n=$((guards_n + 1))
+# The metrics for one guard's rows, printed as one line:
+#   <opportunities> <denies> <warns> <override_rate> <median> <recurrences> <verdict>
+measure() {  # <rows-json-array> <harm>
+  local rows=$1 harm=$2 opps denies warns overrides fires rate attempts median recur verdict
   opps=$(printf '%s' "$rows" | jq 'length')
   denies=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "deny")] | length')
   warns=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "warn")] | length')
@@ -168,12 +171,9 @@ while IFS= read -r group; do
         elif $e.decision == "allow" then .cleared = true
         else . end) | .n)
     | add // 0' 2>/dev/null || echo 0)
-  harm=$(harm_of "$id")
   if [ "$opps" -lt "$MIN_OPPS" ]; then
     verdict="unmeasured"
-    unmeasured=$((unmeasured + 1))
   else
-    measured=$((measured + 1))
     verdict="keep"
     # Irreversible harm, and an unknown guard, are exempt from the zero-fire and
     # override conditions and never from the recurrence conditions below.
@@ -185,9 +185,50 @@ while IFS= read -r group; do
     esac
     if awk -v m="$median" 'BEGIN {exit !(m > 3)}'; then verdict="cut"; fi
     if [ "$recur" -gt 0 ]; then verdict="cut"; fi
+  fi
+  printf '%s %s %s %s %s %s %s\n' "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict"
+}
+
+# A recorded decision judges the evidence through its date and stands until the
+# events after that date differ from the window it judged. They differ when they
+# hold any decision other than a plain allow (a deny, warn, override or bypass),
+# or when they meet the retirement rule on their own as a quiet window while the
+# judged window, the last --min-opportunities events through that date, held a
+# fire: a fire rate that changed to zero. History older than the judged window
+# never re-nominates. A decision without a leading `keep|redesign|cut YYYY-MM-DD`
+# judges nothing.
+judged() {  # <id> <rows-json-array> <harm>
+  local day after fresh v
+  day=$(decision_of "$1" | jq -Rr 'capture("^(keep|redesign|cut) (?<d>[0-9]{4}-[0-9]{2}-[0-9]{2})").d // ""' 2>/dev/null)
+  [ -n "$day" ] || return 1
+  after="${day}T23:59:59Z"
+  fresh=$(printf '%s' "$2" | jq -c --arg after "$after" '[.[] | select((.ts // "") > $after)]')
+  printf '%s' "$fresh" | jq -e 'all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1 || return 1
+  v=$(measure "$fresh" "$3")
+  [ "${v##* }" != cut ] && return 0
+  printf '%s' "$2" | jq -e --arg after "$after" --argjson n "$MIN_OPPS" '
+    [.[] | select((.ts // "") <= $after)] | sort_by(.ts) | .[-$n:]
+    | any(.[]; .decision == "deny" or .decision == "warn") | not' >/dev/null 2>&1
+}
+
+guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''
+if [ "$JSON" -eq 1 ]; then : >"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl" || die "cannot write temp"; fi
+while IFS= read -r group; do
+  [ -n "$group" ] || continue
+  id=$(printf '%s' "$group" | jq -r '.id')
+  rows=$(printf '%s' "$group" | jq -c '.rows')
+  guards_n=$((guards_n + 1))
+  harm=$(harm_of "$id")
+  read -r opps denies warns rate median recur verdict <<EOF_MEASURE
+$(measure "$rows" "$harm")
+EOF_MEASURE
+  if [ "$verdict" = unmeasured ]; then
+    unmeasured=$((unmeasured + 1))
+  else
+    measured=$((measured + 1))
     if [ "$verdict" = cut ]; then
       cut=$((cut + 1))
-      [ -n "$(decision_of "$id")" ] || undecided="$undecided$id
+      judged "$id" "$rows" "$harm" || undecided="$undecided$id
 "
     fi
   fi
