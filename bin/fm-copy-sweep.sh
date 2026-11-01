@@ -4,7 +4,7 @@
 # inside a live task's copy.
 #
 # Usage:
-#   fm-copy-sweep.sh                report every nested copy; change nothing
+#   fm-copy-sweep.sh                report every nested copy; its containment proof may add Git objects but changes no refs, worktrees or copies
 #   fm-copy-sweep.sh --apply        also remove proven copies through their supported route
 #   fm-copy-sweep.sh check          the watcher's periodic entry (report only)
 #   fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
