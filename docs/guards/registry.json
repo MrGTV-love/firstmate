@@ -155,7 +155,7 @@
         {"file": "bin/fm-turnend-guard.sh", "match": "--cleared-by budget-unavailable"},
         {"file": "bin/fm-turnend-guard.sh", "match": "[ \"$COUNT\" -gt \"$BLOCK_BUDGET\" ] || block_stop"}
       ],
-      "invariant": "a primary without live supervision receives at most three charged Claude blocks per failure episode, then an attended failure diagnostic; a budget that cannot be locked or written never blocks: it allows with one repair warning and a reasoned warn event; live supervision never blocks on episode bookkeeping",
+      "invariant": "on the Claude Stop-hook path, a primary without live supervision receives at most three charged blocks per failure episode, then an attended failure diagnostic, and a budget that cannot be locked or written never blocks: it allows with one repair warning and a reasoned warn event; other harnesses keep their per-turn loop suppression and have no per-episode budget; live supervision never blocks on episode bookkeeping",
       "layer": "runtime-block",
       "source": "supervision need, state/.last-watcher-beat age, identity-matched state/.watch.lock owner or away/quiet daemon",
       "trigger": "a task, source, check, relay poll, or queued wake needs supervision and fm_supervision_liveness proves no live owner",

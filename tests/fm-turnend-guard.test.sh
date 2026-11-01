@@ -2303,7 +2303,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
   expect_code 0 "$status" "the auto-arm must not re-trigger continuation after the final fail-open"
   [ -z "$out" ] || fail "post-fail-open auto-arm produced continuation output: $out"
   guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
-  expect_code 0 "$guard_status" "a later unhealthy stop must stay inside the exhausted block budget"
+  expect_code 0 "$guard_status" "a later unhealthy Claude Stop-hook stop must stay inside the exhausted block budget"
   assert_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "a still-unsupervised stop must remain loud"
 
   sleep 60 &
@@ -2552,9 +2552,9 @@ test_hook_claude_mode_stale_rewake_epoch_blocks() {
   pass "fm-turnend-guard --claude: stale rewake epoch does not allow a blind stop"
 }
 
-test_hook_claude_mode_all_absent_recovery_paths_obey_budget() {
+test_hook_claude_stop_path_absent_recovery_obeys_budget() {
   local dir out status i expected scenario count lock fakebin events
-  for scenario in absent clean stale-rewake failed-notice away alarmed owner-lock budget-lock budget-write budget-rename alarm-write; do
+  for scenario in absent clean stale-rewake failed-notice away alarmed owner-lock budget-lock budget-write budget-dir-symlink budget-symlink budget-dangling-symlink budget-rename alarm-write; do
     dir=$(make_primary_dir "$TMP_ROOT/hook-claude-budget-$scenario")
     : > "$dir/state/task1.meta"
     fakebin="$dir/fakebin"
@@ -2572,6 +2572,13 @@ test_hook_claude_mode_all_absent_recovery_paths_obey_budget() {
         mkdir -p "$dir/state/$lock"
         printf '%s\n' "$$" > "$dir/state/$lock/pid" ;;
       budget-write) mkdir "$dir/state/.turnend-claude-blocks" ;;
+      budget-dir-symlink)
+        mkdir "$dir/budget-dir"
+        ln -s "$dir/budget-dir" "$dir/state/.turnend-claude-blocks" ;;
+      budget-symlink)
+        printf 'untouched\n' > "$dir/budget-target"
+        ln -s "$dir/budget-target" "$dir/state/.turnend-claude-blocks" ;;
+      budget-dangling-symlink) ln -s "$dir/budget-missing" "$dir/state/.turnend-claude-blocks" ;;
       budget-rename)
         cat > "$fakebin/mv" <<'SH'
 #!/usr/bin/env bash
@@ -2584,7 +2591,7 @@ SH
     for i in 1 2 3 4 5 6; do
       out=$(PATH="$fakebin:$BLIND_BIN:$PATH" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
       case "$scenario" in
-        budget-lock|budget-write|budget-rename)
+        budget-lock|budget-write|budget-dir-symlink|budget-rename)
           expect_code 0 "$status" "$scenario stop $i must not block without a writable budget"
           assert_not_contains "$out" 'TURN WOULD END BLIND' "$scenario stop $i blocked without a writable budget"
           assert_contains "$out" 'block budget cannot be locked or written' "$scenario stop $i omitted the unwritable-budget warning"
@@ -2606,13 +2613,16 @@ SH
     done
     case "$scenario" in
       budget-lock|budget-rename) assert_absent "$dir/state/.turnend-claude-blocks" "$scenario invented a budget ledger" ;;
-      budget-write) [ -d "$dir/state/.turnend-claude-blocks" ] || fail "budget-write replaced the unwritable budget path" ;;
+      budget-write|budget-dir-symlink) [ -d "$dir/state/.turnend-claude-blocks" ] || fail "$scenario replaced the unwritable budget path" ;;
       *)
         count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
-        [ "$count" -eq 4 ] || fail "$scenario must saturate the exhausted count at 4, got $count" ;;
+        [ "$count" -eq 4 ] || fail "$scenario must saturate the exhausted count at 4, got $count"
+        [ ! -L "$dir/state/.turnend-claude-blocks" ] || fail "$scenario left the budget path a symlink"
+        [ "$scenario" != budget-symlink ] || [ "$(cat "$dir/budget-target")" = untouched ] \
+          || fail "budget-symlink wrote through the link" ;;
     esac
   done
-  pass "fm-turnend-guard --claude: absent recovery never exceeds three charged blocks, and an unwritable budget allows with one repair warning and a warn event"
+  pass "fm-turnend-guard --claude Stop-hook path: absent recovery never exceeds three charged blocks, a writable symlinked budget still counts, and an unwritable budget allows with one repair warning and a warn event"
 }
 
 test_hook_claude_mode_verified_failure_stays_loud_after_budget() {
@@ -2661,7 +2671,7 @@ test_hook_claude_mode_away_failure_obeys_budget() {
   seed_claude_failure "$dir"
   seed_claude_budget "$dir" 3
   out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
-  expect_code 0 "$status" "away mode must remain inside the same block budget"
+  expect_code 0 "$status" "Claude Stop-hook away mode must remain inside the same block budget"
   assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "away-mode budget exhaustion must remain loud"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "away mode did not record the exhausted budget"
   pass "fm-turnend-guard --claude: absent away supervision obeys the same bounded exit"
@@ -3103,7 +3113,7 @@ test_hook_claude_mode_recovery_contention_allows_live_supervision
 test_hook_claude_mode_unwritable_reset_never_blocks_live_supervision
 test_hook_claude_mode_concurrent_recovery_resets_are_idempotent
 test_hook_claude_mode_stale_rewake_epoch_blocks
-test_hook_claude_mode_all_absent_recovery_paths_obey_budget
+test_hook_claude_stop_path_absent_recovery_obeys_budget
 test_hook_claude_mode_verified_failure_stays_loud_after_budget
 test_hook_claude_mode_budget_does_not_require_failure_bookkeeping
 test_hook_claude_mode_away_failure_obeys_budget

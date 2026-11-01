@@ -324,7 +324,7 @@ A wait of 12 seconds nominal stays inside it with a wide margin even at the 9 ti
 The cost lands whenever no claim is open at the end of the wait, not only when the auto-arm is absent.
 Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and it adds up over the Stops of one failure episode:
 
-- Every Claude exit-2 decision must charge the same persisted budget, capped at three blocks per session failure episode by default.
+- Every exit-2 decision on the Claude Stop-hook path must charge the same persisted budget, capped at three blocks per session failure episode by default.
 - The fourth unsupervised Stop allows with an attended failure diagnostic, even without an auto-arm failure notice, in away mode, or after the episode alarm was already recorded.
 - If the budget cannot be locked or written, no bound on another block can be proved, so the guard never blocks that Stop: it allows it, prints the repair command once as a warning, and records a `warn` guard event with `cleared_by` `budget-unavailable`.
 - A proven live supervisor always allows; failed episode-reset bookkeeping remains for a later retry and never changes that verdict.
@@ -410,7 +410,8 @@ Claude drops that exit 2 when it terminated the hook at the configured timeout i
 The first fresh failed epoch preserves its handoff without consuming a blocked-stop count.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
 When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3).
-This is the guard's own block budget, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.
+This is the guard's own block budget for the Claude Stop-hook path, not a wall-clock bound or evidence of when Claude Code itself overrides a hook.
+[Compatibility limits](#compatibility-limits) names the other harnesses' bound.
 In Claude mode, positive watcher recovery allows the stop and clears the block budget, failure notice, and attended alarm together under the existing budget lock; a contended or failed clear leaves that bookkeeping for a later retry and never blocks the supervised stop.
 
 The block budget is charged by two rules:
@@ -426,7 +427,7 @@ Whenever both coordination locks are needed, positive auto-arm recovery and the 
 
 #### Attended fail-open
 
-The loud attended fail-open applies when both of these hold:
+On the Claude Stop-hook path, the loud attended fail-open applies when both of these hold:
 
 - The block budget is exhausted.
 - A final check finds neither a healthy watcher nor an automatic continuation.
@@ -544,6 +545,8 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - A valid secondmate home is in scope.
   An idle secondmate endpoint with no Relay poll remains healthy because it has no supervision need.
 - The blocking and bounded-follow-up mechanisms are limited to the primary integrations listed above.
+- The three-per-episode [block budget](#failure-progression-and-block-budget) covers the Claude Stop-hook path only.
+  The other harnesses keep their loop suppression of one forced continuation per turn and have no per-episode budget, and the Cursor park adds its separate [nag cap](#cursor-repair-nag-and-loop-bounds).
 - OpenCode headless mode and untrusted Grok project hooks remain fail-open at the host boundary.
 - Cursor's `stop` step does not fire in headless `cursor-agent -p`, the same class of limit as OpenCode headless; firstmate primaries run interactive.
 - A Cursor primary must be launched with `--trust`, or its project hooks never load and the whole integration is inert.
@@ -569,7 +572,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - The live-lock and fresh-beacon guard predicate.
 - The cooperative `--claude` open-generation claim wait.
 - Monotonic failed-epoch progression.
-- Bounded attended fail-open.
+- Bounded attended fail-open on the Claude Stop-hook path.
 - The same bound against a ledger frozen by an inert auto-arm with and without a verified failure episode.
 - Post-alarm continuation suppression.
 - Positive recovery reset.

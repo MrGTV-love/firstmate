@@ -369,7 +369,7 @@ BUDGET_CHARGED_EPOCH=
 budget_account_current_epoch() {  # [observe|block]
   local mode=${1:-observe} current_epoch outcome old_session old_count old_epoch tmp initialized charged
   fm_lock_try_acquire "$BUDGET_LOCK" || return 1
-  if [ -d "$BUDGET_FILE" ] || [ -L "$BUDGET_FILE" ]; then
+  if [ -d "$BUDGET_FILE" ]; then
     fm_lock_release "$BUDGET_LOCK"
     return 1
   fi
@@ -575,7 +575,8 @@ if autoarm_owns_recovery; then
   exit 0
 fi
 
-# No automatic recovery was proved: every re-block consumes the same budget.
+# No automatic recovery was proved: every re-block on this Claude Stop-hook
+# path consumes the same budget.
 # A budget that cannot be locked or written cannot prove a bound on another
 # block, and an unbounded repair/Stop loop is the worse harm, so that stop
 # allows with the repair command once as a warning and a reasoned warn event.
