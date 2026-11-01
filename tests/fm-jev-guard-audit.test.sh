@@ -643,7 +643,7 @@ SH
   extra=()
   [ "$posture" != no-helpers ] || extra=(--omp-no-helpers)
   out=$(FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
-    fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
+    FM_GUARD_EVENT_LOG="$world/guard-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
   status=$?
   if [ "$posture" = invalid ] || [ "$posture" = directive-only ] || [ "$posture" = indented ] || [ "$posture" = silent-runtime ] || [ "$posture" = silent-find ]; then
     [ "$status" -ne 0 ] || fail "$posture dispatch input was accepted: $out"
@@ -651,6 +651,18 @@ SH
       indented) assert_contains "$out" 'invalid or unreadable task egress input' 'indented directive refusal' ;;
       silent-runtime) assert_contains "$out" 'egress policy returned no grant' 'silent grant refusal' ;;
       silent-find) assert_contains "$out" 'egress policy returned no find capability' 'silent find refusal' ;;
+    esac
+    case "$posture" in
+      silent-runtime|silent-find)
+        subject=dispatch-grant
+        [ "$posture" != silent-find ] || subject=dispatch-find
+        [ -f "$world/guard-events.jsonl" ] || fail "$posture dispatch refusal emitted no guard events"
+        jq -se --arg session "$id:$subject" '
+          [.[] | select(.guard == "jev-egress-grant")] as $events |
+          ($events | length) == 1 and
+          ($events[0] | .decision == "deny" and .source_ok == false and .session == $session)
+        ' "$world/guard-events.jsonl" >/dev/null || fail "$posture dispatch refusal must emit exactly one deny event"
+        pass "$posture dispatch refusal emits exactly one egress deny event" ;;
     esac
     [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid dispatch input provisioned a worker'
     continue

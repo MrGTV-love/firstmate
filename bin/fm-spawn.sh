@@ -4607,7 +4607,10 @@ if [ "$KIND" != secondmate ]; then
   fi
   case $TASK_EGRESS in
     '['*']') ;;
-    *) echo "error: task $ID egress policy returned no grant; dispatch refused" >&2; exit 1 ;;
+    *)
+      echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      exit 1 ;;
   esac
 fi
 # Print the single refusal a dispatch verdict produces: the brief path, every
@@ -7148,7 +7151,10 @@ EOF
     native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || exit 1
     case $native_find in
       on|off) ;;
-      *) echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2; exit 1 ;;
+      *)
+        echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
+        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true
+        exit 1 ;;
     esac
     native_helpers='{}'
     if [ "$OMP_NO_HELPERS" = 0 ]; then
