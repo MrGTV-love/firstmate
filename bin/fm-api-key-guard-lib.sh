@@ -174,12 +174,9 @@ fm_api_key_guard() {
   # Only claude workers are affected.
   [ "$harness" = claude ] || return 0
   if [ "$allow_api_key" -ne 0 ]; then
-    local fm_api_key_guard_quiet=1
-    if fm_api_key_guard "$harness" 0 "$worker_account" "$launch_env_enabled" "$launch_env_names" "$backend" 2>/dev/null; then
-      fm_api_key_guard_quiet=
+    if fm_api_key_guard_quiet=1 fm_api_key_guard "$harness" 0 "$worker_account" "$launch_env_enabled" "$launch_env_names" "$backend" 2>/dev/null; then
       fm_api_key_guard_event allow
     else
-      fm_api_key_guard_quiet=
       fm_api_key_guard_event allow --override --cleared-by allow-api-key
     fi
     return 0

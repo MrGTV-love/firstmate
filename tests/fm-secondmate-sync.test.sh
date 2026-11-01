@@ -1364,11 +1364,17 @@ test_remote_launch_does_not_retarget_host_copy() {
   fm_fake_exit0 "$fakebin" gh treehouse tmux node
 
   # The real launch leg, exactly as the parent invokes it after its own sync.
-  launch_out=$(PATH="$fakebin:$BASE_PATH" \
+  launch_out=$(PATH="$fakebin:$BASE_PATH" FM_GUARD_EVENT_LOG="$w/launch-events.jsonl" \
     FM_HOME="$w/launched" FM_ROOT_OVERRIDE="$w/coderoot" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-remote-secondmate-control.sh" launch launched codex - - herdr 2>&1) || true
   [ "$(head_of "$w/launched")" = "$c1" ] \
     || fail "a remote launch moved the home onto the host's own Firstmate copy (out: $launch_out)"
+  # The control script's own skips are internal plumbing and record nothing;
+  # the operator's FM_SPAWN_NO_GUARD=1 on the same launch is still an escape.
+  jq -se '([.[] | select(.rule == "FM_SKIP_SECONDMATE_SYNC" or .rule == "FM_SKIP_SECONDMATE_INHERIT")] | length == 0)
+    and ([.[] | select(.rule == "FM_SPAWN_NO_GUARD" and .decision == "bypass" and .override == true
+      and .task == "launched")] | length == 1)' "$w/launch-events.jsonl" >/dev/null \
+    || fail "the remote launch misclassified internal skips or lost the operator escape: $(cat "$w/launch-events.jsonl" 2>/dev/null)"
 
   # Divergence control: the ordinary secondmate spawn contract DOES follow its
   # FM_ROOT, so the suppressed step above is not vacuously absent.

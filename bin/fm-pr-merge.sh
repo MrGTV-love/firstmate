@@ -2192,7 +2192,6 @@ case "$PROVIDER" in
     # exposes no such flag on its own merge subcommand, so the API is called
     # directly through "tea api" instead.
     require_recorded_review || exit 1
-    record_attended_override "$@"
     merge_output=$(tea api --login "$FORGEJO_LOGIN" --repo "$PR_OWNER/$PR_REPO" \
       -X POST "/repos/{owner}/{repo}/pulls/$PR_NUMBER/merge" \
       -f "Do=$forgejo_method" -f "head_commit_id=$FM_PR_MERGE_HEAD" 2>&1) || true

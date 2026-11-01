@@ -2,17 +2,21 @@
 """Read-only heartbeat evidence, never a guard or an attribution of intent.
 
 Usage: python3 bin/fm-guard-workarounds.py [--state <dir>] [--log <jsonl>]
-       [--repo <path> --head <ref> --task <id>] [--json] [--limit <n>]
+       [--repo <path> --head <ref> --task <id>] [--json]
 The home scan inspects only local ship/scout metadata and the recorded branch
 (or HEAD in its isolated copy). No fetch, checkout, ref update or event write.
-The most recent --limit first-parent commits are inspected (default 100),
-excluding the recorded base lineage in a home scan (--base in explicit mode).
+The most recent 100 first-parent commits are inspected, excluding the recorded
+base lineage in a home scan; explicit --repo mode excludes nothing.
 A bare base name resolves to refs/remotes/origin/<name> first, then the local branch.
+A home-scan task whose base resolves to no commit is attributed nothing and is
+reported as base unresolved, never scanned into the base's own history.
 A tree-equal merge is a signature, not proof that a refusal caused the merge.
 A base-merge-only change additionally requires a task/head-bound merge denial,
 a later commit time, and second parents reachable from that denial's base ref.
-Legacy events without a task, head or base cannot establish that second claim,
-and a refusal whose ts or base is not a string is skipped, not fatal.
+Legacy events without a task, head or base cannot establish that second claim.
+An event row that is not an object, or whose guard, task, head, base, ts, rule
+or decision is present and not a string, is skipped and counted on stderr;
+an undecodable byte never ends the scan.
 Text output is one line per task; --json emits one object per signature, suitable
 for fm-guard-metrics.sh --workarounds. Nothing is disabled or automatically fixed.
 """
@@ -23,9 +27,12 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 
 SHA = re.compile(r'[0-9a-f]{40,64}\Z')
+LIMIT = 100
+STRING_FIELDS = ('guard', 'task', 'head', 'base', 'ts', 'rule', 'decision')
 
 
 def git(repo, *args):
@@ -46,30 +53,31 @@ def resolve_base(repo, ref):
     return ''
 
 
-def events(path):
+def events(path, skipped):
     try:
-        with open(path, encoding='utf-8') as stream:
+        with open(path, encoding='utf-8', errors='replace') as stream:
             for line in stream:
+                if not line.strip():
+                    continue
                 try:
                     event = json.loads(line)
                 except ValueError:
-                    continue
-                if isinstance(event, dict):
+                    event = None
+                if isinstance(event, dict) and all(isinstance(event.get(key, ''), str) for key in STRING_FIELDS):
                     yield event
+                else:
+                    skipped[0] += 1
     except OSError:
         return
 
 
-def scan(repo, head, task, refusals, limit, base_ref=''):
+def scan(repo, head, task, refusals, base_tip=''):
     tip = git(repo, 'rev-parse', '--verify', '--end-of-options', head + '^{commit}')
     if not SHA.fullmatch(tip):
         return []
-    exclude = []
-    base_tip = resolve_base(repo, base_ref) if base_ref else ''
-    if base_tip:
-        exclude = ['--not', base_tip]
+    exclude = ['--not', base_tip] if base_tip else []
     commits = [line.split() for line in git(
-        repo, 'log', '--first-parent', f'--max-count={limit}',
+        repo, 'log', '--first-parent', f'--max-count={LIMIT}',
         '--format=%H %T %ct %P', tip, *exclude, '--').splitlines()]
     trees = {row[0]: row[1] for row in commits}
     committed_times = {row[0]: int(row[2]) for row in commits}
@@ -90,8 +98,7 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
         if event.get('task') != task or not SHA.fullmatch(str(event.get('head', ''))):
             continue
         old = event['head']
-        if old == tip or not isinstance(event.get('base'), str) or not event['base'] \
-                or not isinstance(event.get('ts'), str):
+        if old == tip or not event.get('base') or not event.get('ts'):
             continue
         # --ancestry-path alone would include merges along non-first parents.
         # The first-parent path must actually end at the refused head.
@@ -109,7 +116,7 @@ def scan(repo, head, task, refusals, limit, base_ref=''):
             refused_at = datetime.datetime.fromisoformat(event['ts'].replace('Z', '+00:00')).timestamp()
         except ValueError:
             continue
-        base_lineage = set(git(repo, 'log', '--first-parent', f'--max-count={limit}',
+        base_lineage = set(git(repo, 'log', '--first-parent', f'--max-count={LIMIT}',
                                '--format=%H', base, '--').splitlines())
         valid = True
         for commit, parents in chain:
@@ -129,19 +136,19 @@ def main():
     parser.add_argument('--log')
     parser.add_argument('--repo')
     parser.add_argument('--head', default='HEAD')
-    parser.add_argument('--base', default='', help='exclude history already on this base ref')
     parser.add_argument('--task', default='')
-    parser.add_argument('--limit', type=int, default=100)
     parser.add_argument('--json', action='store_true')
     args = parser.parse_args()
-    if args.limit < 1:
-        parser.error('--limit must be positive')
     state = Path(args.state)
     log = args.log or os.environ.get('FM_GUARD_EVENT_LOG') or str(state / 'guard-events.jsonl')
-    refusals = [e for e in events(log) if e.get('decision') == 'deny' and e.get('guard') == 'merge-green-head']
+    skipped = [0]
+    refusals = [e for e in events(log, skipped) if e.get('decision') == 'deny' and e.get('guard') == 'merge-green-head']
+    if skipped[0]:
+        print(f'fm-guard-workarounds: skipped {skipped[0]} malformed event row(s) in {log}', file=sys.stderr)
     targets = []
+    unresolved = []
     if args.repo:
-        targets.append((args.repo, args.head, args.task, args.base))
+        targets.append((args.repo, args.head, args.task, ''))
     else:
         for path in sorted(state.glob('*.meta')):
             if path.is_symlink() or not path.is_file():
@@ -157,11 +164,18 @@ def main():
                 continue
             branch = metadata.get('branch')
             base = metadata.get('base_branch') or git(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD') or 'main'
-            targets.append((repo, 'refs/heads/' + branch if branch else 'HEAD', path.stem, base))
+            base_tip = resolve_base(repo, base)
+            if not base_tip:
+                unresolved.append(path.stem)
+                continue
+            targets.append((repo, 'refs/heads/' + branch if branch else 'HEAD', path.stem, base_tip))
+    for task in unresolved:
+        line = f'GUARD_WORKAROUND task={task} base=unresolved (nothing attributed; record base_branch in its metadata)'
+        print(line, file=sys.stderr if args.json else sys.stdout)
     seen = set()
-    for repo, head, task, base in targets:
+    for repo, head, task, base_tip in targets:
         found = []
-        for signature in scan(repo, head, task, refusals, args.limit, base):
+        for signature in scan(repo, head, task, refusals, base_tip):
             key = (task, signature['head'], signature['kind'], signature['rule'])
             if key in seen:
                 continue

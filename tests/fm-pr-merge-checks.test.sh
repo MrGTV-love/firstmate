@@ -1693,6 +1693,18 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
   jq -se '[.[] | select(.decision == "bypass" or .override == true)] | length == 0' \
     "$case_dir/unused-guard-events.jsonl" >/dev/null \
     || fail "guard-events: a waiver that covered nothing recorded an escape"
+
+  url=https://github.com/example/repo/pull/197
+  case_dir=$(make_case github-guard-events-admitted-override)
+  add_gh_mocks "$case_dir" "$head"
+  FM_GUARD_EVENT_LOG="$case_dir/admitted-override-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" --attended-override -- --admin \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "guard-events: an attended override on a green merge should have proceeded: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "merge-away-waiver")] | length == 1 and .[0].decision == "bypass"
+    and .[0].override == true and .[0].task == "task-x1" and .[0].rule == "attended-override"' \
+    "$case_dir/admitted-override-events.jsonl" >/dev/null \
+    || fail "guard-events: an admitted attended override was not recorded once: $(cat "$case_dir/admitted-override-events.jsonl")"
   pass "fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge"
 }
 

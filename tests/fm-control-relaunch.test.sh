@@ -1081,9 +1081,12 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   dir=$(new_case apikey "$id")
   add_ship_task "$dir" "$id" claude
   printf 'api_key=allow\n' >> "$dir/home/state/$id.meta"
-  out=$(ANTHROPIC_API_KEY=sk-ant-relaunch-test \
+  out=$(ANTHROPIC_API_KEY=sk-ant-relaunch-test FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl" \
     run_control "$dir" "$id" relaunch --note "deliberate API billing"); rc=$?
   expect_code 0 "$rc" "a relaunch of a task that opted in to API billing should carry the opt-in"$'\n'"$out"
+  jq -se --arg id "$id" '[.[] | select(.guard == "claude-api-billing")] | length == 1
+    and .[0].override == true and .[0].cleared_by == "allow-api-key" and .[0].task == $id' "$dir/guard-events.jsonl" >/dev/null \
+    || fail "one guarded relaunch must write one billing decision: $(cat "$dir/guard-events.jsonl" 2>/dev/null)"
   assert_not_contains "$out" "would reach the claude worker" \
     "the recorded opt-in must keep the guard from refusing the replacement"
   [ "$(grep -c '^api_key=' "$dir/home/state/$id.meta")" = 1 ] \
