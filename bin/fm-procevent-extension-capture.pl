@@ -26,7 +26,7 @@ if (@ARGV && $ARGV[0] eq 'handoff') {
   my ($result_id, $sequence) = $result_name =~ /\A\.\/([A-Za-z0-9._-]{1,64})\.(\d+)\.result\z/;
   die "invalid handoff\n" unless $result_id eq $id && getppid() == $claim_pid;
   # Reserve every handoff destination before allocating input handles: an
-  # inherited CPU slot fd can otherwise shift a live handle onto fd 7 or 9.
+  # inherited descriptor can otherwise shift a live handle onto fd 7 or 9.
   dup2($reservation_fd, 7) >= 0 or die "cannot reserve capability descriptor\n";
   dup2($inbox_fd, 9) >= 0 or die "cannot reserve result descriptor\n";
   open(my $inbox, "<&$inbox_fd") or die "cannot retain inbox\n";
