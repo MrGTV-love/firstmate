@@ -220,6 +220,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
+# shellcheck source=bin/fm-primary-scope-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-primary-scope-lib.sh"
 # Shared secondmate endpoint probe + guarded relaunch; the watcher's poll tick
 # drives the same library so session start and ordinary supervision recover
 # from identical evidence through an identical path.
@@ -1111,7 +1113,7 @@ model_freshness_sweep() {
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved index_notes typed_active=false
+  local file err verified_harnesses resolved index_notes projects='{}' typed_active=false inherited=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1136,9 +1138,17 @@ crew_dispatch_validate() {
   else
     verified_harnesses='["claude","codex","opencode","pi","pi-signed","grok","kimi","cursor","agy","muse","rovo","omp","dsh","devin"]'
   fi
-  # Inherited fleet rules may name projects absent from this home. Validate the
-  # policy here; typed intake proves the actual task's local clone binding.
-  err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+  # A secondmate home's crew-dispatch.json is primary-authoritative inherited
+  # material, so its project selectors may name fleet projects this home does
+  # not register; every other home's own policy must name registered projects.
+  ! fm_root_is_secondmate_home "$FM_HOME" || inherited=true
+  if $typed_active && ! $inherited && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
+    if ! projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "$PROJECTS" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>&1); then
+      echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $projects"
+      return 0
+    fi
+  fi
+  err=$(jq -r --argjson projects "$projects" --argjson inherited "$inherited" --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);
     def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
     def effort_ok($h; $m; $e):
@@ -1198,6 +1208,8 @@ crew_dispatch_validate() {
             or (.projects | type != "array" or length == 0 or any(.[]; type != "string"))
             or (has("kind") and .kind != "ship" and .kind != "scout")
           then "match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout"
+          elif ($inherited | not) and any(.projects[]; . as $id | $projects | has($id) | not)
+          then "match.projects contains an unregistered project id"
           elif any(("all", "any", "none") as $k | select(has($k)) | .[$k];
             type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not)))
           then "match all, any, and none must be non-empty arrays of declared judgment ids"

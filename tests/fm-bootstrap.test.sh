@@ -1403,8 +1403,18 @@ test_inherited_dispatch_does_not_require_local_projects() {
     > "$case_dir/parent/config/crew-dispatch.json"
   fakebin=$(make_fake_toolchain "$case_dir")
   add_real_jq "$fakebin"
+  mkdir -p "$case_dir/owned/config" "$case_dir/owned/data"
+  printf '%s\n' manual > "$case_dir/owned/config/backlog-backend"
+  printf '%s\n' '- local-app - Local project' > "$case_dir/owned/data/projects.md"
+  cp "$case_dir/parent/config/crew-dispatch.json" "$case_dir/owned/config/crew-dispatch.json"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/owned" FM_ROOT_OVERRIDE="$case_dir/owned" \
+    TYPESAFE_API_KEY=test-key FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id' \
+    "a home-owned policy must still reject projects its registry lacks"
   for registry in subset empty absent; do
     mkdir -p "$case_dir/$registry/config" "$case_dir/$registry/data"
+    printf '%s\n' "$registry" > "$case_dir/$registry/.fm-secondmate-home"
     printf '%s\n' manual > "$case_dir/$registry/config/backlog-backend"
     case "$registry" in
       subset) printf '%s\n' '- local-app - Local project' > "$case_dir/$registry/data/projects.md" ;;
@@ -1423,7 +1433,7 @@ test_inherited_dispatch_does_not_require_local_projects() {
     assert_contains "$out" 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship' \
       "$registry registry must not hide malformed parent-only profiles"
   done
-  pass 'inherited fleet selectors survive subset, empty and absent registries without hiding malformed profiles'
+  pass 'inherited fleet selectors survive subset, empty and absent secondmate registries while home-owned policy stays strict'
 }
 
 test_crew_dispatch_validation() {
@@ -1511,6 +1521,7 @@ typed rule without structured match is flagged^{"rules":[{"when":"legacy prose r
 typed match naming an unknown judgment is flagged^{"judgments":{},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match all, any, and none must be non-empty arrays of declared judgment ids
 typed judgment without criteria is flagged^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?"}},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false
 typed unknown match selector is flagged^{"judgments":{},"rules":[{"when":"vernant work","match":{"project":"vernant"},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout
+typed unknown project is flagged^{"judgments":{},"rules":[{"when":"unknown project","match":{"projects":["unregistered"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
 typed rule without a match object is flagged^{"judgments":{},"rules":[{"when":"w","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs a match object
 typed unsupported gemini effort is flagged^{"judgments":{},"rules":[{"when":"gemini work","match":{"projects":["firstmate"]},"use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google","effort":"minimal"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: gemini:minimal
 typed structured facts and judgments are accepted^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?","criteria":{"true":"Fresh facts are needed.","false":"Supplied facts suffice."}}},"rules":[{"when":"vernant fresh ship","match":{"projects":["vernant"],"kind":"ship","all":["fresh"]},"use":{"harness":"claude"}},{"when":"other scout","match":{"projects":["firstmate"],"kind":"scout","none":["fresh"]},"use":{"harness":"codex"}}]}^empty^
@@ -1560,6 +1571,12 @@ ROWS
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
+  mv "$case_dir/home/data/projects.md" "$case_dir/projects.md.saved"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable' ] \
+    || fail "typed bootstrap must name an unreadable project registry, got: $out"
+  mv "$case_dir/projects.md.saved" "$case_dir/home/data/projects.md"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"
@@ -1950,8 +1967,6 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
     || fail "the opted-in suite left detector processes behind"
   pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
 }
-
-fm_test_only
 
 test_off_path_tools_get_actionable_path_diagnostics
 test_crew_dispatch_reports_off_path_jq

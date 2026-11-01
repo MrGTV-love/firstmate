@@ -30,8 +30,8 @@ It exited 0 with:
 ```
 
 The tests invoke the actual dispatch adapter's `prepare`, `apply`, and `validate` CLI paths without calling a provider.
-They drive maximally positive semantic answers against incompatible positive project/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject negative selectors and missing predicate references.
-The inherited-policy case uses a subset registry and proves that parent-only and near-spelling project selectors contribute neither semantic questions nor selection support, even with a maximally positive foreign answer.
+They drive maximally positive semantic answers against incompatible positive project/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject negative selectors, unregistered project ids, and missing predicate references.
+The inherited-policy case uses a subset registry: a home-owned load still rejects its parent-only and near-spelling selectors, and under a secondmate home's inherited-policy flag those selectors contribute neither semantic questions nor selection support, even with a maximally positive foreign answer.
 
 The fixture [`dispatch-resolve-20261024.json`](../../tests/fixtures/dispatch-resolve-20261024.json) retains only rule choices and coarse reasons from the 136 logged resolves assessed on 2026-10-24.
 Thirty-two records carry the old human-workflow escalation reason.
@@ -55,7 +55,7 @@ ok - B1 removes free-text project input and rejects missing, unrelated, redirect
 
 This exercises the real shell resolver, scaffold, registry binding, policy adapter, and loopback HTTP provider with synthetic text and credentials.
 It rejects the removed `--project` inputs `Vernant` and ` vernant` before sending, rejects a missing first-line metadata header even when task prose contains a valid-looking record, and rejects unrelated paths, a redirected symlink, and a registered but absent clone.
-An inherited foreign selector no longer invalidates the policy: a locally bound task still resolves, and the foreign-only rule never participates in its selection.
+It rejects an unregistered project in a home-owned rule before sending; in a secondmate home the same inherited selector is inert: a locally bound task still resolves, and the foreign-only rule never participates in its selection.
 A generated Vernant brief then selects only a Vernant-applicable rule despite maximally positive answers for a non-Vernant rule.
 The recorded clone-path header does not reach the provider.
 With `FM_PROJECTS_OVERRIDE` set, the scaffold records the clone under that directory and the same brief binds to Vernant, while a resolve without the override rejects that clone as unregistered.
@@ -72,7 +72,7 @@ Its promoted-Vernant-ship case retains the original scout marker and appends the
 Fenced, non-authoritative ship and scout declarations exercise neighboring boundaries.
 On the same host and date, `bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh` exited 0 and the suite ended with `# all fm-dispatch-resolve tests passed`.
 The optional fast-clock case reported `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
-The focused inherited-bootstrap regression also exercises subset, empty and absent local registries and retains malformed-profile diagnostics through the real bootstrap entry point.
+The focused inherited-bootstrap regression also exercises subset, empty and absent secondmate registries, keeps a home-owned policy strict, and retains malformed-profile diagnostics through the real bootstrap entry point.
 
 ## Verification boundary
 

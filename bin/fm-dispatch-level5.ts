@@ -3,6 +3,8 @@
 // call (request on stdin, key on fd 3); apply <rules> <response> <request>
 // <ship|scout> <allowed-harnesses-json> <cheap-class-re> <max-effort-re> <registry>.
 // The frozen registry contains ids and clone locations. Kind stays in code.
+// FM_DISPATCH_INHERITED_POLICY=1 marks rules a secondmate home inherited: their
+// project selectors may name fleet projects absent from this registry.
 import { readFileSync, writeFileSync } from "node:fs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { noul } from "./ten-levels/src/core/helpers.ts";
@@ -59,8 +61,7 @@ function config(path: string, registryPath: string): Config {
       (m.kind !== undefined && m.kind !== "ship" && m.kind !== "scout")) {
       throw new Error("match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout");
     }
-    // Fleet policy is inherited unchanged; foreign positive selectors are inert.
-    // fm-dispatch-project.py proves the actual task's local binding before prepare.
+    if (process.env.FM_DISPATCH_INHERITED_POLICY !== "1" && m.projects.some(p => !Object.hasOwn(registry, p))) throw new Error("match.projects contains an unregistered project id");
     for (const key of ["all", "any", "none"]) {
       const ids = m[key];
       if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 ||

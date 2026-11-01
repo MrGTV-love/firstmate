@@ -81,6 +81,11 @@ test('inherited foreign selectors stay inert beside an exactly matched local pro
       { ...cfg.rules[0], match: { projects: ['vernant', 'Firstmate', ' firstmate', 'parent-only'], all: ['boundary'] } },
       cfg.rules[1],
     ] };
+    writeFileSync(rulesPath, JSON.stringify(inherited));
+    const owned = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath, registryPath], { encoding: 'utf8' });
+    assert.equal(owned.status, 65, 'a home-owned policy still rejects selectors its registry lacks');
+    assert.match(owned.stderr, /^match.projects contains an unregistered project id/);
+    process.env.FM_DISPATCH_INHERITED_POLICY = '1';
     const request = prepare('firstmate', 'ship', inherited);
     assert.equal(request.questions.judgment_boundary, undefined, 'parent-only and near-spelling selectors send no semantic question');
     assert.ok(request.questions.judgment_bounded, 'the exact local selector retains its semantic question');
@@ -88,6 +93,7 @@ test('inherited foreign selectors stay inert beside an exactly matched local pro
     assert.deepEqual(result.selection.support, { rule_2: 1, default: 0 });
     assert.equal(result.selection.choice, 'rule_2', 'even a positive foreign answer cannot admit an ineligible rule');
   } finally {
+    delete process.env.FM_DISPATCH_INHERITED_POLICY;
     writeFileSync(registryPath, JSON.stringify({ vernant: '/clone/vernant', firstmate: '/home' }));
   }
 });
@@ -142,6 +148,9 @@ test('malformed fact selectors and missing semantic references fail before provi
   const references = /^match all, any, and none must be non-empty arrays of declared judgment ids/;
   for (const [match, named] of [[{ project: 'vernant' }, facts], [{ exclude_project: 'vernant' }, facts], [{ projects: [] }, facts],
     [{ projects: ['vernant'], kind: 'review' }, facts],
+    [{ projects: ['Vernant'] }, /^match.projects contains an unregistered project id/],
+    [{ projects: [' vernant'] }, /^match.projects contains an unregistered project id/],
+    [{ projects: ['unknown-project'] }, /^match.projects contains an unregistered project id/],
     [{ projects: ['vernant'], all: ['missing'] }, references], [{ projects: ['vernant'], any: [] }, references]] as const) {
     writeFileSync(rulesPath, JSON.stringify({ ...cfg, rules: [{ ...cfg.rules[0], match }] }));
     const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath, registryPath], { encoding: 'utf8' });

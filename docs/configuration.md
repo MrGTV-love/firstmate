@@ -2316,7 +2316,7 @@ This section is the single owner of the canonical schema and its per-field seman
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
-      "match": { "projects": ["<fleet project id>"], "kind": "<ship|scout, optional>", "all": ["<judgment_id>"], "any": ["<judgment_id>"], "none": ["<judgment_id>"] },
+      "match": { "projects": ["<registered project id>"], "kind": "<ship|scout, optional>", "all": ["<judgment_id>"], "any": ["<judgment_id>"], "none": ["<judgment_id>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2398,8 +2398,8 @@ Account pins and saved resets are unchanged; reviewer model selection remains ow
 Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
 Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
 Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
-Every rule's `match.projects` is a nonempty positive list of fleet project ids; config load rejects missing project lists and negative selectors.
-Inherited fleet policy may name projects absent from this home's registry: those exact positive selectors are inert here, not invalid configuration or new registrations.
+Every rule's `match.projects` is a nonempty positive list of ids registered in `data/projects.md`; config load rejects unregistered ids, missing project lists, and negative selectors.
+The one exception is a secondmate home, marked by a valid `.fm-secondmate-home`, where `config/crew-dispatch.json` is primary-authoritative inherited material: its selectors may name fleet projects absent from that home's registry, and those exact selectors are inert there, not invalid configuration or new registrations.
 Actual task identity still requires the strict local clone binding described under [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
 It may also constrain `kind` (`ship` or `scout`) and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
 Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
@@ -2407,7 +2407,7 @@ These declarations restrict routing; they do not grant an exception, new profile
 The [example configuration](examples/crew-dispatch.json) shows the structured format.
 
 Migration to structured matches (required before typed resolution runs): a rules file written for the retired rule Choice has no `judgments` object and no rule `match`.
-List each rule's applicable fleet project ids in `match.projects`, retain any `match.kind` fact, and express each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+List each rule's applicable registered projects in `match.projects`, retain any `match.kind` fact, and express each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
 The former `project` and `exclude_project` selectors have no compatibility layer; adding a project to the registry does not make any existing rule apply to it.
 There is no compatibility layer: an old-format file with at least one rule fails closed as a malformed rules file (exit 2), so firstmate dispatches through its manual intake until the file is migrated, and bootstrap reports the same `CREW_DISPATCH: invalid` diagnostic while the key is set.
 
@@ -2463,8 +2463,8 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
-- Bootstrap validates fleet policy independently of `data/projects.md`, including in intentionally project-less homes; registry and actual binding failures remain [typed intake diagnostics](#typed-dispatch-resolution-env-typesafe_api_key), not malformed policy.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; a missing, unreadable, or invalid `data/projects.md` registry is reported there with the registry's own error; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- In a secondmate home, bootstrap validates the inherited policy without reading `data/projects.md`, including in intentionally project-less homes; registry and actual binding failures there remain [typed intake diagnostics](#typed-dispatch-resolution-env-typesafe_api_key), not malformed policy.
 - Missing `jq` is reported through the normal [missing-tool diagnostics](#toolchain).
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
