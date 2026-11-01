@@ -877,6 +877,7 @@ start_herdr_server() {
   fi
   err=$(fm_backend_herdr_server_ensure "$HERDR_SESSION_NAME" 2>&1 >/dev/null) || rc=$?
   err=${err//$'\n'/ }
+  err=${err%%. Remedy: *}
   if [ "$rc" -eq 0 ]; then
     fix_report herdr-server applied "started the herdr server for session $HERDR_SESSION_NAME"
     return 0
