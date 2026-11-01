@@ -170,13 +170,15 @@ await test('T4(a): xd://report_issue and SendFeedback report uploads are refused
     if (meta) writeFileSync(`${state}/audit.meta`, meta);
     try {
       for (const event of [{ toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } },
+        { toolName: 'write', input: { path: '[xd://report_issue#ABCD]', content: 'private-report-canary' } },
         { toolName: 'report_issue', input: { body: 'private-report-canary' } },
         { toolName: 'sendfeedback', input: { description: 'private-report-canary' } }]) {
         let patch;
         const r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
         assert.equal(patch?.block, true, `${event.toolName}: report upload must not execute (grant: ${meta ?? 'none'})`);
-        assert.equal(r.branch, event.toolName === 'write' ? 'device' : 'coverage');
-        assert.equal(r.destination_class, undefined, 'no egress class can admit a report upload');
+        assert.equal(r.branch, event.toolName === 'write' ? 'egress' : 'coverage');
+        assert.equal(r.destination_class, event.toolName === 'write' ? 'provider' : undefined,
+          'device uploads have an egress owner but no grant can admit them');
         assert.equal(r.request_started, false);
         assert.ok(!JSON.stringify(r).includes('private-report-canary'));
       }
@@ -494,6 +496,14 @@ await test('M4: each coverage and egress decision emits one content-free central
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github-write', true]]);
   await decide({ toolName: 'github', input: { op: 'repo_view', repo: 'private-event-canary' } },
     [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github-read', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
+  for (const path of ['xd://github', '[xd://github#ABCD]', '[xd://github]  ', 'xd://github ', 'XD://github', 'xd://git\thub']) {
+    await decide({ toolName: 'write', input: { path, content: '{"op":"pr_push","body":"private-event-canary"}' } },
+      [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://github', true]]);
+  }
+  for (const path of ['[xd://report_issue#0aF9]', 'XD://report_issue', 'xd://report_issue\t']) {
+    await decide({ toolName: 'write', input: { path, content: 'private-event-canary' } },
+      [['jev-tool-coverage', 'allow', 'audit:write', true], ['jev-egress-grant', 'deny', 'audit:xd://report_issue', true]]);
+  }
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
   const log = `${state}/metrics-events.jsonl`;
@@ -505,13 +515,16 @@ await test('M4: an unrelated allow never clears a later deny in the real metrics
     await handlers.tool_call({ toolName: 'find', input: { query: 'synthetic' } }, { cwd: state });
     await handlers.tool_call({ toolName: 'web_search', input: { query: 'synthetic' } }, { cwd: state });
     for (const op of ['pr_push', 'repo_view', 'pr_create']) await handlers.tool_call({ toolName: 'github', input: { op } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'write', input: { path: 'xd://github', content: '{"op":"pr_push"}' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'github', input: { op: 'repo_view' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'write', input: { path: '[xd://github#ABCD]', content: '{"op":"pr_push"}' } }, { cwd: state });
   } finally { rmSync(`${state}/audit.meta`); delete process.env.FM_GUARD_EVENT_LOG; }
   const out = JSON.parse(execFileSync('bash', [`${process.env.AUDIT_ROOT}/bin/fm-guard-metrics.sh`, '--log', log,
     '--registry', `${process.env.AUDIT_ROOT}/docs/guards/registry.json`, '--min-opportunities', '1', '--json'], { encoding: 'utf8' }));
   const metric = id => out.guards.find(g => g.id === id);
-  for (const id of ['jev-tool-coverage', 'jev-egress-grant']) {
-    assert.equal(metric(id).denies, 1, id);
-    assert.equal(metric(id).recurrences, 0, `${id}: an allow of another subject is not a clear`);
+  for (const [id, denies] of [['jev-tool-coverage', 1], ['jev-egress-grant', 3]]) {
+    assert.equal(metric(id).denies, denies, id);
+    assert.equal(metric(id).recurrences, 0, `${id}: an allow of another subject, including a granted class beside a device refusal, is not a clear`);
     assert.equal(metric(id).median_clear_attempts, 0, id);
     assert.equal(metric(id).verdict, 'keep', id);
   }
@@ -572,6 +585,18 @@ await test('S2(d): local read and bash stay unjudged, write/edit keep determinis
     assert.equal(r.decision, 'allow');
     assert.equal(r.request_started, false);
   }
+  // Without proved confinement a colon filename keeps the plain-path refusal.
+  const colon = await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'notes:v2.md', content: 'fixture' } }, { cwd: state }));
+  assert.equal(colon.branch, 'deterministic');
+  assert.equal(colon.decision, 'block');
+  for (const path of ['ssh://remote/file', 'HTTPS://example.invalid/a', 'local://scratch.md']) {
+    const patch = await handlers.tool_call({ toolName: 'write', input: { path, content: 'fixture' } }, { cwd: state });
+    assert.equal(patch?.block, true, path);
+    assert.match(patch.reason, /no write rule is admitted for its scheme\. Report the intended target and effect to Firstmate; do not read or fetch this URI/, path);
+    assert.doesNotMatch(patch.reason, /Read the device documentation/, path);
+  }
+  const device = await handlers.tool_call({ toolName: 'write', input: { path: 'xd://future_device', content: '{}' } }, { cwd: state });
+  assert.match(device?.reason ?? '', /Read the device documentation with read xd:\/\/future_device/);
 });
 JS
 pass 'offline guard settlement, cost completeness and S2 egress acceptance'

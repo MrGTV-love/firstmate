@@ -104,6 +104,31 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   websearch: { call: "web" },
 });
 
+// Device payloads are tool arguments, not file contents. These measured
+// outbound effects remain refused under every grant; moving their owner does
+// not authorize uploads or unscreened GitHub write-tool results.
+type DeviceEgress = { effect: "egress"; destination: DestinationClass; reason: string;
+  alternative?: (input: { content?: unknown }) => string | undefined };
+
+function githubReadAlternative(input: { content?: unknown }): string | undefined {
+  const args: unknown = typeof input.content === "string" ? JSON.parse(input.content) : undefined;
+  if (args !== null && typeof args === "object" && !Array.isArray(args) && "op" in args
+    && (args.op === "repo_view" || args.op === "file_read")) {
+    return "For this read, use gh-axi through the shell instead.";
+  }
+}
+
+const DEVICE_EGRESS: Readonly<Record<string, DeviceEgress>> = Object.freeze({
+  "xd://report_issue": { effect: "egress", destination: "provider",
+    reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
+  "xd://github": { effect: "egress", destination: "remote-storage",
+    reason: "its results return as write-tool output, which this guard never screens for injected instructions", alternative: githubReadAlternative },
+});
+
+export function deviceEgress(path: string): DeviceEgress | undefined {
+  return Object.hasOwn(DEVICE_EGRESS, path) ? DEVICE_EGRESS[path] : undefined;
+}
+
 export function toolPolicy(name: string): ToolPolicy | undefined {
   return Object.hasOwn(TOOL_POLICY, name) ? TOOL_POLICY[name] : undefined;
 }
