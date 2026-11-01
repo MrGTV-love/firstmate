@@ -1,0 +1,25 @@
+== slot=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/1/demo head=91ae951bc33fc08d4c345bbeb08d60bbf1591945
+== (a) no bundle, ordinary teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+91ae951 unpublished work of lbndl1
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+slot still present
+meta still present
+== record:
+/Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle	71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc	3a93d745e28b54eba360c5a22573d408198820d2 91ae951bc33fc08d4c345bbeb08d60bbf1591945
+== (b) bundle recorded, no captain call held
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle: task lbndl1 is not held for the captain's land-or-drop call naming the bundle and every recorded tip.
+Hold it for the captain, then retry ordinary teardown: bin/fm-captain-hold.sh hold lbndl1 --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ lbndl1\,\ tips\ 91ae951bc33fc08d4c345bbeb08d60bbf1591945:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle\,\ whose\ record\ lists\ advertised\ tips\ 3a93d745e28b54eba360c5a22573d408198820d2\ 91ae951bc33fc08d4c345bbeb08d60bbf1591945\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+91ae951 unpublished work of lbndl1
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+slot still present
+== (c) file the captain's call

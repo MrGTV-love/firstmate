@@ -1,0 +1,145 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": "tmp/fm-lab.UPFh8t",
+  "generated": "2026-11-01T07:44:17Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [
+    {
+      "id": "lnest3",
+      "key": "lnest3",
+      "verb": "captain-hold",
+      "summary": "lab nested lnest3: Land or drop the unlanded commits of lnest3: preserved in bundle /Users…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lnest1",
+      "key": "lnest1",
+      "verb": "captain-hold",
+      "summary": "lab nested lnest1: Land or drop the unlanded commits of lnest1: preserved in bundle /Users…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl6",
+      "key": "lbndl6",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl6: Land or drop the unlanded commits of lbndl6: preserved in bundle /…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl4",
+      "key": "lbndl4",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl4: Land or drop the unlanded commits of lbndl4: preserved in bundle /…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl2",
+      "key": "lbndl2",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl2: Land or drop the unlanded commits of lbndl2: preserved in bundle /…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl3",
+      "key": "lbndl3",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl3: Land or drop the unlanded commits of lbndl3: preserved in bundle /…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl5",
+      "key": "lbndl5",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl5: Land or drop the unlanded commits of lbndl5: preserved in bundle /…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl9",
+      "key": "lbndl9",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl9: Land or drop lbndl9?",
+      "owner": "(main)"
+    },
+    {
+      "id": "lbndl10",
+      "key": "lbndl10",
+      "verb": "captain-hold",
+      "summary": "lab bundle task lbndl10: Land or drop lbndl10?",
+      "owner": "(main)"
+    },
+    {
+      "id": "lnest2",
+      "key": "lnest2",
+      "verb": "captain-hold",
+      "summary": "lab nested lnest2: Land or drop the unlanded commits of lnest2: preserved in bundle /Users…",
+      "owner": "(main)"
+    },
+    {
+      "id": "lnest4",
+      "key": "lnest4",
+      "verb": "captain-hold",
+      "summary": "lab nested lnest4: Land or drop the unlanded commits of lnest4: preserved in bundle /Users…",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [
+    {
+      "id": "lbndl11",
+      "what": "lab bundle task lbndl11",
+      "artifact": "local main",
+      "owner": "(main)"
+    }
+  ],
+  "gates": [],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

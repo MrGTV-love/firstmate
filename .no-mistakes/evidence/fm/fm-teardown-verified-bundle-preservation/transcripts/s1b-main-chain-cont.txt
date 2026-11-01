@@ -1,0 +1,45 @@
+== (c) run the exact hold command teardown printed in step (b)
+bin/fm-captain-hold.sh hold lbndl1 --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ lbndl1\,\ tips\ 91ae951bc33fc08d4c345bbeb08d60bbf1591945:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle\,\ whose\ record\ lists\ advertised\ tips\ 3a93d745e28b54eba360c5a22573d408198820d2\ 91ae951bc33fc08d4c345bbeb08d60bbf1591945\;\ an\ advertised\ tip\ may\ already\ be\ landed.
+lbndl1
+exit=0
+  state: in_flight
+  held: yes
+  hold_kind: captain
+== (d) ordinary teardown, no --force
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: 442s ago, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ARTNJJE53FT9ETN002MAA0/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle is held on task lbndl1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle sha256=71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc tips=3a93d745e28b54eba360c5a22573d408198820d2 91ae951bc33fc08d4c345bbeb08d60bbf1591945 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle)
+teardown: reaping leaked worktree process(es) for lbndl1: 44094
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle is held on task lbndl1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle sha256=71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc tips=3a93d745e28b54eba360c5a22573d408198820d2 91ae951bc33fc08d4c345bbeb08d60bbf1591945 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle is held on task lbndl1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle sha256=71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc tips=3a93d745e28b54eba360c5a22573d408198820d2 91ae951bc33fc08d4c345bbeb08d60bbf1591945 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl1.bundle)
+🌳 Worktree returned to pool.
+teardown lbndl1 complete (window firstmate:fm-lbndl1, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/1/demo)
+Backlog: lbndl1 stays open in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+meta removed
+slot HEAD now: 3a93d745e28b54eba360c5a22573d408198820d2 (origin/main=3a93d745e28b54eba360c5a22573d408198820d2)
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/1/demo  (detached)
+keep
+== backlog after:
+  state: queued
+  held: yes
+  hold_kind: captain
+  links: none
+  body: "Captain hold set: 2026-11-01T07:03:58Z\nDecision owner: captain\n\nDeliverable of the finished work: preserved in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle, not landed"
+(no Recently Landed section in backlog.md)
+branch fm/lbndl1 gone from project
+== (e) delete source bundle, restore from stored copy
+-rw-------  1 charlesabrooker  staff  814 Nov  1 01:06 /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle
+71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc  /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl1/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle
+restored work.txt: work of lbndl1
+restored sha: 91ae951bc33fc08d4c345bbeb08d60bbf1591945 expected 91ae951bc33fc08d4c345bbeb08d60bbf1591945

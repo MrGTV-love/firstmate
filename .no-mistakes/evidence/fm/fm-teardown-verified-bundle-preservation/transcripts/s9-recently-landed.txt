@@ -1,0 +1,18 @@
+######## S9 control: a landed task (lbndl11, commit pushed to origin) closes normally
+🌳 Worktree returned to pool.
+teardown lbndl11 complete (window firstmate:fm-lbndl11, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/6/demo)
+Backlog: lbndl11 is closed in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+######## captain answers the bundle-kept row lbndl1 (drop)
+answered: lbndl1
+answer exit=0
+lbndl1:   state: done  hold_kind: captain  closed: 2026-11-01
+lbndl3:   state: queued  hold_kind: captain  closed: "-"
+lbndl11:   state: done  hold_kind: "-"  closed: 2026-11-01
+######## bearings snapshot landed list
+snapshot exit=0
+[{"id":"lbndl11","what":"lab bundle task lbndl11","artifact":"local main","owner":"(main)"}]
+landed.0.id=lbndl11
+landed.0.what=lab bundle task lbndl11
+landed.0.artifact=local main
+landed.0.owner=(main)

@@ -1,0 +1,75 @@
+######## S2a wrong sha256 in record
+/Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl2.bundle	0000000000000000000000000000000000000000000000000000000000000000	3a93d745e28b54eba360c5a22573d408198820d2 c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 624s ago, grace 300s) - full banner already printed this episode.
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl2.bundle: bundle sha256 does not match record.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl2/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c61d5ed unpublished work of lbndl2
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+KEPT: meta present
+KEPT: copy HEAD c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 still checked out
+KEPT: endpoint window alive
+######## S2b bundle lacks a later unlanded tip, then re-bundled
+new tip d3ea9b51cb67d76c12efb6324c74b9462b6031f9 (first d28d0ed20adf3c23f495599a0448372f7f78fde9)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 653s ago, grace 300s) - full banner already printed this episode.
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle: bundle does not list unlanded tip d3ea9b51cb67d76c12efb6324c74b9462b6031f9.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl3/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+d3ea9b5 second unpublished commit
+d28d0ed unpublished work of lbndl3
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+KEPT: meta present
+KEPT: copy HEAD d3ea9b51cb67d76c12efb6324c74b9462b6031f9 still checked out
+KEPT: endpoint window alive
+-- re-bundle with both commits and re-file the call
+/Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle	9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb	3a93d745e28b54eba360c5a22573d408198820d2 c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 d3ea9b51cb67d76c12efb6324c74b9462b6031f9
+hold rc=0
+  state: in_flight
+  held: yes
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 744s ago, grace 300s) - full banner already printed this episode.
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle is held on task lbndl3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl3/preserved-bundles/9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb.bundle sha256=9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb tips=3a93d745e28b54eba360c5a22573d408198820d2 c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 d3ea9b51cb67d76c12efb6324c74b9462b6031f9 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle)
+teardown: reaping leaked worktree process(es) for lbndl3: 92124
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle is held on task lbndl3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl3/preserved-bundles/9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb.bundle sha256=9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb tips=3a93d745e28b54eba360c5a22573d408198820d2 c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 d3ea9b51cb67d76c12efb6324c74b9462b6031f9 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle is held on task lbndl3
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lbndl3/preserved-bundles/9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb.bundle sha256=9caaf0422194765b4177d6ebe165b06db6a920fc0ab1ed943fa2a043cf12f0eb tips=3a93d745e28b54eba360c5a22573d408198820d2 c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 d3ea9b51cb67d76c12efb6324c74b9462b6031f9 (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lbndl3.bundle)
+🌳 Worktree returned to pool.
+teardown lbndl3 complete (window firstmate:fm-lbndl3, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/2/demo)
+Backlog: lbndl3 stays open in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+meta removed
+restored: work of lbndl3 / second / parent=d28d0ed20adf3c23f495599a0448372f7f78fde9
+######## S2c valid bundle + uncommitted file
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 885s ago, grace 300s) - full banner already printed this episode.
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/2/demo has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  dirty.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+KEPT: meta present
+KEPT: copy HEAD 1a479facc722bf9b29b5865083a83743b57caa35 still checked out
+KEPT: endpoint window alive
+KEPT: dirty.txt bytes: uncommitted
+######## S2d valid bundle + away mode (.afk)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 931s ago, grace 300s) - full banner already printed this episode.
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+7872368 unpublished work of lbndl5
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+KEPT: meta present
+KEPT: copy HEAD 7872368b3995d2f1670acd51dcf217e0d1d0f261 still checked out
+KEPT: endpoint window alive

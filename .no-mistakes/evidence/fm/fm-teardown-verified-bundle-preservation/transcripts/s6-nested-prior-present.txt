@@ -1,0 +1,35 @@
+######## S6 nested anchored prior, bytes=unique, current copy present
+case lnest1: slot=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo nested=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo/nested/current (present) prior=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo/nested/prior sentinel_pid=3721
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest1.bundle is held on task lnest1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest1/preserved-bundles/272af582912a8f495c0074e57a7e725df41083f41cfd3b539d902c49b501d26c.bundle sha256=272af582912a8f495c0074e57a7e725df41083f41cfd3b539d902c49b501d26c tips=1a479facc722bf9b29b5865083a83743b57caa35 24d343b3e42ab4ce48d75b413cd81b782ea35a15 3a93d745e28b54eba360c5a22573d408198820d2 61f4921f587fc9d8aec0260fedaba362fdc7ecac c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 ec3562244475634dd62ea1c7c3438afaa78751ee (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest1.bundle)
+REFUSED: bundle-admitted teardown would remove copy /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo/nested/prior, during cleanup admitted by recorded bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest1/preserved-bundles/272af582912a8f495c0074e57a7e725df41083f41cfd3b539d902c49b501d26c.bundle, but it holds ignored files no hash record preserves: unique-anchored.dat.
+Land that commit, or move those ignored files out of the copy, then re-run teardown.
+exit=1
+meta present
+prior copy present
+ignored bytes: only copy lnest1
+current copy present
+sentinel 3721 ALIVE (no reap ran)
+endpoint window alive
+######## S6 nested anchored prior, bytes=clean, current copy present
+case lnest2: slot=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/5/demo nested=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/5/demo/nested/current (present) prior=/Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/5/demo/nested/prior sentinel_pid=75028
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle is held on task lnest2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest2/preserved-bundles/0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c.bundle sha256=0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c tips=1a479facc722bf9b29b5865083a83743b57caa35 24d343b3e42ab4ce48d75b413cd81b782ea35a15 3a93d745e28b54eba360c5a22573d408198820d2 61f4921f587fc9d8aec0260fedaba362fdc7ecac aa1becf7b4745eb6ea4acb36b2c4244617ba459c c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 c9b3c52b3b279e1188ba5f7df0bd0a14ceaaaf5d ec3562244475634dd62ea1c7c3438afaa78751ee (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle)
+teardown: reaping leaked worktree process(es) for lnest2: 75018 75028
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle is held on task lnest2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest2/preserved-bundles/0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c.bundle sha256=0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c tips=1a479facc722bf9b29b5865083a83743b57caa35 24d343b3e42ab4ce48d75b413cd81b782ea35a15 3a93d745e28b54eba360c5a22573d408198820d2 61f4921f587fc9d8aec0260fedaba362fdc7ecac aa1becf7b4745eb6ea4acb36b2c4244617ba459c c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 c9b3c52b3b279e1188ba5f7df0bd0a14ceaaaf5d ec3562244475634dd62ea1c7c3438afaa78751ee (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle is held on task lnest2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest2/preserved-bundles/0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c.bundle sha256=0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c tips=1a479facc722bf9b29b5865083a83743b57caa35 24d343b3e42ab4ce48d75b413cd81b782ea35a15 3a93d745e28b54eba360c5a22573d408198820d2 61f4921f587fc9d8aec0260fedaba362fdc7ecac aa1becf7b4745eb6ea4acb36b2c4244617ba459c c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 c9b3c52b3b279e1188ba5f7df0bd0a14ceaaaf5d ec3562244475634dd62ea1c7c3438afaa78751ee (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle is held on task lnest2
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/lnest2/preserved-bundles/0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c.bundle sha256=0049929efecba14ee86b219f1642238e33f3de607f9f592c3e999b9c9622447c tips=1a479facc722bf9b29b5865083a83743b57caa35 24d343b3e42ab4ce48d75b413cd81b782ea35a15 3a93d745e28b54eba360c5a22573d408198820d2 61f4921f587fc9d8aec0260fedaba362fdc7ecac aa1becf7b4745eb6ea4acb36b2c4244617ba459c c61d5ed8871df2ebb1dcb4da4d2c66b4c90d9218 c9b3c52b3b279e1188ba5f7df0bd0a14ceaaaf5d ec3562244475634dd62ea1c7c3438afaa78751ee (source /Users/charlesabrooker/tmp/fm-lab.UPFh8t/scratch-bundles/lnest2.bundle)
+🌳 Worktree returned to pool.
+teardown lnest2 complete (window firstmate:fm-lnest2; nested reassociated worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/5/demo/nested/current removed and its pool slot /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/5/demo returned)
+Backlog: lnest2 stays open in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+exit=0
+meta removed
+prior copy removed
+current copy absent
+sentinel 75028 gone (reaped)
+endpoint window gone

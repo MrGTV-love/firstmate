@@ -1,0 +1,21 @@
+######## S4b --force --drop-file on a captain-held task, no bundle: new (lbndl9) vs base (lbndl10)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: reaping leaked worktree process(es) for lbndl9: 28702
+🌳 Worktree returned to pool.
+teardown lbndl9 complete (window firstmate:fm-lbndl9, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo)
+Backlog: lbndl9 stays open in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+new exit=0
+meta removed
+  state: queued
+  held: yes
+  body: "Captain hold set: 2026-11-01T07:26:37Z\nDecision owner: captain\n\nDeliverable of the finished work: dropped"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+teardown: reaping leaked worktree process(es) for lbndl10: 23681
+🌳 Worktree returned to pool.
+teardown lbndl10 complete (window firstmate:fm-lbndl10, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/3/demo)
+Backlog: lbndl10 stays open in /Users/charlesabrooker/tmp/fm-lab.UPFh8t/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+base exit=0
+meta removed
+  state: queued
+  held: yes
+  body: "Captain hold set: 2026-11-01T07:28:36Z\nDecision owner: captain\n\nDeliverable of the finished work: dropped"

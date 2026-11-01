@@ -1,0 +1,48 @@
+######## S3a base code, same wrong-sha task lbndl2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 971s ago, grace 300s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c61d5ed unpublished work of lbndl2
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+meta present
+######## S3b base code, dirty task lbndl4
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 989s ago, grace 300s) - full banner already printed this episode.
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/2/demo has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  dirty.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+meta present
+######## S3b' new code, same dirty task lbndl4
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 1003s ago, grace 300s) - full banner already printed this episode.
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/pool/.treehouse/demo-84a815/2/demo has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  dirty.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+meta present
+######## S3c base code with a fully valid bundle + held call (lbndl6)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+WARNING: watcher still down (same stale episode; last beat: 1086s ago, grace 300s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ec35622 unpublished work of lbndl6
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+meta present
+######## S3d --force, no drop words, no bundle: new code (lbndl5 after .afk removed; drop its bundle record)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+meta present
+######## S3e --force, no drop words, no bundle: base code (lbndl7)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+meta present

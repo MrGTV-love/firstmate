@@ -1,0 +1,19 @@
+######## S8 secondmate retirement (forced) while its home keeps a stored bundle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+REFUSED: secondmate home /Users/charlesabrooker/tmp/fm-lab-sm.6MD52Q/lsm-forced holds bundle-preserved commits that only its data/ keeps:
+  /Users/charlesabrooker/tmp/fm-lab-sm.6MD52Q/lsm-forced/data/child-a/preserved-bundles/71f0f2d38a0fc1f3ee43c95f27be9319ab23f59459e156244e02e72279f680dc.bundle
+Remove each stored bundle once its land-or-drop call is answered, or move it to a durable location outside this home and update data/<task>/preservation-bundles.tsv; then retry teardown.
+exit=1
+stored bundle kept: sha 71f0f2d38a0fc1f3…
+home kept
+secondmate record kept
+secondmate endpoint window ALIVE
+child-a record kept
+child-a copy kept
+-- move the stored bundle to a durable place outside the home, retry
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UPFh8t
+worktree /Users/charlesabrooker/tmp/fm-lab-sm.6MD52Q/child-a-wt-lsm-forced is not managed by treehouse
+teardown lsm-forced complete (window firstmate:fm-lsm-forced, worktree /Users/charlesabrooker/tmp/fm-lab.UPFh8t/sm-wt-lsm-forced)
+exit=0
+home retired
+moved bundle kept
