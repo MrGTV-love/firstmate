@@ -50,7 +50,8 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
     actual = json.loads(generated.stdout)
     assert actual["FM_TEST_LOCAL"] == local_value and actual["FM_TEST_EMPTY"] == ""
     assert "FM_TEST_ABSENT" not in actual and "FM_TEST_FAKE_API_KEY" not in actual
-    routed_env = dict(environment, GEMINI_API_KEY=fake, LINEAR_API_KEY=fake, SSH_AUTH_SOCK="/fake/agent.sock",
+    routed_env = dict(environment, GEMINI_API_KEY=fake, OPENAI_API_KEY=fake, LINEAR_API_KEY=fake, SSH_AUTH_SOCK="/fake/agent.sock",
+                      HTTPS_PROXY="http://proxy.invalid:3128", CODEX_HOME="/fake/codex",
                       FM_TASK_INBOX="/fake/inbox", FM_DURATION_HOME="/fake/home")
     def routed(*options):
         result = subprocess.run([python, str(helper), *options, "--", python, "-c", probe],
@@ -59,15 +60,17 @@ with tempfile.TemporaryDirectory(prefix="fm-worker-env-") as temporary:
         return json.loads(result.stdout)
     floor = routed()
     assert not {"FM_TASK_INBOX", "FM_DURATION_HOME", "SSH_AUTH_SOCK", "GEMINI_API_KEY"} & floor.keys(), floor
-    gemini = routed("--harness", "gemini")
-    assert gemini["GEMINI_API_KEY"] == fake and gemini["SSH_AUTH_SOCK"] == "/fake/agent.sock"
-    assert "LINEAR_API_KEY" not in gemini and gemini["TERM"] == "xterm"
-    for harness in ("omp", "raw-tool"):
+    secrets = {"GEMINI_API_KEY", "OPENAI_API_KEY", "LINEAR_API_KEY"}
+    codex = routed("--harness", "codex")
+    assert codex["CODEX_HOME"] == "/fake/codex" and codex["HTTPS_PROXY"] == "http://proxy.invalid:3128"
+    assert not secrets & codex.keys() and codex["TERM"] == "xterm", codex
+    for harness in ("gemini", "omp", "raw-tool"):
         other = routed("--harness", harness)
-        assert not {"GEMINI_API_KEY", "LINEAR_API_KEY"} & other.keys() and other["SSH_AUTH_SOCK"] == "/fake/agent.sock", (harness, other)
+        assert not secrets & other.keys() and "CODEX_HOME" not in other, (harness, other)
+        assert other["SSH_AUTH_SOCK"] == "/fake/agent.sock" and other["HTTPS_PROXY"] == "http://proxy.invalid:3128", (harness, other)
     invalid = subprocess.run([python, str(helper), "--shell-prefix", "--keep", "NAME;false"], env=environment, capture_output=True, text=True)
     assert invalid.returncode == 2 and invalid.stdout == ""
     print("PASS source boundary: env, Python and child shell lose fake credential; operational floor survives; explicit auth retention preserves empty/absent semantics")
     print("PASS generated source boundary: destination-only unexported values and quoted data survive; fake credential absent; invalid names emit no executable source")
-    print("PASS harness route: gemini keeps only its own fake key and work locators; omp and unknown raw tools keep neither fake key; the floor omits inbox and duration names")
+    print("PASS harness route: every harness keeps work plumbing and only its own store selector, and no harness keeps a fake provider key; the floor omits inbox and duration names")
 

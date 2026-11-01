@@ -5,11 +5,12 @@ Usage: python3 bin/fm-worker-env.py [--harness ID] [--keep NAME ...] [--startup]
        python3 bin/fm-worker-env.py --shell-prefix [--harness ID] [--keep NAME ...]
 
 The default is the launch-env-allowlist operational floor. --keep adds
-validated names, never values. --harness adds the non-secret WORK locators and
-that harness's own HARNESS_ROUTES authentication names; fm-spawn passes it on
-every launch without config/launch-env-allowlist, and an allowlist file
-replaces it with exactly the listed names. A retained harness credential
-still reaches that harness's tools; it is not credential-isolated.
+validated names, never values. --harness adds the non-secret WORK plumbing and
+that harness's own HARNESS_ROUTES store selectors; fm-spawn passes it on every
+launch without config/launch-env-allowlist, and an allowlist file replaces it
+with exactly the listed names. No secret-valued name is kept by default: a
+credential kept through --keep or the allowlist still reaches that harness's
+tools; it is not credential-isolated.
 Main-run readers use the default.
 --shell-prefix emits the equivalent names-only shell expansion used by
 fm-spawn, preserving listed non-exported destination variables without reading
@@ -33,20 +34,21 @@ HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID
 CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION
 FM_TASK_ID COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS LAVISH_AXI_HOST
 """.split())
-# Non-secret locators that ordinary worker Git, no-mistakes and native stores use.
+# Non-secret plumbing that ordinary worker Git, no-mistakes, networks and native
+# stores use.
 WORK = frozenset("""
 SSH_AUTH_SOCK SSH_ASKPASS GIT_SSH_COMMAND GIT_CONFIG_GLOBAL NM_HOME
 XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
+HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
+SSL_CERT_FILE SSL_CERT_DIR NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE
 """.split())
-# Each harness's documented store selectors and environment authentication.
-# A harness absent here authenticates through its stored native login.
+# Each harness's non-secret store selectors. Provider API keys and tokens are
+# never named here; they reach a worker only through the allowlist file, and
+# bin/fm-worker-account-lib.sh owns Claude's provider selector names.
 HARNESS_ROUTES = {
-    "claude": ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS"),
-    "codex": ("CODEX_HOME", "OPENAI_API_KEY"),
-    "dsh": ("DEEPSEEK_API_KEY",),
-    "gemini": ("GEMINI_API_KEY",),
+    "claude": ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS"),
+    "codex": ("CODEX_HOME",),
     "grok": ("GROK_HOME",),
-    "muse": ("META_API_KEY",),
     "omp": ("PI_CONFIG_DIR", "PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"),
     "pi": ("PI_CODING_AGENT_DIR",),
     "pi-signed": ("PI_CODING_AGENT_DIR",),
@@ -69,7 +71,7 @@ def startup_event(decision, started):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keep", action="append", default=[])
-    parser.add_argument("--harness", help="also keep the work locators and this harness's authentication route")
+    parser.add_argument("--harness", help="also keep the work plumbing and this harness's store selectors")
     parser.add_argument("--startup", action="store_true")
     parser.add_argument("--shell-prefix", action="store_true", help="emit a names-only clean-env shell prefix for fm-spawn")
     parser.add_argument("command", nargs=argparse.REMAINDER)

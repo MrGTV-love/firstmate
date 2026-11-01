@@ -1906,42 +1906,40 @@ SH
   done
 }
 
-# With no allowlist file, the real generated launch of a named harness keeps
-# that harness's own fake credential and the work locators, and env, Python
-# and a child shell all lose another harness's and an unrelated fake credential.
+# With no allowlist file, the real generated launch keeps the harness's store
+# selector, the work plumbing and the pane's numbered GIT_CONFIG entries, while
+# env, Python and a child shell all lose every fake provider credential.
 test_default_launch_keeps_only_the_harness_route() {
-  local row harness kept dropped id rec out status launch observed pane_shell
-  for row in gemini:GEMINI_API_KEY:OPENAI_API_KEY codex:OPENAI_API_KEY:GEMINI_API_KEY; do
-    IFS=: read -r harness kept dropped <<EOF
-$row
-EOF
-    id="env-default-$harness"
-    rec=$(make_spawn_case "$id" "$harness" "$id")
-    read_case_record "$rec"
-    observed="$CASE_DIR/observed"
-    cat > "$FAKEBIN_DIR/$harness" <<SH
+  local id rec out status launch observed pane_shell kept
+  id=env-default-codex
+  rec=$(make_spawn_case "$id" codex "$id")
+  read_case_record "$rec"
+  observed="$CASE_DIR/observed"
+  cat > "$FAKEBIN_DIR/codex" <<SH
 #!/bin/sh
 { env; /bin/sh -c env; python3 -c 'import os; print("\\n".join(k + "=" + v for k, v in os.environ.items()))'; } > '$observed'
 SH
-    chmod +x "$FAKEBIN_DIR/$harness"
-    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness "$harness" 2>&1)
-    status=$?
-    expect_code 0 "$status" "default $harness spawn should succeed: $out"
-    launch=$(cat "$LAUNCH_LOG")
-    for pane_shell in /bin/bash /bin/zsh; do
-      [ -x "$pane_shell" ] || continue
-      rm -f "$observed"
-      env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:/usr/bin:/bin" TERM=xterm \
-        SSH_AUTH_SOCK=/synthetic/agent.sock LINEAR_API_KEY=synthetic-unrelated \
-        GEMINI_API_KEY=synthetic-gemini OPENAI_API_KEY=synthetic-openai \
-        "$pane_shell" -c "$launch" >/dev/null 2>&1 || fail "default $harness launch failed in $pane_shell"
-      [ "$(grep -c "^$kept=synthetic-" "$observed")" -eq 3 ] || fail "$harness lost its own route $kept in $pane_shell"
-      [ "$(grep -c '^SSH_AUTH_SOCK=/synthetic/agent.sock$' "$observed")" -eq 3 ] || fail "$harness lost SSH_AUTH_SOCK in $pane_shell"
-      [ "$(grep -c '^TERM=xterm$' "$observed")" -eq 3 ] || fail "$harness lost TERM in $pane_shell"
-      ! grep -Eq "^(LINEAR_API_KEY|$dropped)=" "$observed" || fail "$harness received a foreign fake credential in $pane_shell"
+  chmod +x "$FAKEBIN_DIR/codex"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex 2>&1)
+  status=$?
+  expect_code 0 "$status" "default codex spawn should succeed: $out"
+  launch=$(cat "$LAUNCH_LOG")
+  for pane_shell in /bin/bash /bin/zsh; do
+    [ -x "$pane_shell" ] || continue
+    rm -f "$observed"
+    env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:/usr/bin:/bin" TERM=xterm \
+      SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 CODEX_HOME=/synthetic/codex \
+      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='synthetic user' \
+      LINEAR_API_KEY=synthetic-unrelated GEMINI_API_KEY=synthetic-gemini OPENAI_API_KEY=synthetic-openai \
+      "$pane_shell" -c "$launch" >/dev/null 2>&1 || fail "default codex launch failed in $pane_shell"
+    for kept in CODEX_HOME=/synthetic/codex SSH_AUTH_SOCK=/synthetic/agent.sock HTTPS_PROXY=http://proxy.invalid:3128 \
+      TERM=xterm GIT_CONFIG_KEY_0=user.name 'GIT_CONFIG_VALUE_0=synthetic user' GIT_CONFIG_KEY_1=core.hooksPath; do
+      [ "$(grep -cFx "$kept" "$observed")" -eq 3 ] || fail "default codex launch lost $kept in $pane_shell"
     done
-    pass "default $harness launch keeps $kept, SSH_AUTH_SOCK and TERM and drops $dropped and LINEAR_API_KEY through env, Python and a child shell"
+    ! grep -Eq '^(LINEAR_API_KEY|GEMINI_API_KEY|OPENAI_API_KEY)=' "$observed" \
+      || fail "default codex launch received a fake provider credential in $pane_shell"
   done
+  pass "default codex launch keeps its store selector, work plumbing and pane GIT_CONFIG entries and drops every fake provider key through env, Python and a child shell"
 }
 
 test_launch_environment_invalid_config_refuses() {

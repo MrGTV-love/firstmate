@@ -617,12 +617,13 @@
 # Launch environment (config/launch-env-allowlist):
 #   Every launch (ship, scout, secondmate, raw command, and relaunch) runs
 #   under bin/fm-worker-env.py's names-only generated clean-environment prefix.
-#   Absent keeps the operational floor, the helper's non-secret work locators
-#   and the selected harness's own authentication route (plus the Anthropic
-#   key names after --allow-api-key), and the pane's own shell runs the
-#   existing command (zsh with -f).
-#   A present readable regular file keeps exactly the floor and its listed
-#   names instead, followed by /bin/sh -c of the existing command.
+#   Absent keeps the operational floor, the helper's non-secret work plumbing,
+#   the selected harness's store selectors, Claude's provider selectors from
+#   bin/fm-worker-account-lib.sh, the pane's numbered GIT_CONFIG entries and
+#   (after --allow-api-key) the Anthropic key names, and the pane's own shell
+#   runs the existing command (zsh with -f). No other secret-valued name is kept.
+#   A present readable regular file replaces that whole default set with exactly
+#   the floor and its listed names, followed by /bin/sh -c of the existing command.
 #   Each line is one POSIX environment name, never a value or shell expression;
 #   blank lines and lines beginning with # are ignored. Invalid input refuses
 #   before launch, as do path inspection errors such as inaccessible config
@@ -652,7 +653,7 @@
 #   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 unless a leading raw-command assignment
 #   supplies the flag; automatic activation adds FM_COMPACT_ADVISER_HOOKS=1
 #   unless the worker shell already opted in, keeping firstmate-calm inert.
-#   Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where TYPESAFE_API_KEY is in the process environment or ./.env.
+#   compact-adviser has no key route on fm-spawn launches until a home-.env key route like the guard hook's lands (follow-up fm-compact-adviser-key-source).
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -839,9 +840,10 @@
 # without changing shell selection. It removes only core.hooksPath entries equal
 # to this task's generated directory, compacts survivors in order, and appends
 # this task's override on every launch. Unrelated entries and
-# operator hooksPath overrides remain in the pane; the allowlist governs which
-# reach the worker. Reconciliation repeats inside the filtered launch shell so
-# credential checks still select the generated hooks after env -i.
+# operator hooksPath overrides remain in the pane and reach the worker by
+# default; an allowlist file instead governs which reach it. Reconciliation
+# repeats inside the filtered launch shell so credential checks still select
+# the generated hooks after env -i.
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -3874,12 +3876,10 @@ resolve_rovo_binary() {
 # supervision like a wedged worker rather than a missing credential.
 muse_worker_meta_api_key_present() {
   local session worker_env
-  if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-    case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-    *$'\nMETA_API_KEY\n'*) ;;
-    *) return 1 ;;
-    esac
-  fi
+  case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+  *$'\nMETA_API_KEY\n'*) ;;
+  *) return 1 ;;
+  esac
   [ "$BACKEND" = tmux ] || return 1
   if [ -n "${TMUX:-}" ]; then
     session=$(tmux display-message -p '#S' 2>/dev/null) || return 1
@@ -4061,7 +4061,7 @@ case "$LAUNCH" in
   MUSE_AUTH_FILE="$MUSE_CONFIG_HOME/muse/auth.json"
   if ! muse_credential_present "$MUSE_AUTH_FILE"; then
     if [ -n "${META_API_KEY:-}" ]; then
-      echo "error: muse has no worker-reachable credential; META_API_KEY is set for fm-spawn but cannot be proven present in the $BACKEND worker environment. Store the fleet credential at '$MUSE_AUTH_FILE' with 'muse login' or 'muse auth set --api-key-stdin'. The secret will not be copied into the launch command." >&2
+      echo "error: muse has no worker-reachable credential; META_API_KEY is set for fm-spawn but cannot be proven present in the $BACKEND worker environment. Store the fleet credential at '$MUSE_AUTH_FILE' with 'muse login' or 'muse auth set --api-key-stdin', or list META_API_KEY with the full set the launch needs in config/launch-env-allowlist. The secret will not be copied into the launch command." >&2
     else
       echo "error: muse has no worker-reachable credential; META_API_KEY cannot be proven present in the $BACKEND worker environment and '$MUSE_AUTH_FILE' is absent or empty. Store the fleet credential with 'muse login' or 'muse auth set --api-key-stdin'." >&2
     fi
@@ -8078,8 +8078,8 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 # Every launch crosses the shared clean-environment boundary. Without an
-# allowlist file it keeps the floor, work locators and this harness's own
-# authentication route; a file keeps exactly its listed names instead.
+# allowlist file it keeps the floor, work plumbing, this harness's selectors
+# and the pane's GIT_CONFIG entries; a file keeps exactly its listed names.
 # Generate names-only references here and let the destination shell expand
 # values once, including non-exported names.
 launch_env_args=(--shell-prefix)
@@ -8088,9 +8088,14 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     launch_env_args+=(--keep "$env_name")
   done
 else
-  launch_env_args+=(--harness "$HARNESS")
-  if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 1 ]; then
-    launch_env_args+=(--keep ANTHROPIC_API_KEY --keep ANTHROPIC_AUTH_TOKEN)
+  launch_env_args+=("--harness=$HARNESS")
+  if [ "$HARNESS" = claude ]; then
+    for env_name in $FM_WORKER_ACCOUNT_CLAUDE_SELECTORS; do
+      launch_env_args+=(--keep "$env_name")
+    done
+    if [ "$ALLOW_API_KEY" -eq 1 ]; then
+      launch_env_args+=(--keep ANTHROPIC_API_KEY --keep ANTHROPIC_AUTH_TOKEN)
+    fi
   fi
 fi
 if [ -n "$SPAWN_TRACEPARENT" ]; then
@@ -8109,11 +8114,24 @@ LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 else
+  # Numbered GIT_CONFIG names cannot be listed in advance, so the pane shell
+  # collects its reconciled entries as env arguments.
+  IFS= read -r -d '' LAUNCH_GIT_CONFIG_ARGS <<'SH' || true
+set --
+case "${GIT_CONFIG_COUNT-}" in ''|*[!0-9]*) ;; *)
+  fm_i=0
+  while [ "$fm_i" -lt "$GIT_CONFIG_COUNT" ]; do
+    eval "set -- \"\$@\" \"GIT_CONFIG_KEY_$fm_i=\${GIT_CONFIG_KEY_$fm_i-}\" \"GIT_CONFIG_VALUE_$fm_i=\${GIT_CONFIG_VALUE_$fm_i-}\""
+    fm_i=$((fm_i + 1))
+  done
+  set -- "$@" "GIT_CONFIG_COUNT=$GIT_CONFIG_COUNT"
+;; esac
+SH
   # zsh -f skips the user's .zshenv, which could otherwise reload credentials
   # the boundary just removed; noninteractive bash and sh read no startup file
   # without BASH_ENV or ENV, which the boundary does not keep.
   # shellcheck disable=SC2016 # The pane shell expands this selector.
-  LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec $LAUNCH_ENV_PREFIX \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the

@@ -1948,10 +1948,15 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
-With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret work locators (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME` and the `XDG_*` base directories) and the selected harness's own authentication route, and the pane's own shell runs the launch command (zsh with `-f`, so `.zshenv` does not reload credentials).
-[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns each harness's kept names, for example `GEMINI_API_KEY` for gemini, `META_API_KEY` for muse, `OPENAI_API_KEY` for codex and `DEEPSEEK_API_KEY` for dsh; Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
-A harness credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
-The optional local, gitignored `config/launch-env-allowlist` replaces those defaults with exactly the floor and its listed names.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, and the pane's numbered `GIT_CONFIG_*` entries) and the selected harness's non-secret store selectors, and the pane's own shell runs the launch command (zsh with `-f`, so `.zshenv` does not reload credentials).
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) `HARNESS_ROUTES` owns the store selectors; `FM_WORKER_ACCOUNT_CLAUDE_SELECTORS` in [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors.
+Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`, and the [Claude API key guard](#claude-api-key-guard) still refuses an ambient key without it.
+
+The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY`.
+Other names outside the default set, such as `AWS_PROFILE`, `AWS_REGION` and Vertex project selectors, stop reaching the worker the same way.
+The remedy is the optional local, gitignored `config/launch-env-allowlist`.
+That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
+A credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -1982,7 +1987,7 @@ Firstmate retains basic home, executable search, terminal, locale, temporary-dir
 Main-run readers can invoke the same helper directly without fm-spawn, using its default clean environment and its `--startup` option on Darwin.
 An explicit `--keep` retains a named existing authentication route; it does not isolate that credential from the harness's tools.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
+In an allowlist file, every other ambient name must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -2030,7 +2035,7 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+compact-adviser has no key route on fm-spawn launches until a home-`.env` key route like the guard hook's lands (follow-up fm-compact-adviser-key-source).
 Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
 For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
 Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
