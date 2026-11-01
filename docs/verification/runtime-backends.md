@@ -1257,6 +1257,36 @@ All endpoints were local fakes, so these smokes spent USD 0.00.
 They do not exercise unexpected-stop judgments, which need a model stop that the fixture did not produce.
 The task-owned driver remains outside the commit; `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks the generated overlay and credential for both directions without omp.
 
+### Dispatch-time native find authorization
+
+Verified 2026-10-31 on macOS arm64 with omp 18.14.0.
+The real spawn owner published each synthetic scout's grant before the fake endpoint's launch carrier ran, then real omp consumed the generated task overlay in a credential-isolated RPC session without a model prompt.
+An edited brief did not enlarge authorization on relaunch or promotion.
+The native checks covered the actual registry, model tools, device dispatcher registry, ordinary Eval bridge inventory, and native child construction with inherited settings and task depth one.
+Refresh this token-free proof with:
+
+```sh
+bash bin/fm-proc-budget.sh --own-procs 128 -- \
+  python3 bin/fm-duration.py run test.tests/fm-jev-guard-audit.test.sh -- \
+  bash tests/fm-jev-guard-audit.test.sh
+```
+
+Recorded native output:
+
+```text
+native find absent: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find granted: on; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find other-class: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find no-helpers: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find other-project: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+```
+
+The observer supplied fake credentials and a loopback TypeSafe endpoint, intercepted registry catalogue GETs, and rejected catalogue proxy tunnels before they reached external services.
+No semantic query, model turn or inference was submitted, and no inference request reached a fixture endpoint.
+This proves construction, not a model-driven child conversation, arbitrary child reconfiguration, or general network confinement.
+The separately advertised Eval provider globals and native startup catalogue discovery remain outside the native-find capability guarantee.
+[Tool coverage and outbound calls](../configuration.md#tool-coverage-and-outbound-calls) owns authorization and the remaining scope limits.
+
 ### Ordinary worker prompt helpers
 
 Verified 2026-10-13 on macOS arm64 with omp 18.9.2, through the real `fm-spawn.sh` scout path.

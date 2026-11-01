@@ -82,7 +82,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 type DeviceInput = { path?: unknown; content?: unknown };
 type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
-  | { effect: "unknown" | "uri"; reason: string };
+  | { effect: "unknown" | "uri"; reason: string; alternative?: string };
 
 function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
   if (typeof input.content !== "string" || typeof ctx.getAsyncJobSnapshot !== "function") return false;
@@ -128,6 +128,8 @@ function deviceRule(path: string): DeviceRule | undefined {
   if (Object.hasOwn(deviceEffects, path)) return deviceEffects[path];
   if (/^proc:\/\/[A-Za-z0-9][A-Za-z0-9._-]*\/kill$/.test(path)) return deviceEffects["proc://<job>/kill"];
   if (/^(?:xd|proc):\/\//.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
+  if (path.startsWith("conflict://")) return { effect: "uri", reason: "jev-guard cannot prove the file path behind this conflict target",
+    alternative: "Resolve the conflict by editing the conflicted file at its real path in your own work copy with the normal edit tool; that edit is judged by the same path rules as any other write." };
   if (/^[a-z][a-z0-9+.-]*:\/\//.test(path)) return { effect: "uri", reason: "omp routes this URI to a protocol handler, and no write rule is admitted for its scheme" };
 }
 
@@ -221,7 +223,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         await guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
-            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
+            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}report the missing egress=${JSON.stringify([destination])} to Firstmate for stopped-task redispatch with an explicit Egress needs directive; never enlarge a live task grant. No outbound call was made.`);
         }
       }
       if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });
@@ -239,6 +241,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       if (device) {
         terminal.branch = "device";
         const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
+        if (device.effect === "uri" && device.alternative) return deny(`${device.reason}.`, device.alternative);
         if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
         if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
         if (device.effect === "uri") return deny(`${device.reason}. Report the intended target and effect to Firstmate; do not read or fetch this URI to investigate it.`);

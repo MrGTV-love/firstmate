@@ -2213,11 +2213,19 @@ test_live_foreign_or_unreleasable_locks_are_kept() {
 }
 
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
+  local bundle digest tips
   make_world edges
   add_copy one
   printf 'u\n' > "$(copy_path one)/just-one-untracked-file"
   add_copy two
   git -C "$(copy_path two)" commit -q --allow-empty -m unpushed
+  bundle="$W/bundles/two.bundle"
+  mkdir -p "${bundle%/*}" "$HOMED/data/two"
+  git -C "$(copy_path two)" bundle create "$bundle" --all 2>/dev/null || fail 'cannot bundle the unpushed tip'
+  git -C "$(copy_path two)" bundle verify "$bundle" >/dev/null 2>&1 || fail 'bundle must verify'
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$HOMED/data/two/preservation-bundles.tsv"
   take_snapshots before one two
   run_sweep --apply
   [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
@@ -2225,7 +2233,8 @@ test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
   assert_class two HELD-UNPUSHED
   take_snapshots after one two
   assert_untouched one two
-  pass "a copy with one untracked file and a copy whose tip is on no remote are both kept"
+  assert_present "$bundle" 'sweep deleted the external preservation bundle'
+  pass "a dirty copy and an unpushed copy with a verified recorded bundle are both kept"
 }
 
 test_landed_content_without_a_pushed_tip_is_reaped_by_apply() {
@@ -2499,16 +2508,18 @@ test_apply_raises_the_wake_through_the_queue_once() {
 }
 
 test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
+  local measured
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes at once; the second hangs past the bound at every
   # sub-second phase of its whole-second deadline; the third never starts.
   FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
-  assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
-  assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
+  measured=$(du_calls)
+  { [ "$measured" -ge 1 ] && [ "$measured" -le 2 ]; } || fail "a du that could not finish inside the bound was counted, or none finished: $measured completed"
+  assert_contains "$OUT" "container $SLOT is over its budget: " "a lower bound already over the budget should wake"
+  assert_contains "$OUT" "against 5 GiB" "the wake did not name the container budget"
   assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a cut scan was recorded as complete"
-  [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check

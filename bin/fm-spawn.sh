@@ -45,6 +45,9 @@
 #   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
 #   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
+#   Ship/scout egress is resolved before provisioning by fm-jev-egress.ts;
+#   docs/configuration.md "Tool coverage and outbound calls" owns the brief
+#   directive, metadata, native find selection, and relaunch contract.
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract, the extracted captain
 #   intent and current separate verification-plan instructions, even when the
@@ -384,9 +387,10 @@
 #   cannot weaken the assigned model.
 #   Workers pin the native judge to typesafe/jev-latest with judge: [] fallbacks.
 #   Under the captain data-egress decision 2026-10-08, only a firstmate-project
-#   worker (the Jev guard's physical-root test) gets the task-overlay
-#   find.enabled=on, which admits that tool before credential extensions load,
-#   and a private !command credential lookup through fm_typesafe_key. omp
+#   worker (the Jev guard's project test) is eligible for native find and a
+#   private !command credential lookup through fm_typesafe_key. The task overlay
+#   admits find before credential extensions load only with a recorded
+#   semantic-search grant and helpers enabled. omp
 #   memoizes successful lookups for that process; relaunch picks up primary-key
 #   changes. Every other project gets find.enabled=off and a failing judge
 #   credential, so native judgments reach neither TypeSafe nor OpenRouter.
@@ -4379,6 +4383,16 @@ else
   WT=""
   BRIEF="$DATA/$ID/brief.md"
 fi
+# Resolve consent before provisioning, never from a live worker's first refusal.
+# The TypeScript policy owner also validates the runtime backstop's grant.
+jev_egress() {
+  if command -v bun >/dev/null 2>&1; then
+    bun "$SCRIPT_DIR/fm-jev-egress.ts" "$@"
+  else
+    node --experimental-strip-types --no-warnings "$SCRIPT_DIR/fm-jev-egress.ts" "$@"
+  fi
+}
+TASK_EGRESS='[]'
 # Project capacity admission (bin/fm-project-capacity-lib.sh owns the
 # declaration, what holds a place, and why this is race-safe). A fresh worker
 # for a project whose declared capacity is already held is deferred here, before
@@ -4700,6 +4714,20 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     echo "error: $BRIEF records a Base branch line but the spawn has no --base-branch; pass the brief's base with --base-branch or re-scaffold the brief without one" >&2
     exit 1
   fi
+  # Brief admission above owns malformed and incomplete input, so this decision
+  # judges only an admitted brief, before the launch brief declares its result.
+  if [ "$RELAUNCH" = 1 ]; then
+    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || TASK_EGRESS=
+  else
+    TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
+  fi
+  case $TASK_EGRESS in
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
+    *)
+      echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      exit 1 ;;
+  esac
   # Use the existing launch-brief overlay for every worker kind, including
   # pre-scope briefs and relaunches. Charters never enter this worker path.
   # It is rendered here so a contract problem refuses before any endpoint
@@ -4714,6 +4742,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         printf '\n' &&
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
+        printf '\n# Dispatch egress capabilities\nRecorded destination classes: %s.\nNative semantic find is available only with semantic-search authorization and existing project/helper eligibility; otherwise it is absent.\nNever write or enlarge the task grant from a worker.\n' "$TASK_EGRESS" &&
         { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
@@ -6272,6 +6301,7 @@ spawn_slot_refused() {
       [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
       [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
       echo "jev_guard_policy=$guard_policy"
+      echo "egress=$TASK_EGRESS"
       # Preserve the entire declared scope, never a valid-looking subset of
       # malformed input that already failed the pre-admission scope check.
       if fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1; then
@@ -7136,8 +7166,14 @@ EOF
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
     [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
-    native_find=off
-    [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
+    native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || native_find=
+    case $native_find in
+      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-find" 2>/dev/null || true ;;
+      *)
+        echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
+        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true
+        exit 1 ;;
+    esac
     native_helpers='{}'
     if [ "$OMP_NO_HELPERS" = 0 ]; then
       native_helper_role=$MODEL
@@ -7469,6 +7505,7 @@ preserve_relaunch_meta() {
   [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
   if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
     echo "jev_guard_policy=$guard_policy"
+    echo "egress=$TASK_EGRESS"
   fi
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
@@ -7513,7 +7550,7 @@ preserve_relaunch_meta() {
   fi
   # Keep relaunch fields before the preserved PR block so monitoring can parse it;
   # fm_pr_metadata_identity_parse owns the allowed fields following pr=, including
-  # a preserved egress= grant that Firstmate appended after the PR was recorded.
+  # an egress= grant that follows a pr= line.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi

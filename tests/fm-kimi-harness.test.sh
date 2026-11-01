@@ -33,6 +33,7 @@ trap cleanup_kimi_harness EXIT
 make_spawn_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
+  fm_test_link_ts_runtime "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u

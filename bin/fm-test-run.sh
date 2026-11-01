@@ -2143,6 +2143,7 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-remote-reply.test.sh
       ;;
     bin/fm-duration.py|bin/fm-duration-lib.sh|bin/fm-duration-existing-limits.tsv)
+      printf '%s\n' __script__:fm-cpu-pass.test.sh
       printf '%s\n' __script__:fm-duration.test.sh
       printf '%s\n' __script__:fm-test-wait-until.test.sh
       printf '%s\n' __script__:fm-timeout-lib.test.sh

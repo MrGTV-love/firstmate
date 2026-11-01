@@ -20,7 +20,8 @@
     "teardown-superseded-slot-lease",
     "captain-hold-withdraw-ruling",
     "slack-dm-retarget-pending-work",
-    "open-loops-one-deferral"
+    "open-loops-one-deferral",
+    "pipeline-start-unreadable-source"
   ],
   "guards": [
     {
@@ -582,7 +583,13 @@
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",
-      "exemptions": [],
+      "exemptions": [
+        {
+          "case": "a verified bundle holds the copy's unlanded commits",
+          "derivation": "the recorded bundle passes digest, git bundle verify, advertised-tip and isolated fsck --strict restore proofs in attended teardown; admission copies it into task data and verifies the stored digest and bundle before removal, so removing the copy discards no commit; retiring a firstmate home refuses before any removal while any data/*/preserved-bundles/*.bundle remains in it",
+          "demotion": "fm-teardown-unlanded-bundle-exemption-demotion"
+        }
+      ],
       "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
@@ -590,7 +597,10 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4}
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
+        {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
+        {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2}
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",
@@ -851,13 +861,14 @@
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
         {"file": "bin/fm-jev-guard.ts", "match": "branch: \"deterministic\"", "count": 3},
-        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1}
+        {"file": "bin/fm-jev-guard.ts", "match": "do not read or fetch this URI to investigate it.", "count": 1},
+        {"file": "bin/fm-jev-guard.ts", "match": "device.effect === \"uri\" && device.alternative", "count": 1}
       ],
       "invariant": "a filesystem write without proved active T5 confinement must pass the filesystem path/root gate; a native local device must prove its measured effect and scope",
       "layer": "runtime-block",
       "source": "bin/fm-jev-guard.ts deviceEffects and lspEffects tables; on Darwin the seatbelt-v1 launch marker plus bin/fm-write-confinement.py --check-active kernel membership and metadata data-write/unlink denials; absent that proof, plain-path regex and repository roots; for local devices, realpaths and session-owned running-job snapshot",
       "trigger": "without proved active confinement a filesystem target fails its path/root check; a local device has no measured effect or fails its scope proof, or another scheme:// URI has no admitted write rule, each classified on the target omp write routes (hashline header unwrapped, scheme:// only, URL-parsed and trimmed with a lower-case scheme) while local admission needs the exact spelling; outbound-device denials belong to jev-egress-grant",
-      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; for other scheme:// URIs report the intended target and effect to Firstmate without reading or fetching it; for xd/proc devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
+      "remedy": "for unconfined or unproved files use a plain absolute or worktree-relative path; conflict:// targets stay refused because their file path is unproved: resolve the conflict by editing the conflicted file at its real path in your own work copy with the normal edit tool, subject to the same path rules as any other write; this named alternative is not prohibited by the refusal's retry guidance; for other scheme:// URIs report the intended target and effect to Firstmate without reading or fetching it; for xd/proc devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\")",
       "budget": 1,
       "test": "tests/fm-jev-guard.test.sh",
       "tier": "C",
@@ -977,20 +988,22 @@
       "owner": "bin/fm-jev-guard.ts",
       "sites": [
         {"file": "bin/fm-jev-guard.ts", "match": "branch: \"egress\""},
-        {"file": "bin/fm-jev-guard.ts", "match": "No task egress grant admits this device.", "count": 1}
+        {"file": "bin/fm-jev-guard.ts", "match": "No task egress grant admits this device.", "count": 1},
+        {"file": "bin/fm-spawn.sh", "match": "egress policy returned no", "count": 2},
+        {"file": "bin/fm-spawn.sh", "match": "\"$SCRIPT_DIR/fm-guard-event.sh\" jev-egress-grant deny", "count": 2}
       ],
       "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class; xd://report_issue and xd://github remain denied under every grant, under every spelling omp write routes to them, including a [PATH] or [PATH#XXXX] hashline header, scheme case and surrounding whitespace",
       "layer": "runtime-block",
-      "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta; DEVICE_EGRESS in the same module owns unconditional provider/report_issue and remote-storage/GitHub device denials; a skill-bearing learn retains its independently recorded T5 write owner even when its memory effect is refused",
-      "trigger": "an omp write names xd://report_issue or xd://github; otherwise egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked",
-      "remedy": "for a missing tool grant, Firstmate, never the worker, records exactly one grant line in state/<task>.meta, for example `printf 'egress=[\"<class>\"]\\n' >> state/<task>.meta` when none exists; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove; no grant admits either outbound device: report Auto QA problems to Firstmate, use gh-axi through the shell only for the named GitHub read alternative, and report other GitHub device operations",
+      "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta, which bin/fm-spawn.sh derives at dispatch from the brief's `Egress needs:` directive through bin/fm-jev-egress.ts (fresh dispatch) or rereads from the record (relaunch); DEVICE_EGRESS in the same module owns unconditional provider/report_issue and remote-storage/GitHub device denials; a skill-bearing learn retains its independently recorded T5 write owner even when its memory effect is refused",
+      "trigger": "an omp write names xd://report_issue or xd://github; otherwise egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked; at dispatch, bin/fm-spawn.sh refuses before launch when the brief (fresh) or record (relaunch) yields no valid grant array, including an invalid brief directive or a failed policy helper, or the grant yields no on/off native find capability",
+      "remedy": "for a missing tool grant, Firstmate records an explicit `Egress needs: [\"<class>\"]` line in the brief before stopped-task dispatch; fm-spawn atomically publishes the canonical egress= line before launch and omits native find without semantic-search authorization; relaunch and promotion preserve existing authorization, never enlarge a live grant; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove; no grant admits either outbound device: report Auto QA problems to Firstmate, use gh-axi through the shell only for the named GitHub read alternative, and report other GitHub device operations",
       "budget": 1,
       "test": "tests/fm-jev-guard-audit.test.sh",
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; unreadable live memory settings, an unrecognized backend or llmMode, or embeddings left on prove nothing local, so the memory operation requires provider; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; unconditional device denials are keyed to session <task>:<device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each runtime allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; unconditional device denials are keyed to session <task>:<device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; each dispatch decision on the task grant or native find capability emits one event keyed to <task>:dispatch-grant or <task>:dispatch-find respectively: an allow when the policy yields a valid grant array or on/off find capability, otherwise a deny with source_ok=false, including an invalid brief directive or a failed policy helper; the content-free terminal row in state/jev-guard.jsonl remains the runtime task audit"
     },
     {
       "decision": "deny",
@@ -1039,7 +1052,7 @@
       "layer": "impossible-by-construction",
       "source": "omp's fetch.enabled setting, set false in .omp/fm-worker-overlay.yml, which bin/fm-spawn.sh passes to every omp ship and scout launch",
       "trigger": "an omp worker calls read, grep or ast-grep with an http or https URL path",
-      "remedy": "use a web-classed tool under a task grant instead: Firstmate records egress=[\"web\"] in state/<task>.meta and the worker calls web_search; omp's own error reads URL reads are disabled by settings.",
+      "remedy": "use a web-classed tool under a task grant instead: Firstmate records `Egress needs: [\"web\"]` in the brief before a stopped-task dispatch, fm-spawn publishes the grant, and the worker calls web_search; omp's own error reads URL reads are disabled by settings.",
       "budget": 1,
       "test": "tests/fm-jev-guard-omp-live-e2e.test.sh",
       "tier": "C",
@@ -1217,6 +1230,36 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains"
+    },
+    {
+      "id": "pipeline-start-unreadable-source",
+      "version": "1",
+      "owner": "bin/fm-cpu-pass.py",
+      "sites": [
+        {
+          "file": "bin/fm-cpu-pass.py",
+          "match": "pipeline-start refused: %s"
+        }
+      ],
+      "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable host headroom observation",
+      "layer": "runtime-block",
+      "source": "the pool directory's pipeline-start.lock and waiter files, the runs rows of ~/.no-mistakes/state.sqlite opened read-only, and the native CPU count and load5, read by cmd_pipeline_start in bin/fm-cpu-pass.py",
+      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count or a finite nonnegative load5 before it launches the command",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "repair the source the error line names, then issue the same fresh start again: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>",
+      "budget": 1,
+      "telemetry": "state/guard-events.jsonl",
+      "test": "tests/fm-cpu-pass.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database, a garbage database and a bad load value, and proves the admitted start on readable sources"
     }
   ],
   "excluded": [

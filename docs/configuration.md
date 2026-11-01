@@ -598,7 +598,7 @@ Firstmate asks Treehouse where the current pool is and never predicts it: when `
 When the installed Treehouse has no `pool-dir`, or its output is not one absolute path, one `treehouse status --json` listing, run from the project, is read at most once per teardown and reused for every descendant, and only a path it lists is in the current pool.
 `treehouse get` allocates from the current pool only, so an unleased slot in a superseded folder does not stop a start; each start judges this again, so a folder that becomes current again is protected again.
 A held close, and a shared slot's claimant record retiring with one remaining record, leave copies in the slot, so they lease a superseded-folder slot by its exact path with `treehouse lease --path` once every refusal check has passed, so a close that refuses leaves no new lease, and Treehouse then never hands it out, whichever folder is current; without `lease --path` (treehouse v3.1.7-fm or later) they refuse and the copies stay held.
-An unlanded or dirty copy in an old folder is therefore still refused, before any return or lease release.
+A dirty copy in an old folder is therefore still refused, before any return or lease release, and so is an unlanded one that the attended recorded-bundle exception in [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header does not cover.
 A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, after the reservation and the held-copy record checks, and only for the current-pool slot that bears the recorded slot's name in its old folder, only when its holder is that task, no other task claims the slot, no process runs inside it, no copy is registered inside it, and no local task record names a copy in it; a lease left in place, or a listing that cannot be read, is reported with the command that releases it.
 
 ### Herdr homes and presentation
@@ -1087,6 +1087,12 @@ Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
 Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
+A ship whose commits only a recorded verified bundle holds is removed only while its row is held for the captain's land-or-drop call, and teardown keeps that row open and held, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes.
+A home with a manual backlog, or an Orca cleanup recovery, has no row that can hold that call, so the bundle route refuses there.
+A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason>`.
+The captain's answer closes the row with no note, and its captain hold kind keeps it out of Recently Landed.
+A row closed on that bundle instead, by a replay that finds the hold released or by hand, carries the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
+The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
@@ -3000,10 +3006,18 @@ The rule is deterministic and needs neither a model verdict nor a working provid
 Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
-Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
-An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
-Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+Before ship/scout dispatch, Firstmate records the task's authorized needs in one unfenced `Egress needs: ["semantic-search","web"]` directive inside `## Firstmate spec` under `# Task`.
+Only the existing classes `semantic-search`, `web`, `browser`, `provider` and `remote-storage` are recognized; no keyword inference, wildcard, project-wide permission or trust exemption exists.
+The scaffold starts with `Egress needs: []`, and an absent directive in a legacy brief also means no authorization.
+The directive is authorization metadata, not build instructions: spawn and promotion still refuse a Firstmate spec containing only that directive and its exclusion list.
+Duplicate or indented directives, malformed JSON, non-string or unknown members, NUL bytes, unreadable input or a symlinked brief refuse fresh dispatch before worker provisioning; fenced examples do not authorize anything.
+The spawn atomically publishes exactly one canonical `egress=` JSON-array line in `state/<task>.meta` before launch, including an empty grant, and declares the resolved classes in the generated launch brief.
+Native omp semantic `find` is constructed only when that grant includes `semantic-search` and the existing Firstmate-project and helper eligibility also permits it; otherwise the final task overlay sets `find.enabled: off`, removing it from the native registry, model tools and ordinary Eval tool bridge rather than offering a tool that must refuse.
+A relaunch reconstructs find from the recorded grant, not an edited brief, and promotion preserves that grant; neither operation adds authorization to a running task.
+Persistent secondmates keep their existing native-find eligibility and do not gain this worker grant policy.
+The runtime grant backstop stays fail closed: an absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; a grant naming the removed `subagent` class grants nothing.
+Only Firstmate may authorize task metadata at dispatch; a worker reports a mismatch for stopped-task redispatch, meaning teardown and then a fresh dispatch from the corrected brief, and never writes or enlarges its live grant.
+Construction-time removal covers native find only: other egress-classed tools retain their existing runtime grant checks, and omp's separately advertised Eval judge/completion provider helpers remain an unresolved native capability gap, not a claim of network confinement.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
@@ -3029,7 +3043,7 @@ The `xd://github` device write stays refused by the separate device-egress table
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
 The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` and `xd://github` device writes are owned by `jev-egress-grant` and remain refused under every grant.
-Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), `dispatch-grant` or `dispatch-find` (for the `jev-egress-grant` spawn decision that resolves the task grant or the native find capability; a refusal there has `source_ok` false), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
 For grant-based decisions, the egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
 An unconditional device-egress refusal uses the compiled device row as its source, so `source_ok=true` does not imply that task metadata was read or any grant was accepted.
 The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
@@ -3074,6 +3088,7 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
+| `conflict://` targets | Refused on `write` and `edit` because the identifier does not prove a file path; the refusal names the real-path edit described below instead of a report-only outcome. |
 | Other `scheme://` URIs | Refused because omp routes them to a protocol handler with no admitted write rule; the refusal asks for a report to Firstmate and recommends no read or fetch of the URI. |
 
 LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
@@ -3090,14 +3105,15 @@ Finished or missing jobs, named project services absent from the owner snapshot,
 Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 No device that sends data off the machine is admitted.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
+Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround, except the `conflict://` refusal, which names the real-path edit described below.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
 Device `edit` calls and other `scheme://` targets, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; on unconfined or unproved workers, ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard validates the replacement-input schema but does not judge or scan write/edit content.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
 A policy block (deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
-Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
+A refusal that names an alternative exempts only that named alternative from this rule; for example, the `xd://github` read-op refusal names `gh-axi` through the shell, and the `conflict://` refusal names editing the conflicted file at its real path in the worker's own work copy with the normal edit tool.
+A `conflict://` identifier does not prove a file path; the real-path edit takes the same filesystem route as any other write, T5 confinement on a proved worker and the spelling and root checks otherwise, so it never widens what a write may reach.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 Claude receives no post-tool review notice, so an unreviewed result is exactly what the tool returned.
