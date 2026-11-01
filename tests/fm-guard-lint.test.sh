@@ -560,6 +560,7 @@ out=$("$LINT" --root "$NATS" --mode new-or-touched --base HEAD 2>&1) && fail "di
 printf '%s\n' "$out" | grep -q "^VIOLATION S1 $NATS_ID" || fail "expected the touched legacy site to fail under diff.noprefix, got: $out"
 git -C "$NATS" config --unset diff.noprefix
 pass "new-or-touched fails a touched legacy site under diff.noprefix"
+printf 'legacy() {\n  echo "REFUSED: a legacy refusal. Remedy: run bin/gguard.sh --clear" >&2\n  return 1\n}\n' >"$NATS/bin/gnew.sh"
 mutate "$NATS" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a legacy refusal"}]'
 printf '{"schema_version":2,"allowed":[]}\n' >"$NATS/docs/guards/lint-allowlist.json"
 "$LINT" --root "$NATS" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
@@ -576,6 +577,7 @@ printf 'echo "REFUSED: a brand new refusal" >&2\n' >"$NEWSITE/bin/gnew.sh"
 out=$("$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) && fail "a new unmapped site must fail new-or-touched: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S1 site:bin/gnew.sh' || fail "expected S1 for the new site, got: $out"
 pass "new-or-touched fails a new refusal site that maps to nothing"
+printf 'echo "REFUSED: a brand new refusal. Remedy: run bin/gguard.sh --clear" >&2\n' >"$NEWSITE/bin/gnew.sh"
 mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand new refusal"}]'
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
   || fail "a new site mapped with full spec fields must pass new-or-touched"
@@ -624,5 +626,305 @@ printf '{"schema_version":1,"allowed":[]}\n' >"$GROW/docs/guards/lint-allowlist.
 out=$("$LINT" --root "$GROW" --mode new-or-touched --base HEAD 2>&1) && fail "dropping the schema must not unseal the allowlist: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S5 allowlist' || fail "expected S5 for the schema drop, got: $out"
 pass "S5 fails an allowlist that drops back below the sealed schema"
+
+# S3 checks the emitted diagnostic, not a registry remedy or neighboring prose.
+REMEDY=$(fixture site_remedy)
+git -C "$REMEDY" init -q
+git -C "$REMEDY" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$REMEDY" -c user.email=t@example.invalid -c user.name=t commit -qm base
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"REFUSED:"}]'
+assert_remedy_missing() {
+  local out
+  out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "missing diagnostic remedy passed: $out"
+  assert_contains "$out" 'VIOLATION S3 ' "the site itself must fail S3"
+}
+printf 'echo "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf '# Remedy: run bin/gguard.sh --clear\necho "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2 # "Remedy: run bin/gguard.sh --clear"\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2; echo "Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'test "Remedy: run bin/gguard.sh --clear" = ignored || echo "REFUSED: cannot proceed" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed" >&2\necho "Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: ask someone" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run bin/missing.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/bin/env bash bin/missing.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "an absolute system executable must not be read as a repository bin/ path"
+printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/missing.sh, then git status" >&2\n' >"$REMEDY/bin/gnew.sh"
+assert_remedy_missing
+printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/./bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "an absolute /usr/./bin/ path must not be read as a repository ./bin/ path"
+printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a ./bin/ repository command must satisfy S3"
+printf 'echo "REFUSED: cannot proceed # pending. Remedy: run bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a diagnostic with its executable completing step must pass S3"
+pass "S3 rejects a registry-only, commented, neighboring or prose-only remedy and accepts an inline command"
+
+rm "$REMEDY/bin/gnew.sh"
+printf 'print("REFUSED: cannot proceed") # "Remedy: run bin/gguard.sh --clear"\n' >"$REMEDY/bin/gnew.py"
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}]'
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+def label(value):
+    return "pending"
+print(f"REFUSED: {label('Remedy: run bin/gguard.sh --clear')}")
+PY
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+def refuse(reason):
+    print("Remedy: run bin/gguard.sh --clear")
+    raise SystemExit(1)
+print("REFUSED: cannot proceed") # refuse("pending work")
+PY
+assert_remedy_missing
+cat >"$REMEDY/bin/gnew.py" <<'PY'
+import sys
+
+def refuse(reason):
+    print("REFUSED: " + reason + ". "
+          "Remedy: run bin/gguard.sh --clear", file=sys.stderr)
+    raise SystemExit(1)
+
+refuse("fixture work is pending")
+PY
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}, {"file":"bin/gnew.py","match":"refuse(\"fixture"}]'
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a direct helper's emitted multiline remedy must cover its call site"
+out=$(python3 "$REMEDY/bin/gnew.py" 2>&1) && fail "the refusal helper must still block"
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted helper must actually emit the completing step"
+pass "S3 accepts a directly called local helper's emitted multiline remedy without changing its refusal"
+
+rm "$REMEDY/bin/gnew.py"
+cat >"$REMEDY/bin/gnew.sh" <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule 'pending work' machine 'bin/gguard.sh --clear' task fixture
+SH
+mutate "$REMEDY" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"fm_refuse gguard"}]'
+"$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "the shared formatter machine-command argument must satisfy S3 without a second footer"
+cat >"$REMEDY/bin/gnew.sh" <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule 'pending work' machine 'ask someone' task 'bin/gguard.sh --clear'
+SH
+assert_remedy_missing
+pass "S3 validates the shared formatter command argument, not a command in another argument"
+
+# S3 reads the literal message of every emitter shape the scan already
+# recognizes, so a genuine inline remedy completes it, while a useless remedy,
+# a neighboring literal or an uncalled helper still cannot.
+remedy_shape() {  # <file> <site-match> <pass|fail> <label>, file content on stdin
+  local file=$1 match=$2 expect=$3 label=$4 out
+  rm -f "$REMEDY"/bin/gnew.*
+  cat >"$REMEDY/$file"
+  mutate "$REMEDY" ".guards[0].sites = [{\"file\":\"$file\",\"match\":$(jq -Rn --arg m "$match" '$m')}]"
+  if [ "$expect" = pass ]; then
+    out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) || fail "$label must pass S3: $out"
+  else
+    out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "$label escaped S3: $out"
+    assert_contains "$out" 'VIOLATION S3 ' "$label must fail S3"
+    assert_not_contains "$out" 'VIOLATION S1 ' "$label must still map its site"
+    assert_not_contains "$out" 'VIOLATION S2 ' "$label must still match exactly its site"
+  fi
+}
+JS_DENY='function deny(reason) { return reason; }'
+remedy_shape bin/gnew.ts 'return deny(' pass 'a JS helper call with a template remedy' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(\`device \${x} blocked. Remedy: run bin/gguard.sh --clear\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'a JS helper call with a prose remedy' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(\`device \${x} blocked. Remedy: ask someone\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'a JS helper call beside a compared remedy literal' <<JS
+$JS_DENY
+export function check(x) {
+  if (x === "Remedy: run bin/gguard.sh --clear") return deny(\`device \${x} blocked\`);
+}
+JS
+remedy_shape bin/gnew.ts 'return deny(' pass 'a multiline JS helper call' <<JS
+$JS_DENY
+export function check(x) {
+  return deny(
+    "device blocked. " + x + ". Remedy: run bin/gguard.sh --clear",
+  );
+}
+JS
+remedy_shape bin/gnew.ts 'throw new Error' pass 'a JS throw' <<'JS'
+throw new Error("REFUSED: blocked. Remedy: run bin/gguard.sh --clear");
+JS
+remedy_shape bin/gnew.ts 'throw new Error' fail 'a JS throw beside a remedy in another statement' <<'JS'
+const hint = "Remedy: run bin/gguard.sh --clear"; throw new Error("REFUSED: blocked");
+JS
+remedy_shape bin/gnew.ts 'console.error' pass 'a JS console diagnostic' <<'JS'
+console.error(`REFUSED: ${process.argv[2]} blocked. Remedy: run bin/gguard.sh --clear`);
+JS
+remedy_shape bin/gnew.ts 'return deny(' pass "a JS arrow helper's returned remedy" <<'JS'
+const deny = (reason) => `blocked: ${reason}. Remedy: run bin/gguard.sh --clear`;
+export function check() { return deny("pending work"); }
+JS
+remedy_shape bin/gnew.ts 'return deny(' fail 'an uncalled helper definition' <<'JS'
+const refuse_other = () => "Remedy: run bin/gguard.sh --clear";
+const deny = (reason) => `blocked: ${reason}`;
+export function check() { return deny("pending work"); }
+JS
+remedy_shape bin/gnew.py 'raise SystemExit' pass 'a Python raise' <<'PY'
+raise SystemExit("REFUSED: blocked. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py 'raise SystemExit' fail 'a Python raise with a prose remedy' <<'PY'
+raise SystemExit("REFUSED: blocked. Remedy: ask someone")
+PY
+remedy_shape bin/gnew.py 'raise SystemExit' fail 'a Python raise beside a remedy in another call' <<'PY'
+print("Remedy: run bin/gguard.sh --clear"); raise SystemExit("REFUSED: blocked")
+PY
+remedy_shape bin/gnew.py '"refused: ' pass 'a multiline Python raise' <<'PY'
+raise ValueError(
+    "refused: the lease is gone. "
+    "Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py 'sys.exit' pass 'a Python exit' <<'PY'
+import sys
+sys.exit("REFUSED: blocked. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.py "return 'refused'" pass 'a Python refusal returned as data' <<'PY'
+def mode():
+    return 'refused', 'pending work. Remedy: run bin/gguard.sh --clear'
+PY
+remedy_shape bin/gnew.py "return 'refused'" fail 'a Python refusal returned as data without a remedy' <<'PY'
+def mode():
+    return 'refused', 'pending_work'
+PY
+remedy_shape bin/gnew.py 'self.refuse' pass 'a Python method refusal' <<'PY'
+class Gate:
+    def refuse(self, why):
+        raise SystemExit(why)
+
+    def run(self):
+        self.refuse("refused: pending work. Remedy: run bin/gguard.sh --clear")
+PY
+remedy_shape bin/gnew.sh 'fail "REFUSED' pass 'a shell fail diagnostic' <<'SH'
+fail() { echo "$1" >&2; exit 1; }
+fail "REFUSED: blocked. Remedy: run bin/gguard.sh --clear"
+SH
+remedy_shape bin/gnew.sh 'fail "REFUSED' fail 'a shell fail diagnostic with a prose remedy' <<'SH'
+fail() { echo "$1" >&2; exit 1; }
+fail "REFUSED: blocked. Remedy: ask someone"
+SH
+remedy_shape bin/gnew.sh 'log "refused' pass 'a shell log diagnostic' <<'SH'
+log() { echo "$1" >&2; }
+log "refused: blocked. Remedy: run bin/gguard.sh --clear"
+SH
+remedy_shape bin/gnew.sh 'REFUSED:' pass 'a stderr heredoc diagnostic' <<'SH'
+cat >&2 <<EOF
+REFUSED: blocked.
+Remedy: run bin/gguard.sh --clear
+EOF
+SH
+out=$(bash "$REMEDY/bin/gnew.sh" 2>&1)
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted heredoc must actually emit the completing step"
+remedy_shape bin/gnew.sh 'REFUSED:' fail 'a stderr heredoc beside a remedy outside it' <<'SH'
+echo "Remedy: run bin/gguard.sh --clear" >&2
+cat >&2 <<EOF
+REFUSED: blocked.
+EOF
+SH
+remedy_shape bin/gnew.sh 'fm_refuse gguard' pass 'a shared formatter missing text with a variable exit kind' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "pending work. Remedy: run bin/gguard.sh --clear" "$kind" "$exit_text" task fixture
+SH
+out=$(bash "$REMEDY/bin/gnew.sh" 2>&1)
+assert_contains "$out" 'Remedy: run bin/gguard.sh --clear' "the accepted formatter text must actually be emitted"
+remedy_shape bin/gnew.sh 'fm_refuse gguard' fail 'a variable exit kind that cannot prove a machine command' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "$missing" "$kind" 'bin/gguard.sh --clear' task fixture
+SH
+rm -f "$REMEDY"/bin/gnew.*
+pass "S3 reads JS/TS, Python and shell emitter shapes, rejecting prose, neighboring and uncalled-helper remedies"
+
+# A remedy edit is a site edit even when the refusal/call line is unchanged.
+for shape in direct helper deleted-helper; do
+  FOOTER=$(fixture "site_footer_$shape")
+  case "$shape" in
+    direct)
+      printf 'print("REFUSED: blocked. "\n      "Remedy: bin/gguard.sh --clear")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"REFUSED:"}]'
+      ;;
+    helper)
+      printf 'def refuse(reason):\n    print(reason,\n          "Remedy: bin/gguard.sh --clear")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"refuse(\"pending"}]'
+      ;;
+    deleted-helper)
+      printf 'def refuse(reason):\n    print(reason)\n    print("Remedy: bin/gguard.sh --clear")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py"
+      mutate "$FOOTER" '.guards[0].sites = [{"file":"bin/gnew.py","match":"refuse(\"pending"}]'
+      ;;
+  esac
+  git -C "$FOOTER" init -q
+  git -C "$FOOTER" -c user.email=t@example.invalid -c user.name=t add -A
+  git -C "$FOOTER" -c user.email=t@example.invalid -c user.name=t commit -qm base
+  case "$shape" in
+    direct) printf 'print("REFUSED: blocked. "\n      "ask the owner")\n' >"$FOOTER/bin/gnew.py" ;;
+    helper) printf 'def refuse(reason):\n    print(reason,\n          "ask the owner")\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py" ;;
+    deleted-helper) printf 'def refuse(reason):\n    print(reason)\n    raise SystemExit(1)\n\nrefuse("pending work")\n' >"$FOOTER/bin/gnew.py" ;;
+  esac
+  out=$("$LINT" --root "$FOOTER" --mode new-or-touched --base HEAD 2>&1) && fail "$shape footer-only edit escaped S3: $out"
+  assert_contains "$out" 'VIOLATION S3 ' "$shape footer-only edit must touch its diagnostic and callers"
+done
+pass "S3 follows multiline diagnostic spans and local helper edits/deletions without a changed refusal line"
+
+# S3's remedy boundary does not widen S1: a helper edit leaves its unchanged,
+# allowlisted callers unregistered, yet deleting the helper's remedy fails S3.
+HELPER_EDIT=$(fixture site_helper_edit)
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1. Remedy: run bin/gguard.sh --clear" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
+HELPER_IDS=$(site_ids "$HELPER_EDIT")
+[ "$(printf '%s\n' "$HELPER_IDS" | grep -c .)" -eq 2 ] || fail "expected two legacy helper callers, got: $HELPER_IDS"
+jq -n --arg ids "$HELPER_IDS" '{schema_version: 2, allowed: ($ids | split("\n") | map(select(length > 0) | {id: ., rule: "S1"}))}' \
+  >"$HELPER_EDIT/docs/guards/lint-allowlist.json"
+git -C "$HELPER_EDIT" init -q
+git -C "$HELPER_EDIT" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$HELPER_EDIT" -c user.email=t@example.invalid -c user.name=t commit -qm base
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1. Remedy: run bin/gguard.sh --clear, then retry" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
+out=$("$LINT" --root "$HELPER_EDIT" --mode new-or-touched --base HEAD 2>&1) \
+  || fail "a helper-body edit forced registration of its unchanged allowlisted callers: $out"
+cat >"$HELPER_EDIT/bin/gnew.sh" <<'EOF'
+refuse() {
+  echo "$1" >&2
+  return 1
+}
+refuse "legacy caller one"
+refuse "legacy caller two"
+EOF
+out=$("$LINT" --root "$HELPER_EDIT" --mode new-or-touched --base HEAD 2>&1) && fail "deleting a helper's remedy escaped S3: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^VIOLATION S3 ')" -eq 2 ] || fail "both unchanged callers must fail S3 when their helper loses its remedy: $out"
+assert_not_contains "$out" 'VIOLATION S1 ' "a helper edit must not newly force S1 registration of unchanged callers"
+pass "S3 catches a helper remedy deletion at unchanged callers without widening the S1 touched-site ratchet"
 
 printf 'ok - fm-guard-lint\n'

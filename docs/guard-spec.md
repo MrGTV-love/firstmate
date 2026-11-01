@@ -185,12 +185,27 @@ A site's id is `site:<file>:<hash of its normalized line>`, so it survives line 
 The lint computes the unregistered count as the number of sites that map to nothing.
 A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 
-Rules 10 to 13 are mechanically checked on top of the nine rules above:
+Rules 10 to 14 are mechanically checked on top of the nine rules above:
 
 10. **S1** Every refusal site maps to a registry entry.
 11. **S2** A `sites` item matches exactly the sites it declares, and no site has two owners.
-12. **S4** A typed `unregistered_ids` list has the computed length.
-13. **S5** The allowlist does not grow against the base (new-or-touched mode only).
+12. **S3** A new or touched diagnostic site (`A`, `B` or `C`) carries an executable `Remedy:` or shared `completing-command:` in its emitted statement or refusal helper, not only in the registry (new-or-touched mode).
+13. **S4** A typed `unregistered_ids` list has the computed length.
+14. **S5** The allowlist does not grow against the base (new-or-touched mode only).
+
+S3 reads the whole statement that holds a site: the complete Python statement (including adjacent string literals), a JavaScript statement until its parentheses and brackets close, a shell command with its backslash continuations, or the whole body of a text heredoc.
+S3 has its own touched boundary: the entire joined statement and directly called local refusal-helper body, including deletion boundaries, so editing only a remedy footer still checks the unchanged refusal or caller line.
+That boundary applies to S3 alone; S1 still treats a site as touched only when its own line changes.
+S3 reads only literal message text, excluding inline comments as well as separate comments: the positional literals of a Python call, raise, exit or method call and a returned, assigned or bare literal (tuple, list and dict values included); the literal and template text of each JavaScript call, `throw` or other argument, with interpolations dropped; and the words of each shell command, such as `echo`, `fail`, `log` or a refusal helper.
+When the statement holds refusal vocabulary, only text carrying it can supply the remedy; otherwise a refusal-helper call's own arguments must supply it, and only a statement with neither lets any emitted literal supply it.
+A neighboring branch, unrelated command, test operand, interpolated function argument or registry remedy cannot supply the diagnostic's remedy.
+A direct local refusal helper may own the common emitted remedy for its call sites.
+The shared `fm_refuse` formatter's existing machine-command argument and `completing-command:` envelope satisfy the same rule without adding a second footer; its argument must name a concrete command.
+An exit kind held in a variable does not prove that envelope, so such a call needs the remedy in its printed missing text.
+A dynamic message with no literal remedy fails S3 rather than passing on a guess.
+The lint recognizes repository command paths, `git`, `herdr` and `env -u`, and every `bin/` or `./bin/` path a remedy names must exist even beside another command; it does not prove the suggested step is safe or sufficient.
+Executable behavioral fixtures and review must prove completion without weakening the underlying guard.
+Unchanged legacy diagnostics are not newly allowlisted for S3; touching them is the point at which their printed remedy becomes mandatory.
 
 ## Tiers
 

@@ -2771,7 +2771,7 @@ do_relaunch() {
     || die "could not inspect the replacement launch environment before stopping $ID"
   fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
     "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
-    || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
+    || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker. Remedy: remove ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN from the inherited environment and any configured replacement launch environment or backend session reported above, then retry bin/fm-control.sh '$ID' relaunch (--note <text> | --note-file <path>) with the same intended harness and account; do not change an account pin or enable API billing to bypass this refusal."
   journal_write stopping "$note_line"
   exit_result=$(do_exit)
   journal_write exited "$note_line" "exit_result=$exit_result"

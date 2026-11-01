@@ -112,24 +112,24 @@ remote_endpoint_load() {
   REMOTE_ENDPOINT_ERROR=
   REMOTE_ENDPOINT_META=$(meta_path "$id")
   if ! fm_backend_validate_task_endpoint "$REMOTE_ENDPOINT_META" "$id" 2>/dev/null; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint metadata is invalid; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint metadata is invalid; refusing access. Remedy: the owning firstmate must restore $REMOTE_ENDPOINT_META from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session '$REMOTE_HERDR_SESSION', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor."
     return 1
   fi
   REMOTE_ENDPOINT_BACKEND=$FM_BACKEND_VALIDATED_BACKEND
   REMOTE_ENDPOINT_TARGET=$FM_BACKEND_VALIDATED_TARGET
   if [ "$REMOTE_ENDPOINT_BACKEND" != herdr ]; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access. Remedy: the owning firstmate must restore $REMOTE_ENDPOINT_META from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session '$REMOTE_HERDR_SESSION', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor."
     return 1
   fi
   herdr_session=$(fm_backend_meta_exact_value "$REMOTE_ENDPOINT_META" herdr_session 2>/dev/null || true)
   if [ "$herdr_session" != "$REMOTE_HERDR_SESSION" ]; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded in Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded in Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'; refusing access. Remedy: the owning firstmate must restore $REMOTE_ENDPOINT_META from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session '$REMOTE_HERDR_SESSION', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor."
     return 1
   fi
   case "$REMOTE_ENDPOINT_TARGET" in
     "$REMOTE_HERDR_SESSION":?*) ;;
     *)
-      REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint target '$REMOTE_ENDPOINT_TARGET' is outside Herdr session '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
+      REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint target '$REMOTE_ENDPOINT_TARGET' is outside Herdr session '$REMOTE_HERDR_SESSION'; refusing access. Remedy: the owning firstmate must restore $REMOTE_ENDPOINT_META from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session '$REMOTE_HERDR_SESSION', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor."
       return 1
       ;;
   esac

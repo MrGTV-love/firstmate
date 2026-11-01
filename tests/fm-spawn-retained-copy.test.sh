@@ -239,6 +239,9 @@ test_missing_jq_refusal_names_install() (
   local name=missing-jq tool out rc=0
   make_retained_case "$name"
   add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  # The fixture home is intentionally scoped to this isolated subshell; every
+  # library sourced and called below reads it inside the same subshell.
+  # shellcheck disable=SC2030
   FM_HOME=$HOME_DIR
   # shellcheck source=bin/fm-backend.sh
   . "$ROOT/bin/fm-backend.sh"

@@ -33,11 +33,14 @@
 #      bin/fm-guard-refcheck.sh)
 #   R8 every instrumented guard names its telemetry target and calls the writer
 #   R9 every exemption carries a derivation and a demotion candidate
-# plus three rules over the refusal sites bin/fm-guard-sites.py discovers in the
+# plus rules over the refusal sites bin/fm-guard-sites.py discovers in the
 # runtime code (docs/guard-spec.md "Refusal sites"):
 #   S1 every refusal site maps to a registry entry through its sites markers
 #   S2 a sites marker matches exactly the sites it declares, and no site is
 #      mapped by two entries
+#   S3 new-or-touched diagnostic sites carry an executable Remedy: or shared
+#      completing-command: in their statement or refusal helper, not only in
+#      the registry; legacy unchanged diagnostics gain no new allowlist
 #   S4 a typed unregistered_ids list in the registry has the computed length
 # In new-or-touched mode a site on a changed line must map even when it is
 # allowlisted, and the allowlist may not grow against --base (S5).
@@ -153,6 +156,14 @@ jq -r '.sites[] | select(.entry == null)
   | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
 jq -r '.errors[] | [.rule, .id, .message] | @tsv' "$SITES_JSON" \
   | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
+# S3 starts at the changed-site boundary, not a new legacy allowlist: registry
+# prose cannot stand in for the remedy the operator actually sees.
+if [ "$MODE" = new-or-touched ]; then
+  jq -r '.sites[] | select(.remedy_touched and (.remedy | not))
+    | select(.sig | split(",") | any(. == "A" or . == "B" or . == "C"))
+    | ["S3", .key, "\(.file):\(.line) has no executable Remedy: in its diagnostic or directly called local refusal helper"] | @tsv' "$SITES_JSON" \
+    | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
+fi
 SITES_N=$(jq -r '.sites | length' "$SITES_JSON")
 UNREGISTERED_N=$(jq -r '[.sites[] | select(.entry == null)] | length' "$SITES_JSON")
 typed_unregistered=$(jq -r 'if (.unregistered_ids | type) == "array" then (.unregistered_ids | length) else "" end' "$REGISTRY")

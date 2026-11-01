@@ -709,6 +709,54 @@ EOF
   pass "fm-merge-local: a registry change cannot redirect an in-flight local-only task"
 }
 
+# A dirty primary checkout refuses the landing without touching the owner's
+# bytes, and the printed completing step (owner preserves the change on their
+# own branch, checkout returns clean, retry) actually lands the task.
+test_local_merge_refuses_a_dirty_primary_until_its_completing_step() {
+  local home proj id main base fix out rc
+  home="$TMP_ROOT/local-merge-dirty/home"
+  proj="$TMP_ROOT/local-merge-dirty/proj"
+  id=local-merge-dirty
+  mkdir -p "$home/state" "$home/data" "$proj"
+  git -C "$proj" init -q || fail "could not initialize dirty-primary fixture"
+  git -C "$proj" config user.email test@example.com
+  git -C "$proj" config user.name test
+  printf 'base\n' > "$proj/base"
+  git -C "$proj" add base || fail "could not stage dirty-primary fixture base"
+  git -C "$proj" commit -qm base || fail "could not commit dirty-primary fixture base"
+  main=$(git -C "$proj" branch --show-current)
+  base=$(git -C "$proj" rev-parse HEAD)
+  git -C "$proj" checkout -qb "fm/$id" || fail "could not create dirty-primary ship branch"
+  printf 'change\n' > "$proj/change"
+  git -C "$proj" add change || fail "could not stage dirty-primary ship change"
+  git -C "$proj" commit -qm change || fail "could not commit dirty-primary ship change"
+  fix=$(git -C "$proj" rev-parse HEAD)
+  git -C "$proj" checkout -q "$main" || fail "could not restore dirty-primary default branch"
+  printf 'project=%s\nmode=local-only\n' "$proj" > "$home/state/$id.meta"
+  printf 'owner edit\n' > "$proj/base"
+  printf 'owner note\n' > "$proj/untracked"
+
+  rc=0
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$MERGE_LOCAL" "$id" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "local merge into a dirty primary exited $rc, not 1: $out"
+  [ "$(git -C "$proj" rev-parse HEAD)" = "$base" ] || fail "a refused dirty-primary merge moved the default branch"
+  [ "$(cat "$proj/base")" = "owner edit" ] || fail "a refused dirty-primary merge changed the owner's tracked edit"
+  [ "$(cat "$proj/untracked")" = "owner note" ] || fail "a refused dirty-primary merge changed the owner's untracked file"
+  assert_contains "$out" "Remedy:" "the dirty-primary refusal did not name its completing step"
+  assert_contains "$out" "bin/fm-merge-local.sh '$id'" "the dirty-primary refusal did not name its exact retry"
+
+  git -C "$proj" checkout -qb owner/wip || fail "could not move the owner's change to their own branch"
+  git -C "$proj" add -A || fail "could not stage the owner's change"
+  git -C "$proj" commit -qm "owner wip" || fail "could not commit the owner's change"
+  git -C "$proj" checkout -q "$main" || fail "could not return the primary checkout to its default branch"
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$MERGE_LOCAL" "$id" 2>&1) \
+    || fail "local merge did not complete after the owner's change was preserved and the checkout was clean: $out"
+  [ "$(git -C "$proj" rev-parse HEAD)" = "$fix" ] || fail "the completed retry did not land the ship branch"
+  [ "$(git -C "$proj" show owner/wip:base)" = "owner edit" ] || fail "the completing step lost the owner's tracked edit"
+  [ "$(git -C "$proj" show owner/wip:untracked)" = "owner note" ] || fail "the completing step lost the owner's untracked file"
+  pass "fm-merge-local: a dirty primary refuses unchanged and lands after the printed completing step"
+}
+
 # A registered name may contain spaces, and the lookup must match the whole
 # name rather than only its first whitespace-delimited token (issue #1977).
 # The longer "foo bar" row is listed before the "foo" row so a leading-prefix
@@ -2102,6 +2150,7 @@ test_promotion_delivers_the_real_definition_of_done
 test_promotion_persists_the_selected_ship_branch
 test_promotion_branch_command_is_shell_safe
 test_local_merge_uses_the_recorded_ship_branch
+test_local_merge_refuses_a_dirty_primary_until_its_completing_step
 test_project_mode_matches_whole_multiword_names
 test_project_mode_maps_the_conditional_policy
 test_project_mode_binds_the_forge_orthogonally

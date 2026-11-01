@@ -368,7 +368,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
   FM_TASK_COPY_OTHER_FIELD=
   target=$(fm_task_copy_canonical_dir "$path") || return 1
   fm_local_firstmate_state_dirs "$record_state" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $FM_HOME/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry the refused bin/fm-teardown.sh or bin/fm-control.sh command; do not rebind to another home, delete registrations or skip the unreadable home." >&2
     return 2
   }
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do

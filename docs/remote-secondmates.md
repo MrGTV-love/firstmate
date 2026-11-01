@@ -438,7 +438,10 @@ Other parent-side lifecycle verbs retain their remote-placement refusal.
 
 - An explicit request for any other backend is refused rather than honored, and the remote host refuses one too.
 - An existing remote endpoint recorded in another Herdr session, including `default`, is classified as unverified and left untouched.
-  Launch, liveness recovery, control, and retirement refuse it until an operator explicitly migrates it, instead of attempting a live cutover.
+  Launch, liveness recovery, control, and retirement refuse it instead of attempting a live cutover.
+  The refusal names the completing step: the owning firstmate restores the endpoint metadata from this secondmate's verified launch evidence and retries.
+  If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet.
+  The completing step is then an escalation: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor.
 - A launch after a host has drifted out of readiness fails with the doctor's own gap text instead of leaving a half-created endpoint.
 - Raw launch commands are not accepted for remote secondmates.
 - Backends that already refuse secondmate launch, currently Orca and cmux, remain unsupported on the remote host.
