@@ -622,9 +622,9 @@ exec "$real_bun" "\$@"
 SH
   chmod +x "$1/bun"
 }
-# Every jev-egress-grant event as "<session> <decision> <source_ok>", in order.
+# Every jev-egress-grant event as "<task>:<rule> <decision> <source_ok>", in order.
 egress_events() { # <log>
-  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.session) \(.decision) \(.source_ok)"' "$1"
+  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.task):\(.rule) \(.decision) \(.source_ok)"' "$1"
 }
 for posture in directive-only absent granted other-class no-helpers other-project invalid malformed duplicate indented silent-runtime silent-find failed-find failed-record; do
   world="$TMP_ROOT/dispatch-$posture"

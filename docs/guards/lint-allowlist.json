@@ -281,7 +281,6 @@
     {"id": "site:bin/fm-control.sh:c31ce38802", "rule": "S1", "text": "die \"secondmate $ID's child record $child_meta is not a readable regular file; refusing to relaunch\""},
     {"id": "site:bin/fm-control.sh:40e1be5da9", "rule": "S1", "text": "|| die \"task $ID has no instructions at $RELAUNCH_BRIEF; refusing to relaunch a worker with nothing "},
     {"id": "site:bin/fm-control.sh:26fabe6192", "rule": "S1", "text": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch be"},
-    {"id": "site:bin/fm-control.sh:14ff8ee954", "rule": "S1", "text": "|| die \"refused before stopping $ID: an Anthropic credential would reach the replacement worker\""},
     {"id": "site:bin/fm-control.sh:b9f48b04f2", "rule": "S1", "text": "*) die \"task $ID's endpoint reads '$state' rather than a positively classified state; refusing to se"},
     {"id": "site:bin/fm-control.sh:70cbf7bc8d", "rule": "S1", "text": "*) die \"task $ID's endpoint reads '$state' rather than a positively classified state; refusing to se"},
     {"id": "site:bin/fm-control.sh:c46aa9a752~3", "rule": "S1", "text": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle i"},

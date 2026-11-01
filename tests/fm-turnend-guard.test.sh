@@ -1247,6 +1247,7 @@ function invoke(registration, home, context, payload) {
     FM_HOME: home, FM_CONFIG_OVERRIDE: path.join(home, 'config'), FM_STATE_OVERRIDE: path.join(home, 'state'),
     CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
     FM_CLAUDE_AUTOARM_SYNC_WAIT_MS: '100', FM_CLAUDE_AUTOARM_ATTEMPTS: '1',
+    FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG,
   };
   if (home === task || context === 'task-marker') env.FM_TASK_ID = 'config-consumer-task';
   if (context === 'modern') Object.assign(env, {
@@ -1369,6 +1370,7 @@ if (mode === 'contexts') {
                       FM_HOME: task, FM_STATE_OVERRIDE: statePath(task, ''), FM_ROOT_OVERRIDE: task,
                       FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
                       FM_PROCEVENT_CLAIM_ROOT: path.join(home, 'pane-home', 'claims'),
+                      FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG,
                     },
                     encoding: 'utf8', timeout: 15000,
                   });
