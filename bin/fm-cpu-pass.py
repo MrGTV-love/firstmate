@@ -61,7 +61,8 @@ Pipeline starts:
     when nothing is counted (a one-start minimum). S is the largest per-run
     peak of every recorded no-mistakes run with at least 2 readings, and R the
     75th percentile (nearest rank) of those peaks leaving out runs that are
-    status-running with ci_ready_at IS NULL (not past Test yet), read from the
+    status-running with ci_ready_at IS NULL (not CI-ready yet, so its peak may
+    still rise), read from the
     root home's .memory-calibration.json (written by fm-mem-guard.sh probe; the
     root home comes from fm_firstmate_root_home in fm-secondmate-parent-lib.sh,
     kept once resolved, and a failed walk falls back). available
@@ -465,7 +466,7 @@ def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, in
     """(R, S, qualifying runs) from the host's recorded no-mistakes run peaks, or None.
 
     S takes every qualifying peak, since a peak so far is a lower bound. R leaves
-    out runs still running short of CI-ready, which have not reached their peak.
+    out runs still running that are not CI-ready yet, so their peak may still rise.
     None means too little record on this host, never an error: the caller falls
     back to the counted-run limit. A record for another host or RAM size is not
     this host's measurement.

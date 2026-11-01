@@ -76,8 +76,8 @@ def wait_for(predicate, description):
 
 
 GIB = 2 ** 30
-# The recorded per-run peaks (GiB) of the measurements record: 13 runs, so the
-# nearest-rank 75th percentile is 3 GiB and the largest peak is 8 GiB.
+# Fixture per-run peaks (GiB) shaped like the measurements record, not its recorded
+# values: 13 runs, so the nearest-rank 75th percentile is 3 GiB and the largest peak is 8 GiB.
 PEAKS = [0.02, 0.1, 0.69, 0.75, 0.79, 0.8, 0.82, 0.96, 1.0, 3.0, 4.0, 5.8, 8.0]
 
 
@@ -393,7 +393,7 @@ try:
     (folder / 'already-running.release').touch()
     finish(running)
 
-    # A host whose counted runs sit in their Test peak (little memory left) pauses new starts
+    # A host whose counted runs are not CI-ready yet, so their peak may still rise (little memory left), pauses new starts
     # although a lull in load would allow them. Their resident memory is part of the budget,
     # so the pause comes from what the host really has left.
     folder, db, env = case('test-peak', measured=True, running=4, available=14 * GIB, load=0)
