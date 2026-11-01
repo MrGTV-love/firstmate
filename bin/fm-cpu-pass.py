@@ -58,12 +58,13 @@ Pipeline starts:
     first waiter is admitted when, as bytes, (counted + 1) x R + S fits
     B = available memory + the resident memory each counted run holds now, at
     most R per run (memory a run holds above R is not free for new starts), or
-    when nothing is counted (a one-start minimum). R is the 75th percentile
-    (nearest rank) and S the largest per-run peak across the host's recorded
-    no-mistakes runs with at least 2 readings that are not status-running now,
-    read from the root home's .memory-calibration.json (written by
-    fm-mem-guard.sh probe; the root home comes from fm_firstmate_root_home in
-    fm-secondmate-parent-lib.sh, and a failed walk falls back). available
+    when nothing is counted (a one-start minimum). S is the largest per-run
+    peak of every recorded no-mistakes run with at least 2 readings, and R the
+    75th percentile (nearest rank) of those peaks leaving out runs that are
+    status-running with ci_ready_at IS NULL (not past Test yet), read from the
+    root home's .memory-calibration.json (written by fm-mem-guard.sh probe; the
+    root home comes from fm_firstmate_root_home in fm-secondmate-parent-lib.sh,
+    kept once resolved, and a failed walk falls back). available
     and each run's resident memory come from one fm-mem-guard.py admission_sample
     reading, re-taken at most every 2 s while waiting. With fewer than 2
     qualifying recorded runs, or no native memory facts on this platform, the
@@ -391,7 +392,7 @@ HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 
 
 def running_runs() -> dict:
-    """Map each status-running run ID to (repo ID, whether it counts against the start limit).
+    """Map each status-running run ID to (repo ID, whether it counts against the start limit, whether it is CI-ready).
 
     Reads host execution state without creating or changing its database.
     """
@@ -399,8 +400,9 @@ def running_runs() -> dict:
 
     def read(query: str) -> dict:
         with contextlib.closing(sqlite3.connect(path.as_uri() + query, uri=True)) as connection:
-            return {row[0]: (row[1], bool(row[2])) for row in connection.execute(
-                "SELECT id, repo_id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL FROM runs WHERE status = 'running'")}
+            return {row[0]: (row[1], bool(row[2]), bool(row[3])) for row in connection.execute(
+                "SELECT id, repo_id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL, ci_ready_at IS NOT NULL"
+                " FROM runs WHERE status = 'running'")}
 
     try:
         return read("?mode=ro")
@@ -433,8 +435,13 @@ def sibling(module: str, filename: str):
     return loaded
 
 
+_root_home: List[Path] = []
+
+
 def root_home() -> Path:
     """The top-most local firstmate home, which owns the host's calibration record."""
+    if _root_home:
+        return _root_home[0]
     # A worker has FM_DURATION_HOME (the owning home fm-spawn exports) and may have no FM_HOME.
     start = (os.environ.get("FM_HOME") or os.environ.get("FM_DURATION_HOME")
              or str(Path(__file__).resolve().parent.parent))
@@ -445,7 +452,8 @@ def root_home() -> Path:
     home = walk.stdout.strip()
     if not home.startswith("/"):
         raise ValueError("no root home resolved from %s" % start)
-    return Path(home)
+    _root_home.append(Path(home))
+    return _root_home[0]
 
 
 def rank_quantile(values: List[int], quantile: float) -> int:
@@ -456,26 +464,28 @@ def rank_quantile(values: List[int], quantile: float) -> int:
 def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, int, int]]:
     """(R, S, qualifying runs) from the host's recorded no-mistakes run peaks, or None.
 
-    Only finished runs are ranked: a run still running has not reached its peak.
+    S takes every qualifying peak, since a peak so far is a lower bound. R leaves
+    out runs still running short of CI-ready, which have not reached their peak.
     None means too little record on this host, never an error: the caller falls
     back to the counted-run limit. A record for another host or RAM size is not
     this host's measurement.
     """
-    live = {"no-mistakes:%s/%s" % (repo, run) for run, (repo, _) in running.items()}
+    young = {"no-mistakes:%s/%s" % (repo, run) for run, (repo, _, ci_ready) in running.items() if not ci_ready}
     try:
         record = json.loads((root_home() / "state" / ".memory-calibration.json").read_text())
         if (record["schema"] != CALIBRATION_SCHEMA or record["host"] != report["host"]
                 or record["total_bytes"] != report["total_bytes"]):
             return None
-        peaks = [run["peak_bytes"] for name, run in record["runs"].items()
-                 if name.startswith("no-mistakes:") and name not in live and type(run["samples"]) is int
+        peaks = {name: run["peak_bytes"] for name, run in record["runs"].items()
+                 if name.startswith("no-mistakes:") and type(run["samples"]) is int
                  and run["samples"] >= MIN_QUALIFYING_RUNS and type(run["peak_bytes"]) is int
-                 and run["peak_bytes"] > 0]
+                 and run["peak_bytes"] > 0}
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
         return None
-    if len(peaks) < MIN_QUALIFYING_RUNS:
+    ranked = [peak for name, peak in peaks.items() if name not in young]
+    if len(ranked) < MIN_QUALIFYING_RUNS:
         return None
-    return rank_quantile(peaks, RESERVATION_QUANTILE), max(peaks), len(peaks)
+    return rank_quantile(ranked, RESERVATION_QUANTILE), max(peaks.values()), len(ranked)
 
 
 _observed: dict = {}
@@ -586,7 +596,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             reason = "another start is registering"
             if try_lock(admission_fd):
                 before, cores = pipeline_observation()
-                counted = {run: repo for run, (repo, is_counted) in before.items() if is_counted}
+                counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
                 first = first_pipeline_waiter(directory)
                 if first == waiter_path:
                     admit, reason = decide(before, counted, cores, args.priority)

@@ -106,10 +106,11 @@ def procs(folder, count=100, limit=10666, error=False):
     write_json(folder / 'procs.json', dict(count=count, limit=limit, error=error))
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=()):
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None):
     """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
 
-    live names runs (repo_id NULL) whose young, low peak the probe has folded in already.
+    live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
+    extra maps more runs (repo_id NULL) to their recorded peak in bytes.
     """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
@@ -119,6 +120,9 @@ def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=()):
     runs['task:crewmate'] = dict(peak_bytes=64 * GIB, samples=9)
     for run in live:
         runs['no-mistakes:None/' + run] = dict(peak_bytes=GIB // 5, samples=2, incomplete_samples=0,
+                                                first_seen='x', last_seen='x', max_gap_seconds=0)
+    for run, peak in (extra or {}).items():
+        runs['no-mistakes:None/' + run] = dict(peak_bytes=peak, samples=2, incomplete_samples=0,
                                                 first_seen='x', last_seen='x', max_gap_seconds=0)
     write_json(state / '.memory-calibration.json', dict(
         schema='fm-memory-calibration.v1', host=host or socket.gethostname(), total_bytes=total, runs=runs, pressured=None))
@@ -237,7 +241,8 @@ try:
     # fall back; none refuses and none reads as an empty host.
     for name, record in (('one-run', lambda f: calibrate(f, peaks=[3.0])), ('other-host', lambda f: calibrate(f, host='other-host')),
                          ('other-ram', lambda f: calibrate(f, total=64 * GIB)),
-                         ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{'))):
+                         ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{')),
+                         ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n'))):
         folder, db, env = case('fallback-' + name, running=6)
         record(folder)
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
@@ -271,6 +276,17 @@ try:
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'live.marker')], env, folder / 'live'))
     text = (folder / 'live.stderr').read_text()
     assert 'admitted: counted=6 need=%d ' % (7 * 3 * GIB + 8 * GIB) in text and 'reservation=%d slack=%d runs_measured=13 ' % (3 * GIB, 8 * GIB) in text, text
+
+    # S takes every qualifying peak: a CI-ready running run holds the largest (20 GiB), and
+    # a peak so far can only be too low. R ranks that CI-ready run (14 peaks: 4 GiB) but
+    # leaves out a parked run short of CI-ready (12 GiB), which would make the 12th rank 5.8 GiB.
+    folder, db, env = case('ci-ready-peak', measured=True)
+    calibrate(folder, extra={'ci-done': 20 * GIB, 'parked': 12 * GIB})
+    change(db, "INSERT INTO runs (id, status, ci_ready_at) VALUES ('ci-done', 'running', 1)")
+    change(db, "INSERT INTO runs (id, status, awaiting_agent_since) VALUES ('parked', 'running', 1)")
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'ci.marker')], env, folder / 'ci'))
+    text = (folder / 'ci.stderr').read_text()
+    assert 'admitted: counted=0 need=%d ' % (24 * GIB) in text and 'reservation=%d slack=%d runs_measured=14 ' % (4 * GIB, 20 * GIB) in text, text
 
     # One-start minimum: with nothing counted, one start is admitted although R + S = 11 GiB
     # exceeds the 10 GiB budget, unless the backstop reports an overload.
