@@ -186,8 +186,9 @@
 # A failed forge command releases the lock after it returns. A successful one
 # retains the lock until the accepted merge authority is persisted against the
 # still-matching task metadata.
-# The green-check and captain-hold decisions each emit one event through
-# bin/fm-guard-event.sh, whose writer always exits 0 and never decides a merge.
+# Each merge rule and the captain-hold decision emit one event per decision
+# through bin/fm-guard-event.sh, whose writer always exits 0 and never decides
+# a merge.
 #
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
@@ -1350,8 +1351,8 @@ EOF
   fi
 
   if [ -n "$refusals" ]; then
-    # One event per green-check decision: a denial needs a definite check it
-    # read, while a refusal whose source could not be read carries no verdict
+    # One event per merge rule that refused: a denial needs a definite source
+    # it read, while a refusal whose source could not be read carries no verdict
     # to report.
     [ -z "$uncovered" ] || FM_PR_CHECKS_BLOCKED=true
     [ -z "$unreported" ] || FM_PR_REQUIRED_BLOCKED=true
@@ -2021,8 +2022,8 @@ case "$PROVIDER" in
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
-    # One event per green-check decision, after the retries settle it; an
-    # allow waits for the base tip re-read immediately before the merge. The
+    # One deny event per merge rule that refused, after the retries settle it;
+    # allow events wait for the base tip re-read immediately before the merge. The
     # writer always exits 0 and never sits in a condition, so telemetry cannot
     # change what this merge does.
     if [ "$FM_PR_CHECKS_BLOCKED" = true ]; then

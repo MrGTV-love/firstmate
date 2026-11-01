@@ -565,7 +565,7 @@
       ],
       "invariant": "a GitHub merge lands only a tree that verified CI tree records prove tested, or one the ancestry or proven merge-queue rule covers; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
       "layer": "runtime-block",
-      "source": "live compare API, Actions check runs and attempt-scoped artifacts, git merge-tree and queue rules",
+      "source": "live compare API, check runs at the head, Actions attempt-scoped artifacts, git merge-tree and queue rules",
       "trigger": "github_landing_tree_safe or the live base or queue read cannot prove the landing tree safe",
       "remedy": "push a new head commit, first updating the branch to contain the base tip when it lacks it, so CI tests the tree the merge would land, then re-run bin/fm-pr-merge.sh <task-id> <pr-url>; no waiver applies",
       "budget": 1,
