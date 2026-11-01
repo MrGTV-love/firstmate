@@ -5,9 +5,13 @@
 #   [--workarounds <jsonl>] [--days <n>]
 # --workarounds accepts fm-guard-workarounds.py --json output, without modifying
 # the event log. Distinct signatures count once per task, head, rule and kind.
+# No durable signature feed exists yet: without --workarounds, workarounds is
+# null (not measured) and the ratio counts escape records only.
 # Opportunities exclude bypasses, and a guard row counts one per guarded
 # operation, not one per rule row; refusal_to_bypass_ratio is
-# (override/bypass events + workaround signatures) / denies, null if no denies.
+# (override/bypass events + supplied workaround signatures) / denies, null if no
+# denies. A row whose guard is not a string, or whose ts, rule or task is present
+# and not a string, is skipped like a torn line.
 # Repeat denies count additional denies per task across sessions, per rule.
 # Session-only legacy events cannot establish task attribution.
 # Retirement remains the guard-level rule in docs/guard-spec.md; rule rows are
@@ -54,7 +58,8 @@ def json_lines(path):
                     row = json.loads(line)
                 except (ValueError, UnicodeError):
                     continue  # A torn final event must not hide earlier evidence.
-                if isinstance(row, dict) and row.get('guard'):
+                if (isinstance(row, dict) and isinstance(row.get('guard'), str) and row['guard']
+                        and all(isinstance(row.get(key, ''), str) for key in ('ts', 'rule', 'task'))):
                     yield row
     except FileNotFoundError:
         return
@@ -84,7 +89,7 @@ def metric(guard, events, rule=None):
     escapes = sum(e.get('override') is True or e.get('decision') == 'bypass' for e in events)
     workarounds = len({(e.get('task'), e.get('head'), e.get('rule'), e.get('kind'))
                        for e in signatures if e['guard'] == guard
-                       and (rule is None or e.get('rule', guard) == rule)})
+                       and (rule is None or e.get('rule', guard) == rule)}) if a.workarounds else None
     opportunities = sum(e.get('decision') in ('deny', 'warn', 'allow', 'error') for e in counted)
     rate = round(overrides / (denies + warns), 3) if denies + warns else 0
     attempts, recurrences = [], 0
@@ -123,7 +128,7 @@ def metric(guard, events, rule=None):
                   override_rate=rate, median_clear_attempts=median,
                   recurrences=recurrences, verdict=verdict, harm=harm,
                   allows=allows, overrides=overrides, bypasses=bypasses, workarounds=workarounds,
-                  refusal_to_bypass_ratio=round((escapes + workarounds) / denies, 3) if denies else None,
+                  refusal_to_bypass_ratio=round((escapes + (workarounds or 0)) / denies, 3) if denies else None,
                   repeat_denies=sum(max(0, count - 1) for count in tasks.values()),
                   repeat_denies_per_task=[dict(task=task, denies=count, repeat_denies=count - 1,
                                               **({'rule': task_rule} if rule is None else {}))

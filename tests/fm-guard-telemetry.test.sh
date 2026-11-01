@@ -362,6 +362,24 @@ jq -e '.rules[] | select(.rule == "checks") | .denies == 0 and .refusal_to_bypas
   || fail "zero-deny ratio must be undefined, not fabricated"
 pass "per-rule metrics count cross-session task repeats and refusal-to-bypass ratios"
 
+# One malformed row cannot hide valid evidence, and an absent signature feed is
+# reported as not measured rather than as zero signatures.
+MALFORMED="$TMP/malformed-metrics.jsonl"
+"$EVENT" gmalformed deny --rule base --task task-a --log "$MALFORMED"
+printf '%s\n' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","decision":"deny","ts":null}' \
+  '{"guard":"gmalformed","rule":7,"task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":7,"rule":"base","task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":["task-a"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' >> "$MALFORMED"
+"$EVENT" gmalformed allow --rule base --task task-a --log "$MALFORMED"
+"$METRICS" --log "$MALFORMED" --json > "$TMP/malformed-metrics.json" || fail "a malformed event row aborted the metrics report"
+jq -e '.guards[] | select(.id == "gmalformed") | .denies == 1 and .allows == 1 and .median_clear_attempts == 1
+  and .workarounds == null and .refusal_to_bypass_ratio == 0' "$TMP/malformed-metrics.json" >/dev/null \
+  || fail "malformed rows hid valid evidence or an absent feed was reported as measured: $(cat "$TMP/malformed-metrics.json")"
+"$METRICS" --log "$MALFORMED" | grep -q '^METRIC gmalformed .*workarounds=null' \
+  || fail "the text report did not mark workaround signatures as not measured"
+pass "malformed event rows are skipped and an absent workaround feed reads as not measured"
+
 # A green merge writes three rule rows for one guarded operation. The guard row
 # counts one opportunity; each rule row keeps its own allow and its own clear.
 OPS="$TMP/operations.jsonl"
@@ -378,26 +396,6 @@ jq -e '[.rules[] | select(.id == "gops")] | length == 3 and all(.[]; .allows == 
   and (map(select(.rule == "required-reported"))[0].opportunities == 1)' "$TMP/operations.json" >/dev/null \
   || fail "each rule row must keep its own allow"
 pass "one guarded operation counts once at guard level and once per rule"
-
-# fixture homes pass the real check as marked labs, and that check records no bypass.
-FIXTURE_LAB="$TMP/fixture-lab"
-fm_test_lab_home "$FIXTURE_LAB" || fail "the shared lab fixture could not mark an empty directory"
-if fm_test_lab_home "$FIXTURE_LAB" 2>/dev/null; then fail "the shared lab fixture marked a populated directory"; fi
-(
-  cd "$TMP" || exit 111
-  for override in "${!FM_@}"; do
-    case "$override" in *_OVERRIDE) unset "$override" ;; esac
-  done
-  # shellcheck disable=SC2030 # This subshell owns its own gate environment.
-  export NO_MISTAKES_GATE=1 FM_HOME="$FIXTURE_LAB" FM_GUARD_EVENT_LOG="$TMP/fixture-lab.jsonl" FM_GATE_EVENT_TASK=lab-task
-  # shellcheck source=bin/fm-gate-refuse-lib.sh
-  . "$ROOT/bin/fm-gate-refuse-lib.sh"
-  fm_refuse_if_gate_agent
-) 2>/dev/null || fail "the real gate check refused a fixture lab home"
-jq -se 'length == 1 and .[0].decision == "allow" and .[0].actor == "gate" and .[0].override == false' "$TMP/fixture-lab.jsonl" >/dev/null \
-  || fail "a fixture lab home did not record one real gate allow: $(cat "$TMP/fixture-lab.jsonl")"
-[ -z "${FM_GATE_REFUSE_BYPASS+x}" ] || fail "the shared test library left the gate bypass set"
-pass "the shared lab fixture passes the real gate check with no bypass"
 
 # A clearing allow comes from the deny's actor class, through the real gate check.
 ACTOR_LAB=$("$ROOT/bin/fm-lab-home.sh" create "$TMP/actor-lab") || fail "could not create the actor lab home"

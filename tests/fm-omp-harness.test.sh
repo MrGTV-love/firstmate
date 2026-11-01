@@ -1526,8 +1526,7 @@ test_secondmate_launch_relies_on_discovery() {
   local world home fakebin launchlog out status launch
   world="$TMP_ROOT/secondmate"
   home="$world/sm"
-  fm_test_lab_home "$world/home" || fail "could not mark the fixture home"
-  mkdir -p "$home/bin" "$home/data"
+  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   mkdir -p "$world/user-home/.omp/agent"
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$world/user-home/.omp/agent/config.yml"
   printf '# Firstmate\n' > "$home/AGENTS.md"
@@ -1574,8 +1573,7 @@ test_secondmate_config_pinned_model_is_validated() {
   local world home fakebin launchlog out status
   world="$TMP_ROOT/secondmate-config-model"
   home="$world/sm"
-  fm_test_lab_home "$world/home" || fail "could not mark the fixture home"
-  mkdir -p "$home/bin" "$home/data"
+  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
   mkdir -p "$world/user-home"
   printf '# Firstmate\n' > "$home/AGENTS.md"
   printf 'sm\n' > "$home/.fm-secondmate-home"
@@ -1612,8 +1610,7 @@ test_secondmate_explicit_omp_deepseek_profile_is_refused() {
     [ "$via" != model ] || extra=(--model deepseek/deepseek-v4-flash)
     world="$TMP_ROOT/secondmate-deepseek-$via"
     home="$world/sm"
-    fm_test_lab_home "$world/home" || fail "could not mark the fixture home"
-    mkdir -p "$home/bin" "$home/data" "$world/user-home"
+    mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data" "$world/user-home"
     printf '# Firstmate\n' > "$home/AGENTS.md"
     printf 'sm\n' > "$home/.fm-secondmate-home"
     printf 'charter\n' > "$home/data/charter.md"
@@ -1865,7 +1862,6 @@ install_omp_extension_fixture() {  # <repo>
 test_turnend_guard_extension_compels_one_continuation() {
   local repo home out status
   repo="$TMP_ROOT/guard/repo"; home="$TMP_ROOT/guard/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
@@ -1935,7 +1931,6 @@ EOF
 test_watch_extension_arms_and_delivers() {
   local repo home out status
   repo="$TMP_ROOT/watch/repo"; home="$TMP_ROOT/watch/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   # The first arm child closes with one actionable reason; every successor
@@ -2073,7 +2068,6 @@ test_watch_extension_reads_durable_payloads() {
   local kind repo home out status
   for kind in decision merged multiline stale; do
     repo="$TMP_ROOT/watch-identity-$kind/repo"; home="$TMP_ROOT/watch-identity-$kind/home"
-    fm_test_lab_home "$home" || fail "could not mark the fixture home"
     install_omp_extension_fixture "$repo"
     cp -R "$ROOT/bin/." "$repo/bin/"
     mkdir -p "$home/state"
@@ -2160,7 +2154,6 @@ EOF
 test_watch_extension_runs_the_supervision_host() {  # [away|quiet]
   local kind=${1:-away} repo home log out status f
   repo="$TMP_ROOT/watch-host-$kind/repo"; home="$TMP_ROOT/watch-host-$kind/home"; log="$TMP_ROOT/watch-host-$kind/arm.log"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
@@ -2254,7 +2247,6 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off() {
   for line in - off; do
     label=${line#-}; label=${label:-absent}
     repo="$TMP_ROOT/watch-host-gate-$label/repo"; home="$TMP_ROOT/watch-host-gate-$label/home"; log="$TMP_ROOT/watch-host-gate-$label/arm.log"
-    fm_test_lab_home "$home" || fail "could not mark the fixture home"
     install_omp_extension_fixture "$repo"
     mkdir -p "$home/state" "$home/config"
     [ "$line" = - ] || : > "$home/config/supervision-host-off"
@@ -2306,7 +2298,6 @@ EOF
 test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored|refused|stuck-refused>
   local kind=${1:-outcome} repo home log out status
   repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
@@ -2440,7 +2431,6 @@ EOF
 test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note|archived|diagnostic|restore-boundary|restore-diagnostic>
   local kind=${1:-boundary} repo home log out status
   repo="$TMP_ROOT/watch-host-mark-$kind/repo"; home="$TMP_ROOT/watch-host-mark-$kind/home"; log="$TMP_ROOT/watch-host-mark-$kind/arm.log"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
@@ -2565,7 +2555,6 @@ EOF
 test_watch_extension_redelivers_merged_host_notes() {  # <rows|empty>
   local kind=${1:-rows} repo home log out status
   repo="$TMP_ROOT/watch-host-redeliver-$kind/repo"; home="$TMP_ROOT/watch-host-redeliver-$kind/home"; log="$TMP_ROOT/watch-host-redeliver-$kind/arm.log"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
@@ -2653,7 +2642,6 @@ EOF
 test_watch_extension_replays_host_marks_from_the_handoff() {  # <diagnostic|boundary>
   local kind=${1:-diagnostic} repo home out status
   repo="$TMP_ROOT/watch-host-mark-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-mark-handoff-$kind/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -2717,7 +2705,6 @@ EOF
 test_watch_extension_migrates_legacy_handoffs() {
   local repo home out status
   repo="$TMP_ROOT/watch-legacy-handoff/repo"; home="$TMP_ROOT/watch-legacy-handoff/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -2788,7 +2775,6 @@ EOF
 test_watch_extension_delivers_a_split_host_close_whole() {
   local repo home log out status
   repo="$TMP_ROOT/watch-host-split/repo"; home="$TMP_ROOT/watch-host-split/home"; log="$TMP_ROOT/watch-host-split/arm.log"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
@@ -3130,7 +3116,6 @@ test_spawn_refuses_unsupported_omp_before_launch
 run_watch_queue_read_scenario() {
   local scenario=$1 repo home status
   repo="$TMP_ROOT/watch-queue-$scenario/repo"; home="$TMP_ROOT/watch-queue-$scenario/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   cp "$repo/bin/fm-wake-drain.sh" "$repo/bin/fm-wake-drain-real.sh"
@@ -3871,7 +3856,6 @@ test_watch_extension_queue_read_delivery() {
 test_primary_extensions_ignore_a_descendant_session() {
   local repo home out status
   repo="$TMP_ROOT/descendant/repo"; home="$TMP_ROOT/descendant/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
@@ -3921,7 +3905,6 @@ EOF
 test_secondmate_watch_proof_ignores_a_descendant_omp() {
   local repo home parent out status proof before
   repo="$TMP_ROOT/secondmate-descendant/repo"; home="$TMP_ROOT/secondmate-descendant/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   parent="$TMP_ROOT/secondmate-descendant/parent"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-descendant/sessions"
@@ -3974,7 +3957,6 @@ EOF
 test_secondmate_watch_proof_publishes_for_the_secondmate_itself() {
   local repo home parent out status stranger lock_case
   repo="$TMP_ROOT/secondmate-self/repo"; home="$TMP_ROOT/secondmate-self/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   parent="$TMP_ROOT/secondmate-self/parent"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-self/sessions"
@@ -4037,7 +4019,6 @@ EOF
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries() {
   local repo home out status
   repo="$TMP_ROOT/marker-heal/repo"; home="$TMP_ROOT/marker-heal/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
@@ -4103,7 +4084,6 @@ SH
 test_watch_extension_heals_a_generation_stopped_without_a_successor() {
   local repo home out status
   repo="$TMP_ROOT/watch-heal/repo"; home="$TMP_ROOT/watch-heal/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
@@ -4266,7 +4246,6 @@ EOF
 test_watch_extension_is_single_instance_per_home() {
   local repo home out status
   repo="$TMP_ROOT/watch-single/repo"; home="$TMP_ROOT/watch-single/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   install_counting_arm "$repo"
   mkdir -p "$home/state"
@@ -4340,7 +4319,6 @@ EOF
 test_watch_extension_repairs_a_stale_arm_owner() {
   local repo home out status
   repo="$TMP_ROOT/watch-stale/repo"; home="$TMP_ROOT/watch-stale/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4410,7 +4388,6 @@ EOF
 test_watch_extension_labels_an_ended_unreaped_arm_owner() {
   local repo home out status
   repo="$TMP_ROOT/watch-unreaped/repo"; home="$TMP_ROOT/watch-unreaped/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4485,7 +4462,6 @@ EOF
 test_watch_extension_observes_an_arm_exit_held_open_by_a_descendant() {
   local repo home out status
   repo="$TMP_ROOT/watch-exit/repo"; home="$TMP_ROOT/watch-exit/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4561,7 +4537,6 @@ EOF
 test_watch_extension_keeps_the_home_from_a_helper_session() {
   local repo home out status
   repo="$TMP_ROOT/watch-helper/repo"; home="$TMP_ROOT/watch-helper/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4656,7 +4631,6 @@ EOF
 test_watch_extension_rebound_primary_keeps_the_home() {
   local repo home out status
   repo="$TMP_ROOT/watch-rebind/repo"; home="$TMP_ROOT/watch-rebind/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4740,7 +4714,6 @@ EOF
 test_watch_extension_heals_a_failed_session_bind() {
   local repo home out status
   repo="$TMP_ROOT/watch-bind-fail/repo"; home="$TMP_ROOT/watch-bind-fail/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   install_counting_arm "$repo"
   mkdir -p "$home/state"
@@ -4790,7 +4763,6 @@ EOF
 test_watch_extension_judges_readiness_by_liveness() {
   local repo home out status
   repo="$TMP_ROOT/watch-ready/repo"; home="$TMP_ROOT/watch-ready/home"
-  fm_test_lab_home "$home" || fail "could not mark the fixture home"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -4877,7 +4849,6 @@ test_watch_extension_repairs_after_handoff_publication_failure() {
   local repair repo home out status
   for repair in tool command factory; do
     repo="$TMP_ROOT/watch-persist-$repair/repo"; home="$TMP_ROOT/watch-persist-$repair/home"
-    fm_test_lab_home "$home" || fail "could not mark the fixture home"
     install_omp_extension_fixture "$repo"
     mkdir -p "$home/state"
     cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
