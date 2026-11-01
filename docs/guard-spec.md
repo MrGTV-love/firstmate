@@ -81,8 +81,8 @@ because the captain or the runtime creates them per home.
 6. **No post-hoc guard where a pre-check exists.** A guard that runs after the
    write carries `precheck_gap` naming why the condition was not knowable
    earlier, or it does not carry `layer: runtime-warn-after-write`.
-7. **Wiring is tested.** Every owner path, test path, and hook registration
-   resolves to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
+7. **Wiring is tested.** The registry's spec path and every owner path, test
+   path, and hook registration resolve to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
    one does not.
 8. **Every Firstmate guard decision point emits one event per decision.** An instrumented guard that
    emits no event, or that never fires across 30 real opportunities, enters the
