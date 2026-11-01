@@ -33,7 +33,8 @@
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # --complete-actions closes this actor's handling turn; fm-wake-drain.sh runs it after a successful
 # acknowledgement (internal integration, not for direct use).
-# --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
+# --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below,
+# printing each unmet row with the exact action command that records its actual kind and evidence.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: for steered, an inbox record (NNN.msg), or a remote
 # secondmate's delivered pending-reply id, sent after the row's overdue episode began and within four hours,
