@@ -153,7 +153,7 @@ That is the same identity discipline the watcher lock uses.
 A recycled pid, a lock left behind by a killed daemon, and a daemon that never recorded its identity all fail it.
 
 A daemon that cannot record its own identity at startup logs a warning and keeps running, because a supervisor must not refuse to run over an unreadable `ps`.
-That warning is what names the cause when the guard then keeps blocking away/quiet-mode turn boundaries for the rest of that daemon's life.
+That warning is what names the cause when the guard then keeps refusing away/quiet-mode turn boundaries for the rest of that daemon's life; in Claude mode those refusals stay inside the [block budget](#failure-progression-and-block-budget).
 
 The proof covers ownership only, never freshness.
 The guard still requires a fresh beacon, with these results:
@@ -396,7 +396,7 @@ Two bounded residuals are accepted intent, each costing at most one extra contin
 
 A legacy build's lock-holding claim (recognizable by its `autoarm` role file) still defers or reclaims under the legacy abandonment proof.
 A live identity-verified stuck legacy owner is retired via TERM before its lock is removed, and an unverified pid is never signalled.
-An upgrade mid-session can therefore neither double-arm nor deadlock, and a failed reclaim re-blocks rather than allowing a blind stop.
+An upgrade mid-session can therefore neither double-arm nor deadlock, and a failed reclaim never adds a block beyond the block budget: once that budget is exhausted, the Stop takes the loud [attended fail-open](#attended-fail-open).
 
 #### Failure progression and block budget
 
@@ -409,8 +409,8 @@ Claude drops that exit 2 when it terminated the hook at the configured timeout i
 
 The first fresh failed epoch preserves its handoff without consuming a blocked-stop count.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
-When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude's 8-block override).
-In Claude mode, positive watcher recovery clears the block budget, failure notice, and attended alarm together under the existing budget lock before either hook reports ordinary recovery.
+When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude Code's default cap of eight consecutive continuations).
+In Claude mode, positive watcher recovery allows the stop and clears the block budget, failure notice, and attended alarm together under the existing budget lock; a contended or failed clear leaves that bookkeeping for a later retry and never blocks the supervised stop.
 
 The block budget is charged by two rules:
 
@@ -425,15 +425,15 @@ Whenever both coordination locks are needed, positive auto-arm recovery and the 
 
 #### Attended fail-open
 
-The one loud attended fail-open is available only when all of these hold:
+The loud attended fail-open applies when both of these hold:
 
-- The auto-arm has recorded a failure.
-- Its one notice is already consumed.
 - The block budget is exhausted.
 - A final check finds neither a healthy watcher nor an automatic continuation.
 
-After that alarm, the Stop auto-arm suppresses further exit-2 continuations until positive watcher recovery, so the final fail-open remains reachable.
-The alarm cannot repeat during that failure episode, and a later unhealthy stop blocks again.
+It needs no recorded auto-arm failure or consumed notice, and it applies in away mode too.
+The first such Stop records the attended alarm.
+After that alarm, the Stop auto-arm suppresses further exit-2 continuations until positive watcher recovery.
+Every later unsupervised Stop in that episode allows with the same loud diagnostic and never restarts the exhausted budget.
 A positively verified healthy watcher clears the failure notice, alarm, and block budget for a future independent episode.
 A Claude failure notice describes the automatic mechanism as broken and does not direct a routine manual background arm.
 

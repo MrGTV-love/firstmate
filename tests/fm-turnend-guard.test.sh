@@ -2245,6 +2245,30 @@ test_hook_claude_mode_preserves_fresh_failed_progression() {
   pass "fm-turnend-guard --claude: fresh failed epochs preserve and advance monotonic fail-open progression"
 }
 
+test_hook_claude_mode_observed_failed_suppressed_charges_every_block() {
+  local dir out status i expected budget count
+  for budget in missing previous-session; do
+    dir=$(make_primary_dir "$TMP_ROOT/hook-claude-observed-suppressed-$budget")
+    : > "$dir/state/task1.meta"
+    : > "$dir/state/.claude-autoarm-failure-notified"
+    [ "$budget" = missing ] || printf 'session=sess-previous\ncount=2\nepoch=4\n' > "$dir/state/.turnend-claude-blocks"
+    for i in 1 2 3 4; do
+      printf 'epoch=4 owner_pid=999 outcome=failed-suppressed updated_at=%s\n' "$(date +%s)" > "$dir/state/.claude-autoarm-epoch"
+      out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
+      expected=2
+      [ "$i" -le 3 ] || expected=0
+      expect_code "$expected" "$status" "$budget budget: fresh failed-suppressed stop $i must stay within three charged blocks"
+      count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
+      if [ "$i" -le 3 ]; then
+        [ "$count" = "$i" ] || fail "$budget budget: blocked stop $i must be charged, got count $count"
+      else
+        assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "$budget budget: the fourth stop must allow loudly"
+      fi
+    done
+  done
+  pass "fm-turnend-guard --claude: an observed fresh failed-suppressed epoch charges every block"
+}
+
 test_hook_claude_mode_integrated_monotonic_fail_open() {
   local dir out status guard_out guard_status i pid identity count
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-integrated-fail-open")
@@ -3071,6 +3095,7 @@ test_hook_claude_mode_blocks_on_stuck_generation_claim
 test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim
 test_hook_claude_mode_terminal_fail_open_names_queue_only_need
 test_hook_claude_mode_preserves_fresh_failed_progression
+test_hook_claude_mode_observed_failed_suppressed_charges_every_block
 test_hook_claude_mode_integrated_monotonic_fail_open
 test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open
 test_hook_claude_mode_frozen_unverified_epoch_obeys_budget

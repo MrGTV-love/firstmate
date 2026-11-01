@@ -404,6 +404,7 @@ budget_account_current_epoch() {  # [observe|block]
       failed|failed-suppressed)
         if [ -e "$FAILURE_NOTICE" ] && [ "$mode" != block ]; then
           initialized=1
+          charged=0
           COUNT=0
         else
           COUNT=1
