@@ -1083,7 +1083,7 @@ Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
 Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
-Run the observer under the existing home/process manager when continuous observation is wanted; its own start/stop commands manage only its private owner and quota child group, never a shared service.
+Run the observer in the root home's watcher context, not a confined worker, under the existing home/process manager when continuous observation is wanted; its own start/stop commands manage only its private owner and quota child group, never a shared service.
 Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
 
 ### Completion and discard

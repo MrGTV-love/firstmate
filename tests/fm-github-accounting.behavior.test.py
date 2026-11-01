@@ -66,6 +66,37 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
         self.assertNotIn("fixture-secret", json.dumps(rows))
         self.assertEqual(self.records("quota")[0]["graphql"]["used"], 23)
 
+    def test_injected_tables_filter_script_identity_and_ancestor_cycles(self):
+        # Labeled table fixtures exercise the actual owner/filter/storage path,
+        # not a subprocess stub claiming that these are observed OS processes.
+        launcher = self.root / "injected-table.py"
+        launcher.write_text('''import runpy,sys
+owner=runpy.run_path(sys.argv[1])
+scans=0
+def source():
+    global scans
+    scans+=1
+    born="fixture-start-one" if scans==1 else "fixture-start-two"
+    return {
+      21:(10,born,["/bin/sh","/fixture/gh","pr","checks","--body","fixture-secret"]),
+      22:(10,"fixture-wrapper",["/bin/sh","-c","gh api graphql"]),
+      23:(0,"fixture-noncaller",["/fixture/other","gh-axi"]),
+      10:(9,"fixture-parent",["python3","/fixture/parent.py","fixture-secret"]),
+      9:(10,"fixture-grandparent",["/bin/sh","/fixture/root.sh"])}
+owner["run"](owner["private_root"](),duration=0.8,process_source=source)
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        rows = self.records("process")
+        self.assertEqual([(row["pid"], row["start"]) for row in rows],
+                         [(21, "fixture-start-one"), (21, "fixture-start-two")])
+        for row in rows:
+            self.assertEqual(row["argv"], ["sh", "gh", "pr", "checks", "--body", "[REDACTED]"])
+            self.assertEqual([item["pid"] for item in row["ancestors"]], [10, 9])
+            self.assertEqual(row["ancestors"][0]["argv"], ["python3", "parent.py", "[REDACTED]"])
+            self.assertEqual(row["ancestor_end"], "cycle")
+        self.assertNotIn("fixture-secret", json.dumps(rows))
+
     def test_malformed_quota_is_unavailable_not_zero(self):
         self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")
         self.cli("run", "--duration", "0.8")
