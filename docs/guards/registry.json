@@ -1243,10 +1243,10 @@
           "match": "pipeline-start refused: %s"
         }
       ],
-      "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable host headroom observation",
+      "invariant": "a Firstmate-driven fresh no-mistakes start never launches without a readable run database and CPU count",
       "layer": "runtime-block",
-      "source": "the pool directory's pipeline-start.lock and waiter files, the runs rows of ~/.no-mistakes/state.sqlite opened read-only, and the native CPU count and load5, read by cmd_pipeline_start in bin/fm-cpu-pass.py",
-      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count or a finite nonnegative load5 before it launches the command",
+      "source": "the pool directory's pipeline-start.lock and waiter files, the runs rows of ~/.no-mistakes/state.sqlite opened read-only, and the native CPU count, read by cmd_pipeline_start in bin/fm-cpu-pass.py",
+      "trigger": "bin/fm-cpu-pass.sh pipeline-start, directly or through bin/fm-duration.py run on a fresh no-mistakes start, cannot use its pool directory or waiter files, cannot read the state database, or cannot read a positive CPU count before it launches the command",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "repair the source the error line names, then issue the same fresh start again: python3 bin/fm-duration.py run <key> -- no-mistakes axi run <inputs>",
@@ -1261,7 +1261,7 @@
       "exemptions": [],
       "instrumented": false,
       "status": "active",
-      "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database, a garbage database and a bad load value, and proves the admitted start on readable sources"
+      "layer_note": "deny without a guard event: the refusal exits 125 with the reason on stderr and never launches the command, so no run or start lock is left; a start that sees headroom used up waits in the queue and is not this refusal; tests/fm-cpu-pass.test.sh runs tests/fm-cpu-pass-admission.py, which proves the 125 exit with no start on a missing database and a garbage database, and proves the admitted start on readable sources; an unreadable memory or process observation does not refuse but pauses the start (pause-only backstop, proved in the same fixtures)"
     }
   ],
   "excluded": [
