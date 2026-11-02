@@ -219,9 +219,11 @@ printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
-      *" --json body "*)
-        # The body close-at-merge reads: $case_dir/bodies/<owner>_<repo>-<number>, else
-        # <number>, empty when absent; an unreadable-<number> marker makes the read fail.
+      *" --json body,state "*)
+        # The state and body close-at-merge reads: a first line MERGED when <number> is
+        # listed in $case_dir/merged-prs, else OPEN; then the body from
+        # $case_dir/bodies/<owner>_<repo>-<number>, else <number>, empty when absent.
+        # An unreadable-<number> marker makes the read fail.
         pr_path=${3#https://github.com/}
         pr_key=${pr_path%%/pull/*}
         pr_key=${pr_key//\//_}-${3##*/}
@@ -229,6 +231,7 @@ case "${1:-} ${2:-}" in
           echo "HTTP 502: bad gateway" >&2
           exit 1
         fi
+        if grep -qxF "${3##*/}" "$FM_TEST_GH_MERGED_PRS" 2>/dev/null; then echo MERGED; else echo OPEN; fi
         if [ -e "$FM_TEST_GH_BODIES/$pr_key" ]; then
           cat "$FM_TEST_GH_BODIES/$pr_key"
         else

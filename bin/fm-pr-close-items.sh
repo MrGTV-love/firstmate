@@ -15,6 +15,10 @@
 # member's full URL is considered too. Bodies are read from GitHub, GitLab and Forgejo,
 # each member by its own URL. The proof is always the merged pull request this script was
 # given (the train's own URL for a train), because a train's members close unmerged.
+# The same read gives that pull request's merge state: when it is not merged (a hand run
+# with a pull request that is still open, or a state it cannot read), nothing is closed
+# and every named item in the active backlog that is not done yet is reported as not
+# closed because the pull request is not merged.
 #
 # What it does for each named item. It never closes more than bin/fm-tasks-axi.sh done
 # accepts, and it never changes what that command requires: the completion path decides,
@@ -102,19 +106,27 @@ left_open() {  # <id> <reason> [teardown]
 }
 
 # read_body <pr-url> <out-file>: the body text of one pull request or merge request,
-# through the forge's own tool. On failure the reason is left in <out-file>.err.
+# through the forge's own tool. <out-file>.merged holds true only when the same record
+# says it is merged. On failure the reason is left in <out-file>.err.
 read_body() {
   local url=$1 out=$2 json login rc=0
+  echo false > "$out.merged"
   fm_pr_url_parse "$url" || { echo "not a pull request URL" > "$out.err"; return 1; }
   case "$FM_PR_PROVIDER" in
     github)
-      gh pr view "$url" --json body --jq '.body // ""' > "$out" 2>"$out.err" || rc=$?
+      # The first line is the state; the rest is the body.
+      json=$(gh pr view "$url" --json body,state --jq '(.state // "") + "\n" + (.body // "")' 2>"$out.err") || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        printf '%s\n' "$json" | sed '1d' > "$out"
+        [ "$(printf '%s\n' "$json" | sed -n '1p')" != MERGED ] || echo true > "$out.merged"
+      fi
       ;;
     gitlab)
       command -v jq >/dev/null 2>&1 || { echo "jq is not installed" > "$out.err"; return 1; }
       json=$(GITLAB_HOST="$FM_PR_HOST" glab mr view "$FM_PR_NUMBER" -R "https://$FM_PR_HOST/$FM_PR_PATH" -F json 2>"$out.err") || rc=$?
       if [ "$rc" -eq 0 ]; then
         printf '%s' "$json" | jq -er 'if type == "object" then (.description // "") else error("not a merge request record") end' > "$out" 2>"$out.err" || rc=$?
+        printf '%s' "$json" | jq -r 'if type == "object" and .state == "merged" then true else false end' > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       fi
       ;;
     forgejo)
@@ -125,6 +137,7 @@ read_body() {
       json=$(tea api --login "$login" --repo "$FM_PR_OWNER/$FM_PR_REPO" "/repos/{owner}/{repo}/pulls/$FM_PR_NUMBER" 2>"$out.err") || rc=$?
       if [ "$rc" -eq 0 ]; then
         printf '%s' "$json" | jq -er 'if type == "object" and has("merged") then (.body // "") else error("the forge answered: " + ((.message // "no pull request record") | tostring)) end' > "$out" 2>"$out.err" || rc=$?
+        printf '%s' "$json" | jq -r 'if type == "object" and .merged == true then true else false end' > "$out.merged" 2>/dev/null || echo false > "$out.merged"
       fi
       ;;
     *)
@@ -155,6 +168,10 @@ consider() {  # <id> <proof-url> <where it was named>
   state=${FM_BACKLOG_ROW_STATE%% *}
   if [ "$state" = "done" ]; then
     printf 'close-at-merge: %s is already done\n' "$id"
+    return 0
+  fi
+  if [ "$MERGED" != true ]; then
+    left_open "$id" "$URL is not merged, so nothing was closed (named by $source); retry once it has merged: $0 $TASK_ID $URL"
     return 0
   fi
   out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_TASKS_AXI_REFUSE_OPEN_CALL=1 \
@@ -199,6 +216,7 @@ if ! read_body "$URL" "$WORK/body"; then
     "$URL" "$(sed -n '1p' "$WORK/body.err")" "$0" "$TASK_ID" "$URL" >&2
   exit 1
 fi
+MERGED=$(cat "$WORK/body.merged" 2>/dev/null) || MERGED=false
 
 while IFS= read -r id; do
   [ -z "$id" ] || consider "$id" "$URL" "the body of $URL"

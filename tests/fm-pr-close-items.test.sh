@@ -298,6 +298,39 @@ test_a_rerun_closes_nothing_twice() {
   pass "a repeat of the close step changes nothing, with the task record present and after it is gone"
 }
 
+# A hand run with a pull request that is still open closes nothing, on every forge.
+test_a_hand_run_with_an_open_pr_closes_nothing() {
+  local case_dir before rc=0
+  case_dir=$(gh_case c3-open-github 91)
+  cx_add "$case_dir" open-gh-docs docs
+  printf '%s\n' 'Closes: open-gh-docs' > "$case_dir/bodies/92"
+  before=$(backlog_text "$case_dir")
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" PATH="$case_dir/fakebin:$PATH" \
+    FM_TEST_GH_BODIES="$case_dir/bodies" FM_TEST_GH_MERGED_PRS="$case_dir/merged-prs" FM_TEST_GH_LOG="$case_dir/gh.log" \
+    FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" "$CLOSE_SH" task-x1 "$REPO_URL/92" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 3 "$rc" "c3-open-github: an open pull request must leave the item open"
+  [ "$(cx_state "$case_dir" open-gh-docs)" = queued ] || fail "c3-open-github: an item closed on a pull request that is not merged"
+  [ "$before" = "$(backlog_text "$case_dir")" ] || fail "c3-open-github: the backlog changed"
+  assert_match "^actionable: close-at-merge: not closed open-gh-docs: $REPO_URL/92 is not merged" "$case_dir/stderr" \
+    "c3-open-github: the item was not reported as left open because the pull request is not merged"
+
+  rc=0
+  case_dir=$(make_forgejo_case c3-open-forgejo)
+  cx_add "$case_dir" open-fj-docs docs
+  set_json_field "$case_dir/pr.json" body 'Closes: open-fj-docs'
+  before=$(backlog_text "$case_dir")
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" PATH="$case_dir/fakebin:$PATH" \
+    FM_TEST_TEA_LOG="$case_dir/tea.log" HOME="$case_dir/user-home" "$CLOSE_SH" task-x1 "$FJ_URL" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 3 "$rc" "c3-open-forgejo: an open pull request must leave the item open"
+  [ "$(cx_state "$case_dir" open-fj-docs)" = queued ] || fail "c3-open-forgejo: an item closed on a pull request that is not merged"
+  [ "$before" = "$(backlog_text "$case_dir")" ] || fail "c3-open-forgejo: the backlog changed"
+  assert_match "^actionable: close-at-merge: not closed open-fj-docs: $FJ_URL is not merged" "$case_dir/stderr" \
+    "c3-open-forgejo: the item was not reported as left open because the pull request is not merged"
+  pass "a hand run with a pull request that is not merged closes nothing and reports each named item"
+}
+
 # --- trains -----------------------------------------------------------------
 
 # shellcheck disable=SC2016 # Backticks in the fixture bodies are literal Markdown.
@@ -721,6 +754,7 @@ test_an_unreadable_body_is_reported_with_the_url_and_the_error
 test_every_failure_kind_is_reported_and_the_valid_item_still_closes
 test_a_hold_placed_after_the_last_look_still_wins
 test_a_rerun_closes_nothing_twice
+test_a_hand_run_with_an_open_pr_closes_nothing
 test_a_train_closes_the_items_of_its_listed_members_in_every_layout
 test_a_train_with_no_closes_line_of_its_own_still_closes_member_items
 test_a_member_with_both_sources_and_an_unreadable_member
