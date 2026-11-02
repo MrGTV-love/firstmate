@@ -1708,7 +1708,7 @@ test_hold_files_through_the_intake_checks() {
   assert_contains "$out" "this title overlaps open or recently closed items" "the hold did not print the wrapper's refusal"
   assert_contains "$out" "intake-work" "the hold's refusal did not name the neighbour"
   assert_contains "$out" "Do not run the --dup-of command above" "the hold's refusal did not warn against --dup-of"
-  assert_contains "$out" "run the --not-dup command above naming the neighbour you checked, then run this same hold command again" \
+  assert_contains "$out" "run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again" \
     "the hold's refusal did not say how to file and hold anyway"
   assert_no_grep "intake-dup" "$home/data/backlog.md" "a refused hold filed its task"
   assert_no_grep "intake-dup" "$home/data/backlog-review.tsv" "a refused hold wrote an objective row"

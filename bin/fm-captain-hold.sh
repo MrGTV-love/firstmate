@@ -1735,7 +1735,7 @@ command_hold() {
       [ -z "$add_err" ] || printf '%s\n' "$add_err" >&2
       case "$add_err" in
         *"this title overlaps open or recently closed items"*)
-          printf 'fm-captain-hold: the duplicate check refused task %s, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, then run this same hold command again.\n' "$id" >&2
+          printf 'fm-captain-hold: the duplicate check refused task %s, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.\n' "$id" >&2
           ;;
       esac
       fail "could not create task $id"
