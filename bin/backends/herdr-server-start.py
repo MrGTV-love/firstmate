@@ -29,6 +29,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import shlex
 import socket
 import stat
 import subprocess
@@ -302,12 +303,18 @@ def main(mode, session, client, pid=None):
 
 if __name__ == "__main__":
     mode = sys.argv[1] if sys.argv[1:2] in (["--prove-absent"], ["--hold-for-exec"]) else None
+    arguments = sys.argv[1 + (mode is not None):]
     try:
-        main(mode, *sys.argv[1 + (mode is not None):])
+        main(mode, *arguments)
     except LaunchError as error:
         print(f"error: Herdr server launch failed: {error}", file=sys.stderr)
         sys.exit(4)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
-        action = "Herdr session absence is unproven" if mode == "--prove-absent" else "refusing Herdr server startup"
-        print(f"error: {action}: {error}", file=sys.stderr)
+        if mode == "--prove-absent":
+            print(f"error: Herdr session absence is unproven: {error}", file=sys.stderr)
+        else:
+            print(f"error: refusing Herdr server startup: {error}. Remedy: run herdr --session "
+                  f"{shlex.quote(''.join(arguments[:1]))} status --json read-only; restore readable compatible "
+                  "client/socket access through its owner, then retry the original operation against that session; "
+                  "do not stop or restart a live or unknown server", file=sys.stderr)
         sys.exit(1)

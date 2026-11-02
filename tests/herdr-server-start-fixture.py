@@ -433,6 +433,9 @@ class StartupSafety(unittest.TestCase):
         self.listen()
         self.assertEqual(self.ensure()[0], 1)
         refused = self.failure()
+        _, helper = self.invoke('. "$1/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure "$2" 2>&1')
+        self.assertIn("refusing Herdr server startup: the session socket still accepts connections", helper)
+        self.assertIn(f"Remedy: run herdr --session {self.dir.name} status --json read-only", helper)
         self.listener.close()
         self.listener = None
         tools = self.dir / "no-python"

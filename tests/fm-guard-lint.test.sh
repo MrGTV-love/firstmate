@@ -659,7 +659,7 @@ assert_remedy_missing
 printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
 "$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
   || fail "an absolute system executable must not be read as a repository bin/ path"
-printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/missing.sh, then git status" >&2\n' >"$REMEDY/bin/gnew.sh"
+printf 'echo "REFUSED: cannot proceed. Remedy: run ./bin/missing.sh, then herdr --session fixture status" >&2\n' >"$REMEDY/bin/gnew.sh"
 assert_remedy_missing
 printf 'echo "REFUSED: cannot proceed. Remedy: run /usr/./bin/env bash bin/gguard.sh --clear" >&2\n' >"$REMEDY/bin/gnew.sh"
 "$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
@@ -855,6 +855,91 @@ fm_refuse gguard rule "$missing" "$kind" 'bin/gguard.sh --clear' task fixture
 SH
 rm -f "$REMEDY"/bin/gnew.*
 pass "S3 reads JS/TS, Python and shell emitter shapes, rejecting prose, neighboring and uncalled-helper remedies"
+
+# S3 judges refusal sites only: text that tests a value, documents an option or
+# hands a token to its caller is no site, while the same words in a message stay one.
+remedy_no_site() {  # <file> <label>, file content on stdin
+  local file=$1 label=$2 out
+  rm -f "$REMEDY"/bin/gnew.*
+  cat >"$REMEDY/$file"
+  mutate "$REMEDY" '.guards[0].sites = []'
+  out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD --counts 2>&1) || fail "$label must not be a site: $out"
+  assert_contains "$out" ' sites=0 mapped=0' "$label must not be a site"
+}
+remedy_no_site bin/gnew.sh 'a case pattern that tests refusal output' <<'SH'
+case "$line" in
+  "REFUSED: the deliverable is not landed") seen=1 ;;
+esac
+SH
+remedy_no_site bin/gnew.sh 'a sed pattern that extracts refusal output' <<'SH'
+refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
+SH
+remedy_no_site bin/gnew.sh 'a bare plan token its caller consumes' <<'SH'
+plan() {
+  printf 'refuse\n'
+}
+SH
+remedy_no_site bin/gnew.py 'a Python name and option help text' <<'PY'
+REFUSED = []
+parser.add_argument("--check", help="refuse acknowledgement with open rows")
+parser.add_argument("--listen",
+                    help="open-mic is accepted and refuses until "
+                         "end-of-speech detection exists")
+if not REFUSED:
+    pass
+PY
+remedy_shape bin/gnew.sh "printf 'refused" fail 'a bare vocabulary word printed to stderr' <<'SH'
+printf 'refused\n' >&2
+SH
+remedy_shape bin/gnew.sh 'echo "REFUSED' fail 'a printed refusal in a case arm body' <<'SH'
+case "$line" in
+  *) echo "REFUSED: blocked" >&2 ;;
+esac
+SH
+remedy_shape bin/gnew.sh 'echo "REFUSED' fail 'a printed refusal after a search pattern' <<'SH'
+found=$(sed -n '/REFUSED:/p' "$log"); echo "REFUSED: blocked" >&2
+SH
+remedy_shape bin/gnew.py 'parser.error' fail 'a Python call beside option help text' <<'PY'
+parser.add_argument("--check", help="refuse acknowledgement with open rows")
+parser.error("refused: the row is open")
+PY
+pass "S3 sees no site in a tested value, option help text or caller token, and still judges the printed refusal"
+
+remedy_shape bin/gnew.sh 'fm_refuse gguard' pass 'a formatter machine command beside refusal words in its missing text' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "the copy is refused until proof" machine 'bin/gguard.sh --clear' task fixture
+SH
+remedy_shape bin/gnew.sh 'fm_refuse gguard' fail 'a formatter call with only dynamic arguments' <<'SH'
+fm_refuse() { printf '%s\n' "$3" >&2; }
+fm_refuse gguard rule "$missing" "$kind" "$exit_text" task fixture
+SH
+out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "a dynamic formatter call passed S3: $out"
+assert_contains "$out" 'bin/gnew.sh:2 has no executable Remedy:' "S3 must name the exact dynamic site"
+assert_contains "$out" 'its message is dynamic' "S3 must say why a dynamic site has no remedy"
+remedy_shape bin/gnew.py 'results.append' fail 'a refusal tuple with a dynamic message' <<'PY'
+results.append((line, "refused", str(error)))
+PY
+out=$("$LINT" --root "$REMEDY" --mode new-or-touched --base HEAD 2>&1) && fail "a dynamic refusal tuple passed S3: $out"
+assert_contains "$out" 'the only literal text read is "refused"' "S3 must say what it read from a partly dynamic refusal"
+remedy_shape bin/gnew.py 'results.append' pass 'a refusal tuple with a static remedy' <<'PY'
+results.append((line, "refused", str(error) + ". Remedy: run bin/gguard.sh --clear"))
+PY
+pass "S3 names a dynamic site and why, and accepts its static remedy or machine command"
+
+remedy_shape bin/gnew.sh 'REFUSED:' fail 'prose that mentions git' <<'SH'
+echo "REFUSED: blocked. Remedy: ask someone about git history" >&2
+SH
+remedy_shape bin/gnew.sh 'REFUSED:' fail 'an env command that names no checkable command' <<'SH'
+echo "REFUSED: blocked. Remedy: run env -u FM_HOME somewhere" >&2
+SH
+remedy_shape bin/gnew.sh 'REFUSED:' fail 'prose that mentions herdr' <<'SH'
+echo "REFUSED: blocked. Remedy: the herdr team will help" >&2
+SH
+remedy_shape bin/gnew.sh 'REFUSED:' pass 'a herdr session command' <<'SH'
+echo "REFUSED: blocked. Remedy: run herdr --session fixture status --json" >&2
+SH
+rm -f "$REMEDY"/bin/gnew.*
+pass "S3 accepts only repository commands and herdr session commands, not prose naming a tool"
 
 # A remedy edit is a site edit even when the refusal/call line is unchanged.
 for shape in direct helper deleted-helper; do

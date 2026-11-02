@@ -161,7 +161,7 @@ jq -r '.errors[] | [.rule, .id, .message] | @tsv' "$SITES_JSON" \
 if [ "$MODE" = new-or-touched ]; then
   jq -r '.sites[] | select(.remedy_touched and (.remedy | not))
     | select(.sig | split(",") | any(. == "A" or . == "B" or . == "C"))
-    | ["S3", .key, "\(.file):\(.line) has no executable Remedy: in its diagnostic or directly called local refusal helper"] | @tsv' "$SITES_JSON" \
+    | ["S3", .key, "\(.file):\(.line) has no executable Remedy: in its diagnostic or directly called local refusal helper: \(.remedy_gap)"] | @tsv' "$SITES_JSON" \
     | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
 fi
 SITES_N=$(jq -r '.sites | length' "$SITES_JSON")

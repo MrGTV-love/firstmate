@@ -12,8 +12,9 @@ Usage:
 Output is one JSON object on stdout:
   paths      the scanned files, relative to the root
   sites      one record per site: key, file, line, sig, text, entry, touched (its own
-             line changed), remedy, inclusive remedy_spans (diagnostic plus local
-             helper bodies) and remedy_touched (a span line or deletion boundary changed)
+             line changed), remedy, remedy_gap (why a site without a remedy has none),
+             inclusive remedy_spans (diagnostic plus local helper bodies) and
+             remedy_touched (a span line or deletion boundary changed)
   errors     mapping problems: rule, id, message
   helpers    the refusal helper names the scan derived from the code
 
@@ -38,6 +39,8 @@ MARKER = re.compile(r'REFUS[E]D:')
 WORD = re.compile(r'(?<![A-Za-z0-9_$.{/-])refus(?:e|es|ed|ing)(?![A-Za-z0-9_-]|\.sh)', re.I)
 STRING = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|`[^`]*`')
 COMPARED = re.compile(r'(?:[=!]==?|\.(?:starts|ends)_?[wW]ith\(\s*\(?(?:\s*(?:' + STRING.pattern + r')\s*,)*)\s*$')
+SEARCHED = re.compile(r'\b(?:grep|egrep|sed|awk)\b[^|;&]*$')
+TOKEN_OUTPUT = re.compile(r"""^\s*(?:printf|echo)\s+(['"]?)refus(?:e|es|ed|ing)(?:\\n)?\1\s*$""")
 HELPER_WORD = 'refus' + 'e'
 HELPER_EXACT = ('deny', 'block_stop')
 DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\']')
@@ -191,13 +194,36 @@ def case_arm_text(line):
     return line
 
 
+def tests_value(text, match):
+    """True for an operand of == or !=, a prefix or suffix startswith or endswith tests for, or a grep, sed or awk pattern."""
+    before = text[:match.start()]
+    return bool(COMPARED.search(before) or SEARCHED.search(before) or re.match(r'\s*[=!]==?', text[match.end():]))
+
+
 def emits_refusal(text):
-    """True when a string literal carries the refusal vocabulary; an operand of == or !=, or a prefix or suffix a startswith or endswith call tests for, does not emit it."""
-    for match in STRING.finditer(text):
-        if WORD.search(match.group()) and not COMPARED.search(text[:match.start()]) \
-                and not re.match(r'\s*[=!]==?', text[match.end():]):
-            return True
-    return False
+    """True when a string literal that does not test a value carries the refusal vocabulary."""
+    return any(WORD.search(match.group()) and not tests_value(text, match) for match in STRING.finditer(text))
+
+
+def emits_marker(text, kind):
+    """True when the marker is printed: Python needs a literal; a shell word or a JS multi-line string line also prints."""
+    if not MARKER.search(text):
+        return False
+    kept = STRING.sub(lambda match: '' if tests_value(text, match) else match.group(), text)
+    if kind == 'py':
+        return any(MARKER.search(match.group()) for match in STRING.finditer(kept))
+    return bool(MARKER.search(kept))
+
+
+def option_help_lines(lines):
+    """Lines of a Python call's literal help= argument, which documents an option and emits nothing at a refusal."""
+    try:
+        tree = ast.parse('\n'.join(lines))
+    except (SyntaxError, ValueError):
+        return set()
+    return {number for node in ast.walk(tree) if isinstance(node, ast.keyword) and node.arg == 'help'
+            and isinstance(node.value, (ast.Constant, ast.JoinedStr))
+            for number in range(node.value.lineno, node.value.end_lineno + 1)}
 
 
 def is_comment(stripped, kind):
@@ -309,6 +335,7 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
     if kind == 'other':
         kind = shebang_kind(path) or 'other'
     lines = read_lines(path)
+    documented = option_help_lines(lines) if kind == 'py' else set()
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
     heredoc = None
@@ -319,6 +346,8 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
     prev_code = None
     sites = []
     for number, line in enumerate(lines, 1):
+        if number in documented:
+            continue
         stripped = line.strip()
         sig = []
         eff = kind
@@ -381,10 +410,10 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
                 heredoc_stderr = '>&2' in line
                 body_kind = embedded_kind(line, heredoc)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
-        if MARKER.search(line) and 'A' not in sig:
-            sig.append('A')
         message = case_arm_text(line) if eff == 'sh' else line
-        if emits_refusal(message) and 'B' not in sig:
+        if emits_marker(message, eff) and 'A' not in sig:
+            sig.append('A')
+        if emits_refusal(message) and not TOKEN_OUTPUT.match(line) and 'B' not in sig:
             sig.append('B')
         # A definition header names a function and calls nothing; a one-line body after it still can.
         header = {'sh': SH_DEF, 'py': PY_DEF, 'js': JS_DEF}.get(eff)
@@ -433,6 +462,7 @@ SH_ASSIGNMENT = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=')
 EMITTER = re.compile(r'(?:echo|printf|die|fail|log|cat|fm_refuse|raise|throw|return)\b|print\(|sys\.(?:exit|stderr\.write)\('
                      r'|console\.\w+\(|process\.std(?:err|out)\.write\(')
 JS_CALLEE = re.compile(r'([A-Za-z_$][\w$.]*)\s*$')
+SHELL_EXPANSION = re.compile(r'\$\{[^}]*\}|\$\([^)]*\)|\$(?:\w+|[@*#?!-])')
 
 
 def literal_message(value):
@@ -567,25 +597,31 @@ def diagnostic_arguments(statement):
             continue
         if words[0] == 'fm_refuse':
             # The shared formatter prints the missing text and owns the machine command's envelope.
-            yield words[0], words[3] if len(words) > 3 else ''
-            if len(words) >= 6 and words[4] == 'machine':
-                yield words[0], 'completing-command: ' + words[5]
+            envelope = ' completing-command: ' + words[5] if len(words) >= 6 and words[4] == 'machine' else ''
+            yield words[0], ''.join(words[3:4]) + envelope
         elif len(words) == 1 and SH_ASSIGNMENT.match(words[0]):
             yield None, words[0].split('=', 1)[1]
         else:
             yield words[0], ' '.join(words[1:])
 
 
-def statement_has_remedy(arguments, root):
+def remedy_gap(arguments, root):
+    """None when the statement's emitted text carries an executable remedy; otherwise why it does not."""
     # A second command cannot lend its footer to a refusal, or a refusal-helper call, that lacks one.
     # This syntactic lint still leaves remedy safety/sufficiency to fixtures and review.
     refusals = [text for _, text in arguments if MARKER.search(text) or WORD.search(text)]
     calls = [text for name, text in arguments if name and is_helper_name(name)]
-    for text in refusals or calls or [text for _, text in arguments]:
-        marker = re.search(r'\b(?:Remedy|completing-command):', text)
-        if marker and remedy_has_command(text[marker.end():], root):
-            return True
-    return False
+    texts = refusals or calls or [text for _, text in arguments]
+    markers = [(text, re.search(r'\b(?:Remedy|completing-command):', text)) for text in texts]
+    if any(marker and remedy_has_command(text[marker.end():], root) for text, marker in markers):
+        return None
+    if any(marker for _, marker in markers):
+        return 'its remedy names no existing repository bin/ command and no herdr --session command'
+    literal = ' '.join(' '.join(SHELL_EXPANSION.sub('', text).split()) for text in texts).strip()
+    if not literal:
+        return 'its message is dynamic, so no literal text can be read; put a static Remedy: in this statement'
+    return 'the only literal text read is "%s"; dynamic text is not read, so put a static Remedy: in this statement' \
+        % literal[:60]
 
 
 REPO_BIN = r'(?<![\w/.~-])(?:\./)?bin/'
@@ -595,7 +631,7 @@ def remedy_has_command(remedy, root):
     paths = re.findall(REPO_BIN + r'[A-Za-z0-9_./-]+', remedy)
     if any(not os.path.isfile(os.path.join(root, path.rstrip('.'))) for path in paths):
         return False
-    return bool(re.search(REPO_BIN + r'[A-Za-z0-9_.-]+|\bgit\s+|\bherdr\s+|\benv\s+-u\s+', remedy))
+    return bool(re.search(REPO_BIN + r'[A-Za-z0-9_.-]+|\bherdr\s+--session\s+\S', remedy))
 
 
 def site_remedies(root, rel, lines, discovered, helpers, heredocs):
@@ -646,7 +682,7 @@ def site_remedies(root, rel, lines, discovered, helpers, heredocs):
         if name not in names:
             continue
         arrow = line[definition.end():].partition('=>')[2].strip() if definition.re is JS_DEF else ''
-        if arrow and not arrow.startswith('{') and statement_has_remedy(js_arguments(arrow)[0], root):
+        if arrow and not arrow.startswith('{') and remedy_gap(js_arguments(arrow)[0], root) is None:
             helper_remedies.add(name)  # a one-line arrow helper returns its expression
         indent = len(line) - len(line.lstrip())
         end = index + 1
@@ -655,17 +691,18 @@ def site_remedies(root, rel, lines, discovered, helpers, heredocs):
             if body.strip() and len(body) - len(body.lstrip()) <= indent:
                 break
             end = body_index + 1
-            if EMITTER.match(body.lstrip()) and statement_has_remedy(arguments_at(body_index)[0], root):
+            if EMITTER.match(body.lstrip()) and remedy_gap(arguments_at(body_index)[0], root) is None:
                 helper_remedies.add(name)
         helper_spans[name] = [index + 1, end]
     result = {}
     for number, sig, _ in discovered:
         arguments, start, end = arguments_at(number - 1)
         called = {name for name, _ in arguments}
-        direct = statement_has_remedy(arguments, root)
+        gap = remedy_gap(arguments, root)
         call = bool(called.intersection(helper_remedies))
         spans = [[start, end]] + [helper_spans[name] for name in sorted(called - {None}) if name in helper_spans]
-        result[number] = (direct or ('C' in sig.split(',') and call), spans)
+        remedy = gap is None or ('C' in sig.split(',') and call)
+        result[number] = (remedy, spans, None if remedy else gap)
     return result
 
 
@@ -796,7 +833,8 @@ def main(argv):
         for number, sig, text in discovered:
             sites.append({'key': site_key(rel, text, seen), 'file': rel, 'line': number, 'sig': sig,
                           'text': text[:200], 'text_full': text, 'entry': None, 'touched': False,
-                          'remedy': remedies[number][0], 'remedy_spans': remedies[number][1],
+                          'remedy': remedies[number][0], 'remedy_gap': remedies[number][2],
+                          'remedy_spans': remedies[number][1],
                           'remedy_touched': False})
     errors = map_sites(sites, registry)
 

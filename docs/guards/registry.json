@@ -59,7 +59,7 @@
       "remedy": "restore state/<task>.meta from that task's verified original launch evidence, then retry the refused operation; never guess or copy another task's endpoint",
       "decision": "deny", "fail_direction": "closed", "budget": 1,
       "telemetry": "state/guard-events.jsonl", "instrumented": false,
-      "test": "tests/fm-backend.test.sh", "tier": "C", "harm": "irreversible"
+      "test": "tests/fm-teardown-endpoint-safety.test.sh", "tier": "C", "harm": "irreversible"
     },
     {
       "id": "procevent-retire-pending-results",
@@ -95,7 +95,7 @@
       "remedy": "restore state/<secondmate>.meta from its verified launch evidence with the exact task and session binding, then retry the refused operation; if that evidence shows a launch in another Herdr session or on another backend, no supported route exists yet, so preserve the copy and its unlanded work, change no metadata and report the endpoint and the evidence to the owning home's supervisor",
       "decision": "deny", "fail_direction": "closed", "budget": 1,
       "telemetry": "state/guard-events.jsonl", "instrumented": false,
-      "test": "tests/fm-remote-reply.test.sh", "tier": "C", "harm": "irreversible"
+      "test": "tests/fm-remote-secondmate-lifecycle-e2e.test.sh", "tier": "C", "harm": "irreversible"
     },
     {
       "id": "pending-reply-no-duplicate-send",
@@ -114,7 +114,8 @@
       "owner": "bin/backends/herdr.sh",
       "sites": [
         {"file": "bin/backends/herdr.sh", "match": "is unknown; refusing startup", "count": 2},
-        {"file": "bin/backends/herdr.sh", "match": "refused to start the herdr server for session"}
+        {"file": "bin/backends/herdr.sh", "match": "refused to start the herdr server for session"},
+        {"file": "bin/backends/herdr-server-start.py", "match": "refusing Herdr server startup"}
       ],
       "invariant": "an unknown or live Herdr server is never replaced by the startup boundary",
       "layer": "runtime-block", "source": "session-scoped server status and serialized process/socket absence proof",

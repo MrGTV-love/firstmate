@@ -1036,6 +1036,8 @@ case "$fix_line" in
   *"the session socket still accepts connections"*"Remedy:"*) ;;
   *) fail "the refusal cause must precede its completing step: $fix_line" ;;
 esac
+[ "$(printf '%s' "$fix_line" | grep -o 'Remedy:' | wc -l | tr -d ' ')" = 1 ] \
+  || fail "the refusal must print its completing step once: $fix_line"
 assert_not_contains "$DOCTOR_OUT" "did not come up" "a refusal was reported as a failed start"
 
 new_case Linux with-herdr no-gui

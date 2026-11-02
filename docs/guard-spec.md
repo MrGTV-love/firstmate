@@ -159,8 +159,11 @@ A docstring is a triple-quoted string that opens a block, as the first statement
 
 - `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
   The marker is a site even inside a heredoc body or a Python triple-quoted string.
+  In Python code it must sit in a string literal, so a name such as `REFUSED` followed by a colon is not a site, and a marker that a comparison, `case` pattern or search tests is not a site.
 - `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word that is not part of a variable name or path.
-  A string compared with `==` or `!=`, passed to `startswith` or `endswith`, or used as a shell `case` pattern, tests a value and is not a message.
+  A string compared with `==` or `!=`, passed to `startswith` or `endswith`, used as a shell `case` pattern, or given to `grep`, `sed` or `awk` as a pattern, tests a value and is not a message.
+  A Python call's literal `help=` argument documents an option and is not a message.
+  A shell `printf` or `echo` that prints only one of these words to standard output hands a token to its caller and is not a message; the caller's own refusal is the site.
 - `C` helper call: a call to a function whose definition name has `refuse` as one of its underscore-separated words and does not end in `_text`, or is exactly `deny` or `block_stop`.
   The scan derives these names from the definitions in the code and prints them under `helpers`.
 - `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script outside a usage or argument-count check, or a `throw` in an opencode plugin.
@@ -202,8 +205,10 @@ A neighboring branch, unrelated command, test operand, interpolated function arg
 A direct local refusal helper may own the common emitted remedy for its call sites.
 The shared `fm_refuse` formatter's existing machine-command argument and `completing-command:` envelope satisfy the same rule without adding a second footer; its argument must name a concrete command.
 An exit kind held in a variable does not prove that envelope, so such a call needs the remedy in its printed missing text.
-A dynamic message with no literal remedy fails S3 rather than passing on a guess.
-The lint recognizes repository command paths, `git`, `herdr` and `env -u`, and every `bin/` or `./bin/` path a remedy names must exist even beside another command; it does not prove the suggested step is safe or sufficient.
+A dynamic refusal must carry a static `Remedy:` in its statement or helper, and it fails S3 rather than passing on a guess.
+The violation names the exact site and why: its remedy names no accepted command, its message is dynamic with no literal text, or the literal text the lint read has no `Remedy:`.
+Text that only describes a refusal, such as a usage line or a prompt, stays a site while it uses the vocabulary, because the scan cannot prove that a sentence is not a refusal; such text clears S3 when it is reworded without the vocabulary.
+The lint recognizes repository command paths and the `herdr --session` command form, and every `bin/` or `./bin/` path a remedy names must exist even beside another command; a remedy that only mentions a tool such as `git` or `herdr` does not pass, and the lint does not prove the suggested step is safe or sufficient.
 Executable behavioral fixtures and review must prove completion without weakening the underlying guard.
 Unchanged legacy diagnostics are not newly allowlisted for S3; touching them is the point at which their printed remedy becomes mandatory.
 
