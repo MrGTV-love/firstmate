@@ -199,14 +199,14 @@ PY
     fi
     if [ "$scenario" = mixed-unknown ]; then
       expect_code 1 "$rc" "a mixed known and unknown pipeline must refuse: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'the un-coverable unknown group is reported first'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first'
       assert_grep 'captain-word --pr' "$case_dir/stderr" 'the unknown group names the captain-word route'
       assert_no_grep 'OUTSIDE_FAMILY_MODEL' "$case_dir/stderr" 'no known-family read is requested ahead of the unknown group'
     fi
     if [ "$scenario" = unknown-captain-word ]; then
-      expect_code 1 "$rc" "an unknown pipeline family must refuse every PASS: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'unknown group is named accurately'
-      assert_no_grep 'covered-groups' "$case_dir/stderr" 'no PASS recording command is offered for an unknown family'
+      expect_code 1 "$rc" "an unknown pipeline family must refuse a one-family PASS: $(cat "$case_dir/stderr")"
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unknown group is named accurately'
+      assert_grep 'SECOND_KNOWN_FAMILY_MODEL' "$case_dir/stderr" 'the unknown group names the second-family review route'
       command=$(sed -n 's/.* in place of FRESH_CAPTAIN_WORDS with: //p' "$case_dir/stderr")
       command=${command%; inspect review-records.jsonl in the PR task home before retrying}
       [ -n "$command" ] || fail "unknown-family refusal printed no captain-word command: $(cat "$case_dir/stderr")"
