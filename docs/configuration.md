@@ -768,8 +768,8 @@ Any other child of that `.tac/` still keeps the copy.
 Second, the prune counts these exact paths under `data/` and `state/` as scratch, although teardown preserves them: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
 Firstmate's own tooling writes these during ordinary runs.
 The match is by exact path, never by name.
-In a `data/` or `state/` that the project ignores as a whole, a scratch name such as `node_modules` is not scratch there, and any other file is unique work, so the copy stays.
-Under a tracked `data/` or `state/`, any other ignored entry is judged like one anywhere else.
+In a `data/`, `state/`, or `state/extensions/` that the project ignores as a whole, a scratch name such as `node_modules` is not scratch there, and any other file is unique work, so the copy stays.
+Under a tracked `data/` or `state/`, any other ignored entry outside such a directory is judged like one anywhere else.
 A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
@@ -802,7 +802,7 @@ The ordinary finished-session sweep keeps its classification unchanged.
 No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
 A proof read that fails never counts as finding nothing.
-That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude`, `.tac`, `data`, or `state` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
 A process table (`ps`) or open-file listing (`lsof`) that fails also counts as a failed read when it printed rows or process ids first, because the process it did not list may be the one that is alive: the copy stays and the prune retries.
 
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails, including the removal of a copy that teardown returned.

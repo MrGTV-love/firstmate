@@ -68,10 +68,10 @@
 # state/.omp-turnend-extension-loaded, state/.omp-watch-extension-loaded,
 # state/extensions/omp-primary-watch (a directory, and every child of it at any
 # depth) and state/guard-events.jsonl. They match by exact path, never by name.
-# In a data/ or state/ that the project ignores as a whole, a scratch name such
-# as node_modules is not scratch there, and any other file is unique; under a
-# tracked data/ or state/, any other ignored entry is judged like one anywhere
-# else. Under .claude and
+# In a data/, state/ or state/extensions/ that the project ignores as a whole, a
+# scratch name such as node_modules is not scratch there, and any other file is
+# unique; under a tracked data/ or state/, any other ignored entry outside such a
+# directory is judged like one anywhere else. Under .claude and
 # .opencode only the hook files, a clone (proved on its own) and an entry with a
 # scratch name are scratch; any other ignored entry there is unique, stricter
 # than teardown. The preserve
