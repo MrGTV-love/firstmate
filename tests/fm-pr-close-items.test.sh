@@ -795,6 +795,20 @@ test_an_explicit_data_root_gets_the_same_clear() {
   pass "an explicit data root gets the same blocker clear"
 }
 
+test_a_data_row_that_mentions_component_is_no_member_list() {
+  local out
+  out=$(printf '%s\n' '| Note |' '| --- |' '| seven-member Component table below |' \
+    '| https://github.com/example/repo/pull/1 |' '| https://github.com/example/repo/pull/2 |' \
+    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ -z "$out" ] || fail "overmatch: a data row that mentions Component made a member list: $out"
+  # shellcheck disable=SC2016 # Backticks in the fixture row are literal Markdown.
+  out=$(printf '%s\n' '| Component PR | Head |' '| --- | --- |' '| https://github.com/example/repo/pull/3 | `a` |' \
+    '| seven-member Component table below | x |' \
+    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ "$out" = https://github.com/example/repo/pull/3 ] || fail "overmatch: a real header lost its member or a text row added one: $out"
+  pass "only a table's header row names the Component column; a data row that mentions it does not"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -814,6 +828,7 @@ test_a_train_names_a_linked_pr_outside_its_member_list_and_leaves_its_item_open
 test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result
 test_the_closes_parser_reads_real_ids_and_ignores_examples
+test_a_data_row_that_mentions_component_is_no_member_list
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge

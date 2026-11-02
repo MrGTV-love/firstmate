@@ -26,9 +26,12 @@
 # holds, in the layouts the firstmate trains use. A URL anywhere else in the body (the
 # intent paragraph, an excluded or context pull request, an earlier train) is not a
 # member, because it did not land with this merge. A member list is one of:
-#   - a table whose header has a cell containing `Component`; the member is the URL in
-#     that column of each following row (the table ends at the first line that does not
-#     start with `|`), whether the URL column comes first or after a `#` column;
+#   - a table whose header row (the first row of the table, followed by a separator row)
+#     has a cell that is `Component` or `Component` plus one word, such as `Component PR`;
+#     the member is the URL that starts that column's cell in each following row (the
+#     table ends at the first line that does not start with `|`), whether the URL column
+#     comes first or after a `#` column. A data row that merely mentions Component is no
+#     header;
 #   - a bullet whose label contains `Component`, such as `- **Component 1:** <url> ...`;
 #   - the bullets under a heading containing `Component` (until the next heading), each
 #     of which starts with a URL (a bullet that does not start with a URL is skipped);
@@ -95,23 +98,35 @@ fm_pr_closes_train_members() {  # <body-file|->
   local heading_component_re='^[[:space:]]{0,3}#+[[:space:]].*[Cc]omponent'
   local leadin_re='^[Cc]omponents?[^:]*:[[:space:]]*$'
   local item_re='^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+(.*)$'
+  local sep_re='^[[:space:]]*[|]?[[:space:]]*:?-+:?[[:space:]]*([|][[:space:]]*:?-+:?[[:space:]]*)*[|]?[[:space:]]*$'
+  local header_cell_re='^[Cc]omponent([[:space:]]+[A-Za-z]+)?$'
   while IFS= read -r line || [ -n "$line" ]; do
     line=${line%$'\r'}
     url=
     if [[ "$line" =~ $table_re ]]; then
       IFS='|' read -r -a cells <<< "$line"
-      if [ "$mode" != table ]; then
-        col=0
-        for ((i = 1; i < ${#cells[@]}; i++)); do
-          if [[ "${cells[i]}" =~ [Cc]omponent ]]; then col=$i; break; fi
-        done
-        if [ "$col" -gt 0 ]; then mode=table; fi
+      if [ "$mode" = header ]; then
+        # The row under a candidate header must be the separator row, or it was no header.
+        if [[ "$line" =~ $sep_re ]]; then mode=table; else mode=other; fi
         continue
       fi
+      if [ "$mode" = none ]; then
+        # Only the first row of a table can be its header; a later row is a data row.
+        col=0
+        for ((i = 1; i < ${#cells[@]}; i++)); do
+          cell=${cells[i]#"${cells[i]%%[![:space:]]*}"}
+          cell=${cell%"${cell##*[![:space:]]}"}
+          if [[ "$cell" =~ $header_cell_re ]]; then col=$i; break; fi
+        done
+        if [ "$col" -gt 0 ]; then mode=header; else mode=other; fi
+        continue
+      fi
+      [ "$mode" = table ] || continue
       cell=${cells[col]:-}
-      if [[ "$cell" =~ $url_re ]]; then url=${BASH_REMATCH[0]}; fi
+      cell=${cell#"${cell%%[![:space:]]*}"}
+      if [[ "$cell" =~ ^($url_re) ]]; then url=${BASH_REMATCH[1]}; fi
     else
-      [ "$mode" != table ] || mode=none
+      case "$mode" in table|header|other) mode=none ;; esac
       if [[ "$line" =~ $heading_re ]]; then
         mode=none
         if [[ "$line" =~ $heading_component_re ]]; then mode=list; list_kind=heading; items=0; fi

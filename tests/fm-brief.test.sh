@@ -1653,7 +1653,8 @@ test_ship_scaffolds_teach_the_closes_line() {
       assert_grep "Closes: $id" "$brief" "$mode/$forge ship brief did not teach the Closes: line with this task's id"
       assert_no_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief left the placeholder instead of the task id"
       assert_grep 'in your commit message' "$brief" "$mode/$forge ship brief did not say where the line goes"
-      assert_grep 'A merge through bin/fm-pr-merge.sh closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
+      assert_grep 'A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
+      assert_grep 'fm-pr-close-items-queued-and-polled-merges' "$brief" "$mode/$forge ship brief did not name the queued-merge gap"
       assert_grep 'ead the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body"
       assert_grep "then read the body again and confirm each line is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
       if [ "$mode" = no-mistakes ]; then
