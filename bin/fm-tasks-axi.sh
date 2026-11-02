@@ -326,7 +326,7 @@ parse_task_mutation() {
     fi
     case "$token" in
       -h|--help) TASK_HELP=1 ;;
-      --pr|--report|--drop-file|--note|--keep|--backend|--reason|--until|--kind|--title|--body|--body-file|--repo|--priority|--objective|--objective-reason|--dup-of|--not-dup) expect=$token ;;
+      --pr|--report|--drop-file|--note|--keep|--backend|--reason|--until|--kind|--title|--body|--body-file|--repo|--priority) expect=$token ;;
       --pr=*) TASK_PR=${token#*=} ;; --report=*) TASK_REPORT=${token#*=} ;;
       --drop-file=*) TASK_DROP=${token#*=} ;; --note=*) TASK_NOTE=1 ;;
       -*) ;;

@@ -60,15 +60,18 @@ STOP_WORDS = frozenset(
 # triage report's heuristic (data/fm-backlog-triage-and-hygiene/report.md): the text
 # contains "Captain" or "Owner" followed by a space and one of ask, words, question,
 # call, decision, ruling, rule or answer, or "Captain 2026", "Owner:" or "Captain:",
-# or "Owner" or "Captain" followed by an ISO date and a colon ("Owner 2026-11-01:").
-# Only the capitalised forms count, so a bare "Owner 2026" or a lower-case
-# "lock owner:" does not match.
+# or "Owner" or "Captain" followed by an ISO date and a colon ("Owner 2026-11-01:"),
+# or "Captain's words", "Captain's ask", "Captain chose" or "Captain direction"
+# followed by a colon, with an optional ISO date before it.
+# Only the capitalised forms count, so a bare "Owner 2026", a lower-case
+# "lock owner:" or "owner decision", and "Owner's idea" do not match.
 OWNER_PATTERN = re.compile(
     r"(?:Captain|Owner) (?:ask|words|question|call|decision|ruling|rule|answer)"
     r"|Captain 2026"
     r"|Owner:"
     r"|Captain:"
     r"|(?:Captain|Owner) \d{4}-\d{2}-\d{2}:"
+    r"|Captain(?:'s words|'s ask| chose| direction)(?: \d{4}-\d{2}-\d{2})?:"
 )
 
 OBJECTIVE_LINE = re.compile(r"^- (O[0-9]+) - ")
@@ -160,7 +163,7 @@ def list_rows(text):
 
 ARCHIVE_ROW = re.compile(r"^- \[x\] (\S+) - (.*)$")
 ARCHIVE_TAIL = re.compile(
-    r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by|merged |priority: |hold: |hold-kind: |hold-until )[^)]*\)"
+    r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by|merged |priority: |hold: |hold-kind: |hold-until:? )[^)]*\)"
     r"|blocked-by: \S+|https?://\S+|data/\S+)\s*$"
 )
 

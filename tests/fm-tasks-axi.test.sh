@@ -1750,10 +1750,15 @@ SH
   assert_contains "$out" "am-one (Done, archived, overlap 0.75) $PAIR_BASE" "a merged archived row was not scored on its title"
   out=$(refusal_of "$dir" "documented pair at the threshold" add am-new "$PAIR_AT" --objective O7)
   assert_contains "$out" "am-one (Done, archived, overlap 0.25) $PAIR_BASE" "a merged archived row missed the threshold"
-  printf '\n## Archived 2026-11-02\n- [x] am-held - Quartz harbor signal https://github.com/o/r/pull/10 (hold: a vendor reply) (hold-kind: external) (hold-until 2026-12-01) (priority: 1) (merged 2026-11-01) (repo: p) (kind: ship)\n' \
-    >> "$dir/home/data/done-archive.md"
+  wrapper_from_code "$dir" add am-held "Quartz harbor signal" --objective O7 --kind docs --priority 1 >/dev/null || fail "could not file the held row"
+  wrapper_from_code "$dir" hold am-held --reason "a vendor reply" --until 2026-12-01 --kind external >/dev/null || fail "could not hold the row"
+  wrapper_from_code "$dir" "done" am-held --keep 0 >/dev/null || fail "could not close and prune the held row"
+  assert_grep "(hold-until: 2026-12-01)" "$dir/home/data/done-archive.md" "the archived row has no dated hold tail, so this fixture proves nothing"
   out=$(refusal_of "$dir" "held tails" add am-held-new "Quartz harbor signal mast" --objective O7)
   assert_contains "$out" "am-held (Done, archived, overlap 0.75) Quartz harbor signal" "an archived row's hold tails were scored as title words"
+  printf '\n## Archived 2026-11-02\n- [x] am-spelled - Cobalt ferry lantern (kind: docs) (hold-until 2026-12-01)\n' >> "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "hold-until with no colon" add am-spelled-new "Cobalt ferry lantern mast" --objective O7)
+  assert_contains "$out" "am-spelled (Done, archived, overlap 0.75) Cobalt ferry lantern" "a hold-until tail with no colon was scored as title words"
   pass "an archived row's merged, priority, and hold tails are not scored as title words"
 }
 
@@ -2082,7 +2087,9 @@ owner_marker_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
       rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $who $word was recorded here"$'\n'
     done
   done
-  for body in "Captain 2026 asked for this" "Owner: keep" "Captain: keep"; do
+  for body in "Captain 2026 asked for this" "Owner: keep" "Captain: keep" \
+    "Captain's words 2026-10-19: yes on both" "Captain's ask: a workstream view" \
+    "Captain chose 2026-10-20: this one" "Captain direction: one owner"; do
     n=$((n + 1)); id="own-$label-$n"; positive+=("$id")
     rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $body"$'\n'
   done
@@ -2213,7 +2220,7 @@ test_closing_proofs_keep_open_dependents_blocked() {
 }
 
 test_closing_proofs_leave_the_owners_items_alone() {
-  local dir out
+  local dir out body id form
   dir=$(make_split proof-owner)
   make_peer_home "$dir/sm1" ow-open
   printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
@@ -2223,6 +2230,15 @@ test_closing_proofs_leave_the_owners_items_alone() {
   owner_marker_cases "$dir" mov "--moved-to" sm-one ow-open
   owner_call_cases "$dir" dup "--duplicate-of" ow-kept
   owner_call_cases "$dir" mov "--moved-to" sm-one ow-open
+  for form in "Captain's words" "Captain's ask" "Captain chose" "Captain direction"; do
+    printf '%s: keep\n' "$form" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed || fail "$form: did not read as owner-filed"
+    printf '%s 2026-10-22: keep\n' "$form" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed || fail "$form with a date did not read as owner-filed"
+  done
+  for body in "the owner decision stands" "captain chose: agent prose" "Owner's idea: agent prose"; do
+    if printf '%s\n' "$body" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed; then
+      fail "'$body' read as owner-filed"
+    fi
+  done
   # The dated form, in the shape two live backlog items carry, through both proofs.
   for id in fm-role-publish-target-binding fm-nm-protected-paths-policy; do
     wrapper_from_code "$dir" add "$id" "$(ftitle "$id")" --objective O7 --kind docs --body "Owner 2026-11-01: this stays mine" >/dev/null \
