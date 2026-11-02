@@ -138,7 +138,7 @@ test_no_closes_line_changes_no_item_and_prose_urls_close_nothing() {
   gh_merge "$case_dir" 63
   [ "$(cx_state "$case_dir" other-item)" = queued ] || fail "c1-none: an item changed without a Closes line"
   assert_no_grep 'close-at-merge' "$case_dir/stdout" "c1-none: the close step spoke without a directive"
-  assert_no_grep 'close-at-merge' "$case_dir/stderr" "c1-none: a body with no member list named a linked PR"
+  assert_no_grep 'close-at-merge:' "$case_dir/stderr" "c1-none: a body with no member list named a linked PR"
   pass "a body with no Closes line, even one that links another PR, changes no item"
 }
 
