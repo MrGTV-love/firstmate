@@ -869,6 +869,11 @@ remedy_no_site() {  # <file> <label>, file content on stdin
 remedy_no_site bin/gnew.sh 'a case pattern that tests refusal output' <<'SH'
 case "$line" in
   "REFUSED: the deliverable is not landed") seen=1 ;;
+  # A later arm still starts after its comment.
+  *"connection refused"*)
+    seen=2
+    ;;
+  *) seen=3 ;;
 esac
 SH
 remedy_no_site bin/gnew.sh 'a sed address that extracts refusal output' <<'SH'
@@ -935,6 +940,37 @@ PY
 remedy_shape bin/gnew.py 'add_argument' fail 'a printed literal beside argparse help' <<'PY'
 parser.add_argument("refused: the row is open", help="see --check")
 PY
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker that closes a multi-line command substitution' <<'SH'
+msg=$(printf '%s' \
+  "REFUSED: blocked")
+SH
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker that closes a multi-line subshell echo' <<'SH'
+( echo \
+  "REFUSED: blocked" )
+SH
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker that closes a nested multi-line message' <<'SH'
+fail "$(printf '%s %s' \
+  "$x" \
+  "REFUSED: blocked")"
+SH
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker that closes a multi-line array' <<'SH'
+lines=(
+  "REFUSED: blocked")
+SH
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker that closes a multi-line command inside a case arm' <<'SH'
+case "$x" in
+  a)
+    msg=$(printf '%s' \
+      "REFUSED: blocked")
+    ;;
+esac
+SH
+remedy_shape bin/gnew.sh 'REFUSED: blocked' fail 'a marker in a pattern shape with no open case' <<'SH'
+case "$x" in
+  a) seen=1 ;;
+esac
+"REFUSED: blocked") seen=2 ;;
+SH
 pass "S3 sees no site in a case pattern, sed address, printf token or argparse help text, and still judges every printed refusal"
 
 remedy_shape bin/gnew.sh 'fm_refuse gguard' pass 'a formatter machine command beside refusal words in its missing text' <<'SH'

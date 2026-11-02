@@ -41,6 +41,8 @@ STRING = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|`[^`]*`')
 COMPARED = re.compile(r'(?:[=!]==?|\.(?:starts|ends)_?[wW]ith\(\s*\(?(?:\s*(?:' + STRING.pattern + r')\s*,)*)\s*$')
 SED_COMMAND = re.compile(r'(?:^|[|;&(])\s*sed\s+(?:-[A-Za-z]+\s+)*$')
 SED_ADDRESS = re.compile(r"""^['"]/[^/]*/(?:,\$|,/[^/]*/)?[pd]['"]$""")
+CASE_OPEN = re.compile(r'(?:^|[;&|({]|\b(?:then|do|else)\s)\s*case\s.*?\sin\b')
+CASE_CLOSE = re.compile(r'(?:^|[;&|({\s])esac\b')
 PRINTF_TOKEN = re.compile(r"^\s*printf\s+'refus[e]\\n'\s*$")
 HELPER_WORD = 'refus' + 'e'
 HELPER_EXACT = ('deny', 'block_stop')
@@ -177,6 +179,15 @@ def call_pattern(names, kind):
         return re.compile(r'(?:^\s*|[;&|({)]\s*|\b(?:then|do|else|elif|if|while|until)\s+|!\s*)(?:' + alt
                           + r')(?=\s|;|$)')
     return re.compile(r'(?<![.\w$])(?:' + alt + r')\s*\(')
+
+
+def case_state(line, depth):
+    """The open case depth after a shell line, and whether the next line starts an arm of that open case."""
+    code = re.sub(r'(?:^|\s)#.*$', '', STRING.sub('S', line)).rstrip()
+    opened = len(CASE_OPEN.findall(code))
+    depth = max(0, depth + opened - len(CASE_CLOSE.findall(code)))
+    ends_arm_list = code.endswith((';;', ';&')) or bool(opened and re.search(r'\sin$', code))
+    return depth, depth > 0 and ends_arm_list and not re.search(r'["\']', code)
 
 
 def case_arm_text(line):
@@ -345,6 +356,7 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
     lines = read_lines(path)
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
+    case_depth, arm_start = 0, False
     heredoc = None
     heredoc_opener = None
     heredoc_stderr = False
@@ -415,7 +427,9 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
                 heredoc_stderr = '>&2' in line
                 body_kind = embedded_kind(line, heredoc)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
-        message = case_arm_text(line) if eff == 'sh' else line
+        message = case_arm_text(line) if eff == 'sh' and arm_start else line
+        if eff == 'sh':
+            case_depth, arm_start = case_state(line, case_depth)
         if emits_marker(message) and 'A' not in sig:
             sig.append('A')
         if emits_refusal(message) and not PRINTF_TOKEN.match(line) and 'B' not in sig:
