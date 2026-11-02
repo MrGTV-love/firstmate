@@ -1,0 +1,18 @@
+round 2 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 7 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 8 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 12 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 12 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 13 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 14 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 15 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 15 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 17 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 18 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 19 base failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 20 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 22 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+round 23 head failed: not ok - watch lock pid survived quiet checkpoint timeout
+load=0 rounds=25 head_fail=7 base_fail=8
+
+### one-test copies of test_quiet_checkpoint_exits_124_cleanly from git archive of head 72d9bf5e and base 1a8fdf76, alternating, this host, idle. Full file at head alone: 3 of 3 passed. First failure was seen with five scenario drivers running.

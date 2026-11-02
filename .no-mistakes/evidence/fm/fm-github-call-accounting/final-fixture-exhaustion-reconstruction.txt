@@ -1,0 +1,16 @@
+### LABELLED FIXTURE quota values, not the real account; head 72d9bf5e51cee102bcbba1e8bdd112d2e2f5422e
+start exit=0
+caller exit=0
+stop exit=0
+records exit=0 rows=20
+interval used 4000->4001 delta=1 remaining=999 reset=1794000000
+  observed labelled caller: none -> this delta stays unattributed
+  other local gh callers in this interval on the host (not labelled): 0
+interval used 4001->5000 delta=999 remaining=0 reset=1794000000
+  observed caller: ['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]'] pid 65132 start Sun Nov 1 21:38:14 2026 chain [['sh', 'board-reader.sh'], ['bash', 'recon.sh'], ['launchd']]
+  other local gh callers in this interval on the host (not labelled): 0
+interval used 5000->5000 delta=0 remaining=0 reset=1794000000
+  observed labelled caller: none -> this delta stays unattributed
+  other local gh callers in this interval on the host (not labelled): 1
+note: time overlap only; a row does not prove that caller spent these points
+0

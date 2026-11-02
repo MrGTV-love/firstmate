@@ -1,0 +1,7 @@
+### re-drive: SIGKILL limit disclosed in the header; labelled hung gh-axi
+after SIGKILL hung children=1
+{"state": "running", "pid": 85600, "run_
+new owner overlap children=2
+{"state": "stopped"}
+after normal stop children=1 (the crashed owner's child stays until it exits; cleaned below)
+after cleanup=0

@@ -1,0 +1,60 @@
+### head 72d9bf5e51cee102bcbba1e8bdd112d2e2f5422e host GTT-CB.local 2026-11-02T03:37:57Z
+=== primary home: absent owner starts
+after 2s run_id=a686b9db
+{"state": "running", "pid": 44202, "run_id": "a686b9db5fa44f24898d563f6ad41608", "started_at": 1793590680.332663}
+=== running owner left alone across cycles
+same run_id: yes
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 25: kill: (39472) - No such process
+=== crash recovery
+NOT within 20s
+=== plain stop lasts until the next cycle
+{"state": "stopped"}
+NOT within 20s
+=== watcher exit leaves the detached owner; new watcher does not double it
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 29: kill: (39472) - No such process
+owner state: {"state": "stopped"}
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 30: kill: (68387) - No such process
+same run_id: yes
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 33: kill: (68387) - No such process
+=== FM_GITHUB_ACCOUNTING=0 with stopped owner keeps it off
+{"state": "stopped"}
+{"state": "stopped"}
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 35: kill: (91754) - No such process
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 35: kill: (91754) - No such process
+kinds {'owner': 1, 'sampling': 2, 'process': 7, 'quota': 2}
+owner events [('start', 'a686b9db')]
+quota Counter({('observed', 'REST rate_limit resources.graphql', 5000): 2})
+sampling failures 0 max gap 0.351
+payload bytes by kind {'owner': 232, 'sampling': 370, 'process': 4856, 'quota': 750} rows {'owner': 1, 'sampling': 2, 'process': 7, 'quota': 2}
+largest process rows [858, 857, 633, 633, 632]
+observer db growth: 16384 -> 24576 bytes over 165 s (host-wide real gh callers at this moment)
+wake rows: 0
+0; failed marker: none
+=== lab home: marker means no owner (real fm-lab-home.sh)
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 54: kill: (6014) - No such process
+owner state entries:        0
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 54: kill: (6014) - No such process
+lab teardown exit=0
+=== secondmate home: marker means no owner
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 58: kill: (20966) - No such process
+owner state entries:        0
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 58: kill: (20966) - No such process
+=== real failed start: foreign database; one wake, marker, no retry, then recovery
+watcher closed its cycle after 6s
+watcher exit=0
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+queue rows: 0
+ls: /Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/w-failed/state/.github-accounting-start-failed: No such file or directory
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+drain exit=0
+0
+--- second watcher during hold: no retry, no second wake
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 65: kill: (44743) - No such process
+new start log lines: 0
+--- fix the cause, age the marker: next cycle recovers and clears the marker
+NOT within 25s
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/w-failed/state/.github-accounting-start-failed
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 66: kill: (44743) - No such process
+{"state": "stopped"}
+=== leftovers
+pgrep end

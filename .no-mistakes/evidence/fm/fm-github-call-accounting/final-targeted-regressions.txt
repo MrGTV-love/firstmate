@@ -1,0 +1,27 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6BS0VSGYCH01N7E7CZ2GY8H/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T03:38:02Z tests/fm-watch-github-accounting.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-02T03:38:02Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+not ok - watch lock pid survived quiet checkpoint timeout
+FM_TEST_END 2026-11-02T03:38:06Z tests/fm-watch-checkpoint.test.sh exit=1 duration_ms=3874 gate_skip=false
+ok - a cycle starts an absent owner, leaves a running one alone, and recovers a crash
+ok - a failed start wakes once, retries only on the long interval, and clears on success
+ok - a busy start retries at the next cycle with no wake, no hold, and no marker change
+ok - a real lock holder reads as busy, and the next cycle starts the owner once it is free
+ok - a real failed start is reported and its stderr reaches the bounded log
+ok - a secondmate home, a lab home, and FM_GITHUB_ACCOUNTING=0 never start the owner
+ok - a start still running is never doubled, and the poll keeps running
+FM_TEST_END 2026-11-02T03:39:48Z tests/fm-watch-github-accounting.test.sh exit=0 duration_ms=105838 gate_skip=false
+FM_TEST_BEGIN 2026-11-02T03:39:48Z tests/fm-github-accounting.test.sh family=unclassified expected_gate_skip=none
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 41.325s
+
+OK
+ok - GitHub accounting observer behavior
+FM_TEST_END 2026-11-02T03:40:32Z tests/fm-github-accounting.test.sh exit=0 duration_ms=43593 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=1 skipped_gate=0 duration_ms=153700
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=43593 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=109712 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-github-accounting.test.sh duration_ms=105838
+FM_TEST_SLOWEST rank=2 script=tests/fm-github-accounting.test.sh duration_ms=43593
+FM_TEST_SLOWEST rank=3 script=tests/fm-watch-checkpoint.test.sh duration_ms=3874

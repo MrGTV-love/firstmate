@@ -1,0 +1,78 @@
+=== A. hung ps on every call, requests last 2 s: stuck ps count must not grow; quota stream and stop keep working
+{"state": "running", "pid": 87608, "run_id": "930ec0969ded4224902a3575251ab160", "started_at": 1793590589.738105}
+start exit=0
+t=5s stuck ps=3 ps launches=3 gh-axi requests=1
+t=20s stuck ps=3 ps launches=3 gh-axi requests=2
+t=35s stuck ps=3 ps launches=3 gh-axi requests=3
+t=50s stuck ps=3 ps launches=3 gh-axi requests=4
+t=65s stuck ps=3 ps launches=3 gh-axi requests=5
+t=80s stuck ps=3 ps launches=3 gh-axi requests=6
+{"state": "stopped"}
+stop exit=0 took 0s
+stuck ps after stop=0
+Counter({'observed': 6})
+sampling scans 1 failures 0
+sampling scans 0 failures 0
+sampling scans 0 failures 0
+sampling scans 0 failures 0
+sampling scans 0 failures 0
+sampling scans 0 failures 0
+sampling scans 0 failures 0
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+
+=== B. hung ps with SIGTERM to the owner: normal exit ends the stuck ps
+running
+stuck ps=2
+owner-gone
+stuck ps after SIGTERM=0
+{"state": "stopped"}
+
+=== C. ps recovers: a later hung request gets its verdict after ps comes back
+start exit=0 (ps held, 03:38:01)
+03:38:26 hold released; requests so far=2
+{"state": "stopped"}
+stop exit=0
+683.8 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 1}
+711.4 pending  None None
+721.7 unavailable timeout -9 {}
+728.8 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 3}
+743.9 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 4}
+quota grandchild gone
+
+=== D. hung quota in real time: pending rows, one kill at no-progress, no overlap, next tick observed
+start exit=0
+stop exit=0
+765.4 pending  None None
+771.7 unavailable timeout -9 {}
+780.8 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 2}
+796.0 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 3}
+811.1 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 4}
+no overlap
+quota grandchild gone
+
+=== E. stop during a hung quota request kills the whole private group
+grandchild alive before stop
+{"state": "stopped"}
+stop exit=0 took 1s
+grandchild gone
+
+=== F. slow request still using CPU is never killed (no-progress=5 s, 25 s of CPU)
+833.3 pending  None None
+843.3 observed  0 {'limit': 5000, 'remaining': 4977, 'reset': 1794000000, 'used': 23}
+
+=== G. gh-axi absent from PATH: command_unavailable, start and owner do not fail
+gh-axi not on PATH
+running
+start exit=0
+{"state": "stopped"}
+stop exit=0
+{"endpoint": "rate_limit", "kind": "quota", "observed_at": 1793590854.195889, "reason": "command_unavailable", "run_id": "f93645bff9b8493592494b6edbb045e0", "source": "REST rate_limit resources.graphql", "status": "unavailable"}
+{"endpoint": "rate_limit", "kind": "quota", "observed_at": 1793590869.374005, "reason": "command_unavailable", "run_id": "f93645bff9b8493592494b6edbb045e0", "source": "REST rate_limit resources.graphql", "status": "unavailable"}
+
+=== H. bad data stays unavailable, never zero or stale
+observed 0 {'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11}
+unavailable 0 {}
+unavailable 1 {}
+unavailable 0 {}
+=== faults end

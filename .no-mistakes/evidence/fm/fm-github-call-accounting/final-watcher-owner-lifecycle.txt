@@ -1,0 +1,65 @@
+### head 72d9bf5e51cee102bcbba1e8bdd112d2e2f5422e host GTT-CB.local 2026-11-02T03:46:30Z
+=== primary home: absent owner starts
+after 1s run_id=ee39d4b8
+{"state": "running", "pid": 90710, "run_id": "ee39d4b884d54ab1b18eae921d667ff8", "started_at": 1793591191.9722219}
+=== running owner left alone across cycles
+same run_id: yes
+watcher alive
+=== crash recovery
+after 1s run_id=af5e989d
+=== plain stop lasts until the next cycle
+{"state": "stopped"}
+after 1s run_id=2444e821
+=== watcher exit leaves the detached owner; new watcher does not double it
+owner state: {"state": "running", "pid": 45916, "run_id": "2444e821ab5341c7b8b09387db68d7f0", "started_at": 1793591215.888569}
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 30: kill: (49566) - No such process
+same run_id: yes
+/Users/charlesabrooker/tmp/fm-acct-drv.oEJWov/watcher.sh: line 33: kill: (49566) - No such process
+=== FM_GITHUB_ACCOUNTING=0 with stopped owner keeps it off
+{"state": "stopped"}
+{"state": "stopped"}
+watcher alive
+kinds {'owner': 5, 'sampling': 11, 'process': 111, 'quota': 9}
+owner events [('start', 'ee39d4b8'), ('start', 'af5e989d'), ('stop', 'af5e989d'), ('start', '2444e821'), ('stop', '2444e821')]
+quota Counter({('observed', 'REST rate_limit resources.graphql', 5000): 9})
+sampling failures 0 max gap 0.351
+payload bytes by kind {'owner': 929, 'sampling': 2069, 'process': 1502263, 'quota': 3364} rows {'owner': 5, 'sampling': 11, 'process': 111, 'quota': 9}
+largest process rows [169055, 169055, 169054, 169054, 169054]
+observer db growth: 16384 -> 1642496 bytes over 108 s (host-wide real gh callers at this moment)
+wake rows: 0; failed marker: none
+=== lab home: marker means no owner (real fm-lab-home.sh)
+lab watcher alive
+owner state entries:        0
+lab teardown exit=0
+=== secondmate home: marker means no owner
+mate watcher alive
+owner state entries:        0
+=== real failed start: foreign database; one wake, marker, no retry, then recovery
+watcher closed its cycle after 11s
+watcher exit=0
+check: github-accounting owner failed to start: exit=1; owner stderr: <home>/state/github-accounting/owner.log; retries every 3600s without another wake
+queue rows: 1
+-rw-r--r--
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+drain exit=0
+1
+--- second watcher during hold: no retry, no second wake
+watcher alive, no new wake
+new start log lines: 0
+--- fix the cause, age the marker: next cycle recovers and clears the marker
+after 1s run_id=554f1b17
+marker cleared
+{"state": "stopped"}
+=== leftovers
+pgrep end
+### re-drive: new watcher beside a running detached owner; head 72d9bf5e51cee102bcbba1e8bdd112d2e2f5422e
+first watcher started owner: {"state": "running", "pid": 20149, "run_id": "acf4223247e045eea52319d89068bf55", "started_at": 1793591567.818045}
+first watcher ended; owner: {"state": "running", "pid": 20149, "run_id": "acf4223247e045
+arm 1 watcher closed its cycle; wake: check: rearm-resurface
+arm 1 same owner: yes
+arm 2 watcher alive after 10 s
+arm 2 same owner: yes
+arm 3 watcher alive after 10 s
+arm 3 same owner: yes
+{"state": "stopped"}
+owner events [('start', 'acf42232'), ('stop', 'acf42232')]

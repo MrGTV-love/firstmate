@@ -1,0 +1,50 @@
+{"removed": 0}
+first prune exit=0
+--- real time: prune command
+['older_by_60s', 'newer_by_60s']
+{"removed": 1}
+exit=0
+['newer_by_60s']
+--- exact boundary with a fixture clock (now=1794000000, cutoff=1793827200)
+{"removed": 1}
+exit=0
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys;print([r.get("label",r["status"]) for r in map(json.loads,sys.stdin)])
+                                         ~^^^^^^^^^^
+KeyError: 'status'
+--- owner startup prune
+start exit=0
+--- prune and records while the owner runs are refused
+fm-github-accounting: busy (owner lock held); retry
+prune exit=75
+fm-github-accounting: busy (owner lock held); retry
+records exit=75
+--- owner quota-tick prune: expired row added while running
+stop exit=0
+['startup_recent', 'tick_recent', 'observed', 'observed']
+--- unrelated files
+keep
+keep
+observations.sqlite
+owner.lock
+owner.log
+start.lock
+stop
+unrelated-in-owner-dir
+--- refusals: foreign database, symlink database, symlink state dir
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+foreign db exit=1
+[(1,)] ['u']
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+symlink db exit=1
+untouched
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+symlink dir exit=1
+       0
+--- re-drive: exact boundary inventory (the driver's first display line had a bug: fixture rows carry no status field)
+{"removed": 0}
+before [1793827199.0, 1793827200.0, 1793827201.0]
+{"removed": 1}
+fixture clock now=1794000000 exit=0
+after ['cutoff', 'cutoff+1']
