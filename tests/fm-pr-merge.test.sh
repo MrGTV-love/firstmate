@@ -32,7 +32,7 @@ test_machine_checked_merge_evidence() {
       resolved)
         # The fullest pointer: its named log and digest must resolve too.
         "$JQ_BIN" --slurpfile results "$case_dir/machine-artifact/results.json" \
-          '.items[0] += {log: $results[0].items[0].log, log_sha256: $results[0].items[0].sha256, file: "value", line: 1}' \
+          ".items[0] += {log: \$results[0].items[0].log, log_sha256: \$results[0].items[0].sha256, file: \"value\", line: 1}" \
           "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
     esac
     if [ "$scenario" = no-digest ]; then

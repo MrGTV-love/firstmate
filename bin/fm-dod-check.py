@@ -106,6 +106,7 @@ def digest(data):
 
 
 BIN = Path(__file__).resolve().parent
+# measured: value=5 date=2026-11-01 host=GTT-CB.local margin=10000 (ten execute() runs each of a quiet command, a 64 MB burst and a group writer still running at exit, at load 8; slowest reader.join 0.0005 s)
 DRAIN_SECONDS = 5
 SEMANTICS = "unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome"
 
