@@ -2231,7 +2231,7 @@ SH
   first=$!
   fm_test_wait_until --while-alive "$first" --progress-file "$case_dir/gh.log" \
     -- test -e "$case_dir/merge-entered" || fail 'first merge never entered its forge callback'
-  FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" \
+  FM_GUARD_EVENT_LOG="$main/state/guard-events.jsonl" FM_TEST_CODE_ROOT="$main" FM_TEST_HOME="$main" FM_TEST_STATE="$main/state" \
     run_pr_merge "$case_dir" task-x2 https://github.com/example/repo/pull/10 \
       > "$case_dir/second.out" 2> "$case_dir/second.err" &
   second=$!
