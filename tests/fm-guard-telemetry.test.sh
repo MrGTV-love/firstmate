@@ -598,6 +598,27 @@ case "$with_out" in *'is not a directory'*) ;; *) fail "the missing-home refusal
 without_rc=0; without_out=$(typo_send FM_GUARD_EVENT_LOG="$TMP/typo-elsewhere.jsonl") || without_rc=$?
 [ "$with_rc:$with_out" = "$without_rc:$without_out" ] \
   || fail "the home-default log changed the refusal: [$with_rc] $with_out / [$without_rc] $without_out"
+# The same holds when the home disappears after the writer's first look: a jq
+# shim removes it between the precheck and the append.
+RACE_HOME="$TMP/race-home"
+mkdir -p "$RACE_HOME/state" "$TMP/race-bin"
+real_jq=$(command -v jq)
+cat > "$TMP/race-bin/jq" <<SH
+#!/usr/bin/env bash
+rm -rf -- "$RACE_HOME"
+exec "$real_jq" "\$@"
+SH
+chmod +x "$TMP/race-bin/jq"
+race_rc=0
+env -u FM_GUARD_EVENT_LOG PATH="$TMP/race-bin:$PATH" FM_HOME="$RACE_HOME" "$EVENT" grace allow --task race-task 2>/dev/null || race_rc=$?
+[ "$race_rc" = 0 ] || fail "a home removed during the write failed the caller (rc=$race_rc)"
+[ ! -e "$RACE_HOME" ] || fail "the event writer recreated a home removed during its write"
+# An explicit log keeps creating its own directory.
+"$EVENT" grace allow --task race-task --log "$TMP/explicit-log-dir/events.jsonl"
+env -u FM_HOME FM_GUARD_EVENT_LOG="$TMP/explicit-env-dir/events.jsonl" "$EVENT" grace allow --task race-task
+for explicit_log in "$TMP/explicit-log-dir/events.jsonl" "$TMP/explicit-env-dir/events.jsonl"; do
+  jq -se 'length == 1' "$explicit_log" >/dev/null || fail "an explicit event log no longer creates its own directory: $explicit_log"
+done
 pass "the event writer leaves a missing home absent and its refusal unchanged"
 
 # A task's base follows the shared default-branch rule, so a local-only master

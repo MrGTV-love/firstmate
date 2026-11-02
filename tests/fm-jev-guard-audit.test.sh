@@ -460,6 +460,7 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
 });
 await test('M4: each coverage and egress decision emits one content-free central guard event', async () => {
   delete process.env.FM_GUARD_EVENT_LOG;
+  mkdirSync(`${state}/state`, { recursive: true });
   const log = `${state}/state/guard-events.jsonl`;
   const events = () => { try { return readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)); } catch { return []; } };
   const decide = async (event, expected) => {

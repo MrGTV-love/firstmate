@@ -67,11 +67,13 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 0
 ROOT=$(cd "$SCRIPT_DIR/.." && pwd) || exit 0
 HOME_KEY=${FM_HOME:-${FM_ROOT:-$ROOT}}
 HOME_KEY=$(cd "$HOME_KEY" 2>/dev/null && pwd -P) || HOME_KEY=${FM_HOME:-${FM_ROOT:-$ROOT}}
+HOME_LOG=false
 if [ -z "$LOG" ]; then
   LOG=${FM_GUARD_EVENT_LOG:-}
   if [ -z "$LOG" ]; then
     [ -d "$HOME_KEY/state" ] || exit 0
     LOG=$HOME_KEY/state/guard-events.jsonl
+    HOME_LOG=true
   fi
 fi
 if [ -n "$TASK" ]; then
@@ -103,7 +105,7 @@ LINE=$(jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 if [ -e "$LOG" ] && [ ! -f "$LOG" ]; then exit 0; fi
 LOG_DIR=${LOG%/*}
 [ "$LOG_DIR" != "$LOG" ] || LOG_DIR=.
-if ! { mkdir -p "$LOG_DIR" 2>/dev/null && printf '%s\n' "$LINE" >>"$LOG" 2>/dev/null; }; then
+if ! { { [ "$HOME_LOG" = true ] || mkdir -p "$LOG_DIR" 2>/dev/null; } && printf '%s\n' "$LINE" >>"$LOG" 2>/dev/null; }; then
   echo "fm-guard-event: cannot append to $LOG" >&2
 fi
 exit 0
