@@ -920,6 +920,14 @@ hold_fixture_task_owned() {
 
 # Count the guard events in <log> matching a guard and decision, so a test can
 # assert one event per decision without depending on line order.
+assert_guard_rule() {  # <log> <guard> <decision> <rule> <task>: exactly one such row
+  local log=$1 guard=$2 decision=$3 rule=$4 task=$5
+  # shellcheck disable=SC2016 # jq expands the variables supplied by --arg.
+  assert_equals 1 "$("$JQ_BIN" -s --arg guard "$guard" --arg decision "$decision" --arg rule "$rule" --arg task "$task" \
+    '[.[] | select(.guard == $guard and .decision == $decision and .rule == $rule and .task == $task)] | length' "$log")" \
+    "$guard $decision must record rule $rule for task $task"
+}
+
 count_guard_events() {  # <log> <guard> <decision>
   local log=$1 guard=$2 decision=$3
   # shellcheck disable=SC2016 # jq expands the variables supplied by --arg.

@@ -1906,9 +1906,10 @@ test_firstmate_landings_belong_to_main_home() {
   # Two independent home/state records share the installation's repository.
   # The second home's formerly normal merge must not advance Main's train tip.
   rc=0
-  FM_TEST_CODE_ROOT="$main" run_pr_merge "$case_dir" task-x1 "$url" \
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" FM_TEST_CODE_ROOT="$main" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "another home must hand its firstmate landing to Main"
+  assert_guard_rule "$case_dir/guard-events.jsonl" merge-single-owner deny single-owner task-x1
   assert_no_grep 'pr merge ' "$case_dir/gh.log" 'the second home never hands the PR to the forge'
   assert_absent "$case_dir/state/task-x1.check.sh" 'routing happens before PR bookkeeping'
   assert_grep "outside its Main home, $main;" "$case_dir/stderr" 'routing names the Main home its role record proves'
@@ -2080,9 +2081,10 @@ test_shallow_task_lineage_routing() {
   add_gh_mocks "$case_dir" "$head"
 
   rc=0
-  FM_TEST_CODE_ROOT="$root" run_pr_merge "$case_dir" task-x1 "$url" \
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" FM_TEST_CODE_ROOT="$root" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" 'unknown task lineage must not take the unrelated-project merge path'
+  assert_guard_rule "$case_dir/guard-events.jsonl" merge-single-owner deny single-owner task-x1
   assert_grep 'lineage cannot be determined' "$case_dir/stderr" 'unknown lineage is the named refusal reason'
   assert_grep "git -C $task fetch --unshallow" "$case_dir/stderr" 'the remedy names the shallow task copy'
   assert_no_grep 'pr merge ' "$case_dir/gh.log" 'unknown lineage never reaches forge merge'

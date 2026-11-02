@@ -318,8 +318,8 @@ test_claude_session_attribution
 
 # Task identity survives a harness restart; unrelated homes cannot collide.
 ATTR="$TMP/attributed.jsonl"
-"$EVENT" merge-green-head deny --rule base-containment --task task-a --session before --log "$ATTR"
-"$EVENT" merge-green-head allow --rule base-containment --task task-a --session after --log "$ATTR"
+"$EVENT" merge-landing-tree-tested deny --rule base-containment --task task-a --session before --log "$ATTR"
+"$EVENT" merge-landing-tree-tested allow --rule base-containment --task task-a --session after --log "$ATTR"
 jq -se 'all(.[]; .task == "task-a" and .rule == "base-containment" and .session == "task-a")' "$ATTR" >/dev/null \
   || fail "task attribution must survive a session change"
 FM_HOME="$TMP" FM_SESSION_ID=stable "$EVENT" ghome deny --log "$ATTR"
@@ -531,7 +531,7 @@ printf 'same content\n' > "$REPO/change.txt"
 git -C "$REPO" add change.txt
 git -C "$REPO" commit -qm base
 git -C "$REPO" checkout -q feature
-"$EVENT" merge-green-head deny --task merge-task --rule base-containment --head "$refused" --base main --log "$STATE_DIR/guard-events.jsonl"
+"$EVENT" merge-landing-tree-tested deny --task merge-task --rule base-containment --head "$refused" --base main --log "$STATE_DIR/guard-events.jsonl"
 git -C "$REPO" merge -q --no-ff main -m 'merge base'
 merged=$(git -C "$REPO" rev-parse HEAD)
 printf 'kind=ship\nworktree=%s\nbranch=feature\n' "$REPO" > "$STATE_DIR/merge-task.meta"
@@ -546,7 +546,7 @@ jq -se --arg head "$merged" 'length == 2 and all(.[]; .head == $head and .task =
 # fatal, and so is an undecodable torn final line.
 jq -c '.ts = null, (.base = 7 | .ts = "2000-01-01T00:00:00Z"), (.rule = ["x"]), .' \
   "$STATE_DIR/guard-events.jsonl" > "$TMP/malformed-first.jsonl"
-printf '{"guard":"merge-green-head","note":"\303' >> "$TMP/malformed-first.jsonl"
+printf '{"guard":"merge-landing-tree-tested","note":"\303' >> "$TMP/malformed-first.jsonl"
 python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$TMP/malformed-first.jsonl" --json \
   > "$TMP/malformed-first-result.jsonl" 2> "$TMP/malformed-first.err" \
   || fail "a malformed refusal aborted the workaround scan: $(cat "$TMP/malformed-first.err")"

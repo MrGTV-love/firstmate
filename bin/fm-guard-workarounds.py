@@ -34,6 +34,8 @@ import sys
 
 SHA = re.compile(r'[0-9a-f]{40,64}\Z')
 LIMIT = 100
+MERGE_REFUSAL_GUARDS = ('merge-checks-green', 'merge-required-reported',
+                        'merge-landing-tree-tested', 'merge-auto-not-armed')
 STRING_FIELDS = ('guard', 'task', 'head', 'base', 'ts', 'rule', 'decision')
 
 
@@ -101,7 +103,7 @@ def scan(repo, head, task, refusals, base_tip=''):
             parent_tree = git(repo, 'rev-parse', parents[0] + '^{tree}')
             trees[parents[0]] = parent_tree
         if tree and tree == parent_tree:
-            signatures.append(dict(guard='merge-green-head', rule='base-containment',
+            signatures.append(dict(guard='merge-landing-tree-tested', rule='base-containment',
                                    task=task, head=commit, kind='tree-equal-merge'))
     for event in refusals:
         if event.get('task') != task or not SHA.fullmatch(str(event.get('head', ''))):
@@ -151,7 +153,7 @@ def main():
     state = Path(args.state)
     log = args.log or os.environ.get('FM_GUARD_EVENT_LOG') or str(state / 'guard-events.jsonl')
     skipped = [0]
-    refusals = [e for e in events(log, skipped) if e.get('decision') == 'deny' and e.get('guard') == 'merge-green-head']
+    refusals = [e for e in events(log, skipped) if e.get('decision') == 'deny' and e.get('guard') in MERGE_REFUSAL_GUARDS]
     if skipped[0]:
         print(f'fm-guard-workarounds: skipped {skipped[0]} malformed event row(s) in {log}', file=sys.stderr)
     targets = []
