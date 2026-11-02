@@ -1,0 +1,12 @@
+HEAD-poll1: detector started=True after 2.04s
+HEAD-poll1: processes left in the watcher group 0.3 s after exit:
+    16912 00:02 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/bin/fm-watch.sh
+    16920 00:02 bash <fb>/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/bin/fm-guard-workarounds.p
+    16948 00:02 sleep 25
+HEAD-poll1: watcher exited on its own rc=0; stderr close 0.49s after exit
+pre-fix-b7cd2463a-poll1: detector started=True after 2.88s
+pre-fix-b7cd2463a-poll1: processes left in the watcher group 0.3 s after exit:
+    34208 00:03 bash /Users/charlesabrooker/tmp/fm-prefix.de69x7/bin/fm-watch.sh
+    34210 00:03 bash <fb>/python3 /Users/charlesabrooker/tmp/fm-prefix.de69x7/bin/fm-guard-workarounds.py --state <lab>/state
+    34246 00:03 sleep 25
+pre-fix-b7cd2463a-poll1: watcher exited on its own rc=0; stderr close 23.14s after exit

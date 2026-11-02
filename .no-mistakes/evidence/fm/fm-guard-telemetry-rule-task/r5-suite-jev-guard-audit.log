@@ -1,0 +1,58 @@
+✔ dispatch grants are explicit unfenced needs, never inferred consent (188.07775ms)
+✔ native find admission intersects authorization with project and helper eligibility (0.129458ms)
+✔ recorded launch authorization fails closed without changing or replacing the record (526.092667ms)
+✔ the launch interface answers when node reaches it through a symlinked root (311.480792ms)
+✔ audit history merges legacy and task rows without reading unrelated state (1.340583ms)
+✔ write: deterministic admission records no request, piece or cost (24.925833ms)
+✔ call: invalid tool input fails before planning and invents no piece (61.589666ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (1055.25175ms)
+✔ T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body (729.343875ms)
+✔ T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission (51.440292ms)
+✔ T4(b): paid find requires a task grant and records exactly one content-free decision (302.090625ms)
+✔ omp github read ops need a remote-storage grant while write ops refuse under every grant (1512.529917ms)
+✔ T4(d): an installed tool absent from the policy table is rejected, not silently ignored (68.830125ms)
+✔ T4(d): an added Claude host tool fails coverage at the adapter boundary (539.44975ms)
+✔ an unclassified tool elsewhere in the host registry does not refuse a classified call (47.642ms)
+✔ Claude native WebSearch retains its outbound character at the CLI boundary (493.386833ms)
+✔ observed Claude signed-in artifact tools require provider grants at the CLI boundary (1023.972875ms)
+✔ coverage and egress refusals hold in an inactive project scope (632.274958ms)
+✔ tools that move no data or run no worker code are local; unscreened writers name T5 (629.237833ms)
+✔ subagent dispatch needs no grant while the outbound tools a subagent calls still refuse (695.715208ms)
+✔ memory operations need a provider grant unless the live worker settings prove them local (993.003583ms)
+✔ S2 egress classes are permissions, never a bypass of existing write checks (836.543583ms)
+✔ M4: each coverage and egress decision emits one content-free central guard event (1758.538583ms)
+✔ M4: an unrelated allow never clears a later deny in the real metrics reader (1414.652208ms)
+✔ Claude Monitor and PowerShell share Bash shell-command treatment without a grant (470.085416ms)
+✔ a removed execution class cannot authorize an otherwise valid web grant (85.911459ms)
+✔ worker brief shell commands are never refused for a missing egress grant (512.790542ms)
+✔ S2(d): local read and bash stay unjudged, write/edit keep deterministic path checks (516.869ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15497.321667
+ok - offline guard settlement, cost completeness and S2 egress acceptance
+ok - invalid dispatch refusal emits exactly one egress deny event
+ok - malformed dispatch refusal emits exactly one egress deny event
+ok - duplicate dispatch refusal emits exactly one egress deny event
+ok - indented dispatch refusal emits exactly one egress deny event
+ok - silent-runtime dispatch refusal emits exactly one egress deny event
+ok - silent-find dispatch refusal emits exactly one egress deny event
+ok - failed-find dispatch refusal emits exactly one egress deny event
+ok - relaunch refusal emits exactly one egress deny event
+ok - dispatch grants precede launch; native find respects consent and eligibility; relaunch/promotion cannot expand consent
+native find absent: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find granted: on; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find other-class: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find no-helpers: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+native find other-project: off; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted
+ok - installed omp consumes dispatch overlays before any model turn; no ungranted native find handler exists
+installed omp: 37 tools classified; injected unknown tool rejected; no model turn
+ok - installed omp registry coverage (no model turn submitted)
+installed omp: memory effects read from live global and --config overlay settings; no model turn
+ok - installed omp live memory settings (no model turn submitted)
+installed Claude 2.1.316: 24 tools classified; injected unknown tool rejected; no model turn
+ok - installed Claude registry coverage (no model turn submitted)

@@ -1,0 +1,13 @@
+guard-telemetry rc=0 secs=24
+jev-guard-audit rc=0 secs=109
+home-writes rc=0 secs=69
+guard-audit-closure rc=0 secs=106
+DONE
+teardown-landed-allow rc=0 secs=15
+pr-merge-guard-events rc=0 secs=32
+secondmate-T10 rc=1 secs=39
+watch-stderr rc=0 secs=997
+git-secrets rc=0 secs=70
+spawn-batch rc=0 secs=32
+code-root rows       44 ->       44
+DONE2

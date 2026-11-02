@@ -1,0 +1,6 @@
+== secondmate SYNC=1 INHERIT=1: stopped by driver after rows or 45 s rc=143 | 
+{"guard":"secondmate-sync","decision":"bypass","rule":"FM_SKIP_SECONDMATE_SYNC","task":"sm","override":true}
+{"guard":"secondmate-inherit","decision":"bypass","rule":"FM_SKIP_SECONDMATE_INHERIT","task":"sm","override":true}
+   bypass rows: 2; all rows: 3
+== secondmate SYNC=internal INHERIT=internal: exited rc=0 | 
+   bypass rows: 0; all rows: 1

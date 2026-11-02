@@ -1,0 +1,21 @@
+== FM_SPAWN_NO_GUARD=1: spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+{"guard":"guard-watcher-down-warning","decision":"bypass","rule":"FM_SPAWN_NO_GUARD","task":"sw1","override":true}
+   bypass rows: 1
+== FM_SPAWN_NO_GUARD=internal (own re-exec): spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+   bypass rows: 0
+== FM_COMPACT_ADVISER_DISABLE=1: spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+{"guard":"compact-adviser","decision":"bypass","rule":"FM_COMPACT_ADVISER_DISABLE","task":"sw3","override":true}
+   bypass rows: 1
+== no switches: spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+   bypass rows: 0
+== FM_SKIP_SECONDMATE_SYNC=1 + INHERIT=1, secondmate: spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+   bypass rows: 0
+== FM_SKIP_SECONDMATE_SYNC=internal + INHERIT=internal, secondmate: spawn rc=1 | fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+   bypass rows: 0
+--- api key guard through real spawn; the value is a fake placeholder
+no waiver: rc=1 | error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; repair: env -u ANTHROPIC_API_KEY 
+{"guard":"claude-api-billing","decision":"deny","rule":"inherited-credential","task":"probe-key","override":false,"cleared_by":""}
+tmux windows launched: 0
+out tail:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TO

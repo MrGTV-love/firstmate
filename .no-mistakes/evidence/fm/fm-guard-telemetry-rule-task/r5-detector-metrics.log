@@ -1,0 +1,80 @@
+tree-equal merge made: 6baadbc30d728435ebdcd8a1712deeb8fc550fd6
+== home scan (what the heartbeat runs), text
+GUARD_WORKAROUND task=basemerge-no-refusal signatures=tree-equal-merge:6baadbc30d728435ebdcd8a1712deeb8fc550fd6 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=refused-then-basemerge signatures=base-merge-only-after-refusal:d237c0e506ff739bdb45996dc078dc342391f820 (read-only evidence; reassess the guard)
+exit=0
+== home scan, json
+{"guard": "merge-green-head", "rule": "base-containment", "task": "basemerge-no-refusal", "head": "6baadbc30d728435ebdcd8a1712deeb8fc550fd6", "kind": "tree-equal-merge"}
+{"guard": "merge-green-head", "rule": "base-containment", "task": "refused-then-basemerge", "head": "d237c0e506ff739bdb45996dc078dc342391f820", "refused_head": "38d7fd09d44a3237adbfac632a6f2adeffce78da", "kind": "base-merge-only-after-refusal"}
+exit=0
+== source copies unchanged (read-only): 0 0 0 
+== metrics fixture log: repeat denies across sessions, overrides, bypasses, a deny-only guard
+== fm-guard-metrics.sh (text, with the detector feed)
+METRIC merge-green-head opportunities=6 denies=5 warns=0 override_rate=0.2 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=1 workarounds=2 refusal_to_bypass_ratio=0.6 repeat_denies=2 deny_only=false zero_events_days=0
+METRIC only-denies opportunities=2 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRIC teardown-unlanded opportunities=1 denies=1 warns=0 override_rate=1.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-green-head rule=base-containment opportunities=2 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=2 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-green-head rule=checks-green opportunities=4 denies=3 warns=0 override_rate=0.333 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=0.333 repeat_denies=2 deny_only=false zero_events_days=0
+REPEAT merge-green-head rule=checks-green task=t-red denies=3 repeat_denies=2
+RULE only-denies rule=r1 opportunities=2 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE teardown-unlanded rule=landed-work opportunities=1 denies=1 warns=0 override_rate=1.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=0 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+QUIET api-billing-preflight zero_events_days=7
+QUIET backlog-transition zero_events_days=7
+QUIET captain-hold-withdraw-ruling zero_events_days=7
+QUIET claude-api-billing zero_events_days=7
+QUIET compact-adviser zero_events_days=7
+QUIET cursor-park-turnend zero_events_days=7
+QUIET dispatch-profile-resolution zero_events_days=7
+QUIET gate-agent-containment zero_events_days=7
+QUIET git-commit-credential-shapes zero_events_days=7
+QUIET git-push-credential-shapes zero_events_days=7
+QUIET guard-watcher-down-warning zero_events_days=7
+QUIET jev-belay-stop zero_events_days=7
+QUIET jev-egress-grant zero_events_days=7
+QUIET jev-github-write-op zero_events_days=7
+QUIET jev-pretool-deny zero_events_days=7
+QUIET jev-tool-coverage zero_events_days=7
+QUIET jev-write-path-gate zero_events_days=7
+QUIET kimi-hook-install-refusal zero_events_days=7
+QUIET lavish-reply-notice zero_events_days=7
+QUIET mem-pressure-check zero_events_days=7
+QUIET merge-away-waiver zero_events_days=7
+QUIET merge-held-task zero_events_days=7
+QUIET omp-worker-url-reads-off zero_events_days=7
+QUIET open-loops-one-deferral zero_events_days=7
+QUIET pipeline-start-unreadable-source zero_events_days=7
+QUIET primary-tangle-warning zero_events_days=7
+QUIET proc-pileup-watch zero_events_days=7
+QUIET queued-wakes-warning zero_events_days=7
+QUIET secondmate-inherit zero_events_days=7
+QUIET secondmate-sync zero_events_days=7
+QUIET send-home-fail-closed zero_events_days=7
+QUIET slack-dm-retarget-pending-work zero_events_days=7
+QUIET slot-provision-attestation zero_events_days=7
+QUIET spawn-backend-capability zero_events_days=7
+QUIET spawn-brief-dod-placeholders zero_events_days=7
+QUIET spawn-brief-out-of-scope zero_events_days=7
+QUIET spawn-brief-placeholders zero_events_days=7
+QUIET spawn-confinement-coverage zero_events_days=7
+QUIET spawn-local-source-selection zero_events_days=7
+QUIET spawn-worktree-isolation zero_events_days=7
+QUIET spawn-write-confinement zero_events_days=7
+QUIET status-log-size-cap zero_events_days=7
+QUIET teardown-superseded-slot-lease zero_events_days=7
+QUIET turnend-supervision-block zero_events_days=7
+QUIET upstream-publish-role zero_events_days=7
+QUIET verification-plan-dod-shape zero_events_days=7
+QUIET watcher-arm-pretool zero_events_days=7
+METRICS_SUMMARY guards=3 measured=0 cut=0 unmeasured=3 malformed_rows=0
+exit=0
+== fm-guard-metrics.sh --json (rules and flags only)
+{"id":"merge-green-head","opportunities":2,"denies":2,"warns":0,"override_rate":0.0,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"reversible","allows":0,"overrides":0,"bypasses":0,"workarounds":2,"refusal_to_bypass_ratio":1.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":true,"zero_events_days":0,"rule":"base-containment"}
+{"id":"merge-green-head","opportunities":4,"denies":3,"warns":0,"override_rate":0.333,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"reversible","allows":1,"overrides":1,"bypasses":1,"workarounds":0,"refusal_to_bypass_ratio":0.333,"repeat_denies":2,"repeat_denies_per_task":[{"task":"t-red","denies":3,"repeat_denies":2}],"deny_only":false,"zero_events_days":0,"rule":"checks-green"}
+{"id":"only-denies","opportunities":2,"denies":2,"warns":0,"override_rate":0.0,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"unknown","allows":0,"overrides":0,"bypasses":0,"workarounds":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":true,"zero_events_days":0,"rule":"r1"}
+{"id":"teardown-unlanded","opportunities":1,"denies":1,"warns":0,"override_rate":1.0,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"irreversible","allows":0,"overrides":1,"bypasses":1,"workarounds":0,"refusal_to_bypass_ratio":1.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":true,"zero_events_days":0,"rule":"landed-work"}
+exit=0
+{"log":"/Users/charlesabrooker/tmp/fm-detect.NW9lOz/home/state/guard-events.jsonl","present":true,"guards":[{"id":"merge-green-head","denies":5,"refusal_to_bypass_ratio":0.6,"flags":null,"deny_only":null,"zero_events":null},{"id":"only-denies","denies":2,"refusal_to_bypass_ratio":0.0,"flags":null,"deny_only":true,"zero_events":null},{"id":"teardown-unlanded","denies":1,"refusal_to_bypass_ratio":1.0,"flags":null,"deny_only":true,"zero_events":null}],"zero_event_guards":["api-billing-preflight","backlog-transition","captain-hold-withdraw-ruling","claude-api-billing","compact-adviser","cursor-park-turnend","dispatch-profile-resolution","gate-agent-containment","git-commit-credential-shapes","git-push-credential-shapes","guard-watcher-down-warning","jev-belay-stop","jev-egress-grant","jev-github-write-op","jev-pretool-deny","jev-tool-coverage","jev-write-path-gate","kimi-hook-install-refusal","lavish-reply-notice","mem-pressure-check","merge-away-waiver","merge-held-task","omp-worker-url-reads-off","open-loops-one-deferral","pipeline-start-unreadable-source","primary-tangle-warning","proc-pileup-watch","queued-wakes-warning","secondmate-inherit","secondmate-sync","send-home-fail-closed","slack-dm-retarget-pending-work","slot-provision-attestation","spawn-backend-capability","spawn-brief-dod-placeholders","spawn-brief-out-of-scope","spawn-brief-placeholders","spawn-confinement-coverage","spawn-local-source-selection","spawn-worktree-isolation","spawn-write-confinement","status-log-size-cap","teardown-superseded-slot-lease","turnend-supervision-block","upstream-publish-role","verification-plan-dod-shape","watcher-arm-pretool"],"window_days":7,"summary":{"guards":3,"measured":0,"cut":0,"unmeasured":3,"malformed_rows":0}}
+== without --workarounds: workarounds read as not measured
+{"rule":"base-containment","workarounds":null,"refusal_to_bypass_ratio":0.0}
+{"rule":"checks-green","workarounds":null,"refusal_to_bypass_ratio":0.333}
+== log unchanged by metrics: 11 rows

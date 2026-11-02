@@ -1,0 +1,7 @@
+ok - negative control: home-target assertion rejects a bare relative write after cd
+ok - backlog add/start/done/hold/unhold/prune write only the configured home
+ok - brief, inbox note/reply/ack, custom-check registration/retirement, and guard events use home data/state
+/Users/charlesabrooker/tmp/fm-home-writes.wngVVQ/code/bin/fm-guard-event.sh: line 91: /Users/charlesabrooker/tmp/fm-home-writes.wngVVQ/code/bin/fm-session-lock-lib.sh: No such file or directory
+ok - an unset home falls back to the script's own root, not the caller's directory
+ok - spawn/send/status-resolution/control-exit/teardown keep durable writes in the configured home
+ok - promotion and captain-hold/answer persist their contracts and decisions in the home

@@ -1,0 +1,13 @@
+clone tree-equal check: 38202b99eb945630588286dee09d91b76cca111b vs first parent 38202b99eb945630588286dee09d91b76cca111b
+lab tree-equal merge: 1fd6db4f67614cda44c675dc6df9ae13c6805838
+== state/.guard-workarounds-next written by the heartbeat:
+GUARD_WORKAROUND task=lab-task signatures=tree-equal-merge:1fd6db4f67614cda44c675dc6df9ae13c6805838 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+real instance 5ad471a2b reported: yes
+lab tree-equal merge reported: yes
+temp leftovers: 0
+== wake queue:
+1793582505	1	check	memory-health-uncalibrated	check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.ggRgXC/state/.memory-baseline.json); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.ggRgXC.
+no guard-workarounds wake queued
+== read-only: gate worktree status lines 0 -> 0; train-5 ref unchanged: yes
+== guard events written by the scan: 0

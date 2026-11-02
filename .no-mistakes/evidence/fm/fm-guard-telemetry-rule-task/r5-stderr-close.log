@@ -1,0 +1,4 @@
+HEAD: detector started=True after 1.73s
+HEAD: watcher stopped with SIGTERM after 6 s rc=-15; stderr close 8.93s after exit
+pre-fix-b7cd2463a: detector started=True after 1.64s
+pre-fix-b7cd2463a: watcher stopped with SIGTERM after 6 s rc=-15; stderr close 18.53s after exit

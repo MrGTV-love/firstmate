@@ -1,0 +1,49 @@
+code-root rows before:       44
+
+=== A1 rule, task and session on an attributed row ===
+{"ts":"2026-11-02T01:03:53Z","guard":"merge-green-head","rule":"checks-green","task":"t1","version":"1","system":"firstmate","session":"t1","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"abc","base":"main","actor":"main","opportunity":true}
+
+=== A2 no task: two processes share one session; a harness session is kept; no pid- ===
+{"rule":"r","task":"","session":"<home>:unattributed"}
+{"rule":"r","task":"","session":"<home>:unattributed"}
+{"rule":"r2","task":"","session":"<home>:h-42"}
+distinct sessions from 2 processes: 1
+rows with pid-: 0
+
+=== A3 write failure never fails the caller ===
+log=<tmp>/dir writer rc=0
+log=<tmp>/fifo writer rc=0
+log=/nonexistent-root/x/g.jsonl writer rc=0
+malformed args rc=0
+bad decision rc=0
+no jq on PATH rc=0; row written: no
+
+=== A4 typo home stays absent; the refusal is the same as with telemetry pointed elsewhere and as base ===
+head default log: rc=3 home exists=no | error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+head explicit log: rc=3 same output=yes
+base default log: rc=3 home exists=yes | error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+
+=== A5 home removed between the precheck and the append (throwaway jq shim) ===
+default log: rc=0 home recreated=no stderr=[bin/fm-guard-event.sh: line 108: <tmp>/rh/state/guard-events.jsonl: No such file or directory
+fm-guard-event: cannot append to <tmp>/rh/state/guard-events.jsonl]
+explicit FM_GUARD_EVENT_LOG: rc=0 log rows=1 (keeps creating its directory)
+explicit --log rows=1
+
+=== B1 real fm-send from the gate worktree against an unmarked home: refused, attributed deny ===
+rc=3 | 
+{"guard":"gate-agent-containment","decision":"deny","rule":"gate-context","task":"probe-task","actor":"gate","override":false}
+
+=== B2 marked lab home passes the gate: allow rows, no bypass ===
+rc=1 (later failure expected: no such task)
+{"guard":"gate-agent-containment","decision":"allow","rule":"gate-context","task":"probe-task","actor":"gate","override":false}
+{"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"probe-task","actor":"main","override":false}
+
+=== B3 FM_GATE_REFUSE_BYPASS=1: bypass row with override ===
+rc=1
+{"guard":"gate-agent-containment","decision":"bypass","rule":"FM_GATE_REFUSE_BYPASS","task":"bp-task","override":true}
+{"guard":"send-home-fail-closed","decision":"allow","rule":"explicit-home","task":"bp-task","override":false}
+
+=== code-root log ===
+code-root rows after:       44

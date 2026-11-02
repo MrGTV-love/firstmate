@@ -1,0 +1,11 @@
+== secondmate: SYNC=1 INHERIT=1: rc=1 | error: secondmate home cannot be inside the active firstmate home: <lab>/smhome
+   bypass rows: 0
+== secondmate: SYNC=internal INHERIT=internal: rc=1 | error: secondmate home cannot be inside the active firstmate home: <lab>/smhome
+   bypass rows: 0
+== api key, --allow-api-key (fake value): rc=1 | error: task key1 has no brief at inaccessible data path <lab>/data/key1/brief.md
+{"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"key1","override":true,"cleared_by":"allow-api-key"}
+   bypass rows: 0
+== manual backlog backend: rc=1 | error: task bl1 has no brief at inaccessible data path <lab>/data/bl1/brief.md
+   bypass rows: 0
+== default backlog backend: rc=1 | error: task bl2 has no brief at inaccessible data path <lab>/data/bl2/brief.md
+   bypass rows: 0

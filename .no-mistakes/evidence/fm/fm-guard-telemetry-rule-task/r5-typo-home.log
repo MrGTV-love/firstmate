@@ -1,0 +1,3 @@
+head-default: rc=1 home created=no | error: FM_HOME '<tmp>/typo-head-default/nested' is not a directory; fm-send cannot resolve this home's state
+head-explicit-log: rc=1 home created=no | error: FM_HOME '<tmp>/typo-head-explicit-log/nested' is not a directory; fm-send cannot resolve this home's state
+base-default: rc=1 home created=no | error: FM_HOME '<tmp>/typo-base-default/nested' is not a directory; fm-send cannot resolve this home's state

@@ -1,0 +1,10 @@
+HEAD: detector started=True after 1.85s
+HEAD: processes left in the watcher group 0.3 s after exit:
+    23861 00:09 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/bin/fm-watch.sh
+    23878 00:09 bash <fb>/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6A1M5XYTCJS89BZNWQEAKMJ/bin/fm-guard-workarounds.p
+    23934 00:09 sleep 25
+    24235 00:08 sleep 15
+HEAD: watcher stopped with SIGTERM after 6 s rc=-15; stderr close 7.76s after exit
+base-1a8fdf768: detector started=False after 12.12s
+base-1a8fdf768: processes left in the watcher group 0.3 s after exit:
+base-1a8fdf768: watcher stopped with SIGTERM after 6 s rc=-15; stderr close 2.30s after exit

@@ -1,0 +1,14 @@
+== secondmate: SYNC=1 INHERIT=1: rc=1 | error: <tmp>/smhome is not a firstmate home (missing AGENTS.md)
+   bypass rows: 0
+== secondmate: SYNC=internal INHERIT=internal: rc=1 | error: <tmp>/smhome is not a firstmate home (missing AGENTS.md)
+   bypass rows: 0
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A1M5XYTCJS89BZNWQEAKMJ/r5-drive-spawn3.sh: line 14: 81165 Terminated: 15          env -u FM_TASK_ID PATH="$FB:$PATH" TMUX= "${e[@]}" "$WT/bin/fm-spawn.sh" "$@" > "$FM_HOME/out" 2>&1 < /dev/null
+== manual backlog backend: rc=143 | 
+{"guard":"backlog-transition","decision":"bypass","rule":"manual-backend","task":"bl1","override":true}
+   bypass rows: 1
+/Users/charlesabrooker/.no-mistakes/evidence/01M6A1M5XYTCJS89BZNWQEAKMJ/r5-drive-spawn3.sh: line 14: 13415 Terminated: 15          env -u FM_TASK_ID PATH="$FB:$PATH" TMUX= "${e[@]}" "$WT/bin/fm-spawn.sh" "$@" > "$FM_HOME/out" 2>&1 < /dev/null
+== default backlog backend: rc=143 | 
+   bypass rows: 0
+lab tail:
+warning: <lab>/data/bl2/launch-brief.md records no ship branch; defaulting to legacy branch fm/bl2
+warning: <lab>/data/bl2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - con

@@ -1,0 +1,8 @@
+=== M4b -- --admin without --attended-override: refused ===
+rc=1 merged=0 | 
+   merge-away-waiver rows: 0
+0
+=== M4c --attended-override -- --admin: merged, one bypass with override ===
+rc=0 merged=1
+{"guard":"merge-away-waiver","decision":"bypass","rule":"attended-override","task":"task-x1","override":true}
+   merge-away-waiver rows: 1

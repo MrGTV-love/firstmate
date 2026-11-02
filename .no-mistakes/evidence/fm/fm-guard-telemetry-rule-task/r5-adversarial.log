@@ -1,0 +1,18 @@
+base: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(worker account)=0 fm-send(empty FM_HOME)=3 rows=       3
+head: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(worker account)=0 fm-send(empty FM_HOME)=3 rows=       5
+
+METRIC cur opportunities=3 denies=3 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=1 deny_only=true zero_events_d
+METRIC old-guard opportunities=1 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_ev
+RULE cur rule=a opportunities=2 denies=2 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=1 deny_only=true zero_eve
+REPEAT cur rule=a task=t1 denies=2 repeat_denies=1
+RULE cur rule=b opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_eve
+RULE old-guard rule=r opportunities=1 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false ze
+METRICS_SUMMARY guards=2 measured=0 cut=0 unmeasured=2 malformed_rows=3
+rc=0
+log unchanged: yes
+-- absent log: 
+METRICS_SUMMARY guards=0 measured=0 cut=0 unmeasured=0 malformed_rows=0 log_absent=true
+-- bad days: 
+-: error: opportunities and days must be positive
+{"id":"cur","deny_only":true,"zero_events_days":0}
+{"id":"old-guard","deny_only":false,"zero_events_days":30}

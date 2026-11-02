@@ -1,0 +1,1 @@
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge

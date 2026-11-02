@@ -1,0 +1,14 @@
+=== A landed work, no --force: expect exactly one allow, no override ===
+  rc=0 worktree gone=no
+  rows: [{"guard":"teardown-unlanded","decision":"allow","rule":"landed-work","task":"task-x1","override":false,"cleared_by":""}]
+=== B unpushed work, no --force: refused, deny, no allow ===
+  rc=1 worktree kept=yes REFUSED lines=1
+  rows: [{"guard":"teardown-unlanded","decision":"deny","rule":"landed-work","task":"task-x1","override":false,"cleared_by":""}]
+=== C unpushed work, --force: bypass with override, no allow ===
+  rc=0
+  rows: [{"guard":"teardown-unlanded","decision":"bypass","rule":"landed-work","task":"task-x1","override":true,"cleared_by":"force"}]
+=== D manual backlog backend: one backlog-transition bypass ===
+  rc=0
+  rows: [{"guard":"backlog-transition","decision":"bypass","rule":"manual-backend","task":"task-x1","override":true,"cleared_by":""},{"guard":"teardown-unlanded","decision":"allow","rule":"landed-work","task":"task-x1","override":false,"cleared_by":""}]
+=== E write failure while refusing: same refusal ===
+  rc=1 worktree kept=yes REFUSED lines=1
