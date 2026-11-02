@@ -1275,6 +1275,7 @@ teardown_release_locks() {
     TREEHOUSE_PROJECT_LOCK_HELD=0
   fi
   fm_lease_guard_release || true
+  [ -z "${TEARDOWN_SLOT_PROOF:-}" ] || rm -f "$TEARDOWN_SLOT_PROOF"
   return "$status"
 }
 trap teardown_release_locks EXIT
@@ -2742,6 +2743,49 @@ work_is_landed_proof() {
   fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
   [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
   return 1
+}
+
+# Vernant owns slot declarations and their removal. Only a ship's recorded
+# MERGED PR and recorded branch retire the slot's record; every other task
+# keeps it, as before. The forge proof is built before project custody, and
+# both runtime routes retire with it before detaching/deleting the slot branch,
+# after the route's own landed work proof and never on a discard proof.
+# bin/fm-slot-manifest-retire.py's header owns report-only recovery of earlier
+# stale declarations.
+TEARDOWN_SLOT_PROOF=
+teardown_slot_manifest_helper() {  # <slot> <phase arguments...>
+  local slot=$1 branch keep=
+  shift
+  [ "$FORCE" != "--force" ] || return 0
+  if [ ! -f "$PROJ/scripts/git-stability/provision_existing_slot.py" ] \
+     && [ ! -f "$slot/scripts/git-stability/provision_existing_slot.py" ] \
+     && [ ! -f "$PROJ/scripts/git-stability/retire_slot_manifest.py" ] \
+     && [ ! -f "$slot/scripts/git-stability/retire_slot_manifest.py" ]; then
+    return 0
+  fi
+  branch=$(fm_meta_get "$META" branch)
+  if [ "$KIND" != ship ]; then
+    keep="$KIND task records no merged PR"
+  elif [ "$MODE" = local-only ]; then
+    keep="local-only ship records no merged PR"
+  elif [ -z "$branch" ]; then
+    keep="task records no branch"
+  fi
+  python3 "$SCRIPT_DIR/fm-slot-manifest-retire.py" --project "$PROJ" \
+    --firstmate-state "$STATE" --slot "$slot" --owner-id "$ID" \
+    --owner-branch "$branch" --state-dir "${CODEX_HOOK_STATE_DIR:-/tmp/vernant-codex-hooks-$(id -u)}" \
+    ${keep:+--keep "$keep"} "$@"
+}
+teardown_prove_slot_manifest() {  # <slot>
+  [ "$TREEHOUSE_PROJECT_LOCK_HELD" != 1 ] || return 0
+  TEARDOWN_SLOT_PROOF=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-slot-proof.XXXXXX") || {
+    TEARDOWN_SLOT_PROOF=
+    return 0
+  }
+  teardown_slot_manifest_helper "$1" --prove-to "$TEARDOWN_SLOT_PROOF" || true
+}
+teardown_retire_slot_manifest() {  # <slot>
+  teardown_slot_manifest_helper "$1" --apply --proof-file "${TEARDOWN_SLOT_PROOF:-/dev/null}"
 }
 
 # Archive cleanup needs its own stricter proof, not the pipeline-input exception:
@@ -4942,6 +4986,10 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
       branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      teardown_retire_slot_manifest "$teardown_slot" || {
+        "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+        exit 1
+      }
       if [ "$branch" != "HEAD" ]; then
         if git -C "$teardown_slot" checkout --detach -q 2>/dev/null; then
           git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
@@ -6161,6 +6209,7 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
 fi
 teardown_nested_slot prove || exit 1
+[ "$KIND" = secondmate ] || teardown_prove_slot_manifest "${TEARDOWN_ENCLOSING_SLOT:-$WT}"
 
 validate_pr_poll_cleanup "$STATE" "$ID" || exit 1
 
@@ -6558,6 +6607,10 @@ reap_task_archive_branches
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if teardown_owns_worktree && [ -d "$WT" ]; then
     branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+    teardown_retire_slot_manifest "$WT" || {
+      "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+      exit 1
+    }
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
         git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true
