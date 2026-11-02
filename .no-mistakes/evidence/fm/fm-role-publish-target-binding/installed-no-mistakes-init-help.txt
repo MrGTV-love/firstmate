@@ -1,0 +1,17 @@
+$ no-mistakes --version
+no-mistakes version v1.86.1-private.f6.push-owner-clear.20261028 (f4c88fc68bbabeda15414a6a207aad7e6c03f3e7) 2026-10-28T01:45:38Z
+
+$ no-mistakes init --help
+Sets up or refreshes a local bare repo as a gate, installs a post-receive hook,
+best-effort isolates the gate hook path from shared local git config writes when Git supports `config --worktree`,
+adds or repairs the "no-mistakes" git remote, and records the repo in the database.
+
+Run this from inside a git repository that has an "origin" remote.
+
+Usage:
+  no-mistakes init [flags]
+
+Flags:
+      --fork-url string        GitHub fork remote URL to push branches to while opening PRs against origin
+  -h, --help                   help for init
+      --worktree-root string   Directory to create this repository's run worktrees in, so directory-scoped toolchain config (mise, direnv) reaches them; prints the worktree_roots entry to add to the global config
