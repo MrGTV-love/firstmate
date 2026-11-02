@@ -9,6 +9,8 @@ State: FM_STATE_OVERRIDE, else <FM_HOME or FM_ROOT_OVERRIDE or code root>/state,
 under github-accounting/. Private observations.sqlite holds timestamped JSON
 records. Only this database's records strictly older than 48 hours expire,
 on startup, every quota tick and prune. Existing unrelated state is untouched.
+A zero-size observations.sqlite, as an interrupted start leaves, holds no data and is
+treated as new; any other file without this owner's application id is refused unchanged.
 start detaches one owner, run stays foreground, status reports its lock ownership,
 and stop requests that owner's shutdown and awaits release. No launchd agent or
 shared service is installed. Repeating start is idempotent. run refuses a second
@@ -153,12 +155,12 @@ def ownership(root, mode):
 
 def database(root):
     path = root / "observations.sqlite"
-    existed = path.exists()
-    if not existed:
+    populated = path.exists() and path.stat().st_size > 0
+    if not populated:
         with open_private(path):
             pass
     db = sqlite3.connect(path)
-    if existed and db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
+    if populated and db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
         db.close()
         raise RuntimeError("refusing database not owned by the observer")
     db.execute("PRAGMA auto_vacuum=FULL")

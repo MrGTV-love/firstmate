@@ -386,6 +386,32 @@ wait
                 self.assertEqual(reply.returncode, 75, (name, reply.stdout, reply.stderr))
                 self.assertEqual(reply.stdout, "")
 
+    def test_zero_size_database_is_treated_as_new(self):
+        root = self.state / "github-accounting"
+        root.mkdir()
+        path = root / "observations.sqlite"
+        for command in ("prune", "start"):
+            with self.subTest(command=command):
+                path.write_bytes(b"")
+                self.assertEqual(self.cli(command, check=False).returncode, 0)
+                if command == "start":
+                    self.cli("stop")
+                db = sqlite3.connect(path)
+                self.assertEqual(db.execute("PRAGMA application_id").fetchone()[0], 0x464D4748)
+                db.close()
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                path.unlink()
+
+    def test_nonempty_non_database_file_is_refused_unchanged(self):
+        root = self.state / "github-accounting"
+        root.mkdir()
+        path = root / "observations.sqlite"
+        path.write_bytes(b"not a database")
+        for command in ("start", "prune", "records"):
+            with self.subTest(command=command):
+                self.assertEqual(self.cli(command, check=False).returncode, 1)
+                self.assertEqual(path.read_bytes(), b"not a database")
+
     def test_symlink_and_foreign_database_are_not_modified(self):
         root = self.state / "github-accounting"
         root.mkdir()
