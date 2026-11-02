@@ -15,6 +15,9 @@
 # member's full URL is considered too. Bodies are read from GitHub, GitLab and Forgejo,
 # each member by its own URL. The proof is always the merged pull request this script was
 # given (the train's own URL for a train), because a train's members close unmerged.
+# Any other GitHub pull request a train body links outside a fenced code block is not
+# read and closes nothing, so it is named on stderr for someone to check; a body with no
+# member list gets no such line.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not
@@ -46,7 +49,9 @@
 # request's own task still has its live record, which its teardown closes; on stderr
 # behind `actionable:` for every other item), and a summary line. A closed item's cleared
 # blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge it could not
-# clear is an `actionable: close-at-merge:` line on stderr.
+# clear is an `actionable: close-at-merge:` line on stderr. A linked pull request of a
+# train that is not a member is an `actionable: close-at-merge: not read <url>:` line on
+# stderr; it names no item, so it changes neither the summary counts nor the exit status.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
 # left open; exit 1 when a body cannot be read (the line names the pull request URL and
 # the read error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
@@ -246,6 +251,15 @@ while IFS= read -r candidate; do
     consider "$task" "$URL" "the task record that holds train member $member"
   done < <(tasks_recording_pr "$member")
 done < <(fm_pr_closes_train_members "$WORK/body")
+
+if [ "$n" -gt 0 ]; then
+  while IFS= read -r linked; do
+    fm_pr_url_parse "$linked" || continue
+    [ "$FM_PR_URL" != "$URL" ] || continue
+    case "$MEMBER_SEEN" in *$'\n'"$FM_PR_URL"$'\n'*) continue ;; esac
+    printf 'actionable: close-at-merge: not read %s: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed\n' "$FM_PR_URL" >&2
+  done < <(fm_pr_closes_linked_prs "$WORK/body")
+fi
 
 if [ "$CLOSED" -gt 0 ] || [ "$LEFT" -gt 0 ]; then
   printf 'close-at-merge: %s closed, %s left open\n' "$CLOSED" "$LEFT"

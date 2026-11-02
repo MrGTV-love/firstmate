@@ -745,6 +745,7 @@ fm_backlog_unblock_dependents() {  # <data-dir> <id>
     case "$line" in '  '[!\ ]*) ;; *) continue ;; esac
     line=${line#  }
     dep=${line%%,*}
+    case "$dep" in '"'*'"') dep=${dep#\"}; dep=${dep%\"} ;; esac
     case "$line" in
       *'"') rest=${line%\"}; deps=${rest##*,\"} ;;
       *) deps=${line##*,} ;;

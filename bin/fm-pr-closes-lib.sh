@@ -39,12 +39,17 @@
 # canonicalizes it with fm_pr_url_parse (GitHub pull, GitLab merge_requests, Forgejo
 # pulls) and matches by the full URL, never by number or prefix.
 #
-# Both readers take a body file path (or `-` for standard input) and print one value
+# Linked pull requests (fm_pr_closes_linked_prs). Every GitHub pull request URL the body
+# links outside a fenced code block, once each, in body order, member or not. A link to a
+# page of a pull request (`/pull/7/files`, `/pull/7#issuecomment-1`) counts as that pull
+# request. bin/fm-pr-close-items.sh uses this list only to name a linked pull request of
+# a merge train that the member list does not hold; a link never makes a member.
+#
+# All three readers take a body file path (or `-` for standard input) and print one value
 # per line. They never fail on a body without matches; they print nothing.
 
-fm_pr_closes_ids() {  # <body-file|->
-  local line id in_fence=0 fence='' closes_re='^Closes:[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*$'
-  local seen=$'\n'
+fm_pr_closes_unfenced() {  # <body-file|->
+  local line in_fence=0 fence=''
   while IFS= read -r line || [ -n "$line" ]; do
     line=${line%$'\r'}
     if [ "$in_fence" = 1 ]; then
@@ -57,13 +62,27 @@ fm_pr_closes_ids() {  # <body-file|->
       '```'*) in_fence=1; fence='```'; continue ;;
       '~~~'*) in_fence=1; fence='~~~'; continue ;;
     esac
+    printf '%s\n' "$line"
+  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+}
+
+fm_pr_closes_ids() {  # <body-file|->
+  local line id closes_re='^Closes:[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*$'
+  local seen=$'\n'
+  while IFS= read -r line; do
     [[ "$line" =~ $closes_re ]] || continue
     id=${BASH_REMATCH[1]}
     case "$id" in .*) continue ;; esac
     case "$seen" in *$'\n'"$id"$'\n'*) continue ;; esac
     seen="$seen$id"$'\n'
     printf '%s\n' "$id"
-  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+  done < <(fm_pr_closes_unfenced "${1:--}")
+}
+
+fm_pr_closes_linked_prs() {  # <body-file|->
+  fm_pr_closes_unfenced "${1:--}" \
+    | LC_ALL=C grep -Eo 'https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pull/[0-9]+' \
+    | awk '!seen[$0]++'
 }
 
 fm_pr_closes_train_members() {  # <body-file|->

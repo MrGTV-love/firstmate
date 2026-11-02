@@ -138,6 +138,7 @@ test_no_closes_line_changes_no_item_and_prose_urls_close_nothing() {
   gh_merge "$case_dir" 63
   [ "$(cx_state "$case_dir" other-item)" = queued ] || fail "c1-none: an item changed without a Closes line"
   assert_no_grep 'close-at-merge' "$case_dir/stdout" "c1-none: the close step spoke without a directive"
+  assert_no_grep 'close-at-merge' "$case_dir/stderr" "c1-none: a body with no member list named a linked PR"
   pass "a body with no Closes line, even one that links another PR, changes no item"
 }
 
@@ -402,6 +403,8 @@ check_train_outcome() {  # <case-dir> <label> <train-url>
   [ "$(cx_state "$case_dir" bare-number-task)" = queued ] || fail "$label: a pr= that is only a number matched"
   assert_grep "closed m1-item with $train" "$case_dir/stdout" "$label: the proof is not the train URL"
   assert_grep "closed m3-live-docs with $train" "$case_dir/stdout" "$label: the pr= task's proof is not the train URL"
+  assert_match "^actionable: close-at-merge: not read $REPO_URL/90: linked from a merge-train body" "$case_dir/stderr" "$label: the linked PR outside the member list was not named"
+  assert_no_grep "not read $REPO_URL/7" "$case_dir/stderr" "$label: a member was named as not read"
 }
 
 test_a_train_closes_the_items_of_its_listed_members_in_every_layout() {
@@ -455,6 +458,33 @@ test_two_members_with_one_number_in_different_repos_match_by_full_url() {
   [ "$(cx_state "$case_dir" repo-a-task)" = "done" ] || fail "c2-same-number: the matching member's task was not closed"
   [ "$(cx_state "$case_dir" repo-b-task)" = queued ] || fail "c2-same-number: a task with the same number in another repo matched"
   pass "members match by the full URL, never by number"
+}
+
+test_a_train_names_a_linked_pr_outside_its_member_list_and_leaves_its_item_open() {
+  local case_dir base=$REPO_URL
+  case_dir=$(gh_case c2-linked 84)
+  cx_add "$case_dir" member-item
+  cx_add "$case_dir" dropped-item
+  printf '%s\n' 'Closes: member-item' > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes: dropped-item' > "$case_dir/bodies/91"
+  printf '%s\n' 71 91 >> "$case_dir/merged-prs"
+  # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
+  printf '%s\n' '| Additional candidate | Result |' '| --- | --- |' \
+    "| [#91]($base/91/files) | merged |" "| $base/91 | merged |" \
+    "| $base/84 | this train |" '' \
+    '| Component | Head |' '| --- | --- |' "| $base/71 | \`a\` |" '' \
+    "See $base/71 again." '' '```' "$base/92" '```' > "$case_dir/bodies/84"
+  gh_merge "$case_dir" 84
+  [ "$(cx_state "$case_dir" member-item)" = "done" ] || fail "c2-linked: the member's item was not closed"
+  [ "$(cx_state "$case_dir" dropped-item)" = queued ] || fail "c2-linked: a linked PR outside the member list closed its item"
+  assert_match "^actionable: close-at-merge: not read $base/91: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed\$" \
+    "$case_dir/stderr" "c2-linked: the linked PR was not named with its reason"
+  [ "$(grep -c "not read $base/91:" "$case_dir/stderr")" = 1 ] || fail "c2-linked: one linked PR was named more than once"
+  assert_no_grep "not read $base/84" "$case_dir/stderr" "c2-linked: the merged PR itself was named"
+  assert_no_grep "not read $base/71" "$case_dir/stderr" "c2-linked: a member was named"
+  assert_no_grep "not read $base/92" "$case_dir/stderr" "c2-linked: a URL inside a fenced block was named"
+  assert_grep '1 closed, 0 left open' "$case_dir/stdout" "c2-linked: the linked PR changed the summary counts"
+  pass "a train names a linked PR outside its member list, reads none of its items, and counts nothing for it"
 }
 
 # --- other forges -----------------------------------------------------------
@@ -523,6 +553,27 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
 }
 
 # --- parser and blockers ----------------------------------------------------
+
+test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge() {
+  local case_dir id
+  case_dir=$(make_case c4-quoted)
+  cx_add "$case_dir" quoted-blocker docs
+  cx_add "$case_dir" other-blocker docs
+  for id in 123 1.5 true; do
+    cx_add "$case_dir" "$id"
+    cx "$case_dir" block "$id" --by quoted-blocker >/dev/null
+  done
+  cx "$case_dir" block 123 --by other-blocker >/dev/null
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "done" quoted-blocker --note finished >/dev/null 2>"$case_dir/err"
+  assert_no_grep 'actionable:' "$case_dir/err" "c4-quoted: a clear failed"
+  assert_grep 'unblocked: 123 no longer waits on quoted-blocker; it still waits on other-blocker' "$case_dir/err" "c4-quoted: the plain id 123 was not reported"
+  assert_grep 'unblocked: 1.5 no longer waits on quoted-blocker; no stored blocked-by edge remains' "$case_dir/err" "c4-quoted: the plain id 1.5 was not reported"
+  assert_grep 'unblocked: true no longer waits on quoted-blocker; no stored blocked-by edge remains' "$case_dir/err" "c4-quoted: the plain id true was not reported"
+  case "$(cx_deps "$case_dir" 123)" in *quoted-blocker*) fail "c4-quoted: 123 kept the finished edge" ;; *other-blocker*) ;; *) fail "c4-quoted: 123 lost its other blocker" ;; esac
+  [ "$(cx_deps "$case_dir" 1.5)" = none ] || fail "c4-quoted: 1.5 kept an edge"
+  [ "$(cx_deps "$case_dir" true)" = none ] || fail "c4-quoted: true kept an edge"
+  pass "a dependent whose id the list prints in quotes still loses the finished edge"
+}
 
 test_the_closes_parser_reads_real_ids_and_ignores_examples() {
   local out
@@ -759,9 +810,11 @@ test_a_train_closes_the_items_of_its_listed_members_in_every_layout
 test_a_train_with_no_closes_line_of_its_own_still_closes_member_items
 test_a_member_with_both_sources_and_an_unreadable_member
 test_two_members_with_one_number_in_different_repos_match_by_full_url
+test_a_train_names_a_linked_pr_outside_its_member_list_and_leaves_its_item_open
 test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result
 test_the_closes_parser_reads_real_ids_and_ignores_examples
+test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge
 test_a_typed_completion_that_archives_or_cannot_be_read_back
