@@ -42,11 +42,12 @@
 #     bodies. Source annotations remain inputs; ordinary comments, quoted
 #     strings, and heredoc data do not. Child-shell -c strings and heredocs fed
 #     to a shell are runtime data ShellCheck never parses: a source target they
-#     spell selects the root, as a possible caller, but stays out of its cache
-#     inputs, and anything else in them never makes the root unknown or guesses
-#     a target. Whole-word quoted aliases from an
-#     immediately preceding simple scalar declaration are resolved; intervening
-#     commands/control boundaries and effectful declarations remain unknown.
+#     spell, directly or through a positional argument, selects the root, as a
+#     possible caller, but stays out of its cache inputs, and anything else in
+#     them never makes the root unknown or guesses a target. Whole-word quoted
+#     aliases from an immediately preceding simple scalar declaration are
+#     resolved; intervening commands/control boundaries and effectful
+#     declarations remain unknown.
 #     Comments/blank lines do not execute commands; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
@@ -60,7 +61,8 @@
 # backlog backend follows the same tasks-axi lifecycle path.
 # Successful source-aware checks are shared across worktrees via content hashes
 # of the root, its source closure, the analysis arguments, owner, helper, platform,
-# and ShellCheck binary and reported version. Identical concurrent misses share one check through flock.
+# and ShellCheck binary and reported version. Identical concurrent misses share
+# one check through flock.
 # Only successful, input-stable results are retained; findings always run again.
 # FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
 # "off" disables reuse. CI always disables reuse so every canonical root is checked.
