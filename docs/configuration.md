@@ -1996,6 +1996,7 @@ The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKE
 The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
 Other names outside the default set stop reaching the worker the same way.
 That includes `VIRTUAL_ENV`, `PYTHONPATH` and `NODE_OPTIONS`, which the default deliberately omits because they are pane-specific or can inject code.
+A Git identity set only in `GIT_AUTHOR_*` or `GIT_COMMITTER_*` pane variables stops reaching the worker too; set it in Git config, which the kept `HOME`, `XDG_CONFIG_HOME` and `GIT_CONFIG_GLOBAL` still locate.
 A raw launch command runs inside this boundary, so a pane variable it expands is empty unless it is kept.
 The remedy is the optional local, gitignored `config/launch-env-allowlist`.
 That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
@@ -2012,7 +2013,7 @@ Create the file with one environment variable **name** per line, never credentia
 Blank lines and lines beginning with `#` are allowed.
 
 Invalid names, an unreadable or nonregular file, or a path inspection error (including an inaccessible configuration directory) stop the launch.
-An empty file enables filtering with only Firstmate's operational floor.
+An empty file keeps only Firstmate's operational floor.
 
 For example, a provider using `OPENAI_API_KEY` and Git using an SSH agent could use:
 
@@ -2052,7 +2053,7 @@ Choose the minimum additions for the authentication method actually in use:
 
 ### Validation and security limits
 
-Verify the selected provider login and Git transport after opting in; Firstmate does not infer credentials from model names or install a secret manager.
+Verify the selected provider login and Git transport after you change the file; Firstmate does not infer credentials from model names or install a secret manager.
 Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when an allowlist file is present, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
@@ -3007,7 +3008,7 @@ That includes any temp entry with no owner marker: a `/private/tmp/claude-<uid>/
 It also includes the home's shared `state/` files, the shared Git directory's config and hooks, credentials outside the listed harness homes, and Claude's shared `history.jsonl` prompt history, which loads no code.
 Protected lists are read at launch, so a task, home, gate or session directory created later is not covered until the worker is relaunched; only a later task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, a later `data/<other>/` directory and the contents of a later Claude session directory are still covered, by their name patterns or the protected data root.
 Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
-The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
+Apart from the shell startup read rules above, the profile does not restrict reads, network access or system calls unrelated to filesystem writes.
 In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
 macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
 `bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample, the nested copy sweep's lock launcher check and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.

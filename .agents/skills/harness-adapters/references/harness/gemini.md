@@ -39,9 +39,10 @@ Accepting persists to `~/.gemini/trustedFolders.json`, so the spawn's environmen
 ## Credential precondition, and the wedge it causes
 
 A Gemini worker needs a credential it can use without a dialog, and firstmate does not manage one.
-Export `GEMINI_API_KEY` into the environment BEFORE the session-provider daemon starts, or complete `gemini`'s own sign-in.
+Complete `gemini`'s own sign-in, or list `GEMINI_API_KEY` in the [worker launch environment allowlist](../../../docs/configuration.md#worker-launch-environment-configlaunch-env-allowlist) and export it into the environment BEFORE the session-provider daemon starts; the default launch drops the key.
 The daemon matters: a long-lived tmux or Herdr server hands panes the environment it was started with, so a key exported after that server came up never reaches a worker.
 The headless probe `gemini --skip-trust -p '<prompt>'` exits 41 with `you must specify the GEMINI_API_KEY environment variable` when no credential is resolvable, which is the cheapest pre-dispatch confirmation.
+That probe proves only the environment it runs in, so a key held only in Main's pane can pass it while a default worker launch still has no key; run it as `python3 bin/fm-worker-env.py -- gemini --skip-trust -p '<prompt>'` to drop the pane's unlisted names first.
 A first run also shows an auth-method picker (`How would you like to authenticate for this project?`, default `● 2. Use Gemini API Key`); answering it once writes `security.auth.selectedType` to the user `settings.json` and it does not return.
 
 With no credential the pane wedges on an `Enter Gemini API Key` dialog, and that dialog is dangerous in two distinct ways.
