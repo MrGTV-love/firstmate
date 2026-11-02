@@ -1,0 +1,26 @@
+## arm
+armed: state/slack.check.sh
+arm exit=0; requests served: 3
+
+## first check over real TLS: mirror cards
+exit=0
+stderr lines: 13 (each: slack: request finished;)
+cards=4
+
+## 3 s per reply through the real watcher check runner under a 6 s no-progress bound
+status=0 stopped= notice=
+exit=0
+elapsed 37.5s, requests 4
+cards=4
+
+## silent server: real socket timeout ends the read; one transport line
+exit=0
+elapsed 20.8s
+slack: transport failure: unreachable
+stderr bytes: 0 (a hung request is not progress)
+
+## second hung check: same episode, no new line
+exit=0 stdout bytes: 0
+
+## server recovers: no duplicate cards
+exit=0 stdout bytes: 0 cards=4

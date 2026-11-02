@@ -1,0 +1,798 @@
+FM_TEST_BEGIN 2026-11-02T18:26:54Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-10b the spec and the registry are checked in and agree
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 22 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+FM_TEST_END 2026-11-02T18:29:15Z tests/fm-guard-audit-closure.test.sh exit=0 duration_ms=141183 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:29:15Z tests/fm-guard-lint.test.sh family=unclassified expected_gate_skip=none
+ok - a complete single-guard registry is clean
+ok - R1 fails a duplicate id
+ok - R1 fails a duplicate invariant
+ok - R2 fails a prose-only remedy
+ok - R2 fails a remedy naming a missing script
+ok - R2 fails an empty remedy
+ok - R3 fails a proxy source with no reason
+ok - R3 accepts a proxy source with a reason
+ok - R4 fails an undeclared fail direction
+ok - R5 fails a budget above three with no reason
+ok - R5 accepts a declared budget exception
+ok - R6 fails a post-write guard with no precheck_gap
+ok - R7 fails a nonexistent owner file
+ok - R7 fails a nonexistent test file
+ok - R8 fails a guard with no telemetry target
+ok - R8 accepts an instrumented guard that calls the writer
+ok - R8 fails an instrumented guard that never calls the writer
+ok - R9 fails an exemption with no derivation
+ok - a retired guard with a live retirement test is clean
+ok - a retired guard that is still registered fails
+ok - a guard registered after the audit balances the inventory only when it is named
+ok - post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory
+ok - a guard added after the audit fails the count until it is accounted for
+ok - a post-audit guard in beyond_audit_active keeps the audited size unchanged
+ok - a post-audit entry must name a registered guard
+ok - an allowlisted violation passes
+ok - a stale allowlist entry fails, so the allowlist can only shrink
+ok - report mode prints a violation and exits 0
+ok - new-or-touched ignores an unchanged offending guard
+ok - new-or-touched fails for a touched guard
+ok - a malformed registry fails
+ok - S1 finds a REFUSED: marker site
+ok - S1 finds a refusing message site
+ok - S1 finds a message split across lines
+ok - S1 finds a message built in a variable
+ok - S1 finds a call to a refuse helper whose message has no refusal word
+ok - a helper definition is not a site, only its call
+ok - S1 finds a refuse helper call inside a one-line function definition
+ok - a one-line wrapper's helper call is a site, the helper's own definition is not
+ok - S1 finds a refuse helper call after a case-arm pattern
+ok - S1 finds a refusal inside a runtime multiline string
+ok - a runtime multiline refusal passes once a registered entry maps it
+ok - multiline docstrings are not sites while the runtime multiline string beside them is
+ok - prefixed docstrings and docstrings after a commented header are not sites
+ok - S1 finds a deny event whose guard id contains the word allow
+ok - a deny event with allow in its guard id passes once a registered entry maps it
+ok - S1 finds a deny event whose trailing comment says allow
+ok - the event's own decision argument decides, not the words around it
+ok - S1 finds a deny event whose guard id is the word allow
+ok - a deny event whose guard id is allow passes once a registered entry maps it
+ok - S1 finds the deny event among allow events that end in shell punctuation
+ok - a shell separator after the decision does not turn an allow event into a deny
+ok - S1 finds a deny wrapper call beside an allow wrapper call
+ok - a wrapper that takes the decision first is judged by that decision
+ok - a hash inside a guard id does not start a comment
+ok - a quoted closing brace is an argument, not a command boundary
+ok - a quoted pipe is an argument, not an operator
+ok - S1 finds a guard event deny inside a one-line function definition
+ok - S1 finds the Python conditional credential event decision
+ok - Python event sites exclude allow calls and same-module lexical shadowing
+ok - S1 finds an outer wrapper deny beside a same-line nested lambda binding
+ok - a nested lambda binding cannot hide the outer wrapper refusal
+ok - a genuine outer shadow stays excluded beside a same-line nested binding
+ok - an arbitrary Python record function is not a guard event
+ok - S1 finds a call to a Python refuse helper
+ok - S1 finds a hook permission deny
+ok - S1 finds the bare exit 2 of a hook script
+ok - a usage exit 2 in a hook script is not a deny
+ok - S1 fails an unmapped || exit 2 of a hook script
+ok - an argument-count exit 2 in a hook script is not a deny
+ok - a || exit 2 hook site passes once a registered entry maps it
+ok - S1 finds an unquoted refusal in a heredoc printed to stderr
+ok - S1 finds a refusal in a perl heredoc
+ok - a heredoc delimited by PERL or fed to perl is scanned as code
+ok - S1 finds a refusal in the .dsh adapter
+ok - S1 finds an opencode plugin throw
+ok - S1 finds a guard event deny
+ok - a guard event allow is not a site
+ok - comments, heredoc bodies, docstrings, test directories, variables, paths and compared values are not sites
+ok - S1 fails a refusal site that maps to no registry entry
+ok - a refusal site passes once a registered entry maps it with a sites marker
+ok - a site inside the owner file passes when its marker names it
+ok - S1 fails a new site added inside an already-mapped owner file
+ok - S2 fails a sites marker that matches no site
+ok - S2 fails a marker that matches more sites than its count declares
+ok - a group entry with a counted marker passes
+ok - S2 fails a site that two entries map
+ok - a block context distinguishes identical lines enforcing different invariants
+ok - moving identical refusal blocks keeps every site mapped
+ok - a new identical refusal in another block is S1
+ok - a new identical refusal in a mapped block changes its marker count
+ok - a block context still cannot give a site two owners
+ok - a valid key and context do not bypass marker text
+ok - a missing site key is stale
+ok - an occurrence-ordered key never selects a site
+ok - a non-string site key is invalid
+ok - a non-string block context is invalid
+ok - the restored block contexts map both identical lines
+ok - S4 fails a typed unregistered_ids list that disagrees with the scan
+ok - a typed unregistered_ids list of the computed length raises no S4
+ok - --counts prints the computed unregistered count
+ok - an allowlisted legacy site passes enforce
+ok - an allowlisted legacy site still counts as unregistered
+ok - deleting a site makes its allowlist entry stale, so the burn-down list only shrinks
+ok - a duplicate of an allowlisted line is a new site
+ok - new-or-touched ignores a legacy site on an unchanged line
+ok - new-or-touched fails a touched legacy site that is still unmapped
+ok - new-or-touched fails a touched legacy site under diff.noprefix
+ok - new-or-touched passes a touched legacy site once it is mapped
+ok - new-or-touched fails a new refusal site that maps to nothing
+ok - new-or-touched passes a new refusal site once its guard entry maps it
+ok - a git-ignored file is not a site while an untracked new file still is
+ok - new-or-touched fails a new site that an existing marker absorbs
+ok - S5 fails an allowlist that grew against the base
+ok - S5 fails an allowlist that drops back below the sealed schema
+ok - fm-guard-lint
+FM_TEST_END 2026-11-02T18:31:40Z tests/fm-guard-lint.test.sh exit=0 duration_ms=144615 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:31:40Z tests/fm-guard-refcheck.test.sh family=unclassified expected_gate_skip=none
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a registry spec path that resolves is clean
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+FM_TEST_END 2026-11-02T18:31:57Z tests/fm-guard-refcheck.test.sh exit=0 duration_ms=17301 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:31:57Z tests/fm-slack-deadline.test.sh family=unclassified expected_gate_skip=none
+slow check elapsed: 38.124s; request timings: [{"method": "conversations.open", "timeout": 10, "seconds": 0.0006602919893339276}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0009436249965801835}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0009936250280588865}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0009328749729320407}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0050221660058014095}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0006368749891407788}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0006367500172927976}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005382089875638485}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0024154999991878867}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00675658299587667}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00028600002406165004}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00024287495762109756}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0008833329775370657}]
+ok - slow standing check completes after 38.124s; four cards remain four on repeat
+ok - watcher lets 4 requests of 3s each finish under a 6s no-progress bound
+ok - longest silent read ends after 10.002s, before owner no-progress bound 30s; one report per episode
+hanging request timings: [{"method": "conversations.replies", "timeout": 10, "seconds": 10.000944665982388}, {"method": "conversations.replies", "timeout": 10, "seconds": 10.001535333052743}]
+FM_TEST_END 2026-11-02T18:34:34Z tests/fm-slack-deadline.test.sh exit=0 duration_ms=156827 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:34:34Z tests/fm-copy-sweep-orphan.test.sh family=unclassified expected_gate_skip=none
+copy-sweep: mode=report containers=1 copies=4
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/clean	clean, no process, no record, content already in the default branch, Vernant launcher 5653 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: mode=apply containers=1 copies=3
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home/projects/example/.claude/worktrees/clean	branch fm/squashed at 09d9852c5a81, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 5653 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/squash/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=1 freed=0.00
+exit=0
+ok - locked squash-contained orphan is reaped; a unique commit, tracked edit and untracked file are held
+copy-sweep: mode=report containers=1 copies=4
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/locked	clean, no process, no record, content already in the default branch, Vernant launcher 44648 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, content already in the default branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=2
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: mode=apply containers=1 copies=2
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/unlocked	branch detached at 2019766506a2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home/projects/example/.claude/worktrees/locked	branch detached at 2019766506a2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 44648 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=2
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/later-edit/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=2 freed=0.00
+exit=0
+ok - after a later main edit to a squash-merged path, report and apply agree on every copy
+ok - live launcher holds, exited launcher is absent, failed or incomplete observations remain unknown
+copy-sweep: mode=apply containers=1 copies=3
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/missing	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/scratch	branch detached at 9e56be1cb6b2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/missing	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/mismatch	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/log	branch detached at 9e56be1cb6b2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/generated	branch detached at 9e56be1cb6b2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/projects/example/.claude/worktrees/cache	branch detached at 9e56be1cb6b2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.00 reaped=4 freed=0.00
+exit=1
+class=cache source_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/data/copy-sweep/20261102T183512Z.91450-9e56be1cb6b2f2557e46f4d57bc6d51ced8fa2ec/nested-copy-preserved/4856fcc01cffc38421bd98489b6fddcfc6e0470afef5efa712e5edf6491339d8/.import_linter_cache/payload preserved_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d disposition=removed
+class=scratch source_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/data/copy-sweep/20261102T183512Z.91450-9e56be1cb6b2f2557e46f4d57bc6d51ced8fa2ec/nested-copy-preserved/1bace77d17345c6932930244297769b947d999b044f81f70d106cc0aaf58b72c/.tac/tmp/payload preserved_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e disposition=removed
+class=log source_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/data/copy-sweep/20261102T183512Z.91450-9e56be1cb6b2f2557e46f4d57bc6d51ced8fa2ec/nested-copy-preserved/71e3ff72cad9457a89adbe6124bb9b1c6dcfa88cc642ee883745bdc0d3491ccb/.claude/logs/payload preserved_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b disposition=removed
+class=generated source_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/preserved/home/data/copy-sweep/20261102T183512Z.91450-9e56be1cb6b2f2557e46f4d57bc6d51ced8fa2ec/nested-copy-preserved/0d0b27154b8309258993425109ad155d9fedba0344776bc720e8f5a0c4f0afa5/graft/payload preserved_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c disposition=removed
+ok - cache, scratch, log and generated bytes survive by hash; unique, missing and mismatched preservation hold
+copy-sweep: mode=report containers=1 copies=4
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 25151 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.01 GiB removed with it, not preserved
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home: 0.01 GiB of 20 GiB, ok
+regenerable: 0.01 GiB in 2 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: mode=apply containers=1 copies=2
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/unlocked	branch detached at faa61dd70ad6, copy 0.01 GiB, preserved 0.00 GiB, net freed 0.01 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home/projects/example/.claude/worktrees/locked	branch detached at faa61dd70ad6, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 25151 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/class-world/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.01 reaped=2 freed=0.01
+exit=0
+ok - the closed regenerable class goes with a proven copy, other ignored paths survive by hash, and held copies are unchanged
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 51969 is gone
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/held-unique	branch detached at 729b48b6406d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/held-cache	branch detached at 729b48b6406d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=2 freed=0.00
+exit=1
+copy-sweep: mode=report containers=1 copies=2
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/unlocked	branch detached at 729b48b6406d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=1 freed=0.00
+exit=0
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writer.cache/home/projects/example/.claude/worktrees/locked	branch detached at 729b48b6406d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 51969 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+exit=0
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 24107 is gone
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/held-unique	branch detached at 20d555e6bafe, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/held-cache	branch detached at 20d555e6bafe, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=2 freed=0.00
+exit=1
+copy-sweep: mode=report containers=1 copies=2
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/unlocked	branch detached at 20d555e6bafe, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=1 freed=0.00
+exit=0
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/writernode_modules/home/projects/example/.claude/worktrees/locked	branch detached at 20d555e6bafe, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 24107 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+exit=0
+ok - a write inside .cache or node_modules stops a release and keeps a locked copy WAITING until it is quiet
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 16943 is gone
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/unlocked	branch detached at 58af439da7ba, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/held-unique	branch detached at 58af439da7ba, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/held-cache	branch detached at 58af439da7ba, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=3 freed=0.00
+exit=1
+copy-sweep: mode=report containers=1 copies=1
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 16943 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home: 0.00 GiB of 0 GiB, over
+regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
+exit=0
+copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
+exit=0
+copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
+exit=0
+copy-sweep: mode=report containers=1 copies=1
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 16943 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/check-world/home: 0.00 GiB of 0 GiB, over
+regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
+exit=0
+ok - check and report give a quiet waiting copy with file bytes the same class
+copy-sweep: mode=apply containers=1 copies=5
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/changed	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/changed	copy changed after preservation; the copy was left
+summary: REAPABLE-PROVEN=3
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=5
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=5
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/refused/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=0 freed=0.00
+exit=1
+ok - three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/newcontent	branch detached at b914b19cc521, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.cCyTHI/activity/home/projects/example/.claude/worktrees/activity	branch detached at b914b19cc521, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=2 freed=0.00
+exit=0
+ok - three applies with only activity or new content add no preserve, and the quiet release preserves once
+diagnostic_exit1_state=2 expected_unknown=2
+ok - only the exact not-found line for this PID joins empty absence; every other diagnostic stays unknown
+FM_TEST_END 2026-11-02T18:37:55Z tests/fm-copy-sweep-orphan.test.sh exit=0 duration_ms=201013 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:37:56Z tests/fm-write-confinement.test.sh family=unclassified expected_gate_skip=none
+PASS source boundary: env, Python and child shell lose fake credential; operational floor survives; explicit auth retention preserves empty/absent semantics
+PASS generated source boundary: destination-only unexported values and quoted data survive; fake credential absent; invalid names emit no executable source
+PASS harness route: every harness keeps work plumbing and only its own store selector, and no harness keeps a fake provider key; the floor omits inbox and duration names
+PASS toolchain route: a set JAVA_HOME reaches the worker, an unset home path stays unset, and VIRTUAL_ENV, PYTHONPATH, NODE_OPTIONS and a fake provider key do not; --harness refuses outside the generated prefix
+reader startup: Bash/Zsh login-interactive children cannot restore fake credential; PATH/TERM retained; admission event recorded
+invalid project source: refused with project and failed command; no profile published
+claude baseline: {"a": false, "archive-own-pipeline-create": true, "archive-own-pipeline-delete": true, "archive-own-pipeline-update": true, "archive-own-submitted-create": true, "archive-own-submitted-delete": true, "archive-own-submitted-update": true, "b": false, "busy-transition": true, "c": false, "claude-debug": true, "claude-file-history": true, "claude-history": true, "claude-history-lock": true, "claude-json-backup": true, "claude-session-env": true, "claude-statsig": true, "claude-tasks": true, "claude-transcript": true, "claude-transcript-sidecar": true, "d": true, "duration": true, "duration-group-complete": true, "duration-keep-going": true, "duration-ps-table": true, "duration-stale-holder": true, "e-append": true, "e-other.status": false, "e-task.other.status": false, "fetch": true, "fleet-ledger": true, "foreign-audit-denied": false, "gate-push": true, "guard-filesystem-owner": false, "identity": "Mon Nov  2 12:38:17 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(300) josM-CM-) a\\012b t\\011b \n", "inbox-handled": true, "late-tasks-recorded": true, "lint-cpu-sample": true, "native-session-proof": true, "ordinary-source-readable": true, "own-data": true, "own-git-commit": true, "own-home-tmp": true, "packed-branch-resolves": true, "proc-budget": true, "procevent-board": true, "procevent-poll": true, "push-upstream": true, "reap-orphan": true, "refused-archive-contained-id": false, "refused-archive-containing-id": false, "refused-archive-extending-id": false, "refused-archive-hard-link-other-branch": false, "refused-archive-late-extending-id": false, "refused-archive-late-shape-id": false, "refused-archive-other-task": false, "refused-archive-outside-archive": false, "refused-archive-own-id-alone": false, "refused-archive-own-id-long-hex": false, "refused-archive-own-id-nested": false, "refused-archive-own-id-no-hex": false, "refused-archive-own-id-non-hex": false, "refused-archive-own-id-other-shape": false, "refused-archive-own-id-short-hex": false, "refused-archive-own-id-suffix": false, "refused-archive-reflog-extending-id": false, "refused-archive-reflog-late-extending-id": false, "refused-archive-reflog-other-task": false, "refused-archive-rename-other-branch": false, "refused-archive-symlink-folder-other-branch": false, "refused-archive-symlink-other-branch": false, "refused-claude-json": false, "refused-claude-json-config-dir": false, "refused-claude-json-config-dir-atomic": false, "refused-codex-home": false, "refused-commondir": false, "refused-config": false, "refused-data-backlog": false, "refused-data-captain": false, "refused-data-secondmates": false, "refused-dsh-home": false, "refused-env": false, "refused-extending-task-home-tmp": false, "refused-fetch-prune-packed": false, "refused-harness.claude-.credentials.json": false, "refused-harness.claude-CLAUDE.md": false, "refused-harness.claude-agents-agent.md": false, "refused-harness.claude-commands-command.md": false, "refused-harness.claude-file-history-99999999-8888-4777-8666-555555555555-backup": false, "refused-harness.claude-hooks-hook.sh": false, "refused-harness.claude-plugins-plugin.json": false, "refused-harness.claude-projects-own-project-99999999-8888-4777-8666-555555555555.jsonl": false, "refused-harness.claude-projects-p-memory-MEMORY.md": false, "refused-harness.claude-projects-p-session.jsonl": false, "refused-harness.claude-rules-rule.md": false, "refused-harness.claude-session-env-99999999-8888-4777-8666-555555555555-hook.sh": false, "refused-harness.claude-session-env-session-hook.sh": false, "refused-harness.claude-sessions-1234.json": false, "refused-harness.claude-settings.json": false, "refused-harness.claude-settings.local.json": false, "refused-harness.claude-shell-snapshots-snapshot-zsh.sh": false, "refused-harness.claude-skills-skill-SKILL.md": false, "refused-harness.claude-statusline.sh": false, "refused-harness.claude-tasks-99999999-8888-4777-8666-555555555555-1.json": false, "refused-harness.claude-todos-11111111-2222-4333-8444-555555555555-agent-11111111-2222-4333-8444-555555555555.json": false, "refused-harness.omp-agent-.env": false, "refused-harness.omp-agent-auth.json": false, "refused-harness.omp-agent-config.yml": false, "refused-harness.omp-agent-extensions-extension.ts": false, "refused-harness.omp-agent-managed-skills-skill.md": false, "refused-harness.omp-agent-memories-memory.md": false, "refused-harness.omp-agent-models.yml": false, "refused-harness.omp-agent-settings.json": false, "refused-harness.omp-plugins-plugin.ts": false, "refused-harness.omp-run-daemons-0000000000000000-broker.pid": false, "refused-home-primary": false, "refused-late-extending-task-meta": false, "refused-late-shape-task-meta": false, "refused-late-task-control-relaunch": false, "refused-late-task-meta": false, "refused-main-control-relaunch": false, "refused-main-git-hooks": false, "refused-main-meta": false, "refused-other-branch": false, "refused-other-data": false, "refused-other-gate": false, "refused-other-gate-push": false, "refused-other-home": false, "refused-other-task-temp": false, "refused-other-worktree-nested": false, "refused-other-worktree-pool": false, "refused-pack-refs": false, "refused-packed-branch-delete": false, "refused-packed-own-archive-delete": false, "refused-packed-refs-link-create": false, "refused-packed-refs-link-create-outside": false, "refused-packed-refs-new-file": false, "refused-packed-refs-rename-over": false, "refused-packed-refs-write": false, "refused-packed-remote-ref-delete": false, "refused-packed-stash-removal-ref-kept": false, "refused-primary-head": false, "refused-primary-index": false, "refused-project-primary": false, "refused-reftable-switch": false, "refused-rename-claude-temp-session": false, "refused-rename-gates": false, "refused-rename-git-packed-refs": false, "refused-rename-git-refs": false, "refused-rename-git-worktrees": false, "refused-rename-other-data": false, "refused-rename-state": false, "refused-rename-worktree-parent": false, "refused-replace-ref": false, "refused-setuid-ps": false, "refused-shared-legacy-audit": false, "refused-startup-bash": false, "refused-startup-zsh": false, "refused-transcript-container-rename": false, "session-lock-ancestry": true, "stash": true, "symlink": false, "task-audit-written": true, "tool-cache": true}
+claude baseline fresh container: {"create-and-append": true, "deleted": true, "file": true, "renamed": true, "session-folders-created": ["projects", "session-env", "file-history", "tasks"], "symlink": true}
+claude baseline archive branch file: {"archive-branch-kept": true, "own-archive-created": true}
+claude confined: {"a": true, "archive-own-pipeline-create": true, "archive-own-pipeline-delete": true, "archive-own-pipeline-update": true, "archive-own-submitted-create": true, "archive-own-submitted-delete": true, "archive-own-submitted-update": true, "b": true, "busy-transition": true, "c": true, "claude-debug": true, "claude-file-history": true, "claude-history": true, "claude-history-lock": true, "claude-json-backup": true, "claude-session-env": true, "claude-statsig": true, "claude-tasks": true, "claude-transcript": true, "claude-transcript-sidecar": true, "d": true, "duration": true, "duration-group-complete": true, "duration-keep-going": true, "duration-ps-table": true, "duration-stale-holder": true, "e-append": true, "e-other.status": true, "e-task.other.status": true, "fetch": true, "fleet-ledger": true, "foreign-audit-denied": true, "gate-push": true, "guard-filesystem-owner": true, "identity": "Mon Nov  2 12:38:49 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(300) josM-CM-) a\\012b t\\011b \n", "inbox-handled": true, "late-tasks-recorded": true, "lint-cpu-sample": true, "native-session-proof": true, "ordinary-source-readable": true, "own-data": true, "own-git-commit": true, "own-home-tmp": true, "packed-branch-resolves": true, "proc-budget": true, "procevent-board": true, "procevent-poll": true, "push-upstream": true, "reap-orphan": true, "refused-archive-contained-id": true, "refused-archive-containing-id": true, "refused-archive-extending-id": true, "refused-archive-hard-link-other-branch": true, "refused-archive-late-extending-id": true, "refused-archive-late-shape-id": true, "refused-archive-other-task": true, "refused-archive-outside-archive": true, "refused-archive-own-id-alone": true, "refused-archive-own-id-long-hex": true, "refused-archive-own-id-nested": true, "refused-archive-own-id-no-hex": true, "refused-archive-own-id-non-hex": true, "refused-archive-own-id-other-shape": true, "refused-archive-own-id-short-hex": true, "refused-archive-own-id-suffix": true, "refused-archive-reflog-extending-id": true, "refused-archive-reflog-late-extending-id": true, "refused-archive-reflog-other-task": true, "refused-archive-rename-other-branch": true, "refused-archive-symlink-folder-other-branch": true, "refused-archive-symlink-other-branch": true, "refused-claude-json": true, "refused-claude-json-config-dir": true, "refused-claude-json-config-dir-atomic": true, "refused-codex-home": true, "refused-commondir": true, "refused-config": true, "refused-data-backlog": true, "refused-data-captain": true, "refused-data-secondmates": true, "refused-dsh-home": true, "refused-env": true, "refused-extending-task-home-tmp": true, "refused-fetch-prune-packed": true, "refused-harness.claude-.credentials.json": true, "refused-harness.claude-CLAUDE.md": true, "refused-harness.claude-agents-agent.md": true, "refused-harness.claude-commands-command.md": true, "refused-harness.claude-file-history-99999999-8888-4777-8666-555555555555-backup": true, "refused-harness.claude-hooks-hook.sh": true, "refused-harness.claude-plugins-plugin.json": true, "refused-harness.claude-projects-own-project-99999999-8888-4777-8666-555555555555.jsonl": true, "refused-harness.claude-projects-p-memory-MEMORY.md": true, "refused-harness.claude-projects-p-session.jsonl": true, "refused-harness.claude-rules-rule.md": true, "refused-harness.claude-session-env-99999999-8888-4777-8666-555555555555-hook.sh": true, "refused-harness.claude-session-env-session-hook.sh": true, "refused-harness.claude-sessions-1234.json": true, "refused-harness.claude-settings.json": true, "refused-harness.claude-settings.local.json": true, "refused-harness.claude-shell-snapshots-snapshot-zsh.sh": true, "refused-harness.claude-skills-skill-SKILL.md": true, "refused-harness.claude-statusline.sh": true, "refused-harness.claude-tasks-99999999-8888-4777-8666-555555555555-1.json": true, "refused-harness.claude-todos-11111111-2222-4333-8444-555555555555-agent-11111111-2222-4333-8444-555555555555.json": true, "refused-harness.omp-agent-.env": true, "refused-harness.omp-agent-auth.json": true, "refused-harness.omp-agent-config.yml": true, "refused-harness.omp-agent-extensions-extension.ts": true, "refused-harness.omp-agent-managed-skills-skill.md": true, "refused-harness.omp-agent-memories-memory.md": true, "refused-harness.omp-agent-models.yml": true, "refused-harness.omp-agent-settings.json": true, "refused-harness.omp-plugins-plugin.ts": true, "refused-harness.omp-run-daemons-0000000000000000-broker.pid": true, "refused-home-primary": true, "refused-late-extending-task-meta": true, "refused-late-shape-task-meta": true, "refused-late-task-control-relaunch": true, "refused-late-task-meta": true, "refused-main-control-relaunch": true, "refused-main-git-hooks": true, "refused-main-meta": true, "refused-other-branch": true, "refused-other-data": true, "refused-other-gate": true, "refused-other-gate-push": true, "refused-other-home": true, "refused-other-task-temp": true, "refused-other-worktree-nested": true, "refused-other-worktree-pool": true, "refused-pack-refs": true, "refused-packed-branch-delete": true, "refused-packed-own-archive-delete": true, "refused-packed-refs-link-create": true, "refused-packed-refs-link-create-outside": true, "refused-packed-refs-new-file": true, "refused-packed-refs-rename-over": true, "refused-packed-refs-write": true, "refused-packed-remote-ref-delete": true, "refused-packed-stash-removal-ref-kept": true, "refused-primary-head": true, "refused-primary-index": true, "refused-project-primary": true, "refused-reftable-switch": true, "refused-rename-claude-temp-session": true, "refused-rename-gates": true, "refused-rename-git-packed-refs": true, "refused-rename-git-refs": true, "refused-rename-git-worktrees": true, "refused-rename-other-data": true, "refused-rename-state": true, "refused-rename-worktree-parent": true, "refused-replace-ref": true, "refused-setuid-ps": true, "refused-shared-legacy-audit": true, "refused-startup-bash": true, "refused-startup-zsh": true, "refused-transcript-container-rename": true, "session-lock-ancestry": true, "stash": true, "symlink": true, "task-audit-written": true, "tool-cache": true}
+claude confined fresh container: {"create-and-append": true, "deleted": false, "file": false, "renamed": false, "session-folders-created": [], "symlink": false}
+claude confined archive branch file: {"archive-branch-kept": true, "own-archive-created": false}
+claude aliases: worktree, outside-worktree, task-data, loose-ref, head, other-worktree-HEAD, other-worktree-index, other-worktree-commondir, symlinked-ref, symlinked-folder refused naming path and link count or target; symbolic-link HEAD and clean builds still work
+reftable source: refused; no profile published
+omp baseline: {"a": false, "archive-own-pipeline-create": true, "archive-own-pipeline-delete": true, "archive-own-pipeline-update": true, "archive-own-submitted-create": true, "archive-own-submitted-delete": true, "archive-own-submitted-update": true, "b": false, "busy-transition": true, "c": false, "d": true, "duration": true, "duration-group-complete": true, "duration-keep-going": true, "duration-ps-table": true, "duration-stale-holder": true, "e-append": true, "e-other.status": false, "e-task.other.status": false, "fetch": true, "fleet-ledger": true, "foreign-audit-denied": false, "gate-push": true, "guard-filesystem-owner": false, "identity": "Mon Nov  2 12:39:15 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(300) josM-CM-) a\\012b t\\011b \n", "inbox-handled": true, "late-tasks-recorded": true, "lint-cpu-sample": true, "native-session-proof": true, "omp-agent-db": true, "omp-agent-db-wal": true, "omp-daemon-scope": true, "omp-models-db-shm": true, "omp-session": true, "ordinary-source-readable": true, "own-data": true, "own-git-commit": true, "own-home-tmp": true, "packed-branch-resolves": true, "proc-budget": true, "procevent-board": true, "procevent-poll": true, "push-upstream": true, "reap-orphan": true, "refused-archive-contained-id": false, "refused-archive-containing-id": false, "refused-archive-extending-id": false, "refused-archive-hard-link-other-branch": false, "refused-archive-late-extending-id": false, "refused-archive-late-shape-id": false, "refused-archive-other-task": false, "refused-archive-outside-archive": false, "refused-archive-own-id-alone": false, "refused-archive-own-id-long-hex": false, "refused-archive-own-id-nested": false, "refused-archive-own-id-no-hex": false, "refused-archive-own-id-non-hex": false, "refused-archive-own-id-other-shape": false, "refused-archive-own-id-short-hex": false, "refused-archive-own-id-suffix": false, "refused-archive-reflog-extending-id": false, "refused-archive-reflog-late-extending-id": false, "refused-archive-reflog-other-task": false, "refused-archive-rename-other-branch": false, "refused-archive-symlink-folder-other-branch": false, "refused-archive-symlink-other-branch": false, "refused-codex-home": false, "refused-commondir": false, "refused-config": false, "refused-data-backlog": false, "refused-data-captain": false, "refused-data-secondmates": false, "refused-dsh-home": false, "refused-env": false, "refused-extending-task-home-tmp": false, "refused-fetch-prune-packed": false, "refused-harness.claude-.credentials.json": false, "refused-harness.claude-CLAUDE.md": false, "refused-harness.claude-agents-agent.md": false, "refused-harness.claude-commands-command.md": false, "refused-harness.claude-file-history-99999999-8888-4777-8666-555555555555-backup": false, "refused-harness.claude-hooks-hook.sh": false, "refused-harness.claude-plugins-plugin.json": false, "refused-harness.claude-projects-own-project-99999999-8888-4777-8666-555555555555.jsonl": false, "refused-harness.claude-projects-p-memory-MEMORY.md": false, "refused-harness.claude-projects-p-session.jsonl": false, "refused-harness.claude-rules-rule.md": false, "refused-harness.claude-session-env-99999999-8888-4777-8666-555555555555-hook.sh": false, "refused-harness.claude-session-env-session-hook.sh": false, "refused-harness.claude-sessions-1234.json": false, "refused-harness.claude-settings.json": false, "refused-harness.claude-settings.local.json": false, "refused-harness.claude-shell-snapshots-snapshot-zsh.sh": false, "refused-harness.claude-skills-skill-SKILL.md": false, "refused-harness.claude-statusline.sh": false, "refused-harness.claude-tasks-99999999-8888-4777-8666-555555555555-1.json": false, "refused-harness.claude-todos-11111111-2222-4333-8444-555555555555-agent-11111111-2222-4333-8444-555555555555.json": false, "refused-harness.omp-agent-.env": false, "refused-harness.omp-agent-auth.json": false, "refused-harness.omp-agent-config.yml": false, "refused-harness.omp-agent-extensions-extension.ts": false, "refused-harness.omp-agent-managed-skills-skill.md": false, "refused-harness.omp-agent-memories-memory.md": false, "refused-harness.omp-agent-models.yml": false, "refused-harness.omp-agent-settings.json": false, "refused-harness.omp-plugins-plugin.ts": false, "refused-harness.omp-run-daemons-0000000000000000-broker.pid": false, "refused-home-primary": false, "refused-late-extending-task-meta": false, "refused-late-shape-task-meta": false, "refused-late-task-control-relaunch": false, "refused-late-task-meta": false, "refused-main-control-relaunch": false, "refused-main-git-hooks": false, "refused-main-meta": false, "refused-other-branch": false, "refused-other-data": false, "refused-other-gate": false, "refused-other-gate-push": false, "refused-other-home": false, "refused-other-task-temp": false, "refused-other-worktree-nested": false, "refused-other-worktree-pool": false, "refused-pack-refs": false, "refused-packed-branch-delete": false, "refused-packed-own-archive-delete": false, "refused-packed-refs-link-create": false, "refused-packed-refs-link-create-outside": false, "refused-packed-refs-new-file": false, "refused-packed-refs-rename-over": false, "refused-packed-refs-write": false, "refused-packed-remote-ref-delete": false, "refused-packed-stash-removal-ref-kept": false, "refused-primary-head": false, "refused-primary-index": false, "refused-project-primary": false, "refused-reftable-switch": false, "refused-rename-claude-temp-session": false, "refused-rename-gates": false, "refused-rename-git-packed-refs": false, "refused-rename-git-refs": false, "refused-rename-git-worktrees": false, "refused-rename-other-data": false, "refused-rename-state": false, "refused-rename-worktree-parent": false, "refused-replace-ref": false, "refused-setuid-ps": false, "refused-shared-legacy-audit": false, "refused-startup-bash": false, "refused-startup-zsh": false, "session-lock-ancestry": true, "stash": true, "symlink": false, "task-audit-written": true, "tool-cache": true}
+omp baseline archive branch file: {"archive-branch-kept": true, "own-archive-created": true}
+omp confined: {"a": true, "archive-own-pipeline-create": true, "archive-own-pipeline-delete": true, "archive-own-pipeline-update": true, "archive-own-submitted-create": true, "archive-own-submitted-delete": true, "archive-own-submitted-update": true, "b": true, "busy-transition": true, "c": true, "d": true, "duration": true, "duration-group-complete": true, "duration-keep-going": true, "duration-ps-table": true, "duration-stale-holder": true, "e-append": true, "e-other.status": true, "e-task.other.status": true, "fetch": true, "fleet-ledger": true, "foreign-audit-denied": true, "gate-push": true, "guard-filesystem-owner": true, "identity": "Mon Nov  2 12:40:06 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(300) josM-CM-) a\\012b t\\011b \n", "inbox-handled": true, "late-tasks-recorded": true, "lint-cpu-sample": true, "native-session-proof": true, "omp-agent-db": true, "omp-agent-db-wal": true, "omp-daemon-scope": true, "omp-models-db-shm": true, "omp-session": true, "ordinary-source-readable": true, "own-data": true, "own-git-commit": true, "own-home-tmp": true, "packed-branch-resolves": true, "proc-budget": true, "procevent-board": true, "procevent-poll": true, "push-upstream": true, "reap-orphan": true, "refused-archive-contained-id": true, "refused-archive-containing-id": true, "refused-archive-extending-id": true, "refused-archive-hard-link-other-branch": true, "refused-archive-late-extending-id": true, "refused-archive-late-shape-id": true, "refused-archive-other-task": true, "refused-archive-outside-archive": true, "refused-archive-own-id-alone": true, "refused-archive-own-id-long-hex": true, "refused-archive-own-id-nested": true, "refused-archive-own-id-no-hex": true, "refused-archive-own-id-non-hex": true, "refused-archive-own-id-other-shape": true, "refused-archive-own-id-short-hex": true, "refused-archive-own-id-suffix": true, "refused-archive-reflog-extending-id": true, "refused-archive-reflog-late-extending-id": true, "refused-archive-reflog-other-task": true, "refused-archive-rename-other-branch": true, "refused-archive-symlink-folder-other-branch": true, "refused-archive-symlink-other-branch": true, "refused-codex-home": true, "refused-commondir": true, "refused-config": true, "refused-data-backlog": true, "refused-data-captain": true, "refused-data-secondmates": true, "refused-dsh-home": true, "refused-env": true, "refused-extending-task-home-tmp": true, "refused-fetch-prune-packed": true, "refused-harness.claude-.credentials.json": true, "refused-harness.claude-CLAUDE.md": true, "refused-harness.claude-agents-agent.md": true, "refused-harness.claude-commands-command.md": true, "refused-harness.claude-file-history-99999999-8888-4777-8666-555555555555-backup": true, "refused-harness.claude-hooks-hook.sh": true, "refused-harness.claude-plugins-plugin.json": true, "refused-harness.claude-projects-own-project-99999999-8888-4777-8666-555555555555.jsonl": true, "refused-harness.claude-projects-p-memory-MEMORY.md": true, "refused-harness.claude-projects-p-session.jsonl": true, "refused-harness.claude-rules-rule.md": true, "refused-harness.claude-session-env-99999999-8888-4777-8666-555555555555-hook.sh": true, "refused-harness.claude-session-env-session-hook.sh": true, "refused-harness.claude-sessions-1234.json": true, "refused-harness.claude-settings.json": true, "refused-harness.claude-settings.local.json": true, "refused-harness.claude-shell-snapshots-snapshot-zsh.sh": true, "refused-harness.claude-skills-skill-SKILL.md": true, "refused-harness.claude-statusline.sh": true, "refused-harness.claude-tasks-99999999-8888-4777-8666-555555555555-1.json": true, "refused-harness.claude-todos-11111111-2222-4333-8444-555555555555-agent-11111111-2222-4333-8444-555555555555.json": true, "refused-harness.omp-agent-.env": true, "refused-harness.omp-agent-auth.json": true, "refused-harness.omp-agent-config.yml": true, "refused-harness.omp-agent-extensions-extension.ts": true, "refused-harness.omp-agent-managed-skills-skill.md": true, "refused-harness.omp-agent-memories-memory.md": true, "refused-harness.omp-agent-models.yml": true, "refused-harness.omp-agent-settings.json": true, "refused-harness.omp-plugins-plugin.ts": true, "refused-harness.omp-run-daemons-0000000000000000-broker.pid": true, "refused-home-primary": true, "refused-late-extending-task-meta": true, "refused-late-shape-task-meta": true, "refused-late-task-control-relaunch": true, "refused-late-task-meta": true, "refused-main-control-relaunch": true, "refused-main-git-hooks": true, "refused-main-meta": true, "refused-other-branch": true, "refused-other-data": true, "refused-other-gate": true, "refused-other-gate-push": true, "refused-other-home": true, "refused-other-task-temp": true, "refused-other-worktree-nested": true, "refused-other-worktree-pool": true, "refused-pack-refs": true, "refused-packed-branch-delete": true, "refused-packed-own-archive-delete": true, "refused-packed-refs-link-create": true, "refused-packed-refs-link-create-outside": true, "refused-packed-refs-new-file": true, "refused-packed-refs-rename-over": true, "refused-packed-refs-write": true, "refused-packed-remote-ref-delete": true, "refused-packed-stash-removal-ref-kept": true, "refused-primary-head": true, "refused-primary-index": true, "refused-project-primary": true, "refused-reftable-switch": true, "refused-rename-claude-temp-session": true, "refused-rename-gates": true, "refused-rename-git-packed-refs": true, "refused-rename-git-refs": true, "refused-rename-git-worktrees": true, "refused-rename-other-data": true, "refused-rename-state": true, "refused-rename-worktree-parent": true, "refused-replace-ref": true, "refused-setuid-ps": true, "refused-shared-legacy-audit": true, "refused-startup-bash": true, "refused-startup-zsh": true, "session-lock-ancestry": true, "stash": true, "symlink": true, "task-audit-written": true, "tool-cache": true}
+omp confined archive branch file: {"archive-branch-kept": true, "own-archive-created": false}
+omp aliases: worktree, outside-worktree, task-data, loose-ref, head, other-worktree-HEAD, other-worktree-index, other-worktree-commondir, symlinked-ref, symlinked-folder refused naming path and link count or target; symbolic-link HEAD and clean builds still work
+ok - T5 a-e, gate push, duration, procevent and fleet-ledger writes, and refused writes and renames per protected asset class under the omp and Claude profiles
+FM_TEST_END 2026-11-02T18:41:12Z tests/fm-write-confinement.test.sh exit=0 duration_ms=195863 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:41:12Z tests/fm-self-repo-role.test.sh family=unclassified expected_gate_skip=none
+ok - fm-role.sh report: default, user, and maintainer directives resolve
+ok - fm-role.sh report: malformed, unknown, and unsafe input fails closed
+ok - fm-role.sh check: the default user/operator home cannot publish to firstmate upstream
+ok - fm-role.sh check: a task on an ordinary project is untouched by the boundary
+ok - fm-role.sh check: a matching maintainer scope authorizes the self-repository publication
+ok - fm-role.sh check: scope mismatch and mere upstream remote presence never authorize
+ok - fm-role.sh check: equivalent remote spellings resolve to one publication target
+ok - fm-role.sh check: repository lineage, not remotes, identifies firstmate across forks
+ok - fm-role.sh check: undeterminable lineage or publication target refuses
+ok - fm-role.sh check: recorded one-task consent authorizes its named repository only
+ok - secondmate home: a role file without an inheritance receipt grants nothing
+ok - secondmate home: inherited grants need a matching receipt; receipt-less and revoked grants are dead
+ok - secondmate home: a primary role its own resolver rejects propagates as revocation
+ok - fm_dod_block: upstream consent renders on publishing contracts and is refused on local-only
+ok - fm-brief.sh: --upstream-consent validates, scopes to ship tasks, and renders normalized
+ok - fm-brief.sh: --project applies the self-repository gate at scaffold time
+ok - fm-spawn.sh: the launch gate refuses a user/operator home and passes a matching maintainer
+ok - fm-spawn.sh: consent must agree between flag and brief, and is refused on local-only
+ok - fm-promote.sh: the self-repository gate governs promotion identically to spawn
+ok - fm-spawn.sh: --upstream-consent is refused on secondmate charters
+ok - fm-role.sh check: no-mistakes consent for origin passes and reports the origin repository
+ok - fm-brief.sh: no-mistakes consent for origin passes the scaffold gate
+ok - fm-spawn.sh: no-mistakes consent for origin passes the launch gate
+ok - fm-promote.sh: no-mistakes consent for origin passes the promotion gate
+ok - no-mistakes gate: only the origin repository's grant authorizes, and refusals name it
+ok - no-mistakes gate: an unknown destination is refused
+ok - gh delivery keeps upstream, github, origin; an origin-only repo is mode-independent
+ok - no-mistakes gate: github and upstream remotes never name the destination
+ok - no-mistakes gate: origin A with registration B is refused, repair re-authorizes, gh delivery is unaffected
+ok - brief, spawn and promote: grant advice follows only an authority refusal
+ok - no-mistakes gate: an unregistered project or absent registry is checked against origin alone
+ok - no-mistakes gate: an unreadable registry or empty registration is refused
+ok - fm-role.sh check: mode and consent arguments are validated
+# all fm-self-repo-role tests passed
+FM_TEST_END 2026-11-02T18:43:13Z tests/fm-self-repo-role.test.sh exit=0 duration_ms=120895 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:43:13Z tests/fm-pr-close-items.test.sh family=unclassified expected_gate_skip=none
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+ok - a merge that names its own task reports the live-record refusal and still succeeds
+ok - a body with no Closes line, even one that links another PR, changes no item
+ok - a merge whose outcome cannot be recorded runs no close and lists the named items
+ok - a merge the watcher already recorded still closes its items and sends no second notice
+ok - an unreadable merged body leaves the merge unchanged and names the URL and the error
+ok - each failure kind is reported with its reason, none stops the next item, and holds win
+ok - a hold placed after the close step's last look is caught inside the completion lock
+ok - a repeat of the close step changes nothing, with the task record present and after it is gone
+ok - a hand run with a pull request that is not merged closes nothing and reports each named item
+ok - a train closes its members' items from bodies and from pr=, in all five layouts, never an excluded PR's
+ok - a train body without its own Closes line still closes the members' items
+ok - an unreadable member is reported by URL while the item behind its pr= still closes
+ok - members match by the full URL, never by number
+ok - a GitLab merge reports the completion path's actual result per item and still succeeds
+ok - a Forgejo merge reports the completion path's actual result per item and still succeeds
+ok - the parser takes real ids, ignores fenced examples and non-directive lines
+ok - completing a blocker clears its edge on every wrapper route, keeps other blockers and holds, and reports the dependents
+ok - the task noun forms and a typed public-followup completion clear the finished edge
+ok - a typed completion clears the edge when the row is archived at once and reports a failed read back
+ok - a help call on a typed completion asks nobody to act
+ok - a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr
+ok - answering a captain call clears the call's edge from its dependents
+ok - withdrawing a captain call clears the call's edge from its dependents
+ok - an explicit data root gets the same blocker clear
+FM_TEST_END 2026-11-02T18:48:49Z tests/fm-pr-close-items.test.sh exit=0 duration_ms=335531 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:48:49Z tests/fm-tasks-axi.test.sh family=unclassified expected_gate_skip=none
+ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+ok - bootstrap stays silent when the code root is the home
+ok - bare tasks-axi replaced the code-root link and bootstrap reported the fork
+ok - fm-tasks-axi.sh writes, holds, archives, and reads relative body files through to the home from the code root
+ok - fm-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves the dashboard
+ok - fm-tasks-axi.sh refuses caller --file, a symlinked home backlog, and an unresolvable home
+ok - fm-tasks-axi.sh refuses add --start while plain add and start <id> pass through
+ok - fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog
+ok - fm-tasks-axi.sh closes a ship or scout only with its proved deliverable
+ok - fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task
+ok - fm-tasks-axi.sh clears a finished blocker from every dependent, keeps another blocker, and reports on stderr only
+ok - all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence
+ok - public reopen and start with either noun retire drop provenance in home and caller-relative data, preserving body and words
+ok - real snapshot and landed projection distinguish resumed deliveries from untouched captain drops
+ok - restart handles sole dropped bodies and refuses failed retirement updates without changing the row
+ok - unsupported leading global forms are refused by the wrapper without changing the task
+ok - bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving
+ok - bounded backend refusals preserve rows and retained captain words under default, environment beads, and home beads configuration
+ok - only exact unconsumed help tokens reach production help without completion or restart side effects
+ok - documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion
+ok - completion and restart spellings wait for control then metadata custody before authoritative reads
+ok - a concurrent hold serializes before admission or after proved completion, never inside its evidence-to-mutation window
+ok - start and reopen keep body updates outside retirement, failed-command readback, and rollback custody
+ok - failed start and reopen with either noun read back home and caller-relative data before restoring only proved unchanged drops
+ok - nested relative FM_HOME and caller-relative state/config keep filed and closed records in the original home
+ok - ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged
+ok - ledger off writes nothing, and an unwritable ledger costs one stderr line without changing the add
+ok - ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone
+FM_TEST_END 2026-11-02T18:56:44Z tests/fm-tasks-axi.test.sh exit=0 duration_ms=474862 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:56:44Z tests/fm-merge-prune.test.sh family=unclassified expected_gate_skip=none
+ok - only a verified merge of the recorded PR arms the prune, and arming is idempotent
+ok - remote tasks, secondmates and a disabled setting are never armed
+ok - a record that is not due waits, and --now overrides
+ok - a vanished task or a different PR drops the record without calling teardown
+ok - a verified merge asks teardown once, never forced, removes the copy teardown left, and logs reaped
+ok - co-tenant, lease, timeout, not-ready and lifecycle refusals retry on later ticks and then succeed, silently
+ok - a teardown that goes silent is stopped and retried quietly, and the log names the silence
+ok - the sweep retries a contended task on a later tick and finishes it
+ok - backoff doubles from 60s to a 3600s cap and one wake follows the 24th attempt
+ok - a sweep runs only due records, at most 3 per pass
+ok - a copy refused by a false positive but clean, pushed and unused is removed, preserve-list files copied with checksums first
+ok - a changed tracked file keeps the copy with exactly one wake naming it
+ok - an untracked file keeps the copy with exactly one wake
+ok - an untracked file that status.showUntrackedFiles=no hides from a plain git status still keeps the copy with exactly one wake
+ok - an untracked file in a nested copy that status.showUntrackedFiles=no hides still keeps the copy with exactly one wake
+ok - a changed submodule that diff.ignoreSubmodules=all hides from a plain git status still keeps the copy with exactly one wake
+ok - an unpushed commit keeps the copy with exactly one wake naming it
+ok - a stash entry keeps the copy
+ok - a live process inside keeps the copy with exactly one wake
+ok - an unpushed commit in a NESTED copy keeps the whole slot
+ok - an unpushed commit in a nested clone keeps the whole slot with one wake before a teardown that would return it
+ok - an unpushed commit in a nested linked worktree keeps the whole slot with one wake before a teardown that would close the task
+ok - a job in the task's terminal pane keeps the copy with one wake before a teardown that would end it
+ok - the finished worker's agent in its pane does not keep the copy: teardown runs

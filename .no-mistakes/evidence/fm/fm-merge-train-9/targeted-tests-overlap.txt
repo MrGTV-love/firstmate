@@ -1,0 +1,176 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T18:57:10Z tests/fm-brief.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract
+ok - fm-brief.sh: bash -n succeeds
+/Users/charlesabrooker/tmp/fm-test-run.x8GU0l/w1/tmp/fm-brief.yuJZYm/heredoc-in-substitution.sh:2
+ok - fm-brief.sh: no heredoc is nested inside a command substitution (Bash 3.2 parse-safe)
+ok - fm-brief: generated verification-plan command creates the separate input with criteria and exclusions
+ok - fm-brief.sh: --help renders the complete header
+ok - fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly
+ok - fm-brief.sh: --forge forgejo names tea in Rule 3, the direct-PR DOD, and the draft read-back, marks the delivery contract, and the closed set refuses everything else
+ok - fm-brief.sh: ship --mode is required and closed-set validated
+ok - fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget
+ok - fm-brief.sh: emitted process-budget commands execute from foreign paths
+ok - fm-brief.sh: a ship brief forbids the nested worktree and gives the lane a blocked route
+ok - fm-brief.sh: the explicit ship mode wins over the registered posture
+ok - fm-brief.sh: --yolo and scout/secondmate --mode are refused, never silently dropped
+ok - fm-brief.sh: faster paths use configured authority without stacked review
+ok - fm-brief.sh: no-mistakes DOD keeps its apostrophe prose and bans --yes outright
+ok - fm-brief.sh: no-mistakes DOD detects a green PR from the drive call, not a status poll
+ok - fm-brief.sh: PR-based done requires a non-draft PR; a deliberate draft declares a wait
+ok - fm-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot
+ok - fm-brief.sh: ship project-memory wording bounds edits to corrections of wrong information
+ok - fm-brief.sh: --herdr-lab emits the complete hard safety contract
+ok - fm-brief.sh: --herdr-lab uses its quoted Firstmate-owned helper path
+ok - fm-brief.sh: ship and scout scaffolds make omitted Herdr intent fail-visible
+ok - fm-brief.sh: the documented {TASK} and {FIRSTMATE_SPEC} fills cannot corrupt the Herdr safety gate
+ok - fm-brief.sh: Herdr lab contract covers scouts and rejects secondmate misuse
+ok - fm-brief.sh: --no-projects scaffolds a project-less charter and guards misuse
+ok - fm-brief.sh: marked requests avoid generic acknowledgements and preserve material reporting
+ok - fm-brief.sh: relative directory inputs ignore CDPATH, render stable absolute charter paths, or fail loudly
+ok - fm-brief.sh: custom pause verb renders in every scaffold
+ok - fm-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it
+ok - fm-brief.sh: investigation and visual-review completions load the shared decision policy
+ok - fm-brief: scout and secondmate code paths still scaffold well-formed briefs
+ok - fm-brief: ship and scout briefs carry the task Definition of Done and grading sections, charters do not
+ok - fm-spawn: a half-filled brief produces one refusal naming all five tokens and the repair
+ok - fm-spawn: the worktree-isolation refusal prints the relaunch and reassociation repair
+ok - fm-spawn: the backend refusal names the spawn-capable backends and the invocation
+ok - the API-key guard refusal prints the env-u relaunch and the deliberate opt-in
+ok - fm-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor
+ok - fm-brief: workers end the turn on a decision, wait in one blocking shell command, and never poll
+ok - fm-brief: without config/wait-no-turns the brief and drive text stay as they were
+ok - fm-brief.sh: the home brief include lands last on ship and scout, verbatim, and fails closed
+ok - fm-brief.sh: --base-branch records the base, targets the PR at it, and is refused where no PR carries it
+ok - fm-brief.sh: --branch-prefix omitted defaults every ship mode to fm/<task-id>
+ok - fm-brief.sh: a --branch-prefix override renders identically across every generated section
+ok - fm-brief.sh: an empty --branch-prefix override resolves to a bare <task-id> branch
+ok - fm-brief.sh: --branch-prefix is refused on scout and secondmate scaffolds
+ok - fm-brief.sh: --branch-prefix value is validated against embedded spaces and a leading dash
+Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-test-run.x8GU0l/w1/tmp/fm-brief.yuJZYm/branch-prefix-shell-safe-marker)brief-branch-safe-g3'
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+ok - fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not
+FM_TEST_END 2026-11-02T19:02:49Z tests/fm-brief.test.sh exit=0 duration_ms=338173 gate_skip=false
+FM_TEST_BEGIN 2026-11-02T19:02:49Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
+ok - fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks
+ok - fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent
+ok - fm-spawn/fm-promote: authorized intent preserves exact words and refuses operator-address lines
+ok - fm-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions
+ok - fm-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created
+ok - fm-spawn: scout and secondmate spawns refuse ship delivery flags
+ok - fm-spawn: the brief's recorded mode and the spawn's explicit mode must agree
+ok - fm-spawn: a rigor downgrade against the registered posture is announced, never blocked
+ok - fm-spawn: a scout spawn resolves no delivery posture from the registry
+ok - fm-promote: promotion requires the delivery contract and records it exactly once
+ok - fm-promote: a symlinked task record is refused and its target is left untouched
+ok - fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does
+ok - promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-promote: a selected branch prefix reaches both worker instructions and durable task state
+Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-test-run.x8GU0l/w2/tmp/fm-task-delivery.XlgQtC/promote-branch-shell-safe-marker)/promote-branch-safe-e3'
+ok - fm-promote: ref-format-valid shell metacharacters stay literal in promotion branch commands
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6EPYMAJ0MK9FWP9N41W0TCC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ok - fm-merge-local: a registry change cannot redirect an in-flight local-only task
+ok - fm-project-mode: the registry lookup matches a whole multi-word name, not just its first token
+ok - fm-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw
+ok - fm-project-mode: the forge binds from its own token and is reported only through --forge
+ok - fm-project-mode: only a malformed forge binding refuses; every other token keeps its old tolerance
+ok - forge=gerrit: yolo is refused with its reason, never silently dropped
+ok - forge=gerrit: no-mistakes runs with its forge steps skipped, recovers its fixes, then publishes one change
+ok - forge=gerrit: direct-PR publishes one squashed change and a stack is refused with its reason
+ok - fm-spawn: a registered forge must reach the worker's brief
+ok - fm-spawn: the brief must carry the spawn's selected ship branch, and the selection is validated before anything is created
+ok - fm-spawn: a ship branch that deviates from the registered prefix is announced, never blocked
+ok - fm-spawn: a registry forge token the parser refuses stops the launch, reason included
+ok - fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember
+ok - forge=forgejo: spawn agreement and promotion carry the binding, name tea, and keep yolo
+ok - fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled
+ok - fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds
+ok - fm-spawn: the Definition of Done check reads the whole section and matches placeholders only where the scaffold puts them
+ok - fm-spawn: a DoD file line outside the task Definition of Done section is ignored
+ok - fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape
+ok - fm-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix
+warning: re-init: ignored --initial-branch=main
+ok - governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a pre-existing task branch and one that gained work
+warning: re-init: ignored --initial-branch=main
+ok - refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner
+warning: re-init: ignored --initial-branch=main
+ok - refused promotion preserves a task branch the project declared before attestation refused it
+warning: re-init: ignored --initial-branch=main
+ok - promotion refuses to override recorded slot scope before provisioning or rewriting the record
+# all fm-task-delivery tests passed
+FM_TEST_END 2026-11-02T19:26:27Z tests/fm-task-delivery.test.sh exit=0 duration_ms=1418157 gate_skip=false
+FM_TEST_BEGIN 2026-11-02T19:26:28Z tests/fm-spawn-dispatch-profile.test.sh family=backend-dispatch expected_gate_skip=none
+ok - allowlist=absent preserves the operational floor and filters the ambient environment
+ok - allowlist=missing-config preserves the operational floor and filters the ambient environment
+ok - allowlist=enabled preserves the operational floor and filters the ambient environment
+ok - allowlist=empty preserves the operational floor and filters the ambient environment
+ok - default codex mutable export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex non-identifier export absent from env, Python and child Bash in /bin/bash; task, TERM and operational carriers kept
+ok - default codex mutable export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+ok - default codex readonly export absent from env, Python and child Bash in /bin/zsh; task, TERM and operational carriers kept
+# /bin/zsh removes non-identifier entries before the production launch; not counted as boundary proof
+ok - invalid allowlist names refuse before launch or task publication
+ok - inaccessible config with present allowlist refuses before launch or task publication
+ok - inaccessible config with absent allowlist refuses before launch or task publication
+ok - inaccessible ancestor with present allowlist refuses before launch or task publication
+ok - inaccessible ancestor with absent allowlist refuses before launch or task publication
+ok - secondmate launch inherits the allowlist for subsequent worker launches
+ok - local inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - remote inheritance preserves the allowlist on source errors and mirrors proven absence
+ok - spawn records and launches concrete role ids and refuses retired literals before publication
+ok - a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index
+ok - fm-spawn: actual ship/scout launch commands deliver the worker role contract
+ok - no --model/--effort records the default profile
+ok - a claude launch publishes the brief as an operational-inbox record and passes only the doorbell
+ok - a secondmate claude launch publishes its brief record into the secondmate's own home
+ok - a claude spawn whose launch-brief record cannot publish stops with a clear error and sends no launch
+ok - non-cursor launches clear inherited Cursor identity markers
+ok - relative home overrides ignore CDPATH and become absolute before spawn launch construction
+ok - FM_HOME defaults resolve relative paths and preserve absolute spellings
+ok - absolute override spellings are preserved in spawn launch paths
+ok - unresolvable relative spawn overrides fail with named diagnostics
+ok - active crew-dispatch profile requires an explicit harness for ship spawns
+ok - active crew-dispatch profile requires an explicit harness for scout spawns
+ok - active crew-dispatch profile allows an explicit resolved harness
+ok - active crew-dispatch profile allows the legacy positional harness form
+ok - active crew-dispatch profile allows the raw launch-command escape hatch
+ok - a chained raw launch commits through the AI-trailer strip in every step
+ok - claude receives --model and --effort profile flags
+ok - codex receives --model and model_reasoning_effort profile flags
+ok - codex Luna receives --model and model_reasoning_effort max profile flags
+ok - codex omits max for models without the catalog capability
+ok - a codex crewmate launches with no hook layer and keeps its turn-end signal
+ok - a codex secondmate keeps the project hook layer its primary session runs on
+ok - grok receives --model and --reasoning-effort profile flags
+ok - grok omits unsupported max reasoning effort
+ok - grok omits unsupported xhigh reasoning effort
+ok - cursor receives its model-qualified reasoning class and exact task workspace
+ok - cursor refuses model ids absent from its resolved binary's live catalog
+ok - cursor preserves the requested model when its live catalog is unreachable
+ok - opencode receives --model and the effort as its config's agent variant
+ok - opencode without an effort keeps its launch config unchanged
+ok - opencode emits the variant for an effort the openai family exposes
+ok - opencode omits the variant for an effort outside the model family's list
+ok - native effort validator checks harness and model as separate axes

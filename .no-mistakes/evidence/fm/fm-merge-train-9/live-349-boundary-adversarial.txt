@@ -1,0 +1,34 @@
+
+### A1 ANTHROPIC_API_KEY in pane env, no allowlist file: raw worker launches, key absent
+confinement audit: harness=env write_confinement=unconfined-macos-env
+spawned a1 harness=env kind=scout window=primary:fm-a1 worktree=<lab>/treehouse/.treehouse/labdemo-2e00b0/1/labdemo
+spawn-exit=0
+canaries in worker env: 0  ANTHROPIC_API_KEY lines: 0
+
+### A2 allowlist lists ANTHROPIC_API_KEY and it is set: Claude spawn refuses before launch (API-key guard)
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API
+spawn-exit=1
+no a2 meta: nothing launched
+
+### A3 allowlist lists only LAB_KEPT: that name arrives, every other canary stays out
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+confinement audit: harness=env write_confinement=unconfined-macos-env
+spawned a3 harness=env kind=scout window=primary:fm-a3 worktree=<lab>/treehouse/.treehouse/labdemo-2e00b0/2/labdemo
+spawn-exit=0
+LAB_KEPT lines: 1  other canaries: 0
+
+### A4 invalid allowlist line: spawn refuses before launch
+error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments
+spawn-exit=1
+no a4 worker output
+
+### A5 direct reader boundary: fm-worker-env.py default run
+0
+
+### A6 --startup reader: shell startup files are denied on Darwin; output discarded, only exit and error text shown
+/Users/charlesabrooker/.zshenv exit=1 cat: /Users/charlesabrooker/.zshenv: Operation not permitted
+/Users/charlesabrooker/.zshrc exit=1 cat: /Users/charlesabrooker/.zshrc: Operation not permitted
+/Users/charlesabrooker/.bash_profile: absent
+/Users/charlesabrooker/.profile exit=1 cat: /Users/charlesabrooker/.profile: Operation not permitted
+hello
+non-startup read exit=0

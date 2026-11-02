@@ -1,0 +1,72 @@
+# Live: real bin/fm-role.sh and bin/fm-brief.sh with a real clone of this repo, disposable NM_HOME registry, head 4b67e33de00d42280cd10eec2405395a5dfd1939
+role: fm-role: user (default)
+
+## registration names origin
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/forkowner/firstmate mode no-mistakes
+authorized: task consent for github.com/forkowner/firstmate
+exit=0
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/MrGTV-love/firstmate mode no-mistakes
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/forkowner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in <lab>/config/firstmate-role, or one-task consent recorded at dispatc
+exit=1
+
+## direct-PR still reads upstream first, and no registry
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/MrGTV-love/firstmate mode direct-PR
+authorized: task consent for github.com/mrgtv-love/firstmate
+exit=0
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/forkowner/firstmate mode direct-PR
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/mrgtv-love/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in <lab>/config/firstmate-role, or one-task consent recorded at dispat
+exit=1
+
+## registration names another repository: refused even with origin consent
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/forkowner/firstmate mode no-mistakes
+refused: origin names github.com/forkowner/firstmate but the no-mistakes registration for <lab>/projects/selfclone publishes to github.com/someoneelse/firstmate; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open its pull request against github.com/someoneels
+exit=1
+
+## unregistered project keeps origin
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/forkowner/firstmate mode no-mistakes
+authorized: task consent for github.com/forkowner/firstmate
+exit=0
+
+## unreadable registry: refused
+
+$ fm-role.sh check <selfclone> upstream-consent github.com/forkowner/firstmate mode no-mistakes
+refused: cannot read the no-mistakes registration for <lab>/projects/selfclone (registry <lab>/nm/state.sqlite needs python3 and a readable state.sqlite), so the repository a no-mistakes run would publish to cannot be established; run 'no-mistakes doctor', or set NM_HOME to the registry in use, then dispatch again
+exit=1
+
+## no consent at all
+
+$ fm-role.sh check <selfclone> mode no-mistakes
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/forkowner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in <lab>/config/firstmate-role, or one-task consent recorded at dispatc
+exit=1
+
+## real fm-brief.sh --project: consent for the wrong repository refuses
+error: this home runs as firstmate user/operator and holds no publication authority for github.com/forkowner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in <lab>/config/firstmate-role, or one-task consent r
+error: to let this home publish to github.com/forkowner/firstmate, write 'maintainer github.com/forkowner/firstmate' into <lab>/config/firstmate-role (docs/configuration.md "Firstmate role"), or pass --upstream-consent github.com/forkowner/firstmate for this one task with the captain's explicit appr
+brief-exit=1
+no brief written
+
+## real fm-brief.sh --project: consent for the repository it publishes to scaffolds
+scaffolded: <lab>/data/self2/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRST
+brief-exit=0
+brief written
+
+## real fm-brief.sh --project: registration disagreement gets no grant advice
+error: origin names github.com/forkowner/firstmate but the no-mistakes registration for <lab>/projects/selfclone publishes to github.com/someoneelse/firstmate; when its run-start refresh from origin fails 
+brief-exit=1
+
+## fm-spawn on the self repo clone: no consent
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+error: spawn refused for self4: this home runs as firstmate user/operator and holds no publication authority for github.com/forkowner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<own
+error: to let this home publish to github.com/forkowner/firstmate, write 'maintainer github.com/forkowner/firstmate' into <lab>/config/firstmate-role (docs/configuration.md "Firstmate role"), or pass --upstream-consent github
+spawn exit=1; meta: none
+
+## fm-spawn with consent for upstream, while the task publishes to origin
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+error: upstream-consent mismatch for self4: <lab>/data/self4/launch-brief.md records upstream-consent=none but this spawn passed github.com/mrgtv-love/firstmate; correct the flag or re-scaffold the brief so the worker's contr
+spawn exit=1; meta: none

@@ -1,0 +1,11 @@
+guards origin/main 167 head 168
+dropped from main: []
+added to main: ['spawn-shell-startup-confinement']
+sites spawn-write-confinement lost [('bin/fm-spawn.sh', '${confinement_args[@]+"${confinement_args[@]}"} || { confinement_refuse false "cannot derive the protected-asset write profile"; exit 1; }')] new [('bin/fm-spawn.sh', 'confinement_refuse false "cannot derive the protected-asset write profile"')]
+member-349 guards missing at head: ['jev-belay-stop', 'merge-green-head', 'spawn-brief-out-of-scope']
+allowlist equals origin/main: True
+audit-closure test equals origin/main: True
+.gitignore equals origin/main: True
+jev-belay-stop in train base registry: False ; named in retired.json at head: True
+merge-green-head in train base registry: False ; named in retired.json at head: False
+spawn-brief-out-of-scope in train base registry: False ; named in retired.json at head: True

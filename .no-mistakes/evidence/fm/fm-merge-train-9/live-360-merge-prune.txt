@@ -1,0 +1,47 @@
+# Live: real fm-spawn slots, real treehouse pool, real fm-teardown via real fm-merge-prune; only the forge (gh, gh-axi) is a lab fixture. Head 4b67e33de00d42280cd10eec2405395a5dfd1939
+spawned pf harness=echo kind=ship mode=local-only yolo=off window=primary:fm-pf worktree=<lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo
+spawned pg harness=echo kind=ship mode=local-only yolo=off window=primary:fm-pg worktree=<lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo
+=== pf: ignored entries: !! .claude/ !! data/ !! state/ 
+arm exit=0
+run exit=0
+after: copy REMOVED; record gone; meta gone
+2026-11-02T18:45:39Z armed for https://github.com/lab-example/widget/pull/86
+2026-11-02T18:46:02Z removed the returned copy <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo (head c69846d); preserved records, if any, are in <lab>/data/pf/merge-prune-preserved/1793645139
+2026-11-02T18:46:02Z reaped: teardown completed; removed the returned copy
+=== pg: ignored entries: !! .claude/ !! data/ !! state/ 
+arm exit=0
+run exit=0
+after: copy KEPT; record present; meta gone
+2026-11-02T18:46:07Z armed for https://github.com/lab-example/widget/pull/87
+2026-11-02T18:46:56Z retained <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo: <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo holds an ignored file that is neither scratch nor on the preserve list: data/report.md
+state=retained
+reason=<lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo holds an ignored file that is neither scratch nor on the preserve list: data/report.md
+wake_sent=1
+
+--- Slot with an ignored directory that is not a tooling path, and a nested repo with an untracked file (kept, one wake each):
+=== pc: ignored entries: !! .claude/ !! .nested/ !! data/ !! state/ 
+arm exit=0
+run exit=0
+after: copy KEPT; record present; meta gone
+2026-11-02T18:43:37Z armed for https://github.com/lab-example/widget/pull/83
+2026-11-02T18:44:04Z retained <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo: <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+state=retained
+reason=<lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+wake_sent=1
+=== pe: ignored entries: !! .claude/ !! data/ !! state/ 
+arm exit=0
+run exit=0
+after: copy KEPT; record present; meta present
+2026-11-02T18:44:34Z armed for https://github.com/lab-example/widget/pull/85
+2026-11-02T18:44:34Z retained <lab>/treehouse/.treehouse/labdemo-2e00b0/5/labdemo: <lab>/treehouse/.treehouse/labdemo-2e00b0/5/labdemo/.claude/worktrees/n1 has changed or untracked files (1 entries, first: ?? untracked.txt)
+state=retained
+reason=<lab>/treehouse/.treehouse/labdemo-2e00b0/5/labdemo/.claude/worktrees/n1 has changed or untracked files (1 entries, first: ?? untracked.txt)
+wake_sent=1
+
+--- Wake queue:
+1793644869	1	check	merge-prune:pa	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo for pa: <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+1793644913	2	check	merge-prune:pb	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo for pb: <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+1793645044	3	check	merge-prune:pc	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo for pc: <lab>/treehouse/.treehouse/labdemo-2e00b0/3/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+1793645073	4	check	merge-prune:pd	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo for pd: <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo holds an ignored file that is neither scratch nor on the preserve list: .nested
+1793645074	5	check	merge-prune:pe	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/5/labdemo for pe: <lab>/treehouse/.treehouse/labdemo-2e00b0/5/labdemo/.claude/worktrees/n1 has changed or untracked files (1 entries, first: ?? untracked.txt)
+1793645216	6	check	merge-prune:pg	check: merge-prune kept <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo for pg: <lab>/treehouse/.treehouse/labdemo-2e00b0/4/labdemo holds an ignored file that is neither scratch nor on the preserve list: data/report.md

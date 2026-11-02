@@ -1,0 +1,6 @@
+# Real claude CLI through bin/fm-worker-env.py --shell-prefix --harness claude, in a lab tmux pane holding a fake ANTHROPIC_API_KEY. Machine's normal login. Head 4b67e33de00d42280cd10eec2405395a5dfd1939
+pane has fake ANTHROPIC_API_KEY: yes
+claude exit=0
+reply: LAB-OK
+stderr: Permission allow rule (../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permis

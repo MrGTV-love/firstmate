@@ -1,0 +1,48 @@
+fixture: TIP is not an ancestor of origin/main, only its content landed
+
+## report (no flag): classes before any removal
+copy-sweep: mode=report containers=1 copies=6
+HELD-LIVE-TASK	0.00 GiB	busy	process 14131 is running inside it
+HELD-DIRTY	0.00 GiB	dirty	1 uncommitted or untracked path(s), first:  M f.txt
+HELD-DIRTY	0.00 GiB	ignored	it holds ignored files that exist nowhere else: a.ignored
+REAPABLE-PROVEN	0.00 GiB	regen	clean, no process, no record, content already in the default branch; regenerable 0.00 GiB removed with it, not preserved
+REAPABLE-PROVEN	0.00 GiB	squashed	clean, no process, no record, content already in the default branch
+HELD-UNPUSHED	0.00 GiB	unique	3 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=2
+summary: HELD-LIVE-TASK=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
+exit=0
+
+git worktree list count before apply:        7
+
+## --apply under the process budget: only proven copies go
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LIVE-TASK	0.00 GiB	busy	process 14131 is running inside it
+HELD-DIRTY	0.00 GiB	dirty	1 uncommitted or untracked path(s), first:  M f.txt
+HELD-DIRTY	0.00 GiB	ignored	it holds ignored files that exist nowhere else: a.ignored
+HELD-UNPUSHED	0.00 GiB	unique	3 commit(s) are on no remote and not in the default branch
+REMOVED	squashed	branch fm/sq at 33988914951b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+REMOVED	regen	branch detached at 33988914951b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+summary: HELD-LIVE-TASK=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+copies=6 GiB=0.00 reaped=2 freed=0.00
+exit=0
+
+squashed: removed
+unique: kept
+dirty: kept
+busy: kept
+ignored: kept
+regen: removed
+unique commit still present: unique
+dirty edit still present: 1
+ignored evidence present: evidence
+
+## after the busy process ends: second apply
+REMOVED	busy	branch detached at 33988914951b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+busy: removed

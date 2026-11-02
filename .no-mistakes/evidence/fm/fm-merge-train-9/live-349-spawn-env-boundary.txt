@@ -1,0 +1,42 @@
+# Live: real bin/fm-spawn.sh on lab tmux socket at 4b67e33de00d42280cd10eec2405395a5dfd1939
+# The tmux server (the pane's source env) held 4 fake secrets: FM_LAB_SENTINEL_SECRET OPENAI_API_KEY AWS_SECRET_ACCESS_KEY GITHUB_TOKEN
+# canary values in worker env: 0
+# Secret names in worker env: 0
+# Worker cwd: /Users/charlesabrooker/.treehouse/labdemo-2e00b0/1/labdemo
+# Names the worker did get:
+BUN_INSTALL
+CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
+COMPACT_ADVISER_DISABLE
+FM_DURATION_HOME
+FM_TASK_ID
+FM_TASK_INBOX
+FM_WRITE_CONFINEMENT
+GIT_CONFIG_COUNT
+GIT_CONFIG_KEY_0
+GIT_CONFIG_VALUE_0
+GOTMPDIR
+HOME
+HTTPS_PROXY
+HTTP_PROXY
+LANG
+LOGNAME
+NM_HOME
+NODE_EXTRA_CA_CERTS
+NO_PROXY
+NVM_DIR
+OLDPWD
+PATH
+PWD
+SHELL
+SHLVL
+SSH_AUTH_SOCK
+TERM
+TMPDIR
+TMUX
+TMUX_PANE
+TRACEPARENT
+USER
+_
+http_proxy
+https_proxy
+no_proxy

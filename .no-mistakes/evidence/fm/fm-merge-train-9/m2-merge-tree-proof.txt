@@ -1,0 +1,52 @@
+# M2 merge-tree proof at 4b67e33de00d42280cd10eec2405395a5dfd1939
+# base 1c4e2929ff526b358ac91bae0f465e1b7093c7b1; origin/main f77b7973ce14d0eb8813476cf380f8cb022ab9fb
+== 9d74a1a27cf0e7703fa29a0561fdd3249fe94c24  Merge https://github.com/MrGTV-love/firstmate/pull/356 at head 8d7e5d1254fdd66a25227bce50f
+   second parent: 8d7e5d1254fdd66a25227bce50f8bc957c54acc5
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== 7abc2de13e11d1c6d2f86d81fc531ca916959655  Merge https://github.com/MrGTV-love/firstmate/pull/339 at head 3b530bbc4befda3bab303064270
+   second parent: 3b530bbc4befda3bab303064270c72ae70dc5b65
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== c7b73299ebcd618392127e21cc2e0e605b232f7a  Merge https://github.com/MrGTV-love/firstmate/pull/352 at head f455622033a51bd217aa68728d9
+   second parent: f455622033a51bd217aa68728d9029efdb881b07
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== 1ebbbaebf17e965ed23edc7d20717919ff62f6ed  Merge https://github.com/MrGTV-love/firstmate/pull/349 at head f64d484af613bf5123baad550f8
+   second parent: f64d484af613bf5123baad550f8e7a72dcdc0ddf
+   auto-merge exit=1; conflicted: docs/guards/lint-allowlist.json docs/guards/registry.json tests/fm-guard-audit-closure.test.sh 
+   recorded tree minus auto-merge tree (files):
+      docs/guards/lint-allowlist.json      | 405 -----------------------------------
+      docs/guards/registry.json            |  14 +-
+      tests/fm-guard-audit-closure.test.sh |  10 -
+      3 files changed, 5 insertions(+), 424 deletions(-)
+== 6cf883bdceb242b27f577a19e00f1b274cac70a8  no-mistakes(document): Document protected_paths gate default in configuration
+   NON-MERGE; files:
+      docs/configuration.md | 2 ++
+      1 file changed, 2 insertions(+)
+== d36f554e40bf9d87bbbbdb56c128741253d05fff  Merge remote-tracking branch 'origin/main' into fm/fm-merge-train-9
+   second parent: f77b7973ce14d0eb8813476cf380f8cb022ab9fb
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== 9bcc36656add1241befb9951e92446aeb4d1ca09  Merge commit '78bb3bced2a3111f34827115af9526586944b3a2' into fm/fm-merge-train-9
+   second parent: 78bb3bced2a3111f34827115af9526586944b3a2
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== 78884801f7ee4d0b552a1a96f9099609cd107579  Merge commit 'd826cb7debd40f6ae3520919020e248f400c8c8c' into fm/fm-merge-train-9
+   second parent: d826cb7debd40f6ae3520919020e248f400c8c8c
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+== 4b67e33de00d42280cd10eec2405395a5dfd1939  Merge commit 'fc1b2ef31b5a6d84430cf0a2a1a924c58b0bbc03' into fm/fm-merge-train-9
+   second parent: fc1b2ef31b5a6d84430cf0a2a1a924c58b0bbc03
+   auto-merge exit=0; conflicted: 
+   recorded tree minus auto-merge tree (files):
+     (identical)
+
+# .gitignore vs origin/main:
+identical
