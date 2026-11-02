@@ -159,11 +159,12 @@ A docstring is a triple-quoted string that opens a block, as the first statement
 
 - `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
   The marker is a site even inside a heredoc body or a Python triple-quoted string.
-  In Python code it must sit in a string literal, so a name such as `REFUSED` followed by a colon is not a site, and a marker that a comparison, `case` pattern or search tests is not a site.
+  A marker in a shell `case` pattern or in the address argument of a `sed` command tests a value and is not a site.
 - `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word that is not part of a variable name or path.
-  A string compared with `==` or `!=`, passed to `startswith` or `endswith`, used as a shell `case` pattern, or given to `grep`, `sed` or `awk` as a pattern, tests a value and is not a message.
-  A Python call's literal `help=` argument documents an option and is not a message.
-  A shell `printf` or `echo` that prints only one of these words to standard output hands a token to its caller and is not a message; the caller's own refusal is the site.
+  A string compared with `==` or `!=`, passed to `startswith` or `endswith`, used as a shell `case` pattern, or given as the address argument of a command whose command word is `sed`, tests a value and is not a message.
+  The literal `help=` argument of an argparse `add_argument` call documents an option and is not a message.
+  The internal token line `printf 'refuse\n'` hands a plan to its caller and is not a message.
+  Every other printed form stays a site, including a `grep` or `awk` argument, a `sed` script, or a bare refusal word printed to standard output.
 - `C` helper call: a call to a function whose definition name has `refuse` as one of its underscore-separated words and does not end in `_text`, or is exactly `deny` or `block_stop`.
   The scan derives these names from the definitions in the code and prints them under `helpers`.
 - `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script outside a usage or argument-count check, or a `throw` in an opencode plugin.

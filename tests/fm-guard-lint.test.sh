@@ -871,7 +871,7 @@ case "$line" in
   "REFUSED: the deliverable is not landed") seen=1 ;;
 esac
 SH
-remedy_no_site bin/gnew.sh 'a sed pattern that extracts refusal output' <<'SH'
+remedy_no_site bin/gnew.sh 'a sed address that extracts refusal output' <<'SH'
 refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
 SH
 remedy_no_site bin/gnew.sh 'a bare plan token its caller consumes' <<'SH'
@@ -879,14 +879,11 @@ plan() {
   printf 'refuse\n'
 }
 SH
-remedy_no_site bin/gnew.py 'a Python name and option help text' <<'PY'
-REFUSED = []
+remedy_no_site bin/gnew.py 'argparse option help text' <<'PY'
 parser.add_argument("--check", help="refuse acknowledgement with open rows")
 parser.add_argument("--listen",
                     help="open-mic is accepted and refuses until "
                          "end-of-speech detection exists")
-if not REFUSED:
-    pass
 PY
 remedy_shape bin/gnew.sh "printf 'refused" fail 'a bare vocabulary word printed to stderr' <<'SH'
 printf 'refused\n' >&2
@@ -903,7 +900,42 @@ remedy_shape bin/gnew.py 'parser.error' fail 'a Python call beside option help t
 parser.add_argument("--check", help="refuse acknowledgement with open rows")
 parser.error("refused: the row is open")
 PY
-pass "S3 sees no site in a tested value, option help text or caller token, and still judges the printed refusal"
+remedy_shape bin/gnew.sh "sed 's/" fail 'a sed script that writes the marker' <<'SH'
+printf '%s\n' "$err" | sed 's/^/REFUSED: /' >&2
+SH
+remedy_shape bin/gnew.sh "sed '/" fail 'a sed insert after an address' <<'SH'
+sed '/pending/i REFUSED: blocked' "$f" >&2
+SH
+remedy_shape bin/gnew.sh 'awk' fail 'an awk program that prints the marker' <<'SH'
+awk '{print "REFUSED: " $0}' "$f" >&2
+SH
+remedy_shape bin/gnew.sh 'echo "copy' fail 'a message that holds a sed substitution' <<'SH'
+echo "copy $(sed -n 1p "$f") refused: blocked" >&2
+SH
+remedy_shape bin/gnew.sh 'echo "grep' fail 'a shell message that names a search tool' <<'SH'
+echo "grep failed" "refused" >&2
+SH
+remedy_shape bin/gnew.py 'print("grep' fail 'a Python message that names a search tool' <<'PY'
+print("grep failed", "refused", file=sys.stderr)
+PY
+remedy_shape bin/gnew.sh 'echo "refused"' fail 'a bare refusal echoed to standard output' <<'SH'
+echo "refused"
+exit 1
+SH
+remedy_shape bin/gnew.sh "printf 'refused" fail 'a bare refusal printed to standard output' <<'SH'
+printf 'refused\n'
+exit 1
+SH
+remedy_shape bin/gnew.sh "printf 'refuse" fail 'a bare token sent to standard error' <<'SH'
+printf 'refuse\n' >&2
+SH
+remedy_shape bin/gnew.py 'fail("refused' fail 'a refusal call that also takes a help argument' <<'PY'
+fail("refused: the row is open", help="see --check")
+PY
+remedy_shape bin/gnew.py 'add_argument' fail 'a printed literal beside argparse help' <<'PY'
+parser.add_argument("refused: the row is open", help="see --check")
+PY
+pass "S3 sees no site in a case pattern, sed address, printf token or argparse help text, and still judges every printed refusal"
 
 remedy_shape bin/gnew.sh 'fm_refuse gguard' pass 'a formatter machine command beside refusal words in its missing text' <<'SH'
 fm_refuse() { printf '%s\n' "$3" >&2; }

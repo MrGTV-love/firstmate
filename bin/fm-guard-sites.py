@@ -39,8 +39,9 @@ MARKER = re.compile(r'REFUS[E]D:')
 WORD = re.compile(r'(?<![A-Za-z0-9_$.{/-])refus(?:e|es|ed|ing)(?![A-Za-z0-9_-]|\.sh)', re.I)
 STRING = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|`[^`]*`')
 COMPARED = re.compile(r'(?:[=!]==?|\.(?:starts|ends)_?[wW]ith\(\s*\(?(?:\s*(?:' + STRING.pattern + r')\s*,)*)\s*$')
-SEARCHED = re.compile(r'\b(?:grep|egrep|sed|awk)\b[^|;&]*$')
-TOKEN_OUTPUT = re.compile(r"""^\s*(?:printf|echo)\s+(['"]?)refus(?:e|es|ed|ing)(?:\\n)?\1\s*$""")
+SED_COMMAND = re.compile(r'(?:^|[|;&(])\s*sed\s+(?:-[A-Za-z]+\s+)*$')
+SED_ADDRESS = re.compile(r"""^['"]/[^/]*/(?:,\$|,/[^/]*/)?[pd]['"]$""")
+PRINTF_TOKEN = re.compile(r"^\s*printf\s+'refus[e]\\n'\s*$")
 HELPER_WORD = 'refus' + 'e'
 HELPER_EXACT = ('deny', 'block_stop')
 DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\']')
@@ -194,36 +195,43 @@ def case_arm_text(line):
     return line
 
 
-def tests_value(text, match):
-    """True for an operand of == or !=, a prefix or suffix startswith or endswith tests for, or a grep, sed or awk pattern."""
-    before = text[:match.start()]
-    return bool(COMPARED.search(before) or SEARCHED.search(before) or re.match(r'\s*[=!]==?', text[match.end():]))
+def is_sed_address(text, match):
+    """True for a literal that is only the address argument of a command whose command word is sed."""
+    return bool(SED_ADDRESS.match(match.group()) and SED_COMMAND.search(text[:match.start()]))
 
 
 def emits_refusal(text):
-    """True when a string literal that does not test a value carries the refusal vocabulary."""
-    return any(WORD.search(match.group()) and not tests_value(text, match) for match in STRING.finditer(text))
+    """True when a string literal carries the refusal vocabulary; an operand of == or !=, a prefix or suffix a startswith or endswith call tests for, or a sed address does not emit it."""
+    for match in STRING.finditer(text):
+        if WORD.search(match.group()) and not COMPARED.search(text[:match.start()]) \
+                and not re.match(r'\s*[=!]==?', text[match.end():]) and not is_sed_address(text, match):
+            return True
+    return False
 
 
-def emits_marker(text, kind):
-    """True when the marker is printed: Python needs a literal; a shell word or a JS multi-line string line also prints."""
-    if not MARKER.search(text):
-        return False
-    kept = STRING.sub(lambda match: '' if tests_value(text, match) else match.group(), text)
-    if kind == 'py':
-        return any(MARKER.search(match.group()) for match in STRING.finditer(kept))
-    return bool(MARKER.search(kept))
+def emits_marker(text):
+    """True when the marker lies outside a sed address."""
+    return bool(MARKER.search(STRING.sub(lambda match: '' if is_sed_address(text, match) else match.group(), text)))
 
 
-def option_help_lines(lines):
-    """Lines of a Python call's literal help= argument, which documents an option and emits nothing at a refusal."""
+def without_option_help(lines):
+    """The lines with each argparse add_argument help literal blanked, because it documents an option and emits nothing."""
     try:
         tree = ast.parse('\n'.join(lines))
     except (SyntaxError, ValueError):
-        return set()
-    return {number for node in ast.walk(tree) if isinstance(node, ast.keyword) and node.arg == 'help'
-            and isinstance(node.value, (ast.Constant, ast.JoinedStr))
-            for number in range(node.value.lineno, node.value.end_lineno + 1)}
+        return lines
+    rows = [line.encode() for line in lines]
+    for call in ast.walk(tree):
+        if not (isinstance(call, ast.Call) and getattr(call.func, 'attr', None) == 'add_argument'):
+            continue
+        for value in (word.value for word in call.keywords if word.arg == 'help'):
+            if isinstance(value, (ast.Constant, ast.JoinedStr)):
+                for number in range(value.lineno, value.end_lineno + 1):
+                    row = rows[number - 1]
+                    start = value.col_offset if number == value.lineno else 0
+                    end = value.end_col_offset if number == value.end_lineno else len(row)
+                    rows[number - 1] = row[:start] + b' ' * (end - start) + row[end:]
+    return [row.decode() for row in rows]
 
 
 def is_comment(stripped, kind):
@@ -335,7 +343,6 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
     if kind == 'other':
         kind = shebang_kind(path) or 'other'
     lines = read_lines(path)
-    documented = option_help_lines(lines) if kind == 'py' else set()
     hook = kind == 'sh' and is_hook_script(rel, hook_names)
     opencode = rel.startswith('.opencode/plugins/')
     heredoc = None
@@ -345,9 +352,7 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
     triple = None
     prev_code = None
     sites = []
-    for number, line in enumerate(lines, 1):
-        if number in documented:
-            continue
+    for number, line in enumerate(without_option_help(lines) if kind == 'py' else lines, 1):
         stripped = line.strip()
         sig = []
         eff = kind
@@ -411,9 +416,9 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
                 body_kind = embedded_kind(line, heredoc)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
         message = case_arm_text(line) if eff == 'sh' else line
-        if emits_marker(message, eff) and 'A' not in sig:
+        if emits_marker(message) and 'A' not in sig:
             sig.append('A')
-        if emits_refusal(message) and not TOKEN_OUTPUT.match(line) and 'B' not in sig:
+        if emits_refusal(message) and not PRINTF_TOKEN.match(line) and 'B' not in sig:
             sig.append('B')
         # A definition header names a function and calls nothing; a one-line body after it still can.
         header = {'sh': SH_DEF, 'py': PY_DEF, 'js': JS_DEF}.get(eff)
@@ -430,7 +435,7 @@ def scan_file(root, rel, helpers, hook_names, heredocs=None):
         if event_denies(body):
             sig.append('E')
         if sig:
-            sites.append((number, ','.join(sig), stripped))
+            sites.append((number, ','.join(sig), lines[number - 1].strip()))
     return sites
 
 
