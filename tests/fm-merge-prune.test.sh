@@ -788,7 +788,7 @@ scn_unignored_nested_clone_with_unpushed_work_is_kept() {
 # (scn_unique_data_under_claude_or_opencode_is_kept). Two shapes are looser in
 # the prune, each its own named exception: a wholly ignored .tac/
 # (scn_wholly_ignored_tac_caches_are_the_named_exception) and the exact tooling
-# paths under an ignored data/ and state/
+# paths under data/ and state/
 # (scn_tooling_paths_under_data_and_state_are_the_second_named_exception); those
 # paths never go in the pass list below, because teardown preserves them.
 IGNORED_ENTRIES_BOTH_PASS=(
@@ -798,6 +798,7 @@ IGNORED_ENTRIES_BOTH_PASS=(
   .tac/tmp/ .tac/uv-cache/
   .claude/settings.local.json .opencode/plugins/fm-busy-state.js
   scripts/hooks/_conformance_manifest.json graft/
+  data/__pycache__/ data/.DS_Store state/node_modules/ data/pkg/__pycache__/
 )
 IGNORED_ENTRIES_BOTH_BLOCK=(
   build/ data/unique.bin precious.local .tac/state.json .ignore sub/graft/
@@ -951,9 +952,10 @@ scn_copy_with_only_tooling_files_is_removed() {
   return 0
 }
 
-# Everything else under data/ and state/ keeps the copy with one wake that names
-# the first blocking entry (git lists a wholly ignored directory as one entry,
-# and the classifier opens data and state one level at a time).
+# Everything else under a wholly ignored data/ and state/ keeps the copy with
+# one wake that names the first blocking entry (git lists a wholly ignored
+# directory as one entry, and the classifier opens data and state one level at
+# a time).
 scn_other_data_or_state_file_keeps_the_copy() {
   make_world
   printf '%s\n' '/data/' '/state/' >> "$W/project/.git/info/exclude"
@@ -1051,10 +1053,33 @@ scn_omp_watch_extension_must_be_a_directory() {
   printf 'x\n' > "$d/state/extensions/omp-primary-watch/index.js"
   printf 'x\n' > "$d/state/extensions/omp-primary-watch/sub/x.js"
   real=$(cd "$d" && pwd -P)
-  [ -n "$(git -C "$real" ls-files -o -i --exclude-standard --directory | grep -x 'state/extensions/omp-primary-watch/index.js')" ] || why "the fixture does not list a child of omp-primary-watch as its own ignored entry" || return 1
+  git -C "$real" ls-files -o -i --exclude-standard --directory | grep -qx 'state/extensions/omp-primary-watch/index.js' || why "the fixture does not list a child of omp-primary-watch as its own ignored entry" || return 1
   [ -z "$(prune_keep_reason "$real")" ] || why "children of omp-primary-watch listed one by one were kept: $(prune_keep_reason "$real")" || return 1
   printf 'x\n' > "$d/state/extensions/other/x"
   [ -n "$(prune_keep_reason "$real")" ] || why "a child of a sibling extension, listed one by one, passed" || return 1
+  return 0
+}
+
+# A project that tracks data/ and state/ lists each ignored child as its own
+# entry, so the classifier never opens either directory. A scratch name there
+# gets teardown's verdict, and a tooling path is still scratch.
+scn_tracked_data_and_state_children_get_the_base_rules() {
+  local entry d real n=0
+  make_world
+  for entry in data/__pycache__/ data/.DS_Store state/node_modules/ data/pkg/__pycache__/ \
+    data/command-durations.jsonl state/guard-events.jsonl state/extensions/omp-primary-watch/; do
+    n=$((n + 1))
+    d="$W/plant/tracked$n"
+    mkdir -p "$d"
+    make_ignored_entry_repo "$d" "$entry"
+    real=$(cd "$d" && pwd -P)
+    [ "$(git -C "$real" ls-files -o -i --exclude-standard --directory)" = "$entry" ] || why "the fixture does not list $entry as its own ignored entry under a tracked directory" || return 1
+    case "$entry" in
+      data/command-durations.jsonl|state/*/omp-primary-watch/|state/guard-events.jsonl) ;;
+      *) [ "$(teardown_ignored_verdict "$real")" = passes ] || why "teardown blocks $entry under a tracked directory" || return 1 ;;
+    esac
+    [ "$(prune_ignored_verdict "$real")" = passes ] || why "the prune keeps $entry under a tracked directory: $(prune_keep_reason "$real")" || return 1
+  done
   return 0
 }
 
@@ -2602,8 +2627,9 @@ test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch() { assert_sc
 test_fallback_counts_the_tooling_files_under_data_and_state_as_scratch() { assert_scenario scn_tooling_paths_under_data_and_state_are_the_second_named_exception "the second named difference from teardown: the exact tooling paths under an ignored data/ and state/ pass the prune and block teardown, and data/report.md or state/other.log beside them still blocks both"; }
 test_fallback_removes_a_copy_holding_only_tooling_files() { assert_scenario scn_copy_with_only_tooling_files_is_removed "a pool copy whose only ignored files are the exact tooling files under data/ and state/ is removed with no wake"; }
 test_fallback_keeps_a_copy_with_another_data_file() { assert_scenario scn_other_data_or_state_file_keeps_the_copy "data/report.md beside the tooling files keeps the copy with one wake naming it"; }
-test_fallback_keeps_every_path_outside_the_tooling_list() { assert_scenario scn_nothing_outside_the_tooling_list_is_scratch "lookalike suffixes, scratch names under data/ and state/, wrong or deeper directories, directories in place of files, and other ignored trees all keep the copy"; }
+test_fallback_keeps_every_path_outside_the_tooling_list() { assert_scenario scn_nothing_outside_the_tooling_list_is_scratch "lookalike suffixes, scratch names under a wholly ignored data/ and state/, wrong or deeper directories, directories in place of files, and other ignored trees all keep the copy"; }
 test_fallback_needs_the_omp_watch_extension_to_be_a_directory() { assert_scenario scn_omp_watch_extension_must_be_a_directory "state/extensions/omp-primary-watch is scratch with children at any depth only as a directory; a file there and a sibling extension directory keep the copy"; }
+test_fallback_judges_tracked_data_and_state_children_by_the_base_rules() { assert_scenario scn_tracked_data_and_state_children_get_the_base_rules "under a tracked data/ or state/, a scratch-named ignored child passes like teardown and a tooling path is still scratch"; }
 test_fallback_keeps_a_copy_whose_data_directory_cannot_be_listed() { assert_scenario scn_unreadable_data_directory_keeps_the_copy "a data/ that cannot be listed keeps the copy"; }
 test_fallback_removes_an_empty_nested_repo_with_the_slot() { assert_scenario scn_empty_nested_repo_goes_with_the_slot "an empty nested git init, which has no commit to compare, goes with the slot with no wake"; }
 test_fallback_removes_an_unignored_empty_nested_repo_with_the_slot() { assert_scenario scn_unignored_empty_nested_repo_goes_with_the_slot "an empty nested git init that the project does not ignore is removed before the destroy and goes with the slot"; }
@@ -2747,7 +2773,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-nested-proof-before-teardown $orch '  prove_nested_first || return 0' '  :' scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "nested-copy proof before teardown"
   expect_caught no-pane-job-proof-before-teardown $orch '  fm_mp_prove_pane_idle "$real" "$(fm_mp_pane_pid "$META")" || { record_verdict "$real"; return 1; }' '  :' scn_pane_job_keeps_the_copy_before_teardown "pane-job proof before teardown"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
-  expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
+  expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
   expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
   expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1' '    :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
   expect_caught conformance-manifest-by-path-suffix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    *scripts/hooks/_conformance_manifest.json) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact path of the conformance manifest"
@@ -2763,9 +2789,8 @@ test_unsafe_mutations_are_caught() {
     fm_project_lock_release "$plock" || true' scn_worker_busy_after_the_first_verdict "second idle classification under the project lock (busy)"
   expect_caught empty-head-dropped-for-any-branch $lib '    && ! git -C "$copy" rev-parse -q --verify "$headref" >/dev/null 2>&1; then' '    && true; then' scn_unpushed_commit_is_kept "HEAD dropped only when its branch is unborn"
   expect_caught tooling-path-check-always-passes $lib '      if fm_mp_tooling_path "$copy" "$rel"; then' '      if true; then' scn_nothing_outside_the_tooling_list_is_scratch "exact-path check under data and state"
-  expect_caught tooling-scratch-name-bypass-removed $lib '    data/*|state/*)
-      if fm_mp_tooling_path' '    NEVER/*)
-      if fm_mp_tooling_path' scn_nothing_outside_the_tooling_list_is_scratch "bypass of the scratch-name rule under data and state"
+  expect_caught tooling-scratch-name-bypass-removed $lib '      if [ -n "$opened" ]; then' '      if false; then' scn_nothing_outside_the_tooling_list_is_scratch "bypass of the scratch-name rule under an opened data and state"
+  expect_caught opened-flag-never-set $lib '        case "$rel" in data|state|state/extensions) sub=opened ;; esac' '        :' scn_nothing_outside_the_tooling_list_is_scratch "flag for children of an opened data and state"
   expect_caught omp-watch-file-passes $lib '      [ -d "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 0' scn_omp_watch_extension_must_be_a_directory "directory check of the omp-primary-watch extension"
   expect_caught tooling-file-type-unchecked $lib '      [ -f "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 0' scn_nothing_outside_the_tooling_list_is_scratch "regular-file check of the tooling files"
   expect_caught ignored-listing-status-is-tr $lib 'listing=$(set -o pipefail; git -C "$copy" ls-files -o -i' 'listing=$(git -C "$copy" ls-files -o -i' scn_failing_ignored_listing_keeps_the_copy "checked ignored-file listing"
@@ -2850,6 +2875,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
   expect_caught empty-head-always-compared $lib '    refs=()' '    :' scn_empty_nested_repo_goes_with_the_slot "dropping an unborn HEAD from the compared refs"
   expect_caught data-and-state-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac|data|state|state/extensions)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' scn_copy_with_only_tooling_files_is_removed "opening data and state one level at a time"
+  expect_caught tracked-data-children-always-unique $lib '      if [ -n "$opened" ]; then' '      if true; then' scn_tracked_data_and_state_children_get_the_base_rules "base rules for entries listed one by one under a tracked data and state"
   expect_caught tooling-paths-never-scratch $lib '      [ -f "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 1' scn_copy_with_only_tooling_files_is_removed "the exact tooling file paths"
   expect_caught omp-watch-children-never-scratch $lib '      [ -d "$1/state/extensions/omp-primary-watch" ] && [ ! -L "$1/state/extensions/omp-primary-watch" ]' '      return 1' scn_omp_watch_extension_must_be_a_directory "children of the omp-primary-watch extension"
   expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac|data|state|state/extensions)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins|data|state|state/extensions)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
@@ -3282,6 +3308,7 @@ ALL_TESTS=(
   test_fallback_keeps_a_copy_with_another_data_file
   test_fallback_keeps_every_path_outside_the_tooling_list
   test_fallback_needs_the_omp_watch_extension_to_be_a_directory
+  test_fallback_judges_tracked_data_and_state_children_by_the_base_rules
   test_fallback_keeps_a_copy_whose_data_directory_cannot_be_listed
   test_fallback_removes_an_empty_nested_repo_with_the_slot
   test_fallback_removes_an_unignored_empty_nested_repo_with_the_slot

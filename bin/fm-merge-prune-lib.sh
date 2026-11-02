@@ -61,15 +61,17 @@
 # shapes. First: when a project ignores the whole .tac/ directory, teardown
 # preserves its children other than tmp and uv-cache, and the prune counts
 # rebuildable cache children (.venv, node_modules) as scratch. Second: the prune
-# treats these exact paths under an ignored data/ and state/ as scratch, which
-# Firstmate's own tooling writes during ordinary runs, although teardown
-# preserves both directories: data/command-durations.jsonl,
+# treats these exact paths under data/ and state/ as scratch, which Firstmate's
+# own tooling writes during ordinary runs, although teardown preserves them:
+# data/command-durations.jsonl,
 # data/command-durations.jsonl.lock, state/.omp-live-model,
 # state/.omp-turnend-extension-loaded, state/.omp-watch-extension-loaded,
 # state/extensions/omp-primary-watch (a directory, and every child of it at any
-# depth) and state/guard-events.jsonl. They match by exact path, never by name:
-# a scratch name such as node_modules under data/ or state/ is not scratch
-# there, and any other ignored file under either directory is unique. Under .claude and
+# depth) and state/guard-events.jsonl. They match by exact path, never by name.
+# In a data/ or state/ that the project ignores as a whole, a scratch name such
+# as node_modules is not scratch there, and any other file is unique; under a
+# tracked data/ or state/, any other ignored entry is judged like one anywhere
+# else. Under .claude and
 # .opencode only the hook files, a clone (proved on its own) and an entry with a
 # scratch name are scratch; any other ignored entry there is unique, stricter
 # than teardown. The preserve
@@ -348,7 +350,7 @@ EOF
   return 0
 }
 
-# The exact paths under an ignored data/ or state/ that Firstmate's own tooling
+# The exact paths under data/ or state/ that Firstmate's own tooling
 # writes during ordinary runs. A file-valued path must be a regular file; the
 # omp-primary-watch extension directory and everything below it, at any depth,
 # are scratch only when that path is a directory. Matched by exact relative path,
@@ -375,9 +377,10 @@ fm_mp_tooling_path() {  # <real-copy> <relative-path>
 
 # One ignored entry: scratch (return 0), preserved (recorded, return 0), or
 # unique (keep verdict, return 1). Directories that may hold both kinds are
-# opened one level at a time.
-fm_mp_classify_entry() {  # <real-copy> <relative-path>
-  local copy=$1 rel=$2 name child n children
+# opened one level at a time. The third argument is set for a child reached by
+# opening an ignored data, state or state/extensions directory.
+fm_mp_classify_entry() {  # <real-copy> <relative-path> [opened]
+  local copy=$1 rel=$2 opened=${3:-} name child n children sub=
   name=${rel##*/}
   if [ -L "$copy/$rel" ] || teardown_graft_generated "$copy" "$rel"; then
     return 0
@@ -404,9 +407,10 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
           fm_mp_verdict keep "cannot list $rel in $copy"
           return 1
         fi
+        case "$rel" in data|state|state/extensions) sub=opened ;; esac
         while IFS= read -r child; do
           [ -n "$child" ] || continue
-          fm_mp_classify_entry "$copy" "$rel/$child" || return 1
+          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || return 1
         done <<EOF
 $children
 EOF
@@ -423,14 +427,17 @@ EOF
         return 0
       fi
       ;;
-    # Under data and state only the exact tooling paths are scratch. The generic
-    # scratch-name rule below never applies to a child of either directory.
+    # The exact tooling paths are scratch however they were reached. Inside an
+    # ignored data or state that was opened, nothing else is: the generic
+    # scratch-name rule below applies only to entries git lists one by one.
     data/*|state/*)
       if fm_mp_tooling_path "$copy" "$rel"; then
         return 0
       fi
-      fm_mp_verdict keep "$copy holds an ignored file that is neither scratch nor on the preserve list: $rel"
-      return 1
+      if [ -n "$opened" ]; then
+        fm_mp_verdict keep "$copy holds an ignored file that is neither scratch nor on the preserve list: $rel"
+        return 1
+      fi
       ;;
   esac
   if fm_mp_scratch_name "$name"; then

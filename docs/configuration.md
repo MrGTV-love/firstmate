@@ -765,11 +765,12 @@ Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycac
 These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except two named shapes.
 First, when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
-Second, the prune counts these exact paths under an ignored `data/` and `state/` as scratch, although teardown preserves both directories: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
+Second, the prune counts these exact paths under `data/` and `state/` as scratch, although teardown preserves them: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
 Firstmate's own tooling writes these during ordinary runs.
-The match is by exact path, never by name, and a scratch name such as `node_modules` under `data/` or `state/` is not scratch there.
-Any other ignored file under `data/` or `state/` is unique work, so the copy stays.
-A nested repository with no commit and nothing else in it carries no work, so it does not keep the copy.
+The match is by exact path, never by name.
+In a `data/` or `state/` that the project ignores as a whole, a scratch name such as `node_modules` is not scratch there, and any other file is unique work, so the copy stays.
+Under a tracked `data/` or `state/`, any other ignored entry is judged like one anywhere else.
+A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
