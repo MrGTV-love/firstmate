@@ -169,6 +169,22 @@ def finish(child, code=0):
     assert actual == code, (actual, code, records)
 
 
+SPACING_LIMIT = 2.0  # seconds between consecutive grants of ready starts; the handshake takes well under one
+
+
+def grant_gaps(folder, names):
+    """Seconds between consecutive grants, from the nanosecond times the fake starts touched."""
+    stamps = sorted((folder / (name + '.started')).stat().st_mtime_ns for name in names)
+    return [(later - earlier) / 1e9 for earlier, later in zip(stamps, stamps[1:])]
+
+
+def assert_no_spacing(folder, names):
+    """Reject artificial spacing: ready starts follow each other by the registration handshake only."""
+    gaps = grant_gaps(folder, names)
+    assert max(gaps) < SPACING_LIMIT, ('artificial wait between grants', [round(gap, 2) for gap in gaps])
+    return gaps
+
+
 def pending(folder, count):
     wait_for(lambda: len(list((folder / 'pool').glob('pipeline-waiter-*.lock'))) == count,
              str(count) + ' registered waiters')
@@ -190,8 +206,10 @@ def clean_stop(db, writer):
 
 
 worker = root / 'start.py'
-worker.write_text('''import pathlib, sqlite3, sys, time
+worker.write_text('''import os, pathlib, sqlite3, sys, time
 folder, name = pathlib.Path(sys.argv[1]), sys.argv[2]
+# Test-only: a delay before this fake start registers, while the admission lock is held.
+time.sleep(float(os.environ.get('CASE_LAUNCH_DELAY', '0')))
 with sqlite3.connect(folder / 'state.sqlite') as db:
     db.execute('INSERT INTO runs (id, status) VALUES (?, ?)', (name, 'running'))
 with (folder / 'order').open('a') as out: out.write(name + '\\n')
@@ -321,6 +339,8 @@ try:
         assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
     assert any('need=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 40 * GIB) in (folder / (name + '.stderr')).read_text() for name in names[:10])
+    # No artificial wait: the grants follow each other by the registration handshake alone.
+    burst_gaps = assert_no_spacing(folder, names[:10])
     # The eleventh needs 41 GiB of 40 and waits; releasing one run lets it start.
     clients[names[10]] = launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), names[10]], env, folder / names[10])
     pending(folder, 1)
@@ -332,6 +352,31 @@ try:
     finish(clients['burst-0'])
     wait_for(lambda: (folder / (names[10] + '.started')).exists(), 'eleventh grant after a release')
     for name in names[1:]:
+        (folder / (name + '.release')).touch()
+        finish(clients[name])
+
+    # The check must reject spacing. The same burst shape with a 2-second delay injected before
+    # each fake start registers (the admission lock is held across it) passes the earlier
+    # assertions but fails assert_no_spacing; the undelayed burst above passed it.
+    folder, db, env = case('spacing-injected', cores=3, measured=True, available=40 * GIB)
+    env['CASE_LAUNCH_DELAY'] = '2'
+    names = ['slow-%d' % i for i in range(4)]
+    clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names}
+    for name in names:
+        wait_for(lambda: (folder / (name + '.started')).exists(), name + ' delayed grant')
+    for name in names:
+        text = (folder / (name + '.stderr')).read_text()
+        waits = [line for line in text.splitlines() if 'waiting' in line]
+        assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
+        assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
+    assert all(c.poll() is None for c in clients.values())
+    try:
+        assert_no_spacing(folder, names)
+    except AssertionError as rejected:
+        injected_rejection = str(rejected)
+    else:
+        raise AssertionError('the injected 2-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
+    for name in names:
         (folder / (name + '.release')).touch()
         finish(clients[name])
 
@@ -392,6 +437,28 @@ try:
         assert marker.exists(), label
     (folder / 'already-running.release').touch()
     finish(running)
+
+    # A reading that was healthy a moment ago cannot admit a start after the signal turns bad:
+    # the grant takes a new reading. Each case first lets a waiter see healthy inputs (it waits
+    # at the full counted limit), then changes the signal and frees the slot together, so the old
+    # cached reading is the only thing that could grant. It must keep waiting, then start once clear.
+    for label, bad, good in (
+            ('pressure', lambda f: facts(f, pressure=2), lambda f: facts(f)),
+            ('pileup', lambda f: procs(f, count=6400), lambda f: procs(f, count=100)),
+            ('memory-unreadable', lambda f: facts(f, broken=True), lambda f: facts(f)),
+            ('procs-unreadable', lambda f: procs(f, error=True), lambda f: procs(f))):
+        folder, db, env = case('transition-' + label, cores=3, running=1)
+        marker, log = folder / 'transition.marker', folder / 'transition.stderr'
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'transition')
+        pending(folder, 1)
+        wait_for(lambda: 'waiting: counted=1 limit=1 basis=fallback' in log.read_text(), label + ' healthy reading seen while full')
+        bad(folder)
+        change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+        time.sleep(1.2)  # several polls inside the old 2-second reuse window
+        assert not marker.exists() and child.poll() is None and 'admitted' not in log.read_text(), (label, log.read_text())
+        good(folder)
+        finish(child)
+        assert marker.exists() and 'admitted: counted=0 limit=1 basis=fallback' in log.read_text(), (label, log.read_text())
 
     # A host whose counted runs are not CI-ready yet, so their peak may still rise (little memory left), pauses new starts
     # although a lull in load would allow them. Their resident memory is part of the budget,
@@ -635,7 +702,7 @@ if name == 'outer':
     child = launch(duration + ['axi', 'run'], env, folder / 'reattach')
     finish(child)
     assert (folder / 'reattach.started').exists()
-    print(json.dumps(dict(result='pass', artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
+    print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:
     for file in root.glob('*/release-children'):
         file.touch()

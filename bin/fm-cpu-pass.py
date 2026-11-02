@@ -67,7 +67,8 @@ Pipeline starts:
     root home comes from fm_firstmate_root_home in fm-secondmate-parent-lib.sh,
     kept once resolved, and a failed walk falls back). available
     and each run's resident memory come from one fm-mem-guard.py admission_sample
-    reading, re-taken at most every 2 s while waiting. With fewer than 2
+    reading, re-taken at most every 2 s while waiting and always taken anew
+    at the moment of a grant (both backstop signals included). With fewer than 2
     qualifying recorded runs, or no native memory facts on this platform, the
     start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
     record never refuses a start and never reads as an empty host.
@@ -493,10 +494,14 @@ def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, in
 _observed: dict = {}
 
 
-def host_observation() -> dict:
-    """One cached reading of the harm signals; an unreadable source is itself a reason to wait."""
+def host_observation(fresh: bool = False) -> dict:
+    """One reading of the harm signals; an unreadable source is itself a reason to wait.
+
+    A waiting start may reuse a reading up to OBSERVE_EVERY_SECS old to keep polling cheap, but
+    never to grant: the grant path passes fresh=True and takes a new reading at that moment.
+    """
     now = time.monotonic()
-    if _observed and now - _observed["at"] < OBSERVE_EVERY_SECS:
+    if not fresh and _observed and now - _observed["at"] < OBSERVE_EVERY_SECS:
         return _observed
     reasons: List[str] = []
     memory = None
@@ -526,9 +531,9 @@ def host_observation() -> dict:
     return _observed
 
 
-def decide(running: dict, counted: dict, cores: int, priority: str) -> Tuple[bool, str]:
+def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool = False) -> Tuple[bool, str]:
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
-    seen = host_observation()
+    seen = host_observation(fresh)
     if seen["reasons"]:
         return False, "overload: %s counted=%d priority=%s" % ("; ".join(seen["reasons"]), len(counted), priority)
     report = seen["memory"]
@@ -602,6 +607,9 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 first = first_pipeline_waiter(directory)
                 if first == waiter_path:
                     admit, reason = decide(before, counted, cores, args.priority)
+                    if admit:
+                        # A cached healthy reading may be stale: confirm with a new reading at the grant.
+                        admit, reason = decide(before, counted, cores, args.priority, fresh=True)
                     if admit:
                         break
                 else:
