@@ -391,6 +391,28 @@ jq -e '(.guards[] | select(.id == "gmalformed") | .workarounds == 1) and .summar
   || fail "the text report did not mark workaround signatures as not measured"
 pass "malformed event rows are skipped and an absent workaround feed reads as not measured"
 
+# Deny-only and quiet guards stay visible: a guard with only denies is flagged,
+# a guard whose rows are all older than the fixed window reports that window, and
+# a registered guard with no rows is listed as quiet only when a log exists.
+QUIETLOG="$TMP/quiet-flags.jsonl"
+printf '%s\n' '{"guard":"gstale","rule":"gstale","task":"t","decision":"deny","ts":"2020-01-01T00:00:00Z"}' > "$QUIETLOG"
+"$EVENT" gfresh deny --task t --log "$QUIETLOG"
+"$EVENT" gcleared deny --task t --log "$QUIETLOG"
+"$EVENT" gcleared allow --task t --log "$QUIETLOG"
+printf '%s\n' '{"guards":[{"id":"gstale"},{"id":"gfresh"},{"id":"gcleared"},{"id":"gnone"}]}' > "$TMP/quiet-registry.json"
+"$METRICS" --log "$QUIETLOG" --registry "$TMP/quiet-registry.json" --json > "$TMP/quiet-flags.json" || fail "the quiet-flag metrics run failed"
+jq -e '(.guards | map({key: .id, value: .}) | from_entries) as $g
+  | ([.rules[] | select(.id == "gfresh")][0].deny_only == true)
+  and $g.gfresh.deny_only == true and $g.gcleared.deny_only == false
+  and $g.gstale.zero_events_days == 30 and $g.gfresh.zero_events_days == 0
+  and .window_days == 30 and .zero_event_guards == ["gnone"]' "$TMP/quiet-flags.json" >/dev/null \
+  || fail "deny-only or zero-event flags are wrong: $(cat "$TMP/quiet-flags.json")"
+[ "$("$METRICS" --log "$QUIETLOG" --registry "$TMP/quiet-registry.json" | grep '^QUIET ')" = 'QUIET gnone zero_events_days=30' ] \
+  || fail "the text report did not list exactly the quiet registered guard"
+! "$METRICS" --log "$TMP/no-such-log.jsonl" --registry "$TMP/quiet-registry.json" | grep -q '^QUIET ' \
+  || fail "a missing log listed registered guards as quiet"
+pass "deny-only, zero-event and quiet guards are flagged through the real metrics report"
+
 # A green merge writes three rule rows for one guarded operation. The guard row
 # counts one opportunity; each rule row keeps its own allow and its own clear.
 OPS="$TMP/operations.jsonl"

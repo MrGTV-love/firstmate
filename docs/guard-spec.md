@@ -260,7 +260,7 @@ It groups repeated denies by task and rule across harness sessions, and an allow
 The refusal-to-bypass ratio is escape records plus distinct workaround signatures divided by denies, with a record carrying both `bypass` and `override` counted once.
 No durable workaround feed exists yet, so the ratio counts escape records only unless detector JSON is supplied with `--workarounds`; without it `workarounds` is null (not measured), never zero evidence.
 The ratio is undefined (`null`) when there are no denies, rather than zero evidence of escapes.
-Deny-only rows and guards with no recorded events in the selected window remain visible without inventing opportunities.
+Deny-only rows and guards with no recorded events in the fixed 30-day window remain visible without inventing opportunities.
 
 `bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
 Its header owns the bounded first-parent scan, local metadata scope, base resolution and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
