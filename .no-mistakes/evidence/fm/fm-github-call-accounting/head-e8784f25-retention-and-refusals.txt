@@ -1,0 +1,65 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:21:12Z
+=== D1 exact 48 h boundary (labelled frozen clock 1794000000; cutoff 1793827200), convention: strictly older expires
+{"removed": 0}
+before:
+{"delta": -1, "observed_at": 1793827199, "kind": "fixture"}
+{"delta": 0, "observed_at": 1793827200, "kind": "fixture"}
+{"delta": 1, "observed_at": 1793827201, "kind": "fixture"}
+{"removed": 1}
+prune exit=0
+after:
+{"delta": 0, "observed_at": 1793827200, "kind": "fixture"}
+{"delta": 1, "observed_at": 1793827201, "kind": "fixture"}
+unrelated: unrelated, sibling: keep
+=== D2 running owner with real clock: start prunes expired, the 15 s tick prunes a row that crosses the 48 h line
+   before start ['older', 'crosses', 'newer']
+   3 s after start ['crosses', 'newer']
+   21 s after start ['newer']
+  rows after stop:        1
+=== D3 zero-size database, as an interrupted start leaves
+  before -rw-r--r--@ 0
+{"state": "running", "pid": 67733, "run_id": "37c9d5841db64374961bf7d07cf53000", "started_at": 1793647295.0857868}
+  start exit=0
+{"state": "running", "pid": 67733, "run_id": "37c9d5841db64374961bf7d07cf53000", "started_at": 1793647295.0857868}
+{"state": "stopped"}
+  application_id 0x464d4748 auto_vacuum 1 tables ['observations']
+  after -rw-------@
+  owner rows:        2
+{"removed": 0}
+  prune on zero-size exit=0
+  application_id 0x464d4748 auto_vacuum 1 tables ['observations']
+  records on zero-size exit=0 (no rows)
+  application_id 0x464d4748 auto_vacuum 1 tables ['observations']
+=== D4 file with bytes and no owner id, foreign SQLite, foreign id: refused and byte-identical
+ non-database bytes:
+  start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run --duration 1 exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  bytes unchanged fe35769db1a5d045
+{"state": "stopped"}
+ foreign sqlite, application_id 0:
+  start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run --duration 1 exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  bytes unchanged 877bd026786a4f23
+{"state": "stopped"}
+ foreign sqlite, other application_id:
+  start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run --duration 1 exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  bytes unchanged 634812d56e5df2ae
+{"state": "stopped"}
+=== D5 symlinks: refused, target unchanged
+  db symlink start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  db symlink prune exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  target: target
+  state-dir symlink start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  elsewhere entries: 0
+  symlink to zero-size file start exit=1 : fm-github-accounting: operation unavailable (check owner status/state permissions)
+  target size: 0
+=== D6 owner's populated database survives a restart: no rows lost
+  rows after first run 6; owner rows after second run 4 (want 4)
+  application_id 0x464d4748 auto_vacuum 1 tables ['observations']

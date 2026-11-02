@@ -1,0 +1,12 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:24:39Z
+### fake ps logs each launch with argv; /bin/ps reads what is alive
+t+3 launches=2 live=2 owner_children_sleep900=2 owner_threads=2
+t+12 launches=2 live=2 owner_children_sleep900=2 owner_threads=2
+t+15 launches=2 live=2 owner_children_sleep900=2 owner_threads=2
+t+15 launches=2 live=2 owner_children_sleep900=2 owner_threads=2
+t+15 launches=2 live=2 owner_children_sleep900=2 owner_threads=2
+--- argv shapes, first 6 and counts
+   1 -S -axo pid=,ppid=,time=,stat=,lstart=
+   1 -axo pid=,ppid=,lstart=,command=
+{"state": "stopped"}
+live after stop=0

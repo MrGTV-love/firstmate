@@ -1,0 +1,10 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:32:08Z
+=== G1 normal stop: quota child and its grandchild both end
+{"state": "stopped"}
+  alive after: 0 of 2
+=== G2 no-progress verdict (labelled 5 s interval): quota child and its grandchild both end, owner keeps running
+{"state": "running",
+  alive while owner still runs: 0 of 2
+{"state": "stopped"}
+  quota unavailable reason timeout exit -9
+  alive after: 0 of 2

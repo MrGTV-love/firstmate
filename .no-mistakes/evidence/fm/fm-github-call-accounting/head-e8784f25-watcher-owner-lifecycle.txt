@@ -1,0 +1,67 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:26:26Z
+### real bin/fm-watch.sh, real owner, disposable homes; gh-axi is a labelled fake here so the watcher fixtures stay off the account
+=== E1 primary home: absent owner starts on a cycle
+  after 0s
+{"state": "running", "pid": 7424, "run_id": "30fbc8996769492b8c602cbd8f687dc5", "started_at": 1793647589.009886}
+=== E2 running owner left alone across cycles
+  same run_id: yes
+  watcher alive
+  wake rows 0; marker none
+=== E3 SIGKILL of owner recovers at the next cycle
+  after 0s
+=== E4 plain stop lasts until the next cycle
+{"state": "stopped"}
+  after 0s
+=== E5 watcher exit leaves the detached owner; a new watcher does not double it
+  owner: {"state": "running", "pid": 19424, "run_id": "63376d481bc54acb8ce756cfbf71247e", "started_at": 1793647598.411102}
+  same run_id: yes
+=== E6 FM_GITHUB_ACCOUNTING=0 with a stopped owner keeps it off
+{"state": "stopped"}
+{"state": "stopped"}
+  watcher alive
+  wake rows 0; marker none
+  owner events [('start', '30fbc899'), ('start', '91019e44'), ('stop', '91019e44'), ('start', '63376d48'), ('stop', '63376d48')]
+=== E7 foreign database: real failed start wakes once, keeps the file, then holds to the retry interval
+  check: github-accounting owner failed to start: exit=1; owner stderr: <home>/state/github-accounting/owner.log; retries every 3600s without another wake
+  owner.log: fm-github-accounting: operation unavailable (check owner status/state permissions)
+  wake rows 1; marker present
+  database bytes unchanged 249aac5fda718bd0
+  drained; wake rows 0
+0
+  next watcher, 5 s: new log lines 0;   watcher alive
+  wake rows 0
+0; marker present
+=== E8 operator moves the file; next attempt after the interval starts the owner and clears the marker
+  after 0s
+  wake rows 0
+0; marker present
+{"state": "stopped"}
+  moved file intact: 42
+=== E9 zero-size database under the real watcher: starts, no wake, no marker
+  after 0s
+  watcher alive
+  wake rows 0; marker none
+{"state": "stopped"}
+=== E10 held lock: start is busy (75), no wake, no marker; next cycle after release starts the owner
+fm-github-accounting: busy (owner lock held); retry
+  direct start exit=75
+  watcher alive
+  wake rows 0; marker none
+  state: running
+  after 0s
+  wake rows 0; marker none
+{"state": "stopped"}
+=== E11 secondmate home: no owner
+{"state": "stopped"}
+  watcher alive
+=== E12 real fm-lab-home.sh home: marker means no owner
+  .fm-lab-home
+{"state": "stopped"}
+  watcher alive
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:28:10Z
+### re-drive of E8: the first driver stopped the watcher before its next cycle could read the start's exit
+  first watcher closed on wake: 1; marker: present
+  after 1s marker: none
+  owner: {"state": "running", "pid": 35007, "run_id": "7d235001f90d40c3bdc9dd4426b05a21", "started_at": 1793647696.012277}
+  wake rows: 0
+{"state": "stopped"}

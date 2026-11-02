@@ -1,0 +1,75 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:19:46Z
+### FM_HOME is a marked disposable lab home; no FM_STATE_OVERRIDE; real gh-axi on PATH: /opt/homebrew/bin/gh-axi
+$ python3 bin/fm-github-accounting.py status
+{"state": "stopped"}
+exit=0
+$ python3 bin/fm-github-accounting.py start
+{"state": "running", "pid": 25778, "run_id": "6d72220e7e2143ebb2de929b277de9fc", "started_at": 1793647186.842305}
+exit=0
+$ python3 bin/fm-github-accounting.py start
+{"state": "running", "pid": 25778, "run_id": "6d72220e7e2143ebb2de929b277de9fc", "started_at": 1793647186.842305}
+exit=0
+$ python3 bin/fm-github-accounting.py run --duration 1
+fm-github-accounting: busy (owner lock held); retry
+exit=75
+$ python3 bin/fm-github-accounting.py records
+fm-github-accounting: busy (owner lock held); retry
+exit=75
+fixture recon-parent pid=28753
+fixture parent exit=0
+$ python3 bin/fm-github-accounting.py stop
+{"state": "stopped"}
+exit=0
+$ python3 bin/fm-github-accounting.py status
+{"state": "stopped"}
+exit=0
+records exit=0 rows=     168
+--- independent direct read after stop
+  body: used=347 reset=1793649324 limit=5000 remaining=4653
+kinds {'owner': 2, 'sampling': 4, 'process': 159, 'quota': 3}
+owner events [('start', '6d72220e', 0.2, 15.0), ('stop', '6d72220e', None, None)]
+quota observed | REST rate_limit resources.graphql |endpoint rate_limit |host github.com |exit 0 | {'limit': 5000, 'remaining': 4663, 'reset': 1793649324, 'used': 337} |request gap None
+quota observed | REST rate_limit resources.graphql |endpoint rate_limit |host github.com |exit 0 | {'limit': 5000, 'remaining': 4656, 'reset': 1793649324, 'used': 344} |request gap 15.106
+quota observed | REST rate_limit resources.graphql |endpoint rate_limit |host github.com |exit 0 | {'limit': 5000, 'remaining': 4653, 'reset': 1793649324, 'used': 347} |request gap 15.049
+sampling scans 1 failures 0 max_gap 0.0
+sampling scans 45 failures 0 max_gap 0.35
+sampling scans 45 failures 0 max_gap 0.35
+sampling scans 15 failures 0 max_gap 0.35
+fixture caller ['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]', '[REDACTED]', '--header', '[REDACTED]', '[REDACTED]'] pid 29210 ppid 28981 start Mon Nov 2 13:19:49 2026 source ps-command-line-projection end root run 6d72220e
+   ancestor 28981 ['sh', 'board-reader.sh', '[REDACTED]'] Mon Nov 2 13:19:49 2026
+   ancestor 28753 ['sh', 'recon-parent.sh'] Mon Nov 2 13:19:49 2026
+   ancestor 24631 ['bash', 'a.sh'] Mon Nov 2 13:19:45 2026
+   ancestor 24630 ['zsh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:19:45 2026
+   ancestor 24600 ['zsh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:19:45 2026
+   ancestor 80492 ['claude', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:17:50 2026
+   ancestor 2941 ['no-mistakes', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Tue Oct 20 16:42:14 2026
+   ancestor 1 ['launchd'] Tue Oct 20 14:29:12 2026
+fixture caller ['sh', 'gh', 'pr', 'list', '--repo', '[REDACTED]'] pid 34931 ppid 34923 start Mon Nov 2 13:19:52 2026 source ps-command-line-projection end root run 6d72220e
+   ancestor 34923 ['sh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--repo'] Mon Nov 2 13:19:52 2026
+   ancestor 28981 ['sh', 'board-reader.sh', '[REDACTED]'] Mon Nov 2 13:19:49 2026
+   ancestor 28753 ['sh', 'recon-parent.sh'] Mon Nov 2 13:19:49 2026
+   ancestor 24631 ['bash', 'a.sh'] Mon Nov 2 13:19:45 2026
+   ancestor 24630 ['zsh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:19:45 2026
+   ancestor 24600 ['zsh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:19:45 2026
+   ancestor 80492 ['claude', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Mon Nov 2 13:17:50 2026
+   ancestor 2941 ['no-mistakes', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] Tue Oct 20 16:42:14 2026
+   ancestor 1 ['launchd'] Tue Oct 20 14:29:12 2026
+other local gh rows, not labelled, count only: 157
+gh-axi rows seen, argv heads: [(('node', 'gh-axi', 'api', 'rate_limit'), 3)]
+--- privacy: canary hits in every owner file (want 0)
+observations.sqlite 0
+owner.lock 0
+owner.log 0
+start.lock 0
+stop 0
+records.jsonl 0
+--- modes
+drwx------ state/github-accounting
+-rw------- state/github-accounting/observations.sqlite
+-rw------- state/github-accounting/owner.lock
+-rw------- state/github-accounting/owner.log
+-rw------- state/github-accounting/start.lock
+-rw------- state/github-accounting/stop
+--- leftover children from this owner: gh-axi rate_limit ps with this home
+       0
+teardown=0

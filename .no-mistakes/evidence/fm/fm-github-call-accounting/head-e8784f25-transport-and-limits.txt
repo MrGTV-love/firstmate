@@ -1,0 +1,17 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:28:19Z
+=== F1 transport boundary: every gh and gh-axi launch by the owner, logged by labelled fakes
+  run exit=0
+     2 gh-axi [api] [rate_limit] [--jq] [.resources.graphql | "used=\(.used) reset=\(.reset) limit=\(.limit) remaining=\(.remaining)"] [--full]
+  raw gh calls: 0
+=== F2 disclosed limit: SIGKILL of the owner while a quota child hangs
+  after SIGKILL hung children=1
+  new owner overlap children=2
+{"state": "stopped"}
+  after normal stop children=1 (the crashed owner's child stays until it exits)
+  after driver cleanup children=0
+=== F3 bad arguments are refused before any state change
+fm-github-accounting.py: error: --duration must be finite, positive and used wit
+fm-github-accounting.py: error: --duration must be finite, positive and used wit
+fm-github-accounting.py: error: --duration must be finite, positive and used wit
+fm-github-accounting.py: error: --kind is for records
+  state entries: 0

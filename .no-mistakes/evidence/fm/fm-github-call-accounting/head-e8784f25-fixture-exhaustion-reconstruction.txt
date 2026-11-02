@@ -1,0 +1,11 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:19:46Z
+### LABELLED FIXTURE quota values, not the real account
+start=0
+caller exit=0
+stop=0
+records=0 rows= 168
+interval used 4000 -> 4001 delta 1 remaining 999 reset 1794000000
+  observed labelled caller: none -> this delta stays unattributed
+interval used 4001 -> 5000 delta 999 remaining 0 reset 1794000000
+  observed caller ['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]'] pid 57551 start Mon Nov 2 13:20:07 2026 chain [['sh', 'board-reader.sh'], ['sh', 'recon.sh'], ['bash', 'b.sh']]
+note: time overlap only; a row does not prove that caller spent these points

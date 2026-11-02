@@ -1,0 +1,76 @@
+### head e8784f25eacb6275fa6993a7dd1738cf53ddbd90 host GTT-CB.local 2026-11-02T19:21:12Z
+=== C1 gh-axi not on PATH: unavailable with command_unavailable, owner still runs
+  gh-axi absent from PATH
+{"state": "running", "pid": 43097, "run_id": "cfbd18e372954a17b875f2ee07dc1559", "started_at": 1793647272.8231401}
+  start exit=0
+{"state": "running", "pid": 43097, "run_id": "cfbd18e372954a17b875f2ee07dc1559", "started_at": 1793647272.8231401}
+{"state": "stopped"}
+  stop exit 0 took 0.41 s
+  quota unavailable reason command_unavailable exit None graphql None pid None
+  quota unavailable reason command_unavailable exit None graphql None pid None
+  sampling scans 1 failures 0 max_gap 0.0
+  sampling scans 47 failures 0 max_gap 0.353
+  sampling scans 6 failures 0 max_gap 0.347
+=== C2 gh-axi exits nonzero with a rate-limit error: unavailable, never zero
+  run exit=0
+  quota unavailable reason None exit 1 graphql {} pid 64029
+  quota unavailable reason None exit 1 graphql {} pid 76660
+=== C3 gh-axi exits 0 with a malformed body: unavailable, never zero
+  run exit=0
+  quota unavailable reason None exit 0 graphql {} pid 77591
+=== C4 hung gh-axi with a grandchild: pending ticks, no overlap, killed only on no-progress verdict, next tick sends a new request
+  run exit=0
+  quota pending reason None exit None graphql None pid 81431
+  quota unavailable reason timeout exit -9 graphql {} pid 81431
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4993, 'reset': 1794000000, 'used': 7} pid 13836
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4993, 'reset': 1794000000, 'used': 7} pid 36742
+  requests sent: 3
+  hung children left: 0
+=== C5 slow gh-axi still using CPU: not killed, its result is recorded
+  run exit=0
+  quota pending reason None exit None graphql None pid 42245
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4991, 'reset': 1794000000, 'used': 9} pid 42245
+=== C6 stop during a hung gh-axi: group is killed, stop returns
+  hung before stop: 1
+{"state": "stopped"}
+  stop exit 0 took 0.4 s
+  hung after stop: 0
+=== C7 ps hangs for every caller: quota continues, stop works, waiting ps stays bounded, normal stop ends it
+  start exit=0
+  ps fakes waiting at 33 s (children of owner named sleep 900): 17
+{"state": "stopped"}
+  stop exit 0 took 0.41 s
+  owner alive after stop: no
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11} pid 83813
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11} pid 2565
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11} pid 29413
+  sampling scans 1 failures 0 max_gap 0.0
+  sampling scans 0 failures 0 max_gap 0.0
+  sampling scans 0 failures 0 max_gap 0.0
+  sampling scans 0 failures 0 max_gap 0.0
+=== C8 ps hangs only for the table read (CPU read still works): killed on no-progress, failure counted, quota continues
+  run exit=0
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4987, 'reset': 1794000000, 'used': 13} pid 36899
+  quota observed reason None exit 0 graphql {'limit': 5000, 'remaining': 4987, 'reset': 1794000000, 'used': 13} pid 53048
+  sampling scans 1 failures 0 max_gap 0.0
+  sampling scans 2 failures 2 max_gap 6.352
+  sampling scans 0 failures 0 max_gap 0.0
+=== C9 SIGKILL of the owner, then a new start
+{"state": "running", "pid": 56235, "run_id": "c75205c72c1c49989a4aeea489fa9a05", "started_at": 1793647442.575845}
+{"state": "stopped"}
+{"state": "running", "pid": 57115, "run_id": "1902f81ad3634377a16094ecc6c6d783", "started_at": 1793647443.18446}
+  restart exit=0
+{"state": "stopped"}
+  stop exit 0 took 0.41 s
+  owner start c75205c7
+  owner start 1902f81a
+  owner stop 1902f81a
+=== C10 concurrent starts share one owner
+  exits: 75 75 75 75 75 0 
+{"state": "running", "pid": 58162, "run_id": "1a9e0bca38734f13b849c01b61a4b287", "started_at": 1793647443.8111339}
+{"state": "stopped"}
+  owner starts recorded: 1
+
+### Correction to the C7 count "17": that number is a driver error, not product behavior.
+BSD pgrep stops reading options at its first pattern, so "pgrep -f 'sleep 900' -P <pid>" read -P and <pid> as more patterns and matched unrelated processes.
+head-e8784f25-hung-ps-count.txt measures the count again with a launch log and /bin/ps: 2 fake ps launches stay alive at 60 s, and 0 stay alive after stop.

@@ -1,0 +1,81 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6BS0VSGYCH01N7E7CZ2GY8H/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-02T19:28:42Z tests/fm-watch-github-accounting.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-02T19:28:42Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
+ok - an unusable Perl falls back to timeout or gtimeout and still runs the watcher
+ok - a checkpoint restores ignored INT before launching its watcher
+ok - a checkpoint launches its watcher from a code root whose path holds a space
+ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock
+# group-kill ordinary stop_ms=310
+ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint
+# group-kill delayed stop_ms=223
+ok - a group-killed checkpoint still stops a bound child that was slow to make its process group
+ok - an announced recovery is not reannounced by the next foreground checkpoint
+ok - a never-announced recovery still surfaces once from a foreground checkpoint
+ok - a queue append during a foreground checkpoint still resurfaces
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 73352.1793647749.Fzeqs8
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-test-run.UeRMkn/w2/tmp/fm-wake-tangle-root.emcUBO/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - checkpoint passes through a real watcher wake and leaves the queue for drain
+ok - checkpoint preserves watcher environment for registered custom checks
+ok - checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive
+ok - checkpoint rejects an existing watcher singleton as unowned
+ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away
+ok - checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure
+ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
+ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
+FM_TEST_END 2026-11-02T19:29:35Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=52374 gate_skip=false
+ok - a cycle starts an absent owner, leaves a running one alone, and recovers a crash
+ok - a failed start wakes once, retries only on the long interval, and clears on success
+ok - a busy start retries at the next cycle with no wake, no hold, and no marker change
+ok - a real lock holder reads as busy, and the next cycle starts the owner once it is free
+ok - a real failed start is reported and its stderr reaches the bounded log
+ok - a secondmate home, a lab home, and FM_GITHUB_ACCOUNTING=0 never start the owner
+ok - a start still running is never doubled, and the poll keeps running
+FM_TEST_END 2026-11-02T19:29:45Z tests/fm-watch-github-accounting.test.sh exit=0 duration_ms=62692 gate_skip=false
+FM_TEST_BEGIN 2026-11-02T19:29:45Z tests/fm-github-accounting.test.sh family=unclassified expected_gate_skip=none
+...................
+----------------------------------------------------------------------
+Ran 19 tests in 41.572s
+
+OK
+ok - GitHub accounting observer behavior
+FM_TEST_END 2026-11-02T19:30:29Z tests/fm-github-accounting.test.sh exit=0 duration_ms=43078 gate_skip=false
+FM_TEST_BEGIN 2026-11-02T19:30:29Z tests/fm-guard-audit-closure.test.sh family=unclassified expected_gate_skip=none
+ok - G-10 enforce-mode lint validates the audit arithmetic as registered families grow
+ok - G-10b the spec and the registry are checked in and agree
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 21 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard
+ok - fm-guard-audit-closure
+FM_TEST_END 2026-11-02T19:31:50Z tests/fm-guard-audit-closure.test.sh exit=0 duration_ms=80801 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=188775
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=123879 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=115066 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-guard-audit-closure.test.sh duration_ms=80801
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-github-accounting.test.sh duration_ms=62692
+FM_TEST_SLOWEST rank=3 script=tests/fm-watch-checkpoint.test.sh duration_ms=52374
+FM_TEST_SLOWEST rank=4 script=tests/fm-github-accounting.test.sh duration_ms=43078
