@@ -1,0 +1,108 @@
+
+=== S1 real probe writes the record, real reading admits on the measured basis
+load averages (real host): 29.53 25.26 26.32; old rule limit 36
+probe rc=0 
+probe rc=0 
+record: host=Mac-Studio.local total=137438953472 entries={'no-mistakes:repoA/r256': (282525696, 2), 'no-mistakes:repoA/r128': (148553728, 2), 'no-mistakes:repoA/r64': (81166336, 2)}
+PASS  real probe recorded 3 run trees with 2 samples
+fm-cpu-pass: pipeline-start admitted: counted=0 need=565051392 budget=45294075904 reservation=282525696 slack=282525696 runs_measured=3 priority=other
+PASS  fresh start admitted on measured basis, real reading
+PASS  R is nearest-rank p75 of the 3 peaks, S the largest :: [81166336, 148553728, 282525696]
+fm-cpu-pass: pipeline-start admitted: counted=2 need=728186880 budget=45758054400 reservation=148553728 slack=282525696 runs_measured=2 priority=other
+PASS  live run row and live tree are read together: counted=2 (r256 + first), runs_measured drops to 2
+
+=== S2 load under the old limit and count under the old limit, but reservations full: waits
+load averages (real host): 29.72 25.37 26.35; old rule limit 36
+real available_bytes=45655867392
+PASS  start waits with the real reading (old rule: counted 1 < 6 and load <= 36 would admit) :: fm-cpu-pass: pipeline-start waiting: counted=1 need=61635420978 budget=44661751808 reservation=20545140326 slack=20545140326 runs_measured=4 priority=other
+PASS  still waiting after 6 more seconds, no run created
+fm-cpu-pass: pipeline-start admitted: counted=0 need=41090280652 budget=46897332224 reservation=20545140326 slack=20545140326 runs_measured=4 priority=other
+PASS  admitted when the counted run ends, with no spacing :: after 1.03s
+
+=== S3 burst of 8 ready starts, above the old limit of 6 on 18 CPUs: all admitted back to back
+load averages (real host): 28.06 25.23 26.29; old rule limit 36
+return codes [0, 0, 0, 0, 0, 0, 0, 0]; gaps between registrations (s): [1.69, 4.29, 4.19, 1.42, 1.32, 1.29, 1.34]; total 16.46s
+fm-cpu-pass: pipeline-start admitted: counted=0 need=214748364 budget=47640756224 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=1 need=322122546 budget=47396372480 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=2 need=429496728 budget=46772289536 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=3 need=536870910 budget=47136555008 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=4 need=644245092 budget=47134474240 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=5 need=751619274 budget=46721056768 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=6 need=858993456 budget=45971537920 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=7 need=966367638 budget=45182681088 reservation=107374182 slack=107374182 runs_measured=4 priority=other
+PASS  8 of 8 admitted and registered
+PASS  counted reached 7 at the last admission (old limit 6)
+PASS  no gap near the old 10-minute spacing :: 4.29
+
+=== S4 capacity short: classes leave the queue in merge-train, machinery, vernant-build, other order
+load averages (real host): 31.27 26.08 26.57; old rule limit 36
+PASS  all 4 wait while 2 runs are counted
+PASS  next admitted is t and no other slipped past :: ['t']
+PASS  next admitted is m and no other slipped past :: ['t', 'm']
+PASS  next admitted is v and no other slipped past :: ['t', 'm', 'v']
+PASS  next admitted is o and no other slipped past :: ['t', 'm', 'v', 'o']
+PASS  all return 0
+
+=== S5 overload pauses and running work is never stopped
+load averages (real host): 30.26 26.03 26.55; old rule limit 36
+PASS  native pressure 2 pauses even with no counted run (floor does not override) :: fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=0 priority=other
+PASS  pressure back to 1: admitted :: fm-cpu-pass: pipeline-start admitted: counted=0 need=2147483648 budget=107374182400 reservation=1073741824 slack=1073741824 runs_measured=4 priority=other
+PASS  running process untouched
+PASS  unreadable memory facts pause, never read as an empty host :: fm-cpu-pass: pipeline-start waiting: overload: memory: memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab-scratch.1SdpzB/s5/native/sysctl'; memory: processes: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab-scratch.1SdpzB/s5/native/processes.json' counted=1 priority=other
+PASS  no run created while unreadable
+PASS  facts readable again: admitted :: fm-cpu-pass: pipeline-start admitted: counted=1 need=3221225472 budget=107374182400 reservation=1073741824 slack=1073741824 runs_measured=4 priority=other
+PASS  running process still untouched
+
+=== S6 adversarial: run holding above R gets only R of credit; exact byte boundary
+load averages (real host): 30.62 26.28 26.63; old rule limit 36
+fm-cpu-pass: pipeline-start waiting: counted=1 need=15032385536 budget=11811160064 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+PASS  need 14 GiB, B = 8 + min(3, 7) = 11 GiB: waits (uncapped B = 15 would admit)
+PASS  one page short of the boundary: still waits
+fm-cpu-pass: pipeline-start admitted: counted=1 need=15032385536 budget=15032385536 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+PASS  exact fit need == B: admitted
+
+=== S7 adversarial: young running runs do not dilute R; a CI-ready peak stays in R and S
+load averages (real host): 29.69 26.16 26.58; old rule limit 36
+fm-cpu-pass: pipeline-start admitted: counted=4 need=59055800320 budget=107374182400 reservation=7516192768 slack=21474836480 runs_measured=9 priority=other
+PASS  R = 7 GiB: the 4 young and 1 parked 0.1 GiB rows left out, CI-ready ranked
+PASS  S = 20 GiB from the CI-ready running run
+PASS  counted = 4 young only (parked and CI-ready do not count)
+
+=== S8 one-start floor, and every fallback shape
+load averages (real host): 28.92 26.06 26.54; old rule limit 36
+fm-cpu-pass: pipeline-start admitted: counted=0 need=11811160064 budget=1073741824 reservation=3221225472 slack=8589934592 runs_measured=4 priority=other
+PASS  idle host with need > B: one start still admitted
+PASS  one counted run with need > B: floor does not apply :: fm-cpu-pass: pipeline-start waiting: counted=1 need=15032385536 budget=1073741824 reservation=3221225472 slack=8589934592 runs_measured=4 priority=other
+PASS  missing record: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  other host: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  other RAM size: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  garbage JSON: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  wrong schema: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  one qualifying run: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  one-sample runs only: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  runs is a list: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+PASS  corrupt run entry: fallback waits at counted=6, admits at 5 :: fm-cpu-pass: pipeline-start admitted: counted=5 limit=6 basis=fallback priority=other
+
+=== S9 unreadable run database refuses with 125 and starts nothing
+load averages (real host): 28.58 26.48 26.69; old rule limit 36
+PASS  missing database: 125, no client ran :: fm-cpu-pass: pipeline-start refused: unable to open database file
+PASS  reader did not create a database
+PASS  garbage database: 125, no client ran :: fm-cpu-pass: pipeline-start refused: file is not a database
+
+=== S10 a worker with FM_DURATION_HOME and a secondmate home read the root record
+load averages (real host): 27.25 26.24 26.60; old rule limit 36
+fm-cpu-pass: pipeline-start admitted: counted=7 need=30064771072 budget=107374182400 reservation=3221225472 slack=4294967296 runs_measured=4 priority=other
+PASS  worker env: measured basis at counted=7, R=3 GiB (3rd of 4) S=4 GiB
+fm-cpu-pass: pipeline-start admitted: counted=7 need=30064771072 budget=107374182400 reservation=3221225472 slack=4294967296 runs_measured=4 priority=other
+PASS  secondmate home: root record used
+fm-cpu-pass: pipeline-start waiting: counted=7 limit=6 basis=fallback priority=other
+PASS  broken parent link: fallback, never an empty host
+
+=== S11 a reattach does not queue while the host is full
+load averages (real host): 27.25 26.24 26.60; old rule limit 36
+PASS  flagless axi run passes straight through :: calibration: "0 of 5 samples for key-attach on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "key-attach elapsed=0.0s output_bytes=20 tree_cpu=0.02s"
+
+
+47 checks, 0 failed

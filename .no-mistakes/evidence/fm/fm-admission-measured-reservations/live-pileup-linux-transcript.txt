@@ -1,0 +1,10 @@
+soft RLIMIT_NPROC=400 warn line=240 cpus=18
+real user processes now: 264
+--- after 5 s with the pile-up:
+fm-cpu-pass: pipeline-start waiting: overload: process pile-up: 263 of 400 user processes counted=0 priority=other
+PASS no start during pile-up
+running work: alive
+--- after the pile-up cleared: rc=0
+fm-cpu-pass: pipeline-start waiting: overload: process pile-up: 263 of 400 user processes counted=0 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback priority=other
+PASS started after the pile-up cleared
