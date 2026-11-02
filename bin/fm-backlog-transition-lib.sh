@@ -717,9 +717,11 @@ fm_backlog_done() {  # <data-dir> <id> [flag...]
   return 0
 }
 
-# A finished item stops blocking the items that waited on it. Every route that moves
-# an item to Done calls this once the move succeeded: fm_backlog_done above (teardown
-# and every other transition) and bin/fm-tasks-axi.sh done/close. tasks-axi keeps a
+# A finished item stops blocking the items that waited on it. Every Firstmate route that
+# moves an item to Done calls this once the move succeeded: fm_backlog_done above
+# (teardown and every other transition), bin/fm-tasks-axi.sh done/close and its typed
+# public-followup completions, and bin/fm-captain-hold.sh answer, withdraw and reconcile
+# close. A raw tasks-axi done does not. tasks-axi keeps a
 # blocked-by edge after its blocker is done, so the edge is read from each item's
 # stored `deps` field (the `blocked_by` view already hides a done blocker) and cleared
 # with tasks-axi's own `unblock <dependent> --by <id>`. An edge naming another,

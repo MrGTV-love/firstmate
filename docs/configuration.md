@@ -1091,7 +1091,7 @@ The merged pull request's own task is closed by its own teardown, so the merge o
 Any other task that still has a live record stays open, and the merge reports it as an `actionable:` line.
 [`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item and an open captain call among them.
 A close that fails never undoes or fails the merge, and a repeat run changes nothing.
-An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer` or `withdraw` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
+An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer`, `withdraw` or `reconcile close` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
 A raw `tasks-axi done` skips this clear, and so does teardown in a home where the backlog transition gate does not apply.
 [`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
 Dropped work is never presented as recently landed.

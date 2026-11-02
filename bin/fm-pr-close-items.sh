@@ -53,8 +53,9 @@
 # train that is not a member is an `actionable: close-at-merge: not read <url>:` line on
 # stderr; it names no item, so it changes neither the summary counts nor the exit status.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
-# left open; exit 1 when a body cannot be read (the line names the pull request URL and
-# the read error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
+# left open or a train member's body could not be read; exit 1 when the merged pull
+# request's own body cannot be read (the line names the pull request URL and the read
+# error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
 # no close outcome ever changes the merge result.
 set -u
 
