@@ -2200,6 +2200,30 @@ SH
   pass 'ordinary pool return preserves dirt and new commits produced while final project custody is queued'
 }
 
+# A completed ship teardown records one landed-work allow; a forced one records
+# its escape and no allow.
+test_completed_teardown_records_one_landed_work_allow() {
+  local case_dir rc=0
+  case_dir=$(make_case landed-work-allow)
+  write_meta "$case_dir" local-only ship
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "landed-work-allow: a landed teardown should complete: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "teardown-unlanded")] | length == 1 and .[0].decision == "allow"
+    and .[0].rule == "landed-work" and .[0].task == "task-x1" and .[0].override == false' \
+    "$case_dir/guard-events.jsonl" >/dev/null \
+    || fail "a completed teardown did not record exactly one landed-work allow: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+
+  case_dir=$(make_case landed-work-forced)
+  write_meta "$case_dir" local-only ship
+  rc=0
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "landed-work-forced: a forced teardown should complete: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "teardown-unlanded")] | length == 1 and .[0].decision == "bypass" and .[0].override == true' \
+    "$case_dir/guard-events.jsonl" >/dev/null \
+    || fail "a forced teardown did not record only its escape: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+  pass "a completed teardown records one landed-work allow and a forced one only its escape"
+}
+
 # A "not ready yet" refusal must leave Treehouse state exactly as it found it.
 # The reservation is taken only after every non-destructive check has passed,
 # so a later reassociation never strands a state-only lease on the old slot.
@@ -3546,6 +3570,7 @@ test_current_pool_copy_tears_down_without_a_status_listing
 test_current_pool_proof_asks_treehouse
 test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
+test_completed_teardown_records_one_landed_work_allow
 test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal

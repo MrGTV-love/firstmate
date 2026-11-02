@@ -3302,8 +3302,8 @@ guard_workarounds_detached() {
     GUARD_WORKAROUND_PID=
   fi
   rm -f "$out"
-  { python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" </dev/null >"$out.$$" 2>/dev/null \
-      && mv -f "$out.$$" "$out"; } &
+  { python3 "$SCRIPT_DIR/fm-guard-workarounds.py" --state "$STATE" >"$out.$$" \
+      && mv -f "$out.$$" "$out"; } </dev/null >/dev/null 2>&1 &
   GUARD_WORKAROUND_PID=$!
 }
 
