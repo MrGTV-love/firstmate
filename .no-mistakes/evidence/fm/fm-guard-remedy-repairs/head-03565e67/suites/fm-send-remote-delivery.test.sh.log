@@ -1,0 +1,25 @@
+FM_TEST_BEGIN 2026-11-02T03:54:10Z tests/fm-send-remote-delivery.test.sh family=standalone expected_gate_skip=none
+ok - fm-send remote: a text steer lands as a durable remote inbox record and exits 0 at enqueue
+ok - fm-send remote: the printed correlation-reusing resend deduplicates onto the same record
+ok - fm-send remote: a failed retry cannot erase an earlier ambiguous delivery
+ok - fm-send remote: fire-and-forget delivery is idempotent without reply recovery
+ok - remote control: send revalidates endpoint ownership under the metadata lock
+ok - fm-send remote: enqueue revalidates the parent route under its metadata lock
+ok - fm-send remote: expected host is enforced by final route validation
+ok - fm-send remote: a --resolve-key answer closes its decision at enqueue
+ok - fm-send remote: every remote text, harness-native included, rides the inbox
+ok - fm-send remote: a real remote failure still fails loudly with the remote diagnostics
+ok - fm-send remote: exit 3 from the remote leg is a failure, never a delivery claim
+ok - fm-send remote: ssh 255 fails with resend-safe guidance and preserves the expectation
+ok - fm-send remote: the remote leg is budget-bounded and stays idempotent across the bound
+ok - fm-send local: an unconfirmed submit exits 3 with an honest non-error report
+ok - fm-send local: an unconfirmed submit still never closes a --resolve-key decision
+ok - fm-send local: an unconfirmed secondmate send keeps its reply expectation armed
+ok - fm-send local: post-submit draft risk retains reply tracking without resending or closing decisions
+all fm-send-remote-delivery tests passed
+FM_TEST_END 2026-11-02T03:54:50Z tests/fm-send-remote-delivery.test.sh exit=0 duration_ms=40763 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B29PA5S6HV32Q1TR097C9K/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=42367
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=40763 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-send-remote-delivery.test.sh duration_ms=40763
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M6B29PA5S6HV32Q1TR097C9K/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

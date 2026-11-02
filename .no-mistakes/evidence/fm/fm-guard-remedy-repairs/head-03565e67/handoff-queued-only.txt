@@ -1,0 +1,30 @@
+## 1. hand off a mix of in-flight, Done, non-queued and queued keys
+$ bin/fm-backlog-handoff.sh design busy-item old-item held-item ready-item
+error: refusing to hand off in-flight backlog items: busy-item. Remedy: keep these keys with their running owner; retry bin/fm-backlog-handoff.sh 'design' without these keys and with only genuinely queued work from $LAB/data/backlog.md.
+error: refusing to hand off Done (historical) backlog items: old-item; handoffs move in-scope queued work only - Done records stay with their home and are pruned/archived. Remedy: retry bin/fm-backlog-handoff.sh 'design' without these historical keys; if new work is needed, file a distinct queued item instead of reopening Done history.
+error: refusing to hand off non-queued backlog items: held-item; handoffs move in-scope queued work only. Remedy: resolve each item's hold or prerequisite through its owner before it becomes genuinely queued in $LAB/data/backlog.md, or retry bin/fm-backlog-handoff.sh 'design' without these keys; do not relabel held work merely to pass the guard.
+       nothing was moved.
+exit=1
+main backlog unchanged: yes
+--- secondmate queued items: 0
+
+## 2. follow the remedy: retry with only the queued key
+handed off 1 item(s) to design: ready-item
+  into $BASE/sub/data/backlog.md
+fm-send: doorbell not typed because the agent in firstmate:fm-design has exited; the steer is durably recorded at $LAB/state/design.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+--- secondmate backlog:
+## In flight
+
+## Queued
+- [ ] ready-item - genuinely queued (repo: alpha)
+
+## Done
+--- main backlog:
+## In flight
+- [ ] busy-item - running elsewhere (repo: alpha)
+## Queued
+## Blocked
+- [ ] held-item - waiting on a prerequisite (repo: alpha)
+## Done
+- [x] old-item - finished long ago (repo: alpha)

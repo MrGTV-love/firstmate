@@ -1,0 +1,24 @@
+# real bin/fm-on.sh, real ssh, disposable sshd on 127.0.0.1; git lookup is hidden from the remote entrypoint (macOS keeps git in /usr/bin, so an exported command shadow hides it, as tests/fm-on.test.sh does)
+remote git lookup: git-not-found
+pinned hash: 229fdc692fccce1b8eea919e5ad68c5772e32269247a209068583affad062ca5
+shipped doctor: 229fdc692fccce1b8eea919e5ad68c5772e32269247a209068583affad062ca5
+
+## 1. reviewed doctor bootstraps with no git
+$ bin/fm-on.sh ios fm-remote-doctor.sh
+mode=check
+path=$BASE/root/bin:$HOME/.local/bin:$HOME/.nvm/versions/node/v24.4.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=yes
+platform=linux
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=$HOME/.local/bin/herdr
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=$HOME/.local/bin/treehouse
+required python3=/opt/homebrew/bin/python3
+required harness=claude:$HOME/.local/bin/claude
+optional tmux=/opt/homebrew/bin/tmux
+exit=1
+
+## 2. adversarial: one extra byte in the doctor
+error: required tool git is unavailable and the doctor does not match the trusted bootstrap identity
+exit=64

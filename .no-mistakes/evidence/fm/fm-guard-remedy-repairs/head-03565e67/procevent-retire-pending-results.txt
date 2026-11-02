@@ -1,0 +1,50 @@
+# real /usr/bin/ssh to a disposable sshd on 127.0.0.1; remote home $BASE/remote; parent lab home $LAB
+## transport probe
+Warning: Permanently added '[127.0.0.1]:43760' (ED25519) to the list of known hosts.
+ssh-transport-ok
+exit=0
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login <user>" record: Operation not permitted
+BSM audit: bsm_audit_record failed to write "sshd logout <user>" record: Operation not permitted
+source id: remote-reply-ios
+## arm
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=0
+exit=0
+## runner captures the reply over ssh
+remote-reply-ios.1.adapter
+remote-reply-ios.1.handled
+remote-reply-ios.1.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: $LAB/state/procevent-inbox/remote-reply-ios.1.result
+
+## 1. capture present with no handled receipt (receipt removed to stage an unhandled capture); retire is refused
+retired: remote-reply-ios
+error: remote reply retirement refused with 1 unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command below to ingest and acknowledge every capture, then retry the refused retirement or bin/fm-teardown.sh; do not remove capture files or force retirement.
+FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_DATA_OVERRIDE=$LAB/data bash $WT/bin/fm-procevent-remote-reply.sh handle ios 1 $LAB/state/procevent-inbox/remote-reply-ios.1.result
+exit=1
+capture preserved: yes
+
+## 1b. the real teardown of this remote secondmate shows the same completing step, not only a bare refusal
+$ bin/fm-teardown.sh ios
+error: remote reply retirement refused with 1 unhandled captured result(s). Remedy: run each exact bin/fm-procevent-remote-reply.sh handle command below to ingest and acknowledge every capture, then retry the refused retirement or bin/fm-teardown.sh; do not remove capture files or force retirement.
+FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_DATA_OVERRIDE=$LAB/data bash $WT/bin/fm-procevent-remote-reply.sh handle ios 1 $LAB/state/procevent-inbox/remote-reply-ios.1.result
+REFUSED: remote secondmate ios still has an unhandled captured reply
+exit=1
+capture preserved: yes
+task record preserved: yes
+
+## 2. run each exact printed handle command
+ingested: ios appended=0 offset=72
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=72
+handled: remote-reply-ios 1
+handle exit=0
+printed commands run: 1
+handled receipt written: yes
+
+## 3. retry the refused retirement
+retired: remote-reply-ios
+exit=0
+remote reply cursor removed: yes

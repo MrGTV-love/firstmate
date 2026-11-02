@@ -1,0 +1,27 @@
+# local secondmate lsm has a pending-reply whose delivery attempt never resolved (corr=4b46b08f186078e0)
+## 1. resend that correlation
+$ FM_PENDING_REPLY_EXISTING_CORR=4b46b08f186078e0 bin/fm-send.sh lsm '/audit the ledger'
+error: pending-reply delivery for lsm is unresolved; refusing to resend correlation 4b46b08f186078e0. Remedy: the owning firstmate must reconcile the original request with the secondmate and obtain its actual corr=4b46b08f186078e0 report in the parent status channel at $LAB/state/lsm.status; run bin/fm-crew-state.sh 'lsm' to inspect it, then let pending-reply reconciliation resolve it before sending new work. Do not clear delivery markers or resend unknown delivery.
+exit=1
+inbox records written: 0
+pane text: [0] lines with the request
+
+## 2. printed inspect step
+$ bin/fm-crew-state.sh lsm
+state: unknown · source: none · no current-state source available
+exit=0
+
+## 3. adversarial: second resend, still unresolved
+error: pending-reply delivery for lsm is unresolved; refusing to resend correlation 4b46b08f186078e0. Remedy: the owning firstmate must reco
+exit=1
+
+## 4. the actual correlated report lands in the parent status channel; reconciliation resolves the original
+try_resolve exit=0
+phase=resolved
+
+## 5. new work now passes the guard with a fresh correlation (worker is a stand-in pane)
+exit=0
+inbox: 001.msg
+inbox: handled
+pending record: 156109ffb12149b7
+pending record: 4b46b08f186078e0

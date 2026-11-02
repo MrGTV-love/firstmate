@@ -1,0 +1,70 @@
+## 0. a real wake drain presents the two overdue rows
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-0","firstmate","job:question-0","obtain decision",7201,"decision pending",false
+  "row-'quoted","firstmate","job:quoted-question","obtain decision",7201,"decision pending",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 73133.1793591020.h1t59J
+exit=0
+
+## 1. acknowledge with no recorded action: refused, prints per-row commands
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 73133.1793591020.h1t59J
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-0","firstmate","job:question-0","obtain decision",7202,"decision pending",false
+  "row-'quoted","firstmate","job:quoted-question","obtain decision",7202,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help.
+env FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_SUPERVISION_ACTOR=main bash $WT/bin/fm-open-loops.sh action row-0 "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+env FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_SUPERVISION_ACTOR=main bash $WT/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+printed command count: 2
+
+## 2. adversarial: run a printed command with no action or evidence set
+bash: ACTION_KIND: set the action actually performed
+exit=127
+ledger unchanged: yes
+
+## 3. adversarial: invalid evidence for an escalated row
+error: "argument kind: invalid choice: 'bogus' (choose from steered, merged, escalated, deferred, waiting)"
+exit=2
+ledger unchanged: yes
+
+## 3b. --check-actions reports each unmet row with its exact command
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-0","firstmate","job:question-0","obtain decision",7202,"decision pending",false
+  "row-'quoted","firstmate","job:quoted-question","obtain decision",7202,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite flags from --help.
+env FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_SUPERVISION_ACTOR=main bash $WT/bin/fm-open-loops.sh action row-0 "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+env FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_SUPERVISION_ACTOR=main bash $WT/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+
+## 3c. adversarial: a steered action with forged delivery evidence must not record
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+exit=1
+ledger unchanged: yes
+
+## 4. answer one row only; acknowledgement must still refuse the other
+action: "row-0"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic 
+exit=0
+error: overdue rows have no action recorded since presentation; acknowledgement refused. Remedy: perform each next action, then run its exact bin/fm-open-loops.sh action command below.
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-'quoted","firstmate","job:quoted-question","obtain decision",7203,"decision pending",false
+Remedy: perform each row's next action first, then record its actual evidence; set ACTION_KIND (steered, merged or escalated) and ACTION_EVIDENCE before running its command. For a permitted deferred/waiting action, add the required --recheck and prerequisite f
+env FM_HOME=$LAB FM_STATE_OVERRIDE=$LAB/state FM_SUPERVISION_ACTOR=main bash $WT/bin/fm-open-loops.sh action 'row-'"'"'quoted' "${ACTION_KIND:?set the action actually performed}" --evidence "${ACTION_EVIDENCE:?set the actual delivery id, PR URL or escalation}"
+exit=1
+
+## 5. answer the shell-quoted row with its printed command, then the same acknowledgement
+action: "row-'quoted"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic 
+exit=0
+exit=0
+
+## 6. final recorded receipts
+recorded actions: ["row-'quoted", 'row-0']

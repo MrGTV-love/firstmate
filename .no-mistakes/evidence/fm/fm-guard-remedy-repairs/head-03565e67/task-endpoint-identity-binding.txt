@@ -1,0 +1,21 @@
+## 1. missing meta
+REFUSED: task t1 has no regular endpoint metadata at $LAB/state/absent.meta; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $LAB/state/absent.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## 2. ambiguous window
+REFUSED: task t1 has a missing, empty, or ambiguous window endpoint; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $LAB/state/t1.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## 3. adversarial: another task's binding
+REFUSED: endpoint metadata belongs to task t2, not t1; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $LAB/state/t1.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+## 4. invalid task id
+REFUSED: task endpoint identity has an invalid task id; preserving task state. Remedy: retry with the task id recorded by the original bin/fm-spawn.sh launch, using only letters, digits, dot, underscore or hyphen; do not rename or rebind another task's metadata.
+exit=1
+
+## 5. real caller: bin/fm-control.sh on the task with another task's binding
+REFUSED: endpoint metadata belongs to task t2, not t1; preserving task state. Remedy: the owning firstmate must restore this task's unique endpoint fields in $LAB/state/t1.meta from verified original launch evidence, then retry the refused bin/fm-control.sh, bin/fm-spawn.sh, bin/fm-teardown.sh, bin/fm-reboot-recover.sh or bin/fm-procevent.sh operation as applicable; never copy another task's binding or guess an endpoint.
+exit=1
+meta unchanged: yes
+
+## 6. owner restores the unique fields from launch evidence; same check accepts
+accepted: backend=tmux target=s:fm-t1
+exit=0

@@ -1,0 +1,76 @@
+# lab home $LAB, child home $BASE/mate registers $BASE/hidden; $BASE/mate/data/secondmates.md is chmod 000
+## 1. teardown while one registered home is unreadable
+$ FM_HOME=$LAB bin/fm-teardown.sh lab-unreadable-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: local Firstmate registry cannot be read at $BASE/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $LAB/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'lab-unreadable-home'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=1
+task record preserved: yes
+worktree preserved: yes
+runtime calls: 0
+
+## 2. adversarial: --force does not skip the unreadable home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: local Firstmate registry cannot be read at $BASE/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry
+exit=1
+task record preserved: yes
+worktree preserved: yes
+runtime calls: 0
+
+## 3. owner restores read access; the walk now enumerates every descendant, none skipped
+state dir: $LAB/state
+state dir: $BASE/mate/state
+state dir: $BASE/hidden/state
+exit=0
+
+## 4. the printed retry no longer hits the home refusal (next gate is the scout's own work product)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: scout task lab-unreadable-home has no report at $LAB/data/lab-unreadable-home/report.md.
+The report is the work product. Have the crewmate write it, or use --force after explicit discard approval.
+exit=1
+$ bin/fm-captain-hold.sh complete lab-unreadable-home --none (the next gate teardown names)
+complete: lab-unreadable-home captain-call inventory reviewed
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown lab-unreadable-home complete (window firstmate:fm-lab-unreadable-home, worktree $BASE/pool/1/project)
+Backlog: lab-unreadable-home just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move lab-unreadable-home to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers
+exit=0
+task record removed by completed teardown
+runtime calls:
+tmux kill-window -t =firstmate:=fm-lab-unreadable-home
+treehouse return --force $BASE/pool/1/project
+
+## 5. malformed entry in the registered home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: malformed local Firstmate registry entry in $BASE/mate/data/secondmates.md; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $LAB/.fm-secondmate-parent and each local parent binding a
+exit=1
+
+## 6a. root home unresolvable, non-pool task copy: corrupt parent binding; remedy names the binding
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: cannot resolve the root Firstmate home; nothing was changed. Remedy: have the named home's owner restore its availability and read access to its regular, non-symlink data/secondmates.md, repairing any malformed entry from verified home records; when the root Firstmate home cannot be resolved, have the owner restore $LAB/.fm-secondmate-parent and each local parent binding above it to a readable, loop-free chain of reachable homes from verified original binding evidence; then retry bin/fm-teardown.sh 'lab-root-unresolved'; do not rebind to another home, delete registrations or skip the unreadable home.
+exit=1
+task record preserved: yes
+
+## 6b. same corrupt binding, pool-slot task: project-lock gate fires first (unchanged legacy text)
+REFUSED: cannot resolve the shared Treehouse project lock for $BASE/project; nothing was changed
+exit=1
+
+## 7. owner restores the binding (this lab home has none originally); retry passes the home gate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown lab-root-unresolved complete (window firstmate:fm-lab-root-unresolved, worktree $BASE/plain-copy)
+Backlog: lab-root-unresolved just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move lab-root-unresolved to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers
+exit=0
+task record removed by completed teardown
+runtime calls:
+tmux kill-window -t =firstmate:=fm-lab-unreadable-home
+treehouse return --force $BASE/pool/1/project
+tmux list-windows -t =firstmate -F #{window_name}
+tmux list-windows -t =firstmate -F #{window_name}
+tmux list-windows -t =firstmate -F #{window_name}
+treehouse return --force $BASE/plain-copy
+tmux kill-window -t =firstmate:=fm-lab-root-unresolved

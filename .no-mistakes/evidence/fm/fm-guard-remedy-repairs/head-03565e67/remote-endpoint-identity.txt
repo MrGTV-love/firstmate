@@ -1,0 +1,23 @@
+## 1. endpoint on a foreign backend
+error: remote secondmate rsm endpoint is recorded on backend 'tmux', expected 'herdr'; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor.
+unverified
+exit=0
+endpoint metadata unchanged: yes
+
+## 2. adversarial: endpoint truly launched in the foreign Herdr session 'default'
+error: remote secondmate rsm endpoint is recorded in Herdr session 'default', expected 'fm-remote'; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor.
+unverified
+exit=0
+endpoint metadata unchanged: yes
+herdr client calls so far: 0
+
+## 3. missing metadata
+error: remote secondmate rsm endpoint metadata is invalid; refusing access. Remedy: the owning firstmate must restore $LAB/state/parent-route/rsm.meta from this secondmate's verified launch evidence, including its exact task binding and configured Herdr session 'fm-remote', then retry the original bin/fm-remote-secondmate-control.sh action. If that evidence shows the endpoint was really launched in another Herdr session or on another backend, no supported route exists yet: preserve the copy and its unlanded work, change no metadata, and report the endpoint and the evidence to the owning home's supervisor.
+exit=1
+
+## 4. owner restores the exact binding in session fm-remote; retry passes the identity gate and reaches the client
+unreadable
+exit=0
+herdr client calls after restore: 2
+herdr pane get w1:1:1 --session fm-remote
+herdr status --json --session fm-remote

@@ -1,0 +1,75 @@
+## 0. the shipped repo at this head
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO teardown-unlanded: exemptions=1
+INFO inventory: active=54 retired=14 beyond_audit=12 excluded=1 unregistered=760 audited=30 beyond_audit_active=27 sites=943 mapped=183
+LINT_SUMMARY mode=enforce guards=54 violations=760 allowlisted=760 stale=0 shown=0 sites=943
+exit=0
+$ bin/fm-guard-lint.sh --mode new-or-touched --base <run base>
+INFO guard-watcher-down-warning: exemptions=1
+INFO teardown-unlanded: exemptions=1
+LINT_SUMMARY mode=new-or-touched guards=54 violations=760 allowlisted=760 stale=0 shown=0 sites=943
+exit=0
+
+## 1. flag: strip the printed remedy from a shipped refusal; registry remedy still present
+VIOLATION S3 site:bin/fm-merge-local.sh:58ca1af84d: bin/fm-merge-local.sh:112 has no executable Remedy: in its diagnostic or directly called local refusal helper: the only literal text read is "error: has a dirty working tree; refusing to merge into it"; dynamic text is not read,
+lint exit=1
+
+## 2. flag: edit only an unchanged legacy refusal line (allowlisted for S1): touching it requires the printed remedy
+VIOLATION S1 site:bin/fm-teardown.sh:c5504905a7: bin/fm-teardown.sh:1964 [A,B] echo "REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed at maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S3 site:bin/fm-teardown.sh:c5504905a7: bin/fm-teardown.sh:1964 has no executable Remedy: in its diagnostic or directly called local refusal helper: the only literal text read is "REFUSED: cannot resolve the shared Treehouse project lock fo"; dynamic text is not read, so
+STALE S1 site:bin/fm-teardown.sh:1134923238: allowlisted violation no longer occurs; remove the entry
+lint exit=1
+
+## 3. accept: a new shipped-style refusal with a real command remedy, mapped to a guard
+lint exit=0
+
+## 4. remedy text classification on that mapped site
+  REFUSED: blocked                                                               -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: ask someone                                          -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: ask someone about git history                        -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: the herdr team will help                             -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: run bin/missing.sh                                   -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: run ./bin/missing.sh, then herdr --session lab status -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: run /usr/bin/env bash bin/missing.sh                 -> rejected-S3 (exit 1)
+  REFUSED: blocked. Remedy: run /usr/bin/env bash bin/fm-teardown.sh x           -> accepted (exit 0)
+  REFUSED: blocked. Remedy: run ./bin/fm-teardown.sh x                           -> accepted (exit 0)
+  REFUSED: blocked. Remedy: run /usr/./bin/env bash bin/fm-teardown.sh x         -> accepted (exit 0)
+  REFUSED: blocked. Remedy: run herdr --session lab status --json                -> accepted (exit 0)
+
+## 4b. a remedy only in a neighbouring statement, a comment, or the registry
+VIOLATION S3 site:bin/fm-labguard.sh:b47aa82f86: bin/fm-labguard.sh:2 has no executable Remedy: in its diagnostic or directly called local refusal helper: the only literal text read is "REFUSED: block
+lint exit=1
+VIOLATION S3 site:bin/fm-labguard.sh:bf68638cc8: bin/fm-labguard.sh:3 has no executable Remedy: in its diagnostic or directly called local refusal helper: the only literal text read is "REFUSED: block
+lint exit=1
+
+## 5. printed refusal forms that must stay sites, and test-only forms that must not (real scanner on one new file)
+site line 3 [A,B] "REFUSED: form1-closes-substitution")
+site line 5 [A,B] "REFUSED: form2-closes-subshell" )
+site line 8 [A,B] "REFUSED: form3-closes-nested")"
+site line 10 [A,B] "REFUSED: form4-a"
+site line 11 [A,B] "REFUSED: form4-b")
+site line 15 [A,B] "REFUSED: form5-in-case-arm-body")
+site line 19 [A,B] "REFUSED: form6-a"
+site line 20 [A,B] "REFUSED: form6-b")
+site line 22 [A,B] c) echo "REFUSED: form7-same-line-body" >&2 ;;
+site line 27 [A,B] echo "REFUSED: form8-arm-body" >&2
+site line 30 [A,B] "REFUSED: form9-outside-any-case")
+site line 31 [A] printf '%s\n' "$err" | sed 's/^/REFUSED: /' >&2
+--- shipped case patterns, sed address, token and option help that must be no site:
+(end of list)
+
+## 6. allowlist must not grow
+VIOLATION S3 site:bin/fm-labdebt.sh:c39f936279: bin/fm-labdebt.sh:1 has no executable Remedy: in its diagnostic or directly called local refusal helper: the only literal text read is "REFUSED: new deb
+VIOLATION S1 site:bin/fm-labdebt.sh:c39f936279: bin/fm-labdebt.sh:1 [A,B] echo "REFUSED: new debt" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-labdebt.sh:c39f936279: allowlist entry S1 is not in HEAD; the allowlist may only shrink
+lint exit=1
+
+## 7. audited-30 accounting by the real consumer, without population pins
+INFO inventory: active=54 retired=14 beyond_audit=12 excluded=1 unregistered=760 audited=30 beyond_audit_active=27 sites=943 mapped=183
+--- add one guard beyond the audit, correctly recorded: audited stays 30
+INFO inventory: active=55 retired=14 beyond_audit=12 excluded=1 unregistered=760 audited=30 beyond_audit_active=28 sites=943 mapped=183
+exit=0
+--- adversarial: same guard, not recorded beyond the audit: refused
+VIOLATION R1 inventory: active(55, 27 beyond the audit) + retired(14, 12 beyond the audit) + excluded(1) = 31, audited=30
+exit=1

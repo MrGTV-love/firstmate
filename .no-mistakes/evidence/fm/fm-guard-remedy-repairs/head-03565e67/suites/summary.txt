@@ -1,0 +1,14 @@
+fm-guard-lint.test.sh rc=0 secs=117
+fm-teardown-endpoint-safety.test.sh rc=0 secs=173
+fm-guard-audit-closure.test.sh rc=0 secs=185
+fm-on.test.sh rc=0 secs=48
+fm-remote-doctor.test.sh rc=0 secs=115
+fm-api-key-guard-lib.test.sh rc=0 secs=13
+fm-task-delivery.test.sh rc=0 secs=391
+fm-backlog-handoff.test.sh rc=0 secs=118
+fm-pending-reply.test.sh rc=0 secs=88
+fm-remote-reply.test.sh rc=0 secs=471
+fm-send-remote-delivery.test.sh rc=0 secs=43
+herdr-server-start-fixture.py rc=0
+fm-open-loops.test.sh rc=0 secs=1735
+ALL-DONE

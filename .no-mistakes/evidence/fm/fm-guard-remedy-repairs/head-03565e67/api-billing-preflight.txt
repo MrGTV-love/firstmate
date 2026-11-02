@@ -1,0 +1,40 @@
+## registry entry as consumed: id, sites, invariant, source, trigger, remedy
+{
+  "id": "api-billing-preflight",
+  "owner": "bin/fm-api-key-guard-lib.sh",
+  "sites": [
+    {
+      "file": "bin/fm-api-key-guard-lib.sh",
+      "match": "omp $provider/* routes use API billing"
+    }
+  ],
+  "invariant": "explicit omp openai/* and openrouter/* routes never resolve or launch API-billed models",
+  "source": "fm_omp_api_billing_route_check reads the provider-qualified selector before model resolution in bin/fm-spawn.sh (primary and fallback dependency checks), bin/fm-control.sh (replacement preflights) and bin/fm-dispatch-capacity-lib.sh (capability checks)",
+  "trigger": "the whitespace-normalized provider is openai or openrouter, case-insensitively, regardless of catalog availability or credential opt-in",
+  "remedy": "select --model openai-codex/<gpt-model> for omp, then retry the original bin/fm-spawn.sh or bin/fm-control.sh command; do not change credentials or enable API billing to pass this route guard",
+  "test": "tests/fm-api-key-guard-lib.test.sh"
+}
+
+## site scan maps the refusal to that entry
+{"file":"bin/fm-api-key-guard-lib.sh","line":34,"entry":"api-billing-preflight","remedy":true}
+
+## 1. real spawn refuses each billed omp route; no window, no task record
+$ bin/fm-spawn.sh bill-probe alpha --mode local-only --yolo off --harness omp --model 'openai/gpt-6.1-sol'
+REFUSED: omp openai/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ bin/fm-spawn.sh bill-probe alpha --mode local-only --yolo off --harness omp --model ' OpenAI / gpt-6.1-sol '
+REFUSED: omp OpenAI/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+$ bin/fm-spawn.sh bill-probe alpha --mode local-only --yolo off --harness omp --model 'openrouter/vendor/model'
+REFUSED: omp openrouter/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+tmux sessions on lab socket: 0
+task record: none
+
+## 2. adversarial: an API-key opt-in does not license the billed route
+REFUSED: omp openai/* routes use API billing. Remedy: select --model openai-codex/<gpt-model> instead, then retry the original bin/fm-spawn.sh or bin/fm-control.sh operation or dispatch capability check.
+exit=1
+task record: none
+
+## 3. the route the remedy names passes the route check
+exit=0

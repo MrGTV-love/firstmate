@@ -1,0 +1,30 @@
+## 1. malformed config.toml (throwaway HOME)
+fm-kimi-turnend-hook: refused: config.toml is malformed TOML: Expected ']' at the end of a table declaration (at line 2, column 8). Remedy: repair the named file or directory under $BASE/h/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh install; do not delete user files or registry tokens to bypass validation.
+exit=1
+config.toml unchanged: yes
+config.toml
+
+## 2. partial marker: only BEGIN, no END
+fm-kimi-turnend-hook: refused: config.toml has partial, duplicated, or altered Firstmate region markers at $BASE/h/.kimi-code/config.toml; the file must hold exactly one '# BEGIN FIRSTMATE KIMI TURN-END HOOK' line and exactly one '# END FIRSTMATE KIMI TURN-END HOOK' line. Repair that marker pair by hand, then run bin/fm-kimi-turnend-hook.sh install. Remedy: repair the named file or directory under $BASE/h/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh install; do not delete user files or registry tokens to bypass validation.
+exit=1
+config.toml unchanged: yes
+
+## 3. owner repairs per the remedy; printed retry succeeds
+exit=0
+model = "x"
+# BEGIN FIRSTMATE KIMI TURN-END HOOK
+[[hooks]]
+event = "Stop"
+matcher = "^$"
+command = "bash \"$HOME/.kimi-code/fm-turn-end.sh\" >/dev/null 2>&1 || true"
+timeout = 1
+# END FIRSTMATE KIMI TURN-END HOOK
+
+## 4. adversarial: symlinked config.toml
+fm-kimi-turnend-hook: refused: Kimi config is not a regular non-symlink file at $BASE/h/.kimi-code/config.toml. Remedy: repair the named file or directory under $BASE/h/.kimi-code through its owner (valid UTF-8 TOML, complete marker lines, regular non-symlink managed files, and private hook permissions); preserve unrelated config and registry entries. Then retry bin/fm-kimi-turnend-hook.sh remove; do not delete user files or registry tokens to bypass validation.
+exit=1
+symlink preserved: yes
+
+## 5. HOME unset
+fm-kimi-turnend-hook: refused: HOME is unset. Remedy: set HOME to the intended Kimi user home, then retry bin/fm-kimi-turnend-hook.sh with the same action.
+exit=1

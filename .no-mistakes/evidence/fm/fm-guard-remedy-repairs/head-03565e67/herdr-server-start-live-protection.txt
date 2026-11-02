@@ -1,0 +1,34 @@
+# firstmate code is real; the herdr client on PATH is a stand-in (no server is launched in this run)
+## 1. status command fails (client/socket access broken)
+error: herdr server status for '<session>' is unknown; refusing startup. Remedy: run herdr --session '<session>' status --json read-only, repair the reported client/socket access failure through its owner until status is readable, then retry the original operation; do not stop or restart a live or unknown server.
+ensure exit=1
+failure line: refused to start the herdr server for session <session> to protect a live or unknown server. Remedy: run herdr --session <session> status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server
+started servers: 0
+
+## 2. status is malformed
+error: herdr server status for '<session>' is unknown; refusing startup. Remedy: run herdr --session '<session>' status --json read-only, repair the reported client/socket access failure through its owner until status is readable, then retry the original operation; do not stop or restart a live or unknown server.
+ensure exit=1
+failure line: refused to start the herdr server for session <session> to protect a live or unknown server. Remedy: run herdr --session <session> status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server
+started servers: 0
+
+## 3. adversarial: status says not running, but a live listener holds the session socket
+error: refusing Herdr server startup: the session socket still accepts connections. Remedy: run herdr --session <session> status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server
+ensure exit=1
+failure line: refused to start the herdr server for session <session> to protect a live or unknown server. Remedy: run herdr --session <session> status --json read-only; restore readable compatible client/socket access through its owner, then retry the original operation against that session; do not stop or restart a live or unknown server
+started servers: 0
+
+## 4. printed read-only inspect command against the REAL herdr client, through the lab helper (a session with no server)
+$ bin/fm-herdr-lab.sh run <session> status --json | jq -c '.server|{status,running}'
+{"status":"not_running","running":false}
+/tmp/nm-t2/herdr.sh: line 52:  3519 Terminated: 15          python3 -c 'import socket,sys,time
+s=socket.socket(socket.AF_UNIX);s.bind(sys.argv[1]);s.listen(8);time.sleep(240)' "$BASE/s.sock"
+real client still reports no server for this name: false
+
+## 5. retry once status is readable and the server is live: ensure accepts and starts nothing
+ensure exit=0
+started servers: 0
+
+## 6. lab provisioning attempt (would give a real server)
+$ bin/fm-herdr-lab.sh prepare <session>
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+exit=1
