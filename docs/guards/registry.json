@@ -5894,7 +5894,7 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 4},
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
         {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},
@@ -5909,13 +5909,15 @@
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: task $ID's recorded copy $WT was reassigned to task $TEARDOWN_SLOT_REASSIGNED_TO, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its records stay in place.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.\" >&2"},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: worktree $WT has uncommitted changes.\" >&2"},
-        {"file": "bin/fm-teardown.sh", "match": "teardown_refuse_removed_nested_copy", "count": 2}
+        {"file": "bin/fm-teardown.sh", "match": "teardown_refuse_removed_nested_copy", "count": 2},
+        {"file": "bin/fm-slot-manifest-retire.py", "match": "next_step: verify Firstmate landing record"},
+        {"file": "bin/fm-slot-manifest-retire.py", "match": "landing=MERGED retire=REFUSED"}
       ],
       "invariant": "cleanup never discards uncommitted, unlanded, or unpushed work",
       "layer": "runtime-block",
       "source": "git status, forge PR merge state, PR head compared with local commits",
       "trigger": "the copy holds uncommitted changes, or commits not proven present in a merged PR head",
-      "remedy": "land the work first: bin/fm-pr-merge.sh <pr>, or ask the captain for explicit discard authority and rerun bin/fm-teardown.sh <task> --force",
+      "remedy": "land the work first: bin/fm-pr-merge.sh <pr>, or ask the captain for explicit discard authority and rerun bin/fm-teardown.sh <task> --force; when the PR already merged but the Vernant retire entry point (retire_slot_manifest.py) refused, read its printed reason and next_step and verify the Firstmate landing record, because --force does not retire the slot record",
       "budget": 1,
       "test": "tests/fm-teardown.test.sh",
       "tier": "C",
