@@ -32,10 +32,11 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
   - Every reading shows this host's one-run peak (the largest peak of any run
     seen in at least two readings) and headroom margin (the most available
     memory recorded under pressure) derived from that record, or the missing
-    inputs. They are recorded only and never refuse work: one pressured
-    sample sets the margin until the host or RAM size changes, so no
-    admission statistic is chosen from them yet. No peak or margin is ever
-    seeded or guessed.
+    inputs. admit never refuses work on them: one pressured sample sets the
+    margin until the host or RAM size changes, so admit chooses no statistic
+    from them. bin/fm-cpu-pass.py pipeline-start reads the record's
+    no-mistakes run peaks as its slack (all of them) and reservation (leaving
+    out runs short of CI-ready). No peak or margin is ever seeded or guessed.
   - The non-fleet RSS alarm is separate from admission: a missing, invalid or
     other-host baseline never defers work and is reported as calibration.
     A reading with errors judges neither record.

@@ -2251,14 +2251,18 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Every fresh spawn, including a new secondmate, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+The generated worker brief names two routes for a new no-mistakes run.
+A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
+A start through `bin/fm-duration.py run --pipeline-priority <class>` goes through the [CPU pass pool](cpu-pass-pool.md#fresh-pipeline-starts) (`pipeline-start`), which owns start admission on that route.
 A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
 An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
 
-Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin, but neither refuses work yet.
+Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin; `admit` refuses no work on either.
 They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
 The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
-These are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+For `admit` these are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+A fresh no-mistakes run start through `bin/fm-duration.py run` uses recorded run peaks through the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts).
 No exhaustion experiment or stress run is needed or recommended; the records come from real work.
 
 The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.
@@ -2272,7 +2276,7 @@ A matching baseline is never silently replaced as usage grows; an invalid baseli
 The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
 The records contain process identity, run identity and resident size, not process arguments, environment contents or working directories.
 
-Generated worker instructions select the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
+Generated worker instructions name the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
 Reattachment and gate responses remain direct so pressure cannot strand running validation.
 This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
 The watcher presents each queued memory row once, naming non-fleet outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.

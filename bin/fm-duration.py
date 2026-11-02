@@ -20,7 +20,7 @@ machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
 The admission owner re-executes this runner once with an internal argument that
 this runner consumes, so only that measured child skips requeueing; the wrapped
 client and its descendants receive no exemption. Reattachments without fresh
-inputs and responses are unchanged. A missing admission source refuses, never guesses.
+inputs and responses are unchanged. A missing admission source never reads as an empty host.
 
 keep-going is the record-free operational command runner: its only automatic
 stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
