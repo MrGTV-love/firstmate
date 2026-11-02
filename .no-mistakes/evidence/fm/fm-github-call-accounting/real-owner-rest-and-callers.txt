@@ -1,0 +1,76 @@
+### Real owner + real ps + real gh-axi REST read; fixture callers are benign sleepers; head 147f8b23
+### head 147f8b23be4e7a32fef2a0dbcde1af2c1cd3df86 host GTT-CB.local 2026-11-01T19:28:03Z
+$ fm-github-accounting.py start
+{"state": "running", "pid": 70170, "run_id": "5040ae5fca8e49dd94c5944c38ab2589", "started_at": 1793561283.115463}
+exit=0
+$ start (repeat, must be same run_id)
+{"state": "running", "pid": 70170, "run_id": "5040ae5fca8e49dd94c5944c38ab2589", "started_at": 1793561283.115463}
+exit=0
+$ run (second owner must refuse)
+fm-github-accounting: busy (owner lock held); retry
+exit=75
+$ records while running
+fm-github-accounting: busy (owner lock held); retry
+exit=75
+$ status
+{"state": "running", "pid": 70170, "run_id": "5040ae5fca8e49dd94c5944c38ab2589", "started_at": 1793561283.115463}
+exit=0
+$ direct gh-axi rate_limit for independent compare
+limit: 5000
+remaining: 3799
+reset: 1793562789
+used: 1201
+$ stop
+{"state": "stopped"}
+exit=0
+$ status
+{"state": "stopped"}
+exit=0
+
+kinds {'owner': 2, 'sampling': 4, 'process': 66, 'quota': 3}
+quota {"status": "observed", "source": "REST rate_limit resources.graphql", "endpoint": "rate_limit", "host": "github.com", "request_started_at": 1793561283.178022, "exit_code": 0, "graphql": {"limit": 5000, "remaining": 3811, "reset": 1793562789, "used": 1189}}
+quota {"status": "observed", "source": "REST rate_limit resources.graphql", "endpoint": "rate_limit", "host": "github.com", "request_started_at": 1793561298.3792388, "exit_code": 0, "graphql": {"limit": 5000, "remaining": 3809, "reset": 1793562789, "used": 1191}}
+quota {"status": "observed", "source": "REST rate_limit resources.graphql", "endpoint": "rate_limit", "host": "github.com", "request_started_at": 1793561313.528746, "exit_code": 0, "graphql": {"limit": 5000, "remaining": 3804, "reset": 1793562789, "used": 1196}}
+quota request gaps (s) [15.201, 15.15]
+sampling {'scans': 1, 'failures': 0, 'max_gap_seconds': 0.0}
+sampling {'scans': 51, 'failures': 0, 'max_gap_seconds': 0.35}
+sampling {'scans': 46, 'failures': 0, 'max_gap_seconds': 0.349}
+sampling {'scans': 28, 'failures': 0, 'max_gap_seconds': 0.351}
+owner events ['start', 'stop']
+
+fixture caller rows (argv, then ancestors up to the fixture parent); stored fields only
+ pid 70466 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh', 'issue', 'list', '[REDACTED]', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70467 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh', 'api', 'graphql', '--field', '[REDACTED]']
+   ^ 70461 ['bash', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--field']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70468 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['node', '--no-warnings', 'gh-axi', 'api', 'graphql', '--body', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70470 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh-axi', 'pr', 'view', '--body', '[REDACTED]']
+   ^ 70459 ['bash', '-eu', 'fm-caller.sh', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70495 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]', '--header', '[REDACTED]']
+   ^ 70458 ['Python', '-u', 'fm-caller.py', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70497 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh-axi', 'run', 'list', '--title', '[REDACTED]']
+   ^ 70463 ['Python', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+ pid 70498 start 'Sun Nov 1 13:28:03 2026' source ps-command-line-projection end root 
+   argv ['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]', '--header', '[REDACTED]']
+   ^ 70457 ['Python', 'fm-caller.py', '[REDACTED]']
+   ^ 70450 ['bash', 'start.sh']
+
+not published: real host gh rows also stored in this disposable state: 55
+gh-axi rate_limit rows (owner's own requests + one direct compare): 4
+
+### privacy: count of fixture secret marker
+records: 0
+raw sqlite bytes: 0
+owner.log: 0
+non-gh fixture 'notgh' rows: 0

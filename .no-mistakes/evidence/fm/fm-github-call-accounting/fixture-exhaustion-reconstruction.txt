@@ -1,0 +1,16 @@
+LABEL: fixture quota transition (fake gh-axi), real ps, real owner. Not an account exhaustion.
+Built only from `records` output. Real host rows are dropped from this published view.
+
+interval 1793561383.2 -> 1793561397.9: used 4100 -> 4800; remaining 200; reset 1794000000 -> 1794000000
+   first seen here: pid=33510 start='Sun Nov 1 13:29:55 2026' argv=['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]']
+      parent: ['bash', 'burst-caller.sh', '[REDACTED]']
+
+interval 1793561397.9 -> 1793561413.1: used 4800 -> 5000; remaining 0; reset 1794000000 -> 1794000000
+
+interval 1793561413.1 -> 1793561428.1: used 5000 -> 3; remaining 4997; reset 1794000000 -> 1794003600
+
+interval 1793561428.1 -> 1793561443.5: used 3 -> 3; remaining 4997; reset 1794003600 -> 1794003600
+
+This is temporal correlation of an observed caller. It does not prove that the caller spent these points.
+
+fixture secret marker count in records: 0

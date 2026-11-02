@@ -1,0 +1,49 @@
+### Owner boundary drive; head 147f8b23
+
+## four concurrent starts -> one owner
+start2 exit=75
+start1 exit=75
+start4 exit=75
+start3 exit=0
+status: {"state": "running", "pid": 20
+{"state": "stopped"}
+owner starts: 1
+
+## stop during hung request kills the private child group
+child live: 1 1
+{"state": "stopped"}
+stop secs=1
+after stop: grandchild rows=0 child rows=0
+
+## crash of owner with hung request (kill -9), then new start
+status after crash: {"state": "stopped"}
+orphan quota child alive after owner crash: 1 grandchild: 1
+{"state": "running", "pid": 26
+{"state": "stopped"}
+
+## symlinked state dir refused, target untouched
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+exit=1
+target: x
+
+## symlinked database refused, target untouched
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+exit=1
+target: keep
+
+## bad flags
+fm-github-accounting.py: error: --duration must be finite, positive and used with run
+fm-github-accounting.py: error: --duration must be finite, positive and used with run
+fm-github-accounting.py: error: --kind is for records
+
+## --help disclosures
+12:records. Only this database's records strictly older than 48 hours expire,
+15:and stop requests that owner's shutdown and awaits release. No launchd agent or
+27:records needs the observer stopped; a records call held open during start makes
+28:start report busy (75), not a running owner.
+33:points on a GraphQL accounting query. REST shard agreement is not established.
+35:A request still running after QUOTA_TIMEOUT has its private process group killed
+39:watcher context, not a confined worker. A ps past PS_TIMEOUT is killed and counts
+47:value ends the script search, so -c, -e and -m payloads stay withheld. No
+48:environment, headers, prompts or free text is logged.
+51:short-lived, non-gh and off-host callers remain unknown. Temporal correlation

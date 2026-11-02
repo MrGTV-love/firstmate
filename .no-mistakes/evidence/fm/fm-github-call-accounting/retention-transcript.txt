@@ -1,0 +1,17 @@
+### 48 h retention, real owner, real clock, FM_HOME disposable; head 147f8b23; 2026-11-01T19:44:51Z
+before owner start:
+  fixture rows: ['old-by-1h', 'old-by-100s', 'ages-out-in-18s', 'young-by-1h', 'now']
+  all row count: 9
+$ prune while owner runs (must be busy):
+fm-github-accounting: busy (owner lock held); retry
+  exit=75
+after startup prune and 2+ quota-tick prunes at +36s (ages-out row must go):
+  fixture rows: ['young-by-1h', 'now']
+  all row count: 34
+$ prune (stopped)
+{"removed": 1}
+  exit=0
+  fixture rows: ['young-by-1h', 'now']
+  all row count: 34
+sentinels: keep keep
+modes: dir 700 db 600 log 600 lock 600

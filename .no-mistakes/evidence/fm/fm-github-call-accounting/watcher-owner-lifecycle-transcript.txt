@@ -1,0 +1,38 @@
+### real fm-watch.sh + real owner + real ps + real gh-axi read in an unmarked disposable primary home; head 147f8b23; 2026-11-01T19:42:36Z
+absent owner started after 1s; watcher alive: yes
+status: {"state": "running", "pid": 63949, "run_id": "684127cbbf9148c6a1472a96262e0518", "started_at": 1793562157.138966}
+63949     1 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 <worktree>/bin/fm-github-accounting.py run --ready
+20s later (spans a cycle), run_id unchanged: yes
+$ kill -9 owner (crash)
+recovered at next cycle after 1s: d7a57d74 (was 684127cb)
+$ plain stop (doc: lasts until next cycle)
+{"state": "stopped"}
+restarted after plain stop after 1s: b68ae4a6
+$ kill watcher; detached owner must outlive it
+watcher alive: no; owner state: running; same run_id: yes
+new watcher alive: yes; no second owner, same run_id: yes
+wake queue accounting rows: 0; failed marker: none
+{"state": "stopped"}
+stop exit=0 status: {"state": "stopped"}
+kinds {'owner': 5, 'sampling': 7, 'process': 65, 'quota': 4}
+owner events [('start', '684127cb'), ('start', 'd7a57d74'), ('stop', 'd7a57d74'), ('start', 'b68ae4a6'), ('stop', 'b68ae4a6')]
+quota status Counter({('observed', 'REST rate_limit resources.graphql', 5000): 4})
+
+### negative homes, 25s each in parallel, positive control above
+marked lab home: marker=fm-lab-home v1 watcher alive yes; owner dir exists: no
+secondmate home: watcher alive yes; owner dir exists: no
+FM_GITHUB_ACCOUNTING=0: watcher alive yes; owner dir exists: no
+
+### real failed start: foreign database in primary home
+watcher closed its cycle after 4s: alive=no
+check: github-accounting owner failed to start: exit=1; owner stderr: <S>/fail/state/github-accounting/owner.log; retries every 3600s without another wake
+wake queue rows: 1
+marker present: yes
+owner.log: fm-github-accounting: operation unavailable (check owner status/state permissions)
+foreign row kept: [('keep',)]
+
+### busy start: a real records reader blocks on its pipe in a primary home
+direct start while reader blocks: fm-github-accounting: busy (owner lock held); retry exit=75
+after 25s of cycles: status: {"state": "stopped"}; watcher alive: yes; wake rows: 0; marker: none
+reader released; a later cycle started owner after 2s: 5f709ff5
+{"state": "stopped"}

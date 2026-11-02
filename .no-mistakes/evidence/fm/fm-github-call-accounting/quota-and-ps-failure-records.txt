@@ -1,0 +1,58 @@
+### Real owner + real ps. gh-axi or ps replaced by a labeled fixture on PATH (see each heading). Real 15 s and 30 s clock.
+hung = first gh-axi hangs with a child; bad = exit 1, junk, null fields, null limit; psh = ps hangs; abs = gh-axi absent
+=== hung
+  t+  0.00 owner start
+  t+  0.10 sampling scans=1 failures=0 max_gap=0.000
+  t+ 15.29 sampling scans=45 failures=0 max_gap=0.350
+  t+ 15.29 quota status=pending reason=None exit=None req_pid=12459 started=+0.00 graphql=None
+  t+ 30.37 quota status=unavailable reason=timeout exit=-9 req_pid=12459 started=+0.10 graphql={}
+  t+ 30.50 sampling scans=46 failures=0 max_gap=0.350
+  t+ 31.01 quota status=observed reason=None exit=0 req_pid=58403 started=+30.50 graphql={'limit': 5000, 'remaining': 4898, 'reset': 1794000000, 'used': 102}
+  t+ 45.81 sampling scans=51 failures=0 max_gap=0.350
+  t+ 46.55 quota status=observed reason=None exit=0 req_pid=74006 started=+45.81 graphql={'limit': 5000, 'remaining': 4897, 'reset': 1794000000, 'used': 103}
+  t+ 61.07 sampling scans=54 failures=0 max_gap=0.352
+  t+ 61.71 quota status=observed reason=None exit=0 req_pid=88036 started=+61.07 graphql={'limit': 5000, 'remaining': 4896, 'reset': 1794000000, 'used': 104}
+  t+ 66.15 sampling scans=17 failures=0 max_gap=0.351
+  t+ 66.15 owner stop
+=== bad
+  t+  0.00 owner start
+  t+  0.10 sampling scans=1 failures=0 max_gap=0.000
+  t+  0.35 quota status=unavailable reason=None exit=1 req_pid=12447 started=+0.10 graphql={}
+  t+ 15.16 sampling scans=45 failures=0 max_gap=0.350
+  t+ 15.33 quota status=unavailable reason=None exit=0 req_pid=37171 started=+15.16 graphql={}
+  t+ 30.23 sampling scans=46 failures=0 max_gap=0.350
+  t+ 30.50 quota status=unavailable reason=None exit=0 req_pid=58079 started=+30.23 graphql={}
+  t+ 45.48 sampling scans=48 failures=0 max_gap=0.350
+  t+ 45.84 quota status=observed reason=None exit=0 req_pid=73722 started=+45.48 graphql={'reset': 1794000000, 'used': 7}
+  t+ 60.72 sampling scans=52 failures=0 max_gap=0.361
+  t+ 60.96 quota status=observed reason=None exit=0 req_pid=87520 started=+60.72 graphql={'reset': 1794000000, 'used': 7}
+  t+ 63.82 sampling scans=11 failures=0 max_gap=0.344
+  t+ 63.82 owner stop
+=== psh
+  t+  0.00 owner start
+  t+  5.01 sampling scans=1 failures=1 max_gap=0.000
+  t+ 10.02 quota status=observed reason=None exit=0 req_pid=22114 started=+5.01 graphql={'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11}
+  t+ 25.03 sampling scans=4 failures=4 max_gap=5.011
+  t+ 30.06 quota status=observed reason=None exit=0 req_pid=51259 started=+25.03 graphql={'limit': 5000, 'remaining': 4989, 'reset': 1794000000, 'used': 11}
+  t+ 35.08 sampling scans=2 failures=2 max_gap=5.016
+  t+ 35.09 owner stop
+=== abs
+  t+  0.00 owner start
+  t+  0.10 sampling scans=1 failures=0 max_gap=0.000
+  t+  0.10 quota status=unavailable reason=command_unavailable exit=None req_pid=None started=+0.00 graphql=None
+  t+ 15.36 sampling scans=47 failures=0 max_gap=0.352
+  t+ 15.37 quota status=unavailable reason=command_unavailable exit=None req_pid=None started=+0.00 graphql=None
+  t+ 30.62 sampling scans=46 failures=0 max_gap=0.350
+  t+ 30.62 quota status=unavailable reason=command_unavailable exit=None req_pid=None started=+0.00 graphql=None
+  t+ 30.84 sampling scans=0 failures=0 max_gap=0.000
+  t+ 30.84 owner stop
+
+fixture request log (hung):
+1793561383.240343 begin n=1 pid=12459
+1793561413.3504372 begin n=2 pid=58403
+1793561428.986529 begin n=3 pid=74006
+1793561444.1827269 begin n=4 pid=88036
+overlap marker file exists: no
+grandchild sleep 600 alive at t+34 and t+50: no (ps -p empty; it would otherwise run 600 s)
+{"state": "stopped"}
+psh-stop-exit=0 secs=4
