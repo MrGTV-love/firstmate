@@ -237,6 +237,7 @@ A bypass is an escape record, not an additional inspected opportunity, and an ov
 The manual-backlog skip is selected by `config/backlog-backend`; `FM_BACKLOG_TRANSITION_SKIP` is its output reason, not an environment switch.
 The registry also names existing optional surfaces whose bypasses are visible but whose ordinary decisions remain uninstrumented.
 Telemetry failures, unavailable writers and nonregular log targets must never prevent the guarded action or change its verdict.
+The writer never creates a home: without an explicit log, a home with no state directory gets no row, so a later home check still refuses.
 
 `bin/fm-guard-metrics.sh` owns guard/rule metrics and the retirement rule; its header owns the CLI and output fields.
 It groups repeated denies by task and rule across harness sessions, and an allow for another task, rule or actor class cannot clear a refusal.

@@ -477,6 +477,7 @@ test_only_task_worktree_decisions_record_events() {
   fixture="$TMP_ROOT/scope-fixture"
   hooks="$TMP_ROOT/hooks-scope"
   home="$TMP_ROOT/scope-home"
+  mkdir -p "$home/state"
   make_repo "$task"
   make_repo "$fixture"
   "$STRIP" install "$hooks" "$task" || fail "install failed"

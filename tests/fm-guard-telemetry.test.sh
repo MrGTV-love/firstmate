@@ -585,6 +585,21 @@ git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse "
 python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/stale-local-correlation.jsonl"
 jq -se 'any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/stale-local-correlation.jsonl" >/dev/null \
   || fail "a stale local base hid a real base-merge-only change"
+# The writer never creates a home, so a fail-closed home check still refuses.
+TYPO_HOME="$TMP/typo-home/nested"
+typo_send() {  # <extra env assignment...>
+  (cd "$TMP" && env -u FM_GUARD_EVENT_LOG -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE "$@" FM_HOME="$TYPO_HOME" \
+    "$ROOT/bin/fm-send.sh" sess:win 'probe' 2>&1)
+}
+with_rc=0; with_out=$(typo_send) || with_rc=$?
+[ ! -e "$TMP/typo-home" ] || fail "the event writer created a missing home"
+[ "$with_rc" = 1 ] || fail "a missing home was not refused (rc=$with_rc): $with_out"
+case "$with_out" in *'is not a directory'*) ;; *) fail "the missing-home refusal changed: $with_out" ;; esac
+without_rc=0; without_out=$(typo_send FM_GUARD_EVENT_LOG="$TMP/typo-elsewhere.jsonl") || without_rc=$?
+[ "$with_rc:$with_out" = "$without_rc:$without_out" ] \
+  || fail "the home-default log changed the refusal: [$with_rc] $with_out / [$without_rc] $without_out"
+pass "the event writer leaves a missing home absent and its refusal unchanged"
+
 # A task's base follows the shared default-branch rule, so a local-only master
 # project is scanned past its base history; a base that resolves to no commit
 # is skipped with a stderr note and never reaches the report.

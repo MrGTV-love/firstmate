@@ -20,11 +20,13 @@
 #   --log <path>            default FM_GUARD_EVENT_LOG, else home's state log
 # Session identity is the task, else physical home plus harness session.
 # Without a harness session it is home:unattributed, never a new process id.
+# The default home log is written only when that home's state directory already
+# exists: the writer never creates a home, so a home check after it still refuses.
 # Exit always 0, even with malformed arguments, missing tools or failed writes.
 # Callers must also use || true so an unavailable writer never changes policy.
 set -u
 
-usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; }
 case "${1:-}" in ''|-h|--help) usage; exit 0 ;; esac
 GUARD=$1 DECISION=${2:-}
 case "$DECISION" in deny|warn|allow|error|bypass) ;; *) exit 0 ;; esac
@@ -65,7 +67,13 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 0
 ROOT=$(cd "$SCRIPT_DIR/.." && pwd) || exit 0
 HOME_KEY=${FM_HOME:-${FM_ROOT:-$ROOT}}
 HOME_KEY=$(cd "$HOME_KEY" 2>/dev/null && pwd -P) || HOME_KEY=${FM_HOME:-${FM_ROOT:-$ROOT}}
-[ -n "$LOG" ] || LOG=${FM_GUARD_EVENT_LOG:-$HOME_KEY/state/guard-events.jsonl}
+if [ -z "$LOG" ]; then
+  LOG=${FM_GUARD_EVENT_LOG:-}
+  if [ -z "$LOG" ]; then
+    [ -d "$HOME_KEY/state" ] || exit 0
+    LOG=$HOME_KEY/state/guard-events.jsonl
+  fi
+fi
 if [ -n "$TASK" ]; then
   SESSION=$TASK
 else
