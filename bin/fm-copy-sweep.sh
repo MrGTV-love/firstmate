@@ -154,11 +154,11 @@
 # After custody and HEAD are rechecked, the actual preserved tree fingerprint
 # must equal the source fingerprint, and the copy's ignored content with its
 # regenerable directories must equal what it was before preservation, before plain
-# `git worktree remove` from the parent clone. Missing, unreadable or differing
-# preservation or content leaves both copy and preserve; no forced removal is introduced.
-# A refused removal, or a copy no longer proven after preservation, leaves the copy
-# and discards this run's preserve while that same copy still holds every preserved
-# original unchanged, so a repeated refusal adds no preserve.
+# `git worktree remove` from the parent clone; no forced removal is introduced.
+# Missing, unreadable or differing preservation or content, a refused removal, or a
+# copy no longer proven after preservation leaves the copy and discards this run's
+# preserve while that same copy still holds every preserved original unchanged, so a
+# repeated failure adds no preserve. A preserve whose original is gone or changed stays.
 # A locked copy first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
@@ -1802,6 +1802,7 @@ apply_removals() {
       fi
       if [ -z "$want" ] || ! now=$(content_fingerprint "$copy" all) || [ "$now" != "$want" ] \
         || ! now=$(activity_fingerprint "$copy" all) || [ "$now" != "$activity" ]; then
+        discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left"$'\n'
         continue

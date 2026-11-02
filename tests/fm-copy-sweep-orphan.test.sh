@@ -546,6 +546,58 @@ SH
   pass 'three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged'
 }
 
+# A write that leaves every preserved original unchanged proves nothing about the
+# preserve, so it stops the removal without adding one.
+test_activity_only_write_adds_no_preserve() {
+  local name run activity newcontent real_cp key
+  W="$TMP_ROOT/activity"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/\n' > "$CLONE/.gitignore"
+  git -C "$CLONE" add .gitignore
+  git -C "$CLONE" commit -qm 'ignore payloads'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  git -C "$CLONE" fetch -q origin
+  activity="$CLONE/.claude/worktrees/activity"
+  newcontent="$CLONE/.claude/worktrees/newcontent"
+  for name in activity newcontent; do
+    git -C "$CLONE" worktree add -q --detach "$CLONE/.claude/worktrees/$name" origin/main
+    put_file "$CLONE/.claude/worktrees/$name/.claude/keep.txt" "original $name bytes"
+  done
+  put_file "$activity/.claude/.cache/tick" 'v0'
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/lsof"
+  real_cp=$(command -v cp)
+  cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  "$activity"/*) printf 'copy process %s\\n' "\$\$" > "$activity/.claude/.cache/tick" ;;
+  "$newcontent"/*) printf 'new\\n' > "$newcontent/.claude/late-\$\$.txt" ;;
+esac
+SH
+  chmod +x "$W/bin/lsof" "$W/bin/cp"
+  for run in 1 2 3; do
+    sweep_status --apply
+    assert_equals 1 "$SWEEP_RC" "run $run: a write during preservation must fail the run"
+    for name in activity newcontent; do
+      assert_contains "$OUT" "FAILED"$'\t'"$CLONE/.claude/worktrees/$name"$'\t'"ignored payload changed" "run $run: $name was not stopped"
+      assert_equals 0 "$(preserve_count "$CLONE/.claude/worktrees/$name")" "run $run: $name kept a preserve of unchanged originals"
+      assert_equals "original $name bytes" "$(cat "$CLONE/.claude/worktrees/$name/.claude/keep.txt")" "run $run: $name lost an original"
+    done
+  done
+  rm -f "$W/bin/cp"
+  sweep --apply
+  for name in activity newcontent; do
+    assert_absent "$CLONE/.claude/worktrees/$name" "$name was not removed once quiet"
+    assert_equals 1 "$(preserve_count "$CLONE/.claude/worktrees/$name")" "$name needs exactly one preserve after its removal"
+    key=$(printf '%s' "$CLONE/.claude/worktrees/$name" | shasum -a 256 | cut -d ' ' -f 1)
+    assert_equals "original $name bytes" "$(cat "$HOMED/data/copy-sweep/"*/nested-copy-preserved/"$key"/.claude/keep.txt)" "$name preserve misses its original"
+  done
+  pass 'three applies with only activity or new content add no preserve, and the quiet release preserves once'
+}
+
 # check fingerprints under its time bound. That route must read the same file
 # bytes as report, or a quiet copy reads as still changing in the budget wake.
 assert_check_names_pending_driver() {  # <mechanism-label>
@@ -653,4 +705,5 @@ test_regenerable_class
 test_regenerable_write_keeps_waiting
 test_check_matches_report_for_quiet_waiting_copy
 test_refused_removal_adds_no_preserve
+test_activity_only_write_adds_no_preserve
 test_ps_observation_diagnostics
