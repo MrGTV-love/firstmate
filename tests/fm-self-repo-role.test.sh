@@ -45,8 +45,8 @@ PUB_TARGET=$(fm_role_publication_target "$ROOT")
 # mode=no-mistakes scope to that target.
 PUB_TARGET_NM=$(fm_role_publication_target "$ROOT" no-mistakes)
 
-# The no-mistakes gate also confirms the pipeline's own registration names the
-# same destination, read from <NM_HOME>/state.sqlite. This fixture registry
+# The no-mistakes gate also refuses a pipeline registration that names another
+# destination, read from <NM_HOME>/state.sqlite. This fixture registry
 # stands in for the operator's, so no case reads or writes the real one.
 export NM_HOME="$TMP_ROOT/nm-home"
 mkdir -p "$NM_HOME"
@@ -564,12 +564,12 @@ fm_test_link_ts_runtime "$SPAWN_FAKEBIN"
 printf '#!/bin/sh\nexit 1\n' > "$SPAWN_FAKEBIN/tmux"
 chmod +x "$SPAWN_FAKEBIN/tmux"
 
-write_ship_brief() {  # <home> <id> [<contract-extras>] [<mode>]
-  local home=$1 id=$2 extras=${3:-} mode=${4:-no-mistakes}
+write_ship_brief() {  # <home> <id> [<contract-extras>]
+  local home=$1 id=$2 extras=${3:-}
   mkdir -p "$home/data/$id"
   {
     printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nExercise the role gate.\n\n## Firstmate spec\nVerify the boundary.\n\n# Definition of done\n'
-    printf 'Delivery contract: mode=%s%s\nShip branch: fm/%s\n' "$mode" "$extras" "$id"
+    printf 'Delivery contract: mode=no-mistakes%s\nShip branch: fm/%s\n' "$extras" "$id"
   } > "$home/data/$id/brief.md"
 }
 
@@ -904,7 +904,9 @@ test_nomistakes_refuses_when_registration_disagrees_with_origin() {
   expect_code 1 "$rc" "consent for origin must not carry a task whose registration names another repository (got: $out)"
   assert_contains "$out" "origin names $TARGET_A" "the refusal must name origin"
   assert_contains "$out" "registration for $proj publishes to $TARGET_B" "the refusal must name the registered destination"
-  assert_contains "$out" "no-mistakes init" "the refusal must name the repair"
+  assert_contains "$out" "owner must reconcile the no-mistakes registration" "the refusal must name who repairs it"
+  assert_not_contains "$out" "no-mistakes init" "the refusal must not send anyone to init, which refuses a fork layout"
+  assert_not_contains "$out" "correct origin" "the refusal must not ask for a remote change"
 
   home=$(make_role_home nm-reg-mismatch-maint "maintainer $TARGET_A")
   out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
@@ -935,34 +937,50 @@ test_nomistakes_refuses_when_registration_disagrees_with_origin() {
   pass "no-mistakes gate: origin A with registration B is refused, repair re-authorizes, gh delivery is unaffected"
 }
 
-test_nomistakes_refuses_unreadable_or_missing_registration() {
+test_nomistakes_unregistered_project_keeps_origin() {
   local proj home out rc
-  proj=$(make_two_remote_project nm-reg-missing "$URL_A" "$URL_B" none)
-  home=$(make_role_home nm-reg-missing-user)
+  proj=$(make_two_remote_project nm-reg-origin-only "$URL_A" "" none)
+  home=$(make_role_home nm-reg-origin-only-user)
   out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
-  expect_code 1 "$rc" "an unregistered project must be refused (got: $out)"
-  assert_contains "$out" "has no registration for $proj" "the refusal must say the project is unregistered"
-  assert_contains "$out" "no-mistakes init" "the refusal must name the repair"
+  expect_code 0 "$rc" "an unregistered origin-only project with consent for origin must be allowed (got: $out)"
+  assert_contains "$out" "task consent for $TARGET_A" "the allow must name the origin repository"
+
+  proj=$(make_two_remote_project nm-reg-missing "$URL_A" "$URL_B" none)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 0 "$rc" "an unregistered project with consent for origin must be allowed (got: $out)"
+
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "an unregistered project must still refuse consent for another repository (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the refusal must name the origin repository"
 
   out=$(NM_HOME="$TMP_ROOT/nm-home-absent" run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
-  expect_code 1 "$rc" "an absent registry must be refused (got: $out)"
-  assert_contains "$out" "cannot read the no-mistakes registration" "the refusal must say the registry cannot be read"
+  expect_code 0 "$rc" "a home with no registry database must be allowed with consent for origin (got: $out)"
 
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "no grant must still be refused (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the no-grant refusal must name the origin repository"
+
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode direct-PR); rc=$?
+  expect_code 0 "$rc" "gh-based delivery must not need a registration (got: $out)"
+  pass "no-mistakes gate: an unregistered project or absent registry is checked against origin alone"
+}
+
+test_nomistakes_refuses_unreadable_registration() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-reg-unreadable "$URL_A" "$URL_B" none)
+  home=$(make_role_home nm-reg-unreadable-user)
   mkdir -p "$TMP_ROOT/nm-home-corrupt"
   printf 'not a database\n' > "$TMP_ROOT/nm-home-corrupt/state.sqlite"
   out=$(NM_HOME="$TMP_ROOT/nm-home-corrupt" run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
   expect_code 1 "$rc" "a corrupt registry must be refused (got: $out)"
   assert_contains "$out" "cannot read the no-mistakes registration" "the refusal must say the registry cannot be read"
+  assert_not_contains "$out" "no-mistakes init" "the refusal must not send anyone to init"
 
-  # With no grant at all the role refusal comes first and still names origin.
-  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
-  expect_code 1 "$rc" "no grant must still be refused (got: $out)"
-  assert_contains "$out" "no publication authority for $TARGET_A" "the no-grant refusal must name the origin repository"
-
-  # gh-based delivery needs no registration.
-  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode direct-PR); rc=$?
-  expect_code 0 "$rc" "gh-based delivery must not need a registration (got: $out)"
-  pass "no-mistakes gate: a missing or unreadable registration is refused with a repair"
+  nm_register "$proj" ""
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a registration with no destination must not count as unregistered (got: $out)"
+  assert_contains "$out" "cannot read the no-mistakes registration" "the refusal must say the registration cannot be read"
+  pass "no-mistakes gate: an unreadable registry or empty registration is refused"
 }
 
 test_role_check_rejects_bad_mode_arguments() {
@@ -1010,7 +1028,8 @@ test_nomistakes_gate_refuses_unknown_destination
 test_gh_delivery_resolution_is_unchanged
 test_nomistakes_ignores_github_and_upstream_remotes
 test_nomistakes_refuses_when_registration_disagrees_with_origin
-test_nomistakes_refuses_unreadable_or_missing_registration
+test_nomistakes_unregistered_project_keeps_origin
+test_nomistakes_refuses_unreadable_registration
 test_role_check_rejects_bad_mode_arguments
 
 echo "# all fm-self-repo-role tests passed"

@@ -709,7 +709,9 @@ Role is never inferred from GitHub identity, forge permissions, remotes, reposit
 The publication target is the repository the task's delivery mode publishes to, and each caller passes that mode.
 A `no-mistakes` task is checked against `origin` alone, because the no-mistakes pipeline opens its pull request against the repository's origin remote whatever other remotes exist.
 The gate also reads, never writes, the no-mistakes registration for the project (`<NM_HOME>/state.sqlite`, default `~/.no-mistakes`), because the pipeline publishes to its registered destination and keeps the prior registration when its run-start refresh from origin fails.
-It authorizes only when that registration names the same repository as origin; a registration that disagrees, is missing, or cannot be read is refused with the repair (`no-mistakes init` in the project re-reads origin).
+A registration that names another repository is refused: the denial names origin and the registered destination, and the owner must reconcile the no-mistakes registration.
+A registry that exists but cannot be read is refused too.
+A project with no registration, or a home with no registry database, is checked against `origin` alone.
 A `direct-PR` task, and a caller that names no mode (`bin/fm-role.sh check` without `mode`), publishes through `gh` and is checked against the first configured remote in the order `upstream`, `github`, `origin`.
 A `local-only` task publishes nothing and never reaches the gate.
 A missing `origin` on a `no-mistakes` task is an undeterminable target and is refused; see `bin/fm-role-lib.sh` for URL and local-path normalization.

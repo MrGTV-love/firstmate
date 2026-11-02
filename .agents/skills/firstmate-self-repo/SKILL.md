@@ -49,7 +49,8 @@ The captain's approval must be a current explicit instruction naming the contrib
 ## Where the boundary is enforced
 
 The gate is code, not memory: `bin/fm-role-lib.sh`'s `fm_role_gate_self_publish` applies the [lineage and publication-target policy](../../../docs/configuration.md#firstmate-role-configfirstmate-role) to publishing contracts.
-It checks the repository the task's delivery mode names - `origin` for a no-mistakes task, confirmed against the pipeline's own registration, and the `gh` default for a direct-PR task - and every caller passes the task's mode.
+It checks the repository the task's delivery mode names - `origin` for a no-mistakes task, and the `gh` default for a direct-PR task - and every caller passes the task's mode.
+A no-mistakes task is refused when the pipeline's own registration names another repository or its registry cannot be read; the owner must reconcile that registration, and an unregistered project keeps `origin`.
 
 - `bin/fm-brief.sh --project <dir>` refuses to scaffold a publishing ship brief the home cannot authorize.
 - `bin/fm-spawn.sh` refuses to launch a ship task on this repository without a maintainer scope or matching task consent, and refuses a brief whose `upstream-consent=` disagrees with the flag.

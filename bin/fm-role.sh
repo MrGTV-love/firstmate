@@ -21,10 +21,10 @@
 #            recorded per-task consent a dispatcher captured. The optional
 #            `mode <no-mistakes|direct-PR>` argument is the task's delivery mode: it
 #            selects the repository the gate checks (origin for no-mistakes,
-#            confirmed read-only against the no-mistakes registration for the
-#            project, which a disagreeing, missing or unreadable registry
-#            refuses; the first of upstream, github, origin for direct-PR and
-#            when no mode is given).
+#            read-only against the no-mistakes registration for the project: a
+#            registration naming another repository or an unreadable registry
+#            refuses, and an unregistered project keeps origin; the first of
+#            upstream, github, origin for direct-PR and when no mode is given).
 #
 # bin/fm-role-lib.sh owns the schema summary and mechanics;
 # docs/configuration.md "Firstmate role" owns the operator-facing schema.

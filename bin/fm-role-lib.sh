@@ -42,8 +42,9 @@
 # host/owner/repo. A no-mistakes task publishes through the no-mistakes
 # pipeline, which opens its pull request against the destination registered for
 # the repository, normally the origin remote whatever other remotes exist, so
-# the gate checks origin and, before it authorizes, confirms the registration
-# names the same repository (fm_role_nm_registration_check). Every other
+# the gate checks origin and, before it authorizes, refuses when a registration
+# names another repository or the registry cannot be read; an unregistered
+# project publishes to origin (fm_role_nm_registration_check). Every other
 # publishing mode, and a caller that names no mode, publishes through gh, so the
 # gate keeps the first remote named upstream, github, or origin (the order gh
 # prefers when resolving a default repository). A local-path remote is resolved
@@ -235,8 +236,8 @@ fm_role_git_common_dir() {
 # whose pull request destination is the origin remote alone (its init help says
 # it opens pull requests against origin, and its init refuses a fork whose
 # parent an upstream remote names rather than resolve the parent), so only
-# origin counts here; fm_role_nm_registration_check then confirms the pipeline's
-# own registration names that same repository. Any other mode, or none,
+# origin counts here; fm_role_nm_registration_check then refuses when the
+# pipeline's own registration names another repository. Any other mode, or none,
 # publishes through gh and keeps the first of upstream, github, origin that is
 # configured, in the order gh prefers. Empty when the repo has no such remote.
 fm_role_publication_target() {
@@ -255,34 +256,21 @@ fm_role_publication_target() {
   fm_role_remote_identity "$url" "$dir"
 }
 
-# fm_role_nm_registry_db <project-dir> - the no-mistakes state database the CLI
-# would open from <project-dir>: <NM_HOME>/state.sqlite, with NM_HOME defaulting
-# to ~/.no-mistakes and a relative NM_HOME resolving from the project.
-fm_role_nm_registry_db() {
-  local root=${NM_HOME:-}
-  [ -n "$root" ] || root=$HOME/.no-mistakes
-  case $root in
-  /*) ;;
-  *) root=$1/$root ;;
-  esac
-  printf '%s/state.sqlite\n' "$root"
-}
-
 # fm_role_nm_registered_urls <project-dir> <db> - read-only: print the
 # upstream_url of every registration whose working path is the project's
 # checkout or the checkout holding its git common dir, one per line. rc 0 read
-# (zero lines = not registered); rc 1 the registry could not be read.
+# (zero lines = not registered, including no database at all); rc 1 the registry
+# could not be read or a matching row names no destination.
 fm_role_nm_registered_urls() {
   local proj=$1 db=$2 top common cands=
+  [ -e "$db" ] || [ -L "$db" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 1
   top=$(git -C "$proj" rev-parse --show-toplevel 2>/dev/null) || top=
   common=$(fm_role_git_common_dir "$proj")
   [ -z "$top" ] || cands=$top
   case $common in
   */.git) cands=$cands${cands:+$'\n'}${common%/.git} ;;
   esac
-  [ -n "$cands" ] || return 1
-  [ -f "$db" ] || return 1
-  command -v python3 >/dev/null 2>&1 || return 1
   python3 -I - "$db" "$cands" 2>/dev/null <<'PY'
 import os, sqlite3, sys
 from contextlib import closing
@@ -294,38 +282,40 @@ try:
 except sqlite3.Error:
     sys.exit(1)
 for path, url in rows:
-    if isinstance(path, str) and isinstance(url, str) and os.path.realpath(path) in cands:
+    if isinstance(path, str) and os.path.realpath(path) in cands:
+        if not isinstance(url, str) or not url.strip():
+            sys.exit(1)
         print(url)
 PY
 }
 
 # fm_role_nm_registration_check <project-dir> <target> - for a no-mistakes
-# task: 0 when the no-mistakes registration for the project names <target>, the
-# destination the gate is about to authorize; otherwise 1 with FM_ROLE_PUB_DENIAL.
-# The pipeline opens its pull request against the registered destination, and
-# when its run-start refresh from origin fails (unreadable, ambiguous or invalid
-# remote, or a database write failure) it keeps the prior registration, so
-# origin alone does not prove where a run publishes. The registry is only read,
-# never written. A missing registration, an unreadable registry, or any
-# registered destination other than <target> refuses.
+# task: 0 when no registration exists for the project (no row, or no database at
+# all), so origin stands, or when every registration names <target>, the
+# destination the gate is about to authorize; otherwise 1 with
+# FM_ROLE_PUB_DENIAL. The pipeline opens its pull request against the registered
+# destination, and when its run-start refresh from origin fails (unreadable,
+# ambiguous or invalid remote, or a database write failure) it keeps the prior
+# registration, so a registration that disagrees with origin, or a registry that
+# cannot be read, refuses. The registry is only read, never written. The library
+# holding the registry path loads here, so only this check pays for it.
 fm_role_nm_registration_check() {
-  local proj=$1 target=$2 db urls url ident
-  db=$(fm_role_nm_registry_db "$proj")
-  if ! urls=$(fm_role_nm_registered_urls "$proj" "$db"); then
+  local proj=$1 target=$2 db='' urls url ident
+  if ! declare -F fm_nm_state_db >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-nm-run-lib.sh
+    . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-nm-run-lib.sh"
+  fi
+  if ! db=$(fm_nm_state_db "$proj") || ! urls=$(fm_role_nm_registered_urls "$proj" "$db"); then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    FM_ROLE_PUB_DENIAL="cannot read the no-mistakes registration for $proj (registry $db needs python3 and a readable state.sqlite), so the repository a no-mistakes run would publish to cannot be established; run 'no-mistakes doctor', or set NM_HOME to the registry in use, then dispatch again"
+    FM_ROLE_PUB_DENIAL="cannot read the no-mistakes registration for $proj (registry ${db:-state.sqlite} needs python3 and a readable state.sqlite), so the repository a no-mistakes run would publish to cannot be established; run 'no-mistakes doctor', or set NM_HOME to the registry in use, then dispatch again"
     return 1
   fi
-  if [ -z "$urls" ]; then
-    # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    FM_ROLE_PUB_DENIAL="no-mistakes has no registration for $proj in $db, so the repository a no-mistakes run would publish to cannot be established; run 'no-mistakes init' in $proj (it records origin), then dispatch again"
-    return 1
-  fi
+  [ -n "$urls" ] || return 0
   while IFS= read -r url; do
     ident=$(fm_role_remote_identity "$url" "$proj")
     if [ "$ident" != "$target" ]; then
       # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-      FM_ROLE_PUB_DENIAL="origin names $target but the no-mistakes registration for $proj publishes to ${ident:-an unreadable destination}; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open its pull request against ${ident:-that destination} instead; re-register with 'no-mistakes init' in $proj (it re-reads origin) or correct origin, then dispatch again"
+      FM_ROLE_PUB_DENIAL="origin names $target but the no-mistakes registration for $proj publishes to ${ident:-an unreadable destination}; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open its pull request against ${ident:-that destination} instead; the owner must reconcile the no-mistakes registration with origin, then dispatch again"
       return 1
     fi
   done <<EOF
