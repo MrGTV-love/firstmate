@@ -104,7 +104,7 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   assert_grep "closed fm-fixture-alpha-1 with $url" "$case_dir/stdout" "c1: alpha's close was not reported"
   assert_grep "$url" "$case_dir/home/data/backlog.md" "c1: the merged PR URL is not on the closed items"
   [ "$(cx_state "$case_dir" fm-fixture-live-3)" != "done" ] || fail "c1: a ship item with a live record was closed"
-  assert_match "^actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done refused it: .*live task record" "$case_dir/stderr" \
+  assert_match "^actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done did not close it: .*live task record" "$case_dir/stderr" \
     "c1: another task's live item was not reported as actionable with its reason"
   [ "$(cx_state "$case_dir" fm-fixture-prose-5)" != "done" ] || fail "c1: a line that is not a Closes directive closed an item"
   # The non-ship item with a live record gets exactly what the unchanged completion path gives.
@@ -233,7 +233,7 @@ SH
   done
   assert_grep 'not closed no-such-item: unknown id' "$case_dir/stderr" "c3: unknown id not reported"
   assert_grep 'done-already is already done' "$case_dir/stdout" "c3: finished item not reported"
-  assert_grep 'not closed a-scout: bin/fm-tasks-axi.sh done refused it' "$case_dir/stderr" "c3: scout refusal not reported"
+  assert_grep 'not closed a-scout: bin/fm-tasks-axi.sh done did not close it' "$case_dir/stderr" "c3: scout refusal not reported"
   assert_match 'not closed held-ship: .*owner call' "$case_dir/stderr" "c3: held ship not reported as an open owner call"
   assert_grep 'not closed call-open: it is an open owner call' "$case_dir/stderr" "c3: open call not reported"
   assert_grep 'not closed call-expired: it is an open owner call' "$case_dir/stderr" "c3: expired-unanswered call closed or hidden"
@@ -484,9 +484,9 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result() {
   for id in gl-ship gl-docs gl-member-docs; do
     [ "$(cx_state "$case_dir" "$id")" != "done" ] || fail "c1-gitlab: $id closed on a merge request URL the path cannot take"
   done
-  assert_match 'not closed gl-ship: bin/fm-tasks-axi.sh done refused it: only a GitHub pull request' "$case_dir/stderr" \
+  assert_match 'not closed gl-ship: bin/fm-tasks-axi.sh done did not close it: only a GitHub pull request' "$case_dir/stderr" \
     "c1-gitlab: the ship refusal was not reported"
-  assert_match 'not closed gl-docs: bin/fm-tasks-axi.sh done refused it: .*canonical pull request URL' "$case_dir/stderr" \
+  assert_match 'not closed gl-docs: bin/fm-tasks-axi.sh done did not close it: .*canonical pull request URL' "$case_dir/stderr" \
     "c1-gitlab: the non-ship refusal was not reported with the path's own text"
   assert_match 'not closed gl-member-docs: .*canonical pull request URL' "$case_dir/stderr" \
     "c1-gitlab: the member task's refusal was not reported"
@@ -517,7 +517,7 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
     [ "$(cx_state "$case_dir" fj-member-docs)" = "done" ] || fail "c1-forgejo-$mode: the member's pr= task was not closed"
     [ "$(cx_state "$case_dir" fj-other-repo)" = queued ] || fail "c1-forgejo-$mode: the same number in another repository matched"
     [ "$(cx_state "$case_dir" fj-ship)" != "done" ] || fail "c1-forgejo-$mode: a ship item closed on a proof the path cannot verify"
-    assert_grep 'not closed fj-ship: bin/fm-tasks-axi.sh done refused it' "$case_dir/stderr" "c1-forgejo-$mode: refusal not reported"
+    assert_grep 'not closed fj-ship: bin/fm-tasks-axi.sh done did not close it' "$case_dir/stderr" "c1-forgejo-$mode: refusal not reported"
   done
   pass "a Forgejo merge reports the completion path's actual result per item and still succeeds"
 }

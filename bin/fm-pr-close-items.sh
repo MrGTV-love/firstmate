@@ -190,12 +190,12 @@ consider() {  # <id> <proof-url> <where it was named>
     *"open owner call"*) left_open "$id" "it is an open owner call: $first" ;;
     *"has a live task record"*)
       if [ "$id" = "$TASK_ID" ]; then
-        left_open "$id" "bin/fm-tasks-axi.sh done refused it: $first" teardown
+        left_open "$id" "bin/fm-tasks-axi.sh done did not close it: $first" teardown
       else
-        left_open "$id" "bin/fm-tasks-axi.sh done refused it: $first"
+        left_open "$id" "bin/fm-tasks-axi.sh done did not close it: $first"
       fi
       ;;
-    *) left_open "$id" "bin/fm-tasks-axi.sh done refused it: ${first:-failed with no output}" ;;
+    *) left_open "$id" "bin/fm-tasks-axi.sh done did not close it: ${first:-failed with no output}" ;;
   esac
 }
 
