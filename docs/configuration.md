@@ -495,7 +495,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.
 
 No flag or environment variable waives these checks.
-A hold created by `bin/fm-captain-hold.sh hold` is outside the add checks, because that script calls tasks-axi directly.
+A hold created by `bin/fm-captain-hold.sh hold` files through `bin/fm-tasks-axi.sh add` with `--objective none --objective-reason "captain hold record: tracks a captain decision, not a work item"`, so its objective row is recorded and the duplicate check applies; a duplicate refusal stops the hold and prints the neighbours.
 
 ### Which backlog receives a transition
 

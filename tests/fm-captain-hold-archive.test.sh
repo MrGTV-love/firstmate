@@ -153,7 +153,7 @@ test_live_rows_resolve_exactly_as_before_the_archive_lookup() {
   run_captain "$home" hold sample-live-held --title "Held call" \
     --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
     || fail "could not hold the live fixture"
-  run_captain "$home" hold sample-live-answered --title "Answered call" \
+  run_captain "$home" hold sample-live-answered --title "Live answered decision" \
     --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
     || fail "could not hold the live answered fixture"
   printf 'Go.\n' > "$home/live-answer.txt"
@@ -365,7 +365,7 @@ test_archived_answer_after_leading_blank_lines_resolves() {
   printf '\nUse option B.\n' > "$home/blank-lead-one.txt"
   run_captain "$home" answer sample-blank-lead-one --decision-file "$home/blank-lead-one.txt" >/dev/null \
     || fail "could not answer the first blank-led fixture"
-  run_captain "$home" hold sample-blank-lead-two --title "Captain call two" \
+  run_captain "$home" hold sample-blank-lead-two --title "Second blank-led decision" \
     --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
     || fail "could not hold the second blank-led fixture"
   printf '\n\n\nUse option C.\n' > "$home/blank-lead-two.txt"

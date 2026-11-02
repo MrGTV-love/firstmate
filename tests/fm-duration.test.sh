@@ -719,7 +719,17 @@ if shutil.which('tasks-axi'):
     assert not any(r.get('event') == 'filed' and r.get('key') == failing for r in owner_rows)
     sidecar.rmdir()
     sidecar.write_text(saved)
-    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item with the choice recorded, and an unrecorded filing is never called filed')
+    # A hand-filed item for the same key is a neighbour the filer cannot judge, so the refusal goes to the operator.
+    hand_key = 'worker.handkey'
+    hand_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + hand_key).encode()).hexdigest()[:16]
+    subprocess.run(['tasks-axi', 'add', 'hand-filed-timeout', f'Measure and repair repeated timeout: {REPO} {hand_key}', '--kind', 'ship'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
+    worker('timeout', hand_key, 1200000, '--event-id', 'h1')
+    result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', hand_key, '1200000', '--event-id', 'h2'], env=worker_env, cwd=workrepo, capture_output=True, text=True)
+    assert result.returncode != 0 and 'hand-filed-timeout' in result.stdout + result.stderr, (result.returncode, result.stdout, result.stderr)
+    assert hand_task not in (owner / 'data/backlog.md').read_text()
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert not any(r.get('event') == 'filed' and r.get('key') == hand_key for r in owner_rows)
+    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item, a hand-filed neighbour goes to the operator, and an unrecorded filing is never called filed')
 
 # Repeated-timeout work goes to the project registered under the repository's name in
 # the owning home's data/projects.md, and to firstmate when there is no such project.

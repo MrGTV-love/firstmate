@@ -545,11 +545,14 @@ def own_timeout(key, milliseconds, event_id=None):
         result = subprocess.run(add, capture_output=True, text=True, env=env)
         # The wrapper stops a title that overlaps another item and prints the neighbours.
         # This title carries the command key, so the recurrence names the item it follows
-        # as judged different; any other neighbour is a different key's work and is named
-        # the same way.
+        # as judged different, and another fm-timeout- item is a different key's work. Any
+        # other neighbour may be the same work filed by hand, so that refusal goes to the
+        # operator and nothing is filed.
         if result.returncode == 2 and '--not-dup' in result.stderr:
             listed = re.findall(r'^  (\S+) \(', result.stderr, re.M)
-            judged = previous if previous in listed else (listed[0] if listed else None)
+            judged = None
+            if listed and all(n == previous or n.startswith('fm-timeout-') for n in listed):
+                judged = previous if previous in listed else listed[0]
             if judged:
                 result = subprocess.run(add + ['--not-dup', judged], capture_output=True, text=True, env=env)
         shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env)

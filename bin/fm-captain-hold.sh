@@ -781,13 +781,6 @@ ledger_hold_closed() {  # <task-id> [<retained-done-arg>...]
 
 # The same ledger's task.filed record for a captain-hold item this command just
 # created; tasks-axi stores no priority for it.
-ledger_hold_filed() {  # <task-id> <repo>
-  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-  [ -e "$config/fleet-ledger" ] || return 0
-  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
-    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$1" "$2" captain '' || true
-}
-
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
@@ -1736,14 +1729,12 @@ command_hold() {
     # tasks-axi add never passes --due. Beads due.required would refuse this
     # create, and captain holds have no due semantics, so waive it for this
     # call only. --kind captain stays metadata; Beads native type is task.
-    if [ -n "$body" ]; then
-      BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" --body "$body" >/dev/null \
-        || fail "could not create task $id"
-    else
-      BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" >/dev/null \
-        || fail "could not create task $id"
-    fi
-    ledger_hold_filed "$id" "$repo"
+    hold_add=(add "$id" "$title" --kind captain --repo "$repo"
+      --objective none --objective-reason "captain hold record: tracks a captain decision, not a work item")
+    [ -z "$body" ] || hold_add+=(--body "$body")
+    BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+      FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$SCRIPT_DIR/fm-tasks-axi.sh" "${hold_add[@]}" >/dev/null \
+      || fail "could not create task $id"
   fi
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly
