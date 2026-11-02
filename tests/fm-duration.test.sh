@@ -696,16 +696,6 @@ if shutil.which('tasks-axi'):
     # Each filing, the recurrence included, gets its objective row.
     review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
     assert [(r[0], r[2]) for r in review] == [(first, 'O7'), (first + '-2', 'O7')], review
-    # A recurrence after default Done retention archived the previous item, still within the 50 newest Done items.
-    subprocess.run(['tasks-axi', 'done', first + '-2', '--note', 'limit repaired again', '--keep', '0'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
-    assert first + '-2' not in (owner / 'data/backlog.md').read_text()
-    assert first + '-2' in (owner / 'data/done-archive.md').read_text()
-    worker('timeout', key, 1400000, '--event-id', 'w6')
-    worker('timeout', key, 1400000, '--event-id', 'w7')
-    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
-    assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2', first + '-3']
-    review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
-    assert (first + '-3', 'O7') == (review[-1][0], review[-1][2]), review
     # A row that cannot be recorded stops the filing: the item is not filed and the ledger does not call it filed.
     sidecar = owner / 'data/backlog-review.tsv'
     saved = sidecar.read_text()
@@ -719,6 +709,28 @@ if shutil.which('tasks-axi'):
     assert not any(r.get('event') == 'filed' and r.get('key') == failing for r in owner_rows)
     sidecar.rmdir()
     sidecar.write_text(saved)
+    # A recurrence after default Done retention archived the previous item, still within the 50 newest Done items.
+    subprocess.run(['tasks-axi', 'done', first + '-2', '--note', 'limit repaired again', '--keep', '0'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
+    assert first + '-2' not in (owner / 'data/backlog.md').read_text()
+    assert first + '-2' in (owner / 'data/done-archive.md').read_text()
+    worker('timeout', key, 1400000, '--event-id', 'w6')
+    worker('timeout', key, 1400000, '--event-id', 'w7')
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2', first + '-3']
+    review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
+    assert (first + '-3', 'O7') == (review[-1][0], review[-1][2]), review
+    # Three fm-timeout neighbours fill the refusal's list, so a hand-filed item for the same work that ranks
+    # fourth is never shown; the refusal goes to the operator and nothing is filed.
+    hidden_key = 'worker.lintfix'
+    hidden_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + hidden_key).encode()).hexdigest()[:16]
+    subprocess.run(['tasks-axi', 'add', 'hand-raise-lintfix', 'Raise the worker lintfix timeout', '--kind', 'ship'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
+    worker('timeout', hidden_key, 1200000, '--event-id', 'x1')
+    result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', hidden_key, '1200000', '--event-id', 'x2'], env=worker_env, cwd=workrepo, capture_output=True, text=True)
+    out = result.stdout + result.stderr
+    assert result.returncode != 0 and 'overlaps' in out and out.count(first) >= 3 and 'hand-raise-lintfix' not in out, (result.returncode, out)
+    assert hidden_task not in (owner / 'data/backlog.md').read_text()
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert not any(r.get('event') == 'filed' and r.get('key') == hidden_key for r in owner_rows)
     # A hand-filed item for the same key is a neighbour the filer cannot judge, so the refusal goes to the operator.
     hand_key = 'worker.handkey'
     hand_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + hand_key).encode()).hexdigest()[:16]
@@ -729,7 +741,7 @@ if shutil.which('tasks-axi'):
     assert hand_task not in (owner / 'data/backlog.md').read_text()
     owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
     assert not any(r.get('event') == 'filed' and r.get('key') == hand_key for r in owner_rows)
-    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item, a hand-filed neighbour goes to the operator, and an unrecorded filing is never called filed')
+    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item, a hand-filed or possibly hidden neighbour goes to the operator, and an unrecorded filing is never called filed')
 
 # Repeated-timeout work goes to the project registered under the repository's name in
 # the owning home's data/projects.md, and to firstmate when there is no such project.

@@ -496,6 +496,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
 
 No flag or environment variable waives these checks.
 A hold created by `bin/fm-captain-hold.sh hold` files through `bin/fm-tasks-axi.sh add` with `--objective none --objective-reason "captain hold record: tracks a captain decision, not a work item"`, so its objective row is recorded and the duplicate check applies; a duplicate refusal stops the hold and prints the neighbours.
+The refused hold then says not to use the printed `--dup-of` command, which would append the captain call to a work item, file nothing, and record no hold; to file it anyway, run the printed `--not-dup` command naming the neighbour you checked, then run the same hold command again.
+This applies to the teardown recovery commands, whose `Land or drop the bundle-preserved commits of <id>` titles overlap one another, and to calls filed through the `bin/fm-decision-hold.sh` shim.
 
 ### Which backlog receives a transition
 

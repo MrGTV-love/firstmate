@@ -779,8 +779,6 @@ ledger_hold_closed() {  # <task-id> [<retained-done-arg>...]
   return 0
 }
 
-# The same ledger's task.filed record for a captain-hold item this command just
-# created; tasks-axi stores no priority for it.
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
@@ -1732,9 +1730,16 @@ command_hold() {
     hold_add=(add "$id" "$title" --kind captain --repo "$repo"
       --objective none --objective-reason "captain hold record: tracks a captain decision, not a work item")
     [ -z "$body" ] || hold_add+=(--body "$body")
-    BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-      FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$SCRIPT_DIR/fm-tasks-axi.sh" "${hold_add[@]}" >/dev/null \
-      || fail "could not create task $id"
+    add_err=$(BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+      FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$SCRIPT_DIR/fm-tasks-axi.sh" "${hold_add[@]}" 2>&1 >/dev/null) || {
+      [ -z "$add_err" ] || printf '%s\n' "$add_err" >&2
+      case "$add_err" in
+        *"this title overlaps open or recently closed items"*)
+          printf 'fm-captain-hold: the duplicate check refused task %s, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, then run this same hold command again.\n' "$id" >&2
+          ;;
+      esac
+      fail "could not create task $id"
+    }
   fi
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly

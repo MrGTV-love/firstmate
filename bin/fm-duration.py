@@ -547,11 +547,12 @@ def own_timeout(key, milliseconds, event_id=None):
         # This title carries the command key, so the recurrence names the item it follows
         # as judged different, and another fm-timeout- item is a different key's work. Any
         # other neighbour may be the same work filed by hand, so that refusal goes to the
-        # operator and nothing is filed.
+        # operator and nothing is filed. The refusal lists at most three neighbours, so a
+        # list of three may hide a lower-ranked one, and that refusal goes to the operator too.
         if result.returncode == 2 and '--not-dup' in result.stderr:
             listed = re.findall(r'^  (\S+) \(', result.stderr, re.M)
             judged = None
-            if listed and all(n == previous or n.startswith('fm-timeout-') for n in listed):
+            if listed and len(listed) < 3 and all(n == previous or n.startswith('fm-timeout-') for n in listed):
                 judged = previous if previous in listed else listed[0]
             if judged:
                 result = subprocess.run(add + ['--not-dup', judged], capture_output=True, text=True, env=env)
