@@ -40,7 +40,9 @@
 # Output. One `close-at-merge:` line per closed item on stdout, one line per item left
 # open (`close-at-merge: not closed <id>: <reason>`: on stdout only when the merged pull
 # request's own task still has its live record, which its teardown closes; on stderr
-# behind `actionable:` for every other item), and a summary line.
+# behind `actionable:` for every other item), and a summary line. A closed item's cleared
+# blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge it could not
+# clear is an `actionable: close-at-merge:` line on stderr.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
 # left open; exit 1 when a body cannot be read (the line names the pull request URL and
 # the read error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
@@ -161,7 +163,8 @@ consider() {  # <id> <proof-url> <where it was named>
   if [ "$rc" -eq 0 ]; then
     CLOSED=$((CLOSED + 1))
     printf 'close-at-merge: closed %s with %s (named by %s)\n' "$id" "$proof" "$source"
-    printf '%s\n' "$out" | sed -n -E 's/^(unblocked|actionable): /close-at-merge: \1: /p'
+    printf '%s\n' "$out" | sed -n 's/^unblocked: /close-at-merge: unblocked: /p'
+    printf '%s\n' "$out" | sed -n 's/^actionable: /actionable: close-at-merge: /p' >&2
     return 0
   fi
   first=$(printf '%s\n' "$out" | sed -n '1p')

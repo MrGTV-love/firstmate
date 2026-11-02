@@ -438,7 +438,11 @@ case "${ARGS[0]:-}:${ARGS[1]:-}" in
     pf_id=${ARGS[2]:-}
     tasks-axi "${ARGS[@]}"
     pf_status=$?
-    if [ "$pf_status" -eq 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    pf_help=0
+    for pf_arg in "${ARGS[@]}"; do
+      case "$pf_arg" in -h|--help) pf_help=1 ;; esac
+    done
+    if [ "$pf_status" -eq 0 ] && [ "$pf_help" = 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]; then
       if fm_backlog_row_probe "$DATA" "$pf_id"; then
         [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] || fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
       elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then

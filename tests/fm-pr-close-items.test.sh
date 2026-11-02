@@ -617,6 +617,46 @@ SH
   pass "a typed completion clears the edge when the row is archived at once and reports a failed read back"
 }
 
+test_a_typed_completion_help_call_reports_nothing_to_act_on() {
+  local case_dir subcommand
+  case_dir=$(make_case c4-pf-help)
+  for subcommand in waive record-delivery; do
+    FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" public-followup "$subcommand" --help \
+      >/dev/null 2>"$case_dir/err-$subcommand" || fail "c4-pf-help: $subcommand --help failed"
+    assert_no_grep 'actionable:' "$case_dir/err-$subcommand" "c4-pf-help: a $subcommand help call asked someone to act"
+  done
+  pass "a help call on a typed completion asks nobody to act"
+}
+
+test_a_merge_reports_each_cleared_edge_and_each_failed_clear_on_its_own_channel() {
+  local case_dir real
+  case_dir=$(gh_case c4-merge-edges 91)
+  cx_add "$case_dir" edge-blocker
+  cx_add "$case_dir" dep-clears
+  cx_add "$case_dir" dep-fails
+  cx "$case_dir" block dep-clears --by edge-blocker >/dev/null
+  cx "$case_dir" block dep-fails --by edge-blocker >/dev/null
+  printf '%s\n' 'Closes: edge-blocker' > "$case_dir/bodies/91"
+  real=$(command -v tasks-axi)
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = unblock ] && [ "\${2:-}" = dep-fails ]; then
+  echo "error: simulated unblock failure" >&2
+  exit 1
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+  gh_merge "$case_dir" 91
+  [ "$(cx_state "$case_dir" edge-blocker)" = "done" ] || fail "c4-merge-edges: the named item was not closed"
+  assert_match '^close-at-merge: unblocked: dep-clears no longer waits on edge-blocker' "$case_dir/stdout" \
+    "c4-merge-edges: the cleared edge was not reported on stdout"
+  assert_match '^actionable: close-at-merge: edge-blocker is done, but dep-fails could not be unblocked' "$case_dir/stderr" \
+    "c4-merge-edges: the failed clear was not an actionable stderr line"
+  assert_no_grep 'dep-fails could not be unblocked' "$case_dir/stdout" "c4-merge-edges: the failed clear reached stdout"
+  pass "a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr"
+}
+
 test_an_answered_captain_call_clears_the_edge() {
   local case_dir home
   case_dir=$(make_case c4-captain)
@@ -691,6 +731,8 @@ test_the_closes_parser_reads_real_ids_and_ignores_examples
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge
 test_a_typed_completion_that_archives_or_cannot_be_read_back
+test_a_typed_completion_help_call_reports_nothing_to_act_on
+test_a_merge_reports_each_cleared_edge_and_each_failed_clear_on_its_own_channel
 test_an_answered_captain_call_clears_the_edge
 test_a_withdrawn_captain_call_clears_the_edge
 test_an_explicit_data_root_gets_the_same_clear
