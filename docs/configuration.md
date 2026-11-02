@@ -701,6 +701,7 @@ Supported secondmate propagation writes or removes the inherited copy as describ
 A malformed, unreadable, or symlinked file - including one with a second directive anywhere - resolves to user/operator; the role fails closed rather than guessing.
 
 Authority is also available for one task at a time: `--upstream-consent <host>/<owner>/<repo>` on `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh` records the captain's explicit approval in the task's delivery contract and metadata without changing the home's role.
+That consent authorizes a contribution (a push and a pull request), not a landing; the repository's maintainer lands it, and `bin/fm-pr-merge.sh` refuses a firstmate landing outside the primary home with that maintainer grant.
 Role is never inferred from GitHub identity, forge permissions, remotes, repository ownership, authentication state, environment, or CI.
 `bin/fm-role.sh report` prints the resolved role with no network call, and the session-start digest shows it in the HOME ROLE subsection.
 
@@ -1938,7 +1939,7 @@ A missing or mismatched snapshot, a replaced plan at the same path, a different 
 The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
 This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
-A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
+Independent review reads that list as the task's stated boundary.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
 
 ## Home brief include (config/brief-include.md)
@@ -2590,7 +2591,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, [Jev guard](#jev-guard), [belay Stop-hook](#jev-belay-stop-hook), or [shadow model picker](#shadow-model-picker-fm_model_picker_shadow) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, [Jev guard](#jev-guard), or [shadow model picker](#shadow-model-picker-fm_model_picker_shadow) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
 Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
@@ -2608,7 +2609,7 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
-The following marked-region rules apply to dispatch resolution and to worker skill selection, which share `fm_typesafe_brief_task` in `bin/fm-typesafe-lib.sh`; belay neither removes nor validates these markers.
+The following marked-region rules apply to dispatch resolution and to worker skill selection, which share `fm_typesafe_brief_task` in `bin/fm-typesafe-lib.sh`.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -2633,7 +2634,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; the shadow model picker checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2797,7 +2798,7 @@ This section is the single owner of the alert contract; the script header owns i
 | Timeout, no connection, or any other HTTP code | unreachable | Internal until the threshold below |
 
 - Each alert is one `check: typesafe-health:` wake.
-  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook.
+  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), and the Level 6 jev-guard.
   Firstmate sends the captain one plain message from it; no other action follows.
 - `state/.typesafe-health` records the alerted class, so the same failure raises no second wake, whether a probe or a consumer sees it again, until a 200 arrives.
   A different class the captain has not heard of, such as auth after credits, alerts once more.
@@ -3206,33 +3207,12 @@ An active durable-record failure requires review with `AuditUnavailableError`; i
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, controlled decision fixtures and deployed acceptance.
 
-## Jev belay Stop hook
+## Claude worker Stop hook
 
-Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
-`bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
-Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; every other exit, including nonblocking failure or timeout, clears busy and publishes completion.
-Secondmate sessions and other harnesses do not run it.
-
-The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
-The wrapper therefore resolves the key at call time through the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and sets it for the one upstream `node` process.
-The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
-Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
-Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
-The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's Stop deadline.
-The Stop host envelope uses `fm-duration.py limit` with a 25-second fallback and the same raise-only calibrated p99 x 3 policy.
-
-The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
-Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
-The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
-A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
-Each policy check uses the shared three-second process-group deadline and a five-second synchronous-child ceiling, allowing shell startup and cleanup headroom while bounding stalled policy work and its descendants.
-The shared Perl watchdog also reaps the checker group if that ceiling kills its owning shell during startup or cleanup; if Perl is unavailable, the request is withheld rather than checked without this ownership guarantee.
-
-`belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
-Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
-The wrapper runs the file only when its git blob id matches the pin in `bin/fm-jev-belay-hook.sh`, so a changed file never receives the key.
-A missing clone, key, or `node`, or a pin mismatch, makes the hook exit 0 silently and never delays a stop.
-To move to a newer upstream version, review it, update the pinned commit in this section and the blob id in the wrapper together, and refresh the clone.
+Firstmate-launched Claude ship and scout workers use Stop only to publish the turn-ended notification and close the semantic busy state.
+Completion evidence belongs to task review and DoD grading, not a model judgment at the end of each turn.
+Secondmates retain their [primary supervision guard](turnend-guard.md); other harnesses retain their existing lifecycle adapters.
+The retirement regressions are [`tests/fm-retired-jev-belay-stop.test.sh`](../tests/fm-retired-jev-belay-stop.test.sh) and the Claude lifecycle cases in [`tests/fm-busy-adapter-wiring.test.sh`](../tests/fm-busy-adapter-wiring.test.sh).
 
 ## Worker skill selection
 
@@ -4661,11 +4641,11 @@ FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion f
 FMX_FOLLOWUP_MAX_COUNT=3   # local cap on Relay completion follow-ups per linked mention
 FM_PF_RETRY_BACKOFF_SECS=900   # seconds before the next attempt after a retryable promised-public-reply delivery error
 FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs, including zombies, have no age grace
-FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
+FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; both guards share one strict liveness verdict (docs/turnend-guard.md)
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
-FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
+FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # --claude guard re-blocks per failure episode before the loud attended fail-open
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows

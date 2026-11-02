@@ -44,6 +44,21 @@ jobs:
         with:
           # New time-limit literals compare against the default-branch merge-base.
           fetch-depth: 0
+      - name: Record tested merge tree
+        id: tested-tree
+        if: github.event_name == 'pull_request' && matrix.partition == 1
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          base=$(git rev-parse 'HEAD^1')
+          printf 'tree=%s\nbase=%s\n' "$tree" "$base" >> "$GITHUB_OUTPUT"
+          printf '%s %s\n' "$tree" "$base" > "$RUNNER_TEMP/fm-tested-tree"
+      - name: Upload tested merge tree
+        if: github.event_name == 'pull_request' && matrix.partition == 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: fm-tested-tree-${{ steps.tested-tree.outputs.tree }}-base-${{ steps.tested-tree.outputs.base }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fm-tested-tree
+          if-no-files-found: error
       - name: Install pinned ShellCheck
         run: |
           set -eu

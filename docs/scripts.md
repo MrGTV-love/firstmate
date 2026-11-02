@@ -41,8 +41,6 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
 | [`fm-typesafe-health.sh`](../bin/fm-typesafe-health.sh) | Probe and record the TypeSafe account's health and alert the captain once on credit or key failure ([operator contract](configuration.md#typesafe-account-health)) |
-| [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
-| [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
 | [`fm-jev-guard-hook.sh`](../bin/fm-jev-guard-hook.sh) | Run the ten-levels jev-guard as a Claude worker tool hook ([operator contract](configuration.md#jev-guard)) |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
 | [`fm-model-freshness.sh`](../bin/fm-model-freshness.sh) | Report a dispatch or requested model that a newer model of its family has passed in its harness's catalog ([operator contract](configuration.md#model-freshness)) |
@@ -179,7 +177,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-contributions.sh`    | Observe owned publications, retain exact-head judgments, measure required actors, and wake on maintainer signals |
 | `fm-pr-check.sh`         | Record validated task `pr=` and `pr_head=` values, then atomically arm a static merge poll; refuses GitHub drafts and persistent secondmate records (see [architecture.md](architecture.md)) |
 | `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a full ci log reading skipped for that pass as unknown when it goes silent, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
-| `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions for GitHub, GitLab, or Forgejo, refuse Gerrit submission, refuse a GitHub head that lacks the base branch's live tip unless the merge enters that branch's merge queue with at least one required check, then refuse an outcome it cannot prove landed or queued |
+| `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions, verify the tested landing tree or conservative ancestry fallback on GitHub, and refuse an outcome it cannot prove landed or queued |
+| `fm-tested-tree.py`      | The tested-landing-tree verifier behind `fm-pr-merge.sh`; its header owns the exit contract |
 | `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |

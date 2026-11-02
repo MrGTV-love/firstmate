@@ -134,6 +134,11 @@ make_case() {
   git -C "$dir/wt" init -q
   git -C "$dir/wt" commit -q --allow-empty -m init
   git -C "$dir/wt" update-ref refs/remotes/origin/main "$(git -C "$dir/wt" rev-parse HEAD)"
+  # The code root has its own history, so the task copy is provably unrelated to
+  # Firstmate. The distinct message keeps the two root commits different when
+  # both are made within one second.
+  git -C "$fake_root" init -q
+  git -C "$fake_root" commit -q --allow-empty -m "code root"
   fm_fake_ship_review_history "$fakebin"
   cat > "$fake_root/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash

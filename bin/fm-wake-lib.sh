@@ -331,16 +331,16 @@ fm_watcher_healthy() {
 # arm layer (bin/fm-watch-arm.sh, bin/fm-claude-stop-autoarm.sh) needs exactly
 # that - it decides whether to start, attach to, or replace a real watcher
 # process, so a leftover beacon must never satisfy it. bin/fm-turnend-guard.sh
-# also keeps this strict check because it fires at the turn boundary where the
-# auto-arm brings a fresh watcher up. docs/turnend-guard.md "Pull-warning verdict
-# by supervision model" owns the different, model-aware question used by the
-# mid-turn pull warning (bin/fm-guard.sh).
+# and the mid-turn pull warning (bin/fm-guard.sh) also keep this strict check
+# through fm_supervision_liveness in bin/fm-supervision-liveness-lib.sh; the
+# model-aware fm_watcher_supervision_verdict below serves only inbox readiness
+# and the watchdog.
 
 # fm_supervision_model
 # Print the supervision model of this home's PRIMARY harness:
 #   autoarm     Claude's Stop-hook auto-arm and Cursor's stop-hook park.
 #               docs/watcher-continuity.md owns Claude handling succession;
-#               docs/turnend-guard.md owns model-aware pull-warning health.
+#               docs/turnend-guard.md owns the model-aware verdict's limits.
 #   extension   Pi (and pi-signed): .pi/extensions/fm-primary-pi-watch.ts owns
 #               continuity. It tears the watcher down on every actionable wake and
 #               spawns the replacement itself, so a genuinely unheld singleton lock
@@ -518,8 +518,8 @@ fm_afk_mode() {
 }
 
 # fm_watcher_supervision_verdict <state> <watch-path> [grace] [home] [root]
-# Model-aware "is supervision healthy right now" verdict for the pull warning
-# guard (bin/fm-guard.sh), NOT the arm layer or the turn-end guard. Sets:
+# Model-aware health verdict for inbox consumer readiness and the watchdog,
+# NOT the warning, arm layer or turn-end guard. Sets:
 #   FM_WATCHER_VERDICT_OK      true when supervision is healthy for this model
 #   FM_WATCHER_VERDICT_REASON  when not ok, the true failing condition:
 #                              no-watcher   - a live watcher process is the real
@@ -527,8 +527,8 @@ fm_afk_mode() {
 #                                             the lock (the beacon is still fresh)
 #                              stale-beacon - the beacon is stale beyond grace or
 #                                             absent (a genuine supervision lapse)
-# autoarm: docs/turnend-guard.md "Pull-warning verdict by supervision model"
-# owns fresh-beacon tolerance and the proof required for a stale mid-turn gap.
+# autoarm: accept a fresh beacon or the generation-bound mid-turn proof in
+# fm_autoarm_midturn_healthy; the warning and turn-end guards stay PID-strict.
 # extension: a live identity-matched watcher is the ordinary healthy state, but a
 # genuinely unheld lock is also healthy while the beacon is fresh AND a live Pi
 # session provably owns continuity (fm_extension_owns_supervision: the Pi or the
@@ -2384,8 +2384,9 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 }
 
 # True when a stale mid-turn beacon is explained by a healthy Claude Stop
-# auto-arm generation, so the pull guard must not cry supervision-off.
-# docs/turnend-guard.md owns the model-aware pull-warning contract.
+# auto-arm generation, so the model-aware consumers (inbox readiness and the
+# watchdog) must not report supervision off. The pull warning and turn-end guard
+# never use it; docs/turnend-guard.md owns that split.
 #
 # Healthy means outcome=rewake with no exhausted-failure marker, bound to the
 # current session-lock pid and current watcher recovery generation. The rewake
@@ -2395,8 +2396,8 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 # A missing generation, a failed or exhausted episode, an open arming claim, a
 # changed or dead session lock, a moved recovery generation, or an absent/later
 # beacon all fail it, so a genuine lapse stays loud. Cursor autoarm homes have no
-# Claude epoch ledger and fail this, keeping their existing fresh-beacon-only
-# pull-guard contract. The rewake and beacon may both be older than grace: a
+# Claude epoch ledger and fail this, keeping their fresh-beacon-only
+# model-aware verdict. The rewake and beacon may both be older than grace: a
 # legitimate handling turn can outrun grace, which is the false alarm this
 # exists to stop.
 fm_autoarm_midturn_healthy() {  # <state-dir> [grace]

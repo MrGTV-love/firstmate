@@ -317,6 +317,27 @@ case "${1:-} ${2:-}" in
     exit 0
     ;;
   api\ *)
+    api_slurp=false
+    case " $* " in *' --slurp '*) api_slurp=true ;; esac
+    emit_json() {
+      if [ "$api_slurp" = true ]; then jq -s . "$1"; else cat "$1"; fi
+    }
+    # Tested-tree evidence is scoped to the exact Actions run and attempt. A
+    # case can answer one job or run by id (job-<id>.json, run-<id>.json,
+    # artifacts-<run>.json); every other id gets the shared file.
+    emit_scoped() {  # <shared-name> <id>
+      local dir scoped
+      dir=$(dirname "$FM_TEST_GH_HEAD")
+      scoped="$dir/${1%.json}-$2.json"
+      [ -f "$scoped" ] || scoped="$dir/$1"
+      emit_json "$scoped"
+    }
+    scoped_id=$(printf '%s\n' "$*" | sed -nE 's#.*/actions/(runs|jobs)/([0-9]+).*#\2#p')
+    case " $* " in
+      *"/actions/runs/"*"/artifacts"*) emit_scoped artifacts.json "$scoped_id"; exit $? ;;
+      *"/actions/jobs/"*) emit_scoped job.json "$scoped_id"; exit $? ;;
+      *"/actions/runs/"*"/attempts/"*) emit_scoped run.json "$scoped_id"; exit $? ;;
+    esac
     # The required-check reads: the branch itself, and its rules read without
     # the merge-queue filter the queue reader below applies.
     case " $* " in
@@ -347,11 +368,11 @@ case "${1:-} ${2:-}" in
           calls=$(( $(cat "$FM_TEST_GH_RUNS_CALLS" 2>/dev/null || echo 0) + 1 ))
           printf '%s\n' "$calls" > "$FM_TEST_GH_RUNS_CALLS"
           if [ "$calls" -eq 1 ]; then
-            cat "$FM_TEST_GH_RUNS_FIRST"
-            exit 0
+            emit_json "$FM_TEST_GH_RUNS_FIRST"
+            exit $?
           fi
         fi
-        cat "$FM_TEST_GH_RUNS"
+        emit_json "$FM_TEST_GH_RUNS"
         exit $?
         ;;
       *" repos/"*"/rules/branches/"*merge_queue*) ;;
@@ -780,7 +801,7 @@ record_review() {
   done
   printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
-  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
+  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
     "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
@@ -801,9 +822,9 @@ run_pr_merge() {
       record_review "$case_dir" "$2" "$head" >/dev/null 2>&1 || true
     fi
   fi
-  FM_ROOT_OVERRIDE="$ROOT" \
+  FM_ROOT_OVERRIDE="${FM_TEST_CODE_ROOT:-$ROOT}" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  FM_STATE_OVERRIDE="${FM_TEST_STATE:-$case_dir/state}" \
   FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
   FM_TEST_GH_LOG="$case_dir/gh.log" \
   FM_TEST_GH_OUTCOME="$case_dir/github-outcome" \

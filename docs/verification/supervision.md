@@ -474,7 +474,7 @@ ok - cursor primary: an away-mode escalation is delivered, confirmed, and proces
 ```
 
 The live run proved that session start acquires the fleet lock through Cursor's structural process identity in `bin/fm-cursor-lib.sh`; `tests/fm-session-lock-ancestry.test.sh` pins the same ancestry path portably.
-It also proved that Cursor's `autoarm` supervision model lets the mid-turn pull guard accept a fresh beacon after the between-turn watcher closes; `tests/fm-guard-stale-banner.test.sh` pins that model-aware verdict.
+That run predates the unified strict liveness predicate; current mid-turn warning semantics are owned by [the turn-end guard contract](../turnend-guard.md#pull-warning-verdict-by-supervision-model) and exercised by `tests/fm-guard-stale-banner.test.sh`.
 The baton is claimed only by the next `stop`, so an actionable close before that claim can still produce one real follow-up from the sole existing park; durable wake handling is idempotent, and any older park still running after the claim stands down.
 The step is now registered for the dialog mirror, but still does not invalidate the park baton; [turnend-guard.md](../turnend-guard.md) owns the remaining pre-claim window and deferred fix.
 
@@ -580,57 +580,7 @@ fm-doc-audience-check: ok surfaces=61 local_links=174
 FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=102585
 ```
 
-The fresh-beacon portion of the model-aware pull-guard predicate (`bin/fm-guard.sh` accepts a beacon within grace without a live watcher under the Claude Stop auto-arm model) was verified on 2026-08-04 with the installed ShellCheck 0.11.0 and the same isolated behavior suites.
-
-```sh
-bin/fm-lint.sh
-bin/fm-doc-audience-check.sh
-bin/fm-test-run.sh tests/fm-claude-stop-autoarm.test.sh tests/fm-guard-stale-banner.test.sh tests/fm-turnend-guard.test.sh tests/fm-supervision-instructions.test.sh
-```
-
-Observed output:
-
-```text
-fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
-fm-doc-audience-check: ok surfaces=64 local_links=188
-FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=80078
-```
-
-The Pi extension-model pull-guard correction (`bin/fm-guard.sh` no longer reports a false watcher-down on a Pi primary during the extension's own watcher hand-off) was verified on 2026-08-13 with the installed ShellCheck 0.11.0 and isolated behavior suites.
-The guard verdict itself reads only state files and process liveness, so the portable suites are the enforcing evidence; `bin/fm-harness.sh`'s Pi marker detection, which selects the model, is exercised in the same suite through `PI_CODING_AGENT`.
-
-```sh
-bin/fm-lint.sh
-bin/fm-doc-audience-check.sh
-bin/fm-test-run.sh tests/fm-guard-stale-banner.test.sh tests/fm-turnend-guard.test.sh tests/fm-session-start.test.sh tests/fm-pi-watch-extension.test.sh tests/fm-watch-arm.test.sh
-```
-
-Observed output:
-
-```text
-fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
-fm-doc-audience-check: ok surfaces=67 local_links=243
-FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=280160
-```
-
-The same correction was verified against a live Pi primary's own supervision evidence on 2026-08-13.
-The hand-off was captured live at beacon age 63s, then the home's `state/.lock`, `state/.last-watcher-beat`, both `state/.pi-*-extension-loaded` markers, and both `.pi/extensions/*.ts` builds were copied into an isolated fixture with no watcher lock.
-The fixture's copied beacon was fresh at 0s in the output below; the deterministic stale-beacon case separately verifies the grace boundary.
-
-```sh
-FM_SUPERVISION_MODEL=persistent FM_GUARD_READ_ONLY=1 bin/fm-guard.sh
-FM_SUPERVISION_MODEL=extension FM_GUARD_READ_ONLY=1 bin/fm-guard.sh
-```
-
-Observed output, before and after the model correction, then with the recorded Pi session pid replaced by a dead one:
-
-```text
-●  WATCHER DOWN - SUPERVISION IS OFF
-●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
-(silent)
-●  WATCHER DOWN - SUPERVISION IS OFF
-●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
-```
+`bin/fm-guard.sh` no longer has a model-aware fresh-beacon or Pi hand-off tolerance; [the turn-end guard contract](../turnend-guard.md#pull-warning-verdict-by-supervision-model) owns its current strict verdict and `tests/fm-guard-stale-banner.test.sh` enforces it.
 
 The broader relevant regression pass was rerun on 2026-08-02 without live-home or daemon mutation.
 

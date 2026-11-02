@@ -277,6 +277,10 @@ site_ids() {  # <root> -> the S1 site ids a report-mode run prints
   "$LINT" --root "$1" --mode report 2>&1 | awk '$1 == "VIOLATION" && $2 == "S1" {sub(/:$/, "", $3); print $3}'
 }
 
+site_owners() {  # <root> -> "<line> <entry>" for every site the scan discovers
+  python3 "$ROOT/bin/fm-guard-sites.py" --root "$1" | jq -r '.sites[] | "\(.line) \(.entry)"'
+}
+
 assert_mapped() {  # <label> <root> <mapped-count>: clean, and the scan counts that many mapped sites
   local label=$1 dir=$2 want=$3 out
   out=$(run_lint "$dir" --counts) || fail "$label: expected clean exit, got: $out"
@@ -405,6 +409,146 @@ SIG=$(fixture sig_oneline_event)
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"
 assert_site "S1 finds a guard event deny inside a one-line function definition" "$SIG" 'E'
 
+SIG=$(fixture sig_python_event)
+cat >"$SIG/bin/a.py" <<'PY'
+import os
+import subprocess
+EVENT_WRITER = os.path.join('/synthetic', 'fm-guard-event.sh')
+
+def record(guard, decision):
+    subprocess.run([EVENT_WRITER, guard, decision])
+
+record('credential-fixture', 'deny' if blocked else 'allow')
+record('allowed-fixture', 'allow')
+record('allowed-branches', 'allow' if blocked else 'allow')
+record(guard='keyword-fixture', decision='deny')
+subprocess.run([
+    EVENT_WRITER, 'direct-fixture', 'deny',
+])
+subprocess.run([EVENT_WRITER, 'allowed-direct', 'allow'])
+subprocess.run(['other-command', 'not-an-event', 'deny'])
+# record('comment', 'deny')
+example = "record('string', 'deny')"
+
+def emit():
+    record('function-fixture', 'deny')
+
+def ordinary(record):
+    record('parameter-data', 'deny')
+    def nested():
+        record('closure-data', 'deny')
+    return nested
+
+def locally_bound():
+    record = lambda *args: None
+    record('local-data', 'deny')
+
+def locally_imported():
+    from unrelated import record
+    record('imported-data', 'deny')
+
+shadowed_lambda = lambda record: record('lambda-data', 'deny')
+shadowed_comprehension = [record('comprehension-data', 'deny') for record in callbacks]
+
+def comprehensions(denied):
+    [record(guard, 'deny') for guard in denied]
+    {record(guard, 'deny') for guard in denied}
+    {guard: record(guard, 'deny') for guard in denied}
+    list(record(guard, 'deny') for guard in denied)
+    [guard for record in record('iterable-fixture', 'deny') for guard in record]
+
+def shadowed_comprehensions(callbacks):
+    [record('list-data', 'deny') for record in callbacks]
+    {record('set-data', 'deny') for record in callbacks}
+    {record: record('dict-data', 'deny') for record in callbacks}
+    list(record('generator-data', 'deny') for record in callbacks)
+    [record('nested-data', 'deny') for group in callbacks for record in group]
+
+def same_line(denied, other):
+    a, b = [record(item, 'deny') for item in denied], [x for x in other]
+    c = list(record(item, 'deny') for item in denied), list(x for x in other)
+    d = (lambda: record('lambda-fixture', 'deny')), (lambda: 0)
+
+def same_line_shadowed(denied, other):
+    a, b = [record('list-pair-data', 'deny') for record in denied], [x for x in other]
+    c = list(record('generator-pair-data', 'deny') for record in denied), list(x for x in other)
+    d = (lambda record: record('lambda-pair-data', 'deny')), (lambda: 0)
+    e = (lambda: (record := print) and record('walrus-pair-data', 'deny')), (lambda: 0)
+
+def sibling_comprehension(denied, other):
+    i = [x for record in other], [record('sibling-fixture', 'deny') for x in denied]
+    names = [x for record in other]
+    calls = [record('sibling-line-fixture', 'deny') for x in denied]
+
+def sibling_shadowed(denied, other):
+    record = None
+    names = [x for record in other]
+    calls = [record('sibling-data', 'deny') for x in denied]
+
+def defaulted(guard=record('default-fixture', 'deny')):
+    return guard
+
+class Holder:
+    record = None
+    calls = [record('class-fixture', 'deny') for guard in 'x']
+PY
+assert_site "S1 finds the Python conditional credential event decision" "$SIG" 'E'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 16 ] \
+  || fail "only conditional, keyword, direct and unshadowed function and comprehension deny calls may be sites: $(site_ids "$SIG")"
+mutate "$SIG" '.guards[0].sites = [
+  {"file":"bin/a.py","match":"record('\''credential-fixture'\''"},
+  {"file":"bin/a.py","match":"record(guard="},
+  {"file":"bin/a.py","match":"subprocess.run(["},
+  {"file":"bin/a.py","match":"record('\''function-fixture'\''"},
+  {"file":"bin/a.py","match":"record(guard, '\''deny'\'')","count":4},
+  {"file":"bin/a.py","match":"record('\''iterable-fixture'\''"},
+  {"file":"bin/a.py","match":"record(item, ","count":2},
+  {"file":"bin/a.py","match":"record('\''lambda-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''sibling-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''sibling-line-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''default-fixture'\''"},
+  {"file":"bin/a.py","match":"record('\''class-fixture'\''"}]'
+assert_mapped "Python event sites exclude allow calls and same-module lexical shadowing" "$SIG" 16
+
+SIG=$(fixture sig_python_nested_lambda_binding)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['fm-guard-event.sh', guard, decision])
+
+def emit():
+    f = lambda: (record('nested-fixture', 'deny'), (lambda: (record := None))); f()
+PY
+assert_site "S1 finds an outer wrapper deny beside a same-line nested lambda binding" "$SIG" 'E'
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/a.py","match":"record('\''nested-fixture'\''"}]'
+assert_mapped "a nested lambda binding cannot hide the outer wrapper refusal" "$SIG" 1
+
+SIG=$(fixture sig_python_nested_lambda_outer_shadow)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['fm-guard-event.sh', guard, decision])
+
+def ordinary():
+    f = lambda record: (record('shadowed-data', 'deny'), (lambda: (record := None))); f(lambda *args: None)
+PY
+[ -z "$(site_ids "$SIG")" ] || fail "a genuine outer lambda parameter must still shadow the wrapper"
+assert_clean "a genuine outer shadow stays excluded beside a same-line nested binding" "$SIG"
+
+SIG=$(fixture sig_python_unbound_record)
+cat >"$SIG/bin/a.py" <<'PY'
+import subprocess
+
+def record(guard, decision):
+    subprocess.run(['unrelated-program', guard, decision])
+
+record('ordinary-data', 'deny')
+PY
+[ -z "$(site_ids "$SIG")" ] || fail "an unrelated record function must not become a guard event"
+pass "an arbitrary Python record function is not a guard event"
+
 SIG=$(fixture sig_python_helper)
 printf 'def refuse(reason):\n    raise SystemExit(reason)\n\nrefuse("no task named")\n' >"$SIG/bin/a.py"
 assert_site "S1 finds a call to a Python refuse helper" "$SIG" 'C'
@@ -502,6 +646,73 @@ mutate "$TWICE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"contested re
   | .guards += [(.guards[0] | .id = "gother" | .invariant = "another invariant" | .owner = "bin/gother.sh" | .test = "tests/gother.test.sh")]'
 : >"$TWICE/bin/gother.sh"; : >"$TWICE/tests/gother.test.sh"
 assert_fails_with "S2 fails a site that two entries map" "$TWICE" S2
+
+KEYED=$(fixture site_keyed)
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+KEY=$(site_ids "$KEYED" | sed 's/~[0-9]*$//' | sort -u)
+mutate "$KEYED" ".guards[0].sites = [{\"file\":\"bin/a.sh\",\"match\":\"REFUSED: repeated line\",\"key\":\"$KEY\",\"within\":\"\$first\"}]
+  | .guards += [(.guards[0] | .id = \"gother\" | .invariant = \"another invariant\" | .sites[0].within = \"\$second\")]
+  | .beyond_audit_active = [\"gother\"]"
+assert_mapped "a block context distinguishes identical lines enforcing different invariants" "$KEYED" 2
+[ "$(site_owners "$KEYED")" = "$(printf '2 gguard\n5 gother')" ] \
+  || fail "each identical line must map to the guard its block names: $(site_owners "$KEYED")"
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+assert_mapped "moving identical refusal blocks keeps every site mapped" "$KEYED" 2
+[ "$(site_owners "$KEYED")" = "$(printf '2 gother\n5 gguard')" ] \
+  || fail "a moved identical line must keep its owner: $(site_owners "$KEYED")"
+{ cat <<'SH'
+if [ -n "$third" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+  cat "$KEYED/bin/a.sh"; } >"$KEYED/a.tmp"
+mv "$KEYED/a.tmp" "$KEYED/bin/a.sh"
+assert_fails_with "a new identical refusal in another block is S1" "$KEYED" S1
+[ "$(site_owners "$KEYED")" = "$(printf '2 null\n5 gother\n8 gguard')" ] \
+  || fail "a new identical line above mapped ones must stay unmapped while they keep their owners: $(site_owners "$KEYED")"
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+assert_fails_with "a new identical refusal in a mapped block changes its marker count" "$KEYED" S2
+cat >"$KEYED/bin/a.sh" <<'SH'
+if [ -n "$first" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+if [ -n "$second" ]; then
+  echo "REFUSED: repeated line" >&2
+fi
+SH
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$first\""
+assert_fails_with "a block context still cannot give a site two owners" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$second\" | .guards[1].sites[0].match = \"missing text\""
+assert_fails_with "a valid key and context do not bypass marker text" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].match = "REFUSED: repeated line" | .guards[1].sites[0].key = "site:missing"'
+assert_fails_with "a missing site key is stale" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY~2\""
+assert_fails_with "an occurrence-ordered key never selects a site" "$KEYED" S2
+mutate "$KEYED" '.guards[1].sites[0].key = 1'
+assert_fails_with "a non-string site key is invalid" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].key = \"$KEY\" | .guards[1].sites[0].within = 1"
+assert_fails_with "a non-string block context is invalid" "$KEYED" S2
+mutate "$KEYED" ".guards[1].sites[0].within = \"\$second\""
+assert_mapped "the restored block contexts map both identical lines" "$KEYED" 2
 
 # --- computed unregistered count ---------------------------------------------
 TYPED=$(fixture typed_unregistered)

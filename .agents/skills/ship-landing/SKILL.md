@@ -21,6 +21,13 @@ A captain instruction to merge is explicit authority; `yolo` and the standing me
 For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, never sit silent and CPU-idle for `FM_CHECK_TIMEOUT` (the watcher stops such a check and treats that pass as unknown), then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
+For the tested-tree landing rule and its conservative ancestry fallback, see `github_landing_tree_safe` in [`fm-pr-merge.sh`](../../../bin/fm-pr-merge.sh).
+Build train N+1 on train N's head so its CI already tests the predecessor's files; after train N lands, the guard can prove the successor's landing tree is unchanged without another head push.
+Rebuild successors above any failed or changed train rather than landing their stale combination.
+A non-Actions check run (for example Socket Security) can show only its head commit, not a tested landing tree.
+The rule proves a landing tree only from complete, verified records, so any missing, unreadable, or unverifiable record stays on the ancestry fallback, and so does the rebase method.
+Those cases include a rollup with a legacy commit status; a project whose CI uploads no record; an expired artifact; a recorded base that no longer merges with the head or whose merge does not match its recorded tree; a partial re-run ("Re-run failed jobs") that does not re-run Lint partition 1, because CI writes the record only in that job of the attempt that ran it; and bot-authored PRs, because they skip the compliance job, so that check run has no record.
+
 Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority; follow [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s captain-words discard contract.
@@ -32,3 +39,14 @@ Retire one only on an explicit captain or main-firstmate decision, after loading
 ### PR ready, landing, and teardown
 
 Load `ship-landing` when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.
+
+## Firstmate train landing order
+
+Main owns one landing order for this installation's Firstmate publication target, including PRs prepared in repair or secondmate homes.
+Before running trains, record their PR URLs, exact heads, dependencies, and intended landing order in Main's durable task notes.
+Preparation, review, and CI may run for several trains in parallel; only landing is serial.
+Do not insert an unrelated ready PR ahead of an in-flight train without replanning that order and revalidating any affected train.
+Other homes, including a standalone repair clone, hand Main the ready PR; Main spawns a landing-record task in its own home, records the PR's exact-head review with `bin/fm-review-record.py review` and names every source-home author model in `--author-groups`, lands it in order with `bin/fm-pr-merge.sh <landing-task> <pr-url>`, and tears the task down normally.
+`bin/fm-pr-merge.sh` owns the mechanical home-routing and landing-lock rules in its header; a routing refusal is a handoff to Main, not a reason to merge directly at the forge.
+A single ready PR with no train uses the same Main merge path without creating a train.
+The live merge checks, exact-head review, and merge authority remain prerequisites, not consequences of a place in the order.
