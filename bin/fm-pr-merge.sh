@@ -10,6 +10,30 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
+# A PR can be a Firstmate landing when its task copy shares Firstmate's Git
+# history or its repository is any remote of this code root. Such a landing runs
+# only in an unseeded primary Git worktree whose config/firstmate-role records
+# a local maintainer scope for the PR's repository (resolved by fm-role-lib.sh).
+# Remotes identify candidate self-repository landings but never their owner.
+# Unknown task lineage without a matching code-root remote refuses before any
+# merge action; fetch full history with git fetch --unshallow in that task copy
+# before retrying. Only proven-unrelated copies keep the home-local merge path.
+# Other homes refuse before bookkeeping and hand the PR to Main: a landing-record
+# task spawned there lands it under its own task id and is torn down normally,
+# and its review names every source-home author model in --author-groups. The
+# refusal names a home only when that home's own role record proves the grant;
+# otherwise it names the grant to find, never a path or a remote. A remote or
+# unreadable parent uses the parent channel, and an unreadable primary-worktree
+# record names its repair. One-task --upstream-consent authorizes a contribution
+# (push and PR), not a landing; the repository's maintainer lands it.
+# Main's state/.firstmate-landing.lock serializes all such landings from
+# verification through the confirmed outcome and notification. Every other
+# project keeps its existing merge path, with no lock.
+# .agents/skills/ship-landing/SKILL.md owns the train planning procedure.
+# This is installation-local coordination, not a lock against external forge
+# users or independent installations with their own explicit maintainer grants;
+# the live tree and head checks still apply.
+#
 # Every supported forge verifies recorded review evidence inside the away-record
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
@@ -33,17 +57,15 @@
 # Only the final attempt is reported: incomplete sources remain unreadable,
 # never evidence that a required check is missing, and exhausted UNKNOWN alone
 # reports mergeability still pending rather than unmergeable.
-# The head also has to contain the base branch's live tip, so the tree the
-# merge lands is the head's own tree, the one its checks ran on;
-# github_read_base_containment below owns that tree rule, why run timing is
-# never trusted instead, and why no waiver applies. The tip is read again
-# immediately before the forge command and a moved tip refuses, because the
+# github_landing_tree_safe owns the tested landing-tree rule, its conservative
+# ancestry fallback, and the final-read recomputation. No waiver applies.
+# The tip is read again immediately before the forge command, because the
 # head binding below does not extend to the base; a tip that lands in the
 # seconds between that last read and GitHub applying the merge is a residual
-# this script cannot close. Only a merge that enters the base's merge queue,
+# this script cannot close. A merge that enters the base's merge queue,
 # proven live at both reads, into a base whose required set the verify read
-# found complete and non-empty, skips that containment rule and never the check
-# reads, because the queue runs those required checks on the combined tree
+# found complete and non-empty, uses the queue's separate tree proof, never
+# skipping the check reads, because it runs those checks on the combined tree
 # itself; an unreadable queue rule or required set is retried as unreadable at
 # verify, and when verify relied on the queue, a last read that cannot prove
 # the queue again, whether unreadable or not, refuses as unreadable, never
@@ -188,8 +210,9 @@
 # A failed forge command releases the lock after it returns. A successful one
 # retains the lock until the accepted merge authority is persisted against the
 # still-matching task metadata.
-# The green-check and captain-hold decisions each emit one event through
-# bin/fm-guard-event.sh, whose writer always exits 0 and never decides a merge.
+# Each merge rule and the captain-hold decision emit one event per decision
+# through bin/fm-guard-event.sh, whose writer always exits 0 and never decides
+# a merge.
 #
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
@@ -478,6 +501,82 @@ META="$STATE/$ID.meta"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
+# Firstmate's own repository has one landing owner. A PR can be that landing when
+# its task copy shares Firstmate's history or its repository is any remote of this
+# code root. Which remote a home publishes to by default does not decide this: a
+# repair clone defaults to its upstream while its PRs land on its origin.
+# shellcheck source=bin/fm-role-lib.sh
+. "$SCRIPT_DIR/fm-role-lib.sh"
+LANDING_REPO=$(fm_role_scope_norm "$PR_HOST/$PR_PATH")
+firstmate_landing_possible() {  # <task-worktree>
+  local remote url lineage=1
+  if [ -n "$1" ]; then
+    lineage=0
+    fm_role_self_repo "$1" "$FM_ROOT" || lineage=$?
+    [ "$lineage" -ne 0 ] || return 0
+  fi
+  while IFS= read -r remote; do
+    url=$(git -C "$FM_ROOT" remote get-url "$remote" 2>/dev/null) || continue
+    [ "$(fm_role_remote_identity "$url" "$FM_ROOT")" != "$LANDING_REPO" ] || return 0
+  done < <(git -C "$FM_ROOT" remote 2>/dev/null)
+  if [ "$lineage" -eq 2 ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok false --elapsed-ms 0 2>/dev/null
+    printf 'error: refusing merge: task copy %s lineage cannot be determined; fetch full history in that copy: git -C %q fetch --unshallow; then retry this merge\n' "$1" "$1" >&2
+    exit 1
+  fi
+  return 1
+}
+
+# The landing home is an unseeded primary worktree whose local maintainer scope
+# records the PR's publication target. Remotes never select that authority.
+# Every merge gate below still applies; other homes hand the PR to Main.
+firstmate_landing_route() {
+  local landing_home='' landing_root=$FM_ROOT landing_parent=false landing_line caller_home
+  local landing_owner='(unreadable)'
+  if [ -e "$FM_HOME/.fm-secondmate-parent" ] || [ -L "$FM_HOME/.fm-secondmate-parent" ]; then
+    landing_parent=true
+    landing_root=$(fm_firstmate_root_home "$FM_HOME") || landing_root=
+    # A remote parent has no local lockable Main home. Its existing parent
+    # channel carries the handoff; this machine must not become a second owner.
+    if [ -n "$landing_root" ] \
+      && { [ -e "$landing_root/.fm-secondmate-parent" ] || [ -L "$landing_root/.fm-secondmate-parent" ]; }; then
+      landing_root=
+    fi
+  fi
+  if [ -n "$landing_root" ]; then
+    while IFS= read -r landing_line; do
+      case "$landing_line" in
+        'worktree '*) landing_home=${landing_line#worktree }; break ;;
+      esac
+    done < <(git -C "$landing_root" worktree list --porcelain 2>/dev/null)
+  fi
+  if [ -n "$landing_home" ]; then
+    landing_home=$(CDPATH='' cd -- "$landing_home" 2>/dev/null && pwd -P) || landing_home=
+  fi
+  caller_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || caller_home=
+  if [ -n "$landing_home" ]; then
+    fm_role_resolve "$landing_home" "$landing_home/config"
+    if [ "$FM_ROLE" = maintainer ] && [ "$FM_ROLE_SOURCE" = local ] \
+      && [ "$FM_ROLE_SCOPE" = "$LANDING_REPO" ]; then
+      [ "$caller_home" != "$landing_home" ] || return 0
+      landing_owner=$(printf '%q' "$landing_home")
+    else
+      landing_owner="the home whose config/firstmate-role grants maintainer $LANDING_REPO"
+    fi
+  fi
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner deny --source-ok "$([ -n "$landing_home" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+  printf 'error: refusing a firstmate landing outside its Main home, %s; ' "$landing_owner" >&2
+  if [ -z "$landing_home" ] && [ "$landing_parent" = true ]; then
+    printf 'hand the ready PR and review to Main through the existing secondmate parent channel; if that channel cannot resolve Main, repair .fm-secondmate-parent before retrying\n' >&2
+  elif [ -z "$landing_home" ]; then
+    printf 'restore the primary worktree registration, confirm it with git -C %q worktree list --porcelain, then re-run this merge\n' "$FM_ROOT" >&2
+  else
+    printf 'in that home, spawn a landing-record task, record the PR\047s exact-head review with bin/fm-review-record.py review and name every source-home author model in --author-groups, place it in Main\047s train order, merge with bin/fm-pr-merge.sh <landing-task> %q, then tear the task down normally\n' "$URL" >&2
+  fi
+  printf 'one-task --upstream-consent authorizes a contribution (push and PR), not a landing; the repository\047s maintainer lands it\n' >&2
+  exit 1
+}
+
 if [ ! -f "$META" ] || [ -L "$META" ]; then
   echo "error: task metadata is unavailable" >&2
   exit 1
@@ -488,16 +587,29 @@ if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
 fi
 MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
+MERGE_LANDING_LOCK=
+if firstmate_landing_possible "$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)"; then
+  firstmate_landing_route
+  MERGE_LANDING_LOCK="$STATE/.firstmate-landing.lock"
+  "$SCRIPT_DIR/fm-guard-event.sh" merge-single-owner allow --cleared-by route-to-main 2>/dev/null
+fi
+
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
 MERGE_VERIFY_LOG=
+FM_PR_TREE_SCRATCH=
 merge_control_cleanup() {
   [ -z "$MERGE_VERIFY_LOG" ] || rm -f "$MERGE_VERIFY_LOG"
+  [ -z "$FM_PR_TREE_SCRATCH" ] || rm -rf "$FM_PR_TREE_SCRATCH"
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
+  [ -z "$MERGE_LANDING_LOCK" ] || fm_lock_release "$MERGE_LANDING_LOCK" || true
 }
 trap merge_control_cleanup EXIT
+# One Main-wide lock precedes the per-task lock and remains held through the
+# forge outcome read and its durable notification, not just the merge request.
+[ -z "$MERGE_LANDING_LOCK" ] || fm_lock_acquire_wait "$MERGE_LANDING_LOCK"
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
 if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
@@ -575,6 +687,7 @@ require_recorded_review() {
 FM_PR_MERGE_HEAD=
 FM_PR_MERGE_BASE=
 FM_PR_MERGE_BASE_TIP=
+FM_PR_MERGE_TESTED_TREE=
 FM_PR_GITLAB_ASYNC_CONFIGURED=false
 gitlab_verify_mergeable() {
   local json fields line
@@ -1067,21 +1180,9 @@ github_required_checks_missing() {
   ' 2>/dev/null || return 1
 }
 
-# Whether the head contains the base branch's live tip. Every check that ran on
-# the head tested the head's own tree, and a squash or merge of a head that
-# already contains the tip onto that tip lands that same tree, so green head
-# checks then cover the landed tree with no timing evidence at all. A head that
-# lacks the tip lands a tree combined with base commits no check ran beside it.
-# Run timing cannot stand in for this: a GitHub Actions pull_request run tests
-# the merge GitHub built from the base it saw, a re-run keeps that merge (CI run
-# 40719661158 attempt 2), and PR 254 was closed and reopened after its base
-# moved and its new run still tested the old merge. No waiver applies, because
-# there is no verdict to waive: the checks passed, on a different tree.
-# The tip is read from the base branch itself through the compare API, never
-# from the pull request's baseRefOid, which GitHub leaves at the base of the
-# last head push. Sets FM_PR_BASE_TIP (the live tip), FM_PR_BASE_BUILT_ON (the
-# newest base commit the head contains), and FM_PR_BASE_BEHIND (the number of
-# base commits the head lacks). Returns 1 when the comparison cannot be read.
+# Read the live base tip and ancestry fallback from the compare API, not
+# baseRefOid (which can describe the last head push). Run timing cannot prove
+# which merge tree CI tested; github_landing_tree_safe owns that decision.
 FM_PR_BASE_TIP=
 FM_PR_BASE_BUILT_ON=
 FM_PR_BASE_BEHIND=
@@ -1103,6 +1204,36 @@ $fields
 FIELDS
 }
 
+# Landing-tree contract: for merge/squash, complete Actions records must prove
+# the live merge-tree equals every run's checked-out tree. A valid record that
+# proves a different tree refuses even if ancestry holds (including reverts).
+# Missing/unreadable/unverifiable evidence and rebase retain ancestry, never
+# infer safety from disjoint paths or run timing. Verify reads and checks the
+# records once per head; the final read passes offline, so between its tip read
+# and the merge it only recomputes merge-tree locally against those records.
+# The remaining seconds between the final read and GitHub's merge are not atomic.
+FM_PR_TESTED_TREE=
+FM_PR_TREE_RECORDS_ELIGIBLE=false
+github_tree_records_apply() {
+  [ "$FM_PR_TREE_RECORDS_ELIGIBLE" = true ] || return 1
+  case "$FM_PR_GITHUB_CALLER_METHOD" in
+    merge|squash|'') return 0 ;;
+  esac
+  return 1
+}
+github_landing_tree_safe() {
+  local head=$1 tip=$2 mode=${3:-} status=0 worktree
+  FM_PR_TESTED_TREE=
+  if github_tree_records_apply; then
+    worktree=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
+    FM_PR_TESTED_TREE=$(python3 "$SCRIPT_DIR/fm-tested-tree.py" "$PR_OWNER/$PR_REPO" "$head" "$tip" \
+      "$FM_PR_TREE_SCRATCH" "$worktree" ${mode:+"$mode"}) || status=$?
+    [ "$status" -ne 0 ] || return 0
+    [ "$status" -eq 1 ] || return 1
+  fi
+  [ "$FM_PR_BASE_BEHIND" -eq 0 ]
+}
+
 # Pre-merge conditions from a live PR view, complete head rollup, base
 # requirements, and head producers. Sets FM_PR_MERGE_HEAD on success. Returns 3
 # for UNKNOWN alone, or 4 for an unreadable source or missing-check visibility
@@ -1116,7 +1247,9 @@ github_verify_mergeable() {
   local any_pending=false any_failed=false
   local lacks_tip='' queued=false queue_status
   local -a unwaived_red=() unwaived_missing=()
-  FM_PR_GREEN_HEAD_BLOCKED=false
+  FM_PR_CHECKS_BLOCKED=false
+  FM_PR_REQUIRED_BLOCKED=false
+  FM_PR_TREE_BLOCKED=false
 
   if ! json=$(gh pr view "$URL" --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName,baseRefOid 2>/dev/null) \
     || [ -z "$json" ]; then
@@ -1167,6 +1300,11 @@ FIELDS
     || ! red=$(github_checks_not_green "$json"); then
     echo "error: the GitHub pull request check rollup at head $live_head could not be read completely" >&2
     return 4
+  fi
+
+  FM_PR_TREE_RECORDS_ELIGIBLE=false
+  if printf '%s' "$rollup" | jq -e 'length > 0 and all(.[]; .__typename == "CheckRun")' >/dev/null 2>&1; then
+    FM_PR_TREE_RECORDS_ELIGIBLE=true
   fi
 
   # Read the required set before judging individual checks, so each refusal
@@ -1287,9 +1425,8 @@ $missing
 EOF
   fi
 
-  # The head must contain the base branch's live tip, so the landed tree is the
-  # one its checks ran on, unless this merge enters the base's merge queue;
-  # github_read_base_containment and github_merge_enters_queue own the rule.
+  # Verify the tested landing tree or its conservative ancestry fallback;
+  # github_merge_enters_queue owns the existing queue proof.
   queue_status=0
   github_merge_enters_queue "$base" || queue_status=$?
   if [ "$queue_status" -eq 0 ]; then
@@ -1302,10 +1439,19 @@ EOF
     source_unreadable=true
     refusals="$refusals  - whether head $live_head contains the current tip of base branch $base could not be read
 "
-  elif [ "$FM_PR_BASE_BEHIND" -ne 0 ]; then
-    lacks_tip=$FM_PR_BASE_TIP
-    refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind): it was built on $base at $FM_PR_BASE_BUILT_ON, so no check ran on the tree this merge would land
+  elif [ -n "$other_refusals" ] && [ "$source_unreadable" = false ] && github_tree_records_apply; then
+    [ "$FM_PR_BASE_BEHIND" -eq 0 ] \
+      || refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind); whether its tested-tree records cover the tree this merge would land is checked once the refusals above clear
 "
+  elif ! github_landing_tree_safe "$live_head" "$FM_PR_BASE_TIP"; then
+    lacks_tip=$FM_PR_BASE_TIP
+    if [ "$FM_PR_BASE_BEHIND" -eq 0 ]; then
+      refusals="$refusals  - head $live_head contains the current tip, but the landing tree differs from its verified tested-tree records, so no check ran on the tree this merge would land
+"
+    else
+      refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind): it was built on $base at $FM_PR_BASE_BUILT_ON, so no check ran on the tree this merge would land
+"
+    fi
   fi
 
   if [ -n "$mergeable_refusal" ]; then
@@ -1316,17 +1462,20 @@ EOF
   fi
 
   if [ -n "$refusals" ]; then
-    # One event per green-check decision: a denial needs a definite check it
-    # read, while a refusal whose source could not be read carries no verdict
+    # One event per merge rule that refused: a denial needs a definite source
+    # it read, while a refusal whose source could not be read carries no verdict
     # to report.
-    if [ -n "$uncovered" ] || [ -n "$unreported" ] || [ -n "$lacks_tip" ]; then
-      FM_PR_GREEN_HEAD_BLOCKED=true
-    fi
+    [ -z "$uncovered" ] || FM_PR_CHECKS_BLOCKED=true
+    [ -z "$unreported" ] || FM_PR_REQUIRED_BLOCKED=true
+    [ -z "$lacks_tip" ] || FM_PR_TREE_BLOCKED=true
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
-    if [ -n "$lacks_tip" ]; then
+    if [ -n "$lacks_tip" ] && [ "$FM_PR_BASE_BEHIND" -eq 0 ]; then
+      printf 'Push a new head commit to the branch, so CI tests the tree this merge would land on %s at %s. Re-running the jobs or reopening the pull request does not change the tested tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
+        "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
+    elif [ -n "$lacks_tip" ]; then
       printf 'Update the branch so its head contains %s at %s (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
         "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
     fi
@@ -1364,10 +1513,17 @@ EOF
     printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which enters the merge queue of base branch %s\n' \
       "$URL" "$live_head" "$base" >&2
     FM_PR_MERGE_BASE_TIP=
+    FM_PR_MERGE_TESTED_TREE=
+  elif [ -n "$FM_PR_TESTED_TREE" ]; then
+    printf 'verified: %s at head %s lands tested tree %s on current %s tip %s\n' \
+      "$URL" "$live_head" "$FM_PR_TESTED_TREE" "$base" "$FM_PR_BASE_TIP" >&2
+    FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
+    FM_PR_MERGE_TESTED_TREE=$FM_PR_TESTED_TREE
   else
     printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which contains the current %s tip %s\n' \
       "$URL" "$live_head" "$base" "$FM_PR_BASE_TIP" >&2
     FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
+    FM_PR_MERGE_TESTED_TREE=
   fi
   FM_PR_MERGE_HEAD=$live_head
   FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || FM_PR_MERGE_BASE=
@@ -1514,9 +1670,9 @@ github_branch_rules_unavailable_on_plan() {
 # cannot happen there and the head need not contain the tip. Returns 0 then.
 # A direct merge, no queue rule, a conflicting or unrecognised rule, a plan
 # without branch rules, or an empty required set, where the queue would land
-# its group with no check run on it, returns 1, so the containment rule
-# applies unchanged. An unreadable queue rule or required set returns 2,
-# because whether the containment rule applies at all is then unknown. Sets
+# its group with no check run on it, returns 1, so github_landing_tree_safe
+# applies. An unreadable queue rule or required set returns 2,
+# because whether that direct-landing rule applies is then unknown. Sets
 # FM_PR_GITHUB_BASE to the base it read.
 github_merge_enters_queue() {
   [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] || return 1
@@ -1954,6 +2110,10 @@ case "$PROVIDER" in
       echo "error: could not prepare GitHub pre-merge verification diagnostics" >&2
       exit 1
     }
+    FM_PR_TREE_SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/fm-tested-tree.XXXXXX") || {
+      echo "error: could not prepare GitHub tested-tree verification" >&2
+      exit 1
+    }
     mergeable_retry_delay=${FM_PR_GITHUB_MERGEABLE_RETRY_DELAY:-3}
     case "$mergeable_retry_delay" in
       [0-9] | 10) ;;
@@ -1973,12 +2133,18 @@ case "$PROVIDER" in
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
-    # One event per green-check decision, after the retries settle it; an
-    # allow waits for the base tip re-read immediately before the merge. The
+    # One deny event per merge rule that refused, after the retries settle it;
+    # allow events wait for the base tip re-read immediately before the merge. The
     # writer always exits 0 and never sits in a condition, so telemetry cannot
     # change what this merge does.
-    if [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
+    if [ "$FM_PR_CHECKS_BLOCKED" = true ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-checks-green deny --source-ok true --elapsed-ms 0 2>/dev/null
+    fi
+    if [ "$FM_PR_REQUIRED_BLOCKED" = true ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-required-reported deny --source-ok true --elapsed-ms 0 2>/dev/null
+    fi
+    if [ "$FM_PR_TREE_BLOCKED" = true ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok true --elapsed-ms 0 2>/dev/null
     fi
     cat "$MERGE_VERIFY_LOG" >&2
     rm -f "$MERGE_VERIFY_LOG"
@@ -1999,28 +2165,36 @@ case "$PROVIDER" in
     merge_status=0
     require_recorded_review || exit 1
     # --match-head-commit binds only the head, so unless this merge enters the
-    # base's merge queue, read live again here, the base tip is read once more
-    # and a tip that moved since the verify read refuses. A tip that lands in
+    # base's merge queue, read live again here, recompute against the live tip.
+    # An ancestry fallback still refuses a moved tip. A tip that lands in
     # the seconds between this read and GitHub applying the merge is not closed.
     merge_enters_queue=false
     queue_status=0
     github_merge_enters_queue "$FM_PR_GITHUB_BASE" || queue_status=$?
     [ "$queue_status" -ne 0 ] || merge_enters_queue=true
     if [ "$queue_status" -ne 0 ] && [ -z "$FM_PR_MERGE_BASE_TIP" ]; then
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok false --elapsed-ms 0 2>/dev/null
       printf 'error: refusing to merge %s: whether this --auto merge enters the merge queue of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
         "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
       exit 1
     fi
     if [ "$merge_enters_queue" = false ]; then
       if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
-        "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
+        "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok false --elapsed-ms 0 2>/dev/null
         printf 'error: refusing to merge %s: the tip of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
           "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
         exit 1
       fi
-      if [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
-        "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
+      if [ -n "$FM_PR_MERGE_TESTED_TREE" ]; then
+        if ! github_landing_tree_safe "$FM_PR_MERGE_HEAD" "$FM_PR_BASE_TIP" --offline \
+          || [ -z "$FM_PR_TESTED_TREE" ]; then
+          "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok true --elapsed-ms 0 2>/dev/null
+          printf 'error: refusing to merge %s: base branch %s is at %s, and the tree head %s would land there is not proven to be tested tree %s, verified on tip %s, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
+            "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "$FM_PR_MERGE_HEAD" "$FM_PR_MERGE_TESTED_TREE" "$FM_PR_MERGE_BASE_TIP" "$0" "$ID" "$URL" >&2
+          exit 1
+        fi
+      elif [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
+        "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested deny --source-ok true --elapsed-ms 0 2>/dev/null
         printf 'error: refusing to merge %s: base branch %s is at %s, not the tip %s that head %s was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
           "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
         exit 1
@@ -2032,9 +2206,11 @@ case "$PROVIDER" in
         merge_state=$(gh pr view "$URL" --json mergeStateStatus 2>/dev/null \
           | jq -er '.mergeStateStatus | select(type == "string" and . != "")' 2>/dev/null) || merge_state=
         case "$merge_state" in
-          CLEAN|HAS_HOOKS|UNSTABLE) ;;
+          CLEAN|HAS_HOOKS|UNSTABLE)
+            "$SCRIPT_DIR/fm-guard-event.sh" merge-auto-not-armed allow --cleared-by retry 2>/dev/null
+            ;;
           *)
-            "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok "$([ -n "$merge_state" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+            "$SCRIPT_DIR/fm-guard-event.sh" merge-auto-not-armed deny --source-ok "$([ -n "$merge_state" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
             printf 'error: refusing to merge %s: --auto on base branch %s, which has no proven merge queue, needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is %s, so GitHub would arm auto-merge instead, and that can land later on a base tip no check ran with; clear what holds the pull request, then re-run this merge: %s %s %s\n' \
               "$URL" "$FM_PR_GITHUB_BASE" "${merge_state:-unreadable}" "$0" "$ID" "$URL" >&2
             exit 1
@@ -2042,7 +2218,9 @@ case "$PROVIDER" in
         esac
       fi
     fi
-    "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-checks-green allow --cleared-by retry 2>/dev/null
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-required-reported allow --cleared-by retry 2>/dev/null
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-landing-tree-tested allow --cleared-by retry 2>/dev/null
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?

@@ -1182,7 +1182,6 @@ bin/fm-install-actionlint.sh	167
 bin/fm-install-herdr.sh	166
 bin/fm-install-shellcheck.sh	166
 bin/fm-install-treehouse.sh	166
-bin/fm-jev-belay-hook.sh	617
 bin/fm-jev-guard-hook.sh	116
 bin/fm-kimi-turnend-hook.sh	165
 bin/fm-lab-home.sh	8234

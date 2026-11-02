@@ -31,7 +31,7 @@ The check preserves a first or uncertain observation and any watcher whose proce
 The arm rechecks the same identity and progress evidence before signalling so a replacement or resumed watcher is retained.
 When no verified live watcher exists, or the verified watcher has proven no progress, a live session with a rewake ledger bound to its session lock and current recovery generation has a separate fixed limit of 3600 seconds for a legitimate handling turn.
 The bound ledger must be at least as new as the beacon and have no exhausted-failure marker.
-At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATCHDOG_STALE_SECS` is larger or the pull guard's separate mid-turn policy still considers the session healthy.
+At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATCHDOG_STALE_SECS` is larger.
 
 ## Recovery
 
