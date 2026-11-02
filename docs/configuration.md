@@ -1446,6 +1446,8 @@ The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-gui
 
 It also sets `rebase: strategy: merge`, so the rebase step merges newer main instead of rewriting the submitted commits; no-mistakes honors that setting only from the default-branch copy, and [`tests/fm-nm-test-contract.test.sh`](../tests/fm-nm-test-contract.test.sh) pins it.
 [Event-driven supervision](architecture.md#event-driven-supervision) owns its effect on run binding and the CI conflict-repair path it does not cover.
+
+The tracked `.no-mistakes.yaml` also lists `.gitignore` and `.ignore` under `protected_paths`, so a pipeline agent's edit to either file is refused instead of committed automatically, and the run waits for an explicit operator response; the [no-mistakes protected-path reference](https://kunchenguid.github.io/no-mistakes/reference/repo-config/#protected_paths) owns the matching and refusal rules.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test policy and entry points.
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
