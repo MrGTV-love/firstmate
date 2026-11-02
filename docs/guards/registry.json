@@ -1106,7 +1106,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision and elapsed time only, keyed to session <task>:<tool-name> so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision and elapsed time only, the task id with the worker actor and rule <tool-name>, so only a later allow of the same rule clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
@@ -1138,7 +1138,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; unreadable live memory settings, an unrecognized backend or llmMode, or embeddings left on prove nothing local, so the memory operation requires provider; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each runtime allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; unconditional device denials are keyed to session <task>:<device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; each dispatch decision on the task grant or native find capability emits one event keyed to <task>:dispatch-grant or <task>:dispatch-find respectively: an allow when the policy yields a valid grant array or on/off find capability, otherwise a deny with source_ok=false, including an invalid brief directive or a failed policy helper; the content-free terminal row in state/jev-guard.jsonl remains the runtime task audit"
+      "telemetry_note": "each runtime allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, the task id with the worker actor and rule <destination-class>, so only a later allow of the same rule clears a deny; unconditional device denials use rule <device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; each dispatch decision on the task grant or native find capability emits one event with rule dispatch-grant or dispatch-find respectively: an allow when the policy yields a valid grant array or on/off find capability, otherwise a deny with source_ok=false, including an invalid brief directive or a failed policy helper; the content-free terminal row in state/jev-guard.jsonl remains the runtime task audit"
     },
     {
       "decision": "deny",
@@ -1168,7 +1168,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an op that is missing, not a string or not a recognized read op is refused; the read-op list is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, keyed to session <task>:github-read for an allow and <task>:github-write for a deny, so a read op never counts as clearing a write-op refusal, which nothing clears; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, the task id with the worker actor and rule github-read for an allow and github-write for a deny, so a read op never counts as clearing a write-op refusal, which nothing clears; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
