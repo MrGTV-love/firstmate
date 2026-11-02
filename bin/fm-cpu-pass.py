@@ -69,7 +69,7 @@ Pipeline starts:
     and each run's resident memory come from one fm-mem-guard.py admission_sample
     reading, re-taken at most every 2 s while waiting and always taken anew
     at the moment of a grant (both backstop signals included). With fewer than 2
-    qualifying recorded runs, or no native memory facts on this platform, the
+    recorded runs left to rank for R, or no native memory facts on this platform, the
     start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
     record never refuses a start and never reads as an empty host.
   - Pause-only backstop: while that reading is unreadable or reports a reason to

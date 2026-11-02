@@ -107,7 +107,7 @@ Processes appear only in the backstop below.
 
 ### Fallback
 
-With fewer than 2 qualifying recorded runs, a record for another host or RAM size, an unreadable record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
+With fewer than 2 recorded runs left to rank for `R`, a record for another host or RAM size, an unreadable record, or no native memory facts on this platform, the start is admitted while `counted < max(1, floor(logical CPUs / 3))`.
 That is the previous count limit, kept only until the host has measured runs; a missing record never refuses a start and never reads as an empty host.
 
 ### Pause-only backstop
@@ -128,7 +128,7 @@ The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failur
 Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
 `bin/fm-duration.py run` automatically routes fresh `no-mistakes axi run` inputs and `no-mistakes rerun` through that owner before starting its execution clock; its `--pipeline-priority` option selects the class.
-Generated worker delivery instructions require this measured route for fresh starts across harnesses and runtime backends.
+Generated worker delivery instructions name this measured route for fresh starts across harnesses and runtime backends, and also name the [memory-checked route](configuration.md#host-memory-admission), which skips this pool.
 Existing-run reattachment and responses do not requeue, restart a run or consume another start.
 Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes; the wrapped client and every descendant receive no exemption, so a nested fresh start queues like any other.
 A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
