@@ -29,6 +29,61 @@ if ! declare -F secondmate_registry_parse_line >/dev/null 2>&1; then
   . "$FM_TASK_COPY_LIB_DIR/fm-secondmate-registry-lib.sh"
 fi
 
+# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. A confined
+# worker cannot execute setuid ps (126); reuse the test reaper's sysctl helper.
+# Only a complete, readable PID table proves absence there. No age or ancestry
+# exception releases a lock naming a live PID, including a recycled PID.
+fm_task_copy_confined_launcher_state() {  # <pid>
+  local pid=$1 table observed found=1
+  table=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" table pid 2>/dev/null) || return 2
+  [ -n "$table" ] || return 2
+  while IFS= read -r observed; do
+    case "$observed" in ''|*[!0-9]*) return 2 ;; esac
+    [ "$observed" != "$pid" ] || found=0
+  done <<< "$table"
+  return "$found"
+}
+
+# Interpret one completed ps observation without executing a process probe.
+# Exit 1 proves absence only with empty stdout and either empty stderr or exactly
+# macOS's not-found line for this PID; any other diagnostic makes that failed read
+# unknown. The acquisition owner handles exit 126.
+fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
+  local pid=$1 rc=$2 observed=$3 diagnostic=$4
+  case "$rc" in
+    0)
+      observed=${observed//[[:space:]]/}
+      [ "$observed" = "$pid" ] || return 2
+      return 0
+      ;;
+    1)
+      [ -z "$observed" ] || return 2
+      [ -z "$diagnostic" ] || [ "$diagnostic" = "ps: process id too large: $pid"$'\n' ] || return 2
+      return 1
+      ;;
+    *) return 2 ;;
+  esac
+}
+
+fm_task_copy_launcher_state() {  # <pid>
+  local pid=$1 observed diagnostic diagnostic_file rc=0
+  diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-copy-ps.XXXXXX") || return 2
+  observed=$(ps -p "$pid" -o pid= 2>"$diagnostic_file") || rc=$?
+  if [ "$rc" = 126 ]; then
+    rm -f -- "$diagnostic_file"
+    fm_task_copy_confined_launcher_state "$pid"
+    return $?
+  fi
+  # Retain even a whitespace-only diagnostic; failed reads are not absence.
+  diagnostic=$(cat "$diagnostic_file" && printf '.') || {
+    rm -f -- "$diagnostic_file"
+    return 2
+  }
+  diagnostic=${diagnostic%.}
+  rm -f -- "$diagnostic_file"
+  fm_task_copy_ps_observation_state "$pid" "$rc" "$observed" "$diagnostic"
+}
+
 # The physical path of an existing directory, or a failure.
 fm_task_copy_canonical_dir() {  # <path>
   local target=$1
@@ -64,15 +119,16 @@ fm_task_copy_default_branch() {
 
 # A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
 # names why: it is cleared only once the check compared the two trees, and a
-# merge conflict is that comparison's answer.
+# merge conflict is that comparison's answer. With no-fetch the same rule reads
+# the refs already here: merge-tree adds objects only, and no ref or worktree moves.
 FM_TASK_COPY_UNASKED=
-fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
+fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+    [ "$fetch" = no-fetch ] || git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
       FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
       return 1
     }

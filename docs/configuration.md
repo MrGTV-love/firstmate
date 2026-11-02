@@ -2281,7 +2281,8 @@ No budget gates it, so it still fires when both budgets are `off`.
 The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
 It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, the live-copy fact and its record, and how `check` stays inside the watcher's timeout.
 `bin/fm-copy-sweep.sh --help` prints that header.
-The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
+The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it removes nothing, moves no ref, touches no worktree, and lists every copy with its class and reason.
+Its content proof is the one `--apply` uses, and that proof can add Git objects to the object store.
 
 ### Hourly command and watcher check
 
@@ -2327,7 +2328,7 @@ The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only ver
 Review the first batch's records before unattended operation.
 The header also owns the closeout-script liveness dependency and the proposed Vernant follow-ups that would replace this fallback, `vernant-lock-lease` and `vernant-commits-remote-before-lock`; neither is built yet, so the sweep keeps its own proofs.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
-[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the main regression entry point; [`tests/fm-copy-sweep-orphan.test.sh`](../tests/fm-copy-sweep-orphan.test.sh) covers locked squash-content eligibility, report and `--apply` agreement on content proofs, hash-preserved disposable classes, the unpreserved regenerable class, no added preserve on a refused removal or an activity-only write, and diagnostic-preserving launcher observation.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
@@ -2948,7 +2949,7 @@ Second, the delegated-write residual: an already-running unconfined helper, daem
 The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
 In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
 macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
-`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
+`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample, the nested copy sweep's lock launcher check and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
 The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects the task audit ledger and enables the separate write-guard confinement probe, still reaches the helper.
 `bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`, and its macOS resident-memory watch reads each root's process-group tree through a long-lived helper `mem-tree` reader started at the root's first tick, falling back to `ps` for a tick the reader does not answer in time, and for the rest of the root once the reader is given up.
 The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
