@@ -243,7 +243,7 @@ An affected task supplied by the emitter takes precedence over the invoking work
 The session is that task id, otherwise the physical home plus the harness session; an unavailable harness session is explicitly `unattributed`, never a new process id.
 Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validation owned by `bin/fm-session-lock-lib.sh`, so an inherited id from another harness is not borrowed.
 `rule` defaults to the guard id for legacy emitters, and legacy rows without a task cannot prove task-level recurrence.
-Merge refusals record `head` and `base` for the read-only detector; empty fields are missing evidence, not an inferred commit or branch.
+The merge refusals the read-only detector reads (`MERGE_REFUSAL_GUARDS` in `bin/fm-guard-workarounds.py`) record `head` and `base`; empty fields are missing evidence, not an inferred commit or branch.
 
 A guard records allows as well as denies so opportunities are observable.
 A waiver records `override: true` only when it changed the outcome, so an unused `--allow-red`, `--allow-missing`, `--allow-api-key` or `--attended-override` writes no escape; teardown `--force` skips the landed-work check without reading it, so each forced teardown that reaches that check records one escape; a skipped check records decision `bypass` and its activation rule, except that Firstmate's own supervised re-execs set `FM_SPAWN_NO_GUARD`, `FM_SKIP_SECONDMATE_INHERIT` or `FM_SKIP_SECONDMATE_SYNC` to `internal`, which skips the same check and records nothing.
