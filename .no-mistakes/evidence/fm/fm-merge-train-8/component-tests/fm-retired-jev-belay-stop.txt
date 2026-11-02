@@ -1,0 +1,1 @@
+ok - Claude completion Stop closes the turn without consulting the installed evidence judgment

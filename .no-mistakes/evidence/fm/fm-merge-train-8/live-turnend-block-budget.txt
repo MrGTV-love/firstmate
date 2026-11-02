@@ -1,0 +1,47 @@
+# Live: real bin/fm-turnend-guard.sh --claude in a disposable standalone primary checkout of fe38b58cf, one open task (state/task1.meta), no watcher running
+--- Stop 1: exit=2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-train8-primary.xitZMo/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second 
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- Stop 2: exit=2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-train8-primary.xitZMo/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second 
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- Stop 3: exit=2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: never).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-train8-primary.xitZMo/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second 
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- Stop 4: exit=0
+{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: 1 task(s) in flight, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automati
+--- Stop 5: exit=0
+{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: 1 task(s) in flight, no live supervisor or automatic recovery was proved, and the block budget is exhausted. Keep this session attended and diagnose the automati
+--- budget ledger state/.turnend-claude-blocks:
+session=train8-live
+count=5
+epoch=
+--- guard events (guard, decision, cleared_by):
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"deny","cleared_by":""}
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-exhausted"}
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-exhausted"}
+
+# Adversarial live: budget ledger path is a directory (cannot be written); guard must never block, warn budget-unavailable
+--- Stop 1: exit=0; blocked=0; warning: block budget cannot be locked or written, so this stop is allowed instead of blocked
+--- Stop 2: exit=0; blocked=0; warning: block budget cannot be locked or written, so this stop is allowed instead of blocked
+--- Stop 3: exit=0; blocked=0; warning: block budget cannot be locked or written, so this stop is allowed instead of blocked
+--- Stop 4: exit=0; blocked=0; warning: block budget cannot be locked or written, so this stop is allowed instead of blocked
+--- guard events:
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-unavailable"}
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-unavailable"}
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-unavailable"}
+{"guard":"turnend-supervision-block","decision":"warn","cleared_by":"budget-unavailable"}

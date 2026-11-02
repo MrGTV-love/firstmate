@@ -1,0 +1,8 @@
+# Adversarial: break the registry in a disposable copy, run the real closure test and lint (exit codes)
+A0 unmodified: closure EXIT=0 (ok - fm-guard-audit-closure)
+A1 arithmetic drift: lint EXIT=1; VIOLATION R1 inventory: active(167, 140 beyond the audit) + retired(16, 13 beyond the audit) + excluded(1) = 31, audited=30
+A1 arithmetic drift: closure EXIT=1; not ok - registry lint is not clean in enforce mode: INFO guard-watche
+A2 dropped guard: lint EXIT=1; 2 violations shown
+A2 dropped guard: closure EXIT=1
+A3 empty exclusion: closure EXIT=1; not ok - registry lint is not clean in enforce mode: INFO guard-watche
+A4 restored: lint EXIT=0

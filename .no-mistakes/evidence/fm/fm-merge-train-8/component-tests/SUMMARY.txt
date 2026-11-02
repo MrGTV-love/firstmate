@@ -1,0 +1,13 @@
+fm-turnend-guard EXIT=0 (192s) last: ok - fm-turnend-guard: with away mode off, the poll-derived grace never applies
+fm-pr-merge EXIT=0 (725s) last: ok - fm-pr-merge refuses repo override args before recording state
+fm-pr-merge-checks EXIT=0 (1454s) last: ok - fm-pr-merge refuses when whether the head contains the base tip cannot be read
+fm-ci-workflow EXIT=0 (77s) last: ok - both portable parallel jobs pass the concurrency the model starts from
+fm-retired-jev-belay-stop EXIT=0 (16s) last: ok - Claude completion Stop closes the turn without consulting the installed evidence judgment
+fm-retired-spawn-brief-out-of-scope EXIT=0 (25s) last: ok - scout dispatch accepts a blank out-of-scope heading
+fm-guard-stale-banner EXIT=0 (92s) last: ok - fm-guard stale banner: read-only never mutates stale-banner state files
+fm-typesafe-key-source EXIT=0 (20s) last: ok - the jev-guard service resolves the primary key and refuses unavailable remote-bound credentials without egress; the
+fm-typesafe-health EXIT=0 (22s) last: ok - the key never reaches argv, output, state, wakes, or the environment
+fm-dod-lib EXIT=0 (59s) last: all fm-dod-lib tests passed
+fm-brief EXIT=0 (77s) last: ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+fm-task-delivery EXIT=0 (412s) last: # all fm-task-delivery tests passed
+fm-live-lab EXIT=0 (163s) last: tests/lib.sh: line 504: 82505 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV' "$@" > /dev/null 2>&1

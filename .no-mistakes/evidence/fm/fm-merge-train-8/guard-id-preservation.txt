@@ -1,0 +1,46 @@
+# Guard-id and site preservation: every guard id/site in main or any component tip is in HEAD registry, or retired at HEAD
+HEAD active guards: 167  HEAD retired: 16
+cf0e8a49a: guards=45 missing-at-HEAD(not active, not retired)=[merge-green-head]
+e39c2abcd: guards=164 missing-at-HEAD(not active, not retired)=[merge-green-head]
+1110afa93: guards=44 missing-at-HEAD(not active, not retired)=[merge-green-head]
+d79867ff3: guards=47 missing-at-HEAD(not active, not retired)=[]
+958ebaf7c: guards=42 missing-at-HEAD(not active, not retired)=[merge-green-head]
+0f07b896d: guards=45 missing-at-HEAD(not active, not retired)=[merge-green-head]
+
+# merge-green-head: PR 343 (d79867ff3) own change vs its merge-base ec8b5ccfca57e3dbee4683ee67372b2788023c2b
+at merge-base: 16
+at d79867ff3 tip: null
+PR 343 new guards: merge-auto-not-armed merge-checks-green merge-landing-tree-tested merge-required-reported 
+-> removal is PR 343's own split (authorized C7/C8), not a train drop
+
+# Site preservation: every (guard,site) at each tip present at HEAD for guards still active
+cf0e8a49a: sites-missing-at-HEAD=1
+spawn-brief-out-of-scope	{"file":"bin/fm-spawn.sh","match":"spawn-brief-out-of-scope deny"}
+e39c2abcd: sites-missing-at-HEAD=5
+spawn-brief-out-of-scope	{"file":"bin/fm-spawn.sh","match":"spawn-brief-out-of-scope deny"}
+turnend-supervision-block	{"file":"bin/fm-turnend-guard.sh","match":"block_stop","key":"site:bin/fm-turnend-guard.sh:42636292f3","count":2}
+turnend-supervision-block	{"file":"bin/fm-turnend-guard.sh","match":"budget_account_current_epoch block || block_stop"}
+turnend-supervision-block	{"file":"bin/fm-turnend-guard.sh","match":"exit 2","key":"site:bin/fm-turnend-guard.sh:f05ba9904f","count":2}
+turnend-supervision-block	{"file":"bin/fm-turnend-guard.sh","match":"fm_failure_episode_reset \"$STATE\" || exit 2","count":2}
+1110afa93: sites-missing-at-HEAD=1
+spawn-brief-out-of-scope	{"file":"bin/fm-spawn.sh","match":"spawn-brief-out-of-scope deny"}
+d79867ff3: sites-missing-at-HEAD=1
+spawn-brief-out-of-scope	{"file":"bin/fm-spawn.sh","match":"spawn-brief-out-of-scope deny"}
+958ebaf7c: sites-missing-at-HEAD=0
+
+0f07b896d: sites-missing-at-HEAD=1
+spawn-brief-out-of-scope	{"file":"bin/fm-spawn.sh","match":"spawn-brief-out-of-scope deny"}
+
+# Missing sites explained
+spawn-brief-out-of-scope retired at HEAD: 2026-10-31
+'spawn-brief-out-of-scope deny' occurrences in bin/fm-spawn.sh at HEAD: 0
+'budget_account_current_epoch block || block_stop' occurrences in bin/fm-turnend-guard.sh at HEAD: 0
+'fm_failure_episode_reset "$STATE" || exit 2' occurrences in bin/fm-turnend-guard.sh at HEAD: 0
+HEAD turnend-supervision-block sites:
+{"file":"bin/fm-turnend-guard.sh","match":"guard_event deny --source-ok \"$source_ok\""}
+{"file":"bin/fm-turnend-guard.sh","match":"block_stop","key":"site:bin/fm-turnend-guard.sh:42636292f3","count":1}
+{"file":"bin/fm-turnend-guard.sh","match":"exit 2","key":"site:bin/fm-turnend-guard.sh:f05ba9904f","count":1}
+{"file":"bin/fm-turnend-guard.sh","match":"--cleared-by budget-unavailable"}
+{"file":"bin/fm-turnend-guard.sh","match":"--cleared-by budget-exhausted"}
+{"file":"bin/fm-turnend-guard.sh","match":"[ \"$COUNT\" -gt \"$BLOCK_BUDGET\" ] || block_stop"}
+block_stop count in fm-turnend-guard.sh: 3; 'exit 2' count: 4

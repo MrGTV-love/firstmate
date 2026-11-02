@@ -1,0 +1,16 @@
+# Live, read-only: train copy of bin/fm-tested-tree.py against real GitHub check runs and tested-tree records of PR 343 head d79867ff3877e4d2d981504b4b38a7133f91ebfb
+## L1 tip = recorded base ec8b5ccf (landing tree equals tested tree) -> expect exit 0 and the tree
+exit=0 out=0cf6f5ace4fbfa7d59ac4f91544ad8a752b97eb2
+## L2 tip = newer main cf0e8a49a (landing tree differs from tested tree) -> expect exit 2 (refuse)
+exit=1 out=note: tested-tree records unavailable (tip cf0e8a49a20ffb68de01d6ee8251c1516a4ee53c and head d79867ff3877e4d2d981504b4b38a7133f91ebfb do not merge); the ancestry rule applies
+## L3 --offline final read reuses the cached verdict with tip = recorded base -> expect exit 0
+exit=0 out=0cf6f5ace4fbfa7d59ac4f91544ad8a752b97eb2
+## L4 --offline with a fresh scratch (no earlier verdict) -> expect exit 1, ancestry rule
+exit=1 out=note: tested-tree records unavailable (no tested-tree records were verified for head d79867ff3877e4d2d981504b4b38a7133f91ebfb before the final read); the ancestry rule applies
+## L5 head with no check runs on GitHub (unpushed train head fe38b58cf) -> expect exit 1
+exit=1 out=note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+## cross-check: git merge-tree ec8b5ccf + head = 0cf6f5ace4fbfa7d59ac4f91544ad8a752b97eb2; cf0e8a49a + head = 62aa4fdfafae8136a6bb9ff2eaefbb2d868ec5aa
+
+## L2 (corrected): cf0e8a49a conflicts with the head, so exit 1 above is the documented 'no longer merges' ancestry fallback.
+## L2b tip = ff15a3d58 (newer main, merges cleanly, different landing tree 8cd32bad49ff8268e441d042bf3e62272b5a05b6) -> expect exit 2 (records prove a different tree)
+exit=2 out=[]

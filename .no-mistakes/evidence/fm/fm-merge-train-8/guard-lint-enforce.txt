@@ -1,0 +1,11 @@
++(eval):1> bash bin/fm-proc-budget.sh --own-procs 128 -- bash bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO teardown-unlanded: exemptions=1
+INFO inventory: active=167 retired=16 beyond_audit=13 excluded=1 unregistered=292 audited=30 beyond_audit_active=141 sites=955 mapped=663
+LINT_SUMMARY mode=enforce guards=167 violations=292 allowlisted=292 stale=0 shown=0 sites=955
++(eval):1> echo 'EXIT=0'
+EXIT=0
++(eval):1> bash bin/fm-proc-budget.sh --own-procs 128 -- bash bin/fm-guard-refcheck.sh
+REFCHECK_SUMMARY registrations=51 paths=106 missing=0 registry_missing=0 retired=16 resurrected=0
++(eval):1> echo 'EXIT=0'
+EXIT=0

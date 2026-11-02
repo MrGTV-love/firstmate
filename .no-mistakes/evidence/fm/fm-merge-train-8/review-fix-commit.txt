@@ -1,0 +1,48 @@
+# Review-fix commit fe38b58cf
+commit fe38b58cf58ead0d0c501c8c849d35991eb9b92c
+Author: Charles Brooker <charles@greentreetherapeutics.com>
+Date:   Sun Nov 1 15:38:51 2026 -0600
+
+    no-mistakes(review): Drop duplicate teardown sentence and closure-test count pins
+
+diff --git a/.agents/skills/ship-landing/SKILL.md b/.agents/skills/ship-landing/SKILL.md
+index db3edbc10..e7f32a140 100644
+--- a/.agents/skills/ship-landing/SKILL.md
++++ b/.agents/skills/ship-landing/SKILL.md
+@@ -28,7 +28,6 @@ A non-Actions check run (for example Socket Security) can show only its head com
+ The rule proves a landing tree only from complete, verified records, so any missing, unreadable, or unverifiable record stays on the ancestry fallback, and so does the rebase method.
+ Those cases include a rollup with a legacy commit status; a project whose CI uploads no record; an expired artifact; a recorded base that no longer merges with the head or whose merge does not match its recorded tree; a partial re-run ("Re-run failed jobs") that does not re-run Lint partition 1, because CI writes the record only in that job of the attempt that ran it; and bot-authored PRs, because they skip the compliance job, so that check run has no record.
+ 
+-Tear down a ship task only after landing is confirmed.
+ Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
+ A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
+ Never force teardown without explicit discard authority; follow [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s captain-words discard contract.
+diff --git a/tests/fm-guard-audit-closure.test.sh b/tests/fm-guard-audit-closure.test.sh
+index 0b5c9f614..7441e1b16 100755
+--- a/tests/fm-guard-audit-closure.test.sh
++++ b/tests/fm-guard-audit-closure.test.sh
+@@ -20,16 +20,11 @@ REGISTRY="$ROOT/docs/guards/registry.json"
+ # --- G-10: the registry carries the population and its arithmetic -----------
+ out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
+ printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
+-printf '%s\n' "$out" | grep -q 'active=167 retired=16 beyond_audit=13 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=141' \
+-  || fail "registry arithmetic drifted from (167-141)+(16-13)+1=30: $out"
+-pass "G-10 the registry accounts for all 30 audited Firstmate guards"
++pass "G-10 enforce-mode lint validates the audit arithmetic as registered families grow"
+ 
+ [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
+-jq -e '.guards | length == 167' "$REGISTRY" >/dev/null || fail "registry does not hold 167 live guards"
+-jq -e '.beyond_audit_active | length == 141' "$REGISTRY" >/dev/null || fail "the 141 post-audit guards are not recorded"
+ jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
+ pass "G-10b the spec and the registry are checked in and agree"
+-pass "G-10 enforce-mode lint validates the audit arithmetic as registered families grow"
+ 
+ # --- G-11: the nine rules are enforced, with a synthetic bad guard failing ---
+ "$ROOT/tests/fm-guard-lint.test.sh" >/dev/null 2>&1 \
+
+# ship-landing teardown lines at HEAD
+31:Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
+# main form at cf0e8a49a
+24:Tear down a ship task only after landing is confirmed, except for the attended recorded-bundle preservation route owned by [`fm-teardown.sh`](../../../bin/fm-teardown.sh)'s header.
+# G-10 pass lines emitted by the closure test run
+1

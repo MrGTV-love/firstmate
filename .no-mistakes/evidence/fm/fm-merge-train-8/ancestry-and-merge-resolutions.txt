@@ -1,0 +1,45 @@
+# Ancestry
+cf0e8a49a ancestor-of-HEAD
+e39c2abcdc9d33f48920d7642599cf06b9d0be2c ancestor-of-HEAD
+1110afa934cc2b016379831a13e806ecf61f61a0 ancestor-of-HEAD
+d79867ff3877e4d2d981504b4b38a7133f91ebfb ancestor-of-HEAD
+958ebaf7cc70507df2ffbc814d296629333126ee ancestor-of-HEAD
+0f07b896d9ac08562647d49ae59619445899f0a8 ancestor-of-HEAD
+fatal: Not a valid commit name 81ac156f1e5c2a27001b527b26a45d7fa346bb0e
+81ac156f1e5c2a27001b527b26a45d7fa346bb0e NOT-ancestor (excluded by Main 2449: #337)
+
+# Merge commit tree vs automatic merge of its parents (files that differ)
+## 39d6c3db3 (Merge https://github.com/MrGTV-love/firstmate/pull/335 at head e39c2abcdc9d33f48920d7642599cf06b9d0be2c)
+parents cf0e8a49a20ffb68de01d6ee8251c1516a4ee53c e39c2abcdc9d33f48920d7642599cf06b9d0be2c; auto-tree=359e7cdac57231845fae5ec9b344aa9efbedbe4d
+ docs/guards/registry.json            | 106 ++++++-----------------------------
+ tests/fm-guard-audit-closure.test.sh |  11 ++--
+ 2 files changed, 22 insertions(+), 95 deletions(-)
+
+## ac092a864 (Merge https://github.com/MrGTV-love/firstmate/pull/336 at head 1110afa934cc2b016379831a13e806ecf61f61a0)
+parents 39d6c3db39eeeb8b2f6c266ea783e907886cba2d 1110afa934cc2b016379831a13e806ecf61f61a0; auto-tree=481a1a47f6d06764c0c441e6779468fe24fd3b4f
+ docs/guards/lint-allowlist.json | 835 ----------------------------------------
+ docs/guards/registry.json       |  60 ++-
+ 2 files changed, 28 insertions(+), 867 deletions(-)
+
+## 4260742bb (Merge https://github.com/MrGTV-love/firstmate/pull/343 at head d79867ff3877e4d2d981504b4b38a7133f91ebfb)
+parents ac092a864774b975db9c7ba48932c43a950d62c6 d79867ff3877e4d2d981504b4b38a7133f91ebfb; auto-tree=b046006d4d9420e63fc60c58f781b3272eafc1c9
+ .agents/skills/ship-landing/SKILL.md |  5 +----
+ docs/guards/lint-allowlist.json      |  3 +++
+ docs/guards/registry.json            | 28 +---------------------------
+ tests/fm-guard-audit-closure.test.sh | 18 ++++--------------
+ 4 files changed, 9 insertions(+), 45 deletions(-)
+
+## 9ab57b63d (Merge https://github.com/MrGTV-love/firstmate/pull/344 at head 958ebaf7cc70507df2ffbc814d296629333126ee)
+parents 4260742bb0c20c21a39d7b6f11208034e34e4cc9 958ebaf7cc70507df2ffbc814d296629333126ee; auto-tree=5363449899b28d4ac7d752cfd476ccf3e2a426e7
+ .agents/skills/crew-brief-authoring/SKILL.md |  4 ----
+ docs/guards/registry.json                    |  3 ---
+ tests/fm-guard-audit-closure.test.sh         | 18 ++++--------------
+ 3 files changed, 4 insertions(+), 21 deletions(-)
+
+## 5b2a65442 (Merge https://github.com/MrGTV-love/firstmate/pull/346 at head 0f07b896d9ac08562647d49ae59619445899f0a8)
+parents 9ab57b63d12d71b5f6e97f9b2f2bf8231b9ce739 0f07b896d9ac08562647d49ae59619445899f0a8; auto-tree=a63e9dd0fb02b8836570db7c7d3fa15e91f567c7
+ docs/guards/registry.json            |  5 +----
+ tests/fm-guard-audit-closure.test.sh | 18 ++++--------------
+ 2 files changed, 5 insertions(+), 18 deletions(-)
+
+# Each component tip's diff reached HEAD tree? (component vs HEAD in files it touched, sampling)
