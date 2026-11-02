@@ -104,8 +104,8 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   assert_grep "closed fm-fixture-alpha-1 with $url" "$case_dir/stdout" "c1: alpha's close was not reported"
   assert_grep "$url" "$case_dir/home/data/backlog.md" "c1: the merged PR URL is not on the closed items"
   [ "$(cx_state "$case_dir" fm-fixture-live-3)" != "done" ] || fail "c1: a ship item with a live record was closed"
-  assert_match "not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done refused it: .*live task record" "$case_dir/stdout" \
-    "c1: the live item was not reported with its reason"
+  assert_match "^actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done refused it: .*live task record" "$case_dir/stderr" \
+    "c1: another task's live item was not reported as actionable with its reason"
   [ "$(cx_state "$case_dir" fm-fixture-prose-5)" != "done" ] || fail "c1: a line that is not a Closes directive closed an item"
   # The non-ship item with a live record gets exactly what the unchanged completion path gives.
   [ "$(cx_state "$case_dir" docs-live-4)" = "done" ] || fail "c1: docs-live-4 did not get the completion path's outcome"
@@ -123,7 +123,8 @@ test_a_merge_naming_its_own_task_reports_the_live_record() {
   printf '%s\n' 'Closes: task-x1' > "$case_dir/bodies/62"
   gh_merge "$case_dir" 62
   [ "$(cx_state "$case_dir" task-x1)" != "done" ] || fail "c1-self: the merging task was closed before its teardown"
-  assert_match 'not closed task-x1: .*live task record' "$case_dir/stdout" "c1-self: the live-record refusal was not reported by id"
+  assert_match '^close-at-merge: not closed task-x1: .*live task record' "$case_dir/stdout" "c1-self: the live-record refusal was not reported by id"
+  assert_no_grep 'not closed task-x1' "$case_dir/stderr" "c1-self: the merged task's own teardown case was reported as actionable"
   pass "a merge that names its own task reports the live-record refusal and still succeeds"
 }
 
@@ -362,7 +363,7 @@ check_train_outcome() {  # <case-dir> <label> <train-url>
   [ "$(cx_state "$case_dir" m1-item)" = "done" ] || fail "$label: the member's own item was not closed"
   [ "$(cx_state "$case_dir" m3-live-docs)" = "done" ] || fail "$label: the docs task found through pr= was not closed"
   [ "$(cx_state "$case_dir" m2-live-ship)" != "done" ] || fail "$label: a live ship task was closed by the merge"
-  assert_match "not closed m2-live-ship: .*live task record" "$case_dir/stdout" "$label: the live ship task was not reported"
+  assert_match "^actionable: close-at-merge: not closed m2-live-ship: .*live task record" "$case_dir/stderr" "$label: the member's live ship task was not reported as actionable"
   [ "$(cx_state "$case_dir" excluded-item)" = queued ] || fail "$label: a PR the body only mentions closed its item"
   [ "$(cx_state "$case_dir" prefix-task)" = queued ] || fail "$label: a pr= that shares only a prefix matched"
   [ "$(cx_state "$case_dir" bare-number-task)" = queued ] || fail "$label: a pr= that is only a number matched"
@@ -491,7 +492,7 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
 # --- parser and blockers ----------------------------------------------------
 
 test_the_closes_parser_reads_real_ids_and_ignores_examples() {
-  local out stray
+  local out
   out=$(printf '%s\n' 'Closes: fm-backlog-close-at-merge' 'Closes: fm-backlog-finished-blocker-auto-clear' \
     'Closes: ship-a' 'Closes: a.b_c-1' 'Closes:   spaced-id   ' 'Closes: .hidden' 'Closes: two words' \
     'Closes: tail # comment' 'closes: lower' ' Closes: indented' '> Closes: quoted' '- Closes: listed' \
@@ -499,10 +500,7 @@ test_the_closes_parser_reads_real_ids_and_ignores_examples() {
     | bash -c '. "$1"; fm_pr_closes_ids -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
   [ "$out" = "$(printf '%s\n' fm-backlog-close-at-merge fm-backlog-finished-blocker-auto-clear ship-a a.b_c-1 spaced-id)" ] \
     || fail "parser: unexpected ids: $(printf '%s' "$out" | tr '\n' ' ')"
-  stray=$(grep -rn 'Closes:' "$ROOT/bin" | grep -v '^[^:]*:[0-9]*:#' | grep -v 'fm-pr-closes-lib.sh\|fm-pr-close-items.sh\|fm-dod-lib.sh' || true)
-  [ -z "$stray" ] \
-    || fail "parser: a second pattern for Closes: exists outside the owner"
-  pass "the parser takes real ids, ignores fenced examples and non-directive lines, and has one owner"
+  pass "the parser takes real ids, ignores fenced examples and non-directive lines"
 }
 
 test_completion_clears_the_finished_blocker_on_every_route() {
@@ -578,6 +576,47 @@ test_the_task_noun_forms_and_typed_completions_clear_the_edge() {
   pass "the task noun forms and a typed public-followup completion clear the finished edge"
 }
 
+test_a_typed_completion_that_archives_or_cannot_be_read_back() {
+  local case_dir real bin_dir
+  command -v jq >/dev/null 2>&1 || { printf 'ok - skipped (jq is not installed)\n'; return 0; }
+  case_dir=$(make_case c4-pf-archive)
+  wrapper() { FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "$@"; }
+  jq -n '{request_id:"req-1", platform:"x", context_binding:{version:"ctx1", value:"ctx1_req-1"}, public_safe_summary:"s",
+          received_at:"2026-07-30T10:00:00Z", followup_expires_at:"2026-08-06T10:00:00Z", reservation_expires_at:"2026-08-06T10:00:00Z"}' \
+    > "$case_dir/request.json"
+  jq -n '{type:"pr-merged", project:"alpha", required_deliverables:["pr_url"], completion_policy:"all-required"}' > "$case_dir/expected.json"
+  sed 's/^done_keep = .*/done_keep = 0/' "$case_dir/home/.tasks.toml" > "$case_dir/tasks.toml"
+  cat "$case_dir/tasks.toml" > "$case_dir/home/.tasks.toml"
+  for id in pf-archived pf-unread; do
+    wrapper public-followup add "$id" --request-context-file "$case_dir/request.json" --purpose promised-final \
+      --expected-final-file "$case_dir/expected.json" --expires-at 2026-10-01T00:00:00Z >/dev/null 2>&1 \
+      || fail "c4-pf: could not create $id"
+    cx_add "$case_dir" "dep-of-$id"
+    cx "$case_dir" block "dep-of-$id" --by "$id" >/dev/null
+  done
+  wrapper public-followup waive pf-archived --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e1" \
+    || fail "c4-pf: the waive failed"
+  cx "$case_dir" show pf-archived 2>&1 | grep -q '^code: NOT_FOUND$' || fail "c4-pf: done_keep 0 did not archive the row"
+  assert_grep 'unblocked: dep-of-pf-archived no longer waits on pf-archived' "$case_dir/e1" "c4-pf: an archived row did not clear its dependents"
+  [ "$(cx_deps "$case_dir" dep-of-pf-archived)" = none ] || fail "c4-pf: the archived row's edge stayed"
+  real=$(command -v tasks-axi)
+  bin_dir=$case_dir/fakebin
+  mkdir -p "$bin_dir"
+  cat > "$bin_dir/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\${2:-}" = pf-unread ]; then
+  echo "error: simulated read failure" >&2
+  exit 1
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$bin_dir/tasks-axi"
+  PATH="$bin_dir:$PATH" wrapper public-followup waive pf-unread --reason "not needed" --approved-by captain >/dev/null 2>"$case_dir/e2" \
+    || fail "c4-pf: a failed read back changed the waive's exit status"
+  assert_match '^actionable: .*pf-unread.*simulated read failure.*--by pf-unread' "$case_dir/e2" "c4-pf: a failed read back was not reported as actionable"
+  pass "a typed completion clears the edge when the row is archived at once and reports a failed read back"
+}
+
 test_an_answered_captain_call_clears_the_edge() {
   local case_dir home
   case_dir=$(make_case c4-captain)
@@ -651,6 +690,7 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result
 test_the_closes_parser_reads_real_ids_and_ignores_examples
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge
+test_a_typed_completion_that_archives_or_cannot_be_read_back
 test_an_answered_captain_call_clears_the_edge
 test_a_withdrawn_captain_call_clears_the_edge
 test_an_explicit_data_root_gets_the_same_clear

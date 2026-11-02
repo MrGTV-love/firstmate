@@ -1088,7 +1088,8 @@ The `Closes:` syntax has one owner, [`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-clo
 An indented line, a trailing comment, a quoted or listed line, a lowercase `closes:` and any line inside a fenced code block (an example, not a directive) name nothing.
 A merge train, a pull request whose body lists its member pull requests under a `Component` table, bullet or heading, closes its members' items too: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL, with the train as the proof.
 The same library owns which URLs in a train body are members; a pull request the body only mentions is not.
-A task that still has a live record is closed by its own teardown, so the merge only reports it.
+The merged pull request's own task is closed by its own teardown, so the merge only reports it.
+Any other task that still has a live record stays open, and the merge reports it as an `actionable:` line.
 [`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item and an open captain call among them.
 A close that fails never undoes or fails the merge, and a repeat run changes nothing.
 An item that moves to Done by any completion route also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.

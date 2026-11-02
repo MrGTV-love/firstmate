@@ -22,14 +22,14 @@
 #   - unknown id, or an id not in the active backlog (archived ids included): reported,
 #     never created;
 #   - already done: reported, nothing run, so a rerun links no second proof;
-#   - an open owner call (a captain hold that is not released, an expired but unanswered
-#     one included): not closed, reported. The check is repeated inside the lock
-#     bin/fm-tasks-axi.sh holds while it completes the item (FM_TASKS_AXI_REFUSE_OPEN_CALL,
-#     set only here), so a hold placed before the close takes effect wins;
-#   - otherwise `fm-tasks-axi.sh done <id> --pr <url>` runs. A live task record, a scout
-#     item, a proof it cannot verify (a non-GitHub pull request) or any other refusal is
-#     reported with its first line. A task that has a live record is closed by its own
-#     teardown, never here.
+#   - otherwise `fm-tasks-axi.sh done <id> --pr <url>` runs. That command owns the open
+#     owner call check (a captain hold that is not released, an expired but unanswered one
+#     included): FM_TASKS_AXI_REFUSE_OPEN_CALL, set only here, makes it refuse one inside
+#     the lock it holds while it completes the item, so a hold placed before the close
+#     takes effect wins. An open owner call, a live task record, a scout item, a proof it
+#     cannot verify (a non-GitHub pull request) or any other refusal is reported with its
+#     first line. Only the merged pull request's own task is left for its own teardown to
+#     close; any other task with a live record stays open until someone acts on the report.
 # A completed item also clears itself from every other item's blocked-by list
 # (bin/fm-backlog-transition-lib.sh), reported as `unblocked:`.
 #
@@ -38,8 +38,9 @@
 # because the merge was not recorded.
 #
 # Output. One `close-at-merge:` line per closed item on stdout, one line per item left
-# open (`close-at-merge: not closed <id>: <reason>`: on stderr behind `actionable:` when
-# someone must act, on stdout when its own teardown will close it), and a summary line.
+# open (`close-at-merge: not closed <id>: <reason>`: on stdout only when the merged pull
+# request's own task still has its live record, which its teardown closes; on stderr
+# behind `actionable:` for every other item), and a summary line.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
 # left open; exit 1 when a body cannot be read (the line names the pull request URL and
 # the read error); exit 2 on a bad request. bin/fm-pr-merge.sh ignores the exit status:
@@ -154,10 +155,6 @@ consider() {  # <id> <proof-url> <where it was named>
     printf 'close-at-merge: %s is already done\n' "$id"
     return 0
   fi
-  if [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
-    left_open "$id" "it is an open owner call (a captain hold); answer or release it with bin/fm-captain-hold.sh before it can close"
-    return 0
-  fi
   out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_TASKS_AXI_REFUSE_OPEN_CALL=1 \
     "$SCRIPT_DIR/fm-tasks-axi.sh" "done" "$id" --pr "$proof" 2>&1)
   rc=$?
@@ -170,8 +167,14 @@ consider() {  # <id> <proof-url> <where it was named>
   first=$(printf '%s\n' "$out" | sed -n '1p')
   first=${first#fm-tasks-axi: }
   case "$first" in
-    *"has a live task record"*) left_open "$id" "bin/fm-tasks-axi.sh done refused it: $first" teardown ;;
-    *"open owner call"*|*"open captain call"*) left_open "$id" "it is an open owner call: $first" ;;
+    *"open owner call"*) left_open "$id" "it is an open owner call: $first" ;;
+    *"has a live task record"*)
+      if [ "$id" = "$TASK_ID" ]; then
+        left_open "$id" "bin/fm-tasks-axi.sh done refused it: $first" teardown
+      else
+        left_open "$id" "bin/fm-tasks-axi.sh done refused it: $first"
+      fi
+      ;;
     *) left_open "$id" "bin/fm-tasks-axi.sh done refused it: ${first:-failed with no output}" ;;
   esac
 }
