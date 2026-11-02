@@ -485,7 +485,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered exactly once in the `data/secondmates.md` of the operation's own data directory, when that home's own backlog, a different one from this, holds `<item-id>` open.
   A local home is read through tasks-axi in its own data directory.
   A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
-  Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, and a closed item, and each refusal names what to do next.
+  Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
+  A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
   An item the owner filed quotes the owner or captain in a way [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) lists once, after the triage report's heuristic.
   An open owner call is one [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `open` reports, and a call it cannot read counts as undecided.
   The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.

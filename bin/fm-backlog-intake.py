@@ -18,6 +18,11 @@ It reads `tasks-axi list` and `tasks-axi show` output on stdin and never writes.
                             read or interpreted.
   archived <archive> <id>   Exit 0 when <id> is a row of the markdown done archive.
   exists <id>               stdin: the same list output. Exit 0 when <id> is a row.
+  dependents <id>           stdin: `tasks-axi list --fields blocked_by` output. Prints
+                            one line per item that is not Done and is blocked by
+                            <id>. Exit 0 when at least one is printed, 1 when none
+                            is, 3 when the list cannot be read or has no blocked_by
+                            column.
   field <name>              stdin: `tasks-axi show --full` output. Prints that field
                             decoded (the body keeps its line breaks); exit 1 if absent.
   owner-filed               stdin: an item's title and body. Exit 0 when the text
@@ -241,6 +246,16 @@ def show_field(name, text):
     return None
 
 
+def dependents(item, text):
+    found = []
+    for row in list_rows(text):
+        if "blocked_by" not in row:
+            raise IntakeError("the backlog list has no blocked_by column")
+        if row.get("state") != "done" and item in row["blocked_by"].split(","):
+            found.append(row.get("id", ""))
+    return found
+
+
 def main(argv):
     if len(argv) < 2:
         sys.stderr.write(__doc__)
@@ -264,6 +279,11 @@ def run(command, args):
         return 0 if any(r["id"] == args[1] for block in archive_blocks(args[0]) for r in block) else 1
     if command == "exists" and len(args) == 1:
         return 0 if any(r.get("id") == args[0] for r in list_rows(sys.stdin.read())) else 1
+    if command == "dependents" and len(args) == 1:
+        found = dependents(args[0], sys.stdin.read())
+        if found:
+            print("\n".join(found))
+        return 0 if found else 1
     if command == "field" and len(args) == 1:
         value = show_field(args[0], sys.stdin.read())
         if value is None:

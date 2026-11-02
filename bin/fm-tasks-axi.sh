@@ -112,8 +112,10 @@
 #                             through tasks-axi; a remote home through bin/fm-on.sh.
 # Both stop at an item the owner filed (bin/fm-backlog-intake.py OWNER_PATTERN), an
 # open owner call (bin/fm-captain-hold.sh open, where a call it cannot read counts
-# as undecided), an item with a live task record, and a closed item; neither
-# combines with --pr, --report, --drop-file, or --note. The closing note records
+# as undecided), an item with a live task record, a closed item, and an item that
+# still blocks an open item (the refusal names those items and how to re-point
+# them; nothing re-points them for you); neither combines with --pr, --report,
+# --drop-file, or --note. The closing note records
 # the proof ("duplicate of <kept-id>", "moved to <home> as <id>").
 # FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes the `done`/`close` guard
 # also refuse an open captain hold on a row of any kind, inside the lock; without it a
@@ -361,7 +363,6 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
   marker="Merged from $label: $title"
   kept_lock_acquire "$kept"
   tmp=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-merge.XXXXXX" 2>/dev/null) \
-    || tmp=$(mktemp "$DATA/.fm-tasks-axi-merge.XXXXXX" 2>/dev/null) \
     || fail "cannot create a scratch file to merge into $kept"
   while [ "$attempt" -lt 3 ]; do
     attempt=$((attempt + 1))
@@ -431,6 +432,21 @@ guard_owner_items() {  # <id> <title> <body>
   fi
 }
 
+# A proof close leaves the work open elsewhere, so it must not release the open
+# items <id> still blocks. <next step> says how to re-point them for this proof.
+guard_open_dependents() {  # <id> <next step>
+  local list dependents status
+  list=$(fm_backlog_row_list "$DATA" --fields blocked_by) \
+    || fail "cannot read the backlog to find what $1 blocks, so nothing was closed: $(printf '%s\n' "$list" | sed -n '1p')"
+  dependents=$(printf '%s\n' "$list" | intake_python dependents "$1")
+  status=$?
+  case "$status" in
+    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. Re-point each one first: $2, then bin/fm-tasks-axi.sh unblock <dependent> --by $1" ;;
+    1) ;;
+    *) fail "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
+  esac
+}
+
 # --duplicate-of <kept> and --moved-to <home> <item>: close on checked proof,
 # without the owner's words. Runs with the item's row already probed (found).
 # Nothing is written until every check has passed.
@@ -456,6 +472,7 @@ guard_closing_proof() {
       queued|in_flight) ;;
       *) fail "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
     esac
+    guard_open_dependents "$id" "bin/fm-tasks-axi.sh block <dependent> --by $kept"
     append_to_kept "$kept" "duplicate $id" "$title" "$body"
     GUARD_ARGS=(--note "duplicate of $kept")
     LEDGER_CLOSE_ARGS=(--duplicate-of "$kept")
@@ -493,6 +510,7 @@ guard_closing_proof() {
       queued|in_flight) ;;
       *) fail "$home_id's item $item is not open (Queued or In flight); moved work must be open in the new home" ;;
     esac
+    guard_open_dependents "$id" "bin/fm-tasks-axi.sh hold <dependent> --reason \"waits for $item in $home_id\" (a blocker cannot name an item in another backlog)"
     GUARD_ARGS=(--note "moved to $home_id as $item")
     LEDGER_CLOSE_ARGS=(--moved-to "$home_id" "$item")
   fi
@@ -903,7 +921,6 @@ case "$TASK_COMMAND" in
       # Capture the add's stdout: the objective record and the fleet ledger both
       # need the id tasks-axi stored, and a failed capture must not file unrecorded.
       add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null) \
-        || add_out=$(mktemp "$DATA/.fm-tasks-axi-add.XXXXXX" 2>/dev/null) \
         || fail "cannot create a scratch file to record the add's objective"
       tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$add_out"
       add_status=$?

@@ -1978,6 +1978,37 @@ SH
   assert_contains "$out" "fm-teardown.sh live-c-$label" "a live task in an overridden state directory closed"
 }
 
+test_closing_proofs_keep_open_dependents_blocked() {
+  local dir out before
+  dir=$(make_split proof-dependents)
+  make_peer_home "$dir/sm1" dp-open
+  printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
+  wrapper_from_code "$dir" add dp-kept "Normalize the archive header spacing" --objective O7 --kind docs >/dev/null
+  wrapper_from_code "$dir" add dp-dup "Align heading gaps inside the done ledger" --objective O7 --kind docs --body DUP-BODY >/dev/null
+  wrapper_from_code "$dir" add dp-dup-long "Retire the spent fixture cache" --objective O7 --kind docs >/dev/null
+  wrapper_from_code "$dir" add dp-closer "Survey the pending release notes" --objective O7 --kind docs --blocked-by dp-dup >/dev/null
+  wrapper_from_code "$dir" "done" dp-closer >/dev/null || fail "could not close a plain dependent"
+  wrapper_from_code "$dir" add dp-near "Compact the notes folder layout" --objective O7 --kind docs --blocked-by dp-dup-long >/dev/null
+  wrapper_from_code "$dir" add dp-dep "Rotate the stale mirror credentials" --objective O7 --kind docs --blocked-by dp-kept --blocked-by dp-dup >/dev/null
+  before=$(cat "$dir/home/data/backlog.md")
+  out=$(refusal_of "$dir" "duplicate with a dependent" "done" dp-dup --duplicate-of dp-kept)
+  assert_contains "$out" "still blocks open items: dp-dep" "the refusal did not name the dependent"
+  assert_not_contains "$out" "dp-near" "the refusal named an item blocked by a different id"
+  assert_not_contains "$out" "dp-closer" "the refusal named a Done dependent"
+  assert_contains "$out" "unblock <dependent> --by dp-dup" "the refusal did not say how to clear the old blocker"
+  assert_contains "$out" "block <dependent> --by dp-kept" "the refusal did not say how to re-point the dependent"
+  out=$(refusal_of "$dir" "move with a dependent" "done" dp-dup --moved-to sm-one dp-open)
+  assert_contains "$out" "still blocks open items: dp-dep" "the move refusal did not name the dependent"
+  assert_contains "$out" "hold <dependent>" "the move refusal did not say how to keep the dependent waiting"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused proof close changed the backlog"
+  assert_equals "dp-kept,dp-dup" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  blocked_by: *//p' | tr -d '"')" "a refused proof close released the dependent"
+  # Once the open dependent is re-pointed, the close goes through; the Done one never counted.
+  wrapper_from_code "$dir" unblock dp-dep --by dp-dup >/dev/null || fail "could not clear the blocker"
+  out=$(wrapper_from_code "$dir" "done" dp-dup --duplicate-of dp-kept 2>&1) || fail "a re-pointed duplicate was refused: $out"
+  [ "$(row_state "$dir" dp-dup)" = x ] || fail "the re-pointed duplicate did not close"
+  pass "fm-tasks-axi.sh refuses a proof close while the item still blocks open items, and closes once they are re-pointed"
+}
+
 test_closing_proofs_leave_the_owners_items_alone() {
   local dir out
   dir=$(make_split proof-owner)
@@ -2127,6 +2158,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_dup_of_and_not_dup_do_what_the_refusal_says
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
+  test_closing_proofs_keep_open_dependents_blocked
   test_closing_proofs_leave_the_owners_items_alone
   test_closing_proofs_serialize_with_holds_and_live_tasks || exit "$?"
 else
