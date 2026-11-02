@@ -1,0 +1,8 @@
+HEAD=1ebbbaebf17e965ed23edc7d20717919ff62f6ed
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-slack-deadline.test.sh
+slow check elapsed: 33.611s; request timings: [{"method": "conversations.open", "timeout": 10, "seconds": 0.0004592920304276049}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005444169510155916}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0005948750185780227}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005420420202426612}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0004344999906606972}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0005951249622739851}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0005127910408191383}, {"method": "conversations.history", "timeout": 10, "seconds": 0.0006847080076113343}, {"method": "chat.postMessage", "timeout": 10, "seconds": 0.0003748330054804683}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0004879579646512866}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0006377079989761114}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.0003820830024778843}, {"method": "conversations.replies", "timeout": 10, "seconds": 0.00025820796145126224}]
+ok - slow standing check completes after 33.611s; four cards remain four on repeat
+ok - watcher lets 4 requests of 3s each finish under a 6s no-progress bound
+ok - longest silent read ends after 10.002s, before owner no-progress bound 30s; one report per episode
+hanging request timings: [{"method": "conversations.replies", "timeout": 10, "seconds": 10.002206165983807}, {"method": "conversations.replies", "timeout": 10, "seconds": 10.002234250016045}]
+exit=0

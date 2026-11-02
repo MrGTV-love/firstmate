@@ -1,0 +1,13 @@
+HEAD=1ebbbaebf17e965ed23edc7d20717919ff62f6ed
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-spawn-herdr-launch-shell.test.sh
+ok - staged normal Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged raw Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged secondmate Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - omp destination-shell launch matches record without contaminating shell or bare resume
+ok - omp destination-shell launch matches record without contaminating shell or bare resume
+ok - codex destination-shell launch matches record without contaminating shell or bare resume
+ok - codex destination-shell launch matches record without contaminating shell or bare resume
+ok - codex destination-shell launch matches record without contaminating shell or bare resume
+ok - omp destination-shell launch matches record without contaminating shell or bare resume
+ok - omp destination-shell launch matches record without contaminating shell or bare resume
+exit=0

@@ -1,0 +1,7 @@
+HEAD=1ebbbaebf17e965ed23edc7d20717919ff62f6ed
+$ bin/fm-proc-budget.sh --own-procs 128 -- bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO teardown-unlanded: exemptions=1
+INFO inventory: active=168 retired=16 beyond_audit=13 excluded=1 unregistered=292 audited=30 beyond_audit_active=142 sites=961 mapped=669
+LINT_SUMMARY mode=enforce guards=168 violations=292 allowlisted=292 stale=0 shown=0 sites=961
+exit=0
