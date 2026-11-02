@@ -1762,6 +1762,31 @@ SH
   pass "an archived row's merged, priority, and hold tails are not scored as title words"
 }
 
+test_archived_title_words_in_parentheses_stay_in_the_title() {
+  local dir out
+  dir=$(make_split archive-title-words)
+  wrapper_from_code "$dir" add pw-clean "Fix the lock crash (process cleanup)" --objective O7 --kind docs --repo firstmate >/dev/null || fail "could not file the first row"
+  wrapper_from_code "$dir" add pw-report "Survey kiosk (report action 3)" --objective O7 --kind docs >/dev/null || fail "could not file the report row"
+  wrapper_from_code "$dir" add pw-prod "Mend gateway (production)" --objective O7 --kind docs >/dev/null || fail "could not file the production row"
+  wrapper_from_code "$dir" add pw-pr "Trim ferry (pr 123)" --objective O7 --kind docs >/dev/null || fail "could not file the pr row"
+  wrapper_from_code "$dir" add pw-blocked "Mend loom (blocked-by tide)" --objective O7 --kind docs >/dev/null || fail "could not file the blocked row"
+  for id in pw-clean pw-report pw-prod pw-pr pw-blocked; do
+    wrapper_from_code "$dir" "done" "$id" --keep 0 >/dev/null || fail "could not close and prune $id"
+    assert_no_grep "$id" "$dir/home/data/backlog.md" "$id was not pruned"
+  done
+  out=$(refusal_of "$dir" "process cleanup" add pw-new "Process cleanup" --objective O7)
+  assert_contains "$out" "pw-clean (Done, archived, overlap 0.40) Fix the lock crash (process cleanup)" "(process cleanup) was stripped as a tail"
+  out=$(refusal_of "$dir" "report action" add pw-new "Report action" --objective O7)
+  assert_contains "$out" "pw-report (Done, archived, overlap 0.50) Survey kiosk (report action 3)" "(report action 3) was stripped as a tail"
+  out=$(refusal_of "$dir" "production gateway" add pw-new "Production gateway" --objective O7)
+  assert_contains "$out" "pw-prod (Done, archived, overlap 0.67) Mend gateway (production)" "(production) was stripped as a tail"
+  out=$(refusal_of "$dir" "ferry 123" add pw-new "Ferry 123" --objective O7)
+  assert_contains "$out" "pw-pr (Done, archived, overlap 0.67) Trim ferry (pr 123)" "(pr 123) was stripped as a tail"
+  out=$(refusal_of "$dir" "blocked tide" add pw-new "Blocked tide" --objective O7)
+  assert_contains "$out" "pw-blocked (Done, archived, overlap 0.50) Mend loom (blocked-by tide)" "(blocked-by tide) was stripped as a tail"
+  pass "an archived row keeps the parenthesized words of its title and loses only the tails tasks-axi writes"
+}
+
 test_intake_flags_refuse_empty_values_and_a_repeated_not_dup() {
   local dir out flag before
   dir=$(make_split intake-flag-values)
@@ -2396,6 +2421,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_dup_of_repeat_needs_the_whole_block
   test_archived_blocked_by_rows_keep_their_title_score
   test_archived_merged_row_keeps_its_title_score
+  test_archived_title_words_in_parentheses_stay_in_the_title
   test_intake_flags_refuse_empty_values_and_a_repeated_not_dup
   test_backlog_guards_log_each_refusal_and_escape
   test_duplicate_of_closes_on_checked_proof

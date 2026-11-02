@@ -163,7 +163,7 @@ def list_rows(text):
 
 ARCHIVE_ROW = re.compile(r"^- \[x\] (\S+) - (.*)$")
 ARCHIVE_TAIL = re.compile(
-    r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by|merged |priority: |hold: |hold-kind: |hold-until:? )[^)]*\)"
+    r"\s*(?:\((?:repo: |kind: |done |reported |since |merged |priority: |hold: |hold-kind: |hold-until:? )[^)]*\)"
     r"|blocked-by: \S+|https?://\S+|data/\S+)\s*$"
 )
 
