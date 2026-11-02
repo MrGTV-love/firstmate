@@ -14,7 +14,9 @@ freeze records exact selected criteria bytes at state/<task>.dod.<sha256>.md;
 spawn records dod_file and dod_sha256 before launching the worker and preserves
 both on relaunch. Existing tasks without a dispatch snapshot cannot claim one
 retroactively; bin/fm-review-record.py verify --machine-checked reports them as
-not machine-checked and keeps the existing merge contract.
+not machine-checked and keeps the existing merge contract. bin/fm-promote.sh
+does not refreeze: a promoted scout's evidence resolves against its scout-time
+snapshot.
 dispatch submits only those frozen bytes and the exact PR head to
 dod-evidence.yml on the repository default branch through gh-axi, so the
 workflow, this checker and the weakened-test detector run from code the PR
@@ -67,7 +69,7 @@ The resolver requires GitHub's successful default-branch run record and its
 exact-head artifact, not a model's statement of success. verify exits 3 when
 hosted or local evidence cannot be reached and 1 when evidence was read and
 does not resolve.
-Test paths named anywhere in an item's fields use tests/<name>.test.sh.
+Test paths named anywhere in the frozen criteria use tests/<name>.test.sh.
 For changed named tests, the HEAD test is overlaid onto an exported merge-base
 tree: absence of a new test on base is not fail-first proof. Other files stay
 at base. Trees are git archives of exact full commits, never the caller's dirty

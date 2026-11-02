@@ -332,13 +332,15 @@
       "retirement_decision": "keep 2026-10-26: 0 denies and 0 warns across 104 opportunities is the designed state for a fail-closed refusal, not evidence it is dead weight; every spawn in the window carried a complete brief, and cutting it would widen what a fresh spawn accepts without a reassessment of that guard's harm model",
       "owner": "bin/fm-dod-lib.sh",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "spawn-brief-dod-placeholders deny", "count": 2}
+        {"file": "bin/fm-spawn.sh", "match": "spawn-brief-dod-placeholders deny", "count": 2},
+        {"file": "bin/fm-spawn.sh", "match": "Definition Of Done snapshot refused", "count": 1},
+        {"file": "bin/fm-dod-check.py", "match": "criteria owner refused input", "count": 1}
       ],
-      "invariant": "a dispatch refuses a brief whose Definition of Done still holds scaffold tokens",
+      "invariant": "a dispatch refuses a brief whose Definition of Done is missing, still holds scaffold tokens, or has unusable mandatory items",
       "layer": "runtime-block",
       "source": "brief Definition Of Done section body or its DoD file",
-      "trigger": "any of the five DoD tokens remains in the section or the referenced file",
-      "remedy": "edit <brief> and fill the listed DoD tokens, or add an unfenced line 'DoD file: <absolute path>' to the section; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
+      "trigger": "a fresh ship or scout spawn finds no section, any of the five DoD tokens in the section or the referenced file, no well-formed mandatory item, or a mandatory Authority gate item with no single-line Check, or cannot freeze the selected criteria",
+      "remedy": "edit <brief> and fill the listed DoD tokens with each mandatory item as bash bin/fm-dod-lib.sh --shape prints it, or add an unfenced line 'DoD file: <absolute path>' to the section; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
       "budget": 1,
       "test": "tests/fm-brief.test.sh",
       "tier": "B",
