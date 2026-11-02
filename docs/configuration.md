@@ -706,7 +706,15 @@ Role is never inferred from GitHub identity, forge permissions, remotes, reposit
 `bin/fm-role.sh report` prints the resolved role with no network call, and the session-start digest shows it in the HOME ROLE subsection.
 
 `bin/fm-role-lib.sh` owns the fail-closed parser, self-repository detection, and the gate that `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh` apply.
-The publication target is selected from the first configured remote in the order `upstream`, `github`, `origin`; see `bin/fm-role-lib.sh` for URL and local-path normalization.
+The publication target is the repository the task's delivery mode publishes to, and each caller passes that mode.
+A `no-mistakes` task is checked against `origin` alone, because the no-mistakes pipeline opens its pull request against the repository's origin remote whatever other remotes exist.
+The gate also reads, never writes, the no-mistakes registration for the project (`<NM_HOME>/state.sqlite`, default `~/.no-mistakes`), because the pipeline publishes to its registered destination and keeps the prior registration when its run-start refresh from origin fails.
+A registration that names another repository is refused: the denial names origin and the registered destination, and the owner must reconcile the no-mistakes registration.
+A registry that exists but cannot be read is refused too.
+A project with no registration, or a home with no registry database, is checked against `origin` alone.
+A `direct-PR` task, and a caller that names no mode (`bin/fm-role.sh check` without `mode`), publishes through `gh` and is checked against the first configured remote in the order `upstream`, `github`, `origin`.
+A `local-only` task publishes nothing and never reaches the gate.
+A missing `origin` on a `no-mistakes` task is an undeterminable target and is refused; see `bin/fm-role-lib.sh` for URL and local-path normalization.
 A task's project counts as the firstmate repository when it shares the code root's lineage - the same git common dir, or a root commit of the code root's history, which every fork, the parent, and any clone of either share - computed offline; undeterminable lineage (for example a shallow clone sharing no root commit) and an undeterminable publication target are refused, even under task consent.
 Secondmate homes inherit the primary's resolved role, never its raw file: a primary file that resolves to user for any reason propagates as revocation.
 In a secondmate home the file is honored only while the inheritance receipt `config/.fm-inherit-firstmate-role.generation` proves the exact bytes the primary last published (`bin/fm-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
