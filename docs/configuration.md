@@ -762,9 +762,14 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
 Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
-These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
-When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except two named shapes.
+First, when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
+Second, the prune counts these exact paths under an ignored `data/` and `state/` as scratch, although teardown preserves both directories: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
+Firstmate's own tooling writes these during ordinary runs.
+The match is by exact path, never by name, and a scratch name such as `node_modules` under `data/` or `state/` is not scratch there.
+Any other ignored file under `data/` or `state/` is unique work, so the copy stays.
+A nested repository with no commit and nothing else in it carries no work, so it does not keep the copy.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
