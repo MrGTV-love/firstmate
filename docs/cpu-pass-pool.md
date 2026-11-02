@@ -75,7 +75,7 @@ A run that leaves `running`, reaches CI-ready or parks for its agent releases it
 
 ### Admission formula
 
-The first waiter in class order is admitted when, in bytes:
+Subject to the one-start minimum and pause-only backstop below, the first waiter in class order is admitted when, in bytes:
 
 ```text
 (counted + 1) x R + S  <=  B          where  B = available_bytes + held
@@ -89,7 +89,7 @@ The first waiter in class order is admitted when, in bytes:
 | `available_bytes` | free, file-backed and purgeable pages, never compressed or swapped memory | one `bin/fm-mem-guard.py` `admission_sample()` reading: a waiting start may reuse one up to 2 s old, but each grant takes a new reading, with the process-count reading, so a signal that turns bad after a healthy read cannot admit |
 | `held` | resident memory the counted runs hold now, summed over their process trees with each run's share capped at `R`; a run the reading cannot see yet holds 0 | the same reading, keyed `no-mistakes:<repo_id>/<run id>` |
 
-`B` is the memory the counted runs may still use plus what the host has free, so the inequality is the same as "the reservations of the counted runs, the new run and one tail run fit the host's available memory": a counted run's reservation is partly already held, and `held` counts that part once.
+`B` combines available memory with the portion of each counted run's reservation already held, so the inequality checks whether the remaining reservations for counted runs, the new run and one tail run fit in available memory.
 A run that holds more than `R` adds only `R` to `B`, so its excess is never treated as free memory for new starts.
 A run that is registered but not yet visible in the reading therefore reserves its whole `R` in the next decision.
 With no counted run, one start is admitted even when the inequality does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
