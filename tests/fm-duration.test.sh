@@ -693,9 +693,9 @@ if shutil.which('tasks-axi'):
     assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2']
     shown = subprocess.run([str(owner / 'bin/fm-tasks-axi.sh'), 'show', first + '-2', '--full'], env=dict(worker_env, FM_HOME=str(owner)), capture_output=True, text=True, check=True)
     assert 'state: queued' in shown.stdout and first in shown.stdout
-    # The recurrence names the item it follows as judged different, and the wrapper records the choice.
+    # Each filing, the recurrence included, gets its objective row.
     review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
-    assert [(r[0], r[2], r[4] if len(r) > 4 else '') for r in review] == [(first, 'O7', ''), (first + '-2', 'O7', first)], review
+    assert [(r[0], r[2]) for r in review] == [(first, 'O7'), (first + '-2', 'O7')], review
     # A recurrence after default Done retention archived the previous item, still within the 50 newest Done items.
     subprocess.run(['tasks-axi', 'done', first + '-2', '--note', 'limit repaired again', '--keep', '0'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
     assert first + '-2' not in (owner / 'data/backlog.md').read_text()
@@ -705,7 +705,7 @@ if shutil.which('tasks-axi'):
     owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
     assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2', first + '-3']
     review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
-    assert (first + '-3', 'O7', first + '-2') == (review[-1][0], review[-1][2], review[-1][4]), review
+    assert (first + '-3', 'O7') == (review[-1][0], review[-1][2]), review
     # A row that cannot be recorded stops the filing: the item is not filed and the ledger does not call it filed.
     sidecar = owner / 'data/backlog-review.tsv'
     saved = sidecar.read_text()

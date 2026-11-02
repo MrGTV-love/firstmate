@@ -84,16 +84,17 @@
 # `--objective none --objective-reason "<why>"`. An unknown id, or `none` with no
 # reason, is refused, and so is an `--dup-of` or `--not-dup` without one. The
 # objective and its reason land in data/backlog-review.tsv, one line per filed
-# item (id, review-by left empty, objective, reason, plus the `--not-dup`
-# neighbours when named), because tasks-axi has no field for them. The file is
+# item (id, review-by left empty, objective, reason), because tasks-axi has no
+# field for them. The file is
 # checked writable before anything is filed, and an item whose line fails to
 # write is removed again. An add whose title overlaps a Queued or In flight item,
 # or one of the 50 newest Done items, is refused with the three best neighbours
 # and the two overrides as full commands: `--dup-of <kept-id>` appends the new
 # title and body to that kept item in the active backlog through `tasks-axi
 # update --archive-body` and files nothing (an item that is only in the done
-# archive is refused with a pointer to `--not-dup`), and `--not-dup <id>` files
-# the item and records which qualifying neighbour was judged different. A backlog
+# archive is refused with a pointer to `--not-dup`), and `--not-dup <id>`, which
+# must name a qualifying neighbour, files the item. An add is never its own
+# neighbour, and `--dup-of` its own id is refused. A backlog
 # or done archive that cannot be read stops the add. bin/fm-backlog-intake.py
 # owns the overlap rule, the Done window, and the owner-filed pattern; the
 # objective list is docs/objectives.md; docs/configuration.md states the rule.
@@ -435,15 +436,15 @@ guard_owner_items() {  # <id> <title> <body>
 }
 
 # A proof close leaves the work open elsewhere, so it must not release the open
-# items <id> still blocks. <next step> says how to re-point them for this proof.
-guard_open_dependents() {  # <id> <next step>
+# items <id> still blocks. <advice> says how to re-point them for this proof.
+guard_open_dependents() {  # <id> <advice>
   local list dependents status
   list=$(fm_backlog_row_list "$DATA" --fields blocked_by) \
     || fail "cannot read the backlog to find what $1 blocks, so nothing was closed: $(printf '%s\n' "$list" | sed -n '1p')"
   dependents=$(printf '%s\n' "$list" | intake_python dependents "$1")
   status=$?
   case "$status" in
-    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. Re-point each one first: for a dependent with no hold, $2; then, for every dependent, bin/fm-tasks-axi.sh unblock <dependent> --by $1. A dependent already on a hold keeps that hold and needs only the unblock step, because a new hold replaces the old one and can erase an owner call." ;;
+    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. $2" ;;
     1) ;;
     *) fail "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
   esac
@@ -474,7 +475,7 @@ guard_closing_proof() {
       queued|in_flight) ;;
       *) fail "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
     esac
-    guard_open_dependents "$id" "bin/fm-tasks-axi.sh block <dependent> --by $kept (the kept item $kept itself needs only the unblock step)"
+    guard_open_dependents "$id" "Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by $kept, then bin/fm-tasks-axi.sh unblock <dependent> --by $id (the kept item $kept itself needs only the unblock step)."
     append_to_kept "$kept" "duplicate $id" "$title" "$body"
     GUARD_ARGS=(--note "duplicate of $kept")
     LEDGER_CLOSE_ARGS=(--duplicate-of "$kept")
@@ -512,7 +513,7 @@ guard_closing_proof() {
       queued|in_flight) ;;
       *) fail "$home_id's item $item is not open (Queued or In flight); moved work must be open in the new home" ;;
     esac
-    guard_open_dependents "$id" "bin/fm-tasks-axi.sh hold <dependent> --reason \"waits for $item in $home_id\" (a blocker cannot name an item in another backlog)"
+    guard_open_dependents "$id" "Re-point each one first: for a dependent with no hold, bin/fm-tasks-axi.sh hold <dependent> --reason \"waits for $item in $home_id\" (a blocker cannot name an item in another backlog); then, for every dependent, bin/fm-tasks-axi.sh unblock <dependent> --by $id. A dependent already on a hold keeps that hold and needs only the unblock step, because a new hold replaces the old one and can erase an owner call."
     GUARD_ARGS=(--note "moved to $home_id as $item")
     LEDGER_CLOSE_ARGS=(--moved-to "$home_id" "$item")
   fi
@@ -526,10 +527,10 @@ ADD_BODY=
 ADD_OBJECTIVE=
 ADD_REASON=
 ADD_DUP_OF=
+ADD_ID=
 ADD_NOT_DUP=()
 ADD_HELP=0
 ADD_NEIGHBOURS=
-ADD_NOT_DUP_RECORDED=
 parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
   local tokens=("$@") i=0 j token expect='' mint=0 body_file='' flag_title=''
   local positionals=() kept=()
@@ -579,6 +580,7 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
   if [ "$mint" = 1 ]; then
     ADD_TITLE=${positionals[0]:-}
   else
+    ADD_ID=${positionals[0]:-}
     ADD_TITLE=${positionals[1]:-}
   fi
   [ -z "$flag_title" ] || ADD_TITLE=$flag_title
@@ -643,10 +645,13 @@ guard_intake() {
   if [ -n "$ADD_DUP_OF" ] && [ "${#ADD_NOT_DUP[@]}" -gt 0 ]; then
     fail "give --dup-of or --not-dup, not both"
   fi
+  if [ -n "$ADD_DUP_OF" ] && [ "$ADD_DUP_OF" = "$ADD_ID" ]; then
+    fail "--dup-of names this add's own id $ADD_ID; an item cannot be a duplicate of itself, so nothing was filed or appended"
+  fi
   [ -n "$ADD_TITLE" ] || return 0
   list=$(fm_backlog_row_list "$DATA") \
     || fail "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
-  ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(intake_archive)")
+  ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(intake_archive)" "$ADD_ID")
   status=$?
   case "$status" in
     0|1) ;;
@@ -672,7 +677,7 @@ NEIGHBOURS
   if [ "${#ADD_NOT_DUP[@]}" -gt 0 ]; then
     for id in "${ADD_NOT_DUP[@]}"; do
       case "$neighbour_ids" in
-        *" $id "*) ADD_NOT_DUP_RECORDED="${ADD_NOT_DUP_RECORDED:+$ADD_NOT_DUP_RECORDED,}$id" ;;
+        *" $id "*) ;;
         *)
           if printf '%s\n' "$list" | intake_python exists "$id" || intake_python archived "$(intake_archive)" "$id"; then
             printf 'fm-tasks-axi: --not-dup %s names an item whose title does not overlap this one enough to be a neighbour; nothing was filed\n' "$id" >&2
@@ -716,7 +721,7 @@ NEIGHBOURS
     else
       printf '  (every neighbour is Done and archived, so --dup-of has no item to append to)\n'
     fi
-    printf '  the work is different - file it and record that %s was judged different:\n    %q' "$keep_line" "$0"
+    printf '  the work is different from %s - file it:\n    %q' "$keep_line" "$0"
     printf ' %q' "${ORIG_ARGS[@]}" --not-dup "$keep_line"
     printf '\n'
   } >&2
@@ -724,7 +729,7 @@ NEIGHBOURS
 }
 
 # One line per filed item in data/backlog-review.tsv: id, review-by (empty),
-# objective, reason, and the --not-dup neighbours when the filer named any. A row
+# objective, and reason. A row
 # that cannot be written removes the item again, so an item never stays filed
 # without its row.
 intake_record() {  # <captured-add-stdout-file>
@@ -732,7 +737,6 @@ intake_record() {  # <captured-add-stdout-file>
   added_fields "$1" || return 0
   reason=$(printf '%s' "$ADD_REASON" | tr '\t\n' '  ')
   row=$(printf '%s\t\t%s\t%s' "$ADDED_ID" "$ADD_OBJECTIVE" "$reason")
-  [ -z "$ADD_NOT_DUP_RECORDED" ] || row="$row"$'\t'"$ADD_NOT_DUP_RECORDED"
   printf '%s\n' "$row" >> "$DATA/backlog-review.tsv" && return 0
   if fm_backlog_mutate "$DATA" rm "$ADDED_ID"; then
     printf 'fm-tasks-axi: could not record the objective of %s in %s/backlog-review.tsv, so the item was removed again; nothing is filed\n' "$ADDED_ID" "$DATA" >&2

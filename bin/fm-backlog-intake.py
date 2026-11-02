@@ -4,7 +4,7 @@
 bin/fm-tasks-axi.sh calls this helper for every judgment it cannot make in shell.
 It reads `tasks-axi list` and `tasks-axi show` output on stdin and never writes.
 
-  neighbours <title> [<archive>]
+  neighbours <title> [<archive> [<own-id>]]
                             stdin: `tasks-axi list` output. Prints one
                             "<id>\\t<state>\\t<score>\\t<source>\\t<title>" line for every
                             open item and every one of the newest RECENT_DONE Done
@@ -15,7 +15,8 @@ It reads `tasks-axi list` and `tasks-axi show` output on stdin and never writes.
                             from the markdown done archive <archive> when given. Exit
                             0 when at least one is printed, 1 when none is, 3 (with a
                             reason on stderr) when the list or the archive cannot be
-                            read or interpreted.
+                            read or interpreted. The row <own-id> (the add's
+                            own id) is never its own neighbour.
   archived <archive> <id>   Exit 0 when <id> is a row of the markdown done archive.
   exists <id>               stdin: the same list output. Exit 0 when <id> is a row.
   dependents <id>           stdin: `tasks-axi list --fields blocked_by` output. Prints
@@ -209,7 +210,7 @@ def archive_rows(path, count):
     return rows[:count]
 
 
-def neighbours(title, text, archive=None):
+def neighbours(title, text, archive=None, own=""):
     """Every open item and newest-Done item whose title overlaps `title`, best first."""
     mine = words(title[:TITLE_LIST_LIMIT])
     if not mine:
@@ -228,6 +229,8 @@ def neighbours(title, text, archive=None):
             if done_seen > RECENT_DONE:
                 continue
         elif state not in ("queued", "in_flight"):
+            continue
+        if own and row.get("id") == own:
             continue
         score = overlap(mine, words(row.get("title", "")[:TITLE_LIST_LIMIT]))
         if score >= THRESHOLD:
@@ -268,8 +271,8 @@ def main(argv):
 
 
 def run(command, args):
-    if command == "neighbours" and len(args) in (1, 2):
-        found = neighbours(args[0], sys.stdin.read(), args[1] if len(args) == 2 else None)
+    if command == "neighbours" and len(args) in (1, 2, 3):
+        found = neighbours(args[0], sys.stdin.read(), args[1] if len(args) >= 2 else None, args[2] if len(args) == 3 else "")
         for score, row in found:
             title = row.get("title", "").replace("\t", " ").replace("\n", " ")
             print("%s\t%s\t%.2f\t%s\t%s" % (row.get("id", ""), row.get("state", ""), score, row.get("source", ""), title))

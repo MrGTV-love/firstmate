@@ -546,7 +546,7 @@ def own_timeout(key, milliseconds, event_id=None):
         # The wrapper stops a title that overlaps another item and prints the neighbours.
         # This title carries the command key, so the recurrence names the item it follows
         # as judged different; any other neighbour is a different key's work and is named
-        # the same way. The wrapper records the choice with the new item.
+        # the same way.
         if result.returncode == 2 and '--not-dup' in result.stderr:
             listed = re.findall(r'^  (\S+) \(', result.stderr, re.M)
             judged = previous if previous in listed else (listed[0] if listed else None)

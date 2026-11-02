@@ -1160,9 +1160,8 @@ test_add_records_task_filed_once() {
 
   # tasks-axi reports an add of an existing id as already present and exits 0;
   # nothing was filed, so nothing is recorded.
-  # A repeat of the same item is judged as a duplicate of itself now, so it names
-  # itself with --not-dup before tasks-axi answers it.
-  wrapper_from_code "$dir" add --objective O7 ship-a "a ship item" --kind ship --not-dup ship-a >/dev/null 2>&1 || fail "repeat add failed"
+  # An add is never its own neighbour, so the repeat reaches tasks-axi unprompted.
+  wrapper_from_code "$dir" add --objective O7 ship-a "a ship item" --kind ship >/dev/null 2>&1 || fail "repeat add failed"
   assert_equals 1 "$(wc -l < "$dir/home/state/fleet-ledger.jsonl" | tr -d ' ')" "records after a repeated add"
 
   # A minted id, --json output, and absent fields are read from what tasks-axi stored.
@@ -1475,9 +1474,11 @@ test_add_judges_near_duplicate_titles() {
     assert_contains "$out" "usage: tasks-axi" "$sp --help did not print help"
   done
   assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "help changed the backlog"
-  # A repeat of an existing id is judged like any other title.
-  out=$(refusal_of "$dir" "repeat of an id" add dup-base "$PAIR_BASE" --objective O7)
-  assert_contains "$out" "dup-base (Queued, overlap 1.00)" "a repeated id escaped the check"
+  # A repeat of an existing id is never its own neighbour; tasks-axi answers it and nothing changes.
+  out=$(wrapper_from_code "$dir" add dup-base "$PAIR_BASE" --objective O7 2>&1) || fail "a repeated id was refused: $out"
+  assert_not_contains "$out" "overlap" "a repeated id was listed as its own neighbour"
+  assert_contains "$out" "already" "the repeat did not reach tasks-axi"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a repeated id changed the backlog"
   # Overlap order and the top three: four open qualifying items and an archived Done one.
   dir=$(make_split intake-order)
   wrapper_from_code "$dir" add ord-o4 "alpha bravo" --objective O7 >/dev/null
@@ -1502,7 +1503,7 @@ test_add_judges_near_duplicate_titles() {
   # A fourth qualifying item is never listed but --not-dup may still name it.
   wrapper_from_code "$dir" add ord-new "alpha bravo charlie delta echo" --objective O7 --not-dup ord-o4 >/dev/null \
     || fail "--not-dup naming a neighbour outside the top three was refused"
-  assert_grep "$(printf 'ord-new\t\tO7\t\tord-o4')" "$dir/home/data/backlog-review.tsv" "the judged neighbour was not recorded with the item"
+  assert_equals "$(printf 'ord-new\t\tO7\t')" "$(grep '^ord-new	' "$dir/home/data/backlog-review.tsv")" "the --not-dup item's row is not the plain objective row"
   # In flight is a state a neighbour may have.
   dir=$(make_split intake-inflight)
   wrapper_from_code "$dir" add fly-1 "Rotate pager schedule weekly" --objective O7 >/dev/null
@@ -1640,6 +1641,10 @@ test_dup_of_and_not_dup_do_what_the_refusal_says() {
   assert_contains "$out" "--objective" "--dup-of skipped the objective"
   out=$(refusal_of "$dir" "not-dup without an objective" add ov-new "Teardown retire slot manifest again" --not-dup ov-kept)
   assert_contains "$out" "--objective" "--not-dup skipped the objective"
+  before=$(cat "$dir/home/data/backlog.md")
+  out=$(refusal_of "$dir" "dup-of its own id" add ov-kept "Teardown retire slot manifest" --objective O7 --dup-of ov-kept)
+  assert_contains "$out" "duplicate of itself" "--dup-of its own id was accepted"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "--dup-of its own id changed the backlog"
   out=$(refusal_of "$dir" "both overrides" add ov-new "Teardown retire slot manifest again" --objective O7 --dup-of ov-kept --not-dup ov-kept)
   assert_contains "$out" "not both" "both overrides were accepted"
   wrapper_from_code "$dir" prune --keep 0 >/dev/null || fail "could not archive the Done item"
@@ -1648,7 +1653,7 @@ test_dup_of_and_not_dup_do_what_the_refusal_says() {
   assert_contains "$out" "Done and archived" "an archived kept item was not reported"
   assert_contains "$out" "--not-dup ov-done" "the archived refusal did not point at --not-dup"
   assert_no_grep "ov-new" "$dir/home/data/backlog.md" "a refused --dup-of filed the item"
-  # --not-dup: any qualifying neighbour, listed or not, files the item once and is recorded.
+  # --not-dup: any qualifying neighbour, listed or not, files the item once.
   wrapper_from_code "$dir" add ov-n1 "Teardown retire slot manifest later" --objective O7 --not-dup ov-kept >/dev/null || fail "--not-dup naming a listed neighbour failed"
   wrapper_from_code "$dir" add ov-n2 "Teardown retire slot manifest sooner" --objective O7 --not-dup ov-kept >/dev/null || fail "--not-dup naming another neighbour failed"
   wrapper_from_code "$dir" add ov-n3 "Teardown retire slot manifest never" --objective O7 --not-dup ov-kept >/dev/null || fail "the third --not-dup add failed"
@@ -1657,7 +1662,7 @@ test_dup_of_and_not_dup_do_what_the_refusal_says() {
   wrapper_from_code "$dir" add ov-n4 "Teardown retire slot manifest" --objective O7 --not-dup ov-done >/dev/null \
     || fail "--not-dup naming an archived qualifying neighbour failed"
   [ "$(grep -c '^ov-n4	' "$dir/home/data/backlog-review.tsv")" = 1 ] || fail "ov-n4 was not recorded exactly once"
-  assert_grep "$(printf 'ov-n4\t\tO7\t\tov-done')" "$dir/home/data/backlog-review.tsv" "the judged neighbour was not recorded"
+  assert_equals "$(printf 'ov-n4\t\tO7\t')" "$(grep '^ov-n4	' "$dir/home/data/backlog-review.tsv")" "the --not-dup item's row is not the plain objective row"
   out=$(refusal_of "$dir" "not-dup naming a missing id" add ov-n5 "Teardown retire slot manifest" --objective O7 --not-dup ov-nope)
   assert_contains "$out" "names no item" "a missing --not-dup id was accepted"
   wrapper_from_code "$dir" add ov-far "Reticulate splines nightly" --objective O7 >/dev/null
@@ -1674,7 +1679,7 @@ test_dup_of_and_not_dup_do_what_the_refusal_says() {
   assert_present "$dir/raced" "the other writer never ran"
   assert_grep "OTHER-WRITER-TEXT" "$dir/home/data/backlog.md" "the append overwrote another writer's update"
   assert_grep "NEW-BODY" "$dir/home/data/backlog.md" "the append was lost beside another writer"
-  pass "--dup-of appends to an open or retained Done item and --not-dup files and records a qualifying neighbour, and neither runs without an objective or beside a lost update"
+  pass "--dup-of appends to an open or retained Done item and --not-dup files past a qualifying neighbour, and neither runs without an objective or beside a lost update"
 }
 
 test_dup_of_repeat_needs_the_whole_block() {
@@ -2029,7 +2034,7 @@ test_closing_proofs_keep_open_dependents_blocked() {
   wrapper_from_code "$dir" add dp-closer "Survey the pending release notes" --objective O7 --kind docs --blocked-by dp-dup >/dev/null
   wrapper_from_code "$dir" "done" dp-closer >/dev/null || fail "could not close a plain dependent"
   wrapper_from_code "$dir" add dp-near "Compact the notes folder layout" --objective O7 --kind docs --blocked-by dp-dup-long >/dev/null
-  wrapper_from_code "$dir" add dp-dep "Rotate the stale mirror credentials" --objective O7 --kind docs --blocked-by dp-kept --blocked-by dp-dup >/dev/null
+  wrapper_from_code "$dir" add dp-dep "Rotate the stale mirror credentials" --objective O7 --kind docs --blocked-by dp-dup >/dev/null
   wrapper_from_code "$dir" add dp-self "Mend the porch lantern wiring" --objective O7 --kind docs --blocked-by dp-dup >/dev/null
   wrapper_from_code "$dir" hold dp-dep --reason "waiting on a vendor" --kind external >/dev/null || fail "could not hold the dependent"
   before=$(cat "$dir/home/data/backlog.md")
@@ -2038,22 +2043,26 @@ test_closing_proofs_keep_open_dependents_blocked() {
   assert_not_contains "$out" "dp-near" "the refusal named an item blocked by a different id"
   assert_not_contains "$out" "dp-closer" "the refusal named a Done dependent"
   assert_contains "$out" "unblock <dependent> --by dp-dup" "the refusal did not say how to clear the old blocker"
-  assert_contains "$out" "for a dependent with no hold, bin/fm-tasks-axi.sh block <dependent> --by dp-kept" "the refusal did not say how to re-point the dependent"
-  assert_contains "$out" "A dependent already on a hold keeps that hold and needs only the unblock step" "the refusal did not spare a held dependent"
+  assert_contains "$out" "Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by dp-kept, then bin/fm-tasks-axi.sh unblock <dependent> --by dp-dup" "the refusal did not re-point every dependent"
+  assert_not_contains "$out" "keeps that hold" "the duplicate refusal let a held dependent skip the re-point"
+  assert_not_contains "$out" "fm-tasks-axi.sh hold" "the duplicate refusal printed a hold command"
   out=$(refusal_of "$dir" "kept item blocked by the duplicate" "done" dp-dup --duplicate-of dp-self)
   assert_contains "$out" "the kept item dp-self itself needs only the unblock step" "the refusal told the kept item to block itself"
+  assert_contains "$out" "unblock <dependent> --by dp-dup" "the kept-item refusal did not say how to clear the blocker"
   out=$(refusal_of "$dir" "move with a dependent" "done" dp-dup --moved-to sm-one dp-open)
   assert_contains "$out" "still blocks open items: dp-dep dp-self" "the move refusal did not name every dependent"
   assert_contains "$out" "for a dependent with no hold, bin/fm-tasks-axi.sh hold <dependent>" "the move refusal did not limit its hold step to a dependent with no hold"
   assert_contains "$out" "A dependent already on a hold keeps that hold and needs only the unblock step" "the move refusal did not spare a held dependent"
   assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused proof close changed the backlog"
-  assert_equals "dp-kept,dp-dup" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  blocked_by: *//p' | tr -d '"')" "a refused proof close released the dependent"
-  # Once the open dependent is re-pointed, the close goes through; the Done one never counted.
+  assert_equals "dp-dup" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  blocked_by: *//p' | tr -d '"')" "a refused proof close released the dependent"
+  # The held dependent follows the advice like any other; the Done one never counted.
+  wrapper_from_code "$dir" block dp-dep --by dp-kept >/dev/null || fail "could not re-point the held dependent"
   wrapper_from_code "$dir" unblock dp-dep --by dp-dup >/dev/null || fail "could not clear the blocker"
   wrapper_from_code "$dir" unblock dp-self --by dp-dup >/dev/null || fail "could not clear the kept item's blocker"
   assert_equals "external" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  hold_kind: *//p')" "the unblock step changed the dependent's hold"
   out=$(wrapper_from_code "$dir" "done" dp-dup --duplicate-of dp-kept 2>&1) || fail "a re-pointed duplicate was refused: $out"
   [ "$(row_state "$dir" dp-dup)" = x ] || fail "the re-pointed duplicate did not close"
+  assert_equals "dp-kept" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  blocked_by: *//p' | tr -d '"')" "the held dependent is not still waiting for the kept item"
   pass "fm-tasks-axi.sh refuses a proof close while the item still blocks open items, and closes once they are re-pointed"
 }
 

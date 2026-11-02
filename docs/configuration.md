@@ -454,7 +454,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
 - **Objective.**
   An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
   An unknown id, or `none` with no reason, is refused, and so is an add with no objective at all.
-  Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, `reason`, and the `--not-dup` neighbours when the filer named any.
+  Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, and `reason`.
   tasks-axi has no field for these values.
   The line is written for the id tasks-axi stored, a minted one included.
   An add stops before filing when the file cannot take a line, and an item whose line fails to write is removed again.
@@ -476,7 +476,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   A refusal exits 2, files nothing, lists the three highest-overlap neighbours (id, state, overlap, title), and prints both overrides as full commands:
   `--dup-of <kept-id>` appends the new title and body to that kept item in the active backlog and files nothing.
   A neighbour that is only in the done archive cannot take an appended note, so `--dup-of` it is refused and `--not-dup` is the way through.
-  `--not-dup <neighbour-id>` files the item and records which neighbour was judged different; it accepts any neighbour that meets the threshold, listed or not, and nothing else.
+  `--not-dup <neighbour-id>` files the item; it accepts any neighbour that meets the threshold, listed or not, and nothing else.
+  An add is never its own neighbour, and `--dup-of` naming the add's own id is refused.
   Both overrides still need an objective.
   The check shows neighbours and forces a choice; it cannot decide whether two titles are the same work.
   An unreadable backlog or done archive stops the add with a message and files nothing.
@@ -487,7 +488,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
   Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
   A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
-  A dependent already on a hold keeps that hold and needs only the unblock step, and so does a kept item that the duplicate blocks.
+  For `--duplicate-of`, every dependent, held or not, is re-pointed with `block <dependent> --by <kept-id>` and then `unblock <dependent> --by <id>`; the kept item itself needs only the unblock step.
+  For `--moved-to`, a dependent with no hold is held with a reason naming the moved item, and a dependent already on a hold keeps that hold and needs only the unblock step.
   An item the owner filed quotes the owner or captain in a way [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) lists once, after the triage report's heuristic.
   An open owner call is one [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `open` reports, and a call it cannot read counts as undecided.
   The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.
