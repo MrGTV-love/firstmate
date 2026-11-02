@@ -403,7 +403,8 @@ die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
 my @source_candidates = @inventory;
-my (%text, %edges, %unknown);
+my (%text, %edges, %runtime_imports, %unknown);
+our $child_parameters;
 sub contents {
     my ($path) = @_;
     return $text{$path} if exists $text{$path};
@@ -456,6 +457,14 @@ sub shell_word {
         my $char = substr($body, $$position, 1);
         last if !$quote && defined $stop && $char eq $stop;
         last if !$quote && $char =~ /[\s;&|<>()]/ && substr($body, $$position, 2) !~ /^[<>]\(/;
+        if (!$quote && !$literal && substr($body, $$position, 2) eq "\$'") {
+            $$position += 2;
+            while ($$position < length($body) && (my $part = substr($body, $$position++, 1)) ne "'") {
+                $part = substr($body, $$position++, 1) if $part eq '\\';
+                $value .= $part;
+            }
+            next;
+        }
         if (!$quote && $char eq "'") {
             my $end = index($body, "'", $$position + 1);
             $end = length $body if $end < 0;
@@ -498,6 +507,11 @@ sub shell_word {
         }
         if ($char eq '$' && !$literal) {
             pos($body) = $$position;
+            if ($child_parameters && $body =~ /\G\$(?:\{([0-9]+)\}|([0-9]))/gc) {
+                $$position = pos($body);
+                $value .= $child_parameters->{$1 // $2} // "\x01";
+                next;
+            }
             if ($body =~ /\G\$(?:[A-Za-z_]\w*|[0-9?!#*@-])/gc) {
                 $$position = pos($body);
                 $value .= "\x01";
@@ -536,8 +550,17 @@ sub source_dependency {
         $unknown{$path} = 1;
     }
 }
+# A child shell's program is runtime data ShellCheck never reads, so its imports
+# select the root without entering its read set, and nothing unresolved in it
+# makes the root unknown. Only a target spelled in the program is an import.
+sub scan_child_program {
+    my ($path, $program, $finite_backend, $parameters) = @_;
+    local $unknown{$path};
+    local $child_parameters = $parameters;
+    scan_program($path, $program, $runtime_imports{$path} //= {}, $finite_backend);
+}
 sub command_dependencies {
-    my ($path, $words, $deps, $finite_backend) = @_;
+    my ($path, $words, $deps, $finite_backend, $stdin) = @_;
     my @words = @$words;
     while (@words) {
         my $raw = $words[0]{raw} // $words[0]{value};
@@ -554,6 +577,34 @@ sub command_dependencies {
         source_dependency($path, $words[0], $deps, $finite_backend);
     } elsif ($command->{value} =~ /^(?:source|\.)$/) {
         source_dependency($path, $words[0], $deps, $finite_backend);
+    } else {
+        while ($command->{value} =~ /^(?:exec|command|env)$/ && @words) {
+            shift @words while @words && ($words[0]{value} =~ /^-/ || $words[0]{value} =~ /^[A-Za-z_]\w*=/);
+            return unless @words;
+            $command = shift @words;
+        }
+        return unless $command->{value} =~ m{(?:^|/)(?:bash|sh)$};
+        my $stdin_mode = 0;
+        while (@words && $words[0]{value} =~ /^[-+]/) {
+            my $option = shift @words;
+            if ($option->{value} eq '-') { $stdin_mode = 1; last; }
+            last if $option->{value} eq '--';
+            if ($option->{value} =~ /^-[A-Za-z]*c[A-Za-z]*$/) {
+                my $payload = shift @words;
+                return unless defined $payload;
+                my %parameters;
+                $parameters{$_} = $words[$_]{value} for 0 .. $#words;
+                scan_child_program($path, $payload->{value}, $finite_backend, \%parameters);
+                return;
+            }
+            $stdin_mode = 1 if $option->{value} =~ /^-[A-Za-z]*s[A-Za-z]*$/;
+            shift @words if $option->{value} =~ /^(?:[-+][oO]|--rcfile|--init-file)$/;
+        }
+        if (!$stdin_mode && @words && $words[0]{value} eq '-') { $stdin_mode = 1; shift @words; }
+        return unless defined $stdin && ($stdin_mode || !@words);
+        my %parameters;
+        $parameters{$_ + 1} = $words[$_]{value} for 0 .. $#words;
+        $stdin->{parameters} = \%parameters;
     }
 }
 # A preceding scalar declaration can retain an input's lexical identity through
@@ -616,7 +667,7 @@ sub heredoc_substitutions {
 }
 sub scan_program {
     my ($path, $body, $deps, $finite_backend) = @_;
-    my ($position, @words, @heredocs, @cases);
+    my ($position, @words, @heredocs, @cases, $stdin);
     my $bindings = {};
     my $can_bind = 1;
     $position = 0;
@@ -654,11 +705,17 @@ sub scan_program {
             my $heredoc = $operator =~ /^(?:[0-9]+)?<<-?$/;
             my $target = shell_word($body, \$position, undef, $heredoc);
             scan_program($path, $_, $deps, $finite_backend) for @{$target->{subs}};
-            push @heredocs, {
-                delimiter => $target->{value},
-                tabs => scalar($operator =~ /<<-/),
-                quoted => scalar($target->{raw} =~ /['"\\]/),
-            } if $heredoc;
+            my $input = $operator =~ /^(?:0)?</;
+            $stdin = undef if $input;
+            if ($heredoc) {
+                my $record = {
+                    delimiter => $target->{value},
+                    tabs => scalar($operator =~ /<<-/),
+                    quoted => scalar($target->{raw} =~ /['"\\]/),
+                };
+                push @heredocs, $record;
+                $stdin = $record if $input;
+            }
             next;
         }
         if ($body =~ /\G([\n;(){}|&])/gc) {
@@ -668,7 +725,7 @@ sub scan_program {
                 $cases[-1] = 'body' if $separator eq ')';
             } else {
                 $bindings = command_aliases(\@words, $bindings, $can_bind);
-                command_dependencies($path, \@words, $deps, $finite_backend);
+                command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
                 if (@cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/) {
                     $cases[-1] = 'pattern';
                     $bindings = {};
@@ -683,9 +740,10 @@ sub scan_program {
                 $can_bind = 1;
             }
             @words = ();
+            $stdin = undef;
             if ($separator eq "\n") {
                 for my $heredoc (@heredocs) {
-                    my $text = '';
+                    my ($text, $program) = ('', '');
                     while ($position < length $body) {
                         my $end = index($body, "\n", $position);
                         $end = length $body if $end < 0;
@@ -694,8 +752,12 @@ sub scan_program {
                         $line =~ s/^\t+// if $heredoc->{tabs};
                         last if $line eq $heredoc->{delimiter};
                         $text .= "$line\n" unless $heredoc->{quoted};
+                        $program .= "$line\n" if exists $heredoc->{parameters};
                     }
                     scan_program($path, $_, $deps, $finite_backend) for heredoc_substitutions($text);
+                    scan_child_program($path, $program, $finite_backend,
+                        $heredoc->{quoted} ? $heredoc->{parameters} : $child_parameters // {})
+                        if exists $heredoc->{parameters};
                 }
                 @heredocs = ();
             }
@@ -710,7 +772,7 @@ sub scan_program {
         push @words, $word;
     }
     command_aliases(\@words, $bindings, $can_bind);
-    command_dependencies($path, \@words, $deps, $finite_backend);
+    command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
 }
 sub dependencies {
     my ($path) = @_;
@@ -731,6 +793,12 @@ sub closure {
     return if $seen->{$path}++;
     closure($_, $seen) for dependencies($path);
 }
+sub selection_closure {
+    my ($path, $seen) = @_;
+    return if $seen->{$path}++;
+    my @reads = dependencies($path);
+    selection_closure($_, $seen) for @reads, map { identity_path($_) } keys %{$runtime_imports{$path} // {}};
+}
 if ($mode eq 'select') {
     local $/ = "\0";
     my %changed;
@@ -740,7 +808,7 @@ if ($mode eq 'select') {
     my (%selected, %closures, %inputs);
     for my $path (@inventory) {
         my %seen;
-        closure($path, \%seen);
+        selection_closure($path, \%seen);
         $closures{$path} = \%seen;
         $inputs{$_} = 1 for keys %seen;
     }
@@ -769,7 +837,7 @@ my $path = $args[-1];
 die "fm-lint-cache: missing analysis command\n" unless defined $path && defined $tool;
 $path = identity_path($path);
 sub fingerprint {
-    %text = (); %edges = (); %unknown = ();
+    %text = (); %edges = (); %runtime_imports = (); %unknown = ();
     return undef unless defined contents($tool);
     my %seen;
     closure($path, \%seen);

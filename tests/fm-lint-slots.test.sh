@@ -14,6 +14,11 @@
 # shellcheck source=tests/fm-lint-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-lint-helpers.sh"
 
+# Per-root progress lines carry timings and worker interleaving; everything else stays deterministic.
+fm_lint_without_progress() {  # <output>
+  printf '%s\n' "$1" | sed -E '/^fm-lint: (begin|end) /d'
+}
+
 test_jobs_are_deterministic_and_complete() {
   if ! pinned_ready; then
     pass "SKIP (ShellCheck $REQUIRED not resolved): deterministic bounded jobs check"
@@ -50,6 +55,8 @@ SH
   rc_clean_2=0
   out_clean_2=$(FM_LINT_JOBS=2 "$LINT" "$good" 2>&1) || rc_clean_2=$?
   [ "$rc_clean_1" -eq 0 ] && [ "$rc_clean_2" -eq 0 ] || fail "clean jobs=1/jobs=2 paths must both pass"
+  out_clean_1=$(fm_lint_without_progress "$out_clean_1")
+  out_clean_2=$(fm_lint_without_progress "$out_clean_2")
   [ "$out_clean_1" = "$out_clean_2" ] || fail "clean jobs=1/jobs=2 output differs"
 
   rc_fail_1=0
@@ -60,6 +67,9 @@ SH
   out_fail_2b=$(FM_LINT_JOBS=2 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_2b=$?
   [ "$rc_fail_1" -ne 0 ] && [ "$rc_fail_1" -eq "$rc_fail_2" ] && [ "$rc_fail_2" -eq "$rc_fail_2b" ] \
     || fail "failing jobs=1/jobs=2 exit results differ: $rc_fail_1/$rc_fail_2/$rc_fail_2b"
+  out_fail_1=$(fm_lint_without_progress "$out_fail_1")
+  out_fail_2=$(fm_lint_without_progress "$out_fail_2")
+  out_fail_2b=$(fm_lint_without_progress "$out_fail_2b")
   [ "$out_fail_1" = "$out_fail_2" ] && [ "$out_fail_2" = "$out_fail_2b" ] \
     || fail "failing diagnostics are not byte-identical and deterministic across jobs"
   assert_contains "$out_fail_1" "SC1007" "the first failing root diagnostic was lost"
@@ -70,7 +80,7 @@ SH
 
   telemetry_out=$(FM_LINT_JOBS=2 FM_LINT_TELEMETRY="$telemetry" "$LINT" "$good" 2>&1) \
     || fail "telemetry-enabled clean lint failed"
-  [ "$telemetry_out" = "$out_clean_2" ] || fail "quiet telemetry changed routine lint output"
+  [ "$(fm_lint_without_progress "$telemetry_out")" = "$out_clean_2" ] || fail "quiet telemetry changed routine lint output"
   assert_grep $'format\tfm-lint-telemetry-v1' "$telemetry" "telemetry format marker is missing"
   assert_grep $'analysis_mode\tfull' "$telemetry" "telemetry did not record full analysis mode"
   assert_grep $'jobs\t2' "$telemetry" "telemetry did not record bounded jobs"
@@ -86,7 +96,7 @@ SH
   mkdir -p "$cleanup_tmp"
   cleanup_out=$(TMPDIR="$cleanup_tmp" FM_LINT_JOBS=2 "$LINT" "$good" 2>&1) \
     || fail "cleanup fixture lint failed"
-  [ "$cleanup_out" = "$out_clean_2" ] || fail "cleanup fixture changed routine diagnostics"
+  [ "$(fm_lint_without_progress "$cleanup_out")" = "$out_clean_2" ] || fail "cleanup fixture changed routine diagnostics"
   [ -z "$(find "$cleanup_tmp" -mindepth 1 -maxdepth 1 -name 'fm-lint.*' -print -quit)" ] \
     || fail "bounded lint left temporary worker state behind"
   pass "jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry"
@@ -1374,6 +1384,7 @@ local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => "$tmp/cache
     FM_LINT_INTERNAL_BOUNDED => 'perl', FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
     FM_LINT_INTERNAL_ROOT_SECS => 8, FM_LINT_INTERNAL_GRACE => 1,
     FM_LINT_INTERNAL_ROOTS_LOG => "$tmp/roots.tsv", FM_LINT_SHELLCHECK => $tool,
+    FM_LINT_INTERNAL_SHELLCHECK_VERSION => '0.11.0',
     PERL5OPT => "-I$tmp -MCacheReady", CASE_DIR => $tmp, BASH_ENV => "$tmp/bash-env");
 my $pid = fork();
 die "fork: $!" unless defined $pid;

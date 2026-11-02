@@ -58,7 +58,7 @@ SH
 
 test_shellcheck_reads_govern_selection_and_cache() {
   local tmp repo fakebin diff_file listed root out attempt state
-  local -a readers runtime
+  local -a readers importers runtime
   tmp=$(fm_test_tmproot fm-lint-read-set)
   repo="$tmp/repo"
   fm_lint_small_repo "$repo"
@@ -120,6 +120,28 @@ bash <<END
 . "$runtime_target"
 END
 SH
+  cat > "$repo/bin/stdin-forms.sh" <<'SH'
+#!/usr/bin/env bash
+ROOT=$(pwd)
+sh -es "$ROOT/bin/library.sh" <<'POSIX'
+. "$1"
+POSIX
+sh <<-'POSIX'
+	. bin/library.sh
+	POSIX
+bash - "$ROOT/bin/library.sh" <<'END'
+. "$1"
+END
+bash -- - "$ROOT/bin/library.sh" <<'END'
+. "$1"
+END
+bash -s "$ROOT/bin/library.sh" <<\END
+. "$1"
+END
+bash <<END; sh -c ':'
+. bin/library.sh
+END
+SH
   cat > "$repo/bin/quoted-heredoc.sh" <<'SH'
 #!/usr/bin/env bash
 cat <<'END'
@@ -130,9 +152,10 @@ cat <<END
 END
 SH
   readers=(bin/substitution.sh bin/nested.sh bin/nested-caller.sh bin/heredoc-substitution.sh)
-  runtime=(bin/child.sh bin/child-caller.sh bin/dynamic-child.sh bin/stdin.sh bin/quoted-heredoc.sh)
+  importers=(bin/child.sh bin/child-caller.sh bin/stdin.sh bin/stdin-forms.sh)
+  runtime=(bin/dynamic-child.sh bin/quoted-heredoc.sh)
   diff_file="$tmp/diff.nul"
-  for root in "${readers[@]}" "${runtime[@]}"; do
+  for root in "${readers[@]}" "${importers[@]}" "${runtime[@]}"; do
     for attempt in 1 2; do
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root warm-up failed: $out"
@@ -157,20 +180,82 @@ SH
         fi
       done
     done
-    for root in "${runtime[@]}"; do
-      assert_not_contains "$listed" "$root" "$state runtime-only library selected $root"
+    for root in "${importers[@]}" "${runtime[@]}"; do
+      case " ${importers[*]} " in
+        *" $root "*) assert_contains "$listed" "$root" "$state library did not select child-shell importer $root" ;;
+        *) assert_not_contains "$listed" "$root" "$state library selected runtime-only $root" ;;
+      esac
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-      assert_contains "$out" "cache hit $root" "$state runtime-only library invalidated $root"
+      assert_contains "$out" "cache hit $root" "$state library outside ShellCheck's reads invalidated $root"
     done
   done
   fm_lint_write_diff_file "$diff_file" unrelated.sh
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "unrelated read-set selection failed"
-  for root in "${readers[@]}" "${runtime[@]}"; do
+  for root in "${readers[@]}" "${importers[@]}" "${runtime[@]}"; do
     assert_not_contains "$listed" "$root" "an unrelated shell change selected $root"
   done
-  pass "ShellCheck-read sources select and invalidate; child-shell strings and shell stdin heredocs do not"
+  pass "ShellCheck-read sources select and invalidate; spelled child-shell imports only select; runtime strings do neither"
+}
+
+test_ansi_c_quotes_keep_later_reads_in_selection_and_cache() {
+  local tmp repo fakebin diff_file listed out attempt
+  tmp=$(fm_test_tmproot fm-lint-ansi-c-quote)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  cat > "$repo/bin/ansi-c.sh" <<'SH'
+#!/usr/bin/env bash
+reason=$'say \'no\' here'
+. bin/library.sh
+reason=$'and \'no\' again'
+SH
+  for attempt in 1 2; do
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/ansi-c.sh 2>&1) || fail "ANSI-C quote warm-up failed: $out"
+  done
+  assert_contains "$out" 'cache hit bin/ansi-c.sh' "an unchanged ANSI-C quote root was not reusable"
+  printf '\n' >> "$repo/bin/library.sh"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "ANSI-C quote selection failed"
+  assert_contains "$listed" bin/ansi-c.sh "an escaped quote hid a later source from selection"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/ansi-c.sh 2>&1) || fail "ANSI-C quote check failed: $out"
+  assert_not_contains "$out" 'cache hit bin/ansi-c.sh' "an escaped quote hid a read file from the cache key"
+  pass "an escaped quote in an ANSI-C string keeps later reads in selection and the cache key"
+}
+
+# shellcheck disable=SC2016 # Single quotes are deliberate: the fixture must keep its literal expansion.
+test_child_shell_importers_keep_existing_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): child-shell importer findings"; return; }
+  local tmp repo fakebin diff_file out rc
+  tmp=$(fm_test_tmproot fm-lint-child-findings)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff"
+  cat > "$repo/bin/child.sh" <<'SH'
+#!/usr/bin/env bash
+bash -c ". bin/library.sh"
+SH
+  CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" "$repo/bin/fm-lint.sh" bin/child.sh >/dev/null 2>&1 \
+    || fail "the clean child-shell importer did not reach a cached success"
+  printf 'echo $fm_child_error\n' >> "$repo/bin/child.sh"
+  printf '# edit\n' >> "$repo/bin/library.sh"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  rc=0
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    FM_TEST_GIT_DIFF_FILE="$diff_file" "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "a changed library hid its child-shell importer's finding (rc=$rc): $out"
+  assert_contains "$out" 'In bin/child.sh line 3' "the child-shell importer's finding was not reported"
+  assert_contains "$out" SC2154 "the child-shell importer lost its diagnostic code"
+  pass "a changed library still reports an existing finding in its child-shell-only importer"
 }
 
 test_adjacent_aliases_keep_transitive_diagnostics() {
@@ -319,7 +404,7 @@ test_production_stdin_helpers_do_not_invalidate_cache() {
     fm_lint_write_diff_file "$diff_file" tests/herdr-test-safety.sh
     listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --list-files) || fail "$state stdin helper selection failed"
-    assert_not_contains "$listed" "$root" "$state stdin-only helper selected $root"
+    assert_contains "$listed" "$root" "$state stdin-only helper did not select importer $root"
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state stdin helper lint failed: $out"
     assert_contains "$out" "cache hit $root" "$state stdin-only helper invalidated $root"
@@ -329,9 +414,9 @@ test_production_stdin_helpers_do_not_invalidate_cache() {
     fm_lint_write_diff_file "$diff_file" "tests/$helper.sh"
     listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --list-files) || fail "$helper selection failed"
-    assert_not_contains "$listed" "$root" "child-shell-only $helper selected $root"
+    assert_not_contains "$listed" "$root" "runtime-computed $helper target selected $root"
   done
-  pass "production helpers imported only by child-shell stdin neither select nor invalidate their test root"
+  pass "a spelled child-shell stdin helper selects but does not invalidate its test root; a runtime-computed one does neither"
 }
 
 test_production_nested_sources_and_pending_reply_cache() {
@@ -851,8 +936,8 @@ test_runtime_backend_changes_select_every_dispatcher_consumer() {
         "$backend change did not select dispatcher consumer $caller"
     done
     if [ "$backend" = herdr ]; then
-      assert_not_contains "$listed" $'\n''tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh'$'\n' \
-        "Herdr change selected a consumer that only imports it from a child shell"
+      assert_contains "$listed" $'\n''tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh'$'\n' \
+        "Herdr change did not select a consumer that imports it from a child shell"
     fi
   done
   fm_lint_write_diff_file "$diff_file" unrelated-input
@@ -1102,6 +1187,8 @@ PY
 fm_lint_test_cases=(
 test_command_words_exclude_inert_source_text
 test_shellcheck_reads_govern_selection_and_cache
+test_child_shell_importers_keep_existing_findings
+test_ansi_c_quotes_keep_later_reads_in_selection_and_cache
 test_adjacent_aliases_keep_transitive_diagnostics
 test_alias_uncertainty_keeps_conservative_selection
 test_nonprogram_heredocs_remain_inert

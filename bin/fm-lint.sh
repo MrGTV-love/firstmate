@@ -41,8 +41,10 @@
 #     words, balanced substitutions, and substitutions in unquoted heredoc
 #     bodies. Source annotations remain inputs; ordinary comments, quoted
 #     strings, and heredoc data do not. Child-shell -c strings and heredocs fed
-#     to a shell are runtime data ShellCheck never parses, so they neither add
-#     imports nor make a root unknown. Whole-word quoted aliases from an
+#     to a shell are runtime data ShellCheck never parses: a source target they
+#     spell selects the root, as a possible caller, but stays out of its cache
+#     inputs, and anything else in them never makes the root unknown or guesses
+#     a target. Whole-word quoted aliases from an
 #     immediately preceding simple scalar declaration are resolved; intervening
 #     commands/control boundaries and effectful declarations remain unknown.
 #     Comments/blank lines do not execute commands; <<- strips leading tabs.
@@ -168,7 +170,8 @@
 # (cache-key plus host-slot waits) and the initial cache outcome; duration_ms
 # excludes that queue time but still includes scheduling delay and bookkeeping.
 # A memory retry retains its initial cache outcome and still checks the retry's
-# own inputs; it is never a source-following cache success.
+# own inputs; it is never a source-following cache success. A cache hit's notice
+# stays on stderr too, so a reused success leaves stdout as an uncached run does.
 # Duration observations are appended through fm-duration.py in one batch from
 # the roots log when lint exits; cache-hit, partial selection and
 # memory-fallback successes are not cold calibration evidence.
@@ -429,6 +432,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     "$root_seconds" "${FM_LINT_WORKER_ARGS[@]}"
   invocation_rc=$FM_LINT_LAST_RC
   queued_ms=$FM_LINT_LAST_WAIT_MS
+  cache_outcome=$(cat "$rss_file.cache" 2>/dev/null || true)
   reason=$(fm_lint_classify_root "$invocation_rc" "$root_err")
   initial_rc=$invocation_rc
   initial_reason=$reason
@@ -473,14 +477,17 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
   else
     rss_kib=$(fm_lint_root_rss "$rss_file")
-    cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
+    if [ "$cache_outcome" = cache-hit ]; then
+      cat "$root_err" >&2
+    else
+      cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
+    fi
   fi
   end_ms=$(fm_lint_now_ms)
   if declare -F fm_duration_load >/dev/null 2>&1; then
     load_end=$(fm_duration_load)
   fi
   duration_ms=$((end_ms - start_ms - queued_ms))
-  cache_outcome=$(cat "$rss_file.cache" 2>/dev/null || true)
   if [ "$cache_outcome" = analyzed ] && [ "$reason" != memory-fallback ]; then
     calibration=1
   fi
