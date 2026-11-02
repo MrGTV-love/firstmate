@@ -2207,13 +2207,17 @@ case "$outcome_rc" in
     ;;
 esac
 
-# The merge is verified and recorded: close the backlog items its body names with
-# `Closes: <item-id>` lines, and a merge train's members' items too. A failure here
-# never changes the merge result: the close step reports each item it left open and its
-# exit status is ignored (bin/fm-pr-close-items.sh header owns the contract). The
-# explicit home and state keep it on this merge's own backlog.
+# The merge is verified: close the backlog items its body names with
+# `Closes: <item-id>` lines, and a merge train's members' items too, but only when its
+# outcome was recorded above. A merge that could not be recorded runs no close and lists
+# the items it names as not closed. A failure here never changes the merge result: the
+# close step reports each item it left open and its exit status is ignored
+# (bin/fm-pr-close-items.sh header owns the contract). The explicit home and state keep
+# it on this merge's own backlog.
+close_mode=()
+[ "$outcome_rc" -eq 0 ] || close_mode=(--not-recorded)
 FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-  "$SCRIPT_DIR/fm-pr-close-items.sh" "$ID" "$URL" </dev/null || true
+  "$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL" </dev/null || true
 
 # The merge is verified and its outcome recorded: arm the prune of the task's
 # pool copy and start one detached attempt. Teardown stays the authority and the

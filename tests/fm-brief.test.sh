@@ -1636,35 +1636,41 @@ test_crewmate_scaffolds_require_stopping_private_services() {
 }
 
 test_ship_scaffolds_teach_the_closes_line() {
-  local home mode id brief
+  local home mode forge id brief
   home="$TMP_ROOT/closes-line-home"
   mkdir -p "$home/data"
 
-  # A merge through bin/fm-pr-merge.sh closes the items the merged GitHub body
-  # names (bin/fm-pr-close-items.sh), so the two PR deliveries teach the line in
-  # their Definition of done. local-only has no pull request body, a Forgejo
-  # body is not read, and a scout delivers a report.
+  # A merge through bin/fm-pr-merge.sh closes the items the merged pull request body
+  # names (bin/fm-pr-close-items.sh), so every delivery that opens a forge PR teaches the
+  # line, with the route that keeps it in the body the merge reads. local-only has no PR
+  # body, a Gerrit change has no PR body, and a scout delivers a report.
   for mode in no-mistakes direct-PR; do
-    id="brief-closes-$mode"
-    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
-      || fail "fm-brief.sh --mode $mode exited non-zero"
-    brief="$home/data/$id/brief.md"
-    assert_grep 'Closes: <task-id>' "$brief" "$mode ship brief did not teach the Closes: line"
-    assert_grep 'commit message' "$brief" "$mode ship brief did not say where the line goes"
-    assert_grep 'a merge through bin/fm-pr-merge.sh closes each named item' "$brief" "$mode ship brief did not say what the line does"
-    assert_grep 'gh-axi pr edit' "$brief" "$mode ship brief did not say how to add a missing line"
+    for forge in none forgejo; do
+      id="brief-closes-$mode-$forge"
+      FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" --forge "$forge" >/dev/null 2>&1 \
+        || fail "fm-brief.sh --mode $mode --forge $forge exited non-zero"
+      brief="$home/data/$id/brief.md"
+      assert_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief did not teach the Closes: line"
+      assert_grep 'in your commit message and in the PR body' "$brief" "$mode/$forge ship brief did not say where the line goes"
+      assert_grep 'A merge through bin/fm-pr-merge.sh closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
+      assert_grep 'The pipeline can rewrite the PR body after your commit' "$brief" "$mode/$forge ship brief did not warn about pipeline body writes"
+      assert_grep 'read the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body last"
+      assert_grep "then read the body again and confirm each line is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+    done
+    assert_grep 'gh-axi pr edit <number> --body-file' "$home/data/brief-closes-$mode-none/brief.md" "$mode ship brief did not name the GitHub edit route"
+    assert_grep 'tea pulls edit <number>' "$home/data/brief-closes-$mode-forgejo/brief.md" "$mode Forgejo brief did not name the Forgejo edit route"
   done
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-local alpha --mode local-only >/dev/null 2>&1 \
     || fail "fm-brief.sh --mode local-only exited non-zero"
   assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes: line it has no PR body for"
-  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-forgejo alpha --mode no-mistakes --forge forgejo >/dev/null 2>&1 \
-    || fail "fm-brief.sh --forge forgejo exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-forgejo/brief.md" "the Forgejo brief taught a Closes: line no Forgejo merge reads"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-gerrit alpha --mode direct-PR --forge gerrit --shape squash >/dev/null 2>&1 \
+    || fail "fm-brief.sh --forge gerrit exited non-zero"
+  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
   assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes: line"
-  pass "fm-brief.sh: the GitHub PR deliveries teach the Closes: line; local-only, Forgejo and scout briefs do not"
+  pass "fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not"
 }
 
 test_crewmate_scaffolds_teach_the_docker_task_marker() {

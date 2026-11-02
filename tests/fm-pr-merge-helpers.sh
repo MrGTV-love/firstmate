@@ -203,9 +203,11 @@ case "${1:-} ${2:-}" in
     ;;
   "api /repos/"*)
     # The merged proof bin/fm-tasks-axi.sh done reads: a pull request counts as
-    # merged only when its number is listed in $case_dir/merged-prs.
+    # merged only when its owner/repo/pulls/<number> path or its bare number is listed in
+    # $case_dir/merged-prs.
     merged=false
-    if grep -qxF "${2##*/}" "$FM_TEST_GH_MERGED_PRS" 2>/dev/null; then merged=true; fi
+    if grep -qxF "${2#/repos/}" "$FM_TEST_GH_MERGED_PRS" 2>/dev/null \
+      || grep -qxF "${2##*/}" "$FM_TEST_GH_MERGED_PRS" 2>/dev/null; then merged=true; fi
     printf '  body: "merged=%s"\n' "$merged"
     ;;
 esac
@@ -218,8 +220,20 @@ case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
       *" --json body "*)
-        # The body close-at-merge reads: $case_dir/bodies/<pr number>, empty when absent.
-        cat "$FM_TEST_GH_BODIES/${3##*/}" 2>/dev/null
+        # The body close-at-merge reads: $case_dir/bodies/<owner>_<repo>-<number>, else
+        # <number>, empty when absent; an unreadable-<number> marker makes the read fail.
+        pr_path=${3#https://github.com/}
+        pr_key=${pr_path%%/pull/*}
+        pr_key=${pr_key//\//_}-${3##*/}
+        if [ -e "$FM_TEST_GH_BODIES/unreadable-${3##*/}" ]; then
+          echo "HTTP 502: bad gateway" >&2
+          exit 1
+        fi
+        if [ -e "$FM_TEST_GH_BODIES/$pr_key" ]; then
+          cat "$FM_TEST_GH_BODIES/$pr_key"
+        else
+          cat "$FM_TEST_GH_BODIES/${3##*/}" 2>/dev/null
+        fi
         exit 0
         ;;
       *mergeStateStatus*)
@@ -475,6 +489,18 @@ case_dir=$(dirname "$FM_TEST_GLAB_JSON")
 case "${1:-} ${2:-}" in
   "mr view")
     [ ! -e "$case_dir/glab-view-fails" ] || exit 1
+    # A merge request other than the one under test answers from its own record:
+    # mr-body-<project path with / as _>-<number>.json (an unreadable-<number> marker fails).
+    mr_project= mr_number=${3:-}
+    while [ $# -gt 0 ]; do
+      case "$1" in -R) mr_project=${2#https://*/}; shift 2 ;; *) shift ;; esac
+    done
+    mr_key=${mr_project//\//_}
+    [ ! -e "$case_dir/mr-unreadable-$mr_number" ] || { echo "glab: 502" >&2; exit 1; }
+    if [ -e "$case_dir/mr-body-$mr_key-$mr_number.json" ]; then
+      cat "$case_dir/mr-body-$mr_key-$mr_number.json"
+      exit 0
+    fi
     if [ -e "$case_dir/glab-merge-called" ] && [ ! -e "$case_dir/glab-stays-open" ]; then
       cat "$case_dir/mr-post.json"
     else
@@ -563,11 +589,12 @@ fi
 
 [ "${1:-}" = api ] || exit 0
 shift
-endpoint= do_value= head_commit_id=
+endpoint= do_value= head_commit_id= tea_repo=
 while [ $# -gt 0 ]; do
   case "$1" in
     -X) shift 2 ;;
-    --login|--repo) shift 2 ;;
+    --login) shift 2 ;;
+    --repo) tea_repo=$2; shift 2 ;;
     -f)
       case "$2" in
         Do=*) do_value=${2#Do=} ;;
@@ -617,6 +644,14 @@ case "$endpoint" in
     ;;
   *)
     [ ! -e "$log_dir/tea-view-fails" ] || exit 1
+    # A pull request other than the one under test answers from its own record:
+    # tea-body-<owner>_<repo>-<number>.json (an unreadable-<number> marker fails).
+    tea_number=${endpoint##*/}
+    [ ! -e "$log_dir/tea-unreadable-$tea_number" ] || exit 1
+    if [ -e "$log_dir/tea-body-${tea_repo//\//_}-$tea_number.json" ]; then
+      cat "$log_dir/tea-body-${tea_repo//\//_}-$tea_number.json"
+      exit 0
+    fi
     if [ -e "$log_dir/tea-merged" ] && [ -s "$log_dir/tea-post-merge-view-failures" ]; then
       left=$(cat "$log_dir/tea-post-merge-view-failures")
       if [ "$left" -gt 0 ]; then

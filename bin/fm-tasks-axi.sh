@@ -72,7 +72,11 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
-# A `done`/`close` that tasks-axi accepted also removes the finished id from every other
+# FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes that guard
+# also refuse an open captain hold on a row of any kind, inside the lock; without it a
+# row that is not a ship or scout closes as before.
+# A `done`/`close` (or a `public-followup record-delivery`/`waive` that left the row Done)
+# that tasks-axi accepted also removes the finished id from every other
 # item's blocked-by list, so work stops waiting on a blocker that is done; the cleared
 # edges are reported on stderr as `unblocked:` lines
 # (bin/fm-backlog-transition-lib.sh's fm_backlog_unblock_dependents owns the rule).
@@ -267,6 +271,12 @@ guard_completion() {
     [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
   }
+  # Opt-in for bin/fm-pr-close-items.sh only: refuse an open owner call for every row kind,
+  # under the lock this command already holds, so a hold placed before the close wins.
+  if [ "${FM_TASKS_AXI_REFUSE_OPEN_CALL:-}" = 1 ] && [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
+    && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    fail "$id is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it"
+  fi
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
     || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
@@ -420,4 +430,19 @@ if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
   fi
   exit "$task_status"
 fi
+case "${ARGS[0]:-}:${ARGS[1]:-}" in
+  public-followup:record-delivery|public-followup:waive)
+    # These typed completions can move a row to Done. Run them without exec so a row they
+    # finished stops blocking its dependents, exactly like done/close.
+    pf_id=${ARGS[2]:-}
+    tasks-axi "${ARGS[@]}"
+    pf_status=$?
+    if [ "$pf_status" -eq 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      if fm_backlog_row_probe "$DATA" "$pf_id" && [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
+        fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+      fi
+    fi
+    exit "$pf_status"
+    ;;
+esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

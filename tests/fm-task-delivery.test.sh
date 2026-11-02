@@ -619,6 +619,37 @@ STUB
   pass "fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does"
 }
 
+test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists() {
+  local home sendroot payload mode id out
+  home="$TMP_ROOT/promote-closes/home"
+  sendroot="$TMP_ROOT/promote-closes/sendroot"
+  mkdir -p "$home/state" "$sendroot/bin"
+  cat > "$sendroot/bin/fm-send.sh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "$2" > "$FM_TEST_CAPTURE"
+STUB
+  chmod +x "$sendroot/bin/fm-send.sh"
+  for mode in no-mistakes direct-PR local-only; do
+    id="promote-closes-$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')"
+    printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+    FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 || fail "$mode: scout brief generation should succeed"
+    fill_brief_subsections "$home/data/$id/brief.md" "Ship the change." "Keep the contract."
+    assert_no_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "$mode: an unpromoted scout brief taught the Closes: line"
+    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode "$mode" --yolo off 2>&1) || fail "$mode: promotion should succeed"
+    payload="$TMP_ROOT/promote-closes/payload-$id"
+    ( cd "$sendroot" && FM_TEST_CAPTURE="$payload" eval "$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'fm-send\.sh')" ) \
+      || fail "$mode: promotion's delivery command did not run"
+    if [ "$mode" = local-only ]; then
+      assert_no_grep 'Closes: <task-id>' "$payload" "local-only: the delivered ship instructions taught a Closes: line"
+      assert_no_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "local-only: the relaunch brief taught a Closes: line"
+    else
+      assert_grep 'Closes: <task-id>' "$payload" "$mode: the delivered ship instructions did not teach the Closes: line"
+      assert_grep 'Closes: <task-id>' "$home/data/$id/brief.md" "$mode: the relaunch brief did not teach the Closes: line"
+    fi
+  done
+  pass "promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only"
+}
+
 test_promotion_persists_the_selected_ship_branch() {
   local home id meta instructions out
   home="$TMP_ROOT/promote-branch/home"
@@ -2099,6 +2130,7 @@ test_scout_records_no_delivery_posture
 test_promote_requires_and_records_the_delivery_contract
 test_promote_refuses_a_symlinked_task_record
 test_promotion_delivers_the_real_definition_of_done
+test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists
 test_promotion_persists_the_selected_ship_branch
 test_promotion_branch_command_is_shell_safe
 test_local_merge_uses_the_recorded_ship_branch
