@@ -46,7 +46,6 @@ import sys
 
 THRESHOLD = 0.25
 RECENT_DONE = 50
-SHOWN = 3  # neighbours listed in a refusal; every qualifying one is judged
 TITLE_LIST_LIMIT = 80
 TRUNCATION_SENTINEL = re.compile(r"\n\.\.\. \(truncated, .*$", re.S)
 
@@ -157,7 +156,7 @@ def list_rows(text):
 
 
 ARCHIVE_ROW = re.compile(r"^- \[x\] (\S+) - (.*)$")
-ARCHIVE_TAIL = re.compile(r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by)[^)]*\)|https?://\S+|data/\S+)\s*$")
+ARCHIVE_TAIL = re.compile(r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by)[^)]*\)|blocked-by: \S+|https?://\S+|data/\S+)\s*$")
 
 
 def archive_text(path):

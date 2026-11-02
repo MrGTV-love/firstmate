@@ -1295,6 +1295,8 @@ test_add_requires_an_objective() {
   assert_no_grep "obj-1" "$dir/home/data/backlog.md" "a refused add filed the item"
   out=$(refusal_of "$dir" "unknown objective" add obj-1 "Drain the wake queue before peeking" --objective O9)
   assert_contains "$out" "unknown objective 'O9'" "an unknown objective id was not named"
+  out=$(refusal_of "$dir" "two objectives in one value" add obj-1 "Drain the wake queue before peeking" --objective "O1 O2")
+  assert_contains "$out" "unknown objective 'O1 O2'" "two ids in one value were accepted"
   out=$(refusal_of "$dir" "none without a reason" add obj-1 "Drain the wake queue before peeking" --objective none)
   assert_contains "$out" "--objective-reason" "none without a reason did not print the reason flag"
   out=$(refusal_of "$dir" "none with a blank reason" add obj-1 "Drain the wake queue before peeking" --objective none --objective-reason "   ")
@@ -1675,6 +1677,38 @@ test_dup_of_and_not_dup_do_what_the_refusal_says() {
   pass "--dup-of appends to an open or retained Done item and --not-dup files and records a qualifying neighbour, and neither runs without an objective or beside a lost update"
 }
 
+test_dup_of_repeat_needs_the_whole_block() {
+  local dir out
+  dir=$(make_split dup-repeat)
+  wrapper_from_code "$dir" add dr-kept "Normalize the archive header spacing" --objective O7 --kind docs >/dev/null
+  wrapper_from_code "$dir" add dr-a "Rotate the stale mirror credentials" --objective O7 --dup-of dr-kept --body $'FIRST-LINE\n  SECOND-LINE\n' >/dev/null || fail "the first merge failed"
+  # The same title and body again is an interrupted run's repeat, and adds nothing.
+  wrapper_from_code "$dir" add dr-a "Rotate the stale mirror credentials" --objective O7 --dup-of dr-kept --body $'FIRST-LINE\n  SECOND-LINE\n' >/dev/null || fail "the repeat failed"
+  assert_equals 1 "$(grep -o 'SECOND-LINE' "$dir/home/data/backlog.md" | wc -l | tr -d ' ')" "a repeat appended the block again"
+  # The same title with a different body is a second merge.
+  out=$(wrapper_from_code "$dir" add dr-b "Rotate the stale mirror credentials" --objective O7 --dup-of dr-kept --body OTHER-EVIDENCE 2>&1) || fail "the second merge failed: $out"
+  assert_contains "$out" "merged into dr-kept" "the second merge did not report the merge"
+  assert_grep "OTHER-EVIDENCE" "$dir/home/data/backlog.md" "a second merge with a different body lost its body"
+  # A title that is a prefix of an earlier one is its own merge, with or without a body.
+  wrapper_from_code "$dir" add dr-c "Rotate the stale mirror" --objective O7 --dup-of dr-kept --body PREFIX-EVIDENCE >/dev/null || fail "the prefix merge failed"
+  assert_grep "PREFIX-EVIDENCE" "$dir/home/data/backlog.md" "a prefix title lost its body"
+  wrapper_from_code "$dir" add dr-d "Rotate the stale" --objective O7 --dup-of dr-kept >/dev/null || fail "the bodyless prefix merge failed"
+  assert_equals "Merged from a duplicate filing: Rotate the stale" \
+    "$(FM_HOME="$dir/home" python3 "$ROOT/bin/fm-backlog-intake.py" field body < <(wrapper_from_code "$dir" show dr-kept --full) | grep -x 'Merged from a duplicate filing: Rotate the stale')" \
+    "a bodyless prefix title was not appended as its own line"
+  pass "--dup-of counts a repeat only when the whole block is already there, so a second body or a prefix title is never lost"
+}
+
+test_archived_blocked_by_rows_keep_their_title_score() {
+  local dir out
+  dir=$(make_split archive-blocked-by)
+  printf '\n## Archived 2026-11-01\n- [x] ab-one - Retire widget cache blocked-by: some-long-blocker blocked-by: other-blocker data/ab-one/report.md (repo: p) (kind: scout) (done 2026-10-30)\n' \
+    > "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "archived neighbour" add ab-new "Widget cache eviction policy review" --objective O7)
+  assert_contains "$out" "ab-one (Done, archived, overlap 0.33) Retire widget cache" "an archived row's blocked-by tail was scored as title words"
+  pass "an archived row's unparenthesized blocked-by tail is not scored as title words"
+}
+
 test_duplicate_of_closes_on_checked_proof() {
   local dir out before fakebin
   dir=$(make_split proof-dup)
@@ -1754,6 +1788,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
 [ "${FAKE_SSH_MODE:-}" != unreachable ] || exit 255
+[ "${FAKE_SSH_MODE:-}" != refused ] || { echo 'remote says: backlog is locked'; exit 1; }
+[ "${FAKE_SSH_MODE:-}" != garbled ] || { echo 'welcome to far-box'; exit 0; }
 root=$(printf '%s' "$4" | base64 -d)
 home=$(printf '%s' "$5" | base64 -d)
 argv=()
@@ -1823,6 +1859,10 @@ test_moved_to_closes_on_checked_proof() {
   assert_contains "$out" "this backlog itself" "another path to the active backlog was not named"
   out=$(FAKE_SSH_MODE=unreachable moved_close "$dir" mv-item0 sm-far mv-far) && fail "an unreachable remote home was accepted"
   assert_contains "$out" "cannot read sm-far's backlog" "an unreachable remote home was not named"
+  out=$(FAKE_SSH_MODE=refused moved_close "$dir" mv-item0 sm-far mv-far) && fail "a remote error was accepted"
+  assert_contains "$out" "remote says: backlog is locked" "the remote's own error was lost"
+  out=$(FAKE_SSH_MODE=garbled moved_close "$dir" mv-item0 sm-far mv-far) && fail "a remote answer that is not a task record was accepted"
+  assert_contains "$out" "the answer from sm-far is not a task record" "the not-a-record reason was lost"
   out=$(moved_close "$dir" mv-item0 sm-far mv-decoy) && fail "a local decoy path counted for a remote home"
   assert_contains "$out" "has no item mv-decoy" "the decoy local path was read"
   out=$(moved_close "$dir" mv-item0 sm-far mv-fardone) && fail "a Done item in the remote home was accepted"
@@ -1990,20 +2030,28 @@ test_closing_proofs_keep_open_dependents_blocked() {
   wrapper_from_code "$dir" "done" dp-closer >/dev/null || fail "could not close a plain dependent"
   wrapper_from_code "$dir" add dp-near "Compact the notes folder layout" --objective O7 --kind docs --blocked-by dp-dup-long >/dev/null
   wrapper_from_code "$dir" add dp-dep "Rotate the stale mirror credentials" --objective O7 --kind docs --blocked-by dp-kept --blocked-by dp-dup >/dev/null
+  wrapper_from_code "$dir" add dp-self "Mend the porch lantern wiring" --objective O7 --kind docs --blocked-by dp-dup >/dev/null
+  wrapper_from_code "$dir" hold dp-dep --reason "waiting on a vendor" --kind external >/dev/null || fail "could not hold the dependent"
   before=$(cat "$dir/home/data/backlog.md")
   out=$(refusal_of "$dir" "duplicate with a dependent" "done" dp-dup --duplicate-of dp-kept)
-  assert_contains "$out" "still blocks open items: dp-dep" "the refusal did not name the dependent"
+  assert_contains "$out" "still blocks open items: dp-dep dp-self" "the refusal did not name every dependent"
   assert_not_contains "$out" "dp-near" "the refusal named an item blocked by a different id"
   assert_not_contains "$out" "dp-closer" "the refusal named a Done dependent"
   assert_contains "$out" "unblock <dependent> --by dp-dup" "the refusal did not say how to clear the old blocker"
-  assert_contains "$out" "block <dependent> --by dp-kept" "the refusal did not say how to re-point the dependent"
+  assert_contains "$out" "for a dependent with no hold, bin/fm-tasks-axi.sh block <dependent> --by dp-kept" "the refusal did not say how to re-point the dependent"
+  assert_contains "$out" "A dependent already on a hold keeps that hold and needs only the unblock step" "the refusal did not spare a held dependent"
+  out=$(refusal_of "$dir" "kept item blocked by the duplicate" "done" dp-dup --duplicate-of dp-self)
+  assert_contains "$out" "the kept item dp-self itself needs only the unblock step" "the refusal told the kept item to block itself"
   out=$(refusal_of "$dir" "move with a dependent" "done" dp-dup --moved-to sm-one dp-open)
-  assert_contains "$out" "still blocks open items: dp-dep" "the move refusal did not name the dependent"
-  assert_contains "$out" "hold <dependent>" "the move refusal did not say how to keep the dependent waiting"
+  assert_contains "$out" "still blocks open items: dp-dep dp-self" "the move refusal did not name every dependent"
+  assert_contains "$out" "for a dependent with no hold, bin/fm-tasks-axi.sh hold <dependent>" "the move refusal did not limit its hold step to a dependent with no hold"
+  assert_contains "$out" "A dependent already on a hold keeps that hold and needs only the unblock step" "the move refusal did not spare a held dependent"
   assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused proof close changed the backlog"
   assert_equals "dp-kept,dp-dup" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  blocked_by: *//p' | tr -d '"')" "a refused proof close released the dependent"
   # Once the open dependent is re-pointed, the close goes through; the Done one never counted.
   wrapper_from_code "$dir" unblock dp-dep --by dp-dup >/dev/null || fail "could not clear the blocker"
+  wrapper_from_code "$dir" unblock dp-self --by dp-dup >/dev/null || fail "could not clear the kept item's blocker"
+  assert_equals "external" "$(wrapper_from_code "$dir" show dp-dep | sed -n 's/^  hold_kind: *//p')" "the unblock step changed the dependent's hold"
   out=$(wrapper_from_code "$dir" "done" dp-dup --duplicate-of dp-kept 2>&1) || fail "a re-pointed duplicate was refused: $out"
   [ "$(row_state "$dir" dp-dup)" = x ] || fail "the re-pointed duplicate did not close"
   pass "fm-tasks-axi.sh refuses a proof close while the item still blocks open items, and closes once they are re-pointed"
@@ -2156,6 +2204,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_add_judges_near_duplicate_titles
   test_duplicate_check_boundaries_and_unreadable_sources
   test_dup_of_and_not_dup_do_what_the_refusal_says
+  test_dup_of_repeat_needs_the_whole_block
+  test_archived_blocked_by_rows_keep_their_title_score
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
   test_closing_proofs_keep_open_dependents_blocked

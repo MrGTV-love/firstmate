@@ -295,7 +295,7 @@ parse_task_mutation() {
     fi
     case "$token" in
       -h|--help) TASK_HELP=1 ;;
-      --pr|--report|--drop-file|--note|--keep|--backend|--reason|--until|--kind|--title|--body|--body-file|--repo|--priority) expect=$token ;;
+      --pr|--report|--drop-file|--note|--keep|--backend|--reason|--until|--kind|--title|--body|--body-file|--repo|--priority|--objective|--objective-reason|--dup-of|--not-dup) expect=$token ;;
       --pr=*) TASK_PR=${token#*=} ;; --report=*) TASK_REPORT=${token#*=} ;;
       --drop-file=*) TASK_DROP=${token#*=} ;; --note=*) TASK_NOTE=1 ;;
       -*) ;;
@@ -357,10 +357,11 @@ kept_lock_release() {
 # recoverable body rewrite (--archive-body keeps the old body). The body is read
 # again just before the write; a change in between is read afresh and merged, so
 # another writer's text is never overwritten. A repeat after an interrupted run
-# finds its marker line already in the body and adds nothing.
+# finds the whole block (the exact marker line and the body) already in the body
+# and adds nothing; any other text is appended.
 append_to_kept() {  # <kept-id> <origin label> <title> <body>
-  local kept=$1 label=$2 title=$3 body=$4 shown again current latest marker tmp attempt=0
-  marker="Merged from $label: $title"
+  local kept=$1 label=$2 title=$3 body=$4 shown again current latest block tmp attempt=0
+  block=$(printf -- '---\nMerged from %s: %s\n%s' "$label" "$title" "$body")
   kept_lock_acquire "$kept"
   tmp=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-merge.XXXXXX" 2>/dev/null) \
     || fail "cannot create a scratch file to merge into $kept"
@@ -369,11 +370,10 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
     shown=$(fm_backlog_row_show "$DATA" "$kept" --full) \
       || { rm -f -- "$tmp"; fail "cannot read the kept item $kept: $(printf '%s\n' "$shown" | sed -n '1p')"; }
     current=$(printf '%s\n' "$shown" | intake_python field body) || current=
-    case "$current" in *"$marker"*) rm -f -- "$tmp"; kept_lock_release; return 0 ;; esac
+    case $'\n'"$current"$'\n' in *$'\n'"$block"$'\n'*) rm -f -- "$tmp"; kept_lock_release; return 0 ;; esac
     {
       [ -z "$current" ] || printf '%s\n\n' "$current"
-      printf -- '---\n%s\n' "$marker"
-      [ -z "$body" ] || printf '%s\n' "$body"
+      printf '%s\n' "$block"
     } > "$tmp"
     again=$(fm_backlog_row_show "$DATA" "$kept" --full) \
       || { rm -f -- "$tmp"; fail "cannot read the kept item $kept: $(printf '%s\n' "$again" | sed -n '1p')"; }
@@ -391,9 +391,11 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
 
 # Read <item> in the registered remote home <home> through bin/fm-on.sh, which
 # owns the route, the transport, and the remote wrapper's own backlog addressing.
-# Prints the item's state word on success. Exit 1: the item is absent there; exit
-# 2: the remote backlog cannot be read (the transport failed or the answer is not
-# a task record).
+# Sets REMOTE_ITEM_STATE on success. Exit 1: the item is absent there; exit 2: the
+# remote backlog cannot be read (the transport failed or the answer is not a task
+# record), with the reason in REMOTE_ITEM_ERROR. Call it in this shell, not in a
+# command substitution, so both values reach the caller.
+REMOTE_ITEM_STATE=
 REMOTE_ITEM_ERROR=
 remote_item_state() {  # <home> <item>
   local out status state
@@ -407,7 +409,7 @@ remote_item_state() {  # <home> <item>
   fi
   state=$(printf '%s\n' "$out" | sed -n 's/^  state: *//p' | sed -n '1p')
   [ -n "$state" ] || { REMOTE_ITEM_ERROR="the answer from $1 is not a task record"; return 2; }
-  printf '%s' "$state"
+  REMOTE_ITEM_STATE=$state
 }
 
 # The checks both closing proofs share: the item must not belong to the owner.
@@ -441,7 +443,7 @@ guard_open_dependents() {  # <id> <next step>
   dependents=$(printf '%s\n' "$list" | intake_python dependents "$1")
   status=$?
   case "$status" in
-    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. Re-point each one first: $2, then bin/fm-tasks-axi.sh unblock <dependent> --by $1" ;;
+    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. Re-point each one first: for a dependent with no hold, $2; then, for every dependent, bin/fm-tasks-axi.sh unblock <dependent> --by $1. A dependent already on a hold keeps that hold and needs only the unblock step, because a new hold replaces the old one and can erase an owner call." ;;
     1) ;;
     *) fail "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
   esac
@@ -472,7 +474,7 @@ guard_closing_proof() {
       queued|in_flight) ;;
       *) fail "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
     esac
-    guard_open_dependents "$id" "bin/fm-tasks-axi.sh block <dependent> --by $kept"
+    guard_open_dependents "$id" "bin/fm-tasks-axi.sh block <dependent> --by $kept (the kept item $kept itself needs only the unblock step)"
     append_to_kept "$kept" "duplicate $id" "$title" "$body"
     GUARD_ARGS=(--note "duplicate of $kept")
     LEDGER_CLOSE_ARGS=(--duplicate-of "$kept")
@@ -484,9 +486,9 @@ guard_closing_proof() {
     secondmate_registry_line_for_id "$DATA/secondmates.md" "$home_id" \
       || fail "$home_id is not one registered home in $DATA/secondmates.md"
     if [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ]; then
-      dest_state=$(remote_item_state "$home_id" "$item")
+      remote_item_state "$home_id" "$item"
       case $? in
-        0) ;;
+        0) dest_state=$REMOTE_ITEM_STATE ;;
         1) fail "$home_id's backlog has no item $item" ;;
         *) fail "cannot read $home_id's backlog, so nothing was closed: ${REMOTE_ITEM_ERROR:-unreachable remote}" ;;
       esac
@@ -620,7 +622,7 @@ state_label() {  # <state> <source>
 }
 
 guard_intake() {
-  local list valid id state score source ntitle neighbour_ids='' keep_line='' status top='' matched=1 shown_count=0
+  local list valid id state score source ntitle neighbour_ids='' keep_line='' status top='' matched=1 shown_count=0 known=0
   [ "$ADD_HELP" = 0 ] || return 0
   valid=$(intake_python objectives "$OBJECTIVES_FILE") \
     || fail "cannot read the objective list $OBJECTIVES_FILE"
@@ -632,10 +634,11 @@ guard_intake() {
     [[ "$ADD_REASON" =~ [^[:space:]] ]] \
       || fail "--objective none needs --objective-reason \"<why no objective applies>\""
   else
-    case " $valid " in
-      *" $ADD_OBJECTIVE "*) ;;
-      *) fail "unknown objective '$ADD_OBJECTIVE'; use one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why>\"" ;;
-    esac
+    for id in $valid; do
+      [ "$id" != "$ADD_OBJECTIVE" ] || known=1
+    done
+    [ "$known" = 1 ] \
+      || fail "unknown objective '$ADD_OBJECTIVE'; use one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why>\""
   fi
   if [ -n "$ADD_DUP_OF" ] && [ "${#ADD_NOT_DUP[@]}" -gt 0 ]; then
     fail "give --dup-of or --not-dup, not both"
