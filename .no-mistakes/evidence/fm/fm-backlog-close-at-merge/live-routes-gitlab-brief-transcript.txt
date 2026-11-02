@@ -1,0 +1,47 @@
+=== L1 GitLab: real glab reads a real merged MR and finds its Closes: 3461 line; tasks-axi takes no MR URL as proof, so the row stays open, is named with the reason, and its waiter stays (the tested contract)
+list prints:   "3461",queued,docs,"-",fixture 3461,none
+exit=3
+[stdout]
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  actionable: close-at-merge: not closed 3461: bin/fm-tasks-axi.sh done did not close it: error: "Task pr link must be a canonical pull request URL: https://github.com/<owner>/<repo>/pull/<n> (GitHub) or https://<host>/<
+  3461           state=queued    deps=none
+  waits-gl       state=queued    deps="blocked-by:3461"
+--- L1b a ship row on GitLab: the proof rule is unchanged (GitHub only), reported, not closed
+actionable: close-at-merge: not closed 3461: bin/fm-tasks-axi.sh done did not close it: only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop
+close-at-merge: 0 closed, 1 left open
+exit=3
+  3461           state=queued    deps=none
+
+=== L2 M3 routes: task done --note, task close --note, public-followup waive, and waive with done_keep 0 (row archived at once)
+unblocked: dep-n-done no longer waits on n-done; no stored blocked-by edge remains
+unblocked: dep-n-close no longer waits on n-close; no stored blocked-by edge remains
+  n-done         state=done      deps=none
+  n-close        state=done      deps=none
+  dep-n-done     state=queued    deps=none
+  dep-n-close    state=queued    deps=none
+unblocked: dep-pf no longer waits on pf-1; no stored blocked-by edge remains
+  pf-1           state=done      deps=none
+  dep-pf         state=queued    deps=none
+unblocked: dep-pf0 no longer waits on pf-0; no stored blocked-by edge remains
+  pf-0 show: NOT_FOUND
+  dep-pf0        state=queued    deps=none
+
+=== L3 M3 route: a captain hold answered; a held item leaves its dependents
+exit=0
+unblocked: dep-q no longer waits on call-q; no stored blocked-by edge remains
+  call-q         state=done      deps=none
+  dep-q          state=queued    deps=none
+
+=== L4 S1: bin/fm-brief.sh scaffolds teach Closes: with the real id only where a PR body exists
+  --mode no-mistakes                   Closes-with-real-id=2 placeholder=0 read-back=1
+  --mode direct-PR                     Closes-with-real-id=1 placeholder=0 read-back=1
+  --mode direct-PR --forge forgejo     Closes-with-real-id=1 placeholder=0 read-back=1
+  --mode local-only                    Closes-with-real-id=0 placeholder=0 read-back=0
+  --mode direct-PR --forge gerrit --shape squash Closes-with-real-id=0 placeholder=0 read-back=0
+  --scout                              Closes-with-real-id=0 placeholder=0 read-back=0
+--- no-mistakes wording, in order:
+141:Name the backlog items your change finishes: put `Closes: brief-nm` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued
+192:After /no-mistakes reports CI green (the CI-ready return point - do not wait for it to keep monitoring in the background until merge), read the PR back from the forge and confirm it is not a draft (`gh-axi 
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes: brief-nm`), because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr view <n
+195:Then append `done [at=<epoch>]: PR {url} checks green` and stop. You are finished.

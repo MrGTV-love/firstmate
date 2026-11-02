@@ -1,0 +1,219 @@
+{"full_name":"labadmin/fixture"}
+=== F1 M1: merge a PR whose body names items
+before:
+  docs-a         state=queued    deps=none
+  docs-b         state=queued    deps=none
+  ship-c         state=queued    deps=none
+  held-d         state=queued    deps=none
+  prose-e        state=queued    deps=none
+  fenced-f       state=queued    deps=none
+  waiter         state=queued    deps="blocked-by:docs-a,blocked-by:open"
+--- run: bin/fm-pr-merge.sh fj-one https://127.0.0.1.nip.io/labadmin/fixture/pulls/1
+[stdout]
+  close-at-merge: closed docs-a with https://127.0.0.1.nip.io/labadmin/fixture/pulls/1 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/1)
+  close-at-merge: unblocked: waiter no longer waits on docs-a; it still waits on open
+  close-at-merge: closed docs-b with https://127.0.0.1.nip.io/labadmin/fixture/pulls/1 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/1)
+  close-at-merge: 2 closed, 3 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/1 is open and mergeable, with a successful combined status at head 564e5ee1f82aa22e139aed3435dcddd98df6ae18
+  review: PASS
+  actionable: close-at-merge: not closed ship-c: bin/fm-tasks-axi.sh done did not close it: only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop
+  actionable: close-at-merge: not closed held-d: it is an open owner call: held-d is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+  actionable: close-at-merge: not closed ghost-id: unknown id named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/1; no item with that id is in the active backlog (an archived item is not read), and none was created
+merge exit=0
+forge record: {"number":1,"state":"closed","merged":true}
+after:
+  docs-a         state=done      deps=none
+  docs-b         state=done      deps=none
+  ship-c         state=queued    deps=none
+  held-d         state=queued    deps=none
+  prose-e        state=queued    deps=none
+  fenced-f       state=queued    deps=none
+  waiter         state=queued    deps="blocked-by:open"
+ghost-id rows: 0  not-read lines on this non-train body: 0
+12:- [x] docs-a - fixture docs-a https://127.0.0.1.nip.io/labadmin/fixture/pulls/1 (kind: docs) (merged 2026-11-02)
+
+=== F2 M4 edge: a hand re-run after a partial close is idempotent
+close-at-merge: docs-a is already done
+close-at-merge: docs-b is already done
+actionable: close-at-merge: not closed ship-c: bin/fm-tasks-axi.sh done did not close it: only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop
+actionable: close-at-merge: not closed held-d: it is an open owner call: held-d is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+actionable: close-at-merge: not closed ghost-id: unknown id named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/1; no item with that id is in the active backlog (an archived item is not read), and none was created
+close-at-merge: 0 closed, 3 left open
+exit=3
+proof copies on docs-a: 1
+
+=== F3 M2 + R5-1: train with a member that stays unmerged, a member that names nothing, an unreadable member, a task record, and unlisted GitHub links
+before:
+  tr-m1          state=queued    deps=none
+  tr-m2          state=queued    deps=none
+  tr-meta        state=queued    deps=none
+  tr-own         state=queued    deps=none
+  tr-out         state=queued    deps=none
+  tr-none        state=queued    deps=none
+  fm-backlog-intake-dup-and-objective state=queued    deps=none
+--- run: bin/fm-pr-merge.sh fj-train https://127.0.0.1.nip.io/labadmin/fixture/pulls/6
+[stdout]
+  close-at-merge: closed tr-own with https://127.0.0.1.nip.io/labadmin/fixture/pulls/6 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/6)
+  close-at-merge: closed tr-m1 with https://127.0.0.1.nip.io/labadmin/fixture/pulls/6 (named by the body of train member https://127.0.0.1.nip.io/labadmin/fixture/pulls/2)
+  close-at-merge: closed tr-m2 with https://127.0.0.1.nip.io/labadmin/fixture/pulls/6 (named by the body of train member https://127.0.0.1.nip.io/labadmin/fixture/pulls/3)
+  close-at-merge: closed tr-meta with https://127.0.0.1.nip.io/labadmin/fixture/pulls/6 (named by the task record that holds train member https://127.0.0.1.nip.io/labadmin/fixture/pulls/3)
+  close-at-merge: 4 closed, 1 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/6 is open and mergeable, with a successful combined status at head 6b7fcb6bbc4ba87a3e47439ab5c6d1f0d8d050d5
+  review: PASS
+  actionable: close-at-merge: could not read the body of train member https://127.0.0.1.nip.io/labadmin/fixture/pulls/9999 (jq: error (at <stdin>:0): the forge answered: The target couldn't be found.); retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ERPJDRE3
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/361: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+merge exit=0
+forge train: {"number":6,"state":"closed","merged":true}  member1: {"number":2,"state":"open","merged":false}
+after:
+  tr-m1          state=done      deps=none
+  tr-m2          state=done      deps=none
+  tr-meta        state=done      deps=none
+  tr-own         state=done      deps=none
+  tr-out         state=queued    deps=none
+  tr-none        state=queued    deps=none
+  fm-backlog-intake-dup-and-objective state=queued    deps=none
+proof on tr-m2 row is the train: 1
+fenced link 347 named: 0
+
+=== F4 M4: the backlog write fails in the close step (tasks-axi done is made to fail; every other call is real)
+--- run: bin/fm-pr-merge.sh fj-fail https://127.0.0.1.nip.io/labadmin/fixture/pulls/7
+[stdout]
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/7 is open and mergeable, with a successful combined status at head e1244b9d4e72f05a716ef16d1e0f48b5b277eb88
+  review: PASS
+  actionable: close-at-merge: not closed fail-g: bin/fm-tasks-axi.sh done did not close it: simulated: could not write the backlog
+merge exit=0
+forge record: {"number":7,"state":"closed","merged":true}
+  fail-g         state=queued    deps=none
+--- retry by hand after the repair
+close-at-merge: closed fail-g with https://127.0.0.1.nip.io/labadmin/fixture/pulls/7 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/7)
+close-at-merge: 1 closed, 0 left open
+exit=0
+  fail-g         state=done      deps=none
+--- retry again
+close-at-merge: fail-g is already done
+exit=0
+
+=== F5 M4: the close step cannot read the body (only the close step's tea read is made to fail)
+--- run: bin/fm-pr-merge.sh fj-unread https://127.0.0.1.nip.io/labadmin/fixture/pulls/8
+[stdout]
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/8 is open and mergeable, with a successful combined status at head e903df3f5e8bde2b476247d499f46f1b2ebd96a7
+  review: PASS
+  actionable: close-at-merge could not read the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/8 (simulated: 502 bad gateway), so it closed nothing and the merge result is unchanged; retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6ERPJDRE3YW3KYN589E
+merge exit=0
+forge record: {"number":8,"state":"closed","merged":true}
+  unread-h       state=queued    deps=none
+--- retry by hand
+close-at-merge: closed unread-h with https://127.0.0.1.nip.io/labadmin/fixture/pulls/8 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/8)
+close-at-merge: 1 closed, 0 left open
+exit=0
+  unread-h       state=done      deps=none
+
+=== F6 M4: a failed edge clear goes to stderr as actionable, the item still closes, the merge still succeeds
+--- run: bin/fm-pr-merge.sh fj-edge https://127.0.0.1.nip.io/labadmin/fixture/pulls/9
+[stdout]
+  close-at-merge: closed edge-m with https://127.0.0.1.nip.io/labadmin/fixture/pulls/9 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/9)
+  close-at-merge: 1 closed, 0 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/9 is open and mergeable, with a successful combined status at head 390ae6ca1a1c0c47bbcfdf402f00e10fb209ab06
+  review: PASS
+  actionable: close-at-merge: edge-m is done, but edge-w could not be unblocked (simulated: unblock failed); run tasks-axi unblock edge-w --by edge-m
+merge exit=0
+forge record: {"number":9,"state":"closed","merged":true}
+  edge-m         state=done      deps=none
+  edge-w         state=queued    deps="blocked-by:edge-m"
+--- the command the line names
+ok: unblock edge-w -> cleared edge-m
+  edge-w         state=queued    deps=none
+
+=== F7 adversarial: a hand run with an OPEN PR, then a PR closed unmerged, then the same PR after it merges
+forge record: {"number":10,"state":"open","merged":false}
+actionable: close-at-merge: not closed early-i: https://127.0.0.1.nip.io/labadmin/fixture/pulls/10 is not merged, so nothing was closed (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/10); retry once it has m
+actionable: close-at-merge: not closed early-s: https://127.0.0.1.nip.io/labadmin/fixture/pulls/10 is not merged, so nothing was closed (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/10); retry once it has m
+close-at-merge: 0 closed, 2 left open
+exit=3
+  early-i        state=queued    deps=none
+  early-s        state=queued    deps=none
+forge record: {"number":11,"state":"closed","merged":false}
+actionable: close-at-merge: not closed early-k: https://127.0.0.1.nip.io/labadmin/fixture/pulls/11 is not merged, so nothing was closed (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/11); retry once it has m
+close-at-merge: 0 closed, 1 left open
+exit=3
+  early-k        state=queued    deps=none
+forge record: {"number":10,"state":"closed","merged":true}
+close-at-merge: closed early-i with https://127.0.0.1.nip.io/labadmin/fixture/pulls/10 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/10)
+actionable: close-at-merge: not closed early-s: bin/fm-tasks-axi.sh done did not close it: only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop
+close-at-merge: 1 closed, 1 left open
+exit=3
+  early-i        state=done      deps=none
+  early-s        state=queued    deps=none
+
+=== F8 adversarial: a merge the guard does not allow closes nothing
+--- run: bin/fm-pr-merge.sh fj-red https://127.0.0.1.nip.io/labadmin/fixture/pulls/12
+[stdout]
+[stderr]
+  error: refusing to merge https://127.0.0.1.nip.io/labadmin/fixture/pulls/12
+    - the combined commit status is "failure", not success
+merge exit=1
+forge record: {"number":12,"state":"open","merged":false}
+  refuse-j       state=queued    deps=none
+close-at-merge lines: 0
+
+=== F9 adversarial: prefix ids and hard titles: only the finished id leaves the list
+--- run: bin/fm-pr-merge.sh fj-pre https://127.0.0.1.nip.io/labadmin/fixture/pulls/13
+[stdout]
+  close-at-merge: closed ed-1 with https://127.0.0.1.nip.io/labadmin/fixture/pulls/13 (named by the body of https://127.0.0.1.nip.io/labadmin/fixture/pulls/13)
+  close-at-merge: unblocked: w-comma no longer waits on ed-1; it still waits on ed-10
+  close-at-merge: 1 closed, 0 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/13 is open and mergeable, with a successful combined status at head 9202424c314eae3a7b5efd65ad5709050eb23093
+  review: PASS
+merge exit=0
+  ed-1           state=done      deps=none
+  ed-10          state=queued    deps=none
+  w-comma        state=queued    deps="blocked-by:ed-10"
+  w-only10       state=queued    deps="blocked-by:ed-10"
+
+=== F10 own task through the whole life: a ship PR names its own task; the merge reports it for teardown; bin/fm-teardown.sh closes it and clears its dependents
+--- run: bin/fm-pr-merge.sh fj-own https://127.0.0.1.nip.io/labadmin/fixture/pulls/14
+[stdout]
+  close-at-merge: not closed fj-own: bin/fm-tasks-axi.sh done did not close it: fj-own has a live task record; complete it with bin/fm-teardown.sh fj-own, which owns the landing proof
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/14 is open and mergeable, with a successful combined status at head 718900bad1238745af18afd046b13a1bf863a4ce
+  review: PASS
+merge exit=0
+forge record: {"number":14,"state":"closed","merged":true}
+  fj-own         state=queued    deps=none
+  own-w          state=queued    deps="blocked-by:fj-own,blocked-by:own-other"
+meta pr=: pr=https://127.0.0.1.nip.io/labadmin/fixture/pulls/14
+--- run: bin/fm-teardown.sh fj-own
+error: task fj-own's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.Fw5f5J/state/fj-own.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown 
+teardown exit=1
+  fj-own         state=queued    deps=none
+  own-w          state=queued    deps="blocked-by:fj-own,blocked-by:own-other"
+
+=== F10 re-run with spawn_gen=1 and a private lab tmux endpoint; the teardown passes its record and endpoint checks and stops at treehouse, because the lab has no pool copy
+=== F10 own task through the whole life: a ship PR names its own task; the merge reports it for teardown; bin/fm-teardown.sh closes it and clears its dependents
+--- run: bin/fm-pr-merge.sh fj-own https://127.0.0.1.nip.io/labadmin/fixture/pulls/1
+[stdout]
+  close-at-merge: not closed fj-own: bin/fm-tasks-axi.sh done did not close it: fj-own has a live task record; complete it with bin/fm-teardown.sh fj-own, which owns the landing proof
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  verified: https://127.0.0.1.nip.io/labadmin/fixture/pulls/1 is open and mergeable, with a successful combined status at head 6f518987b5ab571dd61934f1d212e799ecc1fc75
+  review: PASS
+merge exit=0
+forge record: {"number":1,"state":"closed","merged":true}
+  fj-own         state=queued    deps=none
+  own-w          state=queued    deps="blocked-by:fj-own,blocked-by:own-other"
+meta pr=: pr=https://127.0.0.1.nip.io/labadmin/fixture/pulls/1
+--- run: bin/fm-teardown.sh fj-own
+tmux dir is the lab private one: yes
+worktree /tmp/fm-live-01M6/fj/wt is not managed by treehouse
+error: treehouse return failed for worktree /tmp/fm-live-01M6/fj/wt; teardown aborted
+teardown exit=1
+  fj-own         state=queued    deps=none
+  own-w          state=queued    deps="blocked-by:fj-own,blocked-by:own-other"

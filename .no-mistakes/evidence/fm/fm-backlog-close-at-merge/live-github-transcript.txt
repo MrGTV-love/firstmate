@@ -1,0 +1,172 @@
+=== G1 R5-1: real OPEN widened train 362: unlisted links named, unlisted member's item stays open
+--- run: bin/fm-pr-close-items.sh lab-g1 https://github.com/MrGTV-love/firstmate/pull/362
+[stdout]
+[stderr]
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/359: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/347: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/358: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/361: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/360: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+exit=0
+  fm-backlog-intake-dup-and-objective      state=queued    deps=none
+not-read on stdout: 0  not-read on stderr: 6
+real body of 361 names: Closes: fm-backlog-intake-dup-and-objective
+
+=== G2 R5-1: real MERGED train 353; a task record holding member 343 closes with the train as proof; 337 and 351 are named; counts unaffected
+  task-343                                 state=queued    deps=none
+  waits-343                                state=queued    deps="blocked-by:task-343,blocked-by:other-open"
+--- run: bin/fm-pr-close-items.sh lab-g2 https://github.com/MrGTV-love/firstmate/pull/353
+[stdout]
+  close-at-merge: closed task-343 with https://github.com/MrGTV-love/firstmate/pull/353 (named by the task record that holds train member https://github.com/MrGTV-love/firstmate/pull/343)
+  close-at-merge: unblocked: waits-343 no longer waits on task-343; it still waits on other-open
+  close-at-merge: 1 closed, 0 left open
+[stderr]
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/337: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/351: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+exit=0
+  task-343                                 state=done      deps=none
+  waits-343                                state=queued    deps="blocked-by:other-open"
+- [x] task-343 - fixture task-343 https://github.com/MrGTV-love/firstmate/pull/353 (kind: docs) (merged 2026-11-02)
+real member 343 state: MERGED; real member 344 state: CLOSED
+
+=== G3 R5-1 negative: real train 341 whose links are all members prints no not-read line
+--- run: bin/fm-pr-close-items.sh lab-g3 https://github.com/MrGTV-love/firstmate/pull/341
+[stdout]
+[stderr]
+exit=0
+not-read lines: 0
+
+=== G4 R5-1 negative: real merged PR 338 with no member list but 3 PR links prints nothing
+--- run: bin/fm-pr-close-items.sh lab-g4 https://github.com/MrGTV-love/firstmate/pull/338
+[stdout]
+[stderr]
+exit=0
+not-read lines: 0
+
+=== G5 reword + channel: ship task with a live record holding member 344, reported by a DIFFERENT task id
+--- run: bin/fm-pr-close-items.sh lab-g5 https://github.com/MrGTV-love/firstmate/pull/353
+[stdout]
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  actionable: close-at-merge: not closed task-344: bin/fm-tasks-axi.sh done did not close it: task-344 has a live task record; complete it with bin/fm-teardown.sh task-344, which owns the landing proof
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/337: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+  actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/351: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+exit=3
+  task-344                                 state=queued    deps=none
+old wording count: 0
+
+=== G6 own task: the merged PR's own task with a live record gets the plain stdout line
+--- run: bin/fm-pr-close-items.sh DEV-2514 https://github.com/veecle/chiplab-cli/pull/54
+[stdout]
+  close-at-merge: not closed DEV-2514: bin/fm-tasks-axi.sh done did not close it: DEV-2514 has a live task record; complete it with bin/fm-teardown.sh DEV-2514, which owns the landing proof
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+exit=3
+  DEV-2514                                 state=queued    deps=none
+
+=== G7 M1/M3 on GitHub: real merged PR names a real ship item; first blocker clears, second unfinished blocker stays
+before:
+  DEV-2514                                 state=queued    deps=none
+  waits-one                                state=queued    deps="blocked-by:DEV-2514"
+  waits-two                                state=queued    deps="blocked-by:DEV-2514,blocked-by:still-open"
+  still-open                               state=queued    deps=none
+--- run: bin/fm-pr-close-items.sh lab-g7 https://github.com/veecle/chiplab-cli/pull/54
+[stdout]
+  close-at-merge: closed DEV-2514 with https://github.com/veecle/chiplab-cli/pull/54 (named by the body of https://github.com/veecle/chiplab-cli/pull/54)
+  close-at-merge: unblocked: waits-one no longer waits on DEV-2514; no stored blocked-by edge remains
+  close-at-merge: unblocked: waits-two no longer waits on DEV-2514; it still waits on still-open
+  close-at-merge: 1 closed, 0 left open
+[stderr]
+exit=0
+after:
+  DEV-2514                                 state=done      deps=none
+  waits-one                                state=queued    deps=none
+  waits-two                                state=queued    deps="blocked-by:still-open"
+  still-open                               state=queued    deps=none
+8:- [x] DEV-2514 - fixture DEV-2514 https://github.com/veecle/chiplab-cli/pull/54 (kind: ship) (merged 2026-11-02)
+--- G7b rerun: idempotent, no second proof
+--- run: bin/fm-pr-close-items.sh lab-g7 https://github.com/veecle/chiplab-cli/pull/54
+[stdout]
+  close-at-merge: DEV-2514 is already done
+[stderr]
+exit=0
+proof-lines before=1 after=1
+
+=== G8 M1 edges: unknown id, open owner call (real PR), nothing created, nothing closed
+--- run: bin/fm-pr-close-items.sh lab-g8 https://github.com/veecle/chiplab-cli/pull/54
+[stdout]
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  actionable: close-at-merge: not closed DEV-2514: unknown id named by the body of https://github.com/veecle/chiplab-cli/pull/54; no item with that id is in the active backlog (an archived item is not read), and none was created
+exit=3
+rows named DEV-2514: 0
+--- run: bin/fm-pr-close-items.sh lab-g8 https://github.com/veecle/chiplab-cli/pull/54
+[stdout]
+  close-at-merge: 0 closed, 1 left open
+[stderr]
+  actionable: close-at-merge: not closed DEV-2514: it is an open owner call: DEV-2514 is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+exit=3
+  DEV-2514                                 state=queued    deps=none
+
+=== G9 proof rule unchanged: done --pr with a real OPEN PR on a ship item, and done with no proof
+fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/362
+exit=2
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+  unproved                                 state=queued    deps=none
+
+=== G10 R5-2 quoted ids: 123, true, 1.5 each blocked by a1 and b2
+tasks-axi list --fields deps prints:
+  a1,queued,docs,"-",fixture a1,none
+  b2,queued,docs,"-",fixture b2,none
+  "123",queued,docs,"-",fixture 123,"blocked-by:a1,blocked-by:b2"
+  "true",queued,docs,"-",fixture true,"blocked-by:a1,blocked-by:b2"
+  "1.5",queued,docs,"-",fixture 1.5,"blocked-by:a1,blocked-by:b2"
+  - Run `tasks-axi show <id>` for full notes on a task
+  - Run `tasks-axi ready` to see unblocked queued work
+exit=0
+[stderr]
+  unblocked: 123 no longer waits on a1; it still waits on b2
+  unblocked: true no longer waits on a1; it still waits on b2
+  unblocked: 1.5 no longer waits on a1; it still waits on b2
+actionable lines: 0
+  a1                                       state=done      deps=none
+  123                                      state=queued    deps="blocked-by:b2"
+  true                                     state=queued    deps="blocked-by:b2"
+  1.5                                      state=queued    deps="blocked-by:b2"
+
+=== G11 M3 routes: done --drop-file, close, public-followup waive
+ok: done b1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: w1 no longer waits on b1; no stored blocked-by edge remains
+exit=0
+ok: done b2 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+unblocked: w2 no longer waits on b2; no stored blocked-by edge remains
+exit=0
+  b1                                       state=done      deps=none
+  b2                                       state=done      deps=none
+  w1                                       state=queued    deps=none
+  w2                                       state=queued    deps=none
+--- G11b a raw failed done leaves the edge
+error: "Task \"ghost-zzz\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+exit=1
+
+=== G12 help calls print no false actionable or unblocked line
+  fm-tasks-axi.sh done --help -> false lines: 0
+  fm-tasks-axi.sh close --help -> false lines: 0
+  fm-tasks-axi.sh public-followup waive --help -> false lines: 0
+  fm-tasks-axi.sh public-followup record-delivery --help -> false lines: 0
+
+=== G13 --not-recorded closes nothing and names every item; a bad PR number gives a retry line
+actionable: close-at-merge: not closed DEV-2514: the merge of https://github.com/veecle/chiplab-cli/pull/54 was not recorded, so nothing was closed (named by the body of https://github.com/veecle/chiplab-cli/pull/54); retry: bin/fm-pr-close-items.sh lab-g13 ht
+close-at-merge: 0 closed, 1 left open
+exit=3
+  DEV-2514                                 state=queued    deps=none
+actionable: close-at-merge could not read the body of https://github.com/MrGTV-love/firstmate/pull/99999999 (GraphQL: Could not resolve to a PullRequest with the number of 99999999. (repository.pullRequest)), so it closed nothing and the merge result is unchan
+exit=1
