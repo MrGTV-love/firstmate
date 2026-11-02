@@ -1096,6 +1096,7 @@ Arguments are a sanitized `ps` command-line projection, not lossless argv; arbit
 Its own start/stop commands manage only its private owner and quota child group, never a shared service.
 No wall-clock limit stops a quota request or a `ps`: each is killed only on `bin/fm-duration.py`'s no-progress verdict (15 quiet minutes by default, `FM_DURATION_NO_PROGRESS_SECS`), a killed request is recorded unavailable with `reason=timeout`, and a killed `ps` counts as a sampling failure.
 Each `ps` runs off the owner's loop, so a slow or hung one delays neither the quota stream nor `stop`.
+A hung `ps` leaves at most one scan and one quota verdict waiting, a later request has no no-progress verdict until `ps` recovers, and an owner that exits normally ends its remaining child processes, including a hung `ps`.
 Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh) and, for the watcher's lifecycle, [`tests/fm-watch-github-accounting.test.sh`](../tests/fm-watch-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
 
 ### Completion and discard

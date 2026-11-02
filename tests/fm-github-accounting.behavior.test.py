@@ -44,10 +44,11 @@ class ObserverTests(unittest.TestCase):
     def records(self, kind):
         return [json.loads(line) for line in self.cli("records", "--kind", kind).stdout.splitlines()]
 
-    def scaled_owner(self, duration):
+    def scaled_owner(self, duration, keep_fake_ps=False):
         # A labeled scaled clock runs the real 15 s cadence and a labeled 30 s
         # no-progress interval twenty times faster. The real ps samples CPU.
-        (self.fakebin / "ps").unlink()
+        if not keep_fake_ps:
+            (self.fakebin / "ps").unlink()
         launcher = self.root / "scaled-clock.py"
         launcher.write_text(f'''import runpy,sys,time
 scale=20.0
@@ -221,12 +222,39 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
         self.assertProcessGone(int((self.root / "ps-pid").read_text()))
 
+    def hung_ps_fixture(self):
+        self.tool("ps", '''printf '%s\\n' "$$" >> "$FIXTURE_ROOT/ps-pids"
+exec sleep 600
+''')
+
+    def assertHungPsEnded(self):
+        pids = [int(line) for line in (self.root / "ps-pids").read_text().splitlines()]
+        self.assertTrue(pids)
+        for pid in pids:
+            self.assertProcessGone(pid)
+        return pids
+
     def test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working(self):
-        self.tool("ps", "exec sleep 20\n")
+        self.hung_ps_fixture()
         reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "3"], env=self.env,
                                capture_output=True, text=True, timeout=60)
         self.assertEqual(reply.returncode, 0, reply.stderr)
         self.assertIn("observed", [row["status"] for row in self.records("quota")])
+        self.assertHungPsEnded()
+
+    def test_hung_ps_does_not_grow_verdicts_across_repeated_requests(self):
+        # A request lasting past the first CPU sample reaches the hung ps; the
+        # injected table keeps this count to the quota verdict's own samples.
+        self.hung_ps_fixture()
+        self.tool("gh-axi", '''printf 'x\\n' >> "$FIXTURE_ROOT/requests"
+sleep 0.3
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        rows = self.scaled_owner(100, keep_fake_ps=True)
+        requests = len((self.root / "requests").read_text().splitlines())
+        self.assertGreaterEqual(requests, 3, rows)
+        self.assertGreaterEqual([row["status"] for row in rows].count("observed"), 3, rows)
+        self.assertEqual(len(self.assertHungPsEnded()), 1, f"{requests} requests")
 
     def test_malformed_quota_is_unavailable_not_zero(self):
         self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")

@@ -44,8 +44,11 @@ watcher context, not a confined worker. Each scan runs off the owner's loop and 
 never overlap, so a slow or hung ps delays neither the quota stream nor stop. A ps
 with no output or CPU progress for the same interval is killed and counts as a
 sampling failure. Where that CPU sample itself needs ps (Darwin) and ps hangs, no
-verdict exists: only stop ends the scan, the sampler's own ps stays until it exits,
-and sampling summaries show the gap as missing scans.
+verdict exists: only stop ends the scan, and sampling summaries show the gap as
+missing scans. A quota request starts its verdict only once the earlier verdict has
+returned, so a hung ps leaves at most one scan and one quota verdict waiting, and a
+later request has no verdict until ps recovers. An owner that exits normally ends its
+remaining child processes, including a hung ps; a SIGKILL of the owner does not.
 run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
 Injected rows prove output behavior, not actual host observations. New gh/gh-axi
@@ -228,10 +231,14 @@ def safe_argv(argv):
     return result
 
 
-@functools.lru_cache(maxsize=1)
+@functools.lru_cache(maxsize=None)
+def sibling(name):
+    return runpy.run_path(str(Path(__file__).resolve().with_name(name)))
+
+
 def progress_api():
     # bin/fm-duration.py owns the no-progress verdict, its interval and the blind-telemetry rule.
-    return runpy.run_path(str(Path(__file__).resolve().with_name("fm-duration.py")))
+    return sibling("fm-duration.py")
 
 
 def wait_for_progress(child):
@@ -252,15 +259,26 @@ def end_child(child):
     child.wait()
 
 
-LIVE_PS = None
+def end_owned_children(table, threads):
+    # bin/fm-proc-budget-tree.py reads the table natively, so a hung ps cannot block this.
+    for _ in range(10):
+        for pid, row in table.read().items():
+            if row[0] == os.getpid() and not row[3]:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        alive = [thread for thread in threads if thread is not None and thread.is_alive()]
+        if not alive:
+            return
+        alive[0].join(0.1)
 
 
 def process_table():
-    global LIVE_PS
-    LIVE_PS = child = subprocess.Popen(["ps", "-axo", "pid=,ppid=,lstart=,command="],
-                                       env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
-                                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                       stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    child = subprocess.Popen(["ps", "-axo", "pid=,ppid=,lstart=,command="],
+                             env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True, start_new_session=True)
     try:
         stdout, _ = wait_for_progress(child)
     except subprocess.TimeoutExpired:
@@ -363,6 +381,8 @@ def run(root, duration=None, ready=None, *, process_source=None):
     # shape without changing filtering, ancestry, identity or storage behavior.
     source = process_table if process_source is None else process_source
     progress_api()
+    tree = sibling("fm-proc-budget-tree.py")
+    table = tree["Table"]()
     with ownership(root, fcntl.LOCK_EX) as lock:
         lock.truncate(0)
         db = database(root)
@@ -378,7 +398,7 @@ def run(root, duration=None, ready=None, *, process_source=None):
 
         for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(number, stop_requested)
-        child = stream = expired = scan = None
+        child = stream = expired = scan = verdict = None
         seen = set()
         scans = failures = 0
         max_gap = 0.0
@@ -450,10 +470,12 @@ def run(root, duration=None, ready=None, *, process_source=None):
                                                  "source": "REST rate_limit resources.graphql", "reason": "command_unavailable"})
                         else:
                             expired = threading.Event()
-                            threading.Thread(target=stop_without_progress, args=(child, expired), daemon=True).start()
                     else:
                         record(db, "quota", {"run_id": run_id, "status": "pending", "endpoint": "rate_limit",
                                              "source": "REST rate_limit resources.graphql", "request_pid": child.pid})
+                    if child is not None and (verdict is None or not verdict.is_alive()):
+                        verdict = threading.Thread(target=stop_without_progress, args=(child, expired), daemon=True)
+                        verdict.start()
                     db.commit()
                     next_quota = time.monotonic() + QUOTA_INTERVAL
                 time.sleep(max(0, min(next_process, next_quota) - time.monotonic()))
@@ -463,8 +485,10 @@ def run(root, duration=None, ready=None, *, process_source=None):
             if child is not None:
                 end_child(child)
                 stream.close()
-            if LIVE_PS is not None:
-                end_child(LIVE_PS)
+            try:
+                end_owned_children(table, (verdict, scan))
+            except tree["SampleError"]:
+                pass
             if scan is not None and scan.rows is not None:
                 finish_scan()
             record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
