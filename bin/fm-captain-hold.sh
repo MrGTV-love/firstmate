@@ -130,7 +130,9 @@
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
 # writes a resolution block while preserving the leading hold-set stamp until
 # the close succeeds (the previous body is preserved and archived through
-# tasks-axi --archive-body). It closes a question with `tasks-axi done` - or,
+# tasks-axi --archive-body). It closes a question with `tasks-axi done` (and then clears
+# the finished id from every other item's blocked-by list, as `answer` and `withdraw`
+# both do) - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
 # ordering. For direct callers, an exact retry also completes unfinished ordering
@@ -1884,6 +1886,7 @@ close_answered() {  # <task-id> <release-0-or-1> [<answer-source>]
   else
     apply_pending_retained_artifact "$1" || return 1
     tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null || return $?
+    fm_backlog_unblock_dependents "$DATA" "$1" >&2
     ledger_hold_closed "$1" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
   fi
   ledger_hold_answered "$1" ${3+"$3"}
@@ -2197,6 +2200,7 @@ command_withdraw() {
     apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for withdrawn task $id"
     tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \
       || fail "could not close withdrawn task $id"
+    fm_backlog_unblock_dependents "$DATA" "$id" >&2
     ledger_hold_closed "$id" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
   else
     tasks_axi unhold "$id" >/dev/null || fail "could not release withdrawn task $id"

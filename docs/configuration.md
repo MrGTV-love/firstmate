@@ -1091,6 +1091,15 @@ Ship and scout completion requires delivery evidence or the captain's own words,
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+A pull request that finishes a queued item names it with a `Closes: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge.
+A merge train closes its members' items too, with the train as the proof: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
+[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the exact `Closes:` line syntax and of which URLs in a train body are members; a line inside a fenced code block is an example, not a directive, and a pull request the body only mentions is not a member.
+The merged pull request's own task is closed by its own teardown, so the merge only reports it.
+Any other task that still has a live record stays open, and the merge reports it as an `actionable:` line.
+[`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item and an open captain call among them.
+A close that fails never undoes or fails the merge, and a repeat run changes nothing.
+An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer` or `withdraw` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
+A raw `tasks-axi done` skips this clear, and so does teardown in a home where the backlog transition gate does not apply.
 [`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
 Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
