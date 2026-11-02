@@ -991,11 +991,11 @@ test_spawn_explicit_harness_uses_explicit_profile_axes() {
   [ "$(meta_field "$meta" model)" = gpt-5.5 ] || fail "explicit-harness-explicit-axes: meta model did not use explicit value"
   [ "$(meta_field "$meta" effort)" = xhigh ] || fail "explicit-harness-explicit-axes: meta effort did not use explicit value"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "--model 'gpt-5.5'" \
+  assert_launch_contains "$launch" "--model 'gpt-5.5'" \
     "explicit-harness-explicit-axes: launch did not use the explicit --model"
-  assert_contains "$launch" "-c 'model_reasoning_effort=\"xhigh\"'" \
+  assert_launch_contains "$launch" "-c 'model_reasoning_effort=\"xhigh\"'" \
     "explicit-harness-explicit-axes: launch did not use the explicit --effort"
-  assert_not_contains "$launch" "--model 'opus'" \
+  assert_launch_not_contains "$launch" "--model 'opus'" \
     "explicit-harness-explicit-axes: launch leaked the file's model token"
   assert_not_contains "$launch" "model_reasoning_effort=\"high\"" \
     "explicit-harness-explicit-axes: launch leaked the file's effort token"
