@@ -1,0 +1,7 @@
+scratch copy of 38b7e5d95bf926d109461c430aa2fc4715ddf4fe, review-record suite
+A. fix in place: exit=0
+ok - an unknown author family is covered only by exact-head PASS reads from two known reader families
+-        return sorted(f for f in families if (len(readers) < 2 if f == "unknown" else not readers - {f}))
++        return sorted(f for f in families if f == "unknown" or not readers - {f})
+B. old rule restored: exit=1
+not ok - two known reader families must cover an unknown author: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"uncovered commit group ship, family unknown; model family unknown needs exact-head 

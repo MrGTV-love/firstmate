@@ -1,0 +1,152 @@
+
+=== A. reported failure: acp:omp empty model, PASS from two known families, no owner words
+  read: head=0088f99ec754 reader=claude-opus-5-5 verdict=PASS
+  read: head=0088f99ec754 reader=gpt-5.1-codex verdict=PASS
+  author evidence: agent=acp:omp model=[]
+  verify --review-only --json: exit=0 {"ok":true,"basis":"independent-review","reader_model":"gpt-5.1-codex"}
+PASS  two families merge without owner words
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 0088f99ec754ebc229ffa1f371774d739f20ee87 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+PASS  reverse-order and non-Claude pair also merge (the ship group has an outside reader in gemini)
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 47e2ce8a1995b846d99e8485a3aa5450c0e06e2b --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+
+=== B. old rule on the same fixture: fm-pr-merge.sh and fm-review-record.py from base f77b7973
+PASS  old rule refuses the same two reads and demands owner words
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this ex 
+
+=== C. one family only, then the printed command and the printed owner-words route
+PASS  one known family refuses
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+  full refusal text:
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6EPHDCB977Y3RYNCYYHHW5P/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    note: tested-tree records unavailable (a GitHub Actions read failed); the ancestry rule applies
+    verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head fe908e4e2fe55d295a9a4fd1170aea9bd77391f9, which contains the current main tip eb44bc06d6da745320acf72c3077d6a47f276316
+    error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/c1/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/c1/state /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6EPHDCB977Y3RYNCYYHHW5P/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head fe908e4e2fe55d295a9a4fd1170aea9bd77391f9 --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/c1/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/c1/state /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M6EPHDCB977Y3RYNCYYHHW5P/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head fe908e4e2fe55d295a9a4fd1170aea9bd77391f9 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  printed review command run: exit=0
+PASS  printed second-family command then merge succeeds without owner words
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit fe908e4e2fe55d295a9a4fd1170aea9bd77391f9 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+  printed captain-word command run: exit=0
+PASS  owner-words route still merges
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 1468d59e618a29b1b2a55f69d42176e116bc227c --squash  captain-word records=1
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+
+=== D. adversarial: reads that must not count
+PASS  two readers of one family (claude-opus-5-5, sonnet)
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  two OpenAI aliases (gpt-5.1-codex, o3)
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  route prefix does not make a new family
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  unknown-family reader plus one known reader
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  second family read names another head
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  two families at head, but newest read names another head
+  exit=1  forge merge=none
+  refusal: error: head mismatch: review names 2222222222222222222222222222222222222222, live head is 14ac87db8bab3fbba304ace17210e13c5946ba8e; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in  
+PASS  second family read skipped the unknown group (covered-groups=ship)
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  all-declaration hides the unknown family
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  covered, but the newest reader has an unknown family
+  exit=1  forge merge=none
+  refusal: error: model family unknown for newest reader mistral-large; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then  
+
+=== E. FAIL precedence stays
+PASS  PASS from before the FAIL does not count; one later family refuses
+  exit=1  forge merge=none
+  refusal: error: verdict is FAIL at live head bbd465a6e89aef36888852f60b1c8eed37a7fa50 (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/e1/review.md); no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FA 
+PASS  second later family clears the FAIL
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit bbd465a6e89aef36888852f60b1c8eed37a7fa50 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+PASS  FAIL after two family PASS reads blocks
+  exit=1  forge merge=none
+  refusal: error: verdict is FAIL at live head 19974174856cdb46643943e8ac177af05896be55 (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/e2/review.md); no later exact-head PASS covers group ship, family openai, that this FAIL read; record  
+
+=== F. trigger answers and report checks stay
+  yes trigger: verify --review-only exit=1 kind=not-qualified msg=widens_guard is yes at live head 400556fcf3b86d49af86054fddbba084a297c14a; --review-only requires an independent PASS wi
+PASS  review-only refuses a yes trigger on the newest two-family PASS
+  report for another head: review exit=2: error: report first line must be exactly VERDICT: <PASS|FAIL> head=<head> matching --verdict and --head
+PASS  report for another head is rejected at record time
+PASS  the rejected second read does not count toward two families
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+
+=== G. away rule stays
+  captain-word while away: exit=2: error: captain-word refused: the away-posture record /Users/charlesabrooker/tmp/fm-pr-merge-tests.ZAxbb6/g1/state/.afk-contract exists, so the captain is away and away wo
+PASS  captain-word still refused while away
+PASS  away posture with one family still refuses
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  away posture with two families merges by the same review rule
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit dface679ec5e6977fb264e7d218619c63c86b424 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+  wake-queue: 1793645439	1	check	merged-task-x1-https://github.com/example/repo/pull/9	check: merge landed: task-x1 https://github.com/example/repo/pull/9 away
+
+=== H. live forge checks stay
+PASS  two families, red check
+  exit=1  forge merge=none
+  refusal: error: refusing to merge https://github.com/example/repo/pull/9   - check 'lint' is not green: it failed, and it is not required by base branch main error: these checks are not green: lint 
+PASS  two families, draft PR
+  exit=1  forge merge=none
+  refusal: error: refusing to merge https://github.com/example/repo/pull/9   - the pull request is a draft 
+PASS  two families, forge head moved after the reads
+  exit=1 refusal: error: head mismatch: review names 864a880cc52a4cc3da1047192a09105cc32a0995, live head is 4444444444444444444444444444444444444444; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in  
+
+=== I. other shapes and known-family wording
+PASS  mixed pipeline with one Claude read: the unknown group is named first
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+PASS  mixed pipeline with Claude and OpenAI reads merges (Claude author read by OpenAI)
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit bd3d03284eeb43de4d094d88e8c3cbb8a8c76724 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+PASS  known-family refusal keeps the OUTSIDE_FAMILY_MODEL command
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown needs two known reader families); obtain the named re 
+PASS  known-family refusal does not ask for two families
+
+=== J. follow only the printed refusals from one partial read, each read naming only what the refusal names
+PASS  step 1: one family of the unknown group refuses
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local 
+  printed SECOND_KNOWN_FAMILY_MODEL command: exit=0
+PASS  step 2: the unknown group is covered; the ship group is named next
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group ship, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown needs two known reader families); obtain the named read, set its actual t 
+  printed OUTSIDE_FAMILY_MODEL command: exit=0
+PASS  step 3: the printed commands alone lead to a merge without owner words
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 38fe19cf6dab5b447e76ee0c4b01a05b28164d6b --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+
+=== K. typed unknown author and yes-trigger merge path
+PASS  typed unknown author with one family refuses
+  exit=1  forge merge=none
+  refusal: error: uncovered commit group declared:all, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report 
+PASS  typed unknown author with two families merges
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit e69fe2f881c2e5932e48dde620d952b815eb02d2 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+PASS  default merge path: a yes trigger alone still does not require owner words (rule unchanged)
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 5b15b35ba52cd693ef3d4c9696b27ef89ed69e98 --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+PASS  control on base f77b7973: a known-family yes trigger also merges, so the path above is old behavior
+  exit=0  forge merge=pr merge 9 --repo example/repo --match-head-commit 9b7f0e833ea004d3edcb74eafec92ceb3530609c --squash  captain-word records=0
+  stdout: verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+
+DRIVER FAILURES: 0

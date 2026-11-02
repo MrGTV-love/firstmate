@@ -1,0 +1,10 @@
+scratch copy of 38b7e5d95bf926d109461c430aa2fc4715ddf4fe with only the old coverage line restored
+ bin/fm-review-record.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+-        return sorted(f for f in families if (len(readers) < 2 if f == "unknown" else not readers - {f}))
++        return sorted(f for f in families if f == "unknown" or not readers - {f})
+ok - default verify text and JSON preserve captain-word precedence
+ok - captain-word alone cannot satisfy review-only
+ok - stale head, FAIL, same family, unknown families and triggers are typed not-qualified
+not ok - two known reader families must cover an unknown author: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"uncovered commit group ship, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-review-record-tests.DrhP5i/unknown-author-two-families/home FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-review-record-tests.DrhP5i/unknown-author-two-families/home/state /Users/charlesabrooker/tmp/fm-redproof.pqg4Vv/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 363eff8014426d0e9c46bce67ded1bf7a9ca9acd --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{\"ship\":[\"mystery-9\"]}' --covered-groups '[\"ship\"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or --review-only requires recorded independent PASS coverage, and a captain-word is not a substitute"}}: expected exit 0, got 1
+review-record new test on old rule: exit=

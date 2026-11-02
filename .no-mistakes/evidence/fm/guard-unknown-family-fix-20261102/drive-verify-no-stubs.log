@@ -1,0 +1,45 @@
+PATH has no stand-in: gh=/opt/homebrew/bin/gh
+
+author evidence: agent=acp:omp model=[]
+PASS  new rule: acp:omp empty model, two known families, --review-only
+  verify exit=0 {"ok":true,"basis":"independent-review","head":"972e28c4bb7a","reader_model":"gpt-5.1-codex"}
+PASS  new rule: same reads, default verify
+  verify exit=0 {"ok":true,"basis":"independent-review","head":"972e28c4bb7a","reader_model":"gpt-5.1-codex"}
+PASS  old rule at base f77b7973: same reads refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known "}
+PASS  one known family refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  two readers of one family refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  second family on another head refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  newest read on another head refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"head mismatch: review names 2222222222222222222222222222222222222222, live head is b62c77a8c406cb51f19534865d91b5f3784e2978; review the live head and record its PASS with"}
+PASS  second family did not read the unknown group: refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  declaration that hides the unknown author: refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  all-declaration that names the unknown author, two families: covered
+  verify exit=0 {"ok":true,"basis":"independent-review","head":"4d3030c9b2a1","reader_model":"gemini-3-pro"}
+PASS  unknown-family reader never counts toward two families: refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  FAIL: earlier PASS does not count, one later family refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"verdict is FAIL at live head 790f922de32be29401930a074a87f89e3733e62c (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-unknown-live.iWXkhp/failorder/report-1637"}
+PASS  FAIL: two later families clear it
+  verify exit=0 {"ok":true,"basis":"independent-review","head":"790f922de32b","reader_model":"gpt-5.1-codex"}
+PASS  FAIL after two families refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"verdict is FAIL at live head 99e039d4424aa02d8e7fba02ba387db11bacef7b (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-unknown-live.iWXkhp/failafter/report-1477"}
+PASS  FAIL is not cleared by reads of another head
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"head mismatch: review names 2222222222222222222222222222222222222222, live head is 99e039d4424aa02d8e7fba02ba387db11bacef7b; review the live head and record its PASS with"}
+PASS  yes trigger on the newest PASS: --review-only refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"widens_guard is yes at live head 8815b8f92f448d9c03215db57444a6f1bccae344; --review-only requires an independent PASS with no escalation trigger, and a captain-word is no"}
+PASS  owner words at the exact head still clear one family
+  verify exit=0 {"ok":true,"basis":"captain-word","head":"aabb3df0f130","reader_model":null}
+PASS  owner words never satisfy --review-only
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  unknown and Claude pipeline authors, one Claude read refused
+  verify exit=1 {"ok":false,"kind":"not-qualified","message":"uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtai"}
+PASS  unknown and Claude pipeline authors, Claude and OpenAI reads covered
+  verify exit=0 {"ok":true,"basis":"independent-review","head":"0d3819c22c48","reader_model":"gpt-5.1-codex"}
+
+DRIVER FAILURES: 0
