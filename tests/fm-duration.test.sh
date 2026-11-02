@@ -693,7 +693,33 @@ if shutil.which('tasks-axi'):
     assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2']
     shown = subprocess.run([str(owner / 'bin/fm-tasks-axi.sh'), 'show', first + '-2', '--full'], env=dict(worker_env, FM_HOME=str(owner)), capture_output=True, text=True, check=True)
     assert 'state: queued' in shown.stdout and first in shown.stdout
-    print('ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work')
+    # The recurrence names the item it follows as judged different, and the wrapper records the choice.
+    review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
+    assert [(r[0], r[2], r[4] if len(r) > 4 else '') for r in review] == [(first, 'O7', ''), (first + '-2', 'O7', first)], review
+    # A recurrence after default Done retention archived the previous item, still within the 50 newest Done items.
+    subprocess.run(['tasks-axi', 'done', first + '-2', '--note', 'limit repaired again', '--keep', '0'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
+    assert first + '-2' not in (owner / 'data/backlog.md').read_text()
+    assert first + '-2' in (owner / 'data/done-archive.md').read_text()
+    worker('timeout', key, 1400000, '--event-id', 'w6')
+    worker('timeout', key, 1400000, '--event-id', 'w7')
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2', first + '-3']
+    review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
+    assert (first + '-3', 'O7', first + '-2') == (review[-1][0], review[-1][2], review[-1][4]), review
+    # A row that cannot be recorded stops the filing: the item is not filed and the ledger does not call it filed.
+    sidecar = owner / 'data/backlog-review.tsv'
+    saved = sidecar.read_text()
+    sidecar.unlink()
+    sidecar.mkdir()
+    failing = 'worker.norecord'
+    worker('timeout', failing, 1200000, '--event-id', 'n1')
+    result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', failing, '1200000', '--event-id', 'n2'], env=worker_env, cwd=workrepo, capture_output=True, text=True)
+    assert result.returncode != 0 and 'backlog-review.tsv' in result.stdout + result.stderr, (result.returncode, result.stdout, result.stderr)
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert not any(r.get('event') == 'filed' and r.get('key') == failing for r in owner_rows)
+    sidecar.rmdir()
+    sidecar.write_text(saved)
+    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item with the choice recorded, and an unrecorded filing is never called filed')
 
 # Repeated-timeout work goes to the project registered under the repository's name in
 # the owning home's data/projects.md, and to firstmate when there is no such project.

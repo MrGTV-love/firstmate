@@ -5,14 +5,18 @@ bin/fm-tasks-axi.sh calls this helper for every judgment it cannot make in shell
 It reads `tasks-axi list` and `tasks-axi show` output on stdin and never writes.
 
   neighbours <title> [<archive>]
-                            stdin: `tasks-axi list` output. Prints up to three
-                            "<id>\\t<state>\\t<score>\\t<title>" lines for open items and
-                            the newest Done items whose title words overlap <title>
-                            at THRESHOLD or more. The list holds only the Done rows
-                            tasks-axi keeps (done_keep); the rest of the newest
-                            RECENT_DONE come from the markdown done archive <archive>
-                            when given. Exit 0 when at least one is printed, 1 when
-                            none is.
+                            stdin: `tasks-axi list` output. Prints one
+                            "<id>\\t<state>\\t<score>\\t<source>\\t<title>" line for every
+                            open item and every one of the newest RECENT_DONE Done
+                            items whose title words overlap <title> at THRESHOLD or
+                            more, highest score first (source is "active" or
+                            "archive"). The list holds only the Done rows tasks-axi
+                            keeps (done_keep); the rest of the newest RECENT_DONE come
+                            from the markdown done archive <archive> when given. Exit
+                            0 when at least one is printed, 1 when none is, 3 (with a
+                            reason on stderr) when the list or the archive cannot be
+                            read or interpreted.
+  archived <archive> <id>   Exit 0 when <id> is a row of the markdown done archive.
   exists <id>               stdin: the same list output. Exit 0 when <id> is a row.
   field <name>              stdin: `tasks-axi show --full` output. Prints that field
                             decoded (the body keeps its line breaks); exit 1 if absent.
@@ -24,11 +28,12 @@ Single owners, defined only here:
   THRESHOLD     the title-word overlap that makes two items neighbours.
   RECENT_DONE   how many of the newest Done rows an add is compared with.
   OWNER_PATTERN the heuristic for an item the owner filed.
-Title overlap is Jaccard similarity of the lower-case words of three or more
-letters or digits with a small stop-word list removed. A title with fewer than
-MIN_WORDS such words is too short to judge and has no neighbours. `tasks-axi
-list` cuts a title at TITLE_LIST_LIMIT characters, so both sides are compared on
-that many characters.
+Title overlap is the Jaccard similarity of two title word sets: the number of
+words both titles share divided by the number of distinct words in either. A word
+is a run of lower-case letters or digits at least three characters long, and a
+small stop-word list is removed. A title with no word left has no neighbours.
+`tasks-axi list` cuts a title at TITLE_LIST_LIMIT characters, so both sides are
+compared on that many characters.
 """
 import json
 import re
@@ -36,8 +41,7 @@ import sys
 
 THRESHOLD = 0.25
 RECENT_DONE = 50
-MIN_WORDS = 3
-SHOWN = 3
+SHOWN = 3  # neighbours listed in a refusal; every qualifying one is judged
 TITLE_LIST_LIMIT = 80
 TRUNCATION_SENTINEL = re.compile(r"\n\.\.\. \(truncated, .*$", re.S)
 
@@ -47,17 +51,17 @@ STOP_WORDS = frozenset(
     "does did use uses used using new one two out off too only more less each own same".split()
 )
 
-# An item "filed by the owner" quotes the captain or owner in its text. This is
-# the triage report's heuristic (data/fm-backlog-triage-and-hygiene/report.md,
-# "items filed by the owner"): "Captain" or "Owner" followed by ask, words,
-# question, call, decision, ruling, rule or answer, "Captain 2026", "Owner:" and
-# "Captain:". The capitalised bare forms keep a lower-case "lock owner:" from
-# matching.
+# An item "filed by the owner" quotes the owner or captain in its text. This is the
+# triage report's heuristic (data/fm-backlog-triage-and-hygiene/report.md): the text
+# contains "Captain" or "Owner" followed by a space and one of ask, words, question,
+# call, decision, ruling, rule or answer, or "Captain 2026", "Owner:" or "Captain:".
+# The report lists the capitalised forms only, so a bare "Owner 2026" or a
+# lower-case "lock owner:" does not match.
 OWNER_PATTERN = re.compile(
-    r"\b(?:[Cc]aptain|[Oo]wner)(?:'s|’s)?\s+(?:ask|words|question|call|decision|ruling|rule|answer)\b"
-    r"|\bCaptain\s+2026\b"
-    r"|\bOwner:"
-    r"|\bCaptain:"
+    r"(?:Captain|Owner) (?:ask|words|question|call|decision|ruling|rule|answer)"
+    r"|Captain 2026"
+    r"|Owner:"
+    r"|Captain:"
 )
 
 OBJECTIVE_LINE = re.compile(r"^- (O[0-9]+) - ")
@@ -107,14 +111,28 @@ def unquote(value):
     return value
 
 
+class IntakeError(Exception):
+    """The backlog or its archive cannot be read or interpreted."""
+
+
 def list_rows(text):
-    """Rows of `tasks-axi list` output as dicts, in the order printed."""
+    """Rows of `tasks-axi list` output as dicts, in the order printed.
+
+    The rows must agree with the declared count, so a cut or garbled list is an
+    error instead of a shorter neighbour set."""
     columns = None
+    declared = None
+    count = None
     rows = []
     for line in text.splitlines():
-        header = re.match(r"^tasks\[\d+\]\{(.*)\}:$", line)
+        counted = re.match(r"^count: (\d+)$", line)
+        if counted:
+            count = int(counted.group(1))
+            continue
+        header = re.match(r"^tasks\[(\d+)\]\{(.*)\}:$", line)
         if header:
-            columns = header.group(1).split(",")
+            declared = int(header.group(1))
+            columns = header.group(2).split(",")
             continue
         if columns is None:
             continue
@@ -123,11 +141,13 @@ def list_rows(text):
             continue
         cells = split_row(line[2:])
         if len(cells) != len(columns):
-            continue
+            raise IntakeError("a backlog row has an unexpected shape: " + line[:80])
         row = {name: unquote(cell) for name, cell in zip(columns, cells)}
         if "title" in row:
             row["title"] = TRUNCATION_SENTINEL.sub("", row["title"])
         rows.append(row)
+    if count is None or count != len(rows) or (declared is not None and declared != len(rows)):
+        raise IntakeError("the backlog list is incomplete or not in the expected format")
     return rows
 
 
@@ -135,41 +155,68 @@ ARCHIVE_ROW = re.compile(r"^- \[x\] (\S+) - (.*)$")
 ARCHIVE_TAIL = re.compile(r"\s*(?:\((?:repo|kind|done|reported|since|pr|blocked-by)[^)]*\)|https?://\S+|data/\S+)\s*$")
 
 
-def archive_rows(path, count):
-    """The newest `count` rows of a markdown done archive, newest first."""
-    if count <= 0 or not path:
-        return []
+def archive_text(path):
+    """The markdown done archive as text; an archive not yet written is empty."""
+    if not path:
+        return ""
     try:
         with open(path, encoding="utf-8") as handle:
-            lines = handle.read().splitlines()
-    except OSError:
-        return []
-    rows = []
-    for line in reversed(lines):
+            return handle.read()
+    except FileNotFoundError:
+        return ""
+    except (OSError, UnicodeDecodeError) as error:
+        raise IntakeError("the done archive %s cannot be read: %s" % (path, error))
+
+
+def archive_blocks(path):
+    """Archive rows grouped by the `## Archived <date>` block that holds them.
+
+    tasks-axi appends one block per prune, so later blocks are newer; inside a
+    block the rows keep the order they had in the Done section, newest first."""
+    blocks, current = [], []
+    for line in archive_text(path).splitlines():
+        if line.startswith("## "):
+            blocks.append(current)
+            current = []
+            continue
+        if not line.startswith("- [x]"):
+            continue
         match = ARCHIVE_ROW.match(line)
         if not match:
-            continue
+            raise IntakeError("a done archive row cannot be interpreted: " + line[:80])
         title = match.group(2)
         while True:
             trimmed = ARCHIVE_TAIL.sub("", title)
             if trimmed == title:
                 break
             title = trimmed
-        rows.append({"id": match.group(1), "state": "done", "title": title[:TITLE_LIST_LIMIT]})
-        if len(rows) >= count:
-            break
-    return rows
+        current.append({"id": match.group(1), "state": "done", "source": "archive", "title": title[:TITLE_LIST_LIMIT]})
+    blocks.append(current)
+    return blocks
+
+
+def archive_rows(path, count):
+    """The newest `count` rows of the markdown done archive, newest first."""
+    if count <= 0 or not path:
+        return []
+    rows = []
+    for block in reversed(archive_blocks(path)):
+        rows.extend(block)
+    return rows[:count]
 
 
 def neighbours(title, text, archive=None):
+    """Every open item and newest-Done item whose title overlaps `title`, best first."""
     mine = words(title[:TITLE_LIST_LIMIT])
-    if len(mine) < MIN_WORDS:
+    if not mine:
         return []
-    found = []
-    done_seen = 0
     rows = list_rows(text)
+    for row in rows:
+        row["source"] = "active"
     kept_done = sum(1 for r in rows if r.get("state") == "done")
     rows = rows + archive_rows(archive, RECENT_DONE - kept_done)
+    found = []
+    done_seen = 0
     for row in rows:
         state = row.get("state", "")
         if state == "done":
@@ -178,14 +225,11 @@ def neighbours(title, text, archive=None):
                 continue
         elif state not in ("queued", "in_flight"):
             continue
-        theirs = words(row.get("title", ""))
-        if len(theirs) < MIN_WORDS:
-            continue
-        score = overlap(mine, theirs)
+        score = overlap(mine, words(row.get("title", "")[:TITLE_LIST_LIMIT]))
         if score >= THRESHOLD:
             found.append((score, row))
     found.sort(key=lambda pair: -pair[0])
-    return found[:SHOWN]
+    return found
 
 
 def show_field(name, text):
@@ -202,12 +246,22 @@ def main(argv):
         sys.stderr.write(__doc__)
         return 2
     command, args = argv[1], argv[2:]
+    try:
+        return run(command, args)
+    except IntakeError as error:
+        sys.stderr.write("fm-backlog-intake: %s\n" % error)
+        return 3
+
+
+def run(command, args):
     if command == "neighbours" and len(args) in (1, 2):
         found = neighbours(args[0], sys.stdin.read(), args[1] if len(args) == 2 else None)
         for score, row in found:
             title = row.get("title", "").replace("\t", " ").replace("\n", " ")
-            print("%s\t%s\t%.2f\t%s" % (row.get("id", ""), row.get("state", ""), score, title))
+            print("%s\t%s\t%.2f\t%s\t%s" % (row.get("id", ""), row.get("state", ""), score, row.get("source", ""), title))
         return 0 if found else 1
+    if command == "archived" and len(args) == 2:
+        return 0 if any(r["id"] == args[1] for block in archive_blocks(args[0]) for r in block) else 1
     if command == "exists" and len(args) == 1:
         return 0 if any(r.get("id") == args[0] for r in list_rows(sys.stdin.read())) else 1
     if command == "field" and len(args) == 1:

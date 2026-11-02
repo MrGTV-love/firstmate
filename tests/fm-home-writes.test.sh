@@ -54,7 +54,8 @@ export FM_HOME="$home"
 run_home() { bash "$ROOT/bin/$1" "${@:2}"; }
 
 for id in archive-1 archive-2; do
-  run_home fm-tasks-axi.sh add --objective O7 "$id" "row $id" >/dev/null
+  # Each title shares no word with the other, so the intake duplicate check stays out of the way.
+  run_home fm-tasks-axi.sh add --objective O7 "$id" "${id//-/x}aaa ${id//-/x}bbb ${id//-/x}ccc" >/dev/null
   run_home fm-tasks-axi.sh start "$id" >/dev/null
   run_home fm-tasks-axi.sh 'done' "$id" >/dev/null
 done

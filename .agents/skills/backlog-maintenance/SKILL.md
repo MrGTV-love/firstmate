@@ -20,7 +20,7 @@ Use compatible `tasks-axi` when the configured backend selects it, always throug
 `secondmate-provisioning` and `bin/fm-backlog-handoff.sh` own cross-home handoff safety.
 Every `bin/fm-tasks-axi.sh add` names the objective it serves with `--objective O1` to `O7`, or `--objective none --objective-reason "<why>"`.
 An add whose title overlaps an open or recently closed item is refused with its neighbours; answer with `--dup-of <kept-id>` when the work is the same, or `--not-dup <neighbour-id>` when it is different.
-A duplicate or moved item closes with `done <id> --duplicate-of <kept-id>` or `done <id> --moved-to <home> <item-id>` on checked proof, but an item that quotes the captain still needs `--drop-file` with the captain's own words.
+A duplicate or moved item closes with `done <id> --duplicate-of <kept-id>` or `done <id> --moved-to <home> <item-id>` on checked proof, but an item that quotes the captain, an open captain call, or an item with a live task still needs the captain's own words or its owner.
 `docs/configuration.md` ("Backlog intake and closing proofs") owns both contracts.
 
 Keep free-form notes free of temporary paths, moving versions, ephemeral identifiers, and copied state that will rot.

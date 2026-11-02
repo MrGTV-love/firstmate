@@ -29,6 +29,14 @@ unset TASKS_AXI_FILE TASKS_AXI_BACKEND FM_HOME FM_ROOT_OVERRIDE \
 HAVE_TASKS_AXI=0
 command -v tasks-axi >/dev/null 2>&1 && HAVE_TASKS_AXI=1
 
+# A fixture title no other fixture title shares a word with, so a fixture that is
+# not about duplicate detection never meets the intake check.
+ftitle() {  # <key>
+  local k
+  k=$(printf '%s' "$1" | tr -c 'a-zA-Z0-9' 'x' | tr 'A-Z' 'a-z')
+  printf '%saaa %sbbb %sccc' "$k" "$k" "$k"
+}
+
 empty_backlog() {  # <path>
   printf '## In flight\n\n## Queued\n\n## Done\n' > "$1"
 }
@@ -139,7 +147,7 @@ test_wrapper_writes_through_to_home() {
   local dir i
   dir=$(make_split wrapper-home)
   for i in 1 2; do
-    wrapper_from_code "$dir" add --objective O7 "ship-$i" "ship $i" >/dev/null || fail "add ship-$i failed"
+    wrapper_from_code "$dir" add --objective O7 "ship-$i" "$(ftitle "ship-$i")" >/dev/null || fail "add ship-$i failed"
     wrapper_from_code "$dir" start "ship-$i" >/dev/null || fail "start ship-$i failed"
     wrapper_from_code "$dir" "done" "ship-$i" >/dev/null || fail "done ship-$i failed"
   done
@@ -307,8 +315,8 @@ test_completion_by_the_captains_own_words() {
   local dir words out
   dir=$(make_split drop)
   words="$dir/words.txt"
-  wrapper_from_code "$dir" add --objective O7 ship-d "ship d" --kind ship --repo p >/dev/null
-  wrapper_from_code "$dir" add --objective O7 ship-e "ship e" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add --objective O7 ship-d "$(ftitle ship-d)" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add --objective O7 ship-e "$(ftitle ship-e)" --kind ship --repo p >/dev/null
   : > "$words"
   completion_refused "$dir" "empty words" "done" ship-d --drop-file "$words" >/dev/null
   ln -s "$words" "$dir/words-link.txt"
@@ -463,7 +471,7 @@ test_public_restart_retires_drop_provenance() (
       for noun in bare task; do
         id="$layout-$verb-$noun"
         if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
-        FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" add --objective O7 "$id" "fixture row" --kind scout >/dev/null \
+        FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" add --objective O7 "$id" "$(ftitle "$id")" --kind scout >/dev/null \
           || fail "could not add restart fixture"
         FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" "done" "$id" --drop-file "$dir/words.txt" >/dev/null \
           || fail "could not drop restart fixture"
@@ -656,8 +664,8 @@ test_completion_serializes_with_a_concurrent_hold() (
   fakebin=$(fm_fakebin "$dir")
   real=$(command -v tasks-axi)
   make_mutation_wait_sleep "$fakebin"
-  wrapper_from_code "$dir" add --objective O7 hold-first "hold before completion" --kind ship >/dev/null || fail "could not add held row"
-  wrapper_from_code "$dir" add --objective O7 completion-first "completion before hold" --kind ship >/dev/null || fail "could not add completion row"
+  wrapper_from_code "$dir" add --objective O7 hold-first "$(ftitle hold-first)" --kind ship >/dev/null || fail "could not add held row"
+  wrapper_from_code "$dir" add --objective O7 completion-first "$(ftitle completion-first)" --kind ship >/dev/null || fail "could not add completion row"
   cat > "$fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = show ] && [ "\${2:-}" = hold-first ]; then
@@ -745,7 +753,7 @@ SH
   chmod +x "$fakebin/tasks-axi"
   trap 'touch "$dir/release-restart"; [ -z "$restart" ] || kill "$restart" 2>/dev/null || true; [ -z "$updating" ] || kill "$updating" 2>/dev/null || true' EXIT
   for verb in start reopen; do
-    wrapper_from_code "$dir" add --objective O7 "body-$verb" "body $verb" --kind scout >/dev/null || fail "could not add body race row"
+    wrapper_from_code "$dir" add --objective O7 "body-$verb" "$(ftitle "body-$verb")" --kind scout >/dev/null || fail "could not add body race row"
     wrapper_from_code "$dir" "done" "body-$verb" --drop-file "$dir/words" >/dev/null || fail "could not drop body race row"
     rm -f "$dir/restart-entered" "$dir/release-restart" "$dir/update-wait"
     PATH="$fakebin:$PATH" FAKE_RESTART_VERB="$verb" FM_TASKS_AXI_TIMEOUT=30 \
@@ -816,7 +824,7 @@ SH
         if [ "$noun" = task ]; then prefix=(task "$verb"); else prefix=("$verb"); fi
         for outcome in before committed unreadable; do
           id="$layout-$verb-$noun-$outcome"
-          FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" add --objective O7 "$id" "fixture row" --kind scout >/dev/null || fail "could not add restart failure fixture"
+          FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" add --objective O7 "$id" "$(ftitle "$id")" --kind scout >/dev/null || fail "could not add restart failure fixture"
           FM_DATA_OVERRIDE="$data_override" wrapper_from_code "$dir" "done" "$id" --drop-file "$dir/words" >/dev/null || fail "could not drop restart failure fixture"
           rm -f "$dir/restart-failed"
           rc=0
@@ -872,7 +880,7 @@ SH
   printf 'Drop this work.\n' > "$dir/words"
   for id in resumed-scout resumed-ship untouched-drop; do
     case "$id" in resumed-scout) kind=scout ;; *) kind=ship ;; esac
-    wrapper_from_code "$dir" add --objective O7 "$id" "fixture row" --kind "$kind" >/dev/null || fail "could not create landed fixture"
+    wrapper_from_code "$dir" add --objective O7 "$id" "$(ftitle "$id")" --kind "$kind" >/dev/null || fail "could not create landed fixture"
     out=$(wrapper_from_code "$dir" "task" "done" "$id" --drop-file "$dir/words" 2>&1) \
       || fail "could not drop landed fixture: $out"
   done
@@ -908,10 +916,10 @@ test_bounded_mutation_grammar_refuses_before_side_effects() {
   dir=$(make_split bounded-mutations)
   fakebin=$(fm_fakebin "$dir")
   real=$(command -v tasks-axi)
-  wrapper_from_code "$dir" add --objective O7 bounded "bounded scout" --kind scout >/dev/null || fail "could not add bounded row"
-  wrapper_from_code "$dir" add --objective O7 decoy "decoy docs" --kind docs >/dev/null || fail "could not add decoy row"
-  wrapper_from_code "$dir" add --objective O7 ship-row "ship row" --kind ship >/dev/null || fail "could not add ship fixture"
-  wrapper_from_code "$dir" add --objective O7 docs-row "docs row" --kind docs >/dev/null || fail "could not add docs fixture"
+  wrapper_from_code "$dir" add --objective O7 bounded "$(ftitle bounded)" --kind scout >/dev/null || fail "could not add bounded row"
+  wrapper_from_code "$dir" add --objective O7 decoy "$(ftitle decoy)" --kind docs >/dev/null || fail "could not add decoy row"
+  wrapper_from_code "$dir" add --objective O7 ship-row "$(ftitle ship-row)" --kind ship >/dev/null || fail "could not add ship fixture"
+  wrapper_from_code "$dir" add --objective O7 docs-row "$(ftitle docs-row)" --kind docs >/dev/null || fail "could not add docs fixture"
   wrapper_from_code "$dir" add --objective O7 retained-row "retained drop" --kind scout >/dev/null || fail "could not add retained fixture"
   printf 'dropped\n' > "$dir/body"
   wrapper_from_code "$dir" update bounded --body-file "$dir/body" >/dev/null || fail "could not set dropped provenance"
@@ -1078,7 +1086,7 @@ test_completion_keep_count_and_normal_options() {
   dir=$(make_split completion-keep)
   for form in split equals no-prune; do
     id="keep-$form"
-    wrapper_from_code "$dir" add --objective O7 "$id" "fixture row" --kind docs >/dev/null || fail "could not add keep fixture"
+    wrapper_from_code "$dir" add --objective O7 "$id" "$(ftitle "$id")" --kind docs >/dev/null || fail "could not add keep fixture"
     case "$form" in
       split) out=$(wrapper_from_code "$dir" "done" "$id" --keep 0 --note "Count zero" --json 2>&1) ;;
       equals) out=$(wrapper_from_code "$dir" "task" "close" "$id" --keep=0 --note="Count zero" --json 2>&1) ;;
@@ -1152,7 +1160,9 @@ test_add_records_task_filed_once() {
 
   # tasks-axi reports an add of an existing id as already present and exits 0;
   # nothing was filed, so nothing is recorded.
-  wrapper_from_code "$dir" add --objective O7 ship-a "a ship item" --kind ship >/dev/null 2>&1 || fail "repeat add failed"
+  # A repeat of the same item is judged as a duplicate of itself now, so it names
+  # itself with --not-dup before tasks-axi answers it.
+  wrapper_from_code "$dir" add --objective O7 ship-a "a ship item" --kind ship --not-dup ship-a >/dev/null 2>&1 || fail "repeat add failed"
   assert_equals 1 "$(wc -l < "$dir/home/state/fleet-ledger.jsonl" | tr -d ' ')" "records after a repeated add"
 
   # A minted id, --json output, and absent fields are read from what tasks-axi stored.
@@ -1162,10 +1172,10 @@ test_add_records_task_filed_once() {
   assert_equals '["task.filed",null,null,null,true]' "$rows" "minted --json add"
 
   # The ledger changes neither the output nor the exit status of the command.
-  plain_out=$(wrapper_from_code "$dir" add --objective O7 ship-b "same item" --kind ship --repo sample 2>&1) || plain_rc=$?
+  plain_out=$(wrapper_from_code "$dir" add --objective O7 ship-b "identical entry text" --kind ship --repo sample 2>&1) || plain_rc=$?
   rm -f "$dir/home/config/fleet-ledger"
   empty_backlog "$dir/home/data/backlog.md"
-  out=$(wrapper_from_code "$dir" add --objective O7 ship-b "same item" --kind ship --repo sample 2>&1) || on_rc=$?
+  out=$(wrapper_from_code "$dir" add --objective O7 ship-b "identical entry text" --kind ship --repo sample 2>&1) || on_rc=$?
   assert_equals "$out" "$plain_out" "add output with the ledger on and off"
   assert_equals "$on_rc" "$plain_rc" "add exit status with the ledger on and off"
   pass "ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged"
@@ -1179,7 +1189,7 @@ test_add_ledger_off_and_failing_ledger_leave_add_alone() {
 
   : > "$dir/home/config/fleet-ledger"
   mkdir "$dir/home/state/fleet-ledger.jsonl"
-  stdout=$(wrapper_from_code "$dir" add --objective O7 bad-a "ledger unwritable" --kind ship 2>"$dir/stderr") || rc=$?
+  stdout=$(wrapper_from_code "$dir" add --objective O7 bad-a "unwritable sink" --kind ship 2>"$dir/stderr") || rc=$?
   stderr=$(cat "$dir/stderr")
   assert_equals 0 "$rc" "add exit status with an unwritable ledger"
   assert_contains "$stdout" "ok: added bad-a" "add stdout with an unwritable ledger"
@@ -1200,7 +1210,7 @@ test_completion_records_task_closed_once_with_its_proof() {
   for kind in "ship-a ship" "scout-a scout" "ship-d ship" "ship-e ship" "ship-f ship" "note-a docs"; do
     # shellcheck disable=SC2086
     set -- $kind
-    wrapper_from_code "$dir" add --objective O7 "$1" "item $1" --kind "$2" --repo p >/dev/null
+    wrapper_from_code "$dir" add --objective O7 "$1" "$(ftitle "$1")" --kind "$2" --repo p >/dev/null
   done
   rm -f "$dir/home/state/fleet-ledger.jsonl"
   mkdir -p "$dir/home/data/scout-a"
@@ -1247,8 +1257,37 @@ refusal_of() {  # <case-dir> <label> <wrapper args...>; prints the output of a r
   completion_refused "$@"
 }
 
+# Titles of the worked pairs docs/configuration.md documents.
+PAIR_BASE="Lock holder crash"
+PAIR_ABOVE="Lock holder crash recovery"
+PAIR_AT="Lock timeout"
+PAIR_BELOW="Lock timeout retry loop"
+
+# Done rows written straight into a backlog's Done section, newest first:
+# done-1 is the newest and done-<count> the oldest. Rows <hit-a> and <hit-b>
+# (positions) carry the title $4; every other row has a title of its own.
+seed_done_rows() {  # <backlog> <count> <hit-title> <hit-position>...
+  local backlog=$1 count=$2 hit=$3 i p hit_row rows=''
+  shift 3
+  for ((i = 1; i <= count; i++)); do
+    hit_row=0
+    for p in "$@"; do [ "$p" = "$i" ] && hit_row=1; done
+    if [ "$hit_row" = 1 ]; then
+      rows="$rows- [x] done-$i - $hit (done 2026-11-01)"$'\n'
+    else
+      rows="$rows- [x] done-$i - $(ftitle "done-$i") (done 2026-11-01)"$'\n'
+    fi
+  done
+  printf '## In flight\n\n## Queued\n\n## Done\n%s' "$rows" > "$backlog"
+}
+
+# The ids a refusal lists, in the order it lists them.
+listed_ids() {  # <refusal output>
+  printf '%s\n' "$1" | grep -E '^  [A-Za-z0-9._-]+ \(' | awk '{print $1}' | tr '\n' ' ' | sed 's/ $//'
+}
+
 test_add_requires_an_objective() {
-  local dir out
+  local dir out o fx
   dir=$(make_split intake-objective)
   out=$(refusal_of "$dir" "no objective" add obj-1 "Drain the wake queue before peeking")
   assert_contains "$out" "--objective" "the refusal did not print the flag"
@@ -1262,102 +1301,393 @@ test_add_requires_an_objective() {
   assert_contains "$out" "--objective-reason" "a blank reason was accepted"
   out=$(refusal_of "$dir" "objective flag without a value" add obj-1 "Drain the wake queue before peeking" --objective)
   assert_contains "$out" "--objective requires a value" "a valueless objective was accepted"
+  out=$(refusal_of "$dir" "create without an objective" create obj-1 "Drain the wake queue before peeking")
+  assert_contains "$out" "--objective" "create skipped the objective check"
+  out=$(refusal_of "$dir" "json without an objective" add obj-1 "Drain the wake queue before peeking" --json)
+  assert_contains "$out" "--objective" "--json skipped the objective check"
+  out=$(refusal_of "$dir" "json unknown objective" create obj-1 "Drain the wake queue before peeking" --json --objective O9)
+  assert_contains "$out" "unknown objective 'O9'" "--json accepted an unknown objective"
   assert_absent "$dir/home/data/backlog-review.tsv" "refusals wrote the review record"
-  wrapper_from_code "$dir" add obj-1 "Drain the wake queue before peeking" --objective O6 >/dev/null \
-    || fail "an add naming O6 was refused"
-  wrapper_from_code "$dir" task add obj-2 "Reconcile unrelated lavish boards" --objective=none --objective-reason="nothing in O1 to O7 covers it" >/dev/null \
+  # Every id docs/objectives.md lists is accepted, each with an exact row.
+  : > "$dir/expected.tsv"
+  for o in O1 O2 O3 O4 O5 O6 O7; do
+    wrapper_from_code "$dir" add "obj-$o" "$(ftitle "obj-$o")" --objective "$o" >/dev/null \
+      || fail "an add naming $o was refused"
+    printf 'obj-%s\t\t%s\t\n' "$o" "$o" >> "$dir/expected.tsv"
+  done
+  wrapper_from_code "$dir" task add obj-none "$(ftitle obj-none)" --objective=none --objective-reason="nothing in O1 to O7 covers it" >/dev/null \
     || fail "none with a reason was refused"
-  printf 'obj-1\t\tO6\t\t\nobj-2\t\tnone\tnothing in O1 to O7 covers it\t\n' > "$dir/expected.tsv"
+  printf 'obj-none\t\tnone\tnothing in O1 to O7 covers it\n' >> "$dir/expected.tsv"
   assert_equals "$(cat "$dir/expected.tsv")" "$(cat "$dir/home/data/backlog-review.tsv")" \
-    "the review record is not id, empty review-by, objective, reason, not-dup"
+    "the review record is not exactly id, empty review-by, objective, reason"
   out=$(refusal_of "$dir" "task noun create without an objective" task create obj-3 "Lavish answers route by hand")
   assert_contains "$out" "--objective" "the task create spelling skipped the objective check"
-  pass "fm-tasks-axi.sh refuses an add with no objective, an unknown id, or none without a reason, and records the objective"
+  # The ids come from the file: a copy of the tree whose docs/objectives.md adds O8 accepts it.
+  fx="$dir/fixture-tree"
+  mkdir -p "$fx/docs"
+  cp -R "$ROOT/bin" "$fx/bin"
+  cp "$ROOT/docs/objectives.md" "$fx/docs/objectives.md"
+  printf -- '- O8 - Fixture: an objective only this tree lists.\n' >> "$fx/docs/objectives.md"
+  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$fx/bin/fm-tasks-axi.sh" add obj-8 "$(ftitle obj-8)" --objective O8 >/dev/null) \
+    || fail "an objective added to docs/objectives.md was not accepted"
+  assert_grep "$(printf 'obj-8\t\tO8\t')" "$dir/home/data/backlog-review.tsv" "the O8 row is missing"
+  out=$(refusal_of "$dir" "O8 in the tracked file" add obj-9 "$(ftitle obj-9)" --objective O8)
+  assert_contains "$out" "unknown objective 'O8'" "O8 was accepted without the fixture file"
+  pass "fm-tasks-axi.sh refuses an add with no objective, an unknown id, or none without a reason, accepts each listed id with an exact row, and reads the ids from docs/objectives.md"
+}
+
+test_objective_rows_land_in_the_addressed_home() {
+  local dir out minted before
+  dir=$(make_split objective-homes)
+  # A minted id is recorded as the stored id.
+  out=$(wrapper_from_code "$dir" add "Reticulate the spline carefully" --mint --objective O3 2>&1) || fail "minted add failed: $out"
+  minted=$(printf '%s\n' "$out" | sed -n 's/^  id: //p' | sed -n '1p')
+  [ -n "$minted" ] || fail "the minted add did not report its id: $out"
+  assert_equals "$(printf '%s\t\tO3\t' "$minted")" "$(cat "$dir/home/data/backlog-review.tsv")" "the minted id is not the recorded id"
+  # Several adds after one pre-existing row keep every row.
+  wrapper_from_code "$dir" add row-b "$(ftitle row-b)" --objective O1 >/dev/null || fail "add row-b failed"
+  wrapper_from_code "$dir" add row-c "$(ftitle row-c)" --objective O2 >/dev/null || fail "add row-c failed"
+  assert_equals "$(printf '%s\t\tO3\t\nrow-b\t\tO1\t\nrow-c\t\tO2\t' "$minted")" "$(cat "$dir/home/data/backlog-review.tsv")" \
+    "an add lost or rewrote an earlier row"
+  # An overriding data root records in that root; the decoy home and the code root stay untouched.
+  mkdir -p "$dir/alt/data"
+  empty_backlog "$dir/alt/data/backlog.md"
+  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add alt-1 "$(ftitle alt-1)" --objective O5 >/dev/null) \
+    || fail "an add through an overriding data root failed"
+  assert_equals "$(printf 'alt-1\t\tO5\t')" "$(cat "$dir/alt/data/backlog-review.tsv")" "the override root missed its row"
+  assert_no_grep "alt-1" "$dir/home/data/backlog-review.tsv" "the decoy home received the override root's row"
+  assert_absent "$dir/code/data/backlog-review.tsv" "the code root received a row"
+  # A sidecar that cannot take a row stops the add before it files anything.
+  rm -f "$dir/home/data/backlog-review.tsv"
+  mkdir "$dir/home/data/backlog-review.tsv"
+  before=$(cat "$dir/home/data/backlog.md")
+  out=$(refusal_of "$dir" "unwritable sidecar" add row-d "$(ftitle row-d)" --objective O1)
+  assert_contains "$out" "cannot record the objective" "an unwritable sidecar was not reported"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "an add filed an item it could not record"
+  rmdir "$dir/home/data/backlog-review.tsv"
+  pass "an objective row is written for the stored id in the addressed data directory, keeps earlier rows, and a sidecar that cannot take it stops the add"
+}
+
+test_failed_row_write_removes_the_filed_item() {
+  local dir fakebin real out rc=0
+  dir=$(make_split objective-rollback)
+  fakebin=$(fm_fakebin "$dir")
+  real=$(command -v tasks-axi)
+  # The sidecar turns unwritable between the readiness check and the write.
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+"$real" "\$@"
+rc=\$?
+if [ "\${1:-}" = add ]; then rm -f "$dir/home/data/backlog-review.tsv"; mkdir "$dir/home/data/backlog-review.tsv"; fi
+exit \$rc
+SH
+  chmod +x "$fakebin/tasks-axi"
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add late-1 "$(ftitle late-1)" --objective O1 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an add whose row could not be written reported success: $out"
+  assert_contains "$out" "so the item was removed again" "the rollback was not reported"
+  assert_no_grep "late-1" "$dir/home/data/backlog.md" "an item stayed filed without its row"
+  rmdir "$dir/home/data/backlog-review.tsv"
+  pass "an item whose objective row cannot be written is removed again and the add fails"
+}
+
+# A fake non-Markdown adapter: tasks-axi answers from files under .stubdata when
+# the working directory's .tasks.toml names the beads backend, and is the real
+# tasks-axi anywhere else.
+make_adapter_stub() {  # <fakebin>
+  local real
+  real=$(command -v tasks-axi)
+  cat > "$1/tasks-axi" <<SH
+#!/usr/bin/env bash
+if grep -q 'backend = "beads"' .tasks.toml 2>/dev/null; then
+  d=.stubdata
+  printf '%s\n' "\$*" >> "\$d/calls"
+  case "\${1:-}" in
+    --version) echo 0.2.6 ;;
+    update) [ "\${2:-}" = --help ] && echo --archive-body ;;
+    mv) [ "\${2:-}" = --help ] && echo 'usage: tasks-axi mv <id>...' ;;
+    list) cat "\$d/list" ;;
+    show) if [ -f "\$d/show-\$2" ]; then cat "\$d/show-\$2"; else echo 'code: NOT_FOUND'; exit 1; fi ;;
+    add) printf 'ok: added %s -> Queued\ntask:\n  id: %s\n  kind: task\n' "\$2" "\$2" ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$1/tasks-axi"
+}
+
+# Give <home> a beads backlog whose list holds one open item and whose stale
+# Markdown file says something else.
+make_adapter_home() {  # <home> <open-id> <open-title>
+  mkdir -p "$1/.stubdata"
+  printf 'backend = "beads"\n\n[beads]\npath = ".beads"\n' > "$1/.tasks.toml"
+  printf 'count: 1\ntasks[1]{id,state,kind,repo,title}:\n  %s,queued,task,"-",%s\n' "$2" "$3" > "$1/.stubdata/list"
+  printf 'task:\n  id: %s\n  title: %s\n  state: queued\n  held: no\n  blocked: no\n  kind: task\n' "$2" "$3" > "$1/.stubdata/show-$2"
 }
 
 test_add_judges_near_duplicate_titles() {
-  local dir out n
+  local dir out sp before fakebin ids
   dir=$(make_split intake-dup)
-  wrapper_from_code "$dir" add dup-a "Teardown refuses slot manifest retire without proof" --objective O7 --body OLD-BODY-MARKER >/dev/null \
-    || fail "could not file the first item"
-  out=$(refusal_of "$dir" "near duplicate" add dup-z "Teardown refuses the slot manifest retire silently" --objective O7)
-  assert_contains "$out" "dup-a (queued" "the refusal did not list the neighbour with its state"
-  assert_contains "$out" "--dup-of dup-a" "the refusal did not print the --dup-of override"
-  assert_contains "$out" "--not-dup dup-a" "the refusal did not print the --not-dup override"
-  assert_no_grep "dup-z" "$dir/home/data/backlog.md" "a refused add filed the item"
-  # An unrelated title is filed with no prompt, and a repeat of an existing id is never judged.
-  out=$(wrapper_from_code "$dir" add dup-u "Lavish board answers route by hand" --objective O7 2>&1) \
-    || fail "an unrelated title was refused: $out"
-  assert_not_contains "$out" "overlaps" "an unrelated title saw a neighbour list"
-  wrapper_from_code "$dir" add dup-a "Teardown refuses slot manifest retire without proof" --objective O7 >/dev/null 2>&1 \
-    || fail "a repeat of an existing id was judged"
-  # --not-dup must name a neighbour that was shown, and files the item.
-  out=$(refusal_of "$dir" "not-dup naming a stranger" add dup-z "Teardown refuses the slot manifest retire silently" --objective O7 --not-dup dup-u)
-  assert_contains "$out" "--not-dup dup-u names no neighbour" "a non-neighbour was accepted as judged"
-  out=$(wrapper_from_code "$dir" add dup-b "Teardown refuses slot manifest retire after reboot" --objective O7 --not-dup dup-a 2>&1) \
-    || fail "--not-dup with a neighbour was refused: $out"
-  assert_grep "dup-b" "$dir/home/data/backlog.md" "--not-dup did not file the item"
-  assert_grep "$(printf 'dup-b\t\tO7\t\tdup-a')" "$dir/home/data/backlog-review.tsv" "--not-dup did not record the neighbour"
-  wrapper_from_code "$dir" add dup-c "Teardown refuses slot manifest retire during restart" --objective O7 --not-dup dup-a >/dev/null \
-    || fail "the third similar item was refused"
-  wrapper_from_code "$dir" add dup-d "Teardown refuses slot manifest retire on retry" --objective O7 --not-dup dup-a >/dev/null \
-    || fail "the fourth similar item was refused"
-  out=$(refusal_of "$dir" "four neighbours" add dup-e "Teardown refuses slot manifest retire twice" --objective O7)
-  n=$(printf '%s\n' "$out" | grep -c 'overlap 0')
-  assert_equals 3 "$n" "the refusal did not list exactly the top three neighbours"
-  # --dup-of appends to the open kept item, archives its old body, and files nothing.
-  out=$(wrapper_from_code "$dir" add dup-e "Teardown refuses slot manifest retire twice" --dup-of dup-a --body "SECOND-BODY-MARKER" 2>&1) \
-    || fail "--dup-of was refused: $out"
-  assert_no_grep "dup-e" "$dir/home/data/backlog.md" "--dup-of filed the item"
-  assert_grep "Merged from a duplicate filing: Teardown refuses slot manifest retire twice" "$dir/home/data/backlog.md" "--dup-of did not append the new title"
-  assert_grep "SECOND-BODY-MARKER" "$dir/home/data/backlog.md" "--dup-of did not append the new body"
-  assert_grep "OLD-BODY-MARKER" "$dir/home/data/backlog.md" "--dup-of lost the kept item's own body"
+  wrapper_from_code "$dir" add dup-base "$PAIR_BASE" --objective O7 >/dev/null || fail "could not file the base item"
+  before=$(cat "$dir/home/data/backlog.md")
+  # The three documented worked pairs: above, exactly at, and below 0.25.
+  out=$(refusal_of "$dir" "pair above" add dup-above "$PAIR_ABOVE" --objective O7)
+  assert_contains "$out" "dup-base (Queued, overlap 0.75) $PAIR_BASE" "the above pair is not listed with 0.75"
+  out=$(refusal_of "$dir" "pair at" add dup-at "$PAIR_AT" --objective O7)
+  assert_contains "$out" "dup-base (Queued, overlap 0.25) $PAIR_BASE" "the pair at the threshold is not refused with 0.25"
+  out=$(wrapper_from_code "$dir" add dup-below "$PAIR_BELOW" --objective O7 2>&1) || fail "the pair below the threshold was refused: $out"
+  assert_not_contains "$out" "overlap" "the pair below the threshold saw a neighbour list"
+  assert_no_grep "dup-above" "$dir/home/data/backlog.md" "a refused add filed the item"
+  assert_no_grep "dup-at" "$dir/home/data/backlog.md" "a refused add filed the item"
+  # Every supported spelling refuses a duplicate and a missing objective, and files nothing.
+  before=$(cat "$dir/home/data/backlog.md")
+  for sp in "add dup-sp POSITIONAL" "create dup-sp POSITIONAL" "task add dup-sp POSITIONAL" "task create dup-sp POSITIONAL" \
+            "add dup-sp --title TITLE" "add POSITIONAL --mint" "create POSITIONAL --mint"; do
+    # shellcheck disable=SC2086  # the spelling is a word list on purpose
+    set -- $sp
+    local args=() w
+    for w in "$@"; do
+      case "$w" in
+        POSITIONAL) args+=("$PAIR_ABOVE") ;;
+        TITLE) args+=("$PAIR_ABOVE") ;;
+        *) args+=("$w") ;;
+      esac
+    done
+    out=$(refusal_of "$dir" "duplicate via $sp" "${args[@]}" --objective O7)
+    assert_contains "$out" "dup-base (Queued, overlap 0.75)" "$sp did not list the neighbour"
+    out=$(refusal_of "$dir" "no objective via $sp" "${args[@]}")
+    assert_contains "$out" "--objective" "$sp skipped the objective check"
+    out=$(refusal_of "$dir" "json duplicate via $sp" "${args[@]}" --objective O7 --json)
+    assert_contains "$out" "dup-base (Queued" "$sp with --json did not list the neighbour"
+    assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$sp changed the backlog"
+  done
+  # An unrelated title files on the first try with no neighbour output.
+  out=$(wrapper_from_code "$dir" add dup-u "Reticulate splines nightly" --objective O7 2>&1) || fail "an unrelated title was refused: $out"
+  assert_not_contains "$out" "overlap" "an unrelated title saw a neighbour list"
+  # Help prints help and files nothing.
+  before=$(cat "$dir/home/data/backlog.md")
+  for sp in "add" "create" "task add"; do
+    # shellcheck disable=SC2086
+    out=$(wrapper_from_code "$dir" $sp --help 2>&1) || fail "$sp --help failed: $out"
+    assert_contains "$out" "usage: tasks-axi" "$sp --help did not print help"
+  done
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "help changed the backlog"
+  # A repeat of an existing id is judged like any other title.
+  out=$(refusal_of "$dir" "repeat of an id" add dup-base "$PAIR_BASE" --objective O7)
+  assert_contains "$out" "dup-base (Queued, overlap 1.00)" "a repeated id escaped the check"
+  # Overlap order and the top three: four open qualifying items and an archived Done one.
+  dir=$(make_split intake-order)
+  wrapper_from_code "$dir" add ord-o4 "alpha bravo" --objective O7 >/dev/null
+  wrapper_from_code "$dir" add ord-o3 "alpha bravo charlie" --objective O7 --not-dup ord-o4 >/dev/null
+  wrapper_from_code "$dir" add ord-o2 "alpha bravo charlie delta" --objective O7 --not-dup ord-o3 >/dev/null
+  wrapper_from_code "$dir" add ord-o1 "alpha bravo charlie delta echo" --objective O7 --not-dup ord-o2 >/dev/null
+  wrapper_from_code "$dir" add ord-d1 "alpha bravo charlie delta echo foxtrot" --objective O7 --not-dup ord-o1 >/dev/null
+  wrapper_from_code "$dir" "done" ord-d1 >/dev/null || fail "could not close the Done neighbour"
+  wrapper_from_code "$dir" prune --keep 0 >/dev/null || fail "could not archive the Done neighbour"
+  assert_grep "ord-d1" "$dir/home/data/done-archive.md" "the Done neighbour was not archived"
+  before=$(cat "$dir/home/data/backlog.md")
+  for sp in add create; do
+    out=$(refusal_of "$dir" "ordering via $sp" "$sp" ord-new "alpha bravo charlie delta echo" --objective O7)
+    ids=$(listed_ids "$out")
+    assert_equals "ord-o1 ord-d1 ord-o2" "$ids" "$sp did not list the three best neighbours best first"
+    assert_contains "$out" "ord-d1 (Done, archived, overlap 0.83) alpha bravo charlie delta echo foxtrot" "the archived Done neighbour is not listed with its state and title"
+    assert_contains "$out" "--dup-of ord-o1" "the --dup-of override is not printed"
+    assert_contains "$out" "--not-dup ord-o1" "the --not-dup override is not printed"
+    assert_contains "$out" "$sp ord-new" "the override is not a full command"
+    assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "$sp changed the backlog"
+  done
+  # A fourth qualifying item is never listed but --not-dup may still name it.
+  wrapper_from_code "$dir" add ord-new "alpha bravo charlie delta echo" --objective O7 --not-dup ord-o4 >/dev/null \
+    || fail "--not-dup naming a neighbour outside the top three was refused"
+  assert_grep "$(printf 'ord-new\t\tO7\t\tord-o4')" "$dir/home/data/backlog-review.tsv" "the judged neighbour was not recorded with the item"
+  # In flight is a state a neighbour may have.
+  dir=$(make_split intake-inflight)
+  wrapper_from_code "$dir" add fly-1 "Rotate pager schedule weekly" --objective O7 >/dev/null
+  wrapper_from_code "$dir" start fly-1 >/dev/null || fail "could not start the item"
+  out=$(refusal_of "$dir" "in flight neighbour" add fly-2 "Rotate pager schedule monthly" --objective O7)
+  assert_contains "$out" "fly-1 (In flight, overlap" "an In flight item was not listed with its state"
+  # Search follows the addressed backlog: an overriding data root and a decoy code-root file.
+  dir=$(make_split intake-addressed)
+  wrapper_from_code "$dir" add home-hit "Zulu yankee xray whiskey" --objective O7 >/dev/null
+  mkdir -p "$dir/alt/data"
+  empty_backlog "$dir/alt/data/backlog.md"
+  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add alt-hit "Zulu yankee xray victor" --objective O7 >/dev/null) \
+    || fail "could not file the override root's item"
+  out=$(cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add new-1 "Zulu yankee xray victor tango" --objective O7 2>&1) && fail "the override root's duplicate was filed"
+  assert_contains "$out" "alt-hit (Queued" "the override root's neighbour was not listed"
+  assert_not_contains "$out" "home-hit" "the decoy home's item was listed for the override root"
+  rm -f "$dir/code/data/backlog.md"
+  printf '## In flight\n\n## Queued\n- [ ] decoy-hit - Zulu yankee xray whiskey tango (since 2026-11-01)\n\n## Done\n' > "$dir/code/data/backlog.md"
+  out=$(refusal_of "$dir" "split home" add new-2 "Zulu yankee xray whiskey tango" --objective O7)
+  assert_contains "$out" "home-hit (Queued" "the home's own neighbour was not listed"
+  assert_not_contains "$out" "decoy-hit" "the code root's decoy was listed"
+  # A non-Markdown adapter is read through tasks-axi, whatever a stale Markdown file says.
+  dir=$(make_split intake-adapter)
+  fakebin=$(fm_fakebin "$dir")
+  make_adapter_stub "$fakebin"
+  make_adapter_home "$dir/home" ad-open "$PAIR_BASE"
+  printf '## In flight\n\n## Queued\n- [ ] ad-decoy - Quartz walnut pigeon (since 2026-11-01)\n\n## Done\n' > "$dir/home/data/backlog.md"
+  out=$(PATH="$fakebin:$PATH" completion_refused "$dir" "adapter duplicate" add ad-new "$PAIR_ABOVE" --objective O7)
+  assert_contains "$out" "ad-open (Queued, overlap 0.75) $PAIR_BASE" "the adapter's item was not listed"
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add ad-new "Quartz walnut pigeon feeders" --objective O7 2>&1) \
+    || fail "a title matching only the stale Markdown decoy was refused through the adapter: $out"
+  assert_grep "add ad-new" "$dir/home/.stubdata/calls" "the adapter did not receive the add"
+  pass "fm-tasks-axi.sh refuses near-duplicate titles with the three best neighbours and both overrides, in every spelling, over the addressed backlog and a non-Markdown adapter"
+}
+
+test_duplicate_check_boundaries_and_unreadable_sources() {
+  local dir out before fakebin
+  # The 50 newest Done items reach past the rows tasks-axi keeps: a real multi-row prune archives 41 of 51.
+  dir=$(make_split intake-window-a)
+  seed_done_rows "$dir/home/data/backlog.md" 51 "Pager rotation handoff gap" 50 51
+  wrapper_from_code "$dir" prune --keep 10 >/dev/null || fail "could not prune the Done rows"
+  assert_grep "done-50 " "$dir/home/data/done-archive.md" "the 50th newest Done row was not archived"
+  assert_grep "done-51 " "$dir/home/data/done-archive.md" "the 51st newest Done row was not archived"
+  before=$(cat "$dir/home/data/backlog.md")
+  out=$(refusal_of "$dir" "50th and 51st Done" add win-new "Pager rotation handoff gap review" --objective O7)
+  assert_equals "done-50" "$(listed_ids "$out")" "the 50th newest Done item was not listed alone, or the 51st was"
+  assert_contains "$out" "done-50 (Done, archived, overlap 0.80)" "the archived 50th Done item is not listed with its state"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused add changed the backlog"
+  # Only the 51st newest matches: filed with no neighbour output.
+  dir=$(make_split intake-window-b)
+  seed_done_rows "$dir/home/data/backlog.md" 51 "Pager rotation handoff gap" 51
+  wrapper_from_code "$dir" prune --keep 10 >/dev/null || fail "could not prune the Done rows"
+  out=$(wrapper_from_code "$dir" add win-new "Pager rotation handoff gap review" --objective O7 2>&1) \
+    || fail "a title matching only the 51st newest Done item was refused: $out"
+  assert_not_contains "$out" "overlap" "the 51st newest Done item was listed"
+  # Only the 50th newest matches, and it is archived: refused and listed.
+  dir=$(make_split intake-window-c)
+  seed_done_rows "$dir/home/data/backlog.md" 51 "Pager rotation handoff gap" 50
+  wrapper_from_code "$dir" prune --keep 10 >/dev/null || fail "could not prune the Done rows"
+  out=$(refusal_of "$dir" "archived only" create win-new "Pager rotation handoff gap review" --objective O7)
+  assert_equals "done-50" "$(listed_ids "$out")" "an archived Done neighbour was not the only listing"
+  # A source that cannot be read or interpreted stops the add: nothing filed, nothing recorded.
+  dir=$(make_split intake-unreadable)
+  wrapper_from_code "$dir" add un-base "$PAIR_BASE" --objective O7 >/dev/null
+  before=$(cat "$dir/home/data/backlog.md")
+  rm -f "$dir/home/data/backlog-review.tsv"
+  mkdir "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "unreadable archive" add un-new "Reticulate splines nightly" --objective O7)
+  assert_contains "$out" "could not read the backlog or its done archive" "an unreadable archive was not reported"
+  rmdir "$dir/home/data/done-archive.md"
+  printf '\n## Archived 2026-11-01\n- [x] broken\n' > "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "uninterpretable archive" add un-new "Reticulate splines nightly" --objective O7)
+  assert_contains "$out" "could not read the backlog or its done archive" "an uninterpretable archive was not reported"
+  rm -f "$dir/home/data/done-archive.md"
+  fakebin=$(fm_fakebin "$dir")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = list ]; then echo 'error: backlog is unreadable' >&2; exit 1; fi
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  out=$(PATH="$fakebin:$PATH" completion_refused "$dir" "unreadable list" add un-new "Reticulate splines nightly" --objective O7)
+  assert_contains "$out" "cannot read the backlog" "an unreadable list was not reported"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a failed read changed the backlog"
+  assert_absent "$dir/home/data/backlog-review.tsv" "a failed read recorded a row"
+  pass "the duplicate check counts the 50 newest Done items across a multi-row prune and stops when a source cannot be read"
+}
+
+
+# A tasks-axi stand-in that lets the first full read of <id> finish, then changes
+# the body of <id> the way another writer would, before the wrapper writes.
+make_interleaving_stub() {  # <fakebin> <id> <flag-file>
+  local real
+  real=$(command -v tasks-axi)
+  cat > "$1/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\${2:-}" = "$2" ] && [ "\${3:-}" = --full ] && [ ! -e "$3" ]; then
+  "$real" "\$@"
+  rc=\$?
+  : > "$3"
+  "$real" update "$2" --body "OTHER-WRITER-TEXT" "\${@: -2}" >/dev/null 2>&1
+  exit \$rc
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$1/tasks-axi"
+}
+
+test_dup_of_and_not_dup_do_what_the_refusal_says() {
+  local dir out fakebin sub
+  dir=$(make_split override-dup)
+  wrapper_from_code "$dir" add ov-kept "Teardown retire slot manifest" --objective O7 --body OLD-BODY-MARKER >/dev/null || fail "could not file the kept item"
+  wrapper_from_code "$dir" add ov-done "Teardown retire slot manifest proof" --objective O7 --not-dup ov-kept >/dev/null
+  wrapper_from_code "$dir" "done" ov-done >/dev/null || fail "could not close the retained Done item"
+  # --dup-of: the kept item keeps its text and gains the new title and body; nothing is filed.
+  printf 'FILE-BODY-LINE\n' > "$dir/new-body.md"
+  mkdir -p "$dir/elsewhere"
+  out=$(cd "$dir/elsewhere" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add ov-new "Teardown retire slot manifest again" \
+    --objective O7 --dup-of ov-kept --body-file ../new-body.md 2>&1) || fail "--dup-of with a caller-relative body file failed: $out"
+  assert_contains "$out" "merged into ov-kept" "--dup-of did not report the merge"
+  assert_no_grep "ov-new" "$dir/home/data/backlog.md" "--dup-of filed the item"
+  assert_grep "OLD-BODY-MARKER" "$dir/home/data/backlog.md" "--dup-of lost the kept item's text"
+  assert_grep "Merged from a duplicate filing: Teardown retire slot manifest again" "$dir/home/data/backlog.md" "--dup-of did not append the new title"
+  assert_grep "FILE-BODY-LINE" "$dir/home/data/backlog.md" "--dup-of did not append the new body file"
   assert_grep "OLD-BODY-MARKER" "$dir/home/data/note-archive.md" "--dup-of did not archive the previous body"
-  wrapper_from_code "$dir" add dup-e "Teardown refuses slot manifest retire twice" --dup-of dup-a --body "SECOND-BODY-MARKER" >/dev/null 2>&1 \
-    || fail "a repeated --dup-of failed"
-  [ "$(grep -c 'Merged from a duplicate filing' "$dir/home/data/backlog.md")" = 1 ] || fail "a repeated --dup-of appended twice"
-  refusal_of "$dir" "dup-of a missing item" add dup-e "Teardown refuses slot manifest retire twice" --dup-of dup-nope >/dev/null
-  refusal_of "$dir" "dup-of with not-dup" add dup-e "Teardown refuses slot manifest retire twice" --dup-of dup-a --not-dup dup-a >/dev/null
-  # A recently closed item is a neighbour too, but never a place to merge into.
-  wrapper_from_code "$dir" "done" dup-u >/dev/null || fail "could not close the unrelated item"
-  out=$(refusal_of "$dir" "closed neighbour" add dup-f "Lavish board answers route by hand again" --objective O7)
-  assert_contains "$out" "dup-u (done" "a recently closed item was not a neighbour"
-  out=$(refusal_of "$dir" "dup-of a closed item" add dup-f "Lavish board answers route by hand again" --dup-of dup-u)
-  assert_contains "$out" "not Queued or In flight" "a closed item accepted a merge"
-  # The 50 newest Done rows reach past the rows tasks-axi keeps: archived rows are neighbours too.
-  wrapper_from_code "$dir" prune --keep 0 >/dev/null || fail "could not archive the closed rows"
-  assert_grep "dup-u" "$dir/home/data/done-archive.md" "the closed row was not archived"
-  assert_no_grep "dup-u" "$dir/home/data/backlog.md" "the closed row stayed in the live backlog"
-  out=$(refusal_of "$dir" "archived neighbour" add dup-g "Lavish board answers route by hand twice" --objective O7)
-  assert_contains "$out" "dup-u (done" "an archived Done row was not a neighbour"
-  # Titles under three significant words are too short to judge.
-  wrapper_from_code "$dir" add dup-s1 "Fix lock" --objective O7 >/dev/null || fail "a short title was refused"
-  wrapper_from_code "$dir" add dup-s2 "Fix lock again" --objective O7 >/dev/null || fail "a second short title was refused"
-  pass "fm-tasks-axi.sh refuses near-duplicate titles with three neighbours and two overrides, and files unrelated titles with no prompt"
+  assert_no_grep "ov-new" "$dir/home/data/backlog-review.tsv" "--dup-of wrote a review row for an item it did not file"
+  # --dup-of a qualifying Done item still in the active backlog works like an open one.
+  wrapper_from_code "$dir" add ov-new "Teardown retire slot manifest proof again" --objective O7 --dup-of ov-done --body DONE-KEPT-BODY >/dev/null 2>&1 \
+    || fail "--dup-of a retained Done item failed"
+  assert_grep "DONE-KEPT-BODY" "$dir/home/data/backlog.md" "the retained Done item did not take the appended body"
+  # Missing ids, an archived-only Done id, and a missing objective stop it.
+  out=$(refusal_of "$dir" "dup-of a missing id" add ov-new "Teardown retire slot manifest again" --objective O7 --dup-of ov-nope)
+  assert_contains "$out" "does not exist" "a missing kept id was accepted"
+  out=$(refusal_of "$dir" "dup-of without an objective" add ov-new "Teardown retire slot manifest again" --dup-of ov-kept)
+  assert_contains "$out" "--objective" "--dup-of skipped the objective"
+  out=$(refusal_of "$dir" "not-dup without an objective" add ov-new "Teardown retire slot manifest again" --not-dup ov-kept)
+  assert_contains "$out" "--objective" "--not-dup skipped the objective"
+  out=$(refusal_of "$dir" "both overrides" add ov-new "Teardown retire slot manifest again" --objective O7 --dup-of ov-kept --not-dup ov-kept)
+  assert_contains "$out" "not both" "both overrides were accepted"
+  wrapper_from_code "$dir" prune --keep 0 >/dev/null || fail "could not archive the Done item"
+  assert_no_grep "ov-done" "$dir/home/data/backlog.md" "the Done item stayed in the active backlog"
+  out=$(refusal_of "$dir" "dup-of an archived id" add ov-new "Teardown retire slot manifest proof again" --objective O7 --dup-of ov-done)
+  assert_contains "$out" "Done and archived" "an archived kept item was not reported"
+  assert_contains "$out" "--not-dup ov-done" "the archived refusal did not point at --not-dup"
+  assert_no_grep "ov-new" "$dir/home/data/backlog.md" "a refused --dup-of filed the item"
+  # --not-dup: any qualifying neighbour, listed or not, files the item once and is recorded.
+  wrapper_from_code "$dir" add ov-n1 "Teardown retire slot manifest later" --objective O7 --not-dup ov-kept >/dev/null || fail "--not-dup naming a listed neighbour failed"
+  wrapper_from_code "$dir" add ov-n2 "Teardown retire slot manifest sooner" --objective O7 --not-dup ov-kept >/dev/null || fail "--not-dup naming another neighbour failed"
+  wrapper_from_code "$dir" add ov-n3 "Teardown retire slot manifest never" --objective O7 --not-dup ov-kept >/dev/null || fail "the third --not-dup add failed"
+  out=$(refusal_of "$dir" "four neighbours" add ov-n4 "Teardown retire slot manifest" --objective O7)
+  [ "$(listed_ids "$out" | wc -w | tr -d ' ')" = 3 ] || fail "the refusal did not list exactly three neighbours: $out"
+  wrapper_from_code "$dir" add ov-n4 "Teardown retire slot manifest" --objective O7 --not-dup ov-done >/dev/null \
+    || fail "--not-dup naming an archived qualifying neighbour failed"
+  [ "$(grep -c '^ov-n4	' "$dir/home/data/backlog-review.tsv")" = 1 ] || fail "ov-n4 was not recorded exactly once"
+  assert_grep "$(printf 'ov-n4\t\tO7\t\tov-done')" "$dir/home/data/backlog-review.tsv" "the judged neighbour was not recorded"
+  out=$(refusal_of "$dir" "not-dup naming a missing id" add ov-n5 "Teardown retire slot manifest" --objective O7 --not-dup ov-nope)
+  assert_contains "$out" "names no item" "a missing --not-dup id was accepted"
+  wrapper_from_code "$dir" add ov-far "Reticulate splines nightly" --objective O7 >/dev/null
+  out=$(refusal_of "$dir" "not-dup naming a stranger" add ov-n5 "Teardown retire slot manifest" --objective O7 --not-dup ov-far)
+  assert_contains "$out" "does not overlap this one enough" "a non-qualifying --not-dup id was accepted"
+  assert_no_grep "ov-n5" "$dir/home/data/backlog.md" "a refused --not-dup filed the item"
+  # Another writer changes the kept item between the wrapper's read and its append.
+  dir=$(make_split override-race)
+  fakebin=$(fm_fakebin "$dir")
+  wrapper_from_code "$dir" add rc-kept "Teardown retire slot manifest" --objective O7 --body FIRST-BODY >/dev/null
+  make_interleaving_stub "$fakebin" rc-kept "$dir/raced"
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add rc-new "Teardown retire slot manifest again" --objective O7 --dup-of rc-kept --body NEW-BODY 2>&1) \
+    || fail "--dup-of beside another writer failed: $out"
+  assert_present "$dir/raced" "the other writer never ran"
+  assert_grep "OTHER-WRITER-TEXT" "$dir/home/data/backlog.md" "the append overwrote another writer's update"
+  assert_grep "NEW-BODY" "$dir/home/data/backlog.md" "the append was lost beside another writer"
+  pass "--dup-of appends to an open or retained Done item and --not-dup files and records a qualifying neighbour, and neither runs without an objective or beside a lost update"
 }
 
 test_duplicate_of_closes_on_checked_proof() {
-  local dir out
+  local dir out before fakebin
   dir=$(make_split proof-dup)
+  : > "$dir/home/config/fleet-ledger"
   wrapper_from_code "$dir" add pd-kept "Normalize the archive header spacing" --objective O7 --kind docs --body KEPT-BODY >/dev/null
+  wrapper_from_code "$dir" add pd-fly "Compact the notes folder layout" --objective O7 --kind docs >/dev/null
+  wrapper_from_code "$dir" start pd-fly >/dev/null || fail "could not start the In flight kept item"
   wrapper_from_code "$dir" add pd-dup "Align heading gaps inside the done ledger" --objective O7 --kind ship --repo p --body DUP-BODY >/dev/null
+  wrapper_from_code "$dir" add pd-dup2 "Square the margin rhythm of every ledger" --objective O7 --kind docs --body DUP2-BODY >/dev/null
   wrapper_from_code "$dir" add pd-scout "Survey the pending release notes" --objective O7 --kind scout >/dev/null
-  wrapper_from_code "$dir" add pd-owner "Rotate the stale spool reader" --objective O7 --kind ship --body "Captain ask: do this first." >/dev/null
-  wrapper_from_code "$dir" add pd-held "Rename the interim spool folder" --objective O7 --kind ship >/dev/null
-  wrapper_from_code "$dir" hold pd-held --reason "which name?" --kind captain >/dev/null || fail "could not hold for the captain"
-  wrapper_from_code "$dir" add pd-live "Prune the idle probe sockets" --objective O7 --kind ship >/dev/null
-  printf 'kind=ship\n' > "$dir/home/state/pd-live.meta"
   wrapper_from_code "$dir" add pd-closed "Retire the spent fixture cache" --objective O7 >/dev/null
   wrapper_from_code "$dir" "done" pd-closed >/dev/null || fail "could not close a plain row"
   before=$(cat "$dir/home/data/backlog.md")
-  out=$(refusal_of "$dir" "owner-filed" "done" pd-owner --duplicate-of pd-kept)
-  assert_contains "$out" "only the captain's own words" "an owner-filed item closed on a duplicate proof"
-  out=$(refusal_of "$dir" "held for the captain" "done" pd-held --duplicate-of pd-kept)
-  assert_contains "$out" "open captain call" "an item held for the captain closed on a duplicate proof"
-  out=$(refusal_of "$dir" "live task" "done" pd-live --duplicate-of pd-kept)
-  assert_contains "$out" "fm-teardown.sh pd-live" "an item with a live task closed on a duplicate proof"
-  out=$(refusal_of "$dir" "already closed" "done" pd-closed --duplicate-of pd-kept)
-  assert_contains "$out" "already closed" "a closed item was closed again"
   out=$(refusal_of "$dir" "missing kept" "done" pd-dup --duplicate-of pd-nope)
   assert_contains "$out" "does not exist" "a missing kept item was accepted"
   out=$(refusal_of "$dir" "closed kept" "done" pd-dup --duplicate-of pd-closed)
@@ -1370,67 +1700,389 @@ test_duplicate_of_closes_on_checked_proof() {
   refusal_of "$dir" "with moved-to" "done" pd-dup --duplicate-of pd-kept --moved-to sm pd-x >/dev/null
   refusal_of "$dir" "without a value" "done" pd-dup --duplicate-of >/dev/null
   assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused closing proof changed the backlog"
+  # An append that fails leaves the duplicate open and the kept item as it was.
+  fakebin=$(fm_fakebin "$dir")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = update ] && [ "\${2:-}" != --help ]; then echo 'error: backlog is unwritable' >&2; exit 1; fi
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  out=$(PATH="$fakebin:$PATH" completion_refused "$dir" "append failure" "done" pd-dup --duplicate-of pd-kept)
+  assert_contains "$out" "could not append" "a failed append was not reported"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a failed append closed the duplicate or changed the kept item"
+  rm -f "$fakebin/tasks-axi"
+  # A Queued kept item takes the duplicate, which closes with a note naming the kept id.
   out=$(wrapper_from_code "$dir" "done" pd-dup --duplicate-of pd-kept 2>&1) || fail "a proved duplicate was refused: $out"
   [ "$(row_state "$dir" pd-dup)" = x ] || fail "the duplicate did not close"
   [ "$(row_state "$dir" pd-kept)" = " " ] || fail "the kept item closed"
-  assert_grep "duplicate of pd-kept" "$dir/home/data/backlog.md" "the closing note does not record the proof"
+  assert_grep "duplicate of pd-kept" "$dir/home/data/backlog.md" "the closing note does not record the kept id"
   assert_grep "Merged from duplicate pd-dup: Align heading gaps inside the done ledger" "$dir/home/data/backlog.md" "the kept item did not receive the duplicate's title"
   assert_grep "DUP-BODY" "$dir/home/data/backlog.md" "the kept item did not receive the duplicate's body"
   assert_grep "KEPT-BODY" "$dir/home/data/backlog.md" "the kept item lost its own body"
+  assert_grep "KEPT-BODY" "$dir/home/data/note-archive.md" "the kept item's previous body was not archived"
+  # An In flight kept item takes a duplicate too.
+  wrapper_from_code "$dir" task close pd-dup2 --duplicate-of pd-fly >/dev/null || fail "a duplicate of an In flight item was refused"
+  assert_grep "DUP2-BODY" "$dir/home/data/backlog.md" "the In flight kept item did not receive the duplicate's body"
+  # The ledger never records a duplicate close as a landing.
+  assert_equals "task.closed none" "$(jq -r 'select(.task == "pd-dup" and .event == "task.closed") | [.event, .evidence] | join(" ")' "$dir/home/state/fleet-ledger.jsonl")" \
+    "a duplicate close was not recorded with evidence none"
+  assert_equals 0 "$(jq -s '[.[] | select(.event == "task.merged")] | length' "$dir/home/state/fleet-ledger.jsonl")" "a duplicate close claimed a landing"
   wrapper_from_code "$dir" task close pd-scout --duplicate-of pd-kept >/dev/null || fail "task close of a scout was refused"
   [ "$(row_state "$dir" pd-scout)" = x ] || fail "the scout did not close on a duplicate proof"
-  pass "fm-tasks-axi.sh closes a duplicate on checked proof and refuses owner-filed, held, live, closed, and unproved items"
+  # Another writer changes the kept item between the wrapper's read and its append.
+  dir=$(make_split proof-dup-race)
+  fakebin=$(fm_fakebin "$dir")
+  wrapper_from_code "$dir" add pr-kept "Normalize the archive header spacing" --objective O7 --body FIRST-BODY >/dev/null
+  wrapper_from_code "$dir" add pr-dup "Align heading gaps inside the done ledger" --objective O7 --body DUP-BODY >/dev/null
+  make_interleaving_stub "$fakebin" pr-kept "$dir/raced"
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" "done" pr-dup --duplicate-of pr-kept >/dev/null 2>&1 || fail "a duplicate close beside another writer failed"
+  assert_grep "OTHER-WRITER-TEXT" "$dir/home/data/backlog.md" "the append overwrote another writer's update"
+  assert_grep "DUP-BODY" "$dir/home/data/backlog.md" "the append was lost beside another writer"
+  [ "$(row_state "$dir" pr-dup)" = x ] || fail "the duplicate did not close beside another writer"
+  pass "fm-tasks-axi.sh closes a duplicate into a Queued or In flight item on checked proof and leaves both items alone when a check or the append fails"
+}
+
+
+# An ssh stand-in for bin/fm-on.sh (FM_SSH_BIN): it decodes the entrypoint
+# arguments and runs the named wrapper command locally against the "remote" home,
+# which lives under $FAKE_REMOTE_PREFIX so a same-named local path stays a decoy.
+make_fake_ssh() {  # <fakebin>
+  cat > "$1/fake-ssh" <<'SH'
+#!/usr/bin/env bash
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
+done
+[ "${FAKE_SSH_MODE:-}" != unreachable ] || exit 255
+root=$(printf '%s' "$4" | base64 -d)
+home=$(printf '%s' "$5" | base64 -d)
+argv=()
+while IFS= read -r -d '' a; do argv+=("$a"); done < <(printf '%s' "$6" | base64 -d)
+cmd=${argv[0]}
+unset 'argv[0]'
+exec env -i PATH="$PATH" HOME="$HOME" FM_HOME="${FAKE_REMOTE_PREFIX:-}$home" "$root/bin/$cmd" "${argv[@]}"
+SH
+  chmod +x "$1/fake-ssh"
+}
+
+# A local registered home <path> holding the items, one per line "id|state".
+make_peer_home() {  # <path> <id|state>...
+  local path=$1 spec
+  shift
+  mkdir -p "$path/data" "$path/state"
+  empty_backlog "$path/data/backlog.md"
+  for spec in "$@"; do
+    tasks-axi add "${spec%%|*}" "$(ftitle "${spec%%|*}")" --file "$path/data/backlog.md" >/dev/null
+    [ "${spec##*|}" != done ] || tasks-axi done "${spec%%|*}" --file "$path/data/backlog.md" >/dev/null
+  done
+}
+
+moved_close() {  # <case-dir> <item> <home> <dest-item>; runs the proof with the fake transport wired in
+  local dir=$1
+  shift
+  FM_SSH_BIN="$dir/fakebin/fake-ssh" FAKE_REMOTE_PREFIX="$dir/remote-fs" FAKE_SSH_MODE="${FAKE_SSH_MODE:-}" \
+    wrapper_from_code "$dir" "done" "$1" --moved-to "$2" "$3" 2>&1
 }
 
 test_moved_to_closes_on_checked_proof() {
-  local dir out sm
+  local dir out fakebin n before
   dir=$(make_split proof-moved)
-  sm="$dir/sm1"
-  mkdir -p "$sm/data"
-  empty_backlog "$sm/data/backlog.md"
-  tasks-axi add mv-open "Ship the moved import path" --file "$sm/data/backlog.md" >/dev/null
-  tasks-axi add mv-gone "Ship the retired import path" --file "$sm/data/backlog.md" >/dev/null
-  tasks-axi done mv-gone --file "$sm/data/backlog.md" >/dev/null
-  printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$sm" > "$dir/home/data/secondmates.md"
-  printf -- '- sm-far - A far home (host: far; root: /srv/fm; home: /srv/fm-home; scope: far scope; projects: p; added 2026-11-01)\n' >> "$dir/home/data/secondmates.md"
-  wrapper_from_code "$dir" add mv-item "Ship the import path elsewhere" --objective O7 --kind ship >/dev/null
-  wrapper_from_code "$dir" add mv-owner "Rotate the stale spool reader" --objective O7 --kind ship --body "Owner: please keep this." >/dev/null
-  wrapper_from_code "$dir" add mv-held "Rename the interim spool folder" --objective O7 >/dev/null
-  wrapper_from_code "$dir" hold mv-held --reason "which name?" --kind captain >/dev/null
-  wrapper_from_code "$dir" add mv-live "Prune the idle probe sockets" --objective O7 >/dev/null
-  printf 'kind=ship\n' > "$dir/home/state/mv-live.meta"
+  fakebin=$(fm_fakebin "$dir")
+  make_fake_ssh "$fakebin"
+  make_adapter_stub "$fakebin"
+  : > "$dir/home/config/fleet-ledger"
+  make_peer_home "$dir/sm1" mv-open "mv-gone|done"
+  # The remote home's backlog exists only under the transport's prefix; a local
+  # path of the same name is a decoy that holds the item open.
+  make_peer_home "$dir/remote-fs$dir/far-home" mv-far "mv-fardone|done"
+  make_peer_home "$dir/far-home" mv-decoy
+  ln -s "$dir/home" "$dir/home-link"
+  {
+    printf -- '- sm-one - A local home, with (parens); semicolons - and dashes (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1"
+    printf -- '- sm-far - A far home (host: far-box; root: %s; home: %s; scope: far scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/far-home"
+    printf -- '- sm-self - The active home (home: %s; scope: self; projects: p; added 2026-11-01)\n' "$dir/home"
+    printf -- '- sm-link - A path to the active home (home: %s; scope: self; projects: p; added 2026-11-01)\n' "$dir/home-link"
+    printf -- '- sm-twice - First (home: %s; scope: dup scope; projects: p; added 2026-11-01)\n' "$dir/sm1"
+    printf -- '- sm-twice - Second (home: %s; scope: dup scope; projects: p; added 2026-11-01)\n' "$dir/sm1"
+  } > "$dir/home/data/secondmates.md"
+  for n in item0 item1 item2 item3 item4 item5 item6 item7 item8 item9 item10 item11; do
+    wrapper_from_code "$dir" add "mv-$n" "$(ftitle "mv-$n")" --objective O7 --kind ship >/dev/null
+  done
   before=$(cat "$dir/home/data/backlog.md")
-  out=$(refusal_of "$dir" "unregistered home" "done" mv-item --moved-to sm-none mv-open)
-  assert_contains "$out" "not a registered home" "an unregistered home was accepted"
-  out=$(refusal_of "$dir" "absent item" "done" mv-item --moved-to sm-one mv-absent)
-  assert_contains "$out" "has no item mv-absent" "an absent item in the home was accepted"
-  out=$(refusal_of "$dir" "closed item" "done" mv-item --moved-to sm-one mv-gone)
-  assert_contains "$out" "is not open" "a closed item in the home was accepted"
-  out=$(refusal_of "$dir" "remote home" "done" mv-item --moved-to sm-far mv-open)
-  assert_contains "$out" "another host" "a remote home was accepted"
-  out=$(refusal_of "$dir" "owner-filed" "done" mv-owner --moved-to sm-one mv-open)
-  assert_contains "$out" "only the captain's own words" "an owner-filed item closed as moved"
-  out=$(refusal_of "$dir" "held for the captain" "done" mv-held --moved-to sm-one mv-open)
-  assert_contains "$out" "open captain call" "an item held for the captain closed as moved"
-  out=$(refusal_of "$dir" "live task" "done" mv-live --moved-to sm-one mv-open)
-  assert_contains "$out" "fm-teardown.sh mv-live" "an item with a live task closed as moved"
-  out=$(refusal_of "$dir" "one value" "done" mv-item --moved-to sm-one)
+  out=$(moved_close "$dir" mv-item0 sm-none mv-open) && fail "an unregistered home was accepted"
+  assert_contains "$out" "not one registered home" "an unregistered home was not named"
+  out=$(moved_close "$dir" mv-item0 sm-one mv-absent) && fail "an absent item was accepted"
+  assert_contains "$out" "has no item mv-absent" "an absent item in the home was not named"
+  out=$(moved_close "$dir" mv-item0 sm-one mv-gone) && fail "a Done item in the home was accepted"
+  assert_contains "$out" "is not open" "a Done item in the home was not named"
+  out=$(moved_close "$dir" mv-item0 sm-twice mv-open) && fail "a home id with two registry entries was accepted"
+  assert_contains "$out" "not one registered home" "an ambiguous home id was not named"
+  out=$(moved_close "$dir" mv-item0 sm-self mv-item1) && fail "the active home was accepted as the destination"
+  assert_contains "$out" "this backlog itself" "the active home was not named"
+  out=$(moved_close "$dir" mv-item0 sm-link mv-item1) && fail "another path to the active backlog was accepted"
+  assert_contains "$out" "this backlog itself" "another path to the active backlog was not named"
+  out=$(FAKE_SSH_MODE=unreachable moved_close "$dir" mv-item0 sm-far mv-far) && fail "an unreachable remote home was accepted"
+  assert_contains "$out" "cannot read sm-far's backlog" "an unreachable remote home was not named"
+  out=$(moved_close "$dir" mv-item0 sm-far mv-decoy) && fail "a local decoy path counted for a remote home"
+  assert_contains "$out" "has no item mv-decoy" "the decoy local path was read"
+  out=$(moved_close "$dir" mv-item0 sm-far mv-fardone) && fail "a Done item in the remote home was accepted"
+  assert_contains "$out" "is not open" "a Done remote item was not named"
+  out=$(moved_close "$dir" mv-item0 sm-one one two) && fail "a missing item id was accepted"
+  out=$(refusal_of "$dir" "one value" "done" mv-item0 --moved-to sm-one)
   assert_contains "$out" "two values" "a one-value --moved-to was accepted"
-  out=$(refusal_of "$dir" "equals form" "done" mv-item --moved-to=sm-one)
+  out=$(refusal_of "$dir" "equals form" "done" mv-item0 --moved-to=sm-one)
   assert_contains "$out" "two values" "the = form of --moved-to was accepted"
-  refusal_of "$dir" "with a note" "done" mv-item --moved-to sm-one mv-open --note moved >/dev/null
-  refusal_of "$dir" "with a duplicate proof" "done" mv-item --moved-to sm-one mv-open --duplicate-of mv-held >/dev/null
+  refusal_of "$dir" "with a note" "done" mv-item0 --moved-to sm-one mv-open --note moved >/dev/null
+  refusal_of "$dir" "with a duplicate proof" "done" mv-item0 --moved-to sm-one mv-open --duplicate-of mv-item1 >/dev/null
   assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused closing proof changed the backlog"
-  out=$(wrapper_from_code "$dir" "done" mv-item --moved-to sm-one mv-open 2>&1) || fail "a proved move was refused: $out"
-  [ "$(row_state "$dir" mv-item)" = x ] || fail "the moved item did not close"
-  assert_grep "moved to sm-one as mv-open" "$dir/home/data/backlog.md" "the closing note does not record the proof"
-  # The probe of the other home must leave this home addressed: a later write still lands here.
+  # A local home with the item open.
+  out=$(moved_close "$dir" mv-item0 sm-one mv-open) || fail "a proved local move was refused: $out"
+  [ "$(row_state "$dir" mv-item0)" = x ] || fail "the moved item did not close"
+  assert_grep "moved to sm-one as mv-open" "$dir/home/data/backlog.md" "the closing note does not record the home and item"
+  assert_no_grep "mv-item0" "$dir/sm1/data/backlog.md" "the move touched the other home's backlog"
+  assert_equals "task.closed none" "$(jq -r 'select(.task == "mv-item0" and .event == "task.closed") | [.event, .evidence] | join(" ")' "$dir/home/state/fleet-ledger.jsonl")" \
+    "a moved close was not recorded with evidence none"
+  assert_equals 0 "$(jq -s '[.[] | select(.event == "task.merged")] | length' "$dir/home/state/fleet-ledger.jsonl")" "a moved close claimed a landing"
+  # A remote home with the item open, read through the transport.
+  out=$(moved_close "$dir" mv-item1 sm-far mv-far) || fail "a proved remote move was refused: $out"
+  [ "$(row_state "$dir" mv-item1)" = x ] || fail "the item moved to the remote home did not close"
+  assert_grep "moved to sm-far as mv-far" "$dir/home/data/backlog.md" "the remote move's note does not record the proof"
+  # The probe of another home must leave this home addressed: a later write still lands here.
   wrapper_from_code "$dir" add mv-after "Audit the lavish listener sockets" --objective O7 >/dev/null || fail "an add after a move failed"
   assert_grep "mv-after" "$dir/home/data/backlog.md" "a write after a move left this home"
-  assert_no_grep "mv-after" "$sm/data/backlog.md" "a write after a move reached the other home"
-  assert_no_grep "mv-item" "$sm/data/backlog.md" "the move touched the other home's backlog"
-  pass "fm-tasks-axi.sh closes a moved item on checked proof and refuses unregistered, remote, absent, closed, owner-filed, held, and live cases"
+  assert_no_grep "mv-after" "$dir/sm1/data/backlog.md" "a write after a move reached the other home"
+  # A destination on a non-Markdown adapter is read through tasks-axi, not from a Markdown file.
+  mkdir -p "$dir/ad1/data" "$dir/ad2/data"
+  make_adapter_home "$dir/ad1" ad-item "Adapter item that the stub says is done"
+  printf 'task:\n  id: ad-item\n  title: done one\n  state: done\n  held: no\n  blocked: no\n  kind: task\n' > "$dir/ad1/.stubdata/show-ad-item"
+  printf '## In flight\n\n## Queued\n- [ ] ad-item - stale markdown shows it open (since 2026-11-01)\n\n## Done\n' > "$dir/ad1/data/backlog.md"
+  make_adapter_home "$dir/ad2" ad-item "Adapter item that the stub says is open"
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/ad2/data/backlog.md"
+  {
+    printf -- '- sm-ad1 - adapter done (home: %s; scope: a; projects: p; added 2026-11-01)\n' "$dir/ad1"
+    printf -- '- sm-ad2 - adapter open (home: %s; scope: a; projects: p; added 2026-11-01)\n' "$dir/ad2"
+  } >> "$dir/home/data/secondmates.md"
+  out=$(PATH="$fakebin:$PATH" moved_close "$dir" mv-item2 sm-ad1 ad-item) && fail "an adapter item that is Done counted as open: $out"
+  assert_contains "$out" "is not open" "the adapter's Done answer was not used"
+  out=$(PATH="$fakebin:$PATH" moved_close "$dir" mv-item2 sm-ad2 ad-item) || fail "an open adapter item was refused: $out"
+  [ "$(row_state "$dir" mv-item2)" = x ] || fail "the item moved to the adapter home did not close"
+  # The registry is the source operation's own: an overriding data root and a split home.
+  mkdir -p "$dir/alt/data"
+  empty_backlog "$dir/alt/data/backlog.md"
+  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add alt-item "$(ftitle alt-item)" --objective O7 >/dev/null) \
+    || fail "could not file the override root's item"
+  out=$(cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" done alt-item --moved-to sm-one mv-open 2>&1) \
+    && fail "a destination only a decoy registry holds was accepted"
+  assert_contains "$out" "not one registered home" "the decoy registry was read for the override root"
+  printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/alt/data/secondmates.md"
+  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" done alt-item --moved-to sm-one mv-open >/dev/null 2>&1) \
+    || fail "the override root's own registry route was refused"
+  pass "fm-tasks-axi.sh closes a moved item on checked proof, local, remote, and adapter, from the source's own registry, and stops on every unproved case"
 }
+
+# One owner-filed marker per row, through one proof. The rows are written into
+# the Queued section in one step, since only the closing proof is under test.
+owner_marker_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
+  local dir=$1 label=$2 who word n=0 id body rows='' positive=() negative=() out
+  shift 2
+  for who in Captain Owner; do
+    for word in ask words question call decision ruling rule answer; do
+      n=$((n + 1)); id="own-$label-$n"; positive+=("$id")
+      rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $who $word was recorded here"$'\n'
+    done
+  done
+  for body in "Captain 2026 asked for this" "Owner: keep" "Captain: keep"; do
+    n=$((n + 1)); id="own-$label-$n"; positive+=("$id")
+    rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $body"$'\n'
+  done
+  for body in "Owner 2026 notes only" "the lock owner holds nothing" "the captain of the ship mentioned this" "Owner's idea"; do
+    n=$((n + 1)); id="own-$label-$n"; negative+=("$id")
+    rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $body"$'\n'
+  done
+  {
+    sed '/^## Done/,$d' "$dir/home/data/backlog.md"
+    printf '%s' "$rows"
+    sed -n '/^## Done/,$p' "$dir/home/data/backlog.md"
+  } > "$dir/home/data/backlog.md.new" && mv "$dir/home/data/backlog.md.new" "$dir/home/data/backlog.md"
+  for id in "${positive[@]}"; do
+    out=$(refusal_of "$dir" "$id via $label" "done" "$id" "$@")
+    assert_contains "$out" "the owner's own item" "$id did not read as owner-filed through $label"
+    assert_contains "$out" "--drop-file" "the owner-filed refusal did not name the owner's words"
+  done
+  for id in "${negative[@]}"; do
+    out=$(wrapper_from_code "$dir" "done" "$id" "$@" 2>&1) || fail "$id mentions the owner without a marker and was stopped through $label: $out"
+    [ "$(row_state "$dir" "$id")" = x ] || fail "$id did not close through $label"
+  done
+}
+
+owner_call_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
+  local dir=$1 label=$2 id fakebin out
+  shift 2
+  # held through bin/fm-captain-hold.sh
+  wrapper_from_code "$dir" add "hold-a-$label" "$(ftitle "hold-a-$label")" --objective O7 --kind ship >/dev/null
+  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold "hold-a-$label" --reason "which name?" >/dev/null 2>&1) \
+    || fail "fm-captain-hold.sh could not hold hold-a-$label"
+  out=$(refusal_of "$dir" "held through fm-captain-hold" "done" "hold-a-$label" "$@")
+  assert_contains "$out" "open owner call" "a task held through fm-captain-hold.sh closed"
+  assert_contains "$out" "fm-captain-hold.sh answer" "the open-call refusal did not name how to answer it"
+  # a kind:captain row with an open hold
+  wrapper_from_code "$dir" add "hold-b-$label" "$(ftitle "hold-b-$label")" --objective O7 --kind captain >/dev/null
+  wrapper_from_code "$dir" hold "hold-b-$label" --reason "which?" --kind captain >/dev/null || fail "could not hold a captain row"
+  refusal_of "$dir" "captain row" "done" "hold-b-$label" "$@" >/dev/null
+  # a dated hold that expired unanswered
+  wrapper_from_code "$dir" add "hold-c-$label" "$(ftitle "hold-c-$label")" --objective O7 --kind ship >/dev/null
+  wrapper_from_code "$dir" hold "hold-c-$label" --reason "which?" --kind captain --until 2020-01-01 >/dev/null || fail "could not hold with a past date"
+  out=$(refusal_of "$dir" "expired hold" "done" "hold-c-$label" "$@")
+  assert_contains "$out" "open owner call" "an expired unanswered hold closed"
+  # released and then held again
+  wrapper_from_code "$dir" add "hold-d-$label" "$(ftitle "hold-d-$label")" --objective O7 --kind ship >/dev/null
+  wrapper_from_code "$dir" hold "hold-d-$label" --reason "which?" --kind captain >/dev/null
+  wrapper_from_code "$dir" unhold "hold-d-$label" >/dev/null || fail "could not release the hold"
+  wrapper_from_code "$dir" hold "hold-d-$label" --reason "again?" --kind captain >/dev/null
+  refusal_of "$dir" "re-held" "done" "hold-d-$label" "$@" >/dev/null
+  # a captain row whose hold was released is not an open call
+  wrapper_from_code "$dir" add "hold-e-$label" "$(ftitle "hold-e-$label")" --objective O7 --kind captain >/dev/null
+  wrapper_from_code "$dir" hold "hold-e-$label" --reason "which?" --kind captain >/dev/null
+  wrapper_from_code "$dir" unhold "hold-e-$label" >/dev/null
+  out=$(wrapper_from_code "$dir" "done" "hold-e-$label" "$@" 2>&1) || fail "a released captain row was read as an open call: $out"
+  [ "$(row_state "$dir" "hold-e-$label")" = x ] || fail "a released captain row did not close through $label"
+  # a hold whose state cannot be read counts as undecided
+  wrapper_from_code "$dir" add "hold-f-$label" "$(ftitle "hold-f-$label")" --objective O7 --kind ship >/dev/null
+  # The wrapper hands bin/fm-captain-hold.sh an explicit FM_DATA_OVERRIDE, which its
+  # own reads do not carry, so this stand-in fails only the hold predicate's read.
+  fakebin=$(fm_fakebin "$dir/hold-fakebin-$label")
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ -n "\${FM_DATA_OVERRIDE:-}" ]; then
+  echo 'error: hold state unreadable' >&2
+  exit 1
+fi
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+  out=$(PATH="$fakebin:$PATH" completion_refused "$dir" "unreadable hold" "done" "hold-f-$label" "$@")
+  assert_contains "$out" "undecided" "an unreadable hold did not count as undecided"
+  # a live task, ship and non-ship, in the default and an overridden state directory
+  wrapper_from_code "$dir" add "live-a-$label" "$(ftitle "live-a-$label")" --objective O7 --kind ship >/dev/null
+  wrapper_from_code "$dir" add "live-b-$label" "$(ftitle "live-b-$label")" --objective O7 --kind docs >/dev/null
+  wrapper_from_code "$dir" add "live-c-$label" "$(ftitle "live-c-$label")" --objective O7 --kind docs >/dev/null
+  printf 'kind=ship\n' > "$dir/home/state/live-a-$label.meta"
+  printf 'kind=docs\n' > "$dir/home/state/live-b-$label.meta"
+  for id in "live-a-$label" "live-b-$label"; do
+    out=$(refusal_of "$dir" "live task $id" "done" "$id" "$@")
+    assert_contains "$out" "fm-teardown.sh $id" "a live task was not sent to teardown"
+  done
+  mkdir -p "$dir/altstate"
+  printf 'kind=docs\n' > "$dir/altstate/live-c-$label.meta"
+  out=$(FM_STATE_OVERRIDE="$dir/altstate" completion_refused "$dir" "live task in an overridden state directory" "done" "live-c-$label" "$@")
+  assert_contains "$out" "fm-teardown.sh live-c-$label" "a live task in an overridden state directory closed"
+}
+
+test_closing_proofs_leave_the_owners_items_alone() {
+  local dir out
+  dir=$(make_split proof-owner)
+  make_peer_home "$dir/sm1" ow-open
+  printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
+  wrapper_from_code "$dir" add ow-kept "$(ftitle ow-kept)" --objective O7 --kind docs >/dev/null
+  # Each proof reads the same markers and the same holds, so the cases run through both.
+  owner_marker_cases "$dir" dup "--duplicate-of" ow-kept
+  owner_marker_cases "$dir" mov "--moved-to" sm-one ow-open
+  owner_call_cases "$dir" dup "--duplicate-of" ow-kept
+  owner_call_cases "$dir" mov "--moved-to" sm-one ow-open
+  pass "both closing proofs stop at every owner-filed marker, open owner call, unreadable hold, and live task, and close an item that only mentions the owner"
+}
+
+# A hold or a live task published while a proof is running never lands on a
+# closed item or closes a held one.
+test_closing_proofs_serialize_with_holds_and_live_tasks() (
+  local dir fakebin real proof closer='' holder='' out rc label
+  trap 'touch "$dir/release-done" "$dir/release-hold"; [ -z "$closer" ] || kill "$closer" 2>/dev/null || true; [ -z "$holder" ] || kill "$holder" 2>/dev/null || true' EXIT
+  for label in dup mov; do
+    dir=$(make_split "proof-race-$label")
+    fakebin=$(fm_fakebin "$dir")
+    real=$(command -v tasks-axi)
+    make_mutation_wait_sleep "$fakebin"
+    make_peer_home "$dir/sm1" race-open
+    printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
+    wrapper_from_code "$dir" add race-kept "$(ftitle race-kept)" --objective O7 --kind docs >/dev/null
+    wrapper_from_code "$dir" add race-a "$(ftitle race-a)" --objective O7 --kind docs >/dev/null
+    wrapper_from_code "$dir" add race-b "$(ftitle race-b)" --objective O7 --kind docs >/dev/null
+    wrapper_from_code "$dir" add race-c "$(ftitle race-c)" --objective O7 --kind docs >/dev/null
+    if [ "$label" = dup ]; then proof=(--duplicate-of race-kept); else proof=(--moved-to sm-one race-open); fi
+    cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = done ] && [ "\${2:-}" = race-a ]; then
+  : > "$dir/done-entered"
+  while [ ! -e "$dir/release-done" ]; do sleep 0.05; done
+fi
+if [ "\${1:-}" = hold ] && [ "\${2:-}" = race-b ]; then
+  : > "$dir/hold-entered"
+  while [ ! -e "$dir/release-hold" ]; do sleep 0.05; done
+fi
+exec "$real" "\$@"
+SH
+    chmod +x "$fakebin/tasks-axi"
+    # Close first: a hold and a live-task record wait behind the proof and land after the close.
+    PATH="$fakebin:$PATH" wrapper_from_code "$dir" "done" race-a "${proof[@]}" > "$dir/close-result" 2>&1 &
+    closer=$!
+    wait_mutation_fixture "$dir/done-entered" "$label proof close" "$closer" "$dir/close-result"
+    PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/hold-wait" wrapper_from_code "$dir" hold race-a --reason "which?" --kind captain \
+      > "$dir/hold-result" 2>&1 &
+    holder=$!
+    wait_mutation_fixture "$dir/hold-wait" "hold behind the $label proof" "$holder" "$dir/hold-result"
+    [ "$(row_state "$dir" race-a)" = " " ] || true
+    : > "$dir/release-done"
+    wait "$closer" || fail "the $label proof close failed: $(cat "$dir/close-result")"
+    closer=''
+    wait "$holder" || true
+    holder=''
+    [ "$(row_state "$dir" race-a)" = x ] || fail "a concurrent hold stopped or reopened a proved $label close"
+    # Hold first: the proof reads the committed hold and stops.
+    PATH="$fakebin:$PATH" wrapper_from_code "$dir" hold race-b --reason "which?" --kind captain > "$dir/hold-result" 2>&1 &
+    holder=$!
+    wait_mutation_fixture "$dir/hold-entered" "hold ahead of the $label proof" "$holder" "$dir/hold-result"
+    PATH="$fakebin:$PATH" FAKE_LOCK_WAIT="$dir/proof-wait" wrapper_from_code "$dir" "done" race-b "${proof[@]}" > "$dir/close-result" 2>&1 &
+    closer=$!
+    wait_mutation_fixture "$dir/proof-wait" "$label proof behind a hold" "$closer" "$dir/close-result"
+    [ "$(row_state "$dir" race-b)" = " " ] || fail "the $label proof closed an item while a hold was committing"
+    : > "$dir/release-hold"
+    wait "$holder" || fail "the concurrent hold failed"
+    holder=''
+    rc=0
+    wait "$closer" || rc=$?
+    closer=''
+    expect_code 2 "$rc" "$label proof after a committed hold"
+    out=$(cat "$dir/close-result")
+    assert_contains "$out" "open owner call" "the $label proof did not read the committed hold"
+    [ "$(row_state "$dir" race-b)" = " " ] || fail "the $label proof closed a concurrently held item"
+    # A live-task record published while the proof runs waits for the close.
+    rm -f "$dir/done-entered" "$dir/release-done"
+    sed -i.bak 's/race-a/race-c/g' "$fakebin/tasks-axi" && rm -f "$fakebin/tasks-axi.bak"
+    PATH="$fakebin:$PATH" wrapper_from_code "$dir" "done" race-c "${proof[@]}" > "$dir/close-result" 2>&1 &
+    closer=$!
+    wait_mutation_fixture "$dir/done-entered" "$label proof close of race-c" "$closer" "$dir/close-result"
+    FM_HOME="$dir/home" bash -c '
+      . "$1"
+      lock=$(fm_meta_lock_path "$STATE/race-c.meta")
+      : > "$2/publisher-waiting"
+      fm_lock_acquire_wait "$lock"
+      printf "kind=docs\n" > "$STATE/race-c.meta"
+      : > "$2/published"
+      fm_lock_release "$lock"
+    ' _ "$ROOT/bin/fm-wake-lib.sh" "$dir" &
+    holder=$!
+    wait_mutation_fixture "$dir/publisher-waiting" "live-task publisher" "$holder"
+    sleep 0.5
+    assert_absent "$dir/published" "a live-task record was published inside the $label proof"
+    : > "$dir/release-done"
+    wait "$closer" || fail "the $label proof close of race-c failed: $(cat "$dir/close-result")"
+    closer=''
+    wait "$holder" || fail "the live-task publisher failed"
+    holder=''
+    [ "$(row_state "$dir" race-c)" = x ] || fail "the $label proof did not close race-c"
+  done
+  pass "a hold or a live-task record published during a closing proof waits for the close, and a committed hold stops the proof"
+)
 
 if [ "$#" -gt 0 ]; then
   fm_test_run_cases -- "$@"
@@ -1468,9 +2120,15 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_add_ledger_off_and_failing_ledger_leave_add_alone
   test_completion_records_task_closed_once_with_its_proof
   test_add_requires_an_objective
+  test_objective_rows_land_in_the_addressed_home
+  test_failed_row_write_removes_the_filed_item
   test_add_judges_near_duplicate_titles
+  test_duplicate_check_boundaries_and_unreadable_sources
+  test_dup_of_and_not_dup_do_what_the_refusal_says
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
+  test_closing_proofs_leave_the_owners_items_alone
+  test_closing_proofs_serialize_with_holds_and_live_tasks || exit "$?"
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

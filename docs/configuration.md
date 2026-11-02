@@ -448,31 +448,50 @@ When a spawn is interrupted after launch delivery began, its exit path re-reads 
 
 ### Backlog intake and closing proofs
 
-[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) judges every `add` before tasks-axi runs, so a backlog that grows by filing stays current and unduplicated.
-The script header owns the flags, the refusals, and their exit status; [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) owns the overlap threshold, the Done window, and the owner-filed heuristic.
+[`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) judges every `add` and `create` before tasks-axi runs, so a backlog that grows by filing stays current and unduplicated.
+The script header owns the flags, the refusals, and their exit status; [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) owns the overlap rule and the owner-filed pattern.
 
 - **Objective.**
   An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
-  An unknown id, or `none` with no reason, is refused.
-  The objective, its reason, and any `--not-dup` neighbour are recorded in `data/backlog-review.tsv` (`id`, `review-by`, `objective`, `reason`, `not-dup`; `review-by` stays empty), because tasks-axi has no field for them.
+  An unknown id, or `none` with no reason, is refused, and so is an add with no objective at all.
+  Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, `reason`, and the `--not-dup` neighbours when the filer named any.
+  tasks-axi has no field for these values.
+  The line is written for the id tasks-axi stored, a minted one included.
+  An add stops before filing when the file cannot take a line, and an item whose line fails to write is removed again.
 - **Duplicate check.**
-  An add whose title overlaps a Queued or In flight item, or one of the 50 newest Done items, at the helper's threshold is refused with the top three neighbours and the two overrides.
-  `--dup-of <kept-id>` appends the new title and body to that open item and files nothing.
-  `--not-dup <neighbour-id>` files the item and records which neighbour was judged different.
+  A title is compared with every Queued and In flight item and with the 50 newest Done items, in the backlog the add addresses.
+  Done items past the rows tasks-axi keeps are read from its markdown done archive, newest first.
+  The overlap of two titles is the number of words they share divided by the number of distinct words in either.
+  A word is a run of letters or digits at least three characters long, compared in lower case, with a short stop-word list removed.
+  Titles are compared on their first 80 characters, the length `tasks-axi list` keeps.
+  An overlap of 0.25 or more makes the other item a neighbour.
+  Three worked pairs, checked by the test suite:
+
+  | New title | Existing title | Shared / distinct words | Overlap | Verdict |
+  | --- | --- | --- | --- | --- |
+  | Lock holder crash recovery | Lock holder crash | 3 / 4 | 0.75 | refused |
+  | Lock timeout | Lock holder crash | 1 / 4 | 0.25 | refused (at the threshold) |
+  | Lock timeout retry loop | Lock holder crash | 1 / 6 | 0.17 | filed |
+
+  A refusal exits 2, files nothing, lists the three highest-overlap neighbours (id, state, overlap, title), and prints both overrides as full commands:
+  `--dup-of <kept-id>` appends the new title and body to that kept item in the active backlog and files nothing.
+  A neighbour that is only in the done archive cannot take an appended note, so `--dup-of` it is refused and `--not-dup` is the way through.
+  `--not-dup <neighbour-id>` files the item and records which neighbour was judged different; it accepts any neighbour that meets the threshold, listed or not, and nothing else.
+  Both overrides still need an objective.
   The check shows neighbours and forces a choice; it cannot decide whether two titles are the same work.
-  A title with too few significant words to judge, and an id that already exists, are never judged.
-  `tasks-axi list` cuts titles at 80 characters, so the comparison uses that many.
+  An unreadable backlog or done archive stops the add with a message and files nothing.
 - **Closing proofs.**
   `done <id> --duplicate-of <kept-id>` closes a duplicate once its title and body are appended to a Queued or In flight kept item.
-  `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered in `data/secondmates.md` that holds `<item-id>` open.
-  A home on another host cannot be read from here and is refused.
-  Both proofs refuse an item the owner filed, an item held for the captain, an item with a live task record, and a closed item.
-  The closing note records the proof, and `--pr`, `--report`, and `--drop-file` behave as before.
-- **Where the values live.**
-  `bin/fm-backlog-intake.py` defines the overlap threshold, the minimum words, the Done window, and the owner-filed pattern once, and its header documents them.
+  `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered exactly once in the `data/secondmates.md` of the operation's own data directory, when that home's own backlog, a different one from this, holds `<item-id>` open.
+  A local home is read through tasks-axi in its own data directory.
+  A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
+  Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, and a closed item, and each refusal names what to do next.
+  An item the owner filed quotes the owner or captain in a way [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) lists once, after the triage report's heuristic.
+  An open owner call is one [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `open` reports, and a call it cannot read counts as undecided.
+  The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.
 
 No flag or environment variable waives these checks.
-The Done window reads the rows beyond `done_keep` from the markdown archive when the home keeps one.
+A hold created by `bin/fm-captain-hold.sh hold` is outside the add checks, because that script calls tasks-axi directly.
 
 ### Which backlog receives a transition
 

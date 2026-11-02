@@ -543,12 +543,17 @@ def own_timeout(key, milliseconds, event_id=None):
     if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
         add = cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', filing_project(), '--body', body, '--objective', 'O7']
         result = subprocess.run(add, capture_output=True, text=True, env=env)
-        # The wrapper refuses a title that overlaps another item and prints a --not-dup override.
-        # This title carries the command key, so a neighbour under another key is different work.
-        override = re.search(r'--not-dup (\S+)', result.stderr) if result.returncode == 2 else None
-        if override:
-            result = subprocess.run(add + ['--not-dup', override.group(1)], capture_output=True, text=True, env=env)
-        if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
+        # The wrapper stops a title that overlaps another item and prints the neighbours.
+        # This title carries the command key, so the recurrence names the item it follows
+        # as judged different; any other neighbour is a different key's work and is named
+        # the same way. The wrapper records the choice with the new item.
+        if result.returncode == 2 and '--not-dup' in result.stderr:
+            listed = re.findall(r'^  (\S+) \(', result.stderr, re.M)
+            judged = previous if previous in listed else (listed[0] if listed else None)
+            if judged:
+                result = subprocess.run(add + ['--not-dup', judged], capture_output=True, text=True, env=env)
+        shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env)
+        if result.returncode and (shown.returncode or 'backlog-review.tsv' in result.stderr):
             raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
     with ledger() as (handle, rows):
         if not any(mine(r, key) and r.get('event') == 'filed' and r.get('task') == task for r in rows):
