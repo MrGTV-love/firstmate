@@ -7,7 +7,8 @@
 # Every routine firstmate backlog read or mutation goes through this command
 # rather than a bare `tasks-axi`; `fm-tasks-axi.sh <command> --help` prints
 # tasks-axi's own help. Accepted arguments reach tasks-axi as given except for
-# captain-drop completion below and file addressing: a relative
+# the intake flags and closing proofs, captain-drop completion below, and file
+# addressing: a relative
 # value of `--to` or any `--*-file` flag (`--body-file`, `--relation-file`, ...)
 # is made absolute against the caller's working directory, because tasks-axi
 # starts from the backlog root instead. `--report` stays as given: tasks-axi
@@ -65,7 +66,8 @@
 #   - `done`/`close` (with or without the optional `task` noun) of a ship or scout row
 #     without proof that its deliverable exists: a regular, nonsymlink,
 #     non-empty report for a scout, a GitHub pull request the forge reports
-#     merged for a ship, or --drop-file carrying the captain's own words.
+#     merged for a ship, --drop-file carrying the captain's own words, or a
+#     closing proof below, which stands in for a deliverable.
 #     The drop file must be regular and nonsymlink, contain non-whitespace
 #     words without NUL bytes, and be 1..8192 bytes; the exact words are retained
 #     at data/<id>/captain-drop.md and the row records only the fixed note

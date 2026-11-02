@@ -188,7 +188,10 @@ repository's name, else for firstmate; later events update the ledger without du
 When that item is done or gone and a timeout recurs, a new item naming the old
 one is filed. A self-imposed read wait that ended while its command continued is
 not a timeout and is never recorded as one. Filing failure
-remains retryable and is reported, never silently marked filed. Manual-backlog
+remains retryable and is reported, never silently marked filed. The item names
+objective O7. A duplicate-check refusal is a filing failure, unless it lists fewer
+than three neighbours and each is the previous item or another fm-timeout- item,
+and then the filing overrides it with --not-dup. Manual-backlog
 homes use compatible tasks-axi for this automated addition as well.
 
 check-literals compares bin/ against the merge-base with origin/main (main if

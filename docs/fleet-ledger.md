@@ -37,7 +37,7 @@ Readers must ignore members and events they do not recognize, so later versions 
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
 | `task.filed`       | `at`, `repo`, `kind`, `priority`               | `bin/fm-tasks-axi.sh add` or `bin/fm-captain-hold.sh hold` created a backlog item. |
-| `task.closed`      | `at`, `evidence`, `pr`                         | A task's backlog item moved to Done on proof of its deliverable, through `bin/fm-teardown.sh`, the next session start's replay of a close teardown recorded, `bin/fm-tasks-axi.sh done`, or `bin/fm-captain-hold.sh` closing a captain-held item that teardown had kept open. |
+| `task.closed`      | `at`, `evidence`, `pr`                         | A task's backlog item moved to Done on proof of its deliverable, or on a duplicate or moved proof, through `bin/fm-teardown.sh`, the next session start's replay of a close teardown recorded, `bin/fm-tasks-axi.sh done`, or `bin/fm-captain-hold.sh` closing a captain-held item that teardown had kept open. |
 | `task.answered`    | `at`, `via`, `key`, `answered_by`              | A decision or blocker was resolved: `fm-send.sh --resolve-key` closed it, or `fm-captain-hold.sh` recorded an answer or a reconciliation. |
 
 `task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote second mate; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.

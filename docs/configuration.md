@@ -493,7 +493,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   For `--moved-to`, a dependent with no hold is held with a reason naming the moved item, and a dependent already on a hold keeps that hold and needs only the unblock step.
   An item the owner filed quotes the owner or captain in a way [`bin/fm-backlog-intake.py`](../bin/fm-backlog-intake.py) lists once, after the triage report's heuristic.
   An open owner call is one [`bin/fm-captain-hold.sh`](../bin/fm-captain-hold.sh) `open` reports, and a call it cannot read counts as undecided.
-  The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.
+  The closing note records the proof, and the ledger records the close with evidence `none`.
 
 No flag or environment variable waives these checks.
 [`docs/guards/registry.json`](guards/registry.json) registers them as the `backlog-intake-*` and `backlog-close-*` guards.
@@ -1206,7 +1206,7 @@ Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tes
 
 ### Completion and discard
 
-Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+Ship and scout completion requires delivery evidence, the captain's own words, or a checked [duplicate or moved proof](#backlog-intake-and-closing-proofs), not merely a stopped worker or a pushed branch.
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
