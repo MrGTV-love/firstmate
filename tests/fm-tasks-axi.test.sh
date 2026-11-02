@@ -1391,6 +1391,23 @@ SH
   pass "an item whose objective row cannot be written is removed again and the add fails"
 }
 
+# A home without jq (a stub that always fails stands in for it) must still record
+# the objective of an item a --json add files.
+test_json_add_records_its_objective_without_jq() {
+  local dir fakebin out
+  dir=$(make_split objective-no-jq)
+  fakebin=$(fm_fakebin "$dir")
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/jq"
+  chmod +x "$fakebin/jq"
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add json-row "$(ftitle json-row)" --objective O2 --json 2>&1) \
+    || fail "a --json add without jq failed: $out"
+  assert_contains "$out" '"ok": true' "the --json add did not report success"
+  assert_grep "json-row" "$dir/home/data/backlog.md" "the --json add did not file the item"
+  assert_equals "$(printf 'json-row\t\tO2\t')" "$(cat "$dir/home/data/backlog-review.tsv")" \
+    "a --json add without jq filed an item with no objective row"
+  pass "a --json add on a home without jq still records the objective row"
+}
+
 # A fake non-Markdown adapter: tasks-axi answers from files under .stubdata when
 # the working directory's .tasks.toml names the beads backend, and is the real
 # tasks-axi anywhere else.
@@ -2210,6 +2227,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_add_requires_an_objective
   test_objective_rows_land_in_the_addressed_home
   test_failed_row_write_removes_the_filed_item
+  test_json_add_records_its_objective_without_jq
   test_add_judges_near_duplicate_titles
   test_duplicate_check_boundaries_and_unreadable_sources
   test_dup_of_and_not_dup_do_what_the_refusal_says

@@ -888,24 +888,42 @@ esac
 # ADDED_ID/REPO/KIND/PRIORITY and returns 0 only for a newly created item: an add
 # that found its id already present (`already`) or failed returns 1.
 added_fields() {  # <captured-stdout-file>
-  local out fields key value
+  local out fields key value json_status
   ADDED_ID=
   ADDED_REPO=
   ADDED_KIND=
   ADDED_PRIORITY=
   out=$(cat -- "$1") || return 1
-  if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
-    fields=$(printf '%s' "$out" | jq -r 'select(.ok == true and .action == "add" and (.already | not))
-      | .task | "id\t\(.id // "")", "repo\t\(.repo // "")", "kind\t\(.kind // "")", "priority\t\(.priority // "")"' 2>/dev/null) || return 1
-  else
-    fields=$(printf '%s\n' "$out" | awk '
-      /^ok: added / { added = 1; next }
-      added && /^  (id|kind|repo|priority): / {
-        key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
-        gsub(/^"|"$/, "", value); if (value == "-") value = ""
-        printf "%s\t%s\n", key, value
-      }') || return 1
-  fi
+  # JSON output is read with python3, which the intake checks already require,
+  # so a home without jq still records the objective of a --json add.
+  # Exit 3 means the output is not JSON and the text reader below takes over.
+  json_status=0
+  fields=$(printf '%s' "$out" | python3 -I -c '
+import json, sys
+try:
+    doc = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+if not (isinstance(doc, dict) and doc.get("ok") is True and doc.get("action") == "add" and not doc.get("already")):
+    sys.exit(0)
+task = doc.get("task") or {}
+for key in ("id", "repo", "kind", "priority"):
+    value = task.get(key)
+    print("%s\t%s" % (key, "" if value is None else value))
+' 2>/dev/null) || json_status=$?
+  case "$json_status" in
+    0) ;;
+    3)
+      fields=$(printf '%s\n' "$out" | awk '
+        /^ok: added / { added = 1; next }
+        added && /^  (id|kind|repo|priority): / {
+          key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
+          gsub(/^"|"$/, "", value); if (value == "-") value = ""
+          printf "%s\t%s\n", key, value
+        }') || return 1
+      ;;
+    *) return 1 ;;
+  esac
   while IFS=$'\t' read -r key value; do
     case "$key" in id) ADDED_ID=$value ;; repo) ADDED_REPO=$value ;; kind) ADDED_KIND=$value ;; priority) ADDED_PRIORITY=$value ;; esac
   done <<< "$fields"
