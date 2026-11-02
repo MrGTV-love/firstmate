@@ -1732,7 +1732,7 @@ command_hold() {
     hold_add=(add "$id" "$title" --kind captain --repo "$repo"
       --objective none --objective-reason "captain hold record: tracks a captain decision, not a work item")
     [ -z "$body" ] || hold_add+=(--body "$body")
-    add_err=$(BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    add_err=$(env BD_DUE_REQUIRED=false FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
       FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$SCRIPT_DIR/fm-tasks-axi.sh" "${hold_add[@]}" 2>&1 >/dev/null) || {
       [ -z "$add_err" ] || printf '%s\n' "$add_err" >&2
       case "$add_err" in

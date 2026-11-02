@@ -33,7 +33,7 @@ command -v tasks-axi >/dev/null 2>&1 && HAVE_TASKS_AXI=1
 # not about duplicate detection never meets the intake check.
 ftitle() {  # <key>
   local k
-  k=$(printf '%s' "$1" | tr -c 'a-zA-Z0-9' 'x' | tr 'A-Z' 'a-z')
+  k=$(printf '%s' "$1" | tr -c 'a-zA-Z0-9' 'x' | tr '[:upper:]' '[:lower:]')
   printf '%saaa %sbbb %sccc' "$k" "$k" "$k"
 }
 
@@ -1613,7 +1613,7 @@ SH
 }
 
 test_dup_of_and_not_dup_do_what_the_refusal_says() {
-  local dir out fakebin sub
+  local dir out fakebin
   dir=$(make_split override-dup)
   wrapper_from_code "$dir" add ov-kept "Teardown retire slot manifest" --objective O7 --body OLD-BODY-MARKER >/dev/null || fail "could not file the kept item"
   wrapper_from_code "$dir" add ov-done "Teardown retire slot manifest proof" --objective O7 --not-dup ov-kept >/dev/null
@@ -1814,7 +1814,7 @@ make_peer_home() {  # <path> <id|state>...
   empty_backlog "$path/data/backlog.md"
   for spec in "$@"; do
     tasks-axi add "${spec%%|*}" "$(ftitle "${spec%%|*}")" --file "$path/data/backlog.md" >/dev/null
-    [ "${spec##*|}" != done ] || tasks-axi done "${spec%%|*}" --file "$path/data/backlog.md" >/dev/null
+    [ "${spec##*|}" != "done" ] || tasks-axi "done" "${spec%%|*}" --file "$path/data/backlog.md" >/dev/null
   done
 }
 
@@ -1916,11 +1916,11 @@ test_moved_to_closes_on_checked_proof() {
   empty_backlog "$dir/alt/data/backlog.md"
   (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add alt-item "$(ftitle alt-item)" --objective O7 >/dev/null) \
     || fail "could not file the override root's item"
-  out=$(cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" done alt-item --moved-to sm-one mv-open 2>&1) \
+  out=$(cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" "done" alt-item --moved-to sm-one mv-open 2>&1) \
     && fail "a destination only a decoy registry holds was accepted"
   assert_contains "$out" "not one registered home" "the decoy registry was read for the override root"
   printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/alt/data/secondmates.md"
-  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" done alt-item --moved-to sm-one mv-open >/dev/null 2>&1) \
+  (cd "$dir/code" && FM_DATA_OVERRIDE="$dir/alt/data" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" "done" alt-item --moved-to sm-one mv-open >/dev/null 2>&1) \
     || fail "the override root's own registry route was refused"
   pass "fm-tasks-axi.sh closes a moved item on checked proof, local, remote, and adapter, from the source's own registry, and stops on every unproved case"
 }
