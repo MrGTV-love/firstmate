@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import socket
 import sqlite3
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -169,7 +170,7 @@ def finish(child, code=0):
     assert actual == code, (actual, code, records)
 
 
-SPACING_LIMIT = 5.0  # Allow scheduling delays while still detecting artificial spacing.
+SPACING_LIMIT = 1.5  # seconds: the median gap between consecutive grants; the handshake gives about 1.0, a 2 s injected delay gives 2 or more
 
 
 def grant_gaps(folder, names):
@@ -179,9 +180,13 @@ def grant_gaps(folder, names):
 
 
 def assert_no_spacing(folder, names):
-    """Reject artificial spacing: ready starts follow each other by the registration handshake only."""
+    """Reject artificial spacing: ready starts follow each other by the registration handshake only.
+
+    The median gap decides, so one gap stretched by scheduling noise cannot fail a correct burst,
+    while a delay on every launch moves the median itself.
+    """
     gaps = grant_gaps(folder, names)
-    assert max(gaps) < SPACING_LIMIT, ('artificial wait between grants', [round(gap, 2) for gap in gaps])
+    assert statistics.median(gaps) < SPACING_LIMIT, ('artificial wait between grants', [round(gap, 2) for gap in gaps])
     return gaps
 
 
@@ -355,11 +360,11 @@ try:
         (folder / (name + '.release')).touch()
         finish(clients[name])
 
-    # The check must reject spacing. The same burst shape with a 5-second delay injected before
+    # The check must reject spacing. The same burst shape with a 2-second delay injected before
     # each fake start registers (the admission lock is held across it) passes the earlier
     # assertions but fails assert_no_spacing; the undelayed burst above passed it.
     folder, db, env = case('spacing-injected', cores=3, measured=True, available=40 * GIB)
-    env['CASE_LAUNCH_DELAY'] = '5'
+    env['CASE_LAUNCH_DELAY'] = '2'
     names = ['slow-%d' % i for i in range(4)]
     clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names}
     for name in names:
@@ -374,8 +379,9 @@ try:
         assert_no_spacing(folder, names)
     except AssertionError as rejected:
         injected_rejection = str(rejected)
+        injected_gaps = grant_gaps(folder, names)
     else:
-        raise AssertionError('the injected 5-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
+        raise AssertionError('the injected 2-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
     for name in names:
         (folder / (name + '.release')).touch()
         finish(clients[name])
@@ -702,7 +708,7 @@ if name == 'outer':
     child = launch(duration + ['axi', 'run'], env, folder / 'reattach')
     finish(child)
     assert (folder / 'reattach.started').exists()
-    print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
+    print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:
     for file in root.glob('*/release-children'):
         file.touch()
