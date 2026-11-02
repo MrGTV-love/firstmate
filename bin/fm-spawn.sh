@@ -4845,7 +4845,7 @@ if [ "$KIND" = ship ]; then
   # never reaches this gate.
   if [ "$MODE" != local-only ]; then
     gate_rc=0
-    fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROJ_ABS" "$FM_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
+    fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROJ_ABS" "$FM_ROOT" "$UPSTREAM_CONSENT" "$MODE" || gate_rc=$?
     case $gate_rc in
     0 | 2) ;;
     *)

@@ -41,6 +41,32 @@ export FM_BACKEND=tmux
 # assumed: a checkout without an upstream/github/origin remote resolves to the
 # undeterminable path and the scope-bound cases adapt.
 PUB_TARGET=$(fm_role_publication_target "$ROOT")
+# A no-mistakes task publishes to origin alone, so the spawn cases that ship
+# mode=no-mistakes scope to that target.
+PUB_TARGET_NM=$(fm_role_publication_target "$ROOT" no-mistakes)
+
+# The no-mistakes gate also confirms the pipeline's own registration names the
+# same destination, read from <NM_HOME>/state.sqlite. This fixture registry
+# stands in for the operator's, so no case reads or writes the real one.
+export NM_HOME="$TMP_ROOT/nm-home"
+mkdir -p "$NM_HOME"
+python3 -I - "$NM_HOME/state.sqlite" <<'PY' || fail "could not create the fixture no-mistakes registry"
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.execute("CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL UNIQUE, upstream_url TEXT NOT NULL, fork_url TEXT)")
+con.commit()
+PY
+
+# nm_register <checkout> <upstream-url> - record a registration for <checkout>.
+nm_register() {
+  python3 -I - "$NM_HOME/state.sqlite" "$1" "$2" <<'PY' || fail "could not register $1 in the fixture registry"
+import sqlite3, sys, uuid
+con = sqlite3.connect(sys.argv[1])
+con.execute("INSERT OR REPLACE INTO repos (id, working_path, upstream_url) VALUES (?, ?, ?)", (uuid.uuid4().hex[:12], sys.argv[2], sys.argv[3]))
+con.commit()
+PY
+}
+[ -z "$(git -C "$ROOT" remote get-url origin 2>/dev/null)" ] || nm_register "$ROOT" "$(git -C "$ROOT" remote get-url origin)"
 ORIGIN_URL=$(git -C "$ROOT" remote get-url upstream 2>/dev/null) \
   || ORIGIN_URL=$(git -C "$ROOT" remote get-url github 2>/dev/null) \
   || ORIGIN_URL=$(git -C "$ROOT" remote get-url origin 2>/dev/null) \
@@ -538,12 +564,12 @@ fm_test_link_ts_runtime "$SPAWN_FAKEBIN"
 printf '#!/bin/sh\nexit 1\n' > "$SPAWN_FAKEBIN/tmux"
 chmod +x "$SPAWN_FAKEBIN/tmux"
 
-write_ship_brief() {  # <home> <id> [<contract-extras>]
-  local home=$1 id=$2 extras=${3:-}
+write_ship_brief() {  # <home> <id> [<contract-extras>] [<mode>]
+  local home=$1 id=$2 extras=${3:-} mode=${4:-no-mistakes}
   mkdir -p "$home/data/$id"
   {
     printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nExercise the role gate.\n\n## Firstmate spec\nVerify the boundary.\n\n# Definition of done\n'
-    printf 'Delivery contract: mode=no-mistakes%s\nShip branch: fm/%s\n' "$extras" "$id"
+    printf 'Delivery contract: mode=%s%s\nShip branch: fm/%s\n' "$mode" "$extras" "$id"
   } > "$home/data/$id/brief.md"
 }
 
@@ -568,8 +594,8 @@ test_spawn_gate_on_self_repo() {
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_absent "$home/state/spawn-self-a1.meta" "a refused spawn must write no task metadata"
 
-  if [ -n "$PUB_TARGET" ]; then
-    home=$(make_role_home spawn-maint "maintainer $PUB_TARGET")
+  if [ -n "$PUB_TARGET_NM" ]; then
+    home=$(make_role_home spawn-maint "maintainer $PUB_TARGET_NM")
     write_ship_brief "$home" spawn-self-a2
     out=$(run_spawn "$home" spawn-self-a2 "$ROOT" claude --mode no-mistakes --yolo off)
     assert_not_contains "$out" "spawn refused" "a matching maintainer home must pass the gate"
@@ -580,7 +606,7 @@ test_spawn_gate_on_self_repo() {
 
 test_spawn_consent_agreement() {
   local home out rc
-  [ -n "$PUB_TARGET" ] || {
+  [ -n "$PUB_TARGET_NM" ] || {
     printf '# skip - checkout has no upstream/github/origin remote to scope\n'
     return
   }
@@ -591,14 +617,14 @@ test_spawn_consent_agreement() {
   write_ship_brief "$home" spawn-consent-b1
   rc=0
   out=$(run_spawn "$home" spawn-consent-b1 "$ROOT" claude --mode no-mistakes --yolo off \
-    --upstream-consent "$PUB_TARGET") || rc=$?
+    --upstream-consent "$PUB_TARGET_NM") || rc=$?
   [ "$rc" -ne 0 ] || fail "a flag-without-brief consent must refuse"
   assert_contains "$out" "upstream-consent mismatch for spawn-consent-b1" \
     "a flag without a matching brief token must refuse"
   assert_absent "$home/state/spawn-consent-b1.meta" "a mismatched spawn must write no metadata"
 
   # Consent on the brief but not the flag: same divergence, other direction.
-  write_ship_brief "$home" spawn-consent-b2 " upstream-consent=$PUB_TARGET"
+  write_ship_brief "$home" spawn-consent-b2 " upstream-consent=$PUB_TARGET_NM"
   rc=0
   out=$(run_spawn "$home" spawn-consent-b2 "$ROOT" claude --mode no-mistakes --yolo off) || rc=$?
   [ "$rc" -ne 0 ] || fail "a brief-without-flag consent must refuse"
@@ -607,9 +633,9 @@ test_spawn_consent_agreement() {
 
   # Both sides agree: the consent carries the task through the gate on a
   # user/operator home.
-  write_ship_brief "$home" spawn-consent-b3 " upstream-consent=$PUB_TARGET"
+  write_ship_brief "$home" spawn-consent-b3 " upstream-consent=$PUB_TARGET_NM"
   out=$(run_spawn "$home" spawn-consent-b3 "$ROOT" claude --mode no-mistakes --yolo off \
-    --upstream-consent "$PUB_TARGET")
+    --upstream-consent "$PUB_TARGET_NM")
   assert_not_contains "$out" "spawn refused" "matching consent must pass the gate"
   assert_not_contains "$out" "upstream-consent mismatch" "agreeing sides must not be reported as a mismatch"
 
@@ -618,9 +644,9 @@ test_spawn_consent_agreement() {
   local proj="$TMP_ROOT/consent-foreign"
   git init -q "$proj" || fail "could not initialize foreign fixture"
   git -C "$proj" remote add origin https://github.com/someone/elseware.git
-  write_ship_brief "$home" spawn-consent-b4 " upstream-consent=$PUB_TARGET"
+  write_ship_brief "$home" spawn-consent-b4 " upstream-consent=$PUB_TARGET_NM"
   out=$(run_spawn "$home" spawn-consent-b4 "$proj" claude --mode no-mistakes --yolo off \
-    --upstream-consent "$PUB_TARGET")
+    --upstream-consent "$PUB_TARGET_NM")
   assert_not_contains "$out" "spawn refused" "consent on an ordinary project must not be gated"
 
   # Consent on local-only is refused before any gate: it names a publication
@@ -628,7 +654,7 @@ test_spawn_consent_agreement() {
   write_ship_brief "$home" spawn-consent-b5
   rc=0
   out=$(run_spawn "$home" spawn-consent-b5 "$ROOT" claude --mode local-only --yolo off \
-    --upstream-consent "$PUB_TARGET") || rc=$?
+    --upstream-consent "$PUB_TARGET_NM") || rc=$?
   [ "$rc" -ne 0 ] || fail "local-only must refuse a consent flag"
   assert_contains "$out" "meaningless on local-only" "local-only must refuse a consent flag"
   pass "fm-spawn.sh: consent must agree between flag and brief, and is refused on local-only"
@@ -679,6 +705,280 @@ test_secondmate_spawn_refuses_consent_flag() {
   pass "fm-spawn.sh: --upstream-consent is refused on secondmate charters"
 }
 
+# --- publication target follows the delivery mode ---------------------------
+
+# make_two_remote_project <name> <origin-url> <upstream-url> [<registered-url>]
+# - a fixture project sharing this checkout's history whose origin and upstream
+# remotes name two different repositories (no upstream remote when
+# <upstream-url> is empty). The no-mistakes registry records <registered-url>
+# for it, defaulting to origin; the word none leaves it unregistered. Echoes
+# its path. Fails the test when the checkout's history cannot seed a lineage
+# clone: a skipped fixture would hide the regression it guards.
+make_two_remote_project() {
+  local proj="$TMP_ROOT/$1"
+  git clone -q --shared --no-checkout "$ROOT" "$proj" 2>/dev/null || fail "could not clone $ROOT for fixture $1"
+  git -C "$proj" remote set-url origin "$2" 2>/dev/null || git -C "$proj" remote add origin "$2"
+  [ -z "${3:-}" ] || git -C "$proj" remote add upstream "$3"
+  fm_role_self_repo "$proj" "$ROOT" || fail "fixture $1 does not share this checkout's lineage (full history required)"
+  [ "${4:-}" = none ] || nm_register "$proj" "${4:-$2}"
+  printf '%s\n' "$proj"
+}
+
+TARGET_A=github.com/fixture-a/firstmate
+TARGET_B=github.com/fixture-b/firstmate
+URL_A=https://github.com/fixture-a/firstmate
+URL_B=https://github.com/fixture-b/firstmate
+
+# The reported publish-guard bug: a no-mistakes task opens its pull request
+# against origin, but the gate used to check the upstream remote instead. One
+# test per user-facing entry point so each reports its own result.
+test_nomistakes_origin_consent_passes_role_check() {
+  local proj home out rc
+  proj=$(make_two_remote_project two-remote-check "$URL_A" "$URL_B")
+  home=$(make_role_home nm-origin-check)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 0 "$rc" "consent for origin must authorize a no-mistakes task (got: $out)"
+  assert_equals "authorized: task consent for $TARGET_A" "$out" "the reported target must be the origin repository"
+  pass "fm-role.sh check: no-mistakes consent for origin passes and reports the origin repository"
+}
+
+test_nomistakes_origin_consent_passes_brief() {
+  local proj home out rc
+  proj=$(make_two_remote_project two-remote-brief "$URL_A" "$URL_B")
+  home=$(make_role_home nm-origin-brief-home)
+  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    "$BRIEF" nm-origin-brief some-proj --mode no-mistakes --project "$proj" \
+    --upstream-consent "$TARGET_A" 2>&1); rc=$?
+  expect_code 0 "$rc" "the brief scaffold must pass the gate for origin consent (got: $out)"
+  assert_grep "upstream-consent=$TARGET_A" "$home/data/nm-origin-brief/brief.md" \
+    "the scaffold must record the consent"
+  pass "fm-brief.sh: no-mistakes consent for origin passes the scaffold gate"
+}
+
+test_nomistakes_origin_consent_passes_spawn() {
+  local proj home out
+  proj=$(make_two_remote_project two-remote-spawn "$URL_A" "$URL_B")
+  home=$(make_role_home nm-origin-spawn-home)
+  write_ship_brief "$home" nm-origin-spawn " upstream-consent=$TARGET_A"
+  out=$(run_spawn "$home" nm-origin-spawn "$proj" claude --mode no-mistakes --yolo off \
+    --upstream-consent "$TARGET_A")
+  assert_not_contains "$out" "spawn refused" "the spawn gate must pass for origin consent (got: $out)"
+  assert_not_contains "$out" "no publication authority" "the spawn gate must not name a missing grant"
+  pass "fm-spawn.sh: no-mistakes consent for origin passes the launch gate"
+}
+
+test_nomistakes_origin_consent_passes_promote() {
+  local proj home out rc
+  proj=$(make_two_remote_project two-remote-promote "$URL_A" "$URL_B")
+  home=$(make_role_home nm-origin-promote-home)
+  mkdir -p "$home/data/nm-origin-promote"
+  printf 'project=%s\nkind=scout\nwindow=fm-nm-origin-promote\nworktree=/tmp/wt\n' "$proj" > "$home/state/nm-origin-promote.meta"
+  printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nInvestigate.\n\n## Firstmate spec\nReport.\n' \
+    > "$home/data/nm-origin-promote/brief.md"
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" \
+    "$PROMOTE" nm-origin-promote --mode no-mistakes --yolo off --upstream-consent "$TARGET_A" 2>&1); rc=$?
+  expect_code 0 "$rc" "promotion must pass the gate for origin consent (got: $out)"
+  assert_grep "upstream-consent=$TARGET_A" "$home/data/nm-origin-promote/ship-instructions.md" \
+    "the promoted instructions must record the consent"
+  pass "fm-promote.sh: no-mistakes consent for origin passes the promotion gate"
+}
+
+# Consent or a maintainer scope for any repository but the one origin names
+# must never carry a no-mistakes task, and the refusal names that repository.
+test_nomistakes_gate_refuses_what_origin_does_not_name() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-neg "$URL_A" "$URL_B")
+
+  home=$(make_role_home nm-neg-wrongconsent)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "consent for the upstream repository must not carry a no-mistakes task (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the refusal must name the origin repository"
+
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a user/operator home with no consent must be refused (got: $out)"
+  assert_contains "$out" "user/operator" "the refusal must name the role"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the refusal must name the origin repository"
+
+  home=$(make_role_home nm-neg-maint-b "maintainer $TARGET_B")
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a maintainer scope for the upstream repository must not carry a no-mistakes task (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the refusal must name the origin repository"
+
+  home=$(make_role_home nm-neg-maint-a "maintainer $TARGET_A")
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 0 "$rc" "a maintainer scope for the origin repository must authorize (got: $out)"
+  assert_equals "authorized: maintainer scope $TARGET_A" "$out" "the authority must name the origin scope"
+
+  # The same refusals come through the entry points that print the remedy.
+  home=$(make_role_home nm-neg-entry)
+  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    "$BRIEF" nm-neg-brief some-proj --mode no-mistakes --project "$proj" \
+    --upstream-consent "$TARGET_B" 2>&1); rc=$?
+  expect_code 1 "$rc" "the brief scaffold must refuse consent for the wrong repository (got: $out)"
+  assert_contains "$out" "--upstream-consent $TARGET_A" "the remedy must name the origin repository"
+  write_ship_brief "$home" nm-neg-spawn " upstream-consent=$TARGET_B"
+  out=$(run_spawn "$home" nm-neg-spawn "$proj" claude --mode no-mistakes --yolo off \
+    --upstream-consent "$TARGET_B"); rc=$?
+  [ "$rc" -ne 0 ] || fail "spawn must refuse consent for the wrong repository"
+  assert_contains "$out" "spawn refused for nm-neg-spawn" "the spawn refusal must name the task"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the spawn refusal must name the origin repository"
+  assert_absent "$home/state/nm-neg-spawn.meta" "a refused spawn must write no task metadata"
+  pass "no-mistakes gate: only the origin repository's grant authorizes, and refusals name it"
+}
+
+test_nomistakes_gate_refuses_unknown_destination() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-noorigin "$URL_A" "$URL_B")
+  git -C "$proj" remote remove origin
+  home=$(make_role_home nm-noorigin-user)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a no-mistakes task with no origin remote must be refused even under consent for upstream (got: $out)"
+  assert_contains "$out" "no publication target can be determined" "the refusal must name the missing destination"
+  assert_contains "$out" "origin remote" "the refusal must name the remote no-mistakes targets"
+
+  home=$(make_role_home nm-noorigin-maint "maintainer $TARGET_B")
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a maintainer scope must not authorize a no-mistakes task with no origin remote (got: $out)"
+
+  # The gh-based path still finds the upstream remote it always did.
+  out=$(run_role "$home" check "$proj" mode direct-PR); rc=$?
+  expect_code 0 "$rc" "direct-PR keeps resolving the upstream remote (got: $out)"
+  pass "no-mistakes gate: an unknown destination is refused"
+}
+
+# Delivery paths that publish through gh keep their resolution: upstream, then
+# github, then origin. A repo with one remote resolves the same for every mode.
+# These assertions hold identically on the base revision.
+test_gh_delivery_resolution_is_unchanged() {
+  local proj home out rc mode
+  proj=$(make_two_remote_project gh-two "$URL_A" "$URL_B")
+  home=$(make_role_home gh-user)
+  for mode in direct-PR ''; do
+    out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" ${mode:+mode "$mode"}); rc=$?
+    expect_code 1 "$rc" "consent for origin must not carry a gh-based task whose default is upstream (mode '${mode:-none}', got: $out)"
+    assert_contains "$out" "no publication authority for $TARGET_B" "the refusal must name the gh default repository"
+    out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" ${mode:+mode "$mode"}); rc=$?
+    expect_code 0 "$rc" "consent for the gh default must authorize (mode '${mode:-none}', got: $out)"
+    assert_equals "authorized: task consent for $TARGET_B" "$out" "the gh default must be the reported target"
+  done
+
+  git -C "$proj" remote add github https://github.com/fixture-c/firstmate
+  git -C "$proj" remote remove upstream
+  out=$(run_role "$home" check "$proj" upstream-consent github.com/fixture-c/firstmate mode direct-PR); rc=$?
+  expect_code 0 "$rc" "github still outranks origin for a gh-based task (got: $out)"
+
+  local solo
+  solo=$(make_two_remote_project origin-only "$URL_A" '')
+  for mode in no-mistakes direct-PR ''; do
+    out=$(run_role "$home" check "$solo" upstream-consent "$TARGET_A" ${mode:+mode "$mode"}); rc=$?
+    expect_code 0 "$rc" "an origin-only repository resolves to origin for mode '${mode:-none}' (got: $out)"
+    assert_equals "authorized: task consent for $TARGET_A" "$out" "the origin-only target must be origin"
+  done
+  pass "gh delivery keeps upstream, github, origin; an origin-only repo is mode-independent"
+}
+
+# The no-mistakes contrast: a github remote outranks origin only for gh-based
+# tasks, never for the pipeline that opens its pull request against origin.
+test_nomistakes_ignores_github_and_upstream_remotes() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-contrast "$URL_A" "$URL_B")
+  git -C "$proj" remote add github https://github.com/fixture-c/firstmate
+  home=$(make_role_home nm-contrast-user)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 0 "$rc" "origin consent must authorize a no-mistakes task beside github and upstream remotes (got: $out)"
+  out=$(run_role "$home" check "$proj" upstream-consent github.com/fixture-c/firstmate mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "consent for the github remote must not carry a no-mistakes task (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the refusal must name the origin repository"
+  pass "no-mistakes gate: github and upstream remotes never name the destination"
+}
+
+# The pipeline opens its pull request against its registered destination and
+# keeps the prior registration when its run-start refresh from origin fails, so
+# origin A with a registration B must not authorize a task consented for A.
+test_nomistakes_refuses_when_registration_disagrees_with_origin() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-reg-mismatch "$URL_A" "$URL_B" "$URL_B")
+  home=$(make_role_home nm-reg-mismatch-user)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "consent for origin must not carry a task whose registration names another repository (got: $out)"
+  assert_contains "$out" "origin names $TARGET_A" "the refusal must name origin"
+  assert_contains "$out" "registration for $proj publishes to $TARGET_B" "the refusal must name the registered destination"
+  assert_contains "$out" "no-mistakes init" "the refusal must name the repair"
+
+  home=$(make_role_home nm-reg-mismatch-maint "maintainer $TARGET_A")
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a maintainer scope for origin must not carry a task whose registration names another repository (got: $out)"
+
+  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    "$BRIEF" nm-reg-mismatch-brief some-proj --mode no-mistakes --project "$proj" \
+    --upstream-consent "$TARGET_A" 2>&1); rc=$?
+  expect_code 1 "$rc" "the brief scaffold must refuse a registration that disagrees with origin (got: $out)"
+  assert_contains "$out" "registration for $proj publishes to $TARGET_B" "the scaffold refusal must name the registered destination"
+  assert_absent "$home/data/nm-reg-mismatch-brief/brief.md" "a refused scaffold must write no brief"
+
+  write_ship_brief "$home" nm-reg-mismatch-spawn " upstream-consent=$TARGET_A"
+  out=$(run_spawn "$home" nm-reg-mismatch-spawn "$proj" claude --mode no-mistakes --yolo off \
+    --upstream-consent "$TARGET_A"); rc=$?
+  [ "$rc" -ne 0 ] || fail "spawn must refuse a registration that disagrees with origin"
+  assert_contains "$out" "spawn refused for nm-reg-mismatch-spawn" "the spawn refusal must name the task"
+  assert_absent "$home/state/nm-reg-mismatch-spawn.meta" "a refused spawn must write no task metadata"
+
+  # Agreement after re-registration passes again, and gh-based delivery never
+  # reads the registry, so the mismatch does not touch it.
+  nm_register "$proj" "$URL_A"
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 0 "$rc" "a registration that agrees with origin must authorize again (got: $out)"
+  nm_register "$proj" "$URL_B"
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode direct-PR); rc=$?
+  expect_code 0 "$rc" "gh-based delivery must not consult the no-mistakes registry (got: $out)"
+  pass "no-mistakes gate: origin A with registration B is refused, repair re-authorizes, gh delivery is unaffected"
+}
+
+test_nomistakes_refuses_unreadable_or_missing_registration() {
+  local proj home out rc
+  proj=$(make_two_remote_project nm-reg-missing "$URL_A" "$URL_B" none)
+  home=$(make_role_home nm-reg-missing-user)
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "an unregistered project must be refused (got: $out)"
+  assert_contains "$out" "has no registration for $proj" "the refusal must say the project is unregistered"
+  assert_contains "$out" "no-mistakes init" "the refusal must name the repair"
+
+  out=$(NM_HOME="$TMP_ROOT/nm-home-absent" run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "an absent registry must be refused (got: $out)"
+  assert_contains "$out" "cannot read the no-mistakes registration" "the refusal must say the registry cannot be read"
+
+  mkdir -p "$TMP_ROOT/nm-home-corrupt"
+  printf 'not a database\n' > "$TMP_ROOT/nm-home-corrupt/state.sqlite"
+  out=$(NM_HOME="$TMP_ROOT/nm-home-corrupt" run_role "$home" check "$proj" upstream-consent "$TARGET_A" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "a corrupt registry must be refused (got: $out)"
+  assert_contains "$out" "cannot read the no-mistakes registration" "the refusal must say the registry cannot be read"
+
+  # With no grant at all the role refusal comes first and still names origin.
+  out=$(run_role "$home" check "$proj" mode no-mistakes); rc=$?
+  expect_code 1 "$rc" "no grant must still be refused (got: $out)"
+  assert_contains "$out" "no publication authority for $TARGET_A" "the no-grant refusal must name the origin repository"
+
+  # gh-based delivery needs no registration.
+  out=$(run_role "$home" check "$proj" upstream-consent "$TARGET_B" mode direct-PR); rc=$?
+  expect_code 0 "$rc" "gh-based delivery must not need a registration (got: $out)"
+  pass "no-mistakes gate: a missing or unreadable registration is refused with a repair"
+}
+
+test_role_check_rejects_bad_mode_arguments() {
+  local home out rc
+  home=$(make_role_home check-badmode)
+  out=$(run_role "$home" check "$ROOT" mode merge-train); rc=$?
+  expect_code 1 "$rc" "an unknown delivery mode must be rejected (got: $out)"
+  assert_contains "$out" "mode must be no-mistakes or direct-PR" "the rejection must name the valid modes"
+  out=$(run_role "$home" check "$ROOT" mode); rc=$?
+  expect_code 1 "$rc" "a valueless mode argument must be rejected (got: $out)"
+  out=$(run_role "$home" check "$ROOT" bogus x); rc=$?
+  expect_code 1 "$rc" "an unknown check argument must be rejected (got: $out)"
+  assert_contains "$out" "usage:" "the rejection must print the usage"
+  pass "fm-role.sh check: mode and consent arguments are validated"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_report_default_and_local_grants
@@ -701,5 +1001,16 @@ test_spawn_gate_on_self_repo
 test_spawn_consent_agreement
 test_promote_gate_on_self_repo
 test_secondmate_spawn_refuses_consent_flag
+test_nomistakes_origin_consent_passes_role_check
+test_nomistakes_origin_consent_passes_brief
+test_nomistakes_origin_consent_passes_spawn
+test_nomistakes_origin_consent_passes_promote
+test_nomistakes_gate_refuses_what_origin_does_not_name
+test_nomistakes_gate_refuses_unknown_destination
+test_gh_delivery_resolution_is_unchanged
+test_nomistakes_ignores_github_and_upstream_remotes
+test_nomistakes_refuses_when_registration_disagrees_with_origin
+test_nomistakes_refuses_unreadable_or_missing_registration
+test_role_check_rejects_bad_mode_arguments
 
 echo "# all fm-self-repo-role tests passed"

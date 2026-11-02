@@ -3,7 +3,7 @@
 #
 # Usage:
 #   bin/fm-role.sh report
-#   bin/fm-role.sh check <project-dir> [upstream-consent <scope>]
+#   bin/fm-role.sh check <project-dir> [upstream-consent <scope>] [mode <mode>]
 #
 #   report   prints one line: fm-role: <user|maintainer> [<scope>] (<source>)
 #            and, when a malformed or unverified input forced a closed result,
@@ -18,7 +18,13 @@
 #            not, and exits 2 with "not a self-repository task" when the task
 #            project is not firstmate's own repository (the boundary does not
 #            apply). The optional `upstream-consent <scope>` argument is the
-#            recorded per-task consent a dispatcher captured.
+#            recorded per-task consent a dispatcher captured. The optional
+#            `mode <no-mistakes|direct-PR>` argument is the task's delivery mode: it
+#            selects the repository the gate checks (origin for no-mistakes,
+#            confirmed read-only against the no-mistakes registration for the
+#            project, which a disagreeing, missing or unreadable registry
+#            refuses; the first of upstream, github, origin for direct-PR and
+#            when no mode is given).
 #
 # bin/fm-role-lib.sh owns the schema summary and mechanics;
 # docs/configuration.md "Firstmate role" owns the operator-facing schema.
@@ -52,14 +58,35 @@ report)
 check)
   proj=${2:-}
   [ -n "$proj" ] || {
-    echo "usage: bin/fm-role.sh check <project-dir> [upstream-consent <scope>]" >&2
+    echo "usage: bin/fm-role.sh check <project-dir> [upstream-consent <scope>] [mode <mode>]" >&2
     exit 1
   }
   consent=
-  if [ "${3:-}" = upstream-consent ]; then
-    consent=${4:-}
-  fi
-  if fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$proj" "$FM_ROOT" "$consent"; then
+  mode=
+  shift 2
+  while [ "$#" -gt 0 ]; do
+    case $1 in
+    upstream-consent) consent=${2:-} ;;
+    mode) mode=${2:-} ;;
+    *)
+      echo "usage: bin/fm-role.sh check <project-dir> [upstream-consent <scope>] [mode <mode>]" >&2
+      exit 1
+      ;;
+    esac
+    [ "$#" -ge 2 ] || {
+      echo "error: $1 requires a value" >&2
+      exit 1
+    }
+    shift 2
+  done
+  case $mode in
+  '' | no-mistakes | direct-PR) ;;
+  *)
+    echo "error: mode must be no-mistakes or direct-PR (got '$mode')" >&2
+    exit 1
+    ;;
+  esac
+  if fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$proj" "$FM_ROOT" "$consent" "$mode"; then
     printf 'authorized: %s\n' "$FM_ROLE_PUB_AUTHORITY"
     exit 0
   else

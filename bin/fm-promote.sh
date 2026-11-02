@@ -252,7 +252,7 @@ fm_base_branch_valid "$BASE_BRANCH" "$MODE" "$FORGE" "fm-promote.sh $ID" || exit
 # greater upstream authority than the spawn path would grant.
 if [ "$MODE" != local-only ] && [ -n "$PROMOTE_PROJECT" ]; then
   gate_rc=0
-  fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROMOTE_PROJECT" "$FM_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
+  fm_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROMOTE_PROJECT" "$FM_ROOT" "$UPSTREAM_CONSENT" "$MODE" || gate_rc=$?
   case $gate_rc in
   0 | 2) ;;
   *)
