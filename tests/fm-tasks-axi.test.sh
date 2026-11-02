@@ -1731,6 +1731,135 @@ test_archived_blocked_by_rows_keep_their_title_score() {
   pass "an archived row's unparenthesized blocked-by tail is not scored as title words"
 }
 
+test_archived_merged_row_keeps_its_title_score() {
+  local dir out fakebin
+  dir=$(make_split archive-merged)
+  fakebin=$(fm_fakebin "$dir/fakebin")
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'api_response:\n  body: merged=true\n'
+SH
+  chmod +x "$fakebin/gh-axi"
+  wrapper_from_code "$dir" add am-one "$PAIR_BASE" --objective O7 --kind ship --repo p --priority 2 >/dev/null || fail "could not file the merged row"
+  out=$(cd "$dir/code" && PATH="$fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" \
+    "$WRAPPER" "done" am-one --pr https://github.com/o/r/pull/9 --keep 0 2>&1) || fail "could not close and prune the merged row: $out"
+  assert_no_grep "am-one" "$dir/home/data/backlog.md" "the merged row was not pruned"
+  assert_grep "(merged " "$dir/home/data/done-archive.md" "the archived row has no merged tail, so this fixture proves nothing"
+  assert_grep "(priority: 2)" "$dir/home/data/done-archive.md" "the archived row has no priority tail, so this fixture proves nothing"
+  out=$(refusal_of "$dir" "documented pair above the threshold" add am-new "$PAIR_ABOVE" --objective O7)
+  assert_contains "$out" "am-one (Done, archived, overlap 0.75) $PAIR_BASE" "a merged archived row was not scored on its title"
+  out=$(refusal_of "$dir" "documented pair at the threshold" add am-new "$PAIR_AT" --objective O7)
+  assert_contains "$out" "am-one (Done, archived, overlap 0.25) $PAIR_BASE" "a merged archived row missed the threshold"
+  printf '\n## Archived 2026-11-02\n- [x] am-held - Quartz harbor signal https://github.com/o/r/pull/10 (hold: a vendor reply) (hold-kind: external) (hold-until 2026-12-01) (priority: 1) (merged 2026-11-01) (repo: p) (kind: ship)\n' \
+    >> "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "held tails" add am-held-new "Quartz harbor signal mast" --objective O7)
+  assert_contains "$out" "am-held (Done, archived, overlap 0.75) Quartz harbor signal" "an archived row's hold tails were scored as title words"
+  pass "an archived row's merged, priority, and hold tails are not scored as title words"
+}
+
+test_intake_flags_refuse_empty_values_and_a_repeated_not_dup() {
+  local dir out flag before
+  dir=$(make_split intake-flag-values)
+  wrapper_from_code "$dir" add fv-one "Quartz harbor signal alpha" --objective O7 >/dev/null || fail "could not file the first neighbour"
+  wrapper_from_code "$dir" add fv-two "Quartz harbor signal beta" --objective O7 --not-dup fv-one >/dev/null || fail "could not file the second neighbour"
+  before=$(cat "$dir/home/data/backlog.md")
+  for flag in --not-dup --objective --objective-reason --dup-of; do
+    out=$(refusal_of "$dir" "empty $flag=" add fv-new "Quartz harbor signal gamma" --objective O7 "$flag=")
+    assert_contains "$out" "$flag requires a value" "an empty $flag= was accepted"
+    out=$(refusal_of "$dir" "option-like $flag=" add fv-new "Quartz harbor signal gamma" --objective O7 "$flag=-x")
+    assert_contains "$out" "$flag requires a value" "an option-like $flag= was accepted"
+  done
+  out=$(refusal_of "$dir" "repeated --not-dup" add fv-new "Quartz harbor signal gamma" --objective O7 --not-dup fv-one --not-dup fv-two)
+  assert_contains "$out" "--not-dup takes one neighbour id" "a repeated --not-dup was accepted"
+  out=$(refusal_of "$dir" "repeated --not-dup, = form" add fv-new "Quartz harbor signal gamma" --objective O7 --not-dup=fv-one --not-dup=fv-one)
+  assert_contains "$out" "--not-dup takes one neighbour id" "a repeated --not-dup= was accepted"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a refused flag value changed the backlog"
+  out=$(wrapper_from_code "$dir" add fv-new "Quartz harbor signal gamma" --objective=O7 --not-dup=fv-two 2>&1) || fail "the = forms with real values were stopped: $out"
+  assert_grep "fv-new" "$dir/home/data/backlog.md" "the = forms did not file the item"
+  pass "the intake flags refuse an empty or option-like value in the = form, and --not-dup can be given only once"
+}
+
+# How many records of <file> carry every <key>=<value> pair (JSON values as text).
+jsonl_count() {  # <file> <key>=<value>...
+  python3 - "$@" <<'PY'
+import json, sys
+wanted = [pair.split("=", 1) for pair in sys.argv[2:]]
+try:
+    lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    lines = []
+def text(value):
+    return json.dumps(value) if isinstance(value, bool) else str(value)
+print(sum(all(text(json.loads(line).get(k)) == v for k, v in wanted) for line in lines))
+PY
+}
+
+test_backlog_guards_log_each_refusal_and_escape() {
+  local dir out events friction
+  dir=$(make_split guard-logging)
+  events="$dir/home/state/guard-events.jsonl"
+  friction="$dir/home/state/friction.jsonl"
+  make_peer_home "$dir/sm1" gl-open
+  printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
+
+  out=$(refusal_of "$dir" "no objective" add gl-a "Quartz harbor signal alpha")
+  assert_contains "$out" "REFUSED: guard=backlog-intake-objective rule=objective-missing" "the objective refusal carries no envelope"
+  assert_contains "$out" "completing-command: " "the objective refusal names no completing command"
+  assert_contains "$out" "fm-tasks-axi: add needs the objective the item serves" "the envelope replaced the refusal text"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-objective decision=deny source_ok=true)" "the objective refusal wrote no deny event"
+  assert_equals 1 "$(jsonl_count "$friction" guard_id=backlog-intake-objective rule_id=objective-missing exit_kind=machine)" "the objective refusal wrote no friction record"
+
+  wrapper_from_code "$dir" add gl-a "Quartz harbor signal alpha" --objective O7 --kind docs >/dev/null || fail "could not file the first item"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-objective decision=allow)" "a passing objective wrote no allow event"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-duplicate decision=allow override=false)" "a title with no neighbour wrote no allow event"
+
+  out=$(refusal_of "$dir" "overlap" add gl-b "Quartz harbor signal beta" --objective O7)
+  assert_contains "$out" "REFUSED: guard=backlog-intake-duplicate rule=title-overlap" "the duplicate refusal carries no envelope"
+  assert_contains "$out" "human-only-exit: is this add the same work as gl-a?" "the duplicate refusal does not ask the question"
+  assert_contains "$out" "this title overlaps open or recently closed items" "the envelope replaced the duplicate refusal text"
+  assert_contains "$out" "--not-dup gl-a" "the envelope replaced the printed override"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-duplicate decision=deny)" "the duplicate refusal wrote no deny event"
+
+  out=$(refusal_of "$dir" "not-dup with no neighbour" add gl-b "Quartz harbor signal beta" --objective O7 --not-dup gl-nope)
+  assert_contains "$out" "fm-tasks-axi: --not-dup gl-nope names no item in this backlog" "the --not-dup refusal text changed"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-not-dup decision=deny)" "the --not-dup refusal wrote no deny event"
+  wrapper_from_code "$dir" add gl-b "Quartz harbor signal beta" --objective O7 --kind docs --not-dup gl-a >/dev/null || fail "--not-dup did not file"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-not-dup decision=allow)" "a passing --not-dup wrote no allow event"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-duplicate decision=allow override=true cleared_by=not-dup)" "the --not-dup escape was not logged as an override"
+
+  out=$(refusal_of "$dir" "dup-of nothing" add gl-c "Quartz harbor signal gamma" --objective O7 --dup-of gl-nope)
+  assert_contains "$out" "fm-tasks-axi: the kept item gl-nope does not exist in this backlog" "the --dup-of refusal text changed"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-dup-of decision=deny)" "the --dup-of refusal wrote no deny event"
+  wrapper_from_code "$dir" add gl-c "Quartz harbor signal gamma" --objective O7 --dup-of gl-a >/dev/null || fail "--dup-of did not append"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-dup-of decision=allow)" "a completed --dup-of wrote no allow event"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-duplicate decision=allow override=false cleared_by=dup-of)" "the --dup-of escape was not logged as agreeing with the guard"
+
+  out=$(refusal_of "$dir" "duplicate of nothing" "done" gl-b --duplicate-of gl-nope)
+  assert_contains "$out" "REFUSED: guard=backlog-close-duplicate-of rule=kept-missing" "the --duplicate-of refusal carries no envelope"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-close-duplicate-of decision=deny)" "the --duplicate-of refusal wrote no deny event"
+  out=$(refusal_of "$dir" "moved to nowhere" "done" gl-b --moved-to sm-nope gl-open)
+  assert_contains "$out" "REFUSED: guard=backlog-close-moved-to rule=home-not-registered" "the --moved-to refusal carries no envelope"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-close-moved-to decision=deny)" "the --moved-to refusal wrote no deny event"
+  wrapper_from_code "$dir" add gl-own "$(ftitle gl-own)" --objective O7 --kind docs --body "Owner 2026-11-01: keep this" >/dev/null || fail "could not file the owner item"
+  out=$(refusal_of "$dir" "owner item" "done" gl-own --duplicate-of gl-a)
+  assert_contains "$out" "REFUSED: guard=backlog-close-item-eligible rule=owner-filed" "the owner refusal carries no envelope"
+  assert_equals 1 "$(jsonl_count "$friction" guard_id=backlog-close-item-eligible rule_id=owner-filed exit_kind=human-only)" "the owner refusal is not recorded as human-only"
+
+  wrapper_from_code "$dir" "done" gl-b --duplicate-of gl-a >/dev/null || fail "a checked duplicate did not close"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-close-duplicate-of decision=allow)" "a completed duplicate close wrote no allow event"
+  wrapper_from_code "$dir" add gl-mov "$(ftitle gl-mov)" --objective O7 --kind docs >/dev/null || fail "could not file the moved item"
+  wrapper_from_code "$dir" "done" gl-mov --moved-to sm-one gl-open >/dev/null || fail "a checked move did not close"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-close-moved-to decision=allow)" "a completed moved close wrote no allow event"
+  assert_equals 2 "$(jsonl_count "$events" guard=backlog-close-item-eligible decision=allow)" "the shared closing checks did not log each pass"
+
+  mkdir "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "unreadable archive" add gl-d "$(ftitle gl-d)" --objective O7)
+  assert_contains "$out" "the duplicate check could not read" "an unreadable archive did not stop the add"
+  assert_not_contains "$out" "REFUSED:" "an unreadable source printed a policy envelope"
+  assert_equals 1 "$(jsonl_count "$events" guard=backlog-intake-duplicate decision=deny source_ok=false)" "an unreadable source was not logged as such"
+  pass "the intake and closing-proof guards log every refusal, pass, and escape, and keep their refusal text"
+}
+
 test_duplicate_of_closes_on_checked_proof() {
   local dir out before fakebin
   dir=$(make_split proof-dup)
@@ -2094,6 +2223,20 @@ test_closing_proofs_leave_the_owners_items_alone() {
   owner_marker_cases "$dir" mov "--moved-to" sm-one ow-open
   owner_call_cases "$dir" dup "--duplicate-of" ow-kept
   owner_call_cases "$dir" mov "--moved-to" sm-one ow-open
+  # The dated form, in the shape two live backlog items carry, through both proofs.
+  for id in fm-role-publish-target-binding fm-nm-protected-paths-policy; do
+    wrapper_from_code "$dir" add "$id" "$(ftitle "$id")" --objective O7 --kind docs --body "Owner 2026-11-01: this stays mine" >/dev/null \
+      || fail "could not file $id"
+    out=$(refusal_of "$dir" "$id via duplicate" "done" "$id" --duplicate-of ow-kept)
+    assert_contains "$out" "the owner's own item" "$id closed through --duplicate-of without the owner's words"
+    out=$(refusal_of "$dir" "$id via move" "done" "$id" --moved-to sm-one ow-open)
+    assert_contains "$out" "the owner's own item" "$id closed through --moved-to without the owner's words"
+    [ "$(row_state "$dir" "$id")" != x ] || fail "$id closed"
+  done
+  wrapper_from_code "$dir" add dated-captain "$(ftitle dated-captain)" --objective O7 --kind docs --body "Captain 2027-01-15: this stays mine" >/dev/null \
+    || fail "could not file dated-captain"
+  out=$(refusal_of "$dir" "dated captain" "done" dated-captain --duplicate-of ow-kept)
+  assert_contains "$out" "the owner's own item" "a dated Captain item in a later year closed without the owner's words"
   pass "both closing proofs stop at every owner-filed marker, open owner call, unreadable hold, and live task, and close an item that only mentions the owner"
 }
 
@@ -2233,6 +2376,9 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_dup_of_and_not_dup_do_what_the_refusal_says
   test_dup_of_repeat_needs_the_whole_block
   test_archived_blocked_by_rows_keep_their_title_score
+  test_archived_merged_row_keeps_its_title_score
+  test_intake_flags_refuse_empty_values_and_a_repeated_not_dup
+  test_backlog_guards_log_each_refusal_and_escape
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
   test_closing_proofs_keep_open_dependents_blocked

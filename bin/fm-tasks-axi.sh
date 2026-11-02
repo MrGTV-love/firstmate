@@ -76,7 +76,11 @@
 #   - `add`/`create` without an objective, or with a title that overlaps an
 #     open or recently closed item (see "Intake" below), or `done`/`close` with a
 #     closing proof the checks below stop. No flag or environment variable waives
-#     any of them.
+#     any of them. docs/guards/registry.json registers these guards (backlog-intake-*
+#     and backlog-close-*). Each policy refusal prints the bin/fm-refuse-lib.sh
+#     envelope above its message, and each decision writes one guard event on
+#     backlog-intake-duplicate: --dup-of agrees with that guard and records
+#     cleared_by dup-of, and --not-dup waives it and also records --override.
 #
 # Intake. Every `add` (and the `create` alias, with or without the `task` noun,
 # the title positional or `--title`, and `--mint`) must name the objective the
@@ -92,9 +96,10 @@
 # and the two overrides as full commands: `--dup-of <kept-id>` appends the new
 # title and body to that kept item in the active backlog through `tasks-axi
 # update --archive-body` and files nothing (an item that is only in the done
-# archive is refused with a pointer to `--not-dup`), and `--not-dup <id>`, which
-# must name a qualifying neighbour, files the item. An add is never its own
-# neighbour, and `--dup-of` its own id is refused. A backlog
+# archive is refused with a pointer to `--not-dup`), and `--not-dup <id>`, given
+# once and naming a qualifying neighbour, files the item. All four intake flags
+# refuse an empty or option-like value in split and = form alike. An add is never
+# its own neighbour, and `--dup-of` its own id is refused. A backlog
 # or done archive that cannot be read stops the add. bin/fm-backlog-intake.py
 # owns the overlap rule, the Done window, and the owner-filed pattern; the
 # objective list is docs/objectives.md; docs/configuration.md states the rule.
@@ -151,6 +156,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-hold-reason-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
+# shellcheck source=bin/fm-refuse-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-refuse-lib.sh"
 INTAKE_HELPER="$SCRIPT_DIR/fm-backlog-intake.py"
 OBJECTIVES_FILE="$SCRIPT_DIR/../docs/objectives.md"
 
@@ -165,6 +172,29 @@ usage() {
 fail() {
   printf 'fm-tasks-axi: %s\n' "$*" >&2
   exit 2
+}
+
+# One policy refusal of a backlog-intake-* or backlog-close-* guard: the guard
+# event and the fm_refuse envelope. With <message> it then fails with that message;
+# without one it returns, for a caller that prints a longer refusal itself.
+backlog_refuse() {  # <guard> <rule> <missing> <machine|human-only> <next-step> <subject> [<message>]
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$1" deny --source-ok true 2>/dev/null || true
+  FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-tasks-axi.sh}" \
+    fm_refuse "$1" "$2" "$3" "$4" "$5" backlog-item "$6"
+  [ "$#" -lt 7 ] || fail "$7"
+}
+
+# The guard's source cannot be read, so it fails closed. This is not a policy
+# judgment, so the event marks the source and no envelope is printed.
+backlog_source_stop() {  # <guard> <message>
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$1" deny --source-ok false 2>/dev/null || true
+  fail "$2"
+}
+
+backlog_guard_allow() {  # <guard> [<writer options>...]
+  local guard=$1
+  shift
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$guard" allow "$@" 2>/dev/null || true
 }
 
 case "${1:-}" in
@@ -420,18 +450,19 @@ guard_owner_items() {  # <id> <title> <body>
   local hold_env=(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA")
   [ -z "${FM_STATE_OVERRIDE:-}" ] || hold_env+=(FM_STATE_OVERRIDE="$FM_STATE_OVERRIDE")
   [ -z "${FM_CONFIG_OVERRIDE:-}" ] || hold_env+=(FM_CONFIG_OVERRIDE="$FM_CONFIG_OVERRIDE")
-  [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] || fail "$id is already closed"
+  [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
+    || backlog_refuse backlog-close-item-eligible item-closed "an open item to close" machine "bin/fm-tasks-axi.sh show $id" "$id" "$id is already closed"
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
-    || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
+    || backlog_refuse backlog-close-item-eligible live-task "an item with no live task record" machine "bin/fm-teardown.sh $id" "$id" "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
   env -u FM_ROOT_OVERRIDE "${hold_env[@]}" "$SCRIPT_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1
   hold_status=$?
   case "$hold_status" in
-    0) fail "$id is an open owner call; answer it with bin/fm-captain-hold.sh answer $id --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close $id" ;;
+    0) backlog_refuse backlog-close-item-eligible open-owner-call "the owner's answer to this call" human-only "what is the owner's answer to the call $id?" "$id" "$id is an open owner call; answer it with bin/fm-captain-hold.sh answer $id --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close $id" ;;
     1) ;;
-    *) fail "cannot tell whether $id is an open owner call, so it counts as undecided; run bin/fm-captain-hold.sh open $id and fix what it reports" ;;
+    *) backlog_source_stop backlog-close-item-eligible "cannot tell whether $id is an open owner call, so it counts as undecided; run bin/fm-captain-hold.sh open $id and fix what it reports" ;;
   esac
   if printf '%s\n%s\n' "$2" "$3" | intake_python owner-filed; then
-    fail "$id quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>"
+    backlog_refuse backlog-close-item-eligible owner-filed "the owner's words" human-only "does the owner close $id, and in what words?" "$id" "$id quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>"
   fi
 }
 
@@ -440,13 +471,13 @@ guard_owner_items() {  # <id> <title> <body>
 guard_open_dependents() {  # <id> <advice>
   local list dependents status
   list=$(fm_backlog_row_list "$DATA" --fields blocked_by) \
-    || fail "cannot read the backlog to find what $1 blocks, so nothing was closed: $(printf '%s\n' "$list" | sed -n '1p')"
+    || backlog_source_stop backlog-close-item-eligible "cannot read the backlog to find what $1 blocks, so nothing was closed: $(printf '%s\n' "$list" | sed -n '1p')"
   dependents=$(printf '%s\n' "$list" | intake_python dependents "$1")
   status=$?
   case "$status" in
-    0) fail "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. $2" ;;
+    0) backlog_refuse backlog-close-item-eligible open-dependents "no open item blocked by this one" machine "bin/fm-tasks-axi.sh unblock <dependent> --by $1" "$1" "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. $2" ;;
     1) ;;
-    *) fail "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
+    *) backlog_source_stop backlog-close-item-eligible "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
   esac
 }
 
@@ -460,23 +491,27 @@ guard_closing_proof() {
   { [ -z "$kept" ] || [ -z "$home_id$item" ]; } \
     || fail "give --duplicate-of or --moved-to, not both"
   shown=$(fm_backlog_row_show "$DATA" "$id" --full) \
-    || fail "cannot read $id: $(printf '%s\n' "$shown" | sed -n '1p')"
+    || backlog_source_stop backlog-close-item-eligible "cannot read $id: $(printf '%s\n' "$shown" | sed -n '1p')"
   title=$(printf '%s\n' "$shown" | intake_python field title) || title=
   body=$(printf '%s\n' "$shown" | intake_python field body) || body=
   guard_owner_items "$id" "$title" "$body"
   if [ -n "$kept" ]; then
     [[ "$kept" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$kept'"
-    [ "$kept" != "$id" ] || fail "an item cannot be a duplicate of itself"
+    [ "$kept" != "$id" ] \
+      || backlog_refuse backlog-close-duplicate-of kept-is-self "a kept item other than this one" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "an item cannot be a duplicate of itself"
     fm_backlog_row_probe "$DATA" "$kept" || {
-      [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && fail "the kept item $kept does not exist in this backlog"
-      fail "cannot read the kept item $kept: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
+      [ "$FM_BACKLOG_ROW_RESULT" = not_found ] \
+        && backlog_refuse backlog-close-duplicate-of kept-missing "a kept item in this backlog" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "the kept item $kept does not exist in this backlog"
+      backlog_source_stop backlog-close-duplicate-of "cannot read the kept item $kept: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
     }
     case "${FM_BACKLOG_ROW_STATE%% *}" in
       queued|in_flight) ;;
-      *) fail "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
+      *) backlog_refuse backlog-close-duplicate-of kept-not-open "a Queued or In flight kept item" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
     esac
     guard_open_dependents "$id" "Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by $kept, then bin/fm-tasks-axi.sh unblock <dependent> --by $id (the kept item $kept itself needs only the unblock step)."
+    backlog_guard_allow backlog-close-item-eligible
     append_to_kept "$kept" "duplicate $id" "$title" "$body"
+    backlog_guard_allow backlog-close-duplicate-of
     GUARD_ARGS=(--note "duplicate of $kept")
     LEDGER_CLOSE_ARGS=(--duplicate-of "$kept")
   else
@@ -485,35 +520,38 @@ guard_closing_proof() {
     # The registry is the one in this operation's own data directory, and the home
     # id must name exactly one record there.
     secondmate_registry_line_for_id "$DATA/secondmates.md" "$home_id" \
-      || fail "$home_id is not one registered home in $DATA/secondmates.md"
+      || backlog_refuse backlog-close-moved-to home-not-registered "one registered home" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is not one registered home in $DATA/secondmates.md"
     if [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ]; then
       remote_item_state "$home_id" "$item"
       case $? in
         0) dest_state=$REMOTE_ITEM_STATE ;;
-        1) fail "$home_id's backlog has no item $item" ;;
-        *) fail "cannot read $home_id's backlog, so nothing was closed: ${REMOTE_ITEM_ERROR:-unreachable remote}" ;;
+        1) backlog_refuse backlog-close-moved-to item-missing "the item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's backlog has no item $item" ;;
+        *) backlog_source_stop backlog-close-moved-to "cannot read $home_id's backlog, so nothing was closed: ${REMOTE_ITEM_ERROR:-unreachable remote}" ;;
       esac
     else
-      case "$SECONDMATE_REGISTRY_HOME" in /*) ;; *) fail "the registered home path for $home_id is not absolute" ;; esac
+      case "$SECONDMATE_REGISTRY_HOME" in /*) ;; *) backlog_source_stop backlog-close-moved-to "the registered home path for $home_id is not absolute" ;; esac
       home_data="$SECONDMATE_REGISTRY_HOME/data"
       if [ "$home_data" -ef "$DATA" ] || { [ -e "$home_data/backlog.md" ] && [ "$home_data/backlog.md" -ef "$DATA/backlog.md" ]; }; then
-        fail "$home_id is this backlog itself; a moved item must live in a different backlog"
+        backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is this backlog itself; a moved item must live in a different backlog"
       fi
       fm_backlog_row_probe "$home_data" "$item"
       probe_status=$?
       # The probe re-addressed the backlog to that home; point it back at this one.
       fm_backlog_tasks_axi_addressing "$DATA" || fail "${FM_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
       if [ "$probe_status" -ne 0 ]; then
-        [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && fail "$home_id's backlog has no item $item"
-        fail "cannot read $home_id's backlog, so nothing was closed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
+        [ "$FM_BACKLOG_ROW_RESULT" = not_found ] \
+          && backlog_refuse backlog-close-moved-to item-missing "the item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's backlog has no item $item"
+        backlog_source_stop backlog-close-moved-to "cannot read $home_id's backlog, so nothing was closed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
       fi
       dest_state=${FM_BACKLOG_ROW_STATE%% *}
     fi
     case "${dest_state%% *}" in
       queued|in_flight) ;;
-      *) fail "$home_id's item $item is not open (Queued or In flight); moved work must be open in the new home" ;;
+      *) backlog_refuse backlog-close-moved-to item-not-open "an open item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's item $item is not open (Queued or In flight); moved work must be open in the new home" ;;
     esac
     guard_open_dependents "$id" "Re-point each one first: for a dependent with no hold, bin/fm-tasks-axi.sh hold <dependent> --reason \"waits for $item in $home_id\" (a blocker cannot name an item in another backlog); then, for every dependent, bin/fm-tasks-axi.sh unblock <dependent> --by $id. A dependent already on a hold keeps that hold and needs only the unblock step, because a new hold replaces the old one and can erase an owner call."
+    backlog_guard_allow backlog-close-item-eligible
+    backlog_guard_allow backlog-close-moved-to
     GUARD_ARGS=(--note "moved to $home_id as $item")
     LEDGER_CLOSE_ARGS=(--moved-to "$home_id" "$item")
   fi
@@ -528,9 +566,23 @@ ADD_OBJECTIVE=
 ADD_REASON=
 ADD_DUP_OF=
 ADD_ID=
-ADD_NOT_DUP=()
+ADD_NOT_DUP=
 ADD_HELP=0
 ADD_NEIGHBOURS=
+set_intake_flag() {  # <flag> <value>
+  case "$2" in
+    ''|-*) fail "$1 requires a value; run tasks-axi directly for other grammar" ;;
+  esac
+  case "$1" in
+    --objective) ADD_OBJECTIVE=$2 ;;
+    --objective-reason) ADD_REASON=$2 ;;
+    --dup-of) ADD_DUP_OF=$2 ;;
+    --not-dup)
+      [ -z "$ADD_NOT_DUP" ] || fail "--not-dup takes one neighbour id; give it once"
+      ADD_NOT_DUP=$2
+      ;;
+  esac
+}
 parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
   local tokens=("$@") i=0 j token expect='' mint=0 body_file='' flag_title=''
   local positionals=() kept=()
@@ -540,17 +592,7 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
   for token in "${tokens[@]:$i}"; do
     if [ -n "$expect" ]; then
       case "$expect" in
-        --objective|--objective-reason|--dup-of|--not-dup)
-          case "$token" in
-            ''|-*) fail "$expect requires a value; run tasks-axi directly for other grammar" ;;
-          esac
-          case "$expect" in
-            --objective) ADD_OBJECTIVE=$token ;;
-            --objective-reason) ADD_REASON=$token ;;
-            --dup-of) ADD_DUP_OF=$token ;;
-            --not-dup) ADD_NOT_DUP+=("$token") ;;
-          esac
-          ;;
+        --objective|--objective-reason|--dup-of|--not-dup) set_intake_flag "$expect" "$token" ;;
         *)
           kept+=("$token")
           case "$expect" in --body) ADD_BODY=$token ;; --body-file) body_file=$token ;; --title) flag_title=$token ;; esac
@@ -562,10 +604,7 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
     case "$token" in
       --help|-h) ADD_HELP=1; kept+=("$token") ;;
       --objective|--objective-reason|--dup-of|--not-dup) expect=$token ;;
-      --objective=*) ADD_OBJECTIVE=${token#*=} ;;
-      --objective-reason=*) ADD_REASON=${token#*=} ;;
-      --dup-of=*) ADD_DUP_OF=${token#*=} ;;
-      --not-dup=*) ADD_NOT_DUP+=("${token#*=}") ;;
+      --objective=*|--objective-reason=*|--dup-of=*|--not-dup=*) set_intake_flag "${token%%=*}" "${token#*=}" ;;
       --kind|--repo|--body|--body-file|--title|--blocked-by|--pr|--report|--priority|--prefix)
         kept+=("$token"); expect=$token ;;
       --body=*) ADD_BODY=${token#*=}; kept+=("$token") ;;
@@ -624,48 +663,52 @@ state_label() {  # <state> <source>
 }
 
 guard_intake() {
-  local list valid id state score source ntitle neighbour_ids='' keep_line='' status top='' matched=1 shown_count=0 known=0
+  local list valid id state score source ntitle neighbour_ids='' keep_line='' status top='' shown_count=0 known=0
+  local subject=${ADD_ID:-new-item} add_step='bin/fm-tasks-axi.sh add <id> <title>'
   [ "$ADD_HELP" = 0 ] || return 0
   valid=$(intake_python objectives "$OBJECTIVES_FILE") \
-    || fail "cannot read the objective list $OBJECTIVES_FILE"
+    || backlog_source_stop backlog-intake-objective "cannot read the objective list $OBJECTIVES_FILE"
   valid=$(printf '%s' "$valid" | tr '\n' ' ')
   if [ -z "$ADD_OBJECTIVE" ]; then
-    fail "add needs the objective the item serves: --objective <id> with one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why no objective applies>\""
+    backlog_refuse backlog-intake-objective objective-missing "an objective" machine "$add_step --objective <objective-id>" "$subject" "add needs the objective the item serves: --objective <id> with one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why no objective applies>\""
   fi
   if [ "$ADD_OBJECTIVE" = none ]; then
     [[ "$ADD_REASON" =~ [^[:space:]] ]] \
-      || fail "--objective none needs --objective-reason \"<why no objective applies>\""
+      || backlog_refuse backlog-intake-objective reason-missing "a reason for no objective" machine "$add_step --objective none --objective-reason <why>" "$subject" "--objective none needs --objective-reason \"<why no objective applies>\""
   else
     for id in $valid; do
       [ "$id" != "$ADD_OBJECTIVE" ] || known=1
     done
     [ "$known" = 1 ] \
-      || fail "unknown objective '$ADD_OBJECTIVE'; use one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why>\""
+      || backlog_refuse backlog-intake-objective objective-unknown "an objective docs/objectives.md lists" machine "$add_step --objective <objective-id>" "$subject" "unknown objective '$ADD_OBJECTIVE'; use one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why>\""
   fi
-  if [ -n "$ADD_DUP_OF" ] && [ "${#ADD_NOT_DUP[@]}" -gt 0 ]; then
+  backlog_guard_allow backlog-intake-objective
+  if [ -n "$ADD_DUP_OF" ] && [ -n "$ADD_NOT_DUP" ]; then
     fail "give --dup-of or --not-dup, not both"
   fi
   if [ -n "$ADD_DUP_OF" ] && [ "$ADD_DUP_OF" = "$ADD_ID" ]; then
-    fail "--dup-of names this add's own id $ADD_ID; an item cannot be a duplicate of itself, so nothing was filed or appended"
+    backlog_refuse backlog-intake-dup-of kept-is-self "a kept item other than this add" machine "$add_step --objective <objective-id> --dup-of <kept-id>" "$subject" "--dup-of names this add's own id $ADD_ID; an item cannot be a duplicate of itself, so nothing was filed or appended"
   fi
   [ -n "$ADD_TITLE" ] || return 0
   list=$(fm_backlog_row_list "$DATA") \
-    || fail "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
+    || backlog_source_stop backlog-intake-duplicate "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
   ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(intake_archive)" "$ADD_ID")
   status=$?
   case "$status" in
     0|1) ;;
-    *) fail "the duplicate check could not read the backlog or its done archive, so nothing was filed; fix what is named above, then file the item again" ;;
+    *) backlog_source_stop backlog-intake-duplicate "the duplicate check could not read the backlog or its done archive, so nothing was filed; fix what is named above, then file the item again" ;;
   esac
   if [ -n "$ADD_DUP_OF" ]; then
     [[ "$ADD_DUP_OF" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$ADD_DUP_OF'"
     if ! printf '%s\n' "$list" | intake_python exists "$ADD_DUP_OF"; then
       if intake_python archived "$(intake_archive)" "$ADD_DUP_OF"; then
-        fail "the kept item $ADD_DUP_OF is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup $ADD_DUP_OF"
+        backlog_refuse backlog-intake-dup-of kept-archived "a kept item in the active backlog" machine "$add_step --objective <objective-id> --not-dup $ADD_DUP_OF" "$subject" "the kept item $ADD_DUP_OF is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup $ADD_DUP_OF"
       fi
-      fail "the kept item $ADD_DUP_OF does not exist in this backlog"
+      backlog_refuse backlog-intake-dup-of kept-missing "a kept item in this backlog" machine "$add_step --objective <objective-id> --dup-of <kept-id>" "$subject" "the kept item $ADD_DUP_OF does not exist in this backlog"
     fi
     append_to_kept "$ADD_DUP_OF" "a duplicate filing" "$ADD_TITLE" "$ADD_BODY"
+    backlog_guard_allow backlog-intake-dup-of
+    backlog_guard_allow backlog-intake-duplicate --cleared-by dup-of
     printf 'ok: merged into %s (nothing filed)\n' "$ADD_DUP_OF"
     exit 0
   fi
@@ -674,29 +717,27 @@ guard_intake() {
   done <<NEIGHBOURS
 $ADD_NEIGHBOURS
 NEIGHBOURS
-  if [ "${#ADD_NOT_DUP[@]}" -gt 0 ]; then
-    for id in "${ADD_NOT_DUP[@]}"; do
-      case "$neighbour_ids" in
-        *" $id "*) ;;
-        *)
-          if printf '%s\n' "$list" | intake_python exists "$id" || intake_python archived "$(intake_archive)" "$id"; then
-            printf 'fm-tasks-axi: --not-dup %s names an item whose title does not overlap this one enough to be a neighbour; nothing was filed\n' "$id" >&2
-          else
-            printf 'fm-tasks-axi: --not-dup %s names no item in this backlog; nothing was filed\n' "$id" >&2
-          fi
-          matched=0
-          break
-          ;;
-      esac
-    done
-    [ "$matched" = 0 ] && exit 2
+  if [ -n "$ADD_NOT_DUP" ]; then
+    case "$neighbour_ids" in
+      *" $ADD_NOT_DUP "*) ;;
+      *)
+        if printf '%s\n' "$list" | intake_python exists "$ADD_NOT_DUP" || intake_python archived "$(intake_archive)" "$ADD_NOT_DUP"; then
+          backlog_refuse backlog-intake-not-dup not-a-neighbour "a neighbour of this title" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names an item whose title does not overlap this one enough to be a neighbour; nothing was filed"
+        fi
+        backlog_refuse backlog-intake-not-dup item-missing "an item in this backlog" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names no item in this backlog; nothing was filed"
+        ;;
+    esac
     intake_sidecar_ready
+    backlog_guard_allow backlog-intake-not-dup
+    backlog_guard_allow backlog-intake-duplicate --override --cleared-by not-dup
     return 0
   fi
   if [ -z "$ADD_NEIGHBOURS" ]; then
     intake_sidecar_ready
+    backlog_guard_allow backlog-intake-duplicate
     return 0
   fi
+  backlog_refuse backlog-intake-duplicate title-overlap "a judgment of the listed neighbours" human-only "is this add the same work as ${ADD_NEIGHBOURS%%$'\t'*}?" "$subject"
   {
     printf 'fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:\n'
     while IFS=$'\t' read -r id state score source ntitle; do
@@ -754,7 +795,8 @@ guard_completion() {
   [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
     if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-      [ -z "$TASK_DUP_OF$TASK_MOVED_HOME$TASK_MOVED_ITEM" ] || fail "no item $id in this backlog to close"
+      [ -z "$TASK_DUP_OF$TASK_MOVED_HOME$TASK_MOVED_ITEM" ] \
+        || backlog_refuse backlog-close-item-eligible item-missing "an item in this backlog" machine "bin/fm-tasks-axi.sh list" "$id" "no item $id in this backlog to close"
       return 0
     fi
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"

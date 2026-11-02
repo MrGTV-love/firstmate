@@ -477,6 +477,7 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   `--dup-of <kept-id>` appends the new title and body to that kept item in the active backlog and files nothing.
   A neighbour that is only in the done archive cannot take an appended note, so `--dup-of` it is refused and `--not-dup` is the way through.
   `--not-dup <neighbour-id>` files the item; it accepts any neighbour that meets the threshold, listed or not, and nothing else.
+  `--not-dup` takes one id, so a repeat is refused, and all four intake flags refuse an empty or option-like value in both the split and the `=` form.
   An add is never its own neighbour, and `--dup-of` naming the add's own id is refused.
   Both overrides still need an objective.
   The check shows neighbours and forces a choice; it cannot decide whether two titles are the same work.
@@ -495,6 +496,11 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   The closing note records the proof, the ledger records the close with evidence `none`, and `--pr`, `--report`, and `--drop-file` behave as before.
 
 No flag or environment variable waives these checks.
+[`docs/guards/registry.json`](guards/registry.json) registers them as the `backlog-intake-*` and `backlog-close-*` guards.
+A policy refusal prints the [refusal envelope](../bin/fm-refuse-lib.sh) above its message and records one refusal in `state/friction.jsonl`.
+Each decision writes one event to `state/guard-events.jsonl`, and a source that cannot be read writes a deny with `source_ok` false.
+A `--not-dup` escape writes an allow with `override` true on `backlog-intake-duplicate`, so the metrics show when that guard is often waived.
+A `--dup-of` escape agrees that the guard found a duplicate, so it writes an allow with `cleared_by` `dup-of` and `override` false.
 A hold created by `bin/fm-captain-hold.sh hold` files through `bin/fm-tasks-axi.sh add` with `--objective none --objective-reason "captain hold record: tracks a captain decision, not a work item"`, so its objective row is recorded and the duplicate check applies; a duplicate refusal stops the hold and prints the neighbours.
 The refused hold then says not to use the printed `--dup-of` command, which would append the captain call to a work item, file nothing, and record no hold; to file it anyway, run the printed `--not-dup` command naming the neighbour you checked, prefixed with `BD_DUE_REQUIRED=false` because a captain call has no due date, then run the same hold command again.
 This applies to the teardown recovery commands, whose `Land or drop the bundle-preserved commits of <id>` titles overlap one another, and to calls filed through the `bin/fm-decision-hold.sh` shim.
