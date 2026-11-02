@@ -160,7 +160,8 @@ A docstring is a triple-quoted string that opens a block, as the first statement
 - `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
   The marker is a site even inside a heredoc body or a Python triple-quoted string.
   A marker in a shell `case` pattern or in the address argument of a `sed` command tests a value and is not a site.
-  A line is a `case` pattern only when it starts an arm of an open `case ... in` block that the scan tracks, directly after the `in` line or a `;;` or `;&` terminator, so a literal that closes a backslash continuation or a multi-line command stays a site.
+  A line is a `case` pattern only when it starts an arm of an open `case ... in` block that the scan tracks, as the next code line after the `in` line or a `;;` or `;&` terminator, so a literal that closes a backslash continuation or a multi-line command stays a site.
+  A marker in the literal `help=` argument of an argparse `add_argument` call documents an option and is not a site.
 - `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word that is not part of a variable name or path.
   A string compared with `==` or `!=`, passed to `startswith` or `endswith`, used as a shell `case` pattern, or given as the address argument of a command whose command word is `sed`, tests a value and is not a message.
   The literal `help=` argument of an argparse `add_argument` call documents an option and is not a message.
@@ -279,7 +280,6 @@ Heartbeat detection must be read-only and flag:
 
 ### Lint
 
-The site-level remedy check must require the printed refusal to carry an executable next step.
 Shrink the S1 allowlist by registering families in batches.
 The refusal-site scanner must detect exit-code-only credential denials; the current scanner limits are described under [Refusal sites](#refusal-sites).
 
