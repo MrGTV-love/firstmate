@@ -135,7 +135,11 @@
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six
-# hours in case the cause cleared. The hourly `treehouse prune --all --yes`
+# hours in case the cause cleared, except a copy that Vernant's closeout driver
+# retained after archiving its ignored files: each try would write another
+# archive, so teardown does not run again while the copy is unchanged
+# (bin/fm-idle-reap-lib.sh, fm_closeout_retained_stands, owns the record that
+# bin/fm-idle-session-reap.sh shares, and the one wake). The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
 # A teardown that succeeds and returns the slot to the pool leaves it reset in
@@ -359,6 +363,7 @@ run_teardown() {
   TD_RC=0
   TD_OUT=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 FM_IDLE_REAP_MERGE_PRUNE=1 \
     fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
+  [ "$TD_RC" -ne 0 ] || fm_closeout_retained_clear "$STATE" "$ID"
 }
 
 # The outcome of a pruned copy: one log line and no wake.
@@ -417,6 +422,16 @@ retain() {  # <copy> <reason>
   rec_save "$ID" || true
   if [ "$changed" = 1 ]; then
     log_line "retained $copy: $reason"
+  fi
+}
+
+# A copy the closeout driver retained is kept with one wake across both sweeps:
+# the shared record, not R_WAKE, says whether this fingerprint's wake was sent.
+retain_closeout() {  # <copy> <wake-sent: 0|1, from the record>
+  R_WAKE=$2
+  retain "$1" "$(fm_closeout_retained_reason)"
+  if [ "$2" = 0 ] && [ "$R_WAKE" = 1 ]; then
+    fm_closeout_retained_mark_wake "$STATE" "$ID" || true
   fi
 }
 
@@ -840,6 +855,10 @@ attempt() {
   fi
   FM_MP_TASK_BRANCH=$R_BRANCH
   prove_nested_first || return 0
+  if fm_closeout_retained_stands "$STATE" "$ID" "$wt"; then
+    retain_closeout "$wt" "$CLOSEOUT_RETAINED_WAKE"
+    return 0
+  fi
   run_teardown
   if [ "$TD_RC" -eq 0 ]; then
     settle_copy "$wt" "$project" "teardown completed"
@@ -863,6 +882,10 @@ attempt() {
   [ -n "$reason" ] || reason="exit status $TD_RC"
   if [ "$TD_RC" -ne 1 ]; then
     retain "$(fm_meta_get "$META" worktree)" "teardown exit $TD_RC: $reason"
+    return 0
+  fi
+  if fm_closeout_retained_record "$STATE" "$ID" "$wt" "$TD_OUT"; then
+    retain_closeout "$wt" 0
     return 0
   fi
   if transient_refusal "$TD_OUT"; then

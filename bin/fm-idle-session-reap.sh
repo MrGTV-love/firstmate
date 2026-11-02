@@ -57,7 +57,12 @@
 # A teardown refusal is reported, not bypassed.
 # The refusal reason is recorded in state/.idle-reap/<id>.refused together with
 # the status line it was made against, and the task is not offered to teardown
-# again until its newest status line changes or six hours pass.
+# again until its newest status line changes or six hours pass. The exception is
+# a copy that Vernant's closeout driver retained after archiving its ignored
+# files: another try would only write another archive, so the task is held,
+# with one wake, until the copy's HEAD or status changes
+# (bin/fm-idle-reap-lib.sh, fm_closeout_retained_stands, owns the record that
+# bin/fm-merge-prune.sh shares).
 # A refusal because the other supervision actor holds the task's lease
 # (FM_LEASE_REFUSE_EXIT) is transient and records nothing. So is the
 # teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): before it
@@ -163,6 +168,11 @@ prune_refusals() {
     id=${id%.refused}
     [ -e "$STATE/$id.meta" ] || rm -f -- "$memo"
   done
+  for memo in "$STATE/.closeout-retained"/*; do
+    [ -e "$memo" ] || continue
+    id=${memo##*/}
+    [ -e "$STATE/$id.meta" ] || fm_closeout_retained_clear "$STATE" "$id"
+  done
 }
 
 ROWS=()
@@ -183,10 +193,14 @@ replace_reap_row() {  # <task-id>
 
 REAP_READY=()
 REAP_READY_LINES=()
+CLOSEOUT_HELD=()
 
 classify_task() {
   fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$1"
   add_row "$IDLE_REAP_CLASS" "$1" "$IDLE_REAP_KIND" "$IDLE_REAP_AGE" "$IDLE_REAP_DETAIL"
+  if [ "$IDLE_REAP_CLASS" = refused ] && [ "$IDLE_REAP_HELD" = closeout ]; then
+    CLOSEOUT_HELD+=("$1")
+  fi
   if [ "$IDLE_REAP_CLASS" = reap ]; then
     REAP_READY+=("$1")
     REAP_READY_LINES+=("$IDLE_REAP_LAST")
@@ -198,6 +212,7 @@ scan_all() {
   ROWS=()
   REAP_READY=()
   REAP_READY_LINES=()
+  CLOSEOUT_HELD=()
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
     id=${meta##*/}
@@ -244,6 +259,16 @@ $1
 EOF
 }
 
+# The one wake of a task whose copy the closeout driver retained; the record
+# marks it sent only once the queue took it, so a failed append is raised again
+# by the next sweep.
+raise_closeout_wake() {  # <task-id>
+  local wt
+  wt=$(fm_meta_get "$STATE/$1.meta" worktree)
+  fm_closeout_retained_wake "$STATE" "$1" "idle-reap:$1" \
+    "check: idle-reap kept $wt for $1: $(fm_closeout_retained_reason)" || true
+}
+
 reap_one() {  # <task-id> <status-line>
   local id=$1 last=$2 out rc=0 reason
   replace_reap_row "$id"
@@ -251,6 +276,7 @@ reap_one() {  # <task-id> <status-line>
     fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$id" </dev/null 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f -- "$REAP_DIR/$id.refused"
+    fm_closeout_retained_clear "$STATE" "$id"
     add_row reaped "$id" - - "teardown completed"
     return 0
   fi
@@ -275,6 +301,9 @@ reap_one() {  # <task-id> <status-line>
     add_row teardown-timeout "$id" - - "teardown made no output or CPU progress for ${TEARDOWN_STALL_SECS}s"
   else
     add_row teardown-refused "$id" - - "$reason"
+    if fm_closeout_retained_record "$STATE" "$id" "$(fm_meta_get "$STATE/$id.meta" worktree)" "$out"; then
+      raise_closeout_wake "$id"
+    fi
   fi
   record_refusal "$id" "$last" "$reason"
 }
@@ -292,6 +321,9 @@ cmd_reap() {
   trap 'fm_lock_release "$LOCK"' EXIT
   prune_refusals
   scan_all
+  for i in ${CLOSEOUT_HELD[@]+"${CLOSEOUT_HELD[@]}"}; do
+    raise_closeout_wake "$i"
+  done
   if [ "${#REAP_READY[@]}" -gt 0 ]; then
     for i in "${!REAP_READY[@]}"; do
       [ "$started" -lt 3 ] || break
