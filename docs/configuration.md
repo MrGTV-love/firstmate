@@ -770,9 +770,15 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
 Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
-These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
-When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except two named shapes.
+First, when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
+Second, the prune counts these exact paths under `data/` and `state/` as scratch, although teardown preserves them: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
+Firstmate's own tooling writes these during ordinary runs.
+The match is by exact path, never by name.
+In a `data/`, `state/`, or `state/extensions/` that the project ignores as a whole, a scratch name such as `node_modules` is not scratch there, and any other file is unique work, so the copy stays.
+Under a tracked `data/` or `state/`, any other ignored entry outside such a directory is judged like one anywhere else.
+A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
@@ -804,7 +810,7 @@ The ordinary finished-session sweep keeps its classification unchanged.
 No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
 A proof read that fails never counts as finding nothing.
-That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude`, `.tac`, `data`, or `state` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
 A process table (`ps`) or open-file listing (`lsof`) that fails also counts as a failed read when it printed rows or process ids first, because the process it did not list may be the one that is alive: the copy stays and the prune retries.
 
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails, including the removal of a copy that teardown returned.

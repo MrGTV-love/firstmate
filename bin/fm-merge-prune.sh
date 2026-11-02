@@ -76,8 +76,9 @@
 # for the task's own copy leaves out nothing the merged PR omits (its HEAD is in
 # the PR's head, or the default branch carries its content),
 # holds only scratch or preserved ignored files (the disposable entries of
-# teardown's own list, scripts/hooks/_conformance_manifest.json included; under
-# .claude and .opencode only
+# teardown's own list, scripts/hooks/_conformance_manifest.json included, plus
+# the exact tooling paths under data/ and state/ that bin/fm-merge-prune-lib.sh
+# lists; under .claude and .opencode only
 # Firstmate's own hook files, clones and scratch names are scratch, and the
 # search for nested copies enters dependency and environment trees), and has no
 # process inside. For a
