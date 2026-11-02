@@ -2089,7 +2089,9 @@ owner_marker_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
   done
   for body in "Captain 2026 asked for this" "Owner: keep" "Captain: keep" \
     "Captain's words 2026-10-19: yes on both" "Captain's ask: a workstream view" \
-    "Captain chose 2026-10-20: this one" "Captain direction: one owner"; do
+    "Captain chose 2026-10-20: this one" "Captain direction: one owner" \
+    "Captain's words, 2026-10-20 (via /kun): this one" "Captain's ask 2026-09-22 on /bearings lavish: a view" \
+    "Captain chose this on the Lavish page" "Captain direction 2026-10-22, verbatim in the direction file"; do
     n=$((n + 1)); id="own-$label-$n"; positive+=("$id")
     rows="$rows- [ ] $id - $(ftitle "$id") (since 2026-11-01)"$'\n'"  $body"$'\n'
   done
@@ -2234,7 +2236,8 @@ test_closing_proofs_leave_the_owners_items_alone() {
     printf '%s: keep\n' "$form" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed || fail "$form: did not read as owner-filed"
     printf '%s 2026-10-22: keep\n' "$form" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed || fail "$form with a date did not read as owner-filed"
   done
-  for body in "the owner decision stands" "captain chose: agent prose" "Owner's idea: agent prose"; do
+  for body in "the owner decision stands" "captain chose: agent prose" "Owner's idea: agent prose" \
+    "Captain's wordsmith" "Captain's asking" "Captain chosen" "Captain directions" "SeaCaptain chose"; do
     if printf '%s\n' "$body" | python3 "$ROOT/bin/fm-backlog-intake.py" owner-filed; then
       fail "'$body' read as owner-filed"
     fi

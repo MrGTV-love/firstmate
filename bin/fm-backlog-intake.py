@@ -61,8 +61,8 @@ STOP_WORDS = frozenset(
 # contains "Captain" or "Owner" followed by a space and one of ask, words, question,
 # call, decision, ruling, rule or answer, or "Captain 2026", "Owner:" or "Captain:",
 # or "Owner" or "Captain" followed by an ISO date and a colon ("Owner 2026-11-01:"),
-# or "Captain's words", "Captain's ask", "Captain chose" or "Captain direction"
-# followed by a colon, with an optional ISO date before it.
+# or the whole phrase "Captain's words", "Captain's ask", "Captain chose" or
+# "Captain direction", wherever it appears and with whatever follows.
 # Only the capitalised forms count, so a bare "Owner 2026", a lower-case
 # "lock owner:" or "owner decision", and "Owner's idea" do not match.
 OWNER_PATTERN = re.compile(
@@ -71,7 +71,7 @@ OWNER_PATTERN = re.compile(
     r"|Owner:"
     r"|Captain:"
     r"|(?:Captain|Owner) \d{4}-\d{2}-\d{2}:"
-    r"|Captain(?:'s words|'s ask| chose| direction)(?: \d{4}-\d{2}-\d{2})?:"
+    r"|\bCaptain(?:'s words|'s ask| chose| direction)\b"
 )
 
 OBJECTIVE_LINE = re.compile(r"^- (O[0-9]+) - ")
