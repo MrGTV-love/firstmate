@@ -29,6 +29,7 @@ TMP_ROOT=$(fm_test_tmproot fm-rovo-harness)
 make_rovo_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
+  fm_test_link_ts_runtime "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u

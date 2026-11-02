@@ -4,8 +4,8 @@
 # Single owner of the supervision-liveness predicate and its reason vocabulary.
 #
 # Source bin/fm-supervision-lib.sh (the need counts) and bin/fm-wake-lib.sh
-# (pid identity, beacon age, lock ownership, away-daemon proof, model-aware
-# verdict) first, exactly as the guards already do, then source this file.
+# (pid identity, beacon age, lock ownership, away-daemon proof) first, exactly
+# as the guards already do, then source this file.
 # It sources nothing itself: bin/fm-wake-lib.sh creates the state directory on
 # load, and the turn-end guard must not do that inside an exempt child worktree
 # before its scope check runs.
@@ -15,8 +15,8 @@
 # ownership test in its own words. They now branch on a verdict from this file,
 # so the answer and its reason cannot drift between them. The harness-specific
 # paths stay in their own guards: Claude's Stop auto-arm cooperation, the
-# Cursor park, the model-aware pull tolerance, and every budget/lock carve-out
-# are decisions about what to do with the verdict, not what the verdict is.
+# Cursor park, and every budget/lock decision are about what to do with the
+# verdict, not what the verdict is. Pull warnings use this same strict verdict.
 #
 # Reason vocabulary (FM_SUP_REASON is always one of these stable tokens):
 #   idle          nothing needs supervision, so nothing can be down
@@ -24,15 +24,13 @@
 #                 beacon (the strict turn-end proof)
 #   away-daemon   away/quiet mode owns supervision and its live daemon has a
 #                 fresh poll-derived beacon (the turn-end away-mode proof)
-#   healthy       the model-aware pull verdict accepts this moment, including a
-#                 documented between-turns or extension hand-off
 #   no-watcher    a fresh beacon exists but no live watcher owns the home
 #   stale-beacon  the beacon is stale or absent
 #   unreadable    the state directory cannot be read, so the source is unknown
 #
 # Fail direction: every caller decides what an `unknown` source means. The
-# turn-end guard fails closed (it keeps blocking), the pull warning fails loud
-# (it warns), exactly as each guard did before this file existed.
+# turn-end guard blocks (on the Claude Stop-hook path, only inside its budget),
+# and the pull warning fails loud (it warns).
 
 FM_SUP_LIVENESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_SUP_LIVE=unknown
@@ -128,7 +126,7 @@ fm_supervision_liveness() {
 # beacon is inside grace (bin/fm-wake-lib.sh owns those primitives). Sets the
 # same verdict fields as fm_supervision_liveness so a caller can branch on
 # either. Callers use it where they re-check one owner mid-decision, such as the
-# Cursor park's benign-close test and the Claude auto-arm cooperation.
+# Cursor park's benign-close test.
 fm_supervision_watcher_live() {
   local state=${1:-} watch=${2:-} grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-} age
   [ -n "$watch" ] || watch="$FM_SUP_LIVENESS_DIR/fm-watch.sh"
@@ -185,45 +183,3 @@ fm_supervision_away_owner() {
   return 1
 }
 
-# fm_supervision_pull_liveness <state-dir> [grace] [watch-path] [home] [root]
-# The model-aware pull-warning verdict. It deliberately accepts the documented
-# between-turns and extension hand-offs that bin/fm-wake-lib.sh's
-# fm_watcher_supervision_verdict owns, because the pull guard runs mid-turn and
-# must not alarm on a healthy hand-off there.
-#
-# This is the one place the two verdicts differ on purpose, and it is why the
-# strict verdict above is not simply reused: adding the away/quiet-daemon proof
-# here would silence today's warning for a non-autoarm harness whose only owner
-# is the away daemon, and adding the model tolerance to the strict verdict would
-# let a turn end without the owner that can accept the continuation. Keep the
-# split; the shared state read, need count, and reason vocabulary still live in
-# this one file.
-fm_supervision_pull_liveness() {
-  local state=${1:-} grace=${2:-${FM_GUARD_GRACE:-300}} watch=${3:-} home=${4:-} root=${5:-}
-  [ -n "$state" ] || state=${STATE:-}
-  [ -n "$watch" ] || watch="$FM_SUP_LIVENESS_DIR/fm-watch.sh"
-  [ -n "$home" ] || home=${FM_HOME:-}
-  [ -n "$root" ] || root=${FM_ROOT:-$(cd "$FM_SUP_LIVENESS_DIR/.." && pwd)}
-  if ! fm_supervision_state_readable "$state"; then
-    fm_supervision_verdict_unknown
-    return 0
-  fi
-  fm_supervision_status "$state" "$grace"
-  if [ "$FM_SUP_NEEDED" != true ]; then
-    FM_SUP_LIVE=live
-    FM_SUP_REASON=idle
-    FM_SUP_SOURCE_OK=true
-    return 0
-  fi
-  fm_watcher_supervision_verdict "$state" "$watch" "$grace" "$home" "$root"
-  if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
-    FM_SUP_LIVE=live
-    FM_SUP_REASON=healthy
-    FM_SUP_SOURCE_OK=true
-    return 0
-  fi
-  FM_SUP_LIVE=off
-  FM_SUP_SOURCE_OK=true
-  FM_SUP_REASON=${FM_WATCHER_VERDICT_REASON:-stale-beacon}
-  return 0
-}

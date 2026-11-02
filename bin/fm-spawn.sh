@@ -4,6 +4,9 @@
 # Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
+#   Every fresh spawn reads host memory once through fm-mem-guard.sh; its
+#   measured refusal returns 75 before task resources or backlog dispatch.
+#   Relaunches and secondmate respawns are recovery and are never refused.
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
 #   per task at intake (AGENTS.md section 7); data/projects.md holds the captain's
@@ -30,18 +33,19 @@
 #   classifier: other prose is accepted. Legacy briefs use marked captain words
 #   when present, otherwise their Task body. Relaunches and secondmate charters
 #   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
-#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder
-#   and a blank scaffolded `### Out of scope` list (write None when nothing is
-#   excluded); one refusal lists every leftover Task body and DoD token and the
-#   blank exclusion list in a single pass,
+#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
+#   one refusal lists every leftover Task body and DoD token in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
 #   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
 #   proceeds. A relaunch re-checks only the Task bodies, because the Definition
-#   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
+#   of Done was accepted at the fresh spawn; a secondmate
 #   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
+#   Ship/scout egress is resolved before provisioning by fm-jev-egress.ts;
+#   docs/configuration.md "Tool coverage and outbound calls" owns the brief
+#   directive, metadata, native find selection, and relaunch contract.
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract, the extracted captain
 #   intent and current separate verification-plan instructions, even when the
@@ -298,7 +302,8 @@
 #   every place held prints one `deferred:` line and exits 75 before any brief
 #   render, endpoint, worktree, record, or backlog move exists, so the task stays
 #   exactly as queued as it was; an unreadable declaration refuses with exit 1.
-#   A batch reports such a pair as `batch: DEFERRED` and exits 75 when nothing
+#   A batch reports a pair whose spawn exits 75, which means deferred (capacity
+#   or host memory admission), as `batch: DEFERRED` and exits 75 when nothing
 #   else failed. A relaunch and a --secondmate spawn are never counted against
 #   capacity.
 #   With no harness arg, a crewmate/scout spawn resolves the CREW harness only when
@@ -380,9 +385,10 @@
 #   cannot weaken the assigned model.
 #   Workers pin the native judge to typesafe/jev-latest with judge: [] fallbacks.
 #   Under the captain data-egress decision 2026-10-08, only a firstmate-project
-#   worker (the Jev guard's physical-root test) gets the task-overlay
-#   find.enabled=on, which admits that tool before credential extensions load,
-#   and a private !command credential lookup through fm_typesafe_key. omp
+#   worker (the Jev guard's project test) is eligible for native find and a
+#   private !command credential lookup through fm_typesafe_key. The task overlay
+#   admits find before credential extensions load only with a recorded
+#   semantic-search grant and helpers enabled. omp
 #   memoizes successful lookups for that process; relaunch picks up primary-key
 #   changes. Every other project gets find.enabled=off and a failing judge
 #   credential, so native judgments reach neither TypeSafe nor OpenRouter.
@@ -2281,7 +2287,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_rc=0
     FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
     if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
-      echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - its project is at capacity, so it stays queued" >&2
+      echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - the spawn was deferred and stays queued" >&2
       [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT
     elif [ "$pair_rc" -ne 0 ]; then
       echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
@@ -4375,6 +4381,16 @@ else
   WT=""
   BRIEF="$DATA/$ID/brief.md"
 fi
+# Resolve consent before provisioning, never from a live worker's first refusal.
+# The TypeScript policy owner also validates the runtime backstop's grant.
+jev_egress() {
+  if command -v bun >/dev/null 2>&1; then
+    bun "$SCRIPT_DIR/fm-jev-egress.ts" "$@"
+  else
+    node --experimental-strip-types --no-warnings "$SCRIPT_DIR/fm-jev-egress.ts" "$@"
+  fi
+}
+TASK_EGRESS='[]'
 # Project capacity admission (bin/fm-project-capacity-lib.sh owns the
 # declaration, what holds a place, and why this is race-safe). A fresh worker
 # for a project whose declared capacity is already held is deferred here, before
@@ -4561,6 +4577,20 @@ if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
     exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
+# One host memory reading per fresh spawn, a new secondmate included, taken
+# after any project-lock wait and before brief rendering, allocation, launch, or
+# a backlog move. Recovery of existing work is not new work and stays usable:
+# a relaunch, or a secondmate respawn whose task record this home still holds.
+# bin/fm-mem-guard.sh owns the native sources, recorded reading and exit 75.
+if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.meta" ]; }; then
+  memory_rc=0
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}" admit >/dev/null || memory_rc=$?
+  if [ "$memory_rc" -ne 0 ]; then
+    echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
+    exit 75
+  fi
+fi
 if [ "$RELAUNCH_RELOCATING" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
@@ -4610,7 +4640,7 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
   done <<EOF
 $problems
 EOF
-  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
 }
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   # One verdict, one refusal: the helper lists every unfinished Task body and
@@ -4620,19 +4650,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-      # One event per decision: this refusal is the decision each brief gate took.
-      case "$DISPATCH_PROBLEMS" in
-      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --source-ok true 2>/dev/null || true ;;
-      esac
-      if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vqF '### Out of scope is empty'; then
-        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
-      fi
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
       exit 1
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
-    if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
-    fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi
@@ -4682,6 +4703,20 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     echo "error: $BRIEF records a Base branch line but the spawn has no --base-branch; pass the brief's base with --base-branch or re-scaffold the brief without one" >&2
     exit 1
   fi
+  # Brief admission above owns malformed and incomplete input, so this decision
+  # judges only an admitted brief, before the launch brief declares its result.
+  if [ "$RELAUNCH" = 1 ]; then
+    TASK_EGRESS=$(jev_egress record "$STATE" "$ID") || TASK_EGRESS=
+  else
+    TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
+  fi
+  case $TASK_EGRESS in
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
+    *)
+      echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      exit 1 ;;
+  esac
   # Use the existing launch-brief overlay for every worker kind, including
   # pre-scope briefs and relaunches. Charters never enter this worker path.
   # It is rendered here so a contract problem refuses before any endpoint
@@ -4696,6 +4731,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         printf '\n' &&
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
+        printf '\n# Dispatch egress capabilities\nRecorded destination classes: %s.\nNative semantic find is available only with semantic-search authorization and existing project/helper eligibility; otherwise it is absent.\nNever write or enlarge the task grant from a worker.\n' "$TASK_EGRESS" &&
         { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
@@ -6254,6 +6290,7 @@ spawn_slot_refused() {
       [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
       [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
       echo "jev_guard_policy=$guard_policy"
+      echo "egress=$TASK_EGRESS"
       # Preserve the entire declared scope, never a valid-looking subset of
       # malformed input that already failed the pre-admission scope check.
       if fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1; then
@@ -6855,9 +6892,8 @@ BUSY_GEN=
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
-    # a turn; accepted Stop, StopFailure (API-error turn end), and SessionEnd
-    # (process shutdown) close it. docs/configuration.md "Jev belay Stop hook"
-    # owns Stop acceptance and completion. Claude fires no hook for a manual
+    # a turn; Stop, StopFailure (API-error turn end), and SessionEnd
+    # (process shutdown) close it. Claude fires no hook for a manual
     # interrupt: fm-control preserves the adapter-owned state, while the
     # legacy fm-send --key Escape path records idle/fm-interrupt. Stop keeps
     # the turn-ended NOTIFICATION touch for the watcher. A secondmate gets no
@@ -6912,13 +6948,8 @@ BUSY_GEN=
       if [ "$busy_notify_turnend" = true ]; then
         stop_turnend="touch $(shell_quote "$TURNEND"); "
       fi
-      if [ "$KIND" = secondmate ]; then
       j_stop=$(json_escape "${stop_turnend}$busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      else
-    j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-      fi
-      j_stop_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-belay.claude-stop --fallback 25 --percentile 99 --margin 3) || exit 1
-      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":$j_stop_limit}]}],"
+      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\"}]}],"
     fi
     hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[${submit_entries}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
@@ -7118,8 +7149,14 @@ EOF
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
     [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
-    native_find=off
-    [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
+    native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || native_find=
+    case $native_find in
+      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-find" 2>/dev/null || true ;;
+      *)
+        echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
+        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true
+        exit 1 ;;
+    esac
     native_helpers='{}'
     if [ "$OMP_NO_HELPERS" = 0 ]; then
       native_helper_role=$MODEL
@@ -7451,6 +7488,7 @@ preserve_relaunch_meta() {
   [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
   if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
     echo "jev_guard_policy=$guard_policy"
+    echo "egress=$TASK_EGRESS"
   fi
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
@@ -7495,7 +7533,7 @@ preserve_relaunch_meta() {
   fi
   # Keep relaunch fields before the preserved PR block so monitoring can parse it;
   # fm_pr_metadata_identity_parse owns the allowed fields following pr=, including
-  # a preserved egress= grant that Firstmate appended after the PR was recorded.
+  # an egress= grant that follows a pr= line.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi
@@ -7889,10 +7927,10 @@ if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh).
-  # docs/turnend-guard.md owns model-aware pull-warning health and hand-offs.
-  # Pi and pi-signed secondmates previously received persistent here and now
-  # receive extension to match fm_supervision_model's own table, so their pull
-  # guard tolerates the extension hand-off exactly as a Pi primary does.
+  # docs/turnend-guard.md owns the model-aware verdict's hand-offs.
+  # Pi and pi-signed secondmates receive extension to match
+  # fm_supervision_model's own table, so their model-aware consumers treat the
+  # extension hand-off exactly as a Pi primary's do.
   case "$HARNESS" in
   claude | cursor) supervision_model=autoarm ;;
   pi | pi-signed | omp) supervision_model=extension ;;

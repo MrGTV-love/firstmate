@@ -556,7 +556,7 @@ for (const host of ['omp', 'claude']) {
   delete process.env.FM_WRITE_CONFINEMENT;
   if (!(await install()(event('write', '~/guard-local.txt'), ctx))?.block) throw Error('missing marker admitted');
   process.env.FM_WRITE_CONFINEMENT = 'seatbelt-v1';
-  for (const path of ['xd://report_issue', 'xd://github', 'xd://future_device', '[xd://github]', '[xd://github#ABCD]', '[xd://report_issue#0aF9]  ', '[xd://future_device]', 'xd://github ', 'XD://report_issue', 'XD://lsp']) {
+  for (const path of ['xd://report_issue', 'xd://github', 'xd://future_device', '[xd://github]', '[xd://github#ABCD]', '[xd://report_issue#0aF9]  ', '[xd://future_device]', 'xd://github ', 'XD://report_issue', 'XD://lsp', 'conflict://1', '[conflict://1#ABCD]']) {
     if (!(await handler(event('write', path, '{}'), ctx))?.block) throw Error('device admitted by confinement: ' + path);
     const row = JSON.parse(readGuardAudit(state).trim().split('\\n').at(-1));
     if (row.branch === 'confinement') throw Error('device deferred to T5: ' + path);

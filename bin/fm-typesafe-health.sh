@@ -19,7 +19,7 @@
 #   check: typesafe-health: recovered ...
 #   Each payload names what failed, since when, and the consumers affected
 #   (dispatch resolution, worker skill picking, compact-adviser, the Level 6
-#   guard, belay), so firstmate can turn it into one plain captain message.
+#   guard), so firstmate can turn it into one plain captain message.
 #   The wake row is appended before the state is updated, so an interruption can
 #   repeat an alert but never lose one.
 #
@@ -98,7 +98,7 @@ case "$UNREACHABLE_PROBES" in
   ''|*[!0-9]*|0) UNREACHABLE_PROBES=3 ;;
   *) UNREACHABLE_PROBES=$((10#$UNREACHABLE_PROBES)) ;;
 esac
-CONSUMERS="worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook"
+CONSUMERS="worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), and the Level 6 jev-guard"
 
 S_STATUS=ok S_SINCE='' S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK='' S_LAST_PROBE='' S_SOURCE='' S_DETAIL=''
 

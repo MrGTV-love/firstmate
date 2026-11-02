@@ -36,6 +36,7 @@ DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
+FIELD_LINE = re.compile(r'^\s*(Decision sought|Brief description of issue|Brief|Recommendation|Alternatives|Evidence):\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
 LABEL_LIMIT = 168  # Leave room for two candidates, a long thread ts, the longest remedy, and the queue marker.
@@ -178,19 +179,48 @@ def parse_options(lines):
     return options
 
 
-def parse_fields(lines):
-    recommendation = ''
-    evidence = ''
+def evidence_pointer(value):
+    return isinstance(value, str) and bool(value.startswith('/') or re.match(r'^https?://[^\s]+$', value))
+
+
+def parse_fields(lines, remainder=None, multiline=False, loose=None, removed=None):
+    fields, current = {}, None
     for line in lines:
-        match = re.match(r'^\s*Recommendation:\s*(.*)$', line)
+        match = FIELD_LINE.match(line)
+        if match and match.group(1) == 'Evidence':
+            value = match.group(2).strip()
+            if (value and value.lower() != 'none recorded'
+                    and (not evidence_pointer(value) or (multiline and fields.get('Evidence')))):
+                match = None
+                current = None
         if match:
-            recommendation = match.group(1).strip()
-        match = re.match(r'^\s*Evidence:\s*(.*)$', line)
-        if match:
-            evidence = match.group(1).strip()
-    if not (evidence.startswith('/') or re.match(r'^https?://[^\s]+$', evidence)):
-        evidence = ''
-    return recommendation, evidence
+            current = match.group(1)
+            if current == 'Brief description of issue':
+                current = 'Brief'
+            value = match.group(2).strip()
+            if multiline:
+                value = '\n'.join(part for part in (fields.get(current), value)
+                                  if part and part.lower() != 'none recorded')
+            fields[current] = value
+            if remainder is not None and current not in ('Recommendation', 'Evidence'):
+                remainder.append(line)
+            elif removed is not None and current in ('Recommendation', 'Evidence'):
+                removed.append((current, line))
+            if current == 'Evidence':
+                current = None
+        elif current and multiline and not OPTION_LINE.match(line):
+            fields[current] += '\n' + line.strip()
+            if remainder is not None and current not in ('Recommendation', 'Evidence'):
+                remainder.append(line)
+            elif removed is not None and current in ('Recommendation', 'Evidence'):
+                removed.append((current, line))
+        else:
+            current = None
+            for kept in (remainder, loose):
+                if kept is not None:
+                    kept.append(line)
+    return {key: value.strip() for key, value in fields.items()
+            if value.strip() and value.strip().lower() != 'none recorded'}
 
 
 def option_from_board(card):
@@ -346,8 +376,7 @@ class Watch:
                                        if isinstance(card, dict) and card.get('key')}
 
     def scope_state(self):
-        scopes = set(getattr(self.api, 'scopes', set()))
-        missing = {'reactions:read', 'users:read'} - scopes
+        missing = {'reactions:read', 'users:read'} - set(self.state.get('scopes') or [])
         return not missing, missing
 
     def scope_notice(self):
@@ -359,45 +388,68 @@ class Watch:
             self.state['scope_notice'] = flag
             self.commit()
 
-    def card_payload(self, row, card, text_only=False):
+    def card_payload(self, row, card, text_only=False, reactions=True):
         lines = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
         options = [] if text_only else (option_from_board(card) or parse_options(lines))
-        recommendation, evidence = parse_fields(lines)
-        if isinstance(card, dict):
-            recommendation = card.get('recommend_value') or recommendation
-            evidence = card.get('pr_url') or card.get('report_path') or evidence
-        if not (isinstance(evidence, str) and (evidence.startswith('/')
-                or re.match(r'^https?://[^\s]+$', evidence))):
-            evidence = ''
+        body = parse_fields(lines)
+        reason_lines = (row.get('hold_reason') or '').splitlines()
+        loose = []
+        reason = parse_fields(reason_lines, multiline=True, loose=loose)
+        parts = dict(body)
+        if card.get('recommend_value'):
+            parts['Recommendation'] = card['recommend_value']
+        parts.update(reason)
+        evidence = next((value for value in (reason.get('Evidence'), card.get('pr_url'),
+                                            card.get('report_path'), body.get('Evidence'))
+                         if evidence_pointer(value)), '')
         usable, missing = self.scope_state()
-        fields = [('Task: ', row['id']),
-                  ('Decision: ', card.get('title') or row.get('title') or row['id'])]
-        if card.get('about'):
-            fields.append(('About: ', card['about']))
-        question = card.get('decide') or row.get('hold_reason')
-        if question:
-            fields.append(('Question: ', question))
-        fields.extend([('Recommendation: ', recommendation or 'none recorded'),
-                       ('Evidence: ', evidence or 'none recorded')])
+        usable = usable and reactions
+        fields = [('Task: ', row['id'])]
+        structured = bool(parts.get('Decision sought'))
+        plain = loose if structured else []
+        if structured:
+            for key, label in (('Decision sought', 'Decision sought: '),
+                               ('Brief', 'Brief description of issue: '),
+                               ('Recommendation', 'Recommendation and key reasons: '),
+                               ('Alternatives', 'Alternatives considered: ')):
+                if parts.get(key):
+                    fields.append((label, parts[key]))
+        else:
+            fields.append(('Decision: ', card.get('title') or row.get('title') or row['id']))
+            if card.get('about'):
+                fields.append(('About: ', card['about']))
+            question = card.get('decide') or row.get('hold_reason') or ''
+            remainder, removed = [], []
+            asked = parse_fields(question.splitlines(), remainder, multiline=True, removed=removed)
+            question = '\n'.join(remainder).strip()
+            shown = {'Recommendation': parts.get('Recommendation'), 'Evidence': evidence}
+            plain = [line for label, line in removed if asked.get(label) and asked[label] != shown[label]]
+            if card.get('decide'):
+                plain += [line for line in loose if FIELD_LINE.match(line)]
+            if question:
+                fields.append(('Question: ', question))
+            if parts.get('Recommendation'):
+                fields.append(('Recommendation: ', parts['Recommendation']))
+        if evidence:
+            fields.append(('Evidence: ', evidence))
         if options:
             fields.append(('Options:', ''))
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
-        fields = [(prefix, slack_escape(value)) for prefix, value in fields]
-        footer = ['Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character')]
+        fields.extend(('', line) for line in plain if line.strip())
+        fields = [(prefix, slack_escape(value)) for prefix, value in fields
+                  if str(value).strip().lower() != 'none recorded']
         if usable and options:
-            footer.append('React with ' + '/'.join(REACTIONS[:len(options)])
-                          + ' or reply in this thread with the option number.')
+            footer = ['Tap a number reaction or type the option number in this thread.']
         elif options:
-            footer.append('Reply in this thread with the option number.')
+            footer = ['Type the option number in this thread.']
         else:
-            footer.append('Reply in this thread with your answer.')
-        footer.append('Messages typed in the main DM window are not read.')
-        footer.append('If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.')
-        if not usable:
+            footer = ['Type your answer in this thread.']
+        if options:
+            footer.append('If you both tap and type: disagreement records neither answer.')
+        if missing:
             footer.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
-        footer.append('Full decision remains in the local backlog.')
         text = '\n'.join([prefix + value for prefix, value in fields] + footer)
         if len(text) <= CARD_LIMIT:
             return text, options, usable
@@ -609,7 +661,8 @@ class Watch:
             if rc == 2:
                 identity = 'uncertain'
             occurrence = key + ':' + identity
-            if occurrence in self.state['threads']:
+            record = self.state['threads'].get(occurrence)
+            if record and (record.get('retired') or rc != 0):
                 continue
             # Uncertain open-state is deliberately shown rather than hidden.
             if not self.state.get('channel'):
@@ -618,16 +671,37 @@ class Watch:
             text_only = bool(card) and not fresh(generated, identity)
             if text_only:
                 card = {}
-            text, options, usable = self.card_payload(row, card, text_only)
+            text, options, usable = self.card_payload(
+                row, card, text_only, reactions=record.get('reactions', False) if record else True)
             self.scope_notice()
-            # Re-check immediately before the network post.
+            digest = hashlib.sha256(text.encode()).hexdigest()
+            if record and (record.get('options') != options or digest in
+                           (record.get('text_digest'), record.get('update_attempt_digest'))):
+                continue
+            # Re-check immediately before the network write.
             again, current = self.probe(key)
             if again == 1 or (current if again == 0 else 'uncertain') != identity:
+                continue
+            if record:
+                channel = self.owner_channel()
+                try:
+                    self.api.call('chat.update', channel=channel, ts=record['ts'],
+                                  text=text, unfurl_links=False, unfurl_media=False)
+                except SlackError as error:
+                    if str(error) in ('request_budget_exhausted', 'unreachable'):
+                        raise
+                    record['update_attempt_digest'] = digest
+                    self.commit()
+                    self.say('check: slack %s - card update failed: %s' % (record['ts'], error))
+                    continue
+                record['text_digest'] = digest
+                record.pop('update_attempt_digest', None)
+                self.commit()
                 continue
             ts = self.post('card:' + occurrence, text)
             record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
                       'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
-                      'reactions': usable, 'retired': False}
+                      'reactions': usable, 'retired': False, 'text_digest': digest}
             self.state['threads'][occurrence] = record
             self.commit()
             if usable and 'reactions:write' in getattr(self.api, 'scopes', set()) and options:

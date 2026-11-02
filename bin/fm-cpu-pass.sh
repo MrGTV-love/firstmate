@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-cpu-pass.sh - Host-wide CPU pass pool for CPU-heavy test bursts; see engine --help.
+# fm-cpu-pass.sh - Host-wide CPU passes and pipeline-start admission; see engine --help.
 # docs/cpu-pass-pool.md owns the cross-repository contract.
 # The engine header owns command behavior, including the no-Python run path.
 set -euo pipefail

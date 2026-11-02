@@ -624,8 +624,8 @@ git -C "$UPSRC" -c user.name=t -c user.email=t@example.invalid commit -qm source
 # not hold up the Claude primary; the generated brief must ask it to end its
 # turn on the gate instead of running a foreground polling command.
 # The stand-in brief script is the real scaffold and the stand-in spawn runs the
-# real dispatch verdict on it, so the lab must fill every placeholder and
-# answer the exclusion list a real spawn refuses.
+# real dispatch verdict on it, so the lab must fill every placeholder a real
+# spawn refuses.
 WORKSRC="$TMP_ROOT/worker-source"
 cp -R "$UPSRC" "$WORKSRC"
 cat > "$WORKSRC/bin/fm-brief.sh" <<SH

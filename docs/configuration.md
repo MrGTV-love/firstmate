@@ -112,6 +112,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
+- The [host memory admission](#host-memory-admission) readings `state/memory-readings.jsonl` and, in the root home only, the alarm episode marker `state/.memory-alarmed`, calibration record `state/.memory-calibration.json` and alarm baseline `state/.memory-baseline.json`, all owned by `bin/fm-mem-guard.sh`; `bin/fm-watch.sh` owns the persistent probe deadline `state/.memory-health-next` and surfaced-row marker `state/.seen-memory-health`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
 
@@ -597,7 +598,7 @@ Firstmate asks Treehouse where the current pool is and never predicts it: when `
 When the installed Treehouse has no `pool-dir`, or its output is not one absolute path, one `treehouse status --json` listing, run from the project, is read at most once per teardown and reused for every descendant, and only a path it lists is in the current pool.
 `treehouse get` allocates from the current pool only, so an unleased slot in a superseded folder does not stop a start; each start judges this again, so a folder that becomes current again is protected again.
 A held close, and a shared slot's claimant record retiring with one remaining record, leave copies in the slot, so they lease a superseded-folder slot by its exact path with `treehouse lease --path` once every refusal check has passed, so a close that refuses leaves no new lease, and Treehouse then never hands it out, whichever folder is current; without `lease --path` (treehouse v3.1.7-fm or later) they refuse and the copies stay held.
-An unlanded or dirty copy in an old folder is therefore still refused, before any return or lease release.
+A dirty copy in an old folder is therefore still refused, before any return or lease release, and so is an unlanded one that the attended recorded-bundle exception in [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header does not cover.
 A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, after the reservation and the held-copy record checks, and only for the current-pool slot that bears the recorded slot's name in its old folder, only when its holder is that task, no other task claims the slot, no process runs inside it, no copy is registered inside it, and no local task record names a copy in it; a lease left in place, or a listing that cannot be read, is reported with the command that releases it.
 
 ### Herdr homes and presentation
@@ -700,6 +701,7 @@ Supported secondmate propagation writes or removes the inherited copy as describ
 A malformed, unreadable, or symlinked file - including one with a second directive anywhere - resolves to user/operator; the role fails closed rather than guessing.
 
 Authority is also available for one task at a time: `--upstream-consent <host>/<owner>/<repo>` on `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh` records the captain's explicit approval in the task's delivery contract and metadata without changing the home's role.
+That consent authorizes a contribution (a push and a pull request), not a landing; the repository's maintainer lands it, and `bin/fm-pr-merge.sh` refuses a firstmate landing outside the primary home with that maintainer grant.
 Role is never inferred from GitHub identity, forge permissions, remotes, repository ownership, authentication state, environment, or CI.
 `bin/fm-role.sh report` prints the resolved role with no network call, and the session-start digest shows it in the HOME ROLE subsection.
 
@@ -1086,6 +1088,12 @@ Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
 Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
 The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
+A ship whose commits only a recorded verified bundle holds is removed only while its row is held for the captain's land-or-drop call, and teardown keeps that row open and held, as [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header describes.
+A home with a manual backlog, or an Orca cleanup recovery, has no row that can hold that call, so the bundle route refuses there.
+A task with no backlog row is asked to file the call as a captain-kind row under the ship's project with `bin/fm-captain-hold.sh hold <id> --title <title> --repo <project> --owner captain --reason <reason>`.
+The captain's answer closes the row with no note, and its captain hold kind keeps it out of Recently Landed.
+A row closed on that bundle instead, by a replay that finds the hold released or by hand, carries the note `preserved in bundle <path>, not landed`; it is never presented as recently landed, and it is not marked as the captain's drop.
+The same transitions retire that line to `Historical preserved in bundle <path>, not landed`, so a row restarted after a bundle close and then closed again is judged on its new close.
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
@@ -1931,7 +1939,7 @@ A missing or mismatched snapshot, a replaced plan at the same path, a different 
 The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
 This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
-A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
+Independent review reads that list as the task's stated boundary.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
 
 ## Home brief include (config/brief-include.md)
@@ -2230,6 +2238,42 @@ When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record,
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 
+## Host memory admission
+
+On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
+Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
+Every fresh spawn, including a new secondmate, reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
+The generated worker brief names two routes for a new no-mistakes run.
+A start through `bin/fm-mem-guard.sh run -- no-mistakes axi run` takes the same reading and can defer with the same exit 75, and the worker then writes the `paused:` status described below; this route skips the CPU pass pool.
+A start through `bin/fm-duration.py run --pipeline-priority <class>` goes through the [CPU pass pool](cpu-pass-pool.md#fresh-pipeline-starts) (`pipeline-start`), which owns start admission on that route.
+A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
+An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
+
+Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin; `admit` refuses no work on either.
+They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
+The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
+For `admit` these are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+A fresh no-mistakes run start through `bin/fm-duration.py run` uses recorded run peaks through the [CPU pass pool's start admission](cpu-pass-pool.md#fresh-pipeline-starts).
+No exhaustion experiment or stress run is needed or recommended; the records come from real work.
+
+The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.
+A reading with unreadable facts judges neither the baseline nor the headroom record, so a transient read failure is reported only as unavailable measurements.
+Only the root local home's watcher runs the periodic probe and publishes memory alarms; every home, including a confined worker's secondmate home, records its own admission readings in its own state and writes no other home's state.
+Before running `baseline` from the root home, let its watcher record readings over a known-healthy representative workload.
+The command derives the alarm boundary only from those root probe readings, never from admission, run-start, `sample` or `baseline` readings, because a confined worker's admission cannot read other users' resident sizes and its lower maximum would fake spread and lower the episode floor; it records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings, or readings whose largest non-fleet resident size never varies, it names that missing input instead of writing a baseline, so the alarm waits for real spread.
+An alarm starts when a non-fleet process exceeds the largest non-fleet resident size observed across those readings, and the episode lasts until that process is at or below the smallest per-reading maximum, the low end of the same measured variation, so a process moving around the boundary wakes once.
+The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+A matching baseline is never silently replaced as usage grows; an invalid baseline, one whose readings show no spread, or one recorded for a different host name or RAM size, is unusable for alarms and is replaced by the next `baseline`.
+The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
+The records contain process identity, run identity and resident size, not process arguments, environment contents or working directories.
+
+Generated worker instructions name the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
+Reattachment and gate responses remain direct so pressure cannot strand running validation.
+This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
+The watcher presents each queued memory row once, naming non-fleet outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
+No memory observation stops existing work or restarts a process.
+Linux retains the existing diagnostic interface; native admission is currently macOS-only.
+
 ## Nested task copy sweep (config/copy-budget)
 
 A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
@@ -2399,6 +2443,8 @@ Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`
 Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
 Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
 Every rule's `match.projects` is a nonempty positive list of ids registered in `data/projects.md`; config load rejects unregistered ids, missing project lists, and negative selectors.
+The one exception is a secondmate home, marked by a valid `.fm-secondmate-home`, where `config/crew-dispatch.json` is primary-authoritative inherited material: its selectors may name fleet projects absent from that home's registry, and those exact selectors are inert there, not invalid configuration or new registrations.
+Actual task identity still requires the strict local clone binding described under [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
 It may also constrain `kind` (`ship` or `scout`) and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
 Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
 These declarations restrict routing; they do not grant an exception, new profile, or permission.
@@ -2462,6 +2508,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
 - While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; a missing, unreadable, or invalid `data/projects.md` registry is reported there with the registry's own error; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- In a secondmate home, bootstrap validates the inherited policy without requiring a local project: a missing or empty `data/projects.md` stays quiet there, including in intentionally project-less homes, while an unreadable registry or one with an invalid or duplicate project id still receives the same diagnostic; actual binding failures remain [typed intake diagnostics](#typed-dispatch-resolution-env-typesafe_api_key), not malformed policy.
 - Missing `jq` is reported through the normal [missing-tool diagnostics](#toolchain).
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
@@ -2548,7 +2595,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, [Jev guard](#jev-guard), [belay Stop-hook](#jev-belay-stop-hook), or [shadow model picker](#shadow-model-picker-fm_model_picker_shadow) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution, worker skill-selection, [Jev guard](#jev-guard), or [shadow model picker](#shadow-model-picker-fm_model_picker_shadow) requests, and keeps marked brief regions out of dispatch-resolution and worker skill-selection requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
 Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so all consumers there withhold the same values.
 
@@ -2566,7 +2613,7 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
-The following marked-region rules apply to dispatch resolution and to worker skill selection, which share `fm_typesafe_brief_task` in `bin/fm-typesafe-lib.sh`; belay neither removes nor validates these markers.
+The following marked-region rules apply to dispatch resolution and to worker skill selection, which share `fm_typesafe_brief_task` in `bin/fm-typesafe-lib.sh`.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -2591,7 +2638,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; the shadow model picker checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2755,7 +2802,7 @@ This section is the single owner of the alert contract; the script header owns i
 | Timeout, no connection, or any other HTTP code | unreachable | Internal until the threshold below |
 
 - Each alert is one `check: typesafe-health:` wake.
-  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook.
+  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), and the Level 6 jev-guard.
   Firstmate sends the captain one plain message from it; no other action follows.
 - `state/.typesafe-health` records the alerted class, so the same failure raises no second wake, whether a probe or a consumer sees it again, until a 200 arrives.
   A different class the captain has not heard of, such as auth after credits, alerts once more.
@@ -2964,10 +3011,18 @@ The rule is deterministic and needs neither a model verdict nor a working provid
 Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
-Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
-An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
-Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+Before ship/scout dispatch, Firstmate records the task's authorized needs in one unfenced `Egress needs: ["semantic-search","web"]` directive inside `## Firstmate spec` under `# Task`.
+Only the existing classes `semantic-search`, `web`, `browser`, `provider` and `remote-storage` are recognized; no keyword inference, wildcard, project-wide permission or trust exemption exists.
+The scaffold starts with `Egress needs: []`, and an absent directive in a legacy brief also means no authorization.
+The directive is authorization metadata, not build instructions: spawn and promotion still refuse a Firstmate spec containing only that directive and its exclusion list.
+Duplicate or indented directives, malformed JSON, non-string or unknown members, NUL bytes, unreadable input or a symlinked brief refuse fresh dispatch before worker provisioning; fenced examples do not authorize anything.
+The spawn atomically publishes exactly one canonical `egress=` JSON-array line in `state/<task>.meta` before launch, including an empty grant, and declares the resolved classes in the generated launch brief.
+Native omp semantic `find` is constructed only when that grant includes `semantic-search` and the existing Firstmate-project and helper eligibility also permits it; otherwise the final task overlay sets `find.enabled: off`, removing it from the native registry, model tools and ordinary Eval tool bridge rather than offering a tool that must refuse.
+A relaunch reconstructs find from the recorded grant, not an edited brief, and promotion preserves that grant; neither operation adds authorization to a running task.
+Persistent secondmates keep their existing native-find eligibility and do not gain this worker grant policy.
+The runtime grant backstop stays fail closed: an absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; a grant naming the removed `subagent` class grants nothing.
+Only Firstmate may authorize task metadata at dispatch; a worker reports a mismatch for stopped-task redispatch, meaning teardown and then a fresh dispatch from the corrected brief, and never writes or enlarges its live grant.
+Construction-time removal covers native find only: other egress-classed tools retain their existing runtime grant checks, and omp's separately advertised Eval judge/completion provider helpers remain an unresolved native capability gap, not a claim of network confinement.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
@@ -2993,7 +3048,7 @@ The `xd://github` device write stays refused by the separate device-egress table
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
 The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` and `xd://github` device writes are owned by `jev-egress-grant` and remain refused under every grant.
-Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), `dispatch-grant` or `dispatch-find` (for the `jev-egress-grant` spawn decision that resolves the task grant or the native find capability; a refusal there has `source_ok` false), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
 For grant-based decisions, the egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
 An unconditional device-egress refusal uses the compiled device row as its source, so `source_ok=true` does not imply that task metadata was read or any grant was accepted.
 The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
@@ -3038,6 +3093,7 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
+| `conflict://` targets | Refused on `write` and `edit` because the identifier does not prove a file path; the refusal names the real-path edit described below instead of a report-only outcome. |
 | Other `scheme://` URIs | Refused because omp routes them to a protocol handler with no admitted write rule; the refusal asks for a report to Firstmate and recommends no read or fetch of the URI. |
 
 LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
@@ -3054,14 +3110,15 @@ Finished or missing jobs, named project services absent from the owner snapshot,
 Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 No device that sends data off the machine is admitted.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
+Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround, except the `conflict://` refusal, which names the real-path edit described below.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
 Device `edit` calls and other `scheme://` targets, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; on unconfined or unproved workers, ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard validates the replacement-input schema but does not judge or scan write/edit content.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
 A policy block (deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
-Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
+A refusal that names an alternative exempts only that named alternative from this rule; for example, the `xd://github` read-op refusal names `gh-axi` through the shell, and the `conflict://` refusal names editing the conflicted file at its real path in the worker's own work copy with the normal edit tool.
+A `conflict://` identifier does not prove a file path; the real-path edit takes the same filesystem route as any other write, T5 confinement on a proved worker and the spelling and root checks otherwise, so it never widens what a write may reach.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 Claude receives no post-tool review notice, so an unreviewed result is exactly what the tool returned.
@@ -3154,33 +3211,12 @@ An active durable-record failure requires review with `AuditUnavailableError`; i
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, controlled decision fixtures and deployed acceptance.
 
-## Jev belay Stop hook
+## Claude worker Stop hook
 
-Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
-`bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
-Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; every other exit, including nonblocking failure or timeout, clears busy and publishes completion.
-Secondmate sessions and other harnesses do not run it.
-
-The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
-The wrapper therefore resolves the key at call time through the shared [TypeSafe key opt-in](#typed-dispatch-resolution-env-typesafe_api_key) and sets it for the one upstream `node` process.
-The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
-Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
-Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
-The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's Stop deadline.
-The Stop host envelope uses `fm-duration.py limit` with a 25-second fallback and the same raise-only calibrated p99 x 3 policy.
-
-The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
-Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
-The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
-A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
-Each policy check uses the shared three-second process-group deadline and a five-second synchronous-child ceiling, allowing shell startup and cleanup headroom while bounding stalled policy work and its descendants.
-The shared Perl watchdog also reaps the checker group if that ceiling kills its owning shell during startup or cleanup; if Perl is unavailable, the request is withheld rather than checked without this ownership guarantee.
-
-`belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
-Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
-The wrapper runs the file only when its git blob id matches the pin in `bin/fm-jev-belay-hook.sh`, so a changed file never receives the key.
-A missing clone, key, or `node`, or a pin mismatch, makes the hook exit 0 silently and never delays a stop.
-To move to a newer upstream version, review it, update the pinned commit in this section and the blob id in the wrapper together, and refresh the clone.
+Firstmate-launched Claude ship and scout workers use Stop only to publish the turn-ended notification and close the semantic busy state.
+Completion evidence belongs to task review and DoD grading, not a model judgment at the end of each turn.
+Secondmates retain their [primary supervision guard](turnend-guard.md); other harnesses retain their existing lifecycle adapters.
+The retirement regressions are [`tests/fm-retired-jev-belay-stop.test.sh`](../tests/fm-retired-jev-belay-stop.test.sh) and the Claude lifecycle cases in [`tests/fm-busy-adapter-wiring.test.sh`](../tests/fm-busy-adapter-wiring.test.sh).
 
 ## Worker skill selection
 
@@ -3517,12 +3553,34 @@ The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
-Each card includes only decision-card fields: the task id and title, the current board's about/question text or the hold reason, options, recommendation, and evidence pointer; arbitrary task-body prose is never posted.
-Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
-A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the affordance, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
+Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
+
+| Hold reason or body label | Card heading | Content |
+| --- | --- | --- |
+| `Decision sought:` | `Decision sought:` | The concrete choice needed. |
+| `Brief:` (also `Brief description of issue:`) | `Brief description of issue:` | A brief description of the issue. |
+| `Recommendation:` | `Recommendation and key reasons:` | The recommended choice and the key reasons it is most advisable. |
+| `Alternatives:` | `Alternatives considered:` | The alternatives and why each is not as good as the recommendation. |
+
+Hold-reason fields override corresponding body fields and the current board's recommendation.
+The four-part layout requires a nonempty `Decision sought:` field in the reason or body and replaces the current board's question, which four-part cards do not show; otherwise the legacy layout keeps the title, the current board's about text when available, and a question. The legacy question is the current board's question text when a fresh board supplies one, and the hold reason otherwise; its recommendation lines, its first valid `Evidence:` pointer, and its empty or `none recorded` evidence lines leave the question, while brief, alternatives, option, unlabeled, and other evidence lines remain in it.
+Four-part cards show every hold-reason line outside the labeled parts, including option lines, text before the first label, the whole reason when it carries no labels, and every nonempty `Evidence:` value other than the first valid pointer except `none recorded`, as plain text after the fields and options and before the answer footer; these lines do not create answer bindings or reactions.
+Missing fields are omitted, never filled with `none recorded`; an `Evidence:` pointer appears only for an absolute path or an HTTP(S) URL, followed by any numbered options. A label repeated in the hold reason keeps every value, joined in input order one per line under that label, and only the first valid `Evidence:` pointer becomes the evidence link.
+On legacy cards, a recommendation or evidence line removed from the question appears as a plain line when the card does not already show that value as its recommendation or evidence link; with the hold reason as the question this adds no line, and with a fresh board question it shows the board question's own `Recommendation:` and `Evidence:` lines. When a fresh board question replaces the hold reason, the reason's question text, unlabeled and option lines, brief, and alternatives are not shown; its recommendation and first valid evidence pointer still fill those fields, and every other nonempty hold-reason `Evidence:` value except `none recorded` appears as a plain line after the board question's lines. Plain lines carry no link or answer binding.
+One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
+Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.
+Only replies inside the card's thread map to that decision; messages typed in the main DM window are not read.
+A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
+Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
+A Slack-returned update failure is reported once for that text change without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt. Local `request_budget_exhausted` and `unreachable` failures propagate without recording an attempted digest, so the next pass can try again.
+Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
+A changed option set is never applied to an existing card and requires a new hold lifecycle.
+Card posts and edits are not limited by `FM_SLACK_POLL_MAX_ANSWERS`; the open cards and existing request deadline bound each mirror pass.
 Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
 Every value posted to Slack (card fields, option text, task ids, and conflict candidates) has `&`, `<`, and `>` escaped as `&amp;`, `&lt;`, and `&gt;`, so a placeholder such as `<source-id>` shows as written instead of being read as Slack markup; the card budget and the post cut count the escaped length and never split an escape, and the wake line keeps the plain text.
-The mirror reads explicit `Option N:`, `Recommendation:`, and `Evidence:` fields from the task body, but does not post other body lines or infer options from arbitrary prose.
+Beyond the labeled parts above and evidence pointers, the mirror reads only explicit `Option N:` fields from the task body and never infers options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.
 When a board card exists but that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
@@ -3559,7 +3617,7 @@ The per-poll answer cap counts only progress made in that poll: a newly staged a
 A journaled row that is only retried or acknowledged again, and a thread read that fails before it delivers an answer, do not count, so a card that can no longer be read, or a row stuck before its acknowledgement, never uses up the cap of the threads after it.
 A journaled row whose thread can no longer be posted to, and a resolution post that fails, are held back the same way: the row stays journaled, the thread stays tracked, and every other thread is still read.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
-Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
+Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post, edit, or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
 No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
@@ -4513,6 +4571,7 @@ FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
+FM_MEMORY_GUARD_BIN=   # test seam: the guard the watcher's memory probe and bin/fm-spawn.sh's admission run instead of bin/fm-mem-guard.sh
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
@@ -4586,11 +4645,11 @@ FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion f
 FMX_FOLLOWUP_MAX_COUNT=3   # local cap on Relay completion follow-ups per linked mention
 FM_PF_RETRY_BACKOFF_SECS=900   # seconds before the next attempt after a retryable promised-public-reply delivery error
 FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs, including zombies, have no age grace
-FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
+FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; both guards share one strict liveness verdict (docs/turnend-guard.md)
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
-FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
+FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # --claude guard re-blocks per failure episode before the loud attended fail-open
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows

@@ -131,6 +131,87 @@ test_hung_probe_is_never_doubled() {
   pass "a probe still running is never started twice, and the poll keeps running"
 }
 
+test_memory_observation_wakes_with_the_process_identity() {
+  local dir state fakebin out pid native rc=0
+  dir=$(make_case memory-health-wake); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  native="$dir/native"; mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  # The alarm baseline record that root probes would derive (tests/fm-mem-guard.test.sh covers that).
+  mkdir -p "$state"
+  jq -n --arg host "$(python3 -c 'import socket; print(socket.gethostname())')" \
+    '{schema: "fm-memory-baseline.v1", host: $host, total_bytes: 34359738368, non_fleet_max_bytes: 1073741824,
+      smallest_reading_max_bytes: 536870912, samples: 2, derivation: "test fixture"}' > "$state/.memory-baseline.json"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":8589934592,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  fm_test_wait_until --while-alive "$pid" --progress-file "$out" -- grep -q 'xprotectd PID 101' "$out" || {
+    stop_owned_watcher "$pid"
+    fail "the watcher failed to present the identifying memory alarm: $(cat "$out") $(cat "$out.err")"
+  }
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "memory alarm stopped watcher with an error: $(cat "$out.err")"
+  assert_contains "$(cat "$state/.wake-queue")" 'xprotectd PID 101' 'the presented memory observation was not durable'
+  jq -es '.[-1].source == "probe" and .[-1].alarms[0].pid == 101' "$state/memory-readings.jsonl" >/dev/null \
+    || fail 'watcher did not retain the alarm reading'
+  # The row stays queued until handling acknowledges it; a handling successor
+  # must supervise instead of presenting the same row again and exiting.
+  start_watcher "$state" "$fakebin" "$out.successor" FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  sleep 4
+  if ! is_live_non_zombie "$pid" || grep -q 'memory-health' "$out.successor"; then
+    stop_owned_watcher "$pid"
+    fail "a handling successor re-presented the surfaced memory row: $(cat "$out.successor") $(cat "$out.successor.err")"
+  fi
+  stop_owned_watcher "$pid"
+  pass 'the real watcher presents its named non-fleet alarm once through the existing durable wake queue'
+}
+
+test_memory_rows_surface_after_a_two_row_marker() {
+  local dir state fakebin out pid native rc=0
+  dir=$(make_case memory-health-marker); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  native="$dir/native"; mkdir -p "$native" "$state"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  jq -n --arg host "$(python3 -c 'import socket; print(socket.gethostname())')" \
+    '{schema: "fm-memory-baseline.v1", host: $host, total_bytes: 34359738368, non_fleet_max_bytes: 1073741824,
+      smallest_reading_max_bytes: 536870912, samples: 2, derivation: "test fixture"}' > "$state/.memory-baseline.json"
+  # The probes run here, not from the poll loop, so both rows are queued before
+  # the watcher first looks and it cannot surface them one at a time.
+  printf '9999999999\n' > "$state/.memory-health-next"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":8589934592,"fleet":false,"run":null},{"pid":102,"ppid":1,"comm":"syspolicyd","started":"start-102","rss_bytes":8589934592,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_MEMORY_FIXTURE_DIR="$native" "$ROOT/bin/fm-mem-guard.sh" probe >/dev/null \
+    || fail 'the first memory probe failed'
+  start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- grep -q 'syspolicyd PID 102' "$out" || {
+    stop_owned_watcher "$pid"
+    fail "the watcher failed to present the two queued memory rows: $(cat "$out") $(cat "$out.err")"
+  }
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "two memory rows stopped the watcher with an error: $(cat "$out.err")"
+  assert_contains "$(cat "$out")" 'xprotectd PID 101' 'the first of the two rows was not presented'
+  printf '[{"pid":103,"ppid":1,"comm":"mds","started":"start-103","rss_bytes":8589934592,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_MEMORY_FIXTURE_DIR="$native" "$ROOT/bin/fm-mem-guard.sh" probe >/dev/null \
+    || fail 'the second memory probe failed'
+  start_watcher "$state" "$fakebin" "$out.third" FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- grep -q 'mds PID 103' "$out.third" || {
+    stop_owned_watcher "$pid"
+    fail "the watcher failed to present the third memory row after two: $(cat "$out.third") $(cat "$out.third.err")"
+  }
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "the third memory row stopped the watcher with an error: $(cat "$out.third.err")"
+  if grep -Eq 'PID 10[12]' "$out.third"; then
+    fail "the third wake presented an already surfaced row again: $(cat "$out.third")"
+  fi
+  pass 'the watcher presents two queued memory rows, then only a third new row'
+}
+
+test_memory_observation_wakes_with_the_process_identity
+test_memory_rows_surface_after_a_two_row_marker
 test_probe_runs_detached_on_its_interval_with_the_home
 test_first_probe_waits_a_full_interval
 test_zero_interval_disables_the_probe

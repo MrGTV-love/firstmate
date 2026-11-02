@@ -10,6 +10,8 @@
 # supervising model. It decides nothing about landing: bin/fm-teardown.sh is
 # the sole authority, and this script only picks which tasks are worth asking
 # it about. It never passes --force or bypasses teardown's safety gates.
+# Its automatic admission marker excludes the attended recorded-bundle exception
+# owned by bin/fm-teardown.sh's header: bundle-only preservation still refuses.
 #
 # A task is reap-ready only when ALL of these hold:
 #   - it is an ordinary ship or scout (never a secondmate, never a remote task);

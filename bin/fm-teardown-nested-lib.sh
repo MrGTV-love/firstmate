@@ -27,8 +27,9 @@
 #     in the copy, waits a bounded time, and sends no KILL; one still alive
 #     refuses the release, named by its pid. A process that is not this
 #     teardown's own is never signalled and refuses at once, named by its pid;
-#   - its work is landed by the existing landed-work rule (teardown_landed).
-# A copy whose work is not proved landed stays, and teardown names why.
+#   - teardown_landed proves delivery or the recorded bundle alternative owned
+#     by bin/fm-teardown.sh's header; the closeout driver keeps its own verdict.
+# A copy with neither proof stays, and teardown names why.
 # One refusal class does not stop the task's own closure. A copy that is clean,
 # owned by no record, process or live launcher, and held back only by ignored
 # files that exist nowhere else or by a HEAD that is not proved landed is HELD:
@@ -55,7 +56,8 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); it loses no commit, because
-# the work is landed, and no tracked change, because the clean proof refuses one.
+# the work is landed or held by a recorded bundle, and no tracked change,
+# because the clean proof refuses one.
 # Any other ignored entry is copied to the task's data directory before removal.
 # The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
@@ -360,6 +362,404 @@ teardown_ignored_sha256() {  # [<path>]
   fi
   case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
   printf '%s\n' "$hash"
+}
+
+# Bundle preservation is separate from delivery, and is deliberately rechecked
+# rather than placed in the immutable-HEAD landing cache. fm-teardown.sh's
+# header owns the record format and supported creation/recovery commands.
+teardown_bundle_refuse() {  # <predicate> [hint]
+  echo "teardown: bundle preservation unavailable: $1." >&2
+  [ -z "${2:-}" ] || echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown." >&2
+  return 1
+}
+
+# Only the stored copy must survive this cleanup. A home can itself be a
+# registered worktree or live below a pool; neither makes its data disposable.
+# Resolve parents physically so aliases into actual removal roots still refuse.
+teardown_bundle_external() {  # <copy> <stored-bundle>
+  local copy=$1 bundle=$2 parent path field root
+  case "$bundle" in /*) ;; *) TEARDOWN_BUNDLE_REASON='bundle path is not absolute'; return 1 ;; esac
+  if [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
+    return 1
+  fi
+  parent=${bundle%/*}
+  [ -n "$parent" ] || parent=/
+  parent=$(fm_task_copy_canonical_dir "$parent") || {
+    TEARDOWN_BUNDLE_REASON='bundle parent cannot be resolved'; return 1;
+  }
+  path="$parent/${bundle##*/}"
+  local roots=() labels=() label i
+  # A missing task copy is proved through its surviving project ref store.
+  # That project is not a removal target, even when it is the active home.
+  if [ -z "${PROJ:-}" ] || ! [ "$copy" -ef "$PROJ" ]; then
+    roots+=("$copy"); labels+=(copy)
+  fi
+  for root in "${WT:-}" "${TEARDOWN_RETURN_SLOT:-}" "${TEARDOWN_ENCLOSING_SLOT:-}" \
+      ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+      ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"}; do
+    [ -z "$root" ] || { roots+=("$root"); labels+=(copy); }
+  done
+  [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
+  [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
+  roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh")
+  labels+=(state state state state)
+  for i in "${!roots[@]}"; do
+    root=${roots[$i]%/}
+    label=${labels[$i]}
+    [ -e "$root" ] || continue
+    field=$(fm_task_copy_canonical_dir "$root") || field=$root
+    case "$path" in "$root"/*|"$field"/*)
+      case "$label" in
+        state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $root" ;;
+        copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $root" ;;
+        *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root" ;;
+      esac
+      return 1 ;;
+    esac
+  done
+}
+
+# A bundle must restore on its own: fetch every recorded tip into a fresh empty
+# repository that holds none of the copy's objects, then require it to pass
+# git fsck --strict.
+# A success is remembered for this process by bundle digest, object format and
+# recorded tips, so the repeated proofs of one teardown restore it once.
+TEARDOWN_BUNDLE_RESTORED=
+teardown_bundle_restorable() {  # <copy> <bundle> <bundle-sha256> <tips>
+  local copy=$1 bundle=$2 digest=$3 tips=$4 scratch format key tip i=0 rc=0
+  local -a specs=()
+  format=$(git -C "$copy" rev-parse --show-object-format 2>/dev/null) || format=sha1
+  key="$digest $format $tips"
+  case $'\n'"$TEARDOWN_BUNDLE_RESTORED" in *$'\n'"$key"$'\n'*) return 0 ;; esac
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-teardown-bundle-restore.XXXXXX") || return 1
+  for tip in $tips; do
+    i=$((i + 1))
+    specs+=("$tip:refs/restore/$i")
+  done
+  git init --quiet --bare --object-format="$format" "$scratch" >/dev/null 2>&1 \
+    && git -C "$scratch" fetch --quiet "$bundle" "${specs[@]}" >/dev/null 2>&1 \
+    && git -C "$scratch" fsck --strict --no-dangling >/dev/null 2>&1 \
+    || rc=1
+  rm -rf "$scratch"
+  [ "$rc" != 0 ] || TEARDOWN_BUNDLE_RESTORED+="$key"$'\n'
+  return "$rc"
+}
+
+# HEADs whose checked-out branches teardown deletes, in this ref store only.
+# Each nested/foreign copy also receives its own proof. Treehouse return resets
+# HEAD, not other branches. The only extra branch deletion is the task's narrowly
+# named archive reaper, whose independent merged-lineage proof remains required.
+teardown_bundle_removed_refs() {  # <copy>
+  local copy=$1 common other root
+  local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+  common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  for root in "${WT:-}" "${TEARDOWN_RETURN_SLOT:-}" "${TEARDOWN_ENCLOSING_SLOT:-}"; do
+    [ -d "$root" ] || continue
+    other=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+    [ "$common" = "$other" ] || continue
+    git -C "$root" rev-parse --verify HEAD || return 1
+  done
+  [ -d "${PROJ:-}" ] || return 0
+  other=$(git -C "$PROJ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  [ "$common" = "$other" ] || return 0
+  git -C "$copy" for-each-ref --format='%(refname)' \
+    "refs/heads/archive/$ID-submitted-$hex8" "refs/heads/archive/$ID-pipeline-$hex8"
+}
+
+# The maximal locally-only tips reachable from the refs on stdin, one per line.
+# --children leaves maximal tips as one-field lines.
+teardown_bundle_tips() {  # <copy>
+  local walk
+  walk=$(git -C "$1" rev-list --stdin --children --not --remotes 2>/dev/null) || return 1
+  printf '%s\n' "$walk" | awk 'NF == 1 {print $1}'
+}
+
+# Automatic cleanup still requires landing, including replays of an attended
+# teardown's interrupted return. Never let the mere record authorize it.
+teardown_bundle_attended() {
+  [ "${FM_IDLE_REAP_ADMISSION:-0}" != 1 ] \
+    && [ "${FM_SUPERVISION_ACTOR:-main}" = main ] \
+    && [ ! -e "$STATE/.afk" ] && [ ! -L "$STATE/.afk" ] \
+    && [ ! -e "$STATE/.afk-contract" ] && [ ! -L "$STATE/.afk-contract" ]
+}
+
+# Reads $DATA/$ID/preservation-bundles.tsv into TEARDOWN_BUNDLE_RECORD_PATH,
+# TEARDOWN_BUNDLE_RECORD_HASH and TEARDOWN_BUNDLE_RECORD_TIPS (space-separated
+# full tips). On failure TEARDOWN_BUNDLE_REASON names the defect.
+teardown_bundle_record() {
+  local record="$DATA/$ID/preservation-bundles.tsv" line='' extra='' extra_seen='' rest bundle hash tips tip
+  local -a recorded=()
+  TEARDOWN_BUNDLE_RECORD_PATH=
+  TEARDOWN_BUNDLE_RECORD_HASH=
+  TEARDOWN_BUNDLE_RECORD_TIPS=
+  if [ ! -f "$record" ] || [ -L "$record" ]; then
+    TEARDOWN_BUNDLE_REASON="missing preservation record (regular nonsymlink file required): $record"
+    return 1
+  fi
+  {
+    IFS= read -r line || true
+    if IFS= read -r extra || [ -n "$extra" ]; then extra_seen=1; fi
+  } < "$record"
+  if [ -n "$extra_seen" ]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (exactly one line required)"
+    return 1
+  fi
+  if [ -z "$line" ]; then
+    TEARDOWN_BUNDLE_REASON="empty preservation record: $record"
+    return 1
+  fi
+  bundle=${line%%$'\t'*}
+  rest=${line#*$'\t'}
+  hash=${rest%%$'\t'*}
+  tips=${rest#*$'\t'}
+  if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
+      || [ -z "$bundle" ] || [ -z "$tips" ] \
+      || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
+      || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)"
+    return 1
+  fi
+  read -r -a recorded <<< "$tips"
+  if [ "${#recorded[@]}" = 0 ]; then
+    TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (no commit tips)"
+    return 1
+  fi
+  for tip in "${recorded[@]}"; do
+    if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+      TEARDOWN_BUNDLE_REASON="malformed preservation record in $record (invalid full commit tip: $tip)"
+      return 1
+    fi
+  done
+  TEARDOWN_BUNDLE_RECORD_PATH=$bundle
+  TEARDOWN_BUNDLE_RECORD_HASH=$hash
+  TEARDOWN_BUNDLE_RECORD_TIPS="${recorded[*]}"
+}
+
+# The captain's land-or-drop question for commits only a bundle holds. It names
+# the copy's unlanded tips apart from the record's advertised tips, since the
+# bundle may also advertise tips that are already landed.
+teardown_bundle_hold_reason() {  # <bundle> <unlanded-tips> <recorded-tips>
+  printf 'Land or drop the unlanded commits of %s, tips %s: they are preserved in bundle %s, whose record lists advertised tips %s; an advertised tip may already be landed.' \
+    "$ID" "$2" "$1" "$3"
+}
+
+# Prints the id of an open task held for the captain whose hold reason names
+# <bundle> and every <tip>. Returns 1 when none does, and 2 when the held rows
+# cannot be read completely.
+teardown_bundle_captain_call() {  # <bundle> <tip>...
+  local listed
+  listed=$(fm_backlog_row_list "$DATA" --state held --fields hold_kind,hold_reason 2>/dev/null) || return 2
+  printf '%s\n' "$listed" | fm_hold_reason_decode_stream toon | perl -MJSON::PP -e '
+    use strict;
+    use warnings;
+    my ($bundle, @tips) = @ARGV;
+    my $json = JSON::PP->new->allow_nonref;
+    my (@names, $count, $declared, $match);
+    my $parsed = 0;
+    while (my $line = <STDIN>) {
+      chomp $line;
+      if ($line =~ /^count: (\d+)$/) { $count = $1; next; }
+      if ($line =~ /^tasks\[(\d+)\]\{([^}]*)\}:$/) { $declared = $1; @names = split /,/, $2; next; }
+      if ($line !~ /^  (.*)$/) { @names = (); next; }
+      next unless @names;
+      my @fields = $1 =~ /("(?:[^"\\]|\\.)*"|[^,]+)/g;
+      exit 2 unless @fields == @names;
+      $parsed++;
+      my %row;
+      @row{@names} = map { /^"/ ? $json->decode($_) : $_ } @fields;
+      next if ($row{state} // "") eq "done" || ($row{hold_kind} // "") ne "captain";
+      my $reason = $row{hold_reason} // "";
+      next if index($reason, $bundle) < 0 || grep { index($reason, $_) < 0 } @tips;
+      $match //= $row{id};
+    }
+    exit 2 unless defined $count && $parsed == $count && (!defined $declared || $declared == $parsed);
+    exit 1 unless defined $match;
+    print "$match\n";
+  ' "$@"
+}
+
+# The bundle route requires the captain's land-or-drop call to be filed: this
+# task's row is held for the captain, and an open captain-held task's reason
+# names the bundle and every recorded tip. Teardown never files it. A home whose
+# backlog transition does not apply (Orca cleanup recovery or a manual backlog)
+# has no row that can hold the call, so the route refuses there, and a closed
+# row cannot be held; neither prints a command that could not pass.
+teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-tips>
+  local call rc=0 reason held=0 title
+  local -a repo=()
+  if [ "${TEARDOWN_BACKLOG_APPLIES:-0}" != 1 ]; then
+    teardown_bundle_refuse "$1: no backlog row can hold the captain's land-or-drop call in this home"
+    return 1
+  fi
+  [ "${TEARDOWN_BACKLOG_TRANSITION:-close}" != retain ] || held=1
+  # shellcheck disable=SC2086 # Recorded tips are full hex object names.
+  call=$(teardown_bundle_captain_call "$1" $3) || rc=$?
+  if [ "$rc" = 0 ] && [ "$held" = 1 ]; then
+    echo "teardown: the captain's land-or-drop call for bundle $1 is held on task $call" >&2
+    return 0
+  fi
+  if [ "$rc" -ge 2 ]; then
+    teardown_bundle_refuse "$1: the captain's held calls cannot be read completely"
+    return 1
+  fi
+  reason=$(teardown_bundle_hold_reason "$1" "$2" "$3")
+  title="Land or drop the bundle-preserved commits of $ID"
+  if [ "$held" = 1 ]; then
+    teardown_bundle_refuse "$1: task $ID is held for the captain on another question, and no open captain-held task's hold reason names the bundle and every recorded tip"
+    {
+      printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "$title" \
+        --origin "$ID" --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  elif fm_backlog_row_probe "$DATA" "$ID"; then
+    if [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ]; then
+      teardown_bundle_refuse "$1: task $ID's backlog row is closed, so it cannot hold the captain's land-or-drop call"
+      return 1
+    fi
+    teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
+    {
+      printf 'Hold it for the captain, then retry ordinary teardown:'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+    [ -z "${PROJ:-}" ] || repo=(--repo "${PROJ##*/}")
+    teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
+    {
+      printf 'File the land-or-drop call as its row, then retry ordinary teardown:'
+      printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason"
+      printf '\n'
+    } >&2
+  else
+    teardown_bundle_refuse "$1: task $ID's backlog row cannot be read"
+  fi
+  return 1
+}
+
+# Admission owns a durable copy, not the lifetime of the operator's source.
+# Stage beside the destination and publish only after the copied bytes survive
+# every removal root and Git verification. Later proofs reuse the stored copy at
+# its fixed path once its digest matches the record. The record's SHA-256 and
+# that fixed path, which the close note also names, recover it after the source
+# is deleted.
+teardown_bundle_store() {  # <copy> <source> <sha256>
+  local copy=$1 source=$2 hash=$3 root="$DATA/$ID/preserved-bundles" stage digest
+  TEARDOWN_BUNDLE_STORED="$root/$hash.bundle"
+  if [ -f "$TEARDOWN_BUNDLE_STORED" ] && [ ! -L "$TEARDOWN_BUNDLE_STORED" ] \
+      && digest=$(teardown_ignored_sha256 "$TEARDOWN_BUNDLE_STORED") && [ "$digest" = "$hash" ]; then
+    teardown_bundle_external "$copy" "$TEARDOWN_BUNDLE_STORED"
+    return
+  fi
+  mkdir -p "$root" || { TEARDOWN_BUNDLE_REASON='bundle storage directory cannot be created'; return 1; }
+  if [ -L "$TEARDOWN_BUNDLE_STORED" ] \
+      || { [ -e "$TEARDOWN_BUNDLE_STORED" ] && [ ! -f "$TEARDOWN_BUNDLE_STORED" ]; }; then
+    TEARDOWN_BUNDLE_REASON='stored bundle is not a regular nonsymlink file'; return 1
+  fi
+  stage=$(mktemp "$root/.bundle.XXXXXX") || {
+    TEARDOWN_BUNDLE_REASON='stored bundle staging file cannot be created'; return 1;
+  }
+  if ! cp "$source" "$stage"; then
+    TEARDOWN_BUNDLE_REASON='bundle cannot be copied into task data'
+  elif ! teardown_bundle_external "$copy" "$stage"; then
+    :
+  elif ! digest=$(teardown_ignored_sha256 "$stage") || [ "$digest" != "$hash" ]; then
+    TEARDOWN_BUNDLE_REASON='stored bundle sha256 does not match record'
+  elif ! git -C "$copy" bundle verify "$stage" >/dev/null 2>&1; then
+    TEARDOWN_BUNDLE_REASON='stored git bundle verify failed'
+  elif ! mv -f "$stage" "$TEARDOWN_BUNDLE_STORED"; then
+    TEARDOWN_BUNDLE_REASON='stored bundle cannot be published'
+  fi
+  rm -f "$stage"
+  [ -z "$TEARDOWN_BUNDLE_REASON" ]
+}
+
+# <ref> itself must carry a locally-only commit, or delivery proof is still
+# required. Coverage includes only this cleanup's HEADs and deleted branch refs,
+# never unrelated unheld branches in the shared repository.
+teardown_bundle_preserved() {  # <copy> <ref> [hint]
+  local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
+  local bundle source hash tips tip own required side heads advertised digest stored
+  TEARDOWN_BUNDLE_ACCEPTED=
+  if ! teardown_bundle_attended; then
+    if [ -f "$record" ] && [ ! -L "$record" ] \
+        && own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") && [ -n "$own" ]; then
+      teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
+      echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
+    fi
+    return 1
+  fi
+  own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if [ -z "$own" ]; then
+    teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
+    return 1
+  fi
+  side=$(teardown_bundle_removed_refs "$copy") || {
+    teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
+  }
+  required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if ! teardown_bundle_record; then
+    teardown_bundle_refuse "$TEARDOWN_BUNDLE_REASON" "$hint"
+    return 1
+  fi
+  bundle=$TEARDOWN_BUNDLE_RECORD_PATH
+  hash=$TEARDOWN_BUNDLE_RECORD_HASH
+  tips=$TEARDOWN_BUNDLE_RECORD_TIPS
+  TEARDOWN_BUNDLE_REASON=
+  source=$bundle
+  stored="$DATA/$ID/preserved-bundles/$hash.bundle"
+  # A completed admission survives deletion of its original source. Never mask
+  # changed bytes or a symlink at a source that still exists.
+  if [ ! -e "$bundle" ] && [ ! -L "$bundle" ] && [ -f "$stored" ]; then
+    bundle=$stored
+  fi
+  if [[ "$bundle" != /* ]]; then
+    TEARDOWN_BUNDLE_REASON='bundle path is not absolute'
+  elif [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
+  elif ! digest=$(teardown_ignored_sha256 "$bundle"); then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 cannot be read'
+  elif [ "$digest" != "$hash" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 does not match record'
+  elif ! git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1; then
+    TEARDOWN_BUNDLE_REASON='git bundle verify failed'
+  elif ! heads=$(git -C "$copy" bundle list-heads "$bundle" 2>/dev/null); then
+    TEARDOWN_BUNDLE_REASON='bundle advertised tips cannot be read'
+  else
+    advertised=$(printf '%s\n' "$heads" | awk '{print $1}' | tr '\n' ' ')
+    while IFS= read -r tip; do
+      case " $advertised " in *" $tip "*) ;; *)
+        TEARDOWN_BUNDLE_REASON="bundle does not list unlanded tip $tip"; break ;;
+      esac
+      case " $tips " in *" $tip "*) ;; *)
+        TEARDOWN_BUNDLE_REASON="record does not list unlanded tip $tip"; break ;;
+      esac
+    done <<< "$required"
+    if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
+      for tip in $tips; do
+        case " $advertised " in *" $tip "*) ;; *)
+          TEARDOWN_BUNDLE_REASON="recorded tip $tip is not advertised by bundle"; break ;;
+        esac
+      done
+    fi
+    if [ -z "$TEARDOWN_BUNDLE_REASON" ] && ! teardown_bundle_restorable "$copy" "$bundle" "$digest" "$tips"; then
+      TEARDOWN_BUNDLE_REASON='bundle cannot be restored in an isolated repository'
+    fi
+  fi
+  if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
+    teardown_bundle_require_captain_call "$source" "$(printf '%s' "$required" | paste -sd ' ' -)" "$tips" || return 1
+    if teardown_bundle_store "$copy" "$bundle" "$hash"; then
+      echo "teardown: preserved unlanded commits in bundle $TEARDOWN_BUNDLE_STORED sha256=$hash tips=$tips (source $source)" >&2
+      TEARDOWN_BUNDLE_ACCEPTED=$TEARDOWN_BUNDLE_STORED
+      return 0
+    fi
+  fi
+  teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
 # Copies every preservable ignored entry of <copy> into

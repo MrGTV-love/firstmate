@@ -1003,7 +1003,7 @@ test_spawn_explicit_harness_uses_explicit_profile_axes() {
 }
 
 test_spawned_secondmate_uses_its_harness_supervision_model() {
-  local harness expected w sm launchlog launch fakebin out
+  local harness w sm launchlog launch fakebin out reason
   for harness in codex claude; do
     w="$TMP_ROOT/spawn-supervision-model-$harness"
     sm="$w/sm"
@@ -1015,25 +1015,25 @@ test_spawned_secondmate_uses_its_harness_supervision_model() {
     fm_write_meta "$sm/state/task.meta" "window=firstmate:fm-task" "kind=ship"
     touch "$sm/state/.last-watcher-beat"
     fakebin="$w/tmux-sm/fakebin"
-    # Point the guard at the fixture home, not at whatever checkout this suite
-    # happens to be running from. The guard also reports a tangled primary
-    # checkout, so without this the branch a contributor is working on decides
-    # whether this assertion passes.
+    # The launched harness reports its home's wake-consumer readiness. That
+    # verdict is model-aware (fm_watcher_supervision_verdict), so a fresh beacon
+    # with no live watcher is supervised under auto-arm and no-watcher under a
+    # persistent watcher. The launch's FM_HOME selects the fixture home.
     cat > "$fakebin/$harness" <<SH
 #!/usr/bin/env bash
-FM_ROOT_OVERRIDE="$sm" "$ROOT/bin/fm-guard.sh"
+"$ROOT/bin/fm-inbox.sh" ready
 SH
     chmod +x "$fakebin/$harness"
     launch=$(cat "$launchlog")
     out=$(PATH="$fakebin:$BASE_PATH" CLAUDECODE=1 bash -c "$launch" 2>&1)
+    reason=$(printf '%s\n' "$out" | jq -r '.wake_consumer.reason' 2>/dev/null || true)
     case "$harness" in
       codex)
-        expected='WATCHER DOWN - SUPERVISION IS OFF'
-        assert_contains "$out" "$expected" \
-          "Codex secondmate inherited Claude auto-arm despite its persistent watcher model"
+        [ "$reason" = no-watcher ] \
+          || fail "Codex secondmate inherited Claude auto-arm despite its persistent watcher model, got: $out"
         ;;
       claude)
-        [ -z "$out" ] \
+        [ "$reason" = supervised ] \
           || fail "Claude secondmate with a fresh beacon should use auto-arm supervision, got: $out"
         ;;
     esac

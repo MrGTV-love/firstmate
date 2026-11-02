@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Offline settlement/audit regression: no provider or model requests.
+# Offline settlement/audit and native construction regression: fake endpoints
+# only; no model turns or inference. Native catalogue discovery is intercepted.
 set -u
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 TMP_ROOT=$(fm_test_tmproot fm-jev-guard-audit)
 export AUDIT_ROOT="$ROOT" AUDIT_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'guard settlement/audit regression'
@@ -18,6 +19,66 @@ const state = process.env.AUDIT_TMP;
 mkdirSync(`${state}/config`);
 const context = { home: state, config: `${state}/config`, state, task: 'audit', project: 'firstmate', worktree: state, data: state, policy: report.GUARD_POLICY_VERSION };
 const service = report.createGuardService(context);
+const egress = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
+await test('dispatch grants are explicit unfenced needs, never inferred consent', () => {
+  const brief = `${state}/dispatch-brief.md`;
+  const write = body => writeFileSync(brief, `# Task\n## Captain's intent\nSearch code and read docs.\nEgress needs: ["provider"]\n## Firstmate spec\n${body}\n`);
+  write('No outbound capability requested.');
+  assert.deepEqual(egress.briefEgress(brief), []);
+  write('```\nEgress needs: ["provider"]\n```\nEgress needs: ["web","semantic-search","web"]');
+  assert.deepEqual(egress.briefEgress(brief), ['semantic-search', 'web']);
+  write('```\n  Egress needs: ["provider"]\n```\nEgress needs: ["web"]');
+  assert.deepEqual(egress.briefEgress(brief), ['web'], 'an indented fenced example is not a directive');
+  for (const body of ['Egress needs: invalid', 'Egress needs: null', 'Egress needs: [1]', 'Egress needs: ["unknown"]',
+    'Egress needs: []\nEgress needs: ["web"]', 'Egress needs: []\0', ' Egress needs: ["semantic-search"]',
+    '   Egress needs: []', '\tEgress needs: ["web"]', 'Build it.\n  Egress needs: ["semantic-search"]\nEgress needs: []']) {
+    write(body);
+    assert.throws(() => egress.briefEgress(brief), undefined, body);
+  }
+  rmSync(brief);
+  assert.throws(() => egress.briefEgress(brief));
+  writeFileSync(`${brief}.target`, '# Task\n## Firstmate spec\nEgress needs: ["semantic-search"]\n');
+  symlinkSync(`${brief}.target`, brief);
+  assert.throws(() => egress.briefEgress(brief), /non-symlinked/);
+});
+await test('native find admission intersects authorization with project and helper eligibility', () => {
+  for (const kind of ['ship', 'scout']) {
+    assert.equal(egress.nativeFindEnabled([], 'firstmate', false, kind), false);
+    assert.equal(egress.nativeFindEnabled(['web', 'provider'], 'firstmate', false, kind), false);
+    assert.equal(egress.nativeFindEnabled(['semantic-search'], 'firstmate', false, kind), true);
+    assert.equal(egress.nativeFindEnabled(['semantic-search'], 'other', false, kind), false);
+    assert.equal(egress.nativeFindEnabled(['semantic-search'], 'firstmate', true, kind), false);
+  }
+  assert.equal(egress.nativeFindEnabled([], 'firstmate', false, 'secondmate'), true, 'persistent secondmate eligibility is unchanged');
+});
+await test('recorded launch authorization fails closed without changing or replacing the record', () => {
+  const task = 'recorded-launch';
+  const meta = `${state}/${task}.meta`;
+  const record = () => JSON.parse(execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', `${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`, 'record', state, task], { encoding: 'utf8' }));
+  assert.deepEqual(record(), [], 'missing record');
+  for (const content of ['project=firstmate\n', 'egress=invalid\n', 'egress=["semantic-search"]\negress=[]\n', 'egress=["semantic-search","unknown"]\n']) {
+    writeFileSync(meta, content);
+    assert.deepEqual(record(), []);
+    assert.equal(readFileSync(meta, 'utf8'), content, 'launch resolution never repairs or expands consent');
+  }
+  writeFileSync(meta, 'egress=["semantic-search"]\n');
+  assert.deepEqual(record(), ['semantic-search']);
+  rmSync(meta);
+  writeFileSync(`${meta}.target`, 'egress=["semantic-search"]\n');
+  symlinkSync(`${meta}.target`, meta);
+  assert.deepEqual(record(), [], 'symlinked authorization never exposes find');
+});
+await test('the launch interface answers when node reaches it through a symlinked root', () => {
+  const linked = `${state}/linked-bin`;
+  symlinkSync(`${process.env.AUDIT_ROOT}/bin`, linked);
+  const run = (...args) => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', `${linked}/fm-jev-egress.ts`, ...args], { encoding: 'utf8' });
+  assert.equal(run('find', '["semantic-search"]', 'firstmate', '0', 'ship'), 'on\n');
+  assert.equal(run('find', '[]', 'firstmate', '0', 'ship'), 'off\n');
+  writeFileSync(`${state}/linked.meta`, 'egress=["web"]\n');
+  assert.deepEqual(JSON.parse(run('record', state, 'linked')), ['web']);
+  writeFileSync(`${state}/linked-brief.md`, '# Task\n## Firstmate spec\nBuild it.\nEgress needs: ["semantic-search"]\n');
+  assert.deepEqual(JSON.parse(run('brief', `${state}/linked-brief.md`)), ['semantic-search']);
+});
 await test('audit history merges legacy and task rows without reading unrelated state', () => {
   const dir = `${state}/reader`;
   mkdirSync(dir);
@@ -540,7 +601,237 @@ await test('S2(d): local read and bash stay unjudged, write/edit keep determinis
 JS
 pass 'offline guard settlement, cost completeness and S2 egress acceptance'
 
+# The real launch owner publishes consent before a fake endpoint can start;
+# installed omp below consumes these actual generated overlays, not a copied policy.
+export AUDIT_DISPATCH_CASES="$TMP_ROOT/dispatch-cases"
+: > "$AUDIT_DISPATCH_CASES"
+# Replace the policy helper's answer for one launch command; every other
+# command still reaches the real helper through the real runtime.
+fake_egress_helper() { # <fakebin> <command> <exit-code>
+  local real_bun
+  real_bun=$(command -v bun) || return 1
+  cat > "$1/bun" <<SH
+#!/usr/bin/env bash
+case "\$1|\$2" in
+  */fm-jev-egress.ts\|$2) exit $3 ;;
+esac
+exec "$real_bun" "\$@"
+SH
+  chmod +x "$1/bun"
+}
+# Every jev-egress-grant event as "<session> <decision> <source_ok>", in order.
+egress_events() { # <log>
+  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.session) \(.decision) \(.source_ok)"' "$1"
+}
+for posture in directive-only absent granted other-class no-helpers other-project invalid malformed duplicate indented silent-runtime silent-find failed-find failed-record; do
+  world="$TMP_ROOT/dispatch-$posture"
+  home="$world/home"
+  project="$world/firstmate"
+  [ "$posture" != other-project ] || project="$world/other"
+  wt="$world/wt"
+  id="egress-$posture"
+  fakebin=$(make_spawn_fakebin "$world/fake" claude omp)
+  fm_test_spawn_home "$home" omp
+  fm_git_worktree "$project" "$wt" "scratch-$posture"
+  fm_test_spawn_brief "$home" "$id"
+  grant='[]'
+  expected=off
+  case "$posture" in
+    granted|silent-find|failed-find) grant='["semantic-search"]'; expected=on ;;
+    no-helpers|other-project) grant='["semantic-search"]' ;;
+    other-class) grant='["web","provider"]' ;;
+    invalid) grant='["semantic-search","unknown"]' ;;
+    malformed) grant='["semantic-search"' ;;
+    duplicate) grant=$'[]\nEgress needs: ["web"]' ;;
+  esac
+  if [ "$posture" = indented ]; then
+    printf '\n  Egress needs: ["semantic-search"]\n' >> "$home/data/$id/brief.md"
+  elif [ "$posture" != absent ]; then
+    printf '\nEgress needs: %s\n' "$grant" >> "$home/data/$id/brief.md"
+  fi
+  if [ "$posture" = directive-only ]; then
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+## Firstmate spec
+Egress needs: []
+### Out of scope
+None.
+EOF
+  fi
+  # The fixture endpoint observes the record at the actual launch send, not
+  # merely after fm-spawn returns. No real agent or terminal is started.
+  mv "$fakebin/tmux" "$fakebin/tmux-base"
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *pane_current_command*) printf 'zsh\n'; exit 0 ;;
+  *launch.*.sh*) cp "$FM_EGRESS_META" "$FM_EGRESS_OBSERVED" || exit 1 ;;
+esac
+exec "${0%/*}/tmux-base" "$@"
+SH
+  chmod +x "$fakebin/tmux"
+  case "$posture" in
+    silent-runtime) fake_egress_helper "$fakebin" '*' 0 ;;
+    silent-find) fake_egress_helper "$fakebin" find 0 ;;
+    failed-find) fake_egress_helper "$fakebin" find 2 ;;
+    *) true ;;
+  esac || { printf 'skip - %s needs bun for the rest of spawn\n' "$posture"; continue; }
+  extra=()
+  [ "$posture" != no-helpers ] || extra=(--omp-no-helpers)
+  out=$(FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
+    FM_GUARD_EVENT_LOG="$world/guard-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --scout --harness omp ${extra[@]+"${extra[@]}"})
+  status=$?
+  case "$posture" in
+    invalid|malformed|duplicate|indented|silent-runtime)
+      refused="$id:dispatch-grant deny false" ;;
+    silent-find|failed-find)
+      refused="$id:dispatch-grant allow true"$'\n'"$id:dispatch-find deny false" ;;
+    directive-only) refused=directive-only ;;
+    *) refused= ;;
+  esac
+  if [ -n "$refused" ]; then
+    [ "$status" -ne 0 ] || fail "$posture dispatch input was accepted: $out"
+    case "$posture" in
+      invalid|malformed|duplicate|indented) assert_contains "$out" 'invalid or unreadable task egress input' "$posture directive refusal" ;;
+      silent-runtime) assert_contains "$out" 'egress policy returned no grant' 'silent grant refusal' ;;
+      silent-find|failed-find) assert_contains "$out" 'egress policy returned no find capability' "$posture find refusal" ;;
+    esac
+    if [ "$posture" != directive-only ]; then
+      assert_equals "$refused" "$(egress_events "$world/guard-events.jsonl")" "$posture dispatch refusal must emit exactly one egress deny event"
+      pass "$posture dispatch refusal emits exactly one egress deny event"
+    fi
+    [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id.omp-fallback.yml" ] || fail 'invalid dispatch input provisioned a worker'
+    continue
+  fi
+  expect_code 0 "$status" "$posture dispatch must succeed: $out"
+  assert_equals "$id:dispatch-grant allow true"$'\n'"$id:dispatch-find allow true" "$(egress_events "$world/guard-events.jsonl")" \
+    "$posture dispatch must emit exactly one allow per egress decision"
+  assert_equals "$grant" "$(sed -n 's/^egress=//p' "$world/at-launch.meta")" 'grant must already be canonical at launch'
+  assert_equals "$expected" "$(jq -r .find.enabled "$home/state/$id.omp-fallback.yml")" "$posture find capability"
+  if [ "$posture" = failed-record ]; then
+    cp "$home/state/$id.meta" "$world/before-failed-relaunch.meta"
+    if fake_egress_helper "$fakebin" record 2; then
+      if out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
+        FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch); then
+        fail "relaunch without a resolvable recorded grant was accepted: $out"
+      fi
+      assert_contains "$out" 'egress policy returned no grant' 'failed record refusal'
+      assert_equals "$id:dispatch-grant deny false" "$(egress_events "$world/relaunch-events.jsonl")" \
+        'relaunch refusal must emit exactly one egress deny event'
+      cmp -s "$world/before-failed-relaunch.meta" "$home/state/$id.meta" || fail 'refused relaunch changed task authorization'
+      pass 'relaunch refusal emits exactly one egress deny event'
+    else
+      printf 'skip - relaunch refusal needs bun for the rest of spawn\n'
+    fi
+    continue
+  fi
+  printf '%s|%s|%s\n' "$posture" "$home/state/$id.omp-fallback.yml" "$expected" >> "$AUDIT_DISPATCH_CASES"
+  if [ "$posture" = absent ]; then
+    printf '\nEgress needs: ["semantic-search"]\n' >> "$home/data/$id/brief.md"
+    out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_EGRESS_META="$home/state/$id.meta" FM_EGRESS_OBSERVED="$world/at-launch.meta" \
+      FM_GUARD_EVENT_LOG="$world/relaunch-events.jsonl" fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+    expect_code 0 $? "relaunch must not authorize the edited brief: $out"
+    assert_equals "$id:dispatch-grant allow true"$'\n'"$id:dispatch-find allow true" "$(egress_events "$world/relaunch-events.jsonl")" \
+      'relaunch must emit exactly one allow per egress decision'
+    assert_equals '[]' "$(sed -n 's/^egress=//p' "$home/state/$id.meta")" 'relaunch preserves recorded consent'
+    assert_equals off "$(jq -r .find.enabled "$home/state/$id.omp-fallback.yml")" 'relaunch keeps ungranted find absent'
+    cp "$home/data/$id/brief.md" "$world/filled-brief.md"
+    cp "$home/state/$id.meta" "$world/before-empty-promotion.meta"
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+## Firstmate spec
+Egress needs: []
+### Out of scope
+None.
+EOF
+    out=$(HOME="$home/user-home" PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+      "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "directive-only Firstmate spec permitted promotion: $out"
+    cmp -s "$world/before-empty-promotion.meta" "$home/state/$id.meta" || fail 'refused promotion changed task authorization or kind'
+    mv "$world/filled-brief.md" "$home/data/$id/brief.md"
+    out=$(HOME="$home/user-home" PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+      "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)
+    expect_code 0 $? "promotion must preserve consent: $out"
+    assert_equals '[]' "$(sed -n 's/^egress=//p' "$home/state/$id.meta")" 'promotion must not expand the grant'
+  fi
+done
+pass 'dispatch grants precede launch; native find respects consent and eligibility; relaunch/promotion cannot expand consent'
+
 if command -v omp >/dev/null 2>&1; then
+  node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'installed omp dispatch find construction'
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createServer } from 'node:http';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+const lab = `${process.env.AUDIT_TMP}/find-construction`;
+mkdirSync(`${lab}/agent`, { recursive: true });
+writeFileSync(`${lab}/agent/config.yml`, 'setupVersion: 2\nfind:\n  enabled: on\neval:\n  py: false\n  js: true\ntools:\n  xdev: true\n');
+const requests = [];
+const server = createServer((req, res) => { requests.push({ url: req.url, method: req.method }); res.writeHead(503); res.end(); });
+server.on('connect', (req, socket) => { requests.push({ url: req.url, method: 'CONNECT' }); socket.destroy(); });
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+try {
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (const line of readFileSync(process.env.AUDIT_DISPATCH_CASES, 'utf8').trim().split('\n')) {
+    const [posture, overlay, expected] = line.split('|');
+    const proof = `${lab}/${posture}.json`;
+    const extension = `${lab}/${posture}.ts`;
+    writeFileSync(extension, `import { writeFileSync } from 'node:fs';
+import { settings } from '@oh-my-pi/pi-coding-agent/config/settings';
+import { lookup } from '@oh-my-pi/pi-coding-agent/config/registry';
+import { createTools } from '@oh-my-pi/pi-coding-agent/tools/index';
+export default function(pi: any) {
+  pi.registerProvider('typesafe', { apiKey: 'synthetic-construction-only', baseUrl: ${JSON.stringify(`${base}/typesafe`)} });
+  pi.on('session_start', async () => {
+    const root: any = { cwd: process.cwd(), settings, skipPythonPreflight: true };
+    await createTools(root, ['read', 'write', 'eval', 'find']);
+    const child = await createTools({ cwd: process.cwd(), settings, taskDepth: 1, restrictToolNames: true, skipPythonPreflight: true }, ['read', 'write', 'find']);
+    const all = pi.getAllTools();
+    writeFileSync(${JSON.stringify(proof)}, JSON.stringify({ active: pi.getActiveTools(), all: all.map(t => t.name),
+      helperDescription: all.find(t => t.name === 'eval')?.description, child: child.map(t => t.name),
+      find: lookup('find.enabled')?.get(settings), xdev: !!root.xdev,
+      deviceFind: root.xdev?.tools.has('find'), mountedFind: root.xdev?.mountedNames.has('find') }));
+    process.exit(0);
+  });
+}`);
+    await promisify(execFile)(`${process.env.AUDIT_ROOT}/bin/fm-proc-budget.sh`, ['--own-procs', '128', '--', 'omp', '--mode', 'rpc', '--model', 'openai/gpt-4.1', '--no-session',
+      '--no-extensions', '-e', extension, '--config', `${process.env.AUDIT_ROOT}/.omp/fm-worker-overlay.yml`, '--config', overlay,
+      '--no-skills', '--no-rules', '--no-context-files', '--no-title', '--no-lsp'],
+      { cwd: lab, env: { PATH: process.env.PATH, HOME: lab, PI_CODING_AGENT_DIR: `${lab}/agent`, OMP_SKIP_SETUP: '1',
+        OPENAI_API_KEY: 'synthetic-construction-only', OPENAI_BASE_URL: base, TYPESAFE_API_KEY: 'synthetic-construction-only',
+        HTTP_PROXY: base, HTTPS_PROXY: base, ALL_PROXY: base } });
+    const observed = JSON.parse(readFileSync(proof, 'utf8'));
+    const enabled = expected === 'on';
+    assert.equal(observed.find, expected, posture);
+    assert.equal(observed.all.includes('find'), enabled, `${posture}: actual native registry`);
+    assert.equal(observed.active.includes('find'), enabled, `${posture}: model tools`);
+    assert.equal(observed.child.includes('find'), enabled, `${posture}: native child construction with inherited settings`);
+    assert.equal(observed.xdev, true, `${posture}: native device dispatcher exercised`);
+    assert.equal(observed.deviceFind, enabled, `${posture}: device dispatcher registry`);
+    const helperNames = observed.helperDescription?.match(/Session tool names: ([^\n]+)/)?.[1];
+    assert.ok(helperNames?.includes('`read`'), `${posture}: native Eval must expose its actual bridge inventory`);
+    assert.equal(helperNames.includes('`find`'), enabled, `${posture}: ordinary Eval helper inventory`);
+    if (!enabled) assert.equal(observed.mountedFind, false, `${posture}: no mounted device`);
+    // Registry initialization makes catalogue GETs (including the fake
+    // TypeSafe /models route) and attempts other catalogue proxy tunnels.
+    // The fixture rejects every tunnel. Inference uses the registered HTTP
+    // TypeSafe endpoint, so any inference request is observable separately
+    // from catalogue discovery; this is not a claim of general confinement.
+    assert.deepEqual(requests.filter(request => request.method !== 'GET' && request.method !== 'CONNECT'), [],
+      `${posture}: an inference request reached a fixture endpoint`);
+    console.log(`native find ${posture}: ${expected}; registry, model, device, Eval bridge and inherited child construction checked; no inference requests; catalogue discovery intercepted`);
+  }
+} finally { await new Promise(resolve => server.close(resolve)); }
+JS
+  pass 'installed omp consumes dispatch overlays before any model turn; no ungranted native find handler exists'
   node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'installed omp tool coverage'
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

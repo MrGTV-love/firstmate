@@ -25,7 +25,9 @@
 #   task extraction. fm-dispatch-project.py derives project from the brief's
 #   typed clone path and a frozen data/projects.md registry, never task prose or
 #   a caller-typed id. Missing or invalid bindings escalate before anything is
-#   sent; every rule must name positive registered projects.
+#   sent; rules name positive registered projects, except that a secondmate
+#   home's inherited rules may name fleet projects it does not register, which
+#   stay inert there. Only an exactly bound local project makes a rule apply.
 #   bin/fm-dispatch-level5.ts owns question assembly and effort floors; bun runs
 #   it when installed, otherwise node with type stripping.
 #   The shared client selects TypeSafe explicitly, retains the raw exchange,
@@ -145,6 +147,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-model-picker-shadow-lib.sh
 . "$SCRIPT_DIR/fm-model-picker-shadow-lib.sh"
+# shellcheck source=bin/fm-primary-scope-lib.sh
+. "$SCRIPT_DIR/fm-primary-scope-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
 TS_INPUT_USD_PER_MILLION=0.042
@@ -456,10 +460,12 @@ fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" "$KIND" \
   || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
 # The TypeScript adapter runs under bun when installed, else node with type
 # stripping, exactly as bin/fm-jev-guard-hook.sh runs the vendored guard.
+INHERITED_POLICY=0
+! fm_root_is_secondmate_home "$FM_HOME" || INHERITED_POLICY=1
 if command -v bun >/dev/null 2>&1; then
-  LEVEL5=(bun "$SCRIPT_DIR/fm-dispatch-level5.ts")
+  LEVEL5=(env "FM_DISPATCH_INHERITED_POLICY=$INHERITED_POLICY" bun "$SCRIPT_DIR/fm-dispatch-level5.ts")
 elif command -v node >/dev/null 2>&1; then
-  LEVEL5=(node --experimental-strip-types --no-warnings "$SCRIPT_DIR/fm-dispatch-level5.ts")
+  LEVEL5=(env "FM_DISPATCH_INHERITED_POLICY=$INHERITED_POLICY" node --experimental-strip-types --no-warnings "$SCRIPT_DIR/fm-dispatch-level5.ts")
 else
   emit_error "neither bun nor node installed"
 fi

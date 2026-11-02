@@ -3,7 +3,16 @@
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
        lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PID |
-       table FIELDS
+       table FIELDS | memory
+
+memory prints a JSON RSS census with PID, PPID, kernel name, start time,
+resident bytes (null when unreadable), fleet attribution, and the run identity
+that attributed it (null otherwise) only. Paired task/inbox markers identify
+run task:<id>; a kernel cwd inside a no-mistakes run worktree
+($NM_HOME or ~/.no-mistakes, then worktrees/<repo>/<run>) identifies run
+no-mistakes:<repo>/<run>; a kernel cwd within FM_MEMORY_FLEET_ROOT attributes
+without a run. Names alone never attribute. It prints no arguments,
+environment or cwd.
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -53,6 +62,7 @@ import json
 import os
 import signal
 import struct
+import subprocess
 import sys
 import time
 
@@ -89,6 +99,29 @@ class RusageInfoV2(ctypes.Structure):
 
 class Timebase(ctypes.Structure):
     _fields_ = [("numer", ctypes.c_uint32), ("denom", ctypes.c_uint32)]
+
+
+# Darwin sys/proc_info.h: PROC_PIDVNODEPATHINFO, not a rendered harness signal.
+class VinfoStat(ctypes.Structure):
+    _fields_ = [("dev", ctypes.c_uint32), ("mode", ctypes.c_uint16), ("nlink", ctypes.c_uint16),
+                ("ino", ctypes.c_uint64), ("uid", ctypes.c_uint32), ("gid", ctypes.c_uint32)] + [
+                    (name, ctypes.c_int64) for name in ("atime", "atimensec", "mtime", "mtimensec",
+                        "ctime", "ctimensec", "birthtime", "birthtimensec", "size", "blocks")] + [
+                ("blksize", ctypes.c_int32), ("flags", ctypes.c_uint32), ("gen", ctypes.c_uint32),
+                ("rdev", ctypes.c_uint32), ("qspare", ctypes.c_int64 * 2)]
+
+
+class VnodeInfo(ctypes.Structure):
+    _fields_ = [("stat", VinfoStat), ("type", ctypes.c_int), ("pad", ctypes.c_int),
+                ("fsid", ctypes.c_int32 * 2)]
+
+
+class VnodeInfoPath(ctypes.Structure):
+    _fields_ = [("info", VnodeInfo), ("path", ctypes.c_char * 1024)]
+
+
+class VnodePathInfo(ctypes.Structure):
+    _fields_ = [("cdir", VnodeInfoPath), ("rdir", VnodeInfoPath)]
 
 
 def sysctl(*mib):
@@ -333,7 +366,74 @@ def mem_watch(root, reader=mem_tree):
     return 0
 
 
+def memory_processes():
+    """Kernel RSS census, including other users; never exports argv or environment.
+
+    Fleet attribution needs paired task/inbox markers or a kernel cwd inside
+    the declared home, never a name such as node or python. Descendants inherit
+    ownership in the consumer even when they clear their own environment.
+    Missing RSS is explicit.
+    """
+    # ps can read other users' RSS where libproc is denied. Sandboxed workers
+    # cannot execute its setuid binary; retain explicit nulls there, never zeros.
+    resident = {}
+    try:
+        output = subprocess.run(["/bin/ps", "-axo", "pid=,rss="], capture_output=True,
+                                text=True, check=True, env={**os.environ, "LC_ALL": "C"}).stdout
+        for line in output.splitlines():
+            fields = line.split()
+            if len(fields) == 2 and all(value.isdigit() for value in fields):
+                resident[int(fields[0])] = int(fields[1]) * 1024
+    except (OSError, subprocess.SubprocessError):
+        pass
+    rows = []
+    fleet_root = os.environ.get("FM_MEMORY_FLEET_ROOT", "")
+    run_root = os.path.join(os.environ.get("NM_HOME") or os.path.expanduser("~/.no-mistakes"), "worktrees")
+    vnode = VnodePathInfo()
+    for record in kinfos():
+        pid = struct.unpack_from("i", record, P_PID)[0]
+        if pid <= 0:
+            continue
+        info = ctypes.create_string_buffer(TASKINFO_SIZE)
+        readable = libc.proc_pidinfo(pid, PROC_PIDTASKINFO, ctypes.c_uint64(0), info, TASKINFO_SIZE) == TASKINFO_SIZE
+        rss = struct.unpack_from("Q", info.raw, 8)[0] if readable else resident.get(pid)
+        fleet, run = False, None
+        try:
+            data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
+            argc = struct.unpack_from("i", data, 0)[0]
+            words = data[4:].split(b"\0", 1)[1].lstrip(b"\0").split(b"\0")
+            environ = dict(word.split(b"=", 1) for word in words[argc:] if b"=" in word)
+            task = environ.get(b"FM_TASK_ID", b"")
+            inbox = environ.get(b"FM_TASK_INBOX", b"")
+            fleet = bool(task and b"/" not in task and inbox.endswith(b"/state/" + task + b".inbox"))
+            run = "task:" + os.fsdecode(task) if fleet else None
+        except (OSError, LookupError, struct.error, IndexError):
+            pass
+        # A pipeline run's own processes, and supervisors and workers predating
+        # paired markers, are positively attributed by kernel cwd. Never print
+        # cwd or inspect another home's endpoint namespace.
+        size = ctypes.sizeof(vnode)
+        if not fleet and libc.proc_pidinfo(pid, 9, ctypes.c_uint64(0), ctypes.byref(vnode), size) == size:
+            cwd = os.fsdecode(vnode.cdir.path)
+            if os.path.isabs(cwd):
+                parts = os.path.relpath(cwd, run_root).split(os.sep)
+                if os.path.commonpath((run_root, cwd)) == run_root and len(parts) >= 2:
+                    fleet, run = True, "no-mistakes:" + "/".join(parts[:2])
+                elif os.path.isabs(fleet_root):
+                    fleet = os.path.commonpath((fleet_root, cwd)) == fleet_root
+        rows.append({"pid": pid, "ppid": struct.unpack_from("i", record, E_PPID)[0],
+                     "comm": os.fsdecode(record[P_COMM:P_COMM + 17].split(b"\0", 1)[0]),
+                     "started": lstart(record), "rss_bytes": rss, "fleet": fleet, "run": run})
+    return rows
+
+
 def main(argv_):
+    if argv_[1:] == ["memory"]:
+        try:
+            print(json.dumps(memory_processes()))
+            return 0
+        except (OSError, LookupError, struct.error, IndexError):
+            return 1
     fields = argv_[2].split(",") if len(argv_) == 3 and argv_[1] == "table" else []
     if len(argv_) != 3 or (fields and not set(fields) <= set(TABLE_FIELDS)) or (not fields and not argv_[2].isdigit()):
         print(__doc__.split("\n\n")[1], file=sys.stderr)

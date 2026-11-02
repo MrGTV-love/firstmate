@@ -27,6 +27,22 @@ jobs:
       github.event.pull_request.user.login != 'github-actions[bot]' &&
       github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Record tested merge tree
+        id: tested-tree
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          base=$(git rev-parse 'HEAD^1')
+          printf 'tree=%s\nbase=%s\n' "$tree" "$base" >> "$GITHUB_OUTPUT"
+          printf '%s %s\n' "$tree" "$base" > "$RUNNER_TEMP/fm-tested-tree"
+      - name: Upload tested merge tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: fm-tested-tree-${{ steps.tested-tree.outputs.tree }}-base-${{ steps.tested-tree.outputs.base }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fm-tested-tree
+          if-no-files-found: error
       - name: Verify no-mistakes signature and pipeline attestation
         uses: kunchenguid/no-mistakes/.github/actions/require-no-mistakes@f6441c96c352a18b9cadcaef6b6c7017e9ac3970 # v1.80.1
         with:

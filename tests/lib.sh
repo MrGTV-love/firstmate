@@ -68,6 +68,13 @@ export FM_MODEL_FRESHNESS=0
 FM_REVIEW_AGENT_SELECT_BIN=$(command -v true)
 export FM_REVIEW_AGENT_SELECT_BIN
 
+# Admission and periodic host observations must not depend on the developer's
+# current workload or write a real home's memory readings. Memory-specific
+# regressions explicitly select the real guard against native-reading fixtures.
+FM_MEMORY_GUARD_BIN=$(command -v true)
+export FM_MEMORY_GUARD_BIN
+unset FM_MEMORY_FIXTURE_DIR
+
 # Stubbed commands are not production timing evidence. Never inherit an
 # operational home's ledger into fixtures; timing-specific cases explicitly
 # select an isolated file after sourcing this helper.
@@ -904,6 +911,15 @@ fm_fakebin() {
   local dir=$1 fakebin="$1/fakebin"
   mkdir -p "$fakebin"
   printf '%s\n' "$fakebin"
+}
+
+# fm_test_link_ts_runtime <fakebin>: fm-spawn.sh resolves task egress under bun
+# or node. A fixture on a system-only PATH links the one runtime it needs, so
+# nothing else from that runtime's directory reaches the fixture.
+fm_test_link_ts_runtime() {
+  local runtime
+  runtime=$(command -v bun || command -v node) || fail "test needs bun or node"
+  ln -sf "$runtime" "$1/${runtime##*/}"
 }
 
 # fm_gh_http_shim <fakebin> turns the body-only fixture <fakebin>/gh into gh-backend and installs
