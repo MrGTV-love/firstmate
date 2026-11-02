@@ -1,0 +1,60 @@
+{
+  "pipeline_head": "725581c5f1c67cf47e2e779b281985433ed04f34",
+  "worktree_has_uncommitted_fix": true,
+  "experiments": [
+    {
+      "variant": "real",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-m1m2-real-fu1efilf/tests/fm-dod-check.test.sh"
+      ],
+      "exit": 0,
+      "seconds": 99.6,
+      "checker_sha256": "85251f596cc0974ac09717466ee80a860feaec96559835904614354d9a125f4d",
+      "mutation": null,
+      "stdout": "ok - gate items require exact commands and all mandatory items require Verify\nok - fenced examples do not supply commands, authority or Verify\nok - Check commands containing Source labels execute as opaque shell content\nok - exact-head gate runs and overlaid new regression fails on base, passes on head, with hashed logs\nok - the recorder records its own exit and ends the command group before a background writer lands\nok - an output pipe held open outside the command group fails the run by name within the drain bound\nok - nonzero commands and failed pipeline components make the check fail\nok - a newly named test that already passes on base is rejected\nok - changed tests named by supporting items also require fail-first proof\nok - a named regression that fails on head cannot pass fail-first proof\nok - mutable refs are rejected before running any command\nok - a marker-file proxy passes fail-first on a wrong app, the real output test rejects it and accepts the repair, and evidence states semantics unassessed\nok - dispatch freezes selected bytes and digest outside the branch, refuses absent criteria, and ignores later criteria rewrites\nok - real machine proof resolves across an unrelated base advance; missing items, shared run ids, stale head, invalid file:line, wrong log digest, failed CI, non-default workflow refs or commits, foreign base history and missing exact-line rulings refuse, and unreachable evidence exits 3\nok - dispatch targets the default-branch workflow with the exact head, and a finished run id becomes resolving claims\nok - review copies pointers immutably and resolves them for an independent PASS; a task without a dispatch digest and captain words keep their existing route\n",
+      "stderr": ""
+    },
+    {
+      "variant": "planted-no-group-kill",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-m1m2-planted-no-group-kill-vfteq5sc/tests/fm-dod-check.test.sh"
+      ],
+      "exit": 1,
+      "seconds": 26.5,
+      "checker_sha256": "7b4ae2c61956610235169a1f783f95d70914dd5cd0573158effb89d2ba6a1ce3",
+      "mutation": [
+        "        os.killpg(process.pid, signal.SIGKILL)\n",
+        "        pass\n"
+      ],
+      "stdout": "ok - gate items require exact commands and all mandatory items require Verify\nok - fenced examples do not supply commands, authority or Verify\nok - Check commands containing Source labels execute as opaque shell content\nok - exact-head gate runs and overlaid new regression fails on base, passes on head, with hashed logs\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 126, in <module>\nAssertionError: a background writer outlived its command\n"
+    },
+    {
+      "variant": "planted-unbounded-drain",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "bash",
+        "/Users/charlesabrooker/tmp/fm-m1m2-planted-unbounded-drain-4ir7887s/tests/fm-dod-check.test.sh"
+      ],
+      "exit": 1,
+      "seconds": 57.5,
+      "checker_sha256": "8263a3b7f5e5693afd3097341977ac8a763a244967c790d64cc07801d57c2c40",
+      "mutation": [
+        "    reader.join(DRAIN_SECONDS)\n",
+        "    reader.join()\n"
+      ],
+      "stdout": "ok - gate items require exact commands and all mandatory items require Verify\nok - fenced examples do not supply commands, authority or Verify\nok - Check commands containing Source labels execute as opaque shell content\nok - exact-head gate runs and overlaid new regression fails on base, passes on head, with hashed logs\nok - the recorder records its own exit and ends the command group before a background writer lands\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 137, in <module>\n  File \"<stdin>\", line 18, in call\nAssertionError: (('/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3', PosixPath('/Users/charlesabrooker/tmp/fm-m1m2-planted-unbounded-drain-4ir7887s/bin/fm-dod-check.py'), 'run', '--dod', PosixPath('/Users/charlesabrooker/tmp/dod-check.7reU3l/dod.md'), '--repo', PosixPath('/Users/charlesabrooker/tmp/dod-check.7reU3l/repo'), '--base', '796912c25e0f46a9e798312c3faa64db822bbedd', '--head', '0c5ab83dc2877722f1e9dba07a6dad64a7d56fe6', '--output', PosixPath('/Users/charlesabrooker/tmp/dod-check.7reU3l/pipe-held')), 0, 'head: 0c5ab83dc2877722f1e9dba07a6dad64a7d56fe6\\nbase: 796912c25e0f46a9e798312c3faa64db822bbedd\\nmerge_base: 796912c25e0f46a9e798312c3faa64db822bbedd\\ndod_sha256: 283fce03aa969344c2b1f901b72c7a92d26099bbda1473a52dd94718fcf00b58\\nflags: 1\\nflag: \"tests/changed.test.sh:1\"\\nreason: \"removed test or fixture code/row\"\\nid: d6c641a7e8639333f3bf491075d8da5c75338414e8fefc03e517c7ce144b440c\\ncommand: \"python3 -c \\\\\"import os,sys; os.setsid(); open(sys.argv[1],\\'w\\').write(str(os.getpid())); os.execvp(\\'sleep\\',[\\'sleep\\',\\'30\\'])\\\\\" /Users/charlesabrooker/tmp/dod-check.7reU3l/pipe-holder.pid & while [ ! -s /Users/charlesabrooker/tmp/dod-check.7reU3l/pipe-holder.pid ]; do sleep 0.05; done; exit 0\"\\ncommit: 0c5ab83dc2877722f1e9dba07a6dad64a7d56fe6\\nexit: 0\\nresult: pass\\nsemantics: unassessed; exit codes prove only each command\\'s own assertions, not an item\\'s Expected outcome\\n', '')\n"
+    }
+  ]
+}

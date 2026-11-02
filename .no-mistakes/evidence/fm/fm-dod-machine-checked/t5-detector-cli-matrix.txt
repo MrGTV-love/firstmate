@@ -1,0 +1,315 @@
+### detector /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-test-weakening.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repos under /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.7OVnYz0fD8
+
+## case=clean-add file=bin/tool.py (expect 0)
+@@ -1 +1,2 @@
+ x = 1
++y = 3
+flags: 0
+### exit: 0
+### verdict: as-expected
+
+## case=add-assert-only file=tests/a.test.sh (expect 0)
+@@ -1 +1,2 @@
+ assert_eq 1 1
++assert_eq 2 2
+flags: 0
+### exit: 0
+### verdict: as-expected
+
+## case=del-assert file=bin/tool.py (expect 1)
+@@ -1,3 +1,2 @@
+ def f():
+-    assert x == 1
+     return x
+flags: 1
+flag: "bin/tool.py:2"
+reason: "removed assertion/check"
+id: f57425e4d2e3779be6d4a8e807ffaec0096a4d8cc34b15d2286171169ddba106
+### exit: 1
+### verdict: as-expected
+
+## case=del-test file=tests/a.test.sh (expect 1)
+@@ -3,4 +3 @@ test_one() {
+ }
+-test_two() {
+-  true
+-}
+flags: 3
+flag: "tests/a.test.sh:4"
+reason: "removed test or fixture code/row"
+id: 81c3f37642c6c184d754c8b0e505beecfdf238d3fa934a31aaaeefee52593ea2
+flag: "tests/a.test.sh:5"
+reason: "removed test or fixture code/row"
+id: ebdfba898ac2b4811e796e705584ff3009f5d59a08b65af6509e25c661d7f025
+flag: "tests/a.test.sh:6"
+reason: "removed test or fixture code/row"
+id: b22b06433978d59ba0c1973b2579a8355ca68c6547892868ab8c410e41f3d518
+### exit: 1
+### verdict: as-expected
+
+## case=del-fixture-row file=tests/fixtures/rows.csv (expect 1)
+@@ -2,2 +2 @@ a,1
+ b,2
+-c,3
+flags: 1
+flag: "tests/fixtures/rows.csv:3"
+reason: "removed test or fixture code/row"
+id: b1533eeff7038328bf76f88547c9e8bd34f823a4fcee43fb463abf88d29a9f44
+### exit: 1
+### verdict: as-expected
+
+## case=raise-timeout file=bin/tool.py (expect 1)
+@@ -1 +1 @@
+-TIMEOUT_SECONDS = 10
++TIMEOUT_SECONDS = 60
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: ade39d7fbe75c8e8a9d3a8a1d82873a10a5459f3802c32a620f51d9cc10d3a92
+### exit: 1
+### verdict: as-expected
+
+## case=raise-retries file=bin/tool.sh (expect 1)
+@@ -1 +1 @@
+-retries=3
++retries=9
+flags: 1
+flag: "bin/tool.sh:1"
+reason: "increased time/retry/iteration bound"
+id: d080c9bebe16bdafac364ec02e9fa15c8a88e0e45a1d2f60d607406835bbc044
+### exit: 1
+### verdict: as-expected
+
+## case=raise-iterations file=bin/tool.py (expect 1)
+@@ -1,2 +1,2 @@
+-for i in range(3):
++for i in range(30):
+     poll()
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 2e493734d5b54421548befbeeea664d792d8417e1f6650e911a639679cd8e9b6
+### exit: 1
+### verdict: as-expected
+
+## case=raise-sleep file=bin/tool.sh (expect 1)
+@@ -1 +1 @@
+-sleep 5
++sleep 50
+flags: 1
+flag: "bin/tool.sh:1"
+reason: "increased time/retry/iteration bound"
+id: 4186f9f5431239343fc20a2795d9120454d7f5261e97e0364751d2d7f5a65a0d
+### exit: 1
+### verdict: as-expected
+
+## case=lower-retries-and-timeout file=bin/tool.py (expect 0)
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 5
+flags: 0
+### exit: 0
+### verdict: as-expected
+
+## case=lower-one-timeout file=bin/tool.py (expect 0)
+@@ -1 +1 @@
+-TIMEOUT_SECONDS = 10
++TIMEOUT_SECONDS = 5
+flags: 0
+### exit: 0
+### verdict: as-expected
+
+## case=ADV-lower-two-timeouts file=bin/tool.py (expect 0)
+@@ -1,2 +1,2 @@
+-TIMEOUT_SECONDS = 10
+-CONNECT_TIMEOUT = 30
++TIMEOUT_SECONDS = 5
++CONNECT_TIMEOUT = 20
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 7c9d2183d80a0f72294f4021509dcf2dc8561e908cd02d2b6174906191a8e838
+### exit: 1
+### verdict: UNEXPECTED
+
+## case=ADV-lower-retries-and-retry_delay file=bin/tool.py (expect 0)
+@@ -1,2 +1,2 @@
+-retries = 3
+-retry_delay = 10
++retries = 2
++retry_delay = 5
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 24fcf6bc856140c812fcefb361445a5c806a7806a5f440215b76e463d976492f
+### exit: 1
+### verdict: UNEXPECTED
+
+## case=ADV-lower-two-sleeps file=bin/tool.sh (expect 0)
+@@ -1,2 +1,2 @@
+-sleep 10
+-sleep 30
++sleep 5
++sleep 20
+flags: 1
+flag: "bin/tool.sh:1"
+reason: "increased time/retry/iteration bound"
+id: 6541c699f21a18b2faeb1fefe005495a0937c41a58b02793687099f14555f980
+### exit: 1
+### verdict: UNEXPECTED
+
+## case=ADV-raise-hidden-among-lowers file=bin/tool.py (expect 1)
+@@ -1,2 +1,2 @@
+-TIMEOUT_SECONDS = 10
+-CONNECT_TIMEOUT = 30
++TIMEOUT_SECONDS = 5
++CONNECT_TIMEOUT = 300
+flags: 2
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 668ebeaed38107b42d403ed97ce5f181aa0837f98e297f61b706c707f7e25dfd
+flag: "bin/tool.py:2"
+reason: "increased time/retry/iteration bound"
+id: 85548b27e605e6c66cf1b2fd49558173a57df82e9de6ed145dbc49675db2a5c6
+### exit: 1
+### verdict: as-expected
+
+## case=ADV-rename-timeout-to-poll_timeout file=bin/tool.py (expect 1)
+@@ -1 +1 @@
+-timeout = 5
++poll_timeout = 50
+flags: 0
+### exit: 0
+### verdict: UNEXPECTED
+
+## case=ADV-rename-attempts-to-retries file=bin/tool.py (expect 1)
+@@ -1 +1 @@
+-max_attempts = 3
++max_retries = 9
+flags: 0
+### exit: 0
+### verdict: UNEXPECTED
+
+## case=ADV-rename-timeout-to-deadline file=bin/tool.py (expect 1)
+@@ -1 +1 @@
+-timeout = 5
++deadline = 50
+flags: 0
+### exit: 0
+### verdict: UNEXPECTED
+
+## case=ADV-rename-seq-to-range file=bin/tool.py (expect 1)
+@@ -1 +1 @@
+-for i in $(seq 1 3); do
++for i in range(30):
+flags: 0
+### exit: 0
+### verdict: UNEXPECTED
+
+## case=ADV-test-path-any-removed-line file=tests/a.test.sh (expect 1)
+@@ -1,2 +1 @@
+ run_case 1
+-run_case 2
+flags: 1
+flag: "tests/a.test.sh:2"
+reason: "removed test or fixture code/row"
+id: 3ee32f31ee15680cf58769a35ac402d7d44ab5d8c6ddc57ef976fad62a929e9d
+### exit: 1
+### verdict: as-expected
+## case=clean-add file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=add-assert-only file=tests/a.test.sh (expect 0)	### verdict: as-expected
+## case=del-assert file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=del-test file=tests/a.test.sh (expect 1)	### verdict: as-expected
+## case=del-fixture-row file=tests/fixtures/rows.csv (expect 1)	### verdict: as-expected
+## case=raise-timeout file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-retries file=bin/tool.sh (expect 1)	### verdict: as-expected
+## case=raise-iterations file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-sleep file=bin/tool.sh (expect 1)	### verdict: as-expected
+## case=lower-retries-and-timeout file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=lower-one-timeout file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=ADV-lower-two-timeouts file=bin/tool.py (expect 0)	### verdict: UNEXPECTED
+## case=ADV-lower-retries-and-retry_delay file=bin/tool.py (expect 0)	### verdict: UNEXPECTED
+## case=ADV-lower-two-sleeps file=bin/tool.sh (expect 0)	### verdict: UNEXPECTED
+## case=ADV-raise-hidden-among-lowers file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=ADV-rename-timeout-to-poll_timeout file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-attempts-to-retries file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-timeout-to-deadline file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-seq-to-range file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-test-path-any-removed-line file=tests/a.test.sh (expect 1)	### verdict: as-expected
+## case=clean-add file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=add-assert-only file=tests/a.test.sh (expect 0)	### verdict: as-expected
+## case=del-assert file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=del-test file=tests/a.test.sh (expect 1)	### verdict: as-expected
+## case=del-fixture-row file=tests/fixtures/rows.csv (expect 1)	### verdict: as-expected
+## case=raise-timeout file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-retries file=bin/tool.sh (expect 1)	### verdict: as-expected
+## case=raise-iterations file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-sleep file=bin/tool.sh (expect 1)	### verdict: as-expected
+## case=lower-retries-and-timeout file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=lower-one-timeout file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=ADV-lower-two-timeouts file=bin/tool.py (expect 0)	### verdict: UNEXPECTED
+## case=ADV-lower-retries-and-retry_delay file=bin/tool.py (expect 0)	### verdict: UNEXPECTED
+## case=ADV-lower-two-sleeps file=bin/tool.sh (expect 0)	### verdict: UNEXPECTED
+## case=ADV-raise-hidden-among-lowers file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=ADV-rename-timeout-to-poll_timeout file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-attempts-to-retries file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-timeout-to-deadline file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-seq-to-range file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-test-path-any-removed-line file=tests/a.test.sh (expect 1)	### verdict: as-expected
+## case=clean-add file=bin/tool.py (expect 0)	### verdict: as-expected	## case=add-assert-only file=tests/a.test.sh (expect 0)	### verdict: as-expected
+## case=del-assert file=bin/tool.py (expect 1)	### verdict: as-expected	## case=del-test file=tests/a.test.sh (expect 1)	### verdict: as-expected
+## case=del-fixture-row file=tests/fixtures/rows.csv (expect 1)	### verdict: as-expected	## case=raise-timeout file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-retries file=bin/tool.sh (expect 1)	### verdict: as-expected	## case=raise-iterations file=bin/tool.py (expect 1)	### verdict: as-expected
+## case=raise-sleep file=bin/tool.sh (expect 1)	### verdict: as-expected	## case=lower-retries-and-timeout file=bin/tool.py (expect 0)	### verdict: as-expected
+## case=lower-one-timeout file=bin/tool.py (expect 0)	### verdict: as-expected	## case=ADV-lower-two-timeouts file=bin/tool.py (expect 0)	### verdict: UNEXPECTED
+## case=ADV-lower-retries-and-retry_delay file=bin/tool.py (expect 0)	### verdict: UNEXPECTED	## case=ADV-lower-two-sleeps file=bin/tool.sh (expect 0)	### verdict: UNEXPECTED
+## case=ADV-raise-hidden-among-lowers file=bin/tool.py (expect 1)	### verdict: as-expected	## case=ADV-rename-timeout-to-poll_timeout file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-attempts-to-retries file=bin/tool.py (expect 1)	### verdict: UNEXPECTED	## case=ADV-rename-timeout-to-deadline file=bin/tool.py (expect 1)	### verdict: UNEXPECTED
+## case=ADV-rename-seq-to-range file=bin/tool.py (expect 1)	### verdict: UNEXPECTED	## case=ADV-test-path-any-removed-line file=tests/a.test.sh (expect 1)	### verdict: as-expected
+
+### summary (case | file | expected exit | actual exit | verdict)
+clean-add | bin/tool.py | 0 | 0 | as-expected
+add-assert-only | tests/a.test.sh | 0 | 0 | as-expected
+del-assert | bin/tool.py | 1 | 1 | as-expected
+del-test | tests/a.test.sh | 1 | 1 | as-expected
+del-fixture-row | tests/fixtures/rows.csv | 1 | 1 | as-expected
+raise-timeout | bin/tool.py | 1 | 1 | as-expected
+raise-retries | bin/tool.sh | 1 | 1 | as-expected
+raise-iterations | bin/tool.py | 1 | 1 | as-expected
+raise-sleep | bin/tool.sh | 1 | 1 | as-expected
+lower-retries-and-timeout | bin/tool.py | 0 | 0 | as-expected
+lower-one-timeout | bin/tool.py | 0 | 0 | as-expected
+ADV-lower-two-timeouts | bin/tool.py | 0 | 1 | UNEXPECTED
+ADV-lower-retries-and-retry_delay | bin/tool.py | 0 | 1 | UNEXPECTED
+ADV-lower-two-sleeps | bin/tool.sh | 0 | 1 | UNEXPECTED
+ADV-raise-hidden-among-lowers | bin/tool.py | 1 | 1 | as-expected
+ADV-rename-timeout-to-poll_timeout | bin/tool.py | 1 | 0 | UNEXPECTED
+ADV-rename-attempts-to-retries | bin/tool.py | 1 | 0 | UNEXPECTED
+ADV-rename-timeout-to-deadline | bin/tool.py | 1 | 0 | UNEXPECTED
+ADV-rename-seq-to-range | bin/tool.py | 1 | 0 | UNEXPECTED
+ADV-test-path-any-removed-line | tests/a.test.sh | 1 | 1 | as-expected
+
+### comparison: same matrix against bin/fm-test-weakening.py from c9a5a73c (before 77d3e2dd fix)
+(case | file | expected exit | actual exit | verdict)
+clean-add | bin/tool.py | 0 | 0 | as-expected
+add-assert-only | tests/a.test.sh | 0 | 0 | as-expected
+del-assert | bin/tool.py | 1 | 1 | as-expected
+del-test | tests/a.test.sh | 1 | 1 | as-expected
+del-fixture-row | tests/fixtures/rows.csv | 1 | 1 | as-expected
+raise-timeout | bin/tool.py | 1 | 1 | as-expected
+raise-retries | bin/tool.sh | 1 | 1 | as-expected
+raise-iterations | bin/tool.py | 1 | 1 | as-expected
+raise-sleep | bin/tool.sh | 1 | 1 | as-expected
+lower-retries-and-timeout | bin/tool.py | 0 | 1 | UNEXPECTED
+lower-one-timeout | bin/tool.py | 0 | 0 | as-expected
+ADV-lower-two-timeouts | bin/tool.py | 0 | 1 | UNEXPECTED
+ADV-lower-retries-and-retry_delay | bin/tool.py | 0 | 1 | UNEXPECTED
+ADV-lower-two-sleeps | bin/tool.sh | 0 | 1 | UNEXPECTED
+ADV-raise-hidden-among-lowers | bin/tool.py | 1 | 1 | as-expected
+ADV-rename-timeout-to-poll_timeout | bin/tool.py | 1 | 1 | as-expected
+ADV-rename-attempts-to-retries | bin/tool.py | 1 | 1 | as-expected
+ADV-rename-timeout-to-deadline | bin/tool.py | 1 | 1 | as-expected
+ADV-rename-seq-to-range | bin/tool.py | 1 | 1 | as-expected
+ADV-test-path-any-removed-line | tests/a.test.sh | 1 | 1 | as-expected

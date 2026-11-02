@@ -1,0 +1,7 @@
+### $ python3 bin/fm-dod-check.py claims --meta <lab>/state/dodlab-ok.meta --run 123   (meta written by the real spawn)
+{"items": [{"id": "C1", "run_id": "123"}, {"id": "C2", "run_id": "123"}]}
+### exit: 0
+### tamper: point dod_sha256 at a different digest in a copy of the meta
+error: "frozen DoD path does not match the task's protected state record"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1

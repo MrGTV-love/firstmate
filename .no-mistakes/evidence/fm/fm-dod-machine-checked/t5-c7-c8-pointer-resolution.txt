@@ -1,0 +1,128 @@
+### C7/C8 pointer resolution at checker 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repo base=22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 head=0a20b0b39f6646f10cb3145e8c598808ef630e76
+### GitHub API is replaced by a local gh-axi stub that serves the real recorder artifact; every other part is the real CLI.
+
+## step: freeze criteria (as spawn does)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py freeze --brief '<tmp>/brief.md' --state '<tmp>/home/state' --task task
+{"dod_file": "/private<tmp>/home/state/task.dod.c8ce70aca79c8ed430ccd98813417ddea780b00f1925524ce0978238fcb2ad3f.md", "dod_sha256": "c8ce70aca79c8ed430ccd98813417ddea780b00f1925524ce0978238fcb2ad3f"}
+### exit: 0
+
+## step: trusted recorder run (what dod-evidence.yml runs)
+### runner env as on GitHub Actions: GITHUB_RUN_ID=123 GITHUB_RUN_ATTEMPT=1
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py run --dod /private/var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.3eXUMsC342/home/state/task.dod.c8ce70aca79c8ed430ccd98813417ddea780b00f1925524ce0978238fcb2ad3f.md --repo '<tmp>/repo' --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 --output '<tmp>/fixture/hosted-artifact'
+head: 0a20b0b39f6646f10cb3145e8c598808ef630e76
+base: 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7
+merge_base: 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7
+dod_sha256: c8ce70aca79c8ed430ccd98813417ddea780b00f1925524ce0978238fcb2ad3f
+flags: 1
+flag: "tests/old.test.sh:2"
+reason: "removed test or fixture code/row"
+id: 2702480cc23fb1ce2831f7b2f8ef77c84c10778dacfb8e3e29e50eff6cf60fc0
+command: "bash tests/fix.test.sh"
+commit: 0a20b0b39f6646f10cb3145e8c598808ef630e76
+exit: 0
+command: "bash tests/fix.test.sh"
+commit: 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 0a20b0b39f6646f10cb3145e8c598808ef630e76
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+
+## case=C7-valid-pointer-resolves (expect exit 0)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+evidence: resolved head=0a20b0b39f6646f10cb3145e8c598808ef630e76 items=1
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected
+
+## case=C7-minimal-id-run-pointer (expect exit 0)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+evidence: resolved head=0a20b0b39f6646f10cb3145e8c598808ef630e76 items=1
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected
+
+## case=C7-missing-mandatory-id (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "PASS must carry exactly one resolving pointer for mandatory ids: C1"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C7-wrong-head-commit (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "C1: evidence needs a CI run id at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C7-bad-file-line (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "C1: file:line does not exist at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C7-wrong-log-sha256 (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "C1: PASS log pointer does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C8-flag-without-ruling (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "tests/old.test.sh:2 (2702480cc23fb1ce2831f7b2f8ef77c84c10778dacfb8e3e29e50eff6cf60fc0): weakened-test line needs an explicit accept ruling and reason in the independent PASS record"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C8-ruling-for-different-line (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "tests/old.test.sh:2 (2702480cc23fb1ce2831f7b2f8ef77c84c10778dacfb8e3e29e50eff6cf60fc0): weakened-test line needs an explicit accept ruling and reason in the independent PASS record"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C7-failed-ci-run (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## case=C7-artifact-from-other-run-attempt (expect exit 1)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py verify --meta '<tmp>/home/state/task.meta' --pr https://github.com/example/repo/pull/9 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 < claims.json
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected
+
+## step: merge-time gate (bin/fm-pr-merge.sh calls this on GitHub) - record PASS with pointers, then verify --machine-checked
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 --verdict PASS --reader-model claude-sonnet --author-groups '{"ship":["gpt-5.1"]}' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report '<tmp>/review.md' --dod-evidence '<tmp>/claims.json'
+recorded: review
+### exit: 0
+
+## case=C8-resolved-record-allows (expect exit 0, review: PASS)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --task task --machine-checked
+review: PASS
+### exit: 0
+### verdict: as-expected
+
+## case=C8-tampered-ci-log-refuses (expect exit 1 naming the item)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --task task --machine-checked
+error: machine-checked DoD unresolved: error: "CI log digest does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item. ; dispatch the default-branch DoD workflow with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py dispatch --meta <tmp>/home/state/task.meta --pr https://github.com/example/repo/pull/9; after that run finishes, build its claims with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py claims --meta <tmp>/home/state/task.meta --run RUN_ID > CLAIMS.json, add an accept ruling with a reason for each named weakened-test flag, and record the PASS again with --dod-evidence CLAIMS.json; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected
+
+## case=C8-forge-unreachable (expect nonzero, not a pass)
+$ /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 0a20b0b39f6646f10cb3145e8c598808ef630e76 --base 22d05e9e7d19a7f3bebbe95fbf3a723e8a38b3e7 --task task --machine-checked
+error: machine-checked DoD evidence unavailable: error: "cannot resolve GitHub evidence: /repos/example/repo: "
+help: Hosted or local evidence is unreachable; retry when it can be read. ; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected

@@ -1,0 +1,20 @@
+### recorder bin/fm-dod-check.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repo base=e0465abde6d8351c16178da970b562d1afb1197e head=820f169e67ade6de356112cbca6737ae61c5b614
+## case=M2-held-pipe-race-free (expect named recorder failure within ~5s drain bound, not a 40s wait)
+### note: an earlier attempt without waiting for setsid() raced (bash exited and killpg reached perl before it left the group), so it proved nothing; this version waits until the holder has left the group
+### Mandatory items
+C1 Source: intent Expected: x Verify: x Edge/negative: x Evidence place: log Authority: gate
+  - Check: perl -MPOSIX=setsid -e 'setsid(); open(F,">",$ARGV[0]); print F $$; close F; exec "sleep","40"' /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sIJy6rkZuM/holder.pid & while [ ! -s /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sIJy6rkZuM/holder.pid ]; do sleep 0.05; done; exit 0
+
+### Supporting items
+head: 820f169e67ade6de356112cbca6737ae61c5b614
+base: e0465abde6d8351c16178da970b562d1afb1197e
+merge_base: e0465abde6d8351c16178da970b562d1afb1197e
+dod_sha256: a53e121a952e923ebceeffbeb907bec6cd652bc077ef217ed1c164a43b9fd138
+flags: 0
+command: "perl -MPOSIX=setsid -e 'setsid(); open(F,\">\",$ARGV[0]); print F $$; close F; exec \"sleep\",\"40\"' /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sIJy6rkZuM/holder.pid & while [ ! -s /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sIJy6rkZuM/holder.pid ]; do sleep 0.05; done; exit 0"
+commit: 820f169e67ade6de356112cbca6737ae61c5b614
+error: "recorder output pipe still held open 5s after the command and its process group ended: a process that left the group kept its stdout, so the recorded output would be incomplete"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1 (wall 5s)
+### no evidence dir created (run failed by name before recording)
+### holder pid 90205 still alive: yes

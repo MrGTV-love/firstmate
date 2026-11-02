@@ -1,0 +1,59 @@
+### checker source head: c0ddaa13e0796df94a76e715bcb4e9479c2d91d3
+### Real fm-review-record.py review + verify --machine-checked (the call bin/fm-pr-merge.sh makes on GitHub). Forge transport is the local gh-axi stub. The merge command itself is driven by tests/fm-pr-merge.test.sh, see t6-suite-fm-pr-merge.log.
+### artifact advisory flags: ['tests/old.test.sh:3']
+## case=resolved-with-advisory-flag-no-ruling (expect accept)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/1 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/1 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+review: PASS
+### exit: 0
+### verdict: as-expected 
+## case=resolved-with-stale-other-line-ruling (expect accept)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/2 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/2 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+review: PASS
+### exit: 0
+### verdict: as-expected 
+## case=unresolved-missing-id-refuses-naming-item (expect refuse)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/3 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/3 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+error: machine-checked DoD unresolved: error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item. ; dispatch the default-branch DoD workflow with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py dispatch --meta <tmp>/case-record/home/state/task.meta --pr https://github.com/example/repo/pull/3; after that run finishes, build its claims with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py claims --meta <tmp>/case-record/home/state/task.meta --run RUN_ID > CLAIMS.json, and record the PASS again with --dod-evidence CLAIMS.json; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=unresolved-refusal-names-dispatch-command (expect refuse)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/4 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/4 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+error: machine-checked DoD unresolved: error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item. ; dispatch the default-branch DoD workflow with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py dispatch --meta <tmp>/case-record/home/state/task.meta --pr https://github.com/example/repo/pull/4; after that run finishes, build its claims with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py claims --meta <tmp>/case-record/home/state/task.meta --run RUN_ID > CLAIMS.json, and record the PASS again with --dod-evidence CLAIMS.json; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=tampered-log-refuses (expect refuse)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/5 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/5 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+error: machine-checked DoD unresolved: error: "CI log digest does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item. ; dispatch the default-branch DoD workflow with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py dispatch --meta <tmp>/case-record/home/state/task.meta --pr https://github.com/example/repo/pull/5; after that run finishes, build its claims with: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py claims --meta <tmp>/case-record/home/state/task.meta --run RUN_ID > CLAIMS.json, and record the PASS again with --dod-evidence CLAIMS.json; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=forge-unreachable-is-not-a-pass (expect refuse)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/6 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --dod-evidence <claims> [0] recorded: review 
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/6 --head 967a794d13922e136aff27db06b55bdf28aaea56 --base bebe2425c7d91e076c5467544da21f51d97bdddf --task task --machine-checked
+error: machine-checked DoD evidence unavailable: error: "cannot resolve GitHub evidence: /repos/example/repo: network down"
+help: Hosted or local evidence is unreachable; retry when it can be read. ; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=independent-review-still-required (reader family equals author family; expect refuse)
+[0] recorded: review 
+error: uncovered commit group ship, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=<tmp>/case-record/home FM_STATE_OVERRIDE=<tmp>/case-record/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/7 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=fail-verdict-still-refused (expect refuse)
+[0] recorded: review 
+error: verdict is FAIL at live head 967a794d13922e136aff27db06b55bdf28aaea56 (reader claude-sonnet, report <tmp>/case-record/review.md); no later exact-head PASS covers group ship, family openai, that this FAIL read; record later exact-head PASS reads of that group from readers outside each of its families with: FM_HOME=<tmp>/case-record/home FM_STATE_OVERRIDE=<tmp>/case-record/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/8 --head 967a794d13922e136aff27db06b55bdf28aaea56 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<tmp>/case-record/home FM_STATE_OVERRIDE=<tmp>/case-record/home/state /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/8 --head 967a794d13922e136aff27db06b55bdf28aaea56 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+### exit: 1
+### verdict: as-expected 
+## case=no-digest-keeps-existing-contract (expect accept and a not-machine-checked note)
+[0] recorded: review 
+review: PASS
+not machine-checked: no dispatch-time DoD digest
+### exit: 0
+### verdict: as-expected 

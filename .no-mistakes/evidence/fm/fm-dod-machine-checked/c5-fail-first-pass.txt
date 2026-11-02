@@ -1,0 +1,57 @@
+## C5 fail-first: changed named test fails on base, passes on head
+### $ python3 bin/fm-dod-check.py run --dod dod-ff.md --repo ff --base main(92f193476fc5366e2aca4fd5c2df38d2a57b0c2c) --head good --output out-good
+head: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+merge_base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: d2f49c535941715c1043285a066dc769c6f19ae0fc02cebacc553138cd1a5c70
+flags: 1
+flag: "tests/greet.test.sh:3"
+reason: "removed test or fixture code/row"
+id: 67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d
+command: "bash tests/greet.test.sh"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### test-0-base.log
+command: bash tests/greet.test.sh
+commit: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+FAIL greet
+
+exit: 1
+### test-0-head.log
+command: bash tests/greet.test.sh
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+PASS greet
+
+exit: 0
+### results.json tests[]
+[
+ {
+  "path": "tests/greet.test.sh",
+  "base": {
+   "command": "bash tests/greet.test.sh",
+   "commit": "92f193476fc5366e2aca4fd5c2df38d2a57b0c2c",
+   "exit": 1,
+   "log": "test-0-base.log",
+   "sha256": "875f4b3c1b8e9353774414345c85d4cf9e310bd8347f991b065fb72d281065a3"
+  },
+  "head": {
+   "command": "bash tests/greet.test.sh",
+   "commit": "41dc633a50d92eba58c9cfb0289424ba7e80e374",
+   "exit": 0,
+   "log": "test-0-head.log",
+   "sha256": "a4b73f74e5f282df4e1f524c8cade919b6fdecc7d19da316dd255dda91ea80d8"
+  },
+  "passed": true
+ }
+]

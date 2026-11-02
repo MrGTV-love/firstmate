@@ -1,0 +1,44 @@
+### source head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; FM_HOME=/Users/charlesabrooker/tmp/fm-lab.AZ4HM8 (disposable lab home)
+
+## case=place
+### $ bin/fm-spawn.sh dodt2-place /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.AZ4HM8
+error: /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-place/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-place/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodt2-place: 
+
+## case=noverify
+### $ bin/fm-spawn.sh dodt2-noverify /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.AZ4HM8
+error: /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-noverify/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 is missing Verify
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-noverify/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodt2-noverify: 
+
+## case=gatenocheck
+### $ bin/fm-spawn.sh dodt2-gatenocheck /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.AZ4HM8
+error: /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-gatenocheck/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 with Authority gate requires an exact Check command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/data/dodt2-gatenocheck/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodt2-gatenocheck: 
+
+## case=ok
+### $ bin/fm-spawn.sh dodt2-ok /Users/charlesabrooker/tmp/fm-lab.AZ4HM8/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.AZ4HM8
+notice: dodt2-ok ships mode=direct-PR while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dodt2-ok: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned dodt2-ok harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodt2-ok worktree=/Users/charlesabrooker/.treehouse/labproj-c77cc3/1/labproj

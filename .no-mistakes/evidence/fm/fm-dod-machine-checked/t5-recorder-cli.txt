@@ -1,0 +1,206 @@
+### recorder /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repo /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.8S4AqsqiN9/repo base=544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 head=926019f58e98a65c8f766111ef9436ba7fdd0034
+
+## case=gate-pass (expect exit 0; gate exit 0; fail-first greet base fail, head pass)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: none Evidence place: log Authority: gate
+  - Check: bash tests/greet.test.sh### $ python3 bin/fm-dod-check.py run --dod gate-pass.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-gate-pass>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: 7105ed4414fe9fa71449eacca5163b60fa4f9cb30dc22a83e4775f2819ee8f95
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "bash tests/greet.test.sh"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (wall 0.7s)
+### evidence dir: dod.md gate-C1.log results.json summary.log test-0-base.log test-0-head.log weakening.json 
+--- gate-C1.log (tail)
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+PASS: README has hello
+
+exit: 0
+
+## case=gate-nonzero (expect nonzero; gate command exit 1 makes the run red)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: README holds nope Verify: grep nope Edge/negative: none Evidence place: log Authority: gate
+  - Check: grep -q nope README### $ python3 bin/fm-dod-check.py run --dod gate-nonzero.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-gate-nonzero>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: d3f09cf5ff5a0d62b46f02d5593bab7586bd278bf250ae60fa936e346ae7a42a
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "grep -q nope README"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 1
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0.8s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+command: grep -q nope README
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+
+exit: 1
+
+## case=fail-first-already-passing (expect nonzero; tests/always.test.sh passes on base so fail-first red, test named)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: always Verify: run tests/always.test.sh Edge/negative: none Evidence place: log Authority: gate
+  - Check: bash tests/always.test.sh### $ python3 bin/fm-dod-check.py run --dod fail-first-already-passing.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-fail-first-already-passing>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: f5201dcc8e9882a5c9273afaf15218039f8b2744dd5f6f243055866c52ff770b
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "bash tests/always.test.sh"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+test: "tests/always.test.sh"
+fail_first: fail
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0.7s)
+### evidence dir: dod.md gate-C1.log results.json summary.log test-0-base.log test-0-head.log weakening.json 
+--- gate-C1.log (tail)
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+still-passes
+
+exit: 0
+
+## case=forged-exit-print (expect nonzero; recorder records its own exit 7, not the printed exit: 0)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: x Verify: y Edge/negative: none Evidence place: log Authority: gate
+  - Check: echo exit: 0; exit 7### $ python3 bin/fm-dod-check.py run --dod forged-exit-print.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-forged-exit-print>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: 24935264f9fb9e5dd6edbfd51033a4a84464f0208e666f59c58fbc5f47214044
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "echo exit: 0; exit 7"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 7
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0.5s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+
+exit: 7
+
+## case=M1-background-writer (expect background writer killed with process group; sentinel never appears)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: x Verify: y Edge/negative: none Evidence place: log Authority: gate
+  - Check: (sleep 3; touch /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.8S4AqsqiN9/escaped-writer) & exit 7### $ python3 bin/fm-dod-check.py run --dod M1-background-writer.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-M1-background-writer>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: 0c52fbfd03e2844f17d9704d26e373ef861f4331da3e490e705f9de65bac1187
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "(sleep 3; touch /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.8S4AqsqiN9/escaped-writer) & exit 7"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 7
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0.5s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+command: (sleep 3; touch /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.8S4AqsqiN9/escaped-writer) & exit 7
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+
+exit: 7
+### M1 sentinel /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.8S4AqsqiN9/escaped-writer after 5s more: absent (writer killed)
+
+## case=M2-held-pipe (expect named recorder failure within about 5s, not a 40s wait)
+### DoD:
+## Definition Of Done
+### Mandatory items
+C1 Source: intent Expected: x Verify: y Edge/negative: none Evidence place: log Authority: gate
+  - Check: perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' sleep 40 & exit 0### $ python3 bin/fm-dod-check.py run --dod M2-held-pipe.dod.md --repo <repo> --base 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6 --head 926019f58e98a65c8f766111ef9436ba7fdd0034 --output <out-M2-held-pipe>
+head: 926019f58e98a65c8f766111ef9436ba7fdd0034
+base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+merge_base: 544b27e9ffcd5a9b0258838ae2ec25bd6bc095a6
+dod_sha256: d33faf9989393d4cf33840035b5a68cebd49eedca601c07240e1bad12f65868d
+flags: 1
+flag: "tests/always.test.sh:1"
+reason: "removed test or fixture code/row"
+id: e4472fa73d2e31d6c77985d4d0100c543ba72dee56505686ee1ac3edf8f006e2
+command: "perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' sleep 40 & exit 0"
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+exit: 0
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (wall 0.6s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+command: perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' sleep 40 & exit 0
+commit: 926019f58e98a65c8f766111ef9436ba7fdd0034
+
+exit: 0
+### validator C3: gate item without Check
+mandatory item C1 with Authority gate requires an exact Check command
+### exit: 1
+### validator C3: grader item without Check
+[{"id":"C1","mandatory":true,"fields":{"Source":"s","Expected":"e","Verify":"v","Edge/negative":"n","Evidence place":"p","Authority":"grader","Check":""}}]
+### exit: 0
+
+## case=M2-held-pipe-race-free (rerun: holder confirms it left the group before bash exits; expect named recorder failure within about 5s, not a 40s wait)
+### note: the M2-held-pipe case above raced (killpg reached perl before setsid), so it proves nothing about M2
+## Definition Of Done
+### Mandatory items
+C1 Source: s Expected: x Verify: x Edge/negative: x Evidence place: log Authority: gate
+  - Check: perl -MPOSIX=setsid -e 'setsid(); open(F,">",$ARGV[0]); print F $$; close F; exec "sleep","40"' /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sYl6UsPUWT/holder.pid & while [ ! -s /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sYl6UsPUWT/holder.pid ]; do sleep 0.05; done; exit 0
+### $ python3 bin/fm-dod-check.py run --dod dod.md --repo <repo> --base b98e66c6abc4580dd53c4ee8922476d946908c2c --head b54c1a9263373ccfa58575d454bfd532ae9aa2d4 --output <out>
+head: b54c1a9263373ccfa58575d454bfd532ae9aa2d4
+base: b98e66c6abc4580dd53c4ee8922476d946908c2c
+merge_base: b98e66c6abc4580dd53c4ee8922476d946908c2c
+dod_sha256: 51c6a732918d74263c4b51fc5719f2b376ce057d2c486b336c3d4e087e7e3dc2
+flags: 0
+command: "perl -MPOSIX=setsid -e 'setsid(); open(F,\">\",$ARGV[0]); print F $$; close F; exec \"sleep\",\"40\"' /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sYl6UsPUWT/holder.pid & while [ ! -s /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.sYl6UsPUWT/holder.pid ]; do sleep 0.05; done; exit 0"
+commit: b54c1a9263373ccfa58575d454bfd532ae9aa2d4
+error: "recorder output pipe still held open 5s after the command and its process group ended: a process that left the group kept its stdout, so the recorded output would be incomplete"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1 (wall 6s)
+### no evidence dir created (run failed by name before recording)
+### holder pid 21796 still alive: yes (it left the group; recorder did not wait for it)

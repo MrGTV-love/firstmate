@@ -1,0 +1,247 @@
+### recorder: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-dod-check.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repo /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.gTqgS0SzvE/repo base=0447454943677e4d0b478d10b19426505abf9e1f head=eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+## case=gate-pass (expect 0; gate log exit 0; fail-first greet base!=0 head=0)
+### DoD:
+Capability in plain words: README greets visitors.
+
+### Mandatory items
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: no hello fails Evidence place: log Authority: gate
+  - Check: bash tests/greet.test.sh
+
+### Supporting items
+None
+### $ python3 bin/fm-dod-check.py run --dod gate-pass.dod.md --repo <repo> --base 0447454943677e4d0b478d10b19426505abf9e1f --head eb911cab9c77395c717cc9b5af3e4db8589ee481 --output <out-gate-pass>
+head: eb911cab9c77395c717cc9b5af3e4db8589ee481
+base: 0447454943677e4d0b478d10b19426505abf9e1f
+merge_base: 0447454943677e4d0b478d10b19426505abf9e1f
+dod_sha256: 954b8daf84aef6e4beb8990d3d555c805e2c62a5b3fd7582070549c873d2349b
+flags: 0
+command: "bash tests/greet.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### evidence dir:
+dod.md
+gate-C1.log
+results.json
+summary.log
+test-0-base.log
+test-0-head.log
+weakening.json
+--- gate-C1.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: 954b8daf84aef6e4beb8990d3d555c805e2c62a5b3fd7582070549c873d2349b
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+
+exit: 1
+--- test-0-head.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- results.json (passed/phase/exit)
+passed True head eb911cab9c77395c717cc9b5af3e4db8589ee481 dod_sha256 954b8daf84aef6e4beb8990d3d555c805e2c62a5b3fd7582070549c873d2349b
+
+## case=gate-nonzero (expect nonzero; gate exit 1 recorded red)
+### DoD:
+Capability in plain words: README greets visitors.
+
+### Mandatory items
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: no hello fails Evidence place: log Authority: gate
+  - Check: grep -q goodbye README
+
+### Supporting items
+None
+### $ python3 bin/fm-dod-check.py run --dod gate-nonzero.dod.md --repo <repo> --base 0447454943677e4d0b478d10b19426505abf9e1f --head eb911cab9c77395c717cc9b5af3e4db8589ee481 --output <out-gate-nonzero>
+head: eb911cab9c77395c717cc9b5af3e4db8589ee481
+base: 0447454943677e4d0b478d10b19426505abf9e1f
+merge_base: 0447454943677e4d0b478d10b19426505abf9e1f
+dod_sha256: ac57d9d2267b72b757ddeb8c5092dc894bab056164ec73408a46e1055e247348
+flags: 0
+command: "grep -q goodbye README"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### evidence dir:
+dod.md
+gate-C1.log
+results.json
+summary.log
+test-0-base.log
+test-0-head.log
+weakening.json
+--- gate-C1.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 1
+--- summary.log (tail)
+dod_sha256: ac57d9d2267b72b757ddeb8c5092dc894bab056164ec73408a46e1055e247348
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+
+exit: 1
+--- test-0-head.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- results.json (passed/phase/exit)
+passed False head eb911cab9c77395c717cc9b5af3e4db8589ee481 dod_sha256 ac57d9d2267b72b757ddeb8c5092dc894bab056164ec73408a46e1055e247348
+
+## case=fail-first-already-passing (expect nonzero; always.test.sh passes on base -> red, named)
+### DoD:
+Capability in plain words: README greets visitors.
+
+### Mandatory items
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: no hello fails Evidence place: log Authority: gate
+  - Check: bash tests/always.test.sh
+
+### Supporting items
+None
+### $ python3 bin/fm-dod-check.py run --dod fail-first-already-passing.dod.md --repo <repo> --base 0447454943677e4d0b478d10b19426505abf9e1f --head eb911cab9c77395c717cc9b5af3e4db8589ee481 --output <out-fail-first-already-passing>
+head: eb911cab9c77395c717cc9b5af3e4db8589ee481
+base: 0447454943677e4d0b478d10b19426505abf9e1f
+merge_base: 0447454943677e4d0b478d10b19426505abf9e1f
+dod_sha256: d8df0588f3caf3bd338f7fb0fc090598f16faf9ed44b50c94076f4c054fd5269
+flags: 0
+command: "bash tests/always.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+exit: 0
+command: "bash tests/always.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+test: "tests/always.test.sh"
+fail_first: fail
+test: "tests/greet.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### evidence dir:
+dod.md
+gate-C1.log
+results.json
+summary.log
+test-0-base.log
+test-0-head.log
+test-1-base.log
+test-1-head.log
+weakening.json
+--- gate-C1.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: d8df0588f3caf3bd338f7fb0fc090598f16faf9ed44b50c94076f4c054fd5269
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+
+exit: 0
+--- test-0-head.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- test-1-base.log (tail)
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+
+exit: 1
+--- test-1-head.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- results.json (passed/phase/exit)
+passed False head eb911cab9c77395c717cc9b5af3e4db8589ee481 dod_sha256 d8df0588f3caf3bd338f7fb0fc090598f16faf9ed44b50c94076f4c054fd5269
+
+## case=forged-exit-print (expect nonzero; recorder records exit 7 not printed exit 0)
+### DoD:
+Capability in plain words: README greets visitors.
+
+### Mandatory items
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: no hello fails Evidence place: log Authority: gate
+  - Check: echo "exit: 0"; exit 7
+
+### Supporting items
+None
+### $ python3 bin/fm-dod-check.py run --dod forged-exit-print.dod.md --repo <repo> --base 0447454943677e4d0b478d10b19426505abf9e1f --head eb911cab9c77395c717cc9b5af3e4db8589ee481 --output <out-forged-exit-print>
+head: eb911cab9c77395c717cc9b5af3e4db8589ee481
+base: 0447454943677e4d0b478d10b19426505abf9e1f
+merge_base: 0447454943677e4d0b478d10b19426505abf9e1f
+dod_sha256: 9a9b5cd02894513577b6fd3da5e4a6d9695613833f8ab4b97c31d52679ec5c13
+flags: 0
+command: "echo \"exit: 0\"; exit 7"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 7
+command: "bash tests/greet.test.sh"
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### evidence dir:
+dod.md
+gate-C1.log
+results.json
+summary.log
+test-0-base.log
+test-0-head.log
+weakening.json
+--- gate-C1.log (tail)
+exit: 0
+
+exit: 7
+--- summary.log (tail)
+dod_sha256: 9a9b5cd02894513577b6fd3da5e4a6d9695613833f8ab4b97c31d52679ec5c13
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+commit: 0447454943677e4d0b478d10b19426505abf9e1f
+
+exit: 1
+--- test-0-head.log (tail)
+commit: eb911cab9c77395c717cc9b5af3e4db8589ee481
+
+exit: 0
+--- results.json (passed/phase/exit)
+passed False head eb911cab9c77395c717cc9b5af3e4db8589ee481 dod_sha256 9a9b5cd02894513577b6fd3da5e4a6d9695613833f8ab4b97c31d52679ec5c13

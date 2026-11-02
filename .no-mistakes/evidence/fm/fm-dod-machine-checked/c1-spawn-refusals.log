@@ -1,0 +1,48 @@
+### $ bin/fm-spawn.sh dodlab-place /Users/charlesabrooker/tmp/fm-lab.r1O4Li/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r1O4Li
+error: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-place/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-place/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodlab-place: 
+### launch-brief present: no
+
+### $ bin/fm-spawn.sh dodlab-noverify /Users/charlesabrooker/tmp/fm-lab.r1O4Li/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r1O4Li
+error: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-noverify/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 is missing Verify
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-noverify/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodlab-noverify: 
+### launch-brief present: no
+
+### $ bin/fm-spawn.sh dodlab-gatenocheck /Users/charlesabrooker/tmp/fm-lab.r1O4Li/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r1O4Li
+error: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-gatenocheck/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 with Authority gate requires an exact Check command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-gatenocheck/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodlab-gatenocheck: 
+### launch-brief present: no
+
+### $ bin/fm-spawn.sh dodlab-multilinecheck /Users/charlesabrooker/tmp/fm-lab.r1O4Li/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r1O4Li
+error: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-multilinecheck/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 Check must be a single-line command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-multilinecheck/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodlab-multilinecheck: 
+### launch-brief present: no
+
+### $ bin/fm-spawn.sh dodlab-nodod /Users/charlesabrooker/tmp/fm-lab.r1O4Li/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r1O4Li
+error: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-nodod/brief.md cannot be dispatched; every input problem is listed once:
+  ## Definition Of Done (task) is missing
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.r1O4Li/data/dodlab-nodod/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1
+### state files for dodlab-nodod: 
+### launch-brief present: no
+

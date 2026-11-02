@@ -1,0 +1,138 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+export TMUX_TMPDIR=/tmp/fml.oW73J3
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.jpEM6Q && rm -rf /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+### source head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+### FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jpEM6Q TMUX_TMPDIR=/tmp/fml.oW73J3 TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/t5pool.ZNS8mz
+### TMUX=/private/tmp/fml.oW73J3/tmux-501/fm-lab,64951,0
+
+## case=placeholders task=dodt564270-placeholders (expect refuse)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-placeholders/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD mandatory items as dispatched:
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+### $ bin/fm-spawn.sh dodt564270-placeholders /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+error: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-placeholders/brief.md still contains {TASK} or {FIRSTMATE_SPEC}, and has an unfinished task Definition of Done; every unfinished item is listed once:
+  ## Captain's intent still holds {TASK}
+  ## Firstmate spec still holds {FIRSTMATE_SPEC}
+  ### Out of scope is empty: name the work this task does not do, or write None
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-placeholders/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (2s)
+### state files for dodt564270-placeholders: 
+### verdict: as-expected (refused, no worker)
+
+## case=no-verify task=dodt564270-no-verify (expect refuse)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-no-verify/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD mandatory items as dispatched:
+### Mandatory items
+C1 Source: captain intent Expected: README holds hello Edge/negative: none Evidence place: README Authority: grader
+
+### Supporting items
+### $ bin/fm-spawn.sh dodt564270-no-verify /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+error: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-no-verify/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 is missing Verify
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-no-verify/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (2s)
+### state files for dodt564270-no-verify: 
+### verdict: as-expected (refused, no worker)
+
+## case=gate-without-check task=dodt564270-gate-without-check (expect refuse)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-gate-without-check/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD mandatory items as dispatched:
+### Mandatory items
+C1 Source: captain intent Expected: README holds hello Verify: grep hello README Edge/negative: none Evidence place: README Authority: gate
+
+### Supporting items
+### $ bin/fm-spawn.sh dodt564270-gate-without-check /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+error: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-gate-without-check/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 with Authority gate requires an exact Check command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-gate-without-check/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (2s)
+### state files for dodt564270-gate-without-check: 
+### verdict: as-expected (refused, no worker)
+
+## case=accepted task=dodt564270-accepted (expect spawn)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/data/dodt564270-accepted/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD mandatory items as dispatched:
+### Mandatory items
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+
+### Supporting items
+### $ bin/fm-spawn.sh dodt564270-accepted /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+notice: dodt564270-accepted ships mode=direct-PR while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dodt564270-accepted: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned dodt564270-accepted harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodt564270-accepted worktree=/Users/charlesabrooker/tmp/t5pool.ZNS8mz/.treehouse/labproj-e28550/1/labproj
+### exit: 0 (10s)
+### state files for dodt564270-accepted: dodt564270-accepted.busy-gen dodt564270-accepted.busy-state dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md dodt564270-accepted.git-hooks dodt564270-accepted.inbox dodt564270-accepted.launch-models dodt564270-accepted.meta dodt564270-accepted.write-confinement.sb 
+### verdict: as-expected (spawned)
+
+## case=accepted frozen-record checks
+### grep dod_ /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.meta
+7:dod_file=/Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md
+8:dod_sha256=2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f
+### ls -l snapshot
+-r--r--r--@ 1 charlesabrooker  staff  1593 Nov  1 01:56 /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md
+### shasum -a 256 snapshot
+2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f  /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md
+### bash bin/fm-dod-lib.sh --criteria <brief> | shasum -a 256
+2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f  -
+### worker worktree: /Users/charlesabrooker/tmp/t5pool.ZNS8mz/.treehouse/labproj-e28550/1/labproj
+### snapshot inside worktree: no
+### git -C <worktree> ls-files | grep -c dod: 0
+### attempt plain overwrite of snapshot as same user:
+/Users/charlesabrooker/tmp/t5scripts.QqDbPI/spawn.sh: line 57: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md: Permission denied
+write exit: 1
+
+## case=post-spawn-mutation (expect recorded digest and snapshot unchanged)
+### brief rewritten: Check -> 'true', C2 dropped; new criteria digest:
+8c138b1144c0e4ce8bec3a8acc72437946be1f20ade856302922ded1b7d4b984  -
+### meta after mutation
+dod_file=/Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md
+dod_sha256=2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f
+### snapshot digest after mutation
+2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f  /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.dod.2656e7cfdc4da4959dc9c8e1b0ecc051bcf852cc642e67f0818fe2d6333fc47f.md
+### RESULT: snapshot digest == recorded dod_sha256
+### snapshot Check/C2 lines:
+9:Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+13:  - Check: grep -q hello README
+14:C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+
+## claims from frozen meta
+### $ python3 bin/fm-dod-check.py claims --meta /Users/charlesabrooker/tmp/fm-lab.jpEM6Q/state/dodt564270-accepted.meta --run 424242
+{"items": [{"id": "C1", "run_id": "424242"}, {"id": "C2", "run_id": "424242"}]}
+### exit: 0
+### windows: primary:zsh primary:fm-dodt564270-accepted 
+### worker pane tail:
+⏺ Running 1 shell command…
+✳ Beaming…
+                                                              ● high · /effort
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 0% 0/0 labproj:9c8f49e0
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+## teardown
+### tmux -L fm-lab kill-server exit: 0
+### $ fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.jpEM6Q && rm -rf /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+### teardown exit: 0
+### lab dir gone: /Users/charlesabrooker/tmp/fm-lab.jpEM6Q
+### pool dir gone: /Users/charlesabrooker/tmp/t5pool.ZNS8mz
+### no new labproj pool under ~/.treehouse

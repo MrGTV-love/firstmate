@@ -1,0 +1,74 @@
+## valid minimal pointers + explicit ruling resolve
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+evidence: resolved head=41dc633a50d92eba58c9cfb0289424ba7e80e374 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+
+## valid refined pointer (commit, file:line, log, log_sha256) resolves
+### claims: {"items":[{"id":"C1","run_id":"123","commit":"41dc633a50d92eba58c9cfb0289424ba7e80e374","file":"lib.sh","line":1,"log":"gate-C1.log","log_sha256":"a4b73f74e5f282df4e1f524c8cade919b6fdecc7d19da316dd255dda91ea80d8"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+evidence: resolved head=41dc633a50d92eba58c9cfb0289424ba7e80e374 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+
+## pointer for only some mandatory ids is refused
+### claims: {"items":[{"id":"C1","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## pointer at the wrong head commit is refused
+### claims: {"items":[{"id":"C1","run_id":"123","commit":"92f193476fc5366e2aca4fd5c2df38d2a57b0c2c"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "C1: evidence needs a CI run id at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## wrong log sha256 is refused
+### claims: {"items":[{"id":"C1","run_id":"123","log_sha256":"0000000000000000000000000000000000000000000000000000000000000000"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "C1: PASS log pointer does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## gate pointer naming summary.log instead of its command log is refused
+### claims: {"items":[{"id":"C1","run_id":"123","log":"summary.log"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "C1: gate pointer does not name its exact command log"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## file:line past end of file at head is refused
+### claims: {"items":[{"id":"C1","run_id":"123","file":"lib.sh","line":99},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "C1: file:line does not exist at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## flagged weakened-test line with no ruling is refused, naming file:line
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}]}
+error: "tests/greet.test.sh:3 (67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d): weakened-test line needs an explicit accept ruling and reason in the independent PASS record"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## ruling for a different line does not count
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","decision":"accept","reason":"other line"}]}
+error: "tests/greet.test.sh:3 (67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d): weakened-test line needs an explicit accept ruling and reason in the independent PASS record"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## failed CI run is refused
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+### fake forge: FAKE_CONCLUSION=failure
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## CI run from a non-default branch ref is refused
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+### fake forge: FAKE_REF=fm/evil
+error: "C1: CI workflow ref is not the default branch main"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+
+## artifact whose gate log was altered after recording is refused
+### claims: {"items":[{"id":"C1","run_id":"123"},{"id":"C2","run_id":"123"}],"rulings":[{"id":"67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d","decision":"accept","reason":"assertion intentionally changed from hi to hello"}]}
+error: "CI log digest does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+

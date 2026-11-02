@@ -1,0 +1,129 @@
+### compares c9a5a73c vs 77d3e2dd294e7b9509be2c432c2feb7c69028ab4 bin/fm-test-weakening.py on the same disposable diffs
+
+## case=true-clean-add-only
+@@ -1 +1,2 @@
+ x = 1
++y = 3
+### before fix (c9a5a73c detector):
+flags: 0
+### exit: 0
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+
+## case=nonbound-number-raised
+@@ -1 +1 @@
+-x = 1
++x = 2
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+
+## case=lower-retries-and-timeout
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 5
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+
+## case=ATTACK-lower-two-timeouts
+@@ -1,2 +1,2 @@
+-TIMEOUT_SECONDS = 10
+-CONNECT_TIMEOUT = 30
++TIMEOUT_SECONDS = 5
++CONNECT_TIMEOUT = 20
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+
+## case=ATTACK-lower-two-retry-names
+@@ -1,2 +1,2 @@
+-retries = 3
+-retry_delay = 10
++retries = 2
++retry_delay = 5
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+
+## case=ATTACK-rename-timeout-to-poll_timeout
+@@ -1 +1 @@
+-timeout = 5
++poll_timeout = 50
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+
+## case=ATTACK-rename-attempts-to-retries
+@@ -1 +1 @@
+-max_attempts = 3
++max_retries = 9
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+
+## case=ATTACK-rename-timeout-to-deadline
+@@ -1 +1 @@
+-timeout = 5
++deadline = 50
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+
+## case=ATTACK-rename-seq-to-range
+@@ -1 +1 @@
+-for i in $(seq 1 3); do :; done
++for i in range(30): pass
+### before fix (c9a5a73c detector):
+flags: 1
+flag: "bin/loop.py:1"
+reason: "increased time/retry/iteration bound"
+### exit: 1
+### after fix (77d3e2dd detector):
+flags: 0
+### exit: 0
+

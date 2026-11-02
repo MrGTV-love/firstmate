@@ -1,0 +1,166 @@
+### source head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+### lab: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.oNwsNQ TMUX_TMPDIR=/tmp/fml.irrG9o (disposable lab home from bin/fm-lab-home.sh env)
+### teardown line: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.oNwsNQ && rm -rf /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+### primary: tmux -L fm-lab session 'primary' (socket /private/tmp/fml.irrG9o/tmux-501/fm-lab); spawns run with TMUX naming that socket
+### project: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/projects/labproj origin=/Users/charlesabrooker/tmp/fm-lab.oNwsNQ/origins/labproj.git; data/projects.md: - labproj [direct-PR] - tiny lab project
+
+## case=place task=dodt381401c-place
+### $ bin/fm-brief.sh dodt381401c-place labproj --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-place/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### exit: 0
+### filled DoD section of brief:
+Capability in plain words: {DOD_CAPABILITY}
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+### Supporting items
+{DOD_SUPPORTING_ITEMS}
+### Hard gates
+{DOD_HARD_GATES}
+### Honesty rule
+{DOD_HONESTY_RULE}
+### backlog add exit: 0
+### $ bin/fm-spawn.sh dodt381401c-place /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+error: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-place/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-place/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (5s)
+### state files for dodt381401c-place: 
+
+## case=noverify task=dodt381401c-noverify
+### $ bin/fm-brief.sh dodt381401c-noverify labproj --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-noverify/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### exit: 0
+### filled DoD section of brief:
+### Mandatory items
+C1 Source: captain intent Expected: README holds a hello line Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+### Supporting items
+### Hard gates
+### Honesty rule
+### backlog add exit: 0
+### $ bin/fm-spawn.sh dodt381401c-noverify /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+error: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-noverify/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 is missing Verify
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-noverify/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (5s)
+### state files for dodt381401c-noverify: 
+
+## case=gatenocheck task=dodt381401c-gatenocheck
+### $ bin/fm-brief.sh dodt381401c-gatenocheck labproj --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-gatenocheck/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### exit: 0
+### filled DoD section of brief:
+### Mandatory items
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+### Supporting items
+### Hard gates
+### Honesty rule
+### backlog add exit: 0
+### $ bin/fm-spawn.sh dodt381401c-gatenocheck /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+error: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-gatenocheck/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 with Authority gate requires an exact Check command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-gatenocheck/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (5s)
+### state files for dodt381401c-gatenocheck: 
+
+## case=ok task=dodt381401c-ok
+### $ bin/fm-brief.sh dodt381401c-ok labproj --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/data/dodt381401c-ok/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### exit: 0
+### filled DoD section of brief:
+### Mandatory items
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+### Supporting items
+### Hard gates
+### Honesty rule
+### backlog add exit: 0
+### $ bin/fm-spawn.sh dodt381401c-ok /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+skill selection for dodt381401c-ok: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned dodt381401c-ok harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodt381401c-ok worktree=/Users/charlesabrooker/tmp/fm-lab.oNwsNQ/treehouse/.treehouse/labproj-76eed8/1/labproj
+### exit: 0 (37s)
+### state files for dodt381401c-ok: dodt381401c-ok.busy-gen dodt381401c-ok.busy-state dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md dodt381401c-ok.git-hooks dodt381401c-ok.inbox dodt381401c-ok.launch-models dodt381401c-ok.meta dodt381401c-ok.write-confinement.sb 
+
+## case=ok frozen-record checks
+### grep -n dod_ /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.meta
+7:dod_file=/Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+8:dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### ls -l snapshot
+-r--r--r--@ 1 charlesabrooker  staff  1580 Nov  1 00:54 /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### shasum -a 256 snapshot
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### bash bin/fm-dod-lib.sh --criteria <brief> | shasum -a 256
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  -
+### worker worktree: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/treehouse/.treehouse/labproj-76eed8/1/labproj
+### snapshot inside worktree: no
+### git -C <worktree> ls-files | grep -c dod: 0
+### attempt plain overwrite of snapshot as same user:
+/Users/charlesabrooker/tmp/t3scripts.9QZW51/run.sh: line 53: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md: Permission denied
+write exit: 1
+### worker window: primary:zsh primary:fm-dodt381401c-ok 
+
+## case=post-spawn-mutation
+### rewrite brief Check to 'true' and drop C2
+152:Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+156:  - Check: true
+### bash bin/fm-dod-lib.sh --criteria <mutated brief> | shasum -a 256 (differs):
+5b8a19153edf73152b87194aad6532cef25fc3b88d973dbe273862daa9871302  -
+### meta after mutation
+dod_file=/Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### snapshot digest after mutation
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### snapshot Check line: Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+  - Check: grep -q hello README
+### RESULT: snapshot digest == recorded dod_sha256
+
+## teardown
+### tmux -L fm-lab kill-server exit: 0
+### fm-lab server gone
+### lab-path processes left: 94966 
+### claude trust entries removed under lab: 2
+### ~/.treehouse new entries: 
+### $ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.oNwsNQ && rm -rf /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state/dodt381401c-ok.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ: Directory not empty
+### teardown exit: 1
+### lab dir STILL PRESENT
+### rm -rf refused by read-only hook dir; $ chmod -R u+w /Users/charlesabrooker/tmp/fm-lab.oNwsNQ && rm -rf /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+### exit: 0
+### lab dir gone: /Users/charlesabrooker/tmp/fm-lab.oNwsNQ
+### no fm-lab server on default TMUX_TMPDIR
+/tmp/fml.QudY4K
+/tmp/fml.gQ8vjc
+### lab-path processes: 

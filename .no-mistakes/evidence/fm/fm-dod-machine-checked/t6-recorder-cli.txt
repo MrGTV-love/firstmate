@@ -1,0 +1,247 @@
+### checker source head: c0ddaa13e0796df94a76e715bcb4e9479c2d91d3
+### Real fm-dod-check.py run (the step dod-evidence.yml runs) on a disposable repo. The head diff also removes a test line, so every case carries an advisory flag.
+## case=gate-pass-with-advisory-flag (expect exit 0)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: d11adb5641ab3e359b5760869feb742f77a8a0d3da0398c3620a882744489df0
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "test \"$(cat value)\" = fixed && test -z \"${GH_TOKEN:-}${GITHUB_TOKEN:-}${GITHUB_OUTPUT:-}\""
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (0.7s)
+### results.json: passed=True head=967a794d13922e136aff27db06b55bdf28aaea56 item=C1 exit=0 run_id=123; weakening flags=1
+### gate-C1.log:
+command: test "$(cat value)" = fixed && test -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}${GITHUB_OUTPUT:-}"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+
+exit: 0
+### verdict: as-expected 
+## case=gate-nonzero-red (expect exit 1)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: 966c785c3a92daa6b449dc7641e3680a761987161d4e4df57291e541b5bfbd4a
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "exit 7"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 7
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (0.7s)
+### verdict: as-expected 
+## case=forged-exit-print (expect exit 1)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: c282f624a3383219baa3db06f7b7bcdb239b80d951858b099d7167e6df695891
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "printf 'exit: 0\\n'; exit 7"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 7
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (0.7s)
+### verdict: as-expected 
+## case=fail-first-pass (expect exit 0)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: e1ae3829b2108b61d140270892169fb1815e002616d7b232810336b948932971
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (0.6s)
+### test row: path=tests/fix.test.sh base_exit=1 base_commit=bebe2425c7d91e076c5467544da21f51d97bdddf head_exit=0 head_commit=967a794d13922e136aff27db06b55bdf28aaea56
+### verdict: as-expected 
+## case=fail-first-already-passing-red (expect exit 1)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base 58f9220f5aeebdcc59a12c41c4be209564501a46 --head 50efb3246499a907f19971bfe7d9013d240c2de0 --output <out>
+head: 50efb3246499a907f19971bfe7d9013d240c2de0
+base: 58f9220f5aeebdcc59a12c41c4be209564501a46
+merge_base: 58f9220f5aeebdcc59a12c41c4be209564501a46
+dod_sha256: f032b1190acb4acd85586732b689ef5b5bd2a809643f1e89e8076dc7c8c0834e
+advisory weakened-test detector, never a gate:
+flags: 0
+command: "bash tests/always.test.sh"
+commit: 50efb3246499a907f19971bfe7d9013d240c2de0
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 58f9220f5aeebdcc59a12c41c4be209564501a46
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 50efb3246499a907f19971bfe7d9013d240c2de0
+exit: 0
+test: "tests/always.test.sh"
+fail_first: fail
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (0.9s)
+### verdict: as-expected 
+## case=background-writer-killed (expect exit 0)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: fef4f83d8e5bb099394916ac8cad567671defdeb13759460b12a9940ccc93170
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "(exec >/dev/null 2>&1; sleep 2; touch <tmp>/escaped-writer) & exit 0"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (0.9s)
+### sentinel exists 4s later: False
+### verdict: as-expected 
+## case=held-pipe-named-failure (expect exit 1)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 --output <out>
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: b35502564347ba5af4502da9cd45f949d4006b7d4c3df734f97d9aeda2a9154a
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "python3 -c 'import os,time; os.setsid(); open(\"<tmp>/holder.pid\",\"w\").write(str(os.getpid())); time.sleep(30)' & while ! test -s <tmp>/holder.pid; do sleep 0.1; done; exit 0"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+error: "recorder output pipe still held open 5s after the command and its process group ended: a process that left the group kept its stdout, so the recorded output would be incomplete"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1 (6.4s)
+### verdict: as-expected took=6.4s
+## case=detector-error-not-a-gate (expect exit 0)
+$ fm-dod-check.py run --dod <dod> --repo <repo> --base 165a3792e6ba2f484a53f7f6e9ccb333ada4c17e --head add25b4de086c7d830cc7877eec27b482db2f5cf --output <out>
+head: add25b4de086c7d830cc7877eec27b482db2f5cf
+base: 165a3792e6ba2f484a53f7f6e9ccb333ada4c17e
+merge_base: 165a3792e6ba2f484a53f7f6e9ccb333ada4c17e
+dod_sha256: 3a2523ca10a4cfb9f6dcdd4eff0c14bcf58f7995cd00460eabd0a4fbf88e9480
+advisory weakened-test detector, never a gate:
+error: "'utf-8' codec can't decode byte 0xe9 in position 97: invalid continuation byte"
+help: Supply readable repository and exact base/head commits.
+command: "true"
+commit: add25b4de086c7d830cc7877eec27b482db2f5cf
+exit: 0
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (1.2s)
+### artifact files: ['dod.md', 'gate-C1.log', 'results.json', 'summary.log']
+### verdict: as-expected 
+## case=workflow-record-step (run the exact run: script of the workflow step under bash -e, with trusted/ and candidate/ as the workflow checks them out)
+### variant=green: job step exit 0; artifact files=['dod.md', 'gate-C1.log', 'results.json', 'summary.log', 'test-0-base.log', 'test-0-head.log', 'weakening.json']
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: e1ae3829b2108b61d140270892169fb1815e002616d7b232810336b948932971
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### verdict: as-expected 
+### variant=red: job step exit 1; artifact files=['dod.md', 'gate-C1.log', 'results.json', 'summary.log', 'test-0-base.log', 'test-0-head.log', 'weakening.json']
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+base: bebe2425c7d91e076c5467544da21f51d97bdddf
+merge_base: bebe2425c7d91e076c5467544da21f51d97bdddf
+dod_sha256: 9c956dfe95499b22e0c63a7cfee37080d87e11718ed61b78bd3d5c0b920d115c
+advisory weakened-test detector, never a gate:
+flags: 1
+flag: "tests/old.test.sh:3"
+reason: "removed test or fixture code/row"
+id: a9c51f733f7beb3cc2d9d34f1d2b2081199a6b1d02c6e879fc41090d2bf615c6
+command: "exit 9"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 9
+command: "bash tests/fix.test.sh"
+commit: bebe2425c7d91e076c5467544da21f51d97bdddf
+exit: 1
+command: "bash tests/fix.test.sh"
+commit: 967a794d13922e136aff27db06b55bdf28aaea56
+exit: 0
+test: "tests/fix.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### verdict: as-expected 
+### upload step if='always()' name='fm-dod-evidence-${{ steps.pr.outputs.head }}'; upload runs after a red record step, so a red run keeps its logs; hosted execution not exercised here

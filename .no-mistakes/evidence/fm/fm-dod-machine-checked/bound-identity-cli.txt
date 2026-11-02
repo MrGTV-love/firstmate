@@ -1,0 +1,47 @@
+## head=lower
+diff --git a/tool.py b/tool.py
+index 65d106c..67874fc 100644
+--- a/tool.py
++++ b/tool.py
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 5
+### $ python3 bin/fm-test-weakening.py --repo r --base 5091329d3d226c3bd3030c37401691b641023e9a --head e68393ac2e2fb60cf796cf85c1d9aa482e651922
+flags: 0
+### exit: 0
+
+## head=raise
+diff --git a/tool.py b/tool.py
+index 65d106c..42f4537 100644
+--- a/tool.py
++++ b/tool.py
+@@ -1,2 +1,2 @@
+-retries = 3
++retries = 9
+ TIMEOUT_SECONDS = 10
+### $ python3 bin/fm-test-weakening.py --repo r --base 5091329d3d226c3bd3030c37401691b641023e9a --head bfb5d0bdd6bcdd7e7cbeb94d595d7f3ddf0634a1
+flags: 1
+flag: "tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 607f8785d005682df1deee4e90bb35570da76d21ef26dd9e9036d883ef15e81b
+### exit: 1
+
+## head=rewrite-raise
+diff --git a/tool.py b/tool.py
+index 65d106c..09cde96 100644
+--- a/tool.py
++++ b/tool.py
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++max_retries = 9
++TIMEOUT_SECONDS = 5
+### $ python3 bin/fm-test-weakening.py --repo r --base 5091329d3d226c3bd3030c37401691b641023e9a --head 8393a0b780a19b2636f6975cd0b3db94eebe7a68
+flags: 1
+flag: "tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 996ee68e6be3e329bf070f85da6e0e17e3ee82124f1e0bbf3456b4a61b15805b
+### exit: 1
+

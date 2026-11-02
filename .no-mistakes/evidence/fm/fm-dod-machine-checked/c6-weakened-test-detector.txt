@@ -1,0 +1,65 @@
+## head=weak
+### $ git -C ff diff main...weak --stat
+ bin/tool.py             | 5 ++---
+ tests/fixtures/rows.csv | 1 -
+ tests/other.test.sh     | 1 -
+ 3 files changed, 2 insertions(+), 5 deletions(-)
+### $ python3 bin/fm-test-weakening.py --repo ff --base 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c --head a0dc37599ecf7e0fcf788ce005b28e8bc80bdeaa
+flags: 5
+flag: "bin/tool.py:2"
+reason: "removed assertion/check"
+id: b06c4da648ae78eb81c4095a51e8a5a79841733f0cf12d25f6a06207acdfd428
+flag: "bin/tool.py:4"
+reason: "increased time/retry/iteration bound"
+id: 41050eb17e1b66f0a6c03a10b341eb36589348031dcd0080e6a1bac2fa209c72
+flag: "bin/tool.py:5"
+reason: "increased time/retry/iteration bound"
+id: c7112ed6a6c4c3c604ba8142d37fd75f29404323255f341f952384f9de781aa0
+flag: "tests/fixtures/rows.csv:3"
+reason: "removed test or fixture code/row"
+id: f1c20918f81ec2bf3563b3107da351c1166ade6f5c7c76acc32129f98794242f
+flag: "tests/other.test.sh:4"
+reason: "removed test or fixture code/row"
+id: d05c5d5575db2b2106949b8d6060b234a6a12baae833d3c71f921c9e9ae1a24a
+### exit: 1
+
+## head=deltest
+### $ git -C ff diff main...deltest --stat
+ tests/other.test.sh | 5 -----
+ 1 file changed, 5 deletions(-)
+### $ python3 bin/fm-test-weakening.py --repo ff --base 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c --head d7c1c5d64d51c85c7e315be3f9ca7a0c6778dd1b
+flags: 4
+flag: "tests/other.test.sh:2"
+reason: "removed test or fixture code/row"
+id: 9e254f610e1c156a3a51bd8233327101e06d781ca38a3f77fcc4775a7773a40d
+flag: "tests/other.test.sh:3"
+reason: "removed test or fixture code/row"
+id: bf443f059c5e4df75b528ff16a0029d655815d3286d8343d58ed7bb83352b1f3
+flag: "tests/other.test.sh:4"
+reason: "removed test or fixture code/row"
+id: d05c5d5575db2b2106949b8d6060b234a6a12baae833d3c71f921c9e9ae1a24a
+flag: "tests/other.test.sh:5"
+reason: "removed test or fixture code/row"
+id: 0b3c3a534f287d564ac642f1b9184306d723abc8bd87fc60c5fb1bbc06aeb1b1
+### exit: 1
+
+## head=clean
+### $ git -C ff diff main...clean --stat
+ tests/fixtures/rows.csv | 1 +
+ tests/other.test.sh     | 1 +
+ 2 files changed, 2 insertions(+)
+### $ python3 bin/fm-test-weakening.py --repo ff --base 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c --head 94f15312f7ff4e36e0d92e55a56037fe7b8e477b
+flags: 0
+### exit: 0
+
+## head=lower
+### $ git -C ff diff main...lower --stat
+ bin/tool.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+### $ python3 bin/fm-test-weakening.py --repo ff --base 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c --head dc52964c54e305ce3ed3e1bc4609841139026bda
+flags: 1
+flag: "bin/tool.py:4"
+reason: "increased time/retry/iteration bound"
+id: 17b248f45454adba71468c7729283980b838c7c89674daece7d95bd65bfb9778
+### exit: 1
+

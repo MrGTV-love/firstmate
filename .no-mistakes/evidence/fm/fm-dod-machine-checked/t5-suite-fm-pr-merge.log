@@ -1,0 +1,7 @@
+### head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+### $ nice -n 20 bash bin/fm-test-run.sh tests/fm-pr-merge.test.sh
+FM_TEST_BEGIN 2026-11-01T06:59:16Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+ok - fm-pr-merge: machine evidence unresolved-id
+ok - fm-pr-merge: machine evidence unruled-line
+ok - fm-pr-merge: machine evidence wrong-line
+### STOPPED: the test agent stopped this run after it submitted the structured result. This log is incomplete and is not a pass.

@@ -1,0 +1,232 @@
+### source head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+### FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Ue6jXp TMUX=/private/tmp/fml.ogtGhF/tmux-501/fm-lab,84659,0
+### project /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj origin /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/origins/labproj.git
+
+## case=place task=dodt415445-place
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-place/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD section of brief as dispatched:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+{DOD_MANDATORY_ITEMS}
+
+### $ bin/fm-spawn.sh dodt415445-place /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+error: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-place/brief.md still contains {TASK} or {FIRSTMATE_SPEC}, and has an unfinished task Definition of Done; every unfinished item is listed once:
+  ## Captain's intent still holds {TASK}
+  ## Firstmate spec still holds {FIRSTMATE_SPEC}
+  ### Out of scope is empty: name the work this task does not do, or write None
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-place/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (4s)
+### state files for dodt415445-place: 
+
+## case=noverify task=dodt415445-noverify
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-noverify/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD section of brief as dispatched:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: README greets.
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+### $ bin/fm-spawn.sh dodt415445-noverify /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+error: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-noverify/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 is missing Verify
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-noverify/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (1s)
+### state files for dodt415445-noverify: 
+
+## case=gatenocheck task=dodt415445-gatenocheck
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-gatenocheck/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD section of brief as dispatched:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: README greets.
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+### $ bin/fm-spawn.sh dodt415445-gatenocheck /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+error: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-gatenocheck/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item C1 with Authority gate requires an exact Check command
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-gatenocheck/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+### exit: 1 (1s)
+### state files for dodt415445-gatenocheck: 
+
+## case=grader-nocheck-ok task=dodt415445-grader-nocheck-ok
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-grader-nocheck-ok/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD section of brief as dispatched:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: README greets.
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: grader
+
+### $ bin/fm-spawn.sh dodt415445-grader-nocheck-ok /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+skill selection for dodt415445-grader-nocheck-ok: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned dodt415445-grader-nocheck-ok harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodt415445-grader-nocheck-ok worktree=/Users/charlesabrooker/.treehouse/labproj-cc5814/1/labproj
+### exit: 0 (26s)
+### state files for dodt415445-grader-nocheck-ok: dodt415445-grader-nocheck-ok.busy-gen dodt415445-grader-nocheck-ok.busy-state dodt415445-grader-nocheck-ok.dod.6f15232ce1f7ea7ac640f2d463021f1ec8edc899db3ffddf1ce3834652a6da2b.md dodt415445-grader-nocheck-ok.git-hooks dodt415445-grader-nocheck-ok.inbox dodt415445-grader-nocheck-ok.launch-models dodt415445-grader-nocheck-ok.meta dodt415445-grader-nocheck-ok.write-confinement.sb 
+
+## case=ok task=dodt415445-ok
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/data/dodt415445-ok/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+### fm-brief exit: 0
+### DoD section of brief as dispatched:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: README greets.
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+### $ bin/fm-spawn.sh dodt415445-ok /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/projects/labproj --mode direct-PR --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for dodt415445-ok: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned dodt415445-ok harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodt415445-ok worktree=/Users/charlesabrooker/.treehouse/labproj-cc5814/2/labproj
+### exit: 0 (26s)
+### state files for dodt415445-ok: dodt415445-ok.busy-gen dodt415445-ok.busy-state dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md dodt415445-ok.git-hooks dodt415445-ok.inbox dodt415445-ok.launch-models dodt415445-ok.meta dodt415445-ok.write-confinement.sb 
+
+## case=ok frozen-record checks
+### grep -n dod_ /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.meta
+7:dod_file=/Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md
+8:dod_sha256=019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c
+### ls -l snapshot
+-r--r--r--@ 1 charlesabrooker  staff  1574 Nov  1 01:44 /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md
+### shasum -a 256 snapshot
+019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c  /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md
+### bash bin/fm-dod-lib.sh --criteria <brief> | shasum -a 256
+019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c  -
+### worker worktree: /Users/charlesabrooker/.treehouse/labproj-cc5814/2/labproj
+### snapshot inside worktree: no
+### git -C <worktree> ls-files | grep -c dod: 0
+### attempt plain overwrite of snapshot as same user:
+/Users/charlesabrooker/tmp/t4scripts.UDS7dH/spawn.sh: line 58: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md: Permission denied
+write exit: 1
+
+## case=post-spawn-mutation
+### rewrote brief Check to 'true' and dropped C2; brief now:
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: true
+
+### Supporting items
+### bash bin/fm-dod-lib.sh --criteria <mutated brief> | shasum -a 256:
+1bd1e8a53922f341b488c58e3aa795da733f8cce4f749c366856c305187782ec  -
+### meta after mutation
+dod_file=/Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md
+dod_sha256=019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c
+### snapshot digest after mutation
+019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c  /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.dod.019a57adea806082578522315da757e3e5825748c95406ee7220015b4865b78c.md
+### snapshot Check/C2 lines:
+13:  - Check: grep -q hello README
+14:C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+### RESULT: snapshot digest == recorded dod_sha256
+
+## claims from frozen meta
+### $ python3 bin/fm-dod-check.py claims --meta /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.meta --run 424242
+{"items": [{"id": "C1", "run_id": "424242"}, {"id": "C2", "run_id": "424242"}]}
+### exit: 0
+### windows: primary:zsh primary:runner primary:fm-dodt415445-grader-nocheck-ok primary:fm-dodt415445-ok 
+### worker pane head:
+⚠ Ask rule Bash(*>*/.claude/settings*:*) reads its * literally · use
+  Bash(*>*/.claude/settings*)
+⚠ Ask rule Bash(*>*/.claude/hooks/*:*) reads its * literally · use
+  Bash(*>*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use
+  Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use
+  Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use
+  Bash(*>*/.tac/governance/*)
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.Ue6jXp/state/operational-inbox/1793515503-654e78a6032d79f3.msg' and handle
+  its contents as Firstmate operational input.
+⏺ Running 1 shell command…
+✽ Tomfoolering…
+
+## teardown
+### tmux -L fm-lab kill-server exit: 0
+### removing spawn-created treehouse pool ~/.treehouse/labproj-cc5814 (origin points into lab)
+exit: 0
+### $ bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.Ue6jXp && rm -rf /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+rm: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state/dodt415445-ok.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp: Directory not empty
+### teardown exit: 
+### lab still present (read-only hook dir); chmod -R u+w + rm -rf
+exit: 0
+### lab dir gone: /Users/charlesabrooker/tmp/fm-lab.Ue6jXp
+ls: /Users/charlesabrooker/.treehouse/labproj-cc5814: No such file or directory
+### no lab processes

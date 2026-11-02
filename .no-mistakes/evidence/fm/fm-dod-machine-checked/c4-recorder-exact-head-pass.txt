@@ -1,0 +1,54 @@
+### $ python3 bin/fm-dod-check.py run --dod <frozen snapshot> --repo candidate --base 6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9 --head 24d8730c1b6b79e863c9979e739418c1bc23b363 --output out-pass
+### (head 24d8730c1b6b79e863c9979e739418c1bc23b363 is the commit the real lab worker pushed)
+head: 24d8730c1b6b79e863c9979e739418c1bc23b363
+base: 6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9
+merge_base: 6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9
+dod_sha256: 00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+flags: 0
+command: "grep -q hello README"
+commit: 24d8730c1b6b79e863c9979e739418c1bc23b363
+exit: 0
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### ls out-pass
+dod.md
+gate-C1.log
+results.json
+summary.log
+weakening.json
+### gate-C1.log
+command: grep -q hello README
+commit: 24d8730c1b6b79e863c9979e739418c1bc23b363
+
+exit: 0
+### summary.log
+head: 24d8730c1b6b79e863c9979e739418c1bc23b363
+base: 6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9
+dod_sha256: 00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### results.json
+{
+  "schema": "fm-dod-evidence.v1",
+  "head": "24d8730c1b6b79e863c9979e739418c1bc23b363",
+  "base": "6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9",
+  "merge_base": "6adb0b1055b1047fa3cfdcd7a7b82dd9173f32d9",
+  "dod_sha256": "00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c",
+  "run_id": "",
+  "run_attempt": "",
+  "items": [
+    {
+      "command": "grep -q hello README",
+      "commit": "24d8730c1b6b79e863c9979e739418c1bc23b363",
+      "exit": 0,
+      "log": "gate-C1.log",
+      "sha256": "ac764103b961dc89c31221d2b1e00425a0c58c92b9275196d511ef5158429abe",
+      "id": "C1"
+    }
+  ],
+  "tests": [],
+  "passed": true
+}
+### sha256 of gate-C1.log matches manifest?
+ac764103b961dc89c31221d2b1e00425a0c58c92b9275196d511ef5158429abe  /Users/charlesabrooker/tmp/fmlab-rec/out-pass/gate-C1.log

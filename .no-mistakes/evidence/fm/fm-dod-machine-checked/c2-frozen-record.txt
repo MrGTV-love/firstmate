@@ -1,0 +1,38 @@
+### grep dod_ /Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.meta
+7:dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+8:dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### ls -l snapshot
+-r--r--r--@ 1 charlesabrooker  staff  1580 Oct 31 22:03 /Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### shasum -a 256 snapshot
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  /Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### selected DoD span recomputed from the brief by the owner (bash bin/fm-dod-lib.sh --criteria brief | shasum)
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  -
+### worker worktree: worktree=/Users/charlesabrooker/tmp/fmlab-pool/.treehouse/labproj-88426f/1/labproj
+### git -C worktree ls-files | grep -c dod (snapshot tracked in branch?)
+0
+### is snapshot inside worktree? no
+### frozen snapshot content
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: README greets visitors.
+
+### Mandatory items
+Write at least one item.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
+C1 Source: captain intent Expected: README holds a hello line Verify: grep hello README Edge/negative: README without hello fails Evidence place: README Authority: gate
+  - Check: grep -q hello README
+C2 Source: captain intent Expected: nothing else changes Verify: git diff --stat Edge/negative: other files unchanged Evidence place: diff Authority: grader
+
+### Supporting items
+None
+
+### Hard gates
+None
+
+### Honesty rule
+None
+

@@ -1,0 +1,173 @@
+### checker source head: c0ddaa13e0796df94a76e715bcb4e9479c2d91d3
+### Real fm-dod-check.py freeze/run/verify on a disposable repo. Only the GitHub transport is a local gh-axi stub that serves the real recorder artifact.
+### artifact: head=967a794d13922e136aff27db06b55bdf28aaea56 passed=True advisory flags in weakening.json=1: ['tests/old.test.sh:3']
+## case=C7-full-pointer-resolves (expect exit 0)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 1, "log": "gate-C1.log", "log_sha256": "a0a7dc8e2cddeb69a0c53958ba9f09ab204f5bd0
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C7-minimal-pointer-resolves (expect exit 0)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123"}, {"id": "C2", "run_id": "123"}]}
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C7-missing-mandatory-id (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123"}]}
+error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-no-items (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": []}
+error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-extra-id (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 1, "log": "gate-C1.log", "log_sha256": "a0a7dc8e2cddeb69a0c53958ba9f09ab204f5bd0
+error: "PASS must carry exactly one resolving pointer for mandatory ids: C1,C2"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-wrong-head-commit (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "bebe2425c7d91e076c5467544da21f51d97bdddf", "file": "value", "line": 1, "log": "gate-C1.log", "log_sha256": "a0a7dc8e2cddeb69a0c53958ba9f09ab204f5bd0
+error: "C1: evidence needs a CI run id at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-bad-run-id (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "abc", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 1, "log": "gate-C1.log", "log_sha256": "a0a7dc8e2cddeb69a0c53958ba9f09ab204f5bd0
+error: "C1: evidence needs a CI run id at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-bad-file-line (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 999, "log": "gate-C1.log", "log_sha256": "a0a7dc8e2cddeb69a0c53958ba9f09ab204f5b
+error: "C1: file:line does not exist at the exact PR head"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-wrong-log-sha256 (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 1, "log": "gate-C1.log", "log_sha256": "0000000000000000000000000000000000000000
+error: "C1: PASS log pointer does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-gate-points-at-other-log (expect exit 1)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123", "commit": "967a794d13922e136aff27db06b55bdf28aaea56", "file": "value", "line": 1, "log": "summary.log"}, {"id": "C2", "run_id": "123"}]}
+error: "C1: gate pointer does not name its exact command log"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C6-advisory-no-ruling-not-refused (expect exit 0)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123"}, {"id": "C2", "run_id": "123"}]}
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C6-stale-ruling-for-other-line-not-refused (expect exit 0)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123"}, {"id": "C2", "run_id": "123"}], "rulings": [{"id": "different-line"}]}
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C6-malformed-rulings-not-read (expect exit 0)
+$ fm-dod-check.py verify --meta <meta> --pr https://github.com/example/repo/pull/9 --base bebe2425c7d91e076c5467544da21f51d97bdddf --head 967a794d13922e136aff27db06b55bdf28aaea56 < {"items": [{"id": "C1", "run_id": "123"}, {"id": "C2", "run_id": "123"}], "rulings": "not-a-list"}
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C6-artifact-without-weakening-json (detector error path; expect exit 0)
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C6-garbage-weakening-json (verify never reads it; expect exit 0)
+evidence: resolved head=967a794d13922e136aff27db06b55bdf28aaea56 items=2
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0
+### verdict: as-expected 
+## case=C7-failed-ci-run (expect exit 1)
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-unfinished-ci-run (expect exit 1)
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-other-workflow-path (expect exit 1)
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-run-from-pr-branch (expect exit 1)
+error: "C1: CI workflow ref is not the default branch main"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-workflow-commit-off-history (expect exit 1)
+error: "C1: CI workflow commit is not in default branch main history"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-other-run-attempt (expect exit 1)
+error: "CI artifact does not prove this frozen DoD at this dispatch base/head/run attempt"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-artifact-expired (expect exit 1)
+error: "exact-head CI evidence artifact missing, expired, or ambiguous"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-tampered-log (expect exit 1)
+error: "CI log digest does not resolve"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-red-artifact (expect exit 1)
+error: "CI artifact does not prove this frozen DoD at this dispatch base/head/run attempt"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-verify-at-other-head (expect exit 1)
+error: "exact-head CI evidence artifact missing, expired, or ambiguous"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=C7-forge-unreachable (expect exit 3)
+error: "cannot resolve GitHub evidence: /repos/example/repo: network down"
+help: Hosted or local evidence is unreachable; retry when it can be read.
+### exit: 3
+### verdict: as-expected 
+## case=C2-no-digest-cannot-be-adopted (expect exit 1)
+error: "task has no dispatch-time DoD digest; do not adopt mutable worker criteria"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=dispatch-submits-frozen-bytes (expect exit 0)
+dispatched: true
+head: 967a794d13922e136aff27db06b55bdf28aaea56
+dod_sha256: feefee78e496196ed56d0dbc81e6042ef513e7d3f888b6c115c011a56d5d1e38
+### exit: 0
+### gh-axi argv: ['workflow', 'run', 'dod-evidence.yml', '--repo', 'example/repo', '--ref', 'main'] ... dod field bytes equal frozen snapshot: True
+### verdict: as-expected 
+## case=dispatch-no-workflow-on-default-branch (expect refusal, no bootstrap; exit 1)
+error: "DoD CI dispatch refused:  error: \"gh: workflow dod-evidence.yml not found on the default branch (HTTP 404)\"\n"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=real-gh-axi-transport (read-only GET of public cli/cli run 41363456476; real gh-axi, no stub; expect exit 1: not the DoD workflow)
+error: "C1: CI run is missing, unfinished, failed, or not the DoD workflow"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1
+### verdict: as-expected 
+## case=real-gh-axi-missing-run (run id 9 does not exist; expect exit 3 unavailable, never a pass)
+error: "cannot resolve GitHub evidence: /repos/cli/cli/actions/runs/9: "
+help: Hosted or local evidence is unreachable; retry when it can be read.
+### exit: 3
+### verdict: as-expected 

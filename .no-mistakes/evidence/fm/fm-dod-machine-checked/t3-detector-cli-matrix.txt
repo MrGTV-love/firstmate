@@ -1,0 +1,189 @@
+### detector: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-test-weakening.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repos under /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.M4vaoohc5c (bash 3.2.57(1)-release)
+
+## case=clean-add (expect 0)
+@@ -1 +1,2 @@
+ x = 1
++y = 3
+### $ python3 bin/fm-test-weakening.py --repo <clean-add> --base 8fd5f8f2ce7cf2ea67915083c545fffa470a2f00 --head 697cecf3ba196344ce0ac33c5c01051ff13da70f
+flags: 0
+### exit: 0
+
+## case=add-assert-only (expect 0)
+@@ -1 +1,2 @@
+ assert_eq 1 1
++assert_eq 2 2
+### $ python3 bin/fm-test-weakening.py --repo <add-assert-only> --base 518cb508face0dc1cdab115f99444c2f23a06361 --head 7a4c552fc0796f47a9c1e2ec1079672d866ebaf4
+flags: 0
+### exit: 0
+
+## case=del-assert (expect 1 removed assertion)
+@@ -1,3 +1,2 @@
+ def f():
+-    assert x == 1
+     return x
+### $ python3 bin/fm-test-weakening.py --repo <del-assert> --base 5dbf029423c6fb8934d62f1e1482b8cf381660ec --head d74154fd10ce6a5951fd867ebacd0e086ed94d09
+flags: 1
+flag: "bin/tool.py:2"
+reason: "removed assertion/check"
+id: f57425e4d2e3779be6d4a8e807ffaec0096a4d8cc34b15d2286171169ddba106
+### exit: 1
+
+## case=del-test (expect 1 removed test code)
+@@ -1,6 +1,3 @@
+ test_one() {
+   true
+ }
+-test_two() {
+-  true
+-}
+### $ python3 bin/fm-test-weakening.py --repo <del-test> --base 2976c31f7634b2fb857fa7aa63714b60d5db59cf --head 07008799f8bba0596312217e023c47b12ecee402
+flags: 3
+flag: "tests/a.test.sh:4"
+reason: "removed test or fixture code/row"
+id: 81c3f37642c6c184d754c8b0e505beecfdf238d3fa934a31aaaeefee52593ea2
+flag: "tests/a.test.sh:5"
+reason: "removed test or fixture code/row"
+id: ebdfba898ac2b4811e796e705584ff3009f5d59a08b65af6509e25c661d7f025
+flag: "tests/a.test.sh:6"
+reason: "removed test or fixture code/row"
+id: b22b06433978d59ba0c1973b2579a8355ca68c6547892868ab8c410e41f3d518
+### exit: 1
+
+## case=del-fixture-row (expect 1 removed fixture row)
+@@ -1,3 +1,2 @@
+ a,1
+ b,2
+-c,3
+### $ python3 bin/fm-test-weakening.py --repo <del-fixture-row> --base d231b1aaa8c57fc6ad3ceff470b85e9bda56faaa --head d20f94b657893f42641ee003146e87d0f0f7191d
+flags: 1
+flag: "tests/fixtures/rows.csv:3"
+reason: "removed test or fixture code/row"
+id: b1533eeff7038328bf76f88547c9e8bd34f823a4fcee43fb463abf88d29a9f44
+### exit: 1
+
+## case=raise-timeout (expect 1 increased bound)
+@@ -1 +1 @@
+-timeout 10 cmd
++timeout 60 cmd
+### $ python3 bin/fm-test-weakening.py --repo <raise-timeout> --base 5aa0581310affe4f265c0dc1996b8b7180bb2905 --head 8461ae4c9aad30befc935edff3ff510856c0599c
+flags: 1
+flag: "bin/tool.sh:1"
+reason: "increased time/retry/iteration bound"
+id: 0af62bce0f64e9bb220a54f943e14ec0b7dff560e188921f274dcf6b836f1d16
+### exit: 1
+
+## case=raise-retries (expect 1 increased bound)
+@@ -1,2 +1,2 @@
+-retries = 3
++retries = 9
+ TIMEOUT_SECONDS = 10
+### $ python3 bin/fm-test-weakening.py --repo <raise-retries> --base 2fa26349835f12859558d1382a233e2b4458c782 --head cc697479ccacaa75195100c83bb6f127548cb6a1
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: 90356bc91c53b954a7a59717318f6d93403ef1eca9de9d444fc1435bf60898af
+### exit: 1
+
+## case=raise-range (expect 1 increased bound)
+@@ -1 +1 @@
+-for i in range(3): pass
++for i in range(30): pass
+### $ python3 bin/fm-test-weakening.py --repo <raise-range> --base 6d7ef48ea1c935850d01c151681db09db3fc160a --head 90c9ad4de846bed1f9e3d1a61ccbd88db6fa9be6
+flags: 1
+flag: "bin/loop.py:1"
+reason: "increased time/retry/iteration bound"
+id: ced70e2b448f0d5f11cd0ee667d84dba4a4f1092df9fbd54caeb34e4ee4782d0
+### exit: 1
+
+## case=raise-rewritten-shape (expect 1 increased bound)
+@@ -1,2 +1,2 @@
+ retries = 2
+-TIMEOUT_SECONDS = 5
++TIMEOUT_SECONDS = min(60, 5)
+### $ python3 bin/fm-test-weakening.py --repo <raise-rewritten-shape> --base bbca9ce5b8c9dba6f411ab053d96e894e58f3f60 --head b1dedbf77a1a412d9b23e287aa9cb00ea7da616f
+flags: 1
+flag: "bin/limits.py:2"
+reason: "increased time/retry/iteration bound"
+id: d29ca63f1629a97737804d58c25abfe85ee783dbcb59c64381ce84aa18994328
+### exit: 1
+
+## case=lower-retries-and-timeout (expect 0 (Main2145 case))
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 5
+### $ python3 bin/fm-test-weakening.py --repo <lower-retries-and-timeout> --base 1d6b11ab743145e50b2522d3efd6c55768e973b2 --head ca5401431232d387aab9ea04981294cc5c05f5df
+flags: 0
+### exit: 0
+
+## case=ADV-lower-two-timeouts (expect 0 (only lowers))
+@@ -1,2 +1,2 @@
+-TIMEOUT_SECONDS = 10
+-CONNECT_TIMEOUT = 30
++TIMEOUT_SECONDS = 5
++CONNECT_TIMEOUT = 20
+### $ python3 bin/fm-test-weakening.py --repo <ADV-lower-two-timeouts> --base 9e4f0faa04276d0e945a34c795d41534a9f23bc7 --head e8014ec7fda499ac4ad5e3c900910074e057311d
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: e29d6e123cd0a7987bb210fba53649b0bc550a01609c8ba7c71480e7fe2d5d69
+### exit: 1
+
+## case=ADV-lower-retries-and-retry_delay (expect 0 (only lowers))
+@@ -1,2 +1,2 @@
+-retries = 3
+-retry_delay = 10
++retries = 2
++retry_delay = 5
+### $ python3 bin/fm-test-weakening.py --repo <ADV-lower-retries-and-retry_delay> --base 8baa8fe3fe19167f3b4e334573fd89aea7427024 --head bd787174023198d5b3f34a6fc51fcba5fecc9505
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: 13b7b021cb6f8575cf8a27f7e284f8dd676b43034c40e4f23b2d0ebd50d0bf95
+### exit: 1
+
+## case=ADV-lower-two-sleeps (expect 0 (only lowers))
+@@ -1,2 +1,2 @@
+-sleep 10
+-sleep 30
++sleep 5
++sleep 20
+### $ python3 bin/fm-test-weakening.py --repo <ADV-lower-two-sleeps> --base 7f6005c8af211bde8c915e4d8ec9f7561c9f06e6 --head b699ba40b716cd380eaf59ba714d6ed1b03e877f
+flags: 1
+flag: "bin/tool.sh:1"
+reason: "increased time/retry/iteration bound"
+id: 6541c699f21a18b2faeb1fefe005495a0937c41a58b02793687099f14555f980
+### exit: 1
+
+## case=ADV-rename-timeout-to-poll_timeout (expect 1 (raised timeout))
+@@ -1 +1 @@
+-timeout = 5
++poll_timeout = 50
+### $ python3 bin/fm-test-weakening.py --repo <ADV-rename-timeout-to-poll_timeout> --base 778c08759fe0b3abc454ba826e6af86e3cc14cac --head def56b67733b7b9a1b9051772a473ef4d8fbdb8e
+flags: 0
+### exit: 0
+
+## case=ADV-rename-attempts-to-retries (expect 1 (raised retry bound))
+@@ -1 +1 @@
+-max_attempts = 3
++max_retries = 9
+### $ python3 bin/fm-test-weakening.py --repo <ADV-rename-attempts-to-retries> --base 29e2fcba7cb98090ee005167c8dc018e5827dd82 --head 1bfa04e446128fd53b6c3cf9823f8a360bc17328
+flags: 0
+### exit: 0
+
+## case=ADV-rename-timeout-to-deadline (expect 1 (raised time bound))
+@@ -1 +1 @@
+-timeout = 5
++deadline = 50
+### $ python3 bin/fm-test-weakening.py --repo <ADV-rename-timeout-to-deadline> --base 4169bc06fdd1c3201c40375f634c0541aa31b1aa --head 0a386b1080f5b8cc136547db0ff2d8408072dc74
+flags: 0
+### exit: 0
+
+## case=ADV-rename-seq-to-range (expect 1 (raised iteration bound))
+@@ -1 +1 @@
+-for i in $(seq 1 3); do :; done
++for i in range(30): pass
+### $ python3 bin/fm-test-weakening.py --repo <ADV-rename-seq-to-range> --base 4025eb00c54cecc360eb270732a679023b651684 --head 05e055a319a85deafe2bd1c510e91f0441b6f245
+flags: 0
+### exit: 0

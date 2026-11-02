@@ -1,0 +1,29 @@
+## C4 edge: gate command exiting non-zero turns the run red
+### $ python3 bin/fm-dod-check.py run --dod dod-red.md --repo ff --base main(92f193476fc5366e2aca4fd5c2df38d2a57b0c2c) --head good --output out-red
+head: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+merge_base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: f017191b858b4fe85f06855418cf03b14c134fc6256d58c9fac257bcc3157df5
+flags: 1
+flag: "tests/greet.test.sh:3"
+reason: "removed test or fixture code/row"
+id: 67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d
+command: "grep -q goodbye lib.sh"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### gate-C1.log
+command: grep -q goodbye lib.sh
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+
+exit: 1

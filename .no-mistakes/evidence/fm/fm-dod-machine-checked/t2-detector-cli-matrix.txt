@@ -1,0 +1,185 @@
+### detector source: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-test-weakening.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+
+## case=clean
+@@ -1 +1,2 @@
+-x = 1
++x = 2
++y = 3
+### $ python3 bin/fm-test-weakening.py --repo r --base e2a69ad59b49417b3945ff0530badfec067a2f99 --head 924c34fe204e0c08dd735c721a9f6da9ec9adcc8
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: ddda8c984451a11fc20a4857df27623e9ed5e1485281f9633e0b0b1727034466
+### exit: 1
+
+## case=add-assert-only
+@@ -1 +1,2 @@
+ assert_eq 1 1
++assert_eq 2 2
+### $ python3 bin/fm-test-weakening.py --repo r --base 09a11195f525c0edaa866508ea592067cb81a4c8 --head 6759008085eced5aa8d98cdd3fe0b52900362a7e
+flags: 0
+### exit: 0
+
+## case=del-assert
+@@ -1,3 +1,2 @@
+ def f():
+-    assert x == 1
+     return x
+### $ python3 bin/fm-test-weakening.py --repo r --base d499c1eaf8d513c368b86493294de9b0f6b576b6 --head 8d3dbb262d89852e9c6f5af7c531336442f88870
+flags: 1
+flag: "bin/tool.py:2"
+reason: "removed assertion/check"
+id: f57425e4d2e3779be6d4a8e807ffaec0096a4d8cc34b15d2286171169ddba106
+### exit: 1
+
+## case=del-test
+@@ -1,6 +1,3 @@
+ test_one() {
+   true
+ }
+-test_two() {
+-  true
+-}
+### $ python3 bin/fm-test-weakening.py --repo r --base e9c6eec17210df3360e4fd3e0c13d87f6a231bb7 --head 2bfd5d82b7a93d68502b91396b016cf58e8a9d4e
+flags: 3
+flag: "tests/a.test.sh:4"
+reason: "removed test or fixture code/row"
+id: 81c3f37642c6c184d754c8b0e505beecfdf238d3fa934a31aaaeefee52593ea2
+flag: "tests/a.test.sh:5"
+reason: "removed test or fixture code/row"
+id: ebdfba898ac2b4811e796e705584ff3009f5d59a08b65af6509e25c661d7f025
+flag: "tests/a.test.sh:6"
+reason: "removed test or fixture code/row"
+id: b22b06433978d59ba0c1973b2579a8355ca68c6547892868ab8c410e41f3d518
+### exit: 1
+
+## case=del-fixture-row
+@@ -1,3 +1,2 @@
+ a,1
+ b,2
+-c,3
+### $ python3 bin/fm-test-weakening.py --repo r --base 97add2e8b21c6f7c1497d704fb2710cb6654d559 --head 3099ba8bbef3f619c1328721fa0569d1de506ad3
+flags: 1
+flag: "tests/fixtures/rows.csv:3"
+reason: "removed test or fixture code/row"
+id: b1533eeff7038328bf76f88547c9e8bd34f823a4fcee43fb463abf88d29a9f44
+### exit: 1
+
+## case=raise-timeout
+@@ -1 +1 @@
+-TIMEOUT_SECONDS = 10
++TIMEOUT_SECONDS = 60
+### $ python3 bin/fm-test-weakening.py --repo r --base 1012b40fc0632b620d05e8823f1318e966ad1bbc --head 1acab5acbbceb9d7aa34f5992fb259f8e4b0a587
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: ade39d7fbe75c8e8a9d3a8a1d82873a10a5459f3802c32a620f51d9cc10d3a92
+### exit: 1
+
+## case=raise-range
+@@ -1,2 +1,2 @@
+-for i in range(3):
++for i in range(30):
+     pass
+### $ python3 bin/fm-test-weakening.py --repo r --base 29ee25d70ea8a03df9a498092b6206f07c63f805 --head 7d48635336f8a82390a635016be2f7cbfd43be0a
+flags: 1
+flag: "bin/tool.py:1"
+reason: "increased time/retry/iteration bound"
+id: 2e493734d5b54421548befbeeea664d792d8417e1f6650e911a639679cd8e9b6
+### exit: 1
+
+## case=raise-shell-lt
+@@ -1 +1 @@
+-while [ $i -lt 5 ]; do i=$((i+1)); done
++while [ $i -lt 50 ]; do i=$((i+1)); done
+### $ python3 bin/fm-test-weakening.py --repo r --base 3356d0a58587b1bad86aa58e8fe2705d0ce8faf3 --head 12bb86163c5b4ae52c2182d8169e0c4c94206239
+flags: 1
+flag: "bin/run.sh:1"
+reason: "increased time/retry/iteration bound"
+id: a2bff9a8824d8f3ebcd677c71ae3d2c5a7b3e9a37e64ab55fbb871adc0145844
+### exit: 1
+
+## case=lower-retries-and-timeout
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 5
+### $ python3 bin/fm-test-weakening.py --repo r --base cb73222df67f5e504adf36e3deb95489cd49fbdb --head 5d6f028936206ced475ebbb4227832d2b8edab41
+flags: 0
+### exit: 0
+
+## case=lower-retry-only
+@@ -1 +1 @@
+-retries = 3
++retries = 1
+### $ python3 bin/fm-test-weakening.py --repo r --base 0af09ab42e4ad49cae2ec1944e3474ebc484d6e5 --head 33009d41bb4c816a9928c57ad33faf1d678dd3cf
+flags: 0
+### exit: 0
+
+## case=cross-kind-mixed-raise-timeout
+@@ -1,2 +1,2 @@
+-retries = 3
+-TIMEOUT_SECONDS = 10
++retries = 2
++TIMEOUT_SECONDS = 50
+### $ python3 bin/fm-test-weakening.py --repo r --base e03e071c6fe5d3900c523f463135bb8de693c489 --head 0d8c6c94f2c4ce1de0406cbe7c9e39cd3b5bc459
+flags: 1
+flag: "bin/limits.py:2"
+reason: "increased time/retry/iteration bound"
+id: 359dc1923280f62b5df75e28f7c74478dd395600c8ffc0e08be33c0b058226d3
+### exit: 1
+
+## case=rename-raise-retries
+@@ -1 +1 @@
+-retries = 3
++max_retries = 9
+### $ python3 bin/fm-test-weakening.py --repo r --base 429de56d9525db2eecfd561403aa4904c5c09401 --head 2f9c07b12c61aebacbd890c0bbdbc00d868195f8
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: 2e9f3de2c9b22572a25bd1a5eeef94ab9ac699d327daa1bca586990c88fb6d59
+### exit: 1
+
+## case=ATTACK-lower-two-timeouts
+@@ -1,2 +1,2 @@
+-TIMEOUT_SECONDS = 10
+-CONNECT_TIMEOUT = 30
++TIMEOUT_SECONDS = 5
++CONNECT_TIMEOUT = 20
+### $ python3 bin/fm-test-weakening.py --repo r --base 691e67380976644325f47827fd9ecca16e4bac07 --head b2e89154fa76d8deffd3fc29c18ed9f67e237ccf
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: e29d6e123cd0a7987bb210fba53649b0bc550a01609c8ba7c71480e7fe2d5d69
+### exit: 1
+
+## case=ATTACK-lower-two-retry-names
+@@ -1,2 +1,2 @@
+-retries = 3
+-retry_delay = 10
++retries = 2
++retry_delay = 5
+### $ python3 bin/fm-test-weakening.py --repo r --base 2336128e43b9104860d27449b68f7aea56aa862b --head 35f1b53d529f26ceb254394c3574d10dc1d322de
+flags: 1
+flag: "bin/limits.py:1"
+reason: "increased time/retry/iteration bound"
+id: 13b7b021cb6f8575cf8a27f7e284f8dd676b43034c40e4f23b2d0ebd50d0bf95
+### exit: 1
+
+## case=ATTACK-rename-timeout-to-poll_timeout
+@@ -1 +1 @@
+-timeout = 5
++poll_timeout = 50
+### $ python3 bin/fm-test-weakening.py --repo r --base 1436efdaab7987f86d354f3e646ec63a76c0f581 --head 090b80d9689b15ce62a7514945d815ecc836a19e
+flags: 0
+### exit: 0
+
+## case=ATTACK-rename-attempts-to-retries
+@@ -1 +1 @@
+-max_attempts = 3
++max_retries = 9
+### $ python3 bin/fm-test-weakening.py --repo r --base b888fe97809d8024c8e9891a310cae9bc328678b --head 72918b8e9a2e865fa1aeef1ff7f54eba56bf8c74
+flags: 0
+### exit: 0
+

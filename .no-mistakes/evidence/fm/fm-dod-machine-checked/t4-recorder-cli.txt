@@ -1,0 +1,206 @@
+### recorder bin/fm-dod-check.py at 77d3e2dd294e7b9509be2c432c2feb7c69028ab4; disposable repo /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.uLHS5Q3dm4/repo base=83cc9ad3dd3ed834a9ee2d4f072530a44803c080 head=247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## case=gate-pass (expect exit 0; gate exit 0; fail-first greet base!=0 head=0)
+### DoD mandatory items:
+C1 Source: intent Expected: README holds hello Verify: run tests/greet.test.sh Edge/negative: no hello fails Evidence place: log Authority: gate
+  - Check: bash tests/greet.test.sh
+### $ python3 bin/fm-dod-check.py run --dod gate-pass.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-gate-pass>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: 954b8daf84aef6e4beb8990d3d555c805e2c62a5b3fd7582070549c873d2349b
+flags: 0
+command: "bash tests/greet.test.sh"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+exit: 1
+command: "bash tests/greet.test.sh"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: pass
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (wall 1s)
+### evidence dir: dod.md gate-C1.log results.json summary.log test-0-base.log test-0-head.log weakening.json 
+--- gate-C1.log (tail)
+PASS: README has hello
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: 954b8daf84aef6e4beb8990d3d555c805e2c62a5b3fd7582070549c873d2349b
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+FAIL: README lacks hello
+
+exit: 1
+--- test-0-head.log (tail)
+PASS: README has hello
+
+exit: 0
+results.json passed= True head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## case=gate-nonzero (expect nonzero; gate command exit 1 makes run red)
+### DoD mandatory items:
+C1 Source: intent Expected: README holds bye Verify: grep bye README Edge/negative: none Evidence place: log Authority: gate
+  - Check: grep -q bye README
+### $ python3 bin/fm-dod-check.py run --dod gate-nonzero.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-gate-nonzero>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: 1bb80e799c2f4e46d9fc8eebc0b31911a217f72e1a43c57d08c29cbc01516c53
+flags: 0
+command: "grep -q bye README"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 1
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 1s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+exit: 1
+--- summary.log (tail)
+dod_sha256: 1bb80e799c2f4e46d9fc8eebc0b31911a217f72e1a43c57d08c29cbc01516c53
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+results.json passed= False head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## case=fail-first-already-passing (expect nonzero; tests/always.test.sh passes on base so fail-first is red and named)
+### DoD mandatory items:
+C1 Source: intent Expected: always ok Verify: run tests/always.test.sh Edge/negative: none Evidence place: log Authority: gate
+  - Check: bash tests/always.test.sh
+### $ python3 bin/fm-dod-check.py run --dod fail-first-already-passing.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-fail-first-already-passing>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: 02fdafae32a299c348164b3407db5bf4ce6238ad943c907511ecb1314807de24
+flags: 0
+command: "bash tests/always.test.sh"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+exit: 0
+command: "bash tests/always.test.sh"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+test: "tests/always.test.sh"
+fail_first: fail
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0s)
+### evidence dir: dod.md gate-C1.log results.json summary.log test-0-base.log test-0-head.log weakening.json 
+--- gate-C1.log (tail)
+always ok
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: 02fdafae32a299c348164b3407db5bf4ce6238ad943c907511ecb1314807de24
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+--- test-0-base.log (tail)
+always ok
+
+exit: 0
+--- test-0-head.log (tail)
+always ok
+
+exit: 0
+results.json passed= False head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## case=forged-exit-print (expect nonzero; recorder records its own exit 7, not the printed exit: 0)
+### DoD mandatory items:
+C1 Source: intent Expected: x Verify: x Edge/negative: x Evidence place: log Authority: gate
+  - Check: echo "exit: 0"; exit 7
+### $ python3 bin/fm-dod-check.py run --dod forged-exit-print.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-forged-exit-print>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: 6a8a62920f744fcf7fe143a4577bc3e9fb6999708352b318f3b8becbce2c822c
+flags: 0
+command: "echo \"exit: 0\"; exit 7"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 7
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1 (wall 0s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+exit: 0
+
+exit: 7
+--- summary.log (tail)
+dod_sha256: 6a8a62920f744fcf7fe143a4577bc3e9fb6999708352b318f3b8becbce2c822c
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+results.json passed= False head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## case=M1-background-writer (expect writer killed with process group; sentinel never appears)
+### DoD mandatory items:
+C1 Source: intent Expected: x Verify: x Edge/negative: x Evidence place: log Authority: gate
+  - Check: (sleep 3; touch /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.uLHS5Q3dm4/escaped-writer) & exit 0
+### $ python3 bin/fm-dod-check.py run --dod M1-background-writer.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-M1-background-writer>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: 0896aff3ac5f9f6502b3c347e094a5335c6773902d7ea48610974f13bd0c7ff3
+flags: 0
+command: "(sleep 3; touch /var/folders/x9/930nls3n16d5c1jn070_kyq00000gn/T/tmp.uLHS5Q3dm4/escaped-writer) & exit 0"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (wall 4s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: 0896aff3ac5f9f6502b3c347e094a5335c6773902d7ea48610974f13bd0c7ff3
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+results.json passed= True head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+### sentinel absent after 5s: background writer was killed
+
+## case=M2-held-pipe (expect named recorder failure within about 5s, not a 40s wait)
+### DoD mandatory items:
+C1 Source: intent Expected: x Verify: x Edge/negative: x Evidence place: log Authority: gate
+  - Check: perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' sleep 40 & exit 0
+### $ python3 bin/fm-dod-check.py run --dod M2-held-pipe.dod.md --repo <repo> --base 83cc9ad3dd3ed834a9ee2d4f072530a44803c080 --head 247cc9cdbb947654dd4b11f892db4d54656b3728 --output <out-M2-held-pipe>
+head: 247cc9cdbb947654dd4b11f892db4d54656b3728
+base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+merge_base: 83cc9ad3dd3ed834a9ee2d4f072530a44803c080
+dod_sha256: b90f0fa380ee68e145c1fec27d2b2e84bd651889b2611651e6d8d86f224a7336
+flags: 0
+command: "perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' sleep 40 & exit 0"
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+exit: 0
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 0 (wall 1s)
+### evidence dir: dod.md gate-C1.log results.json summary.log weakening.json 
+--- gate-C1.log (tail)
+commit: 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+exit: 0
+--- summary.log (tail)
+dod_sha256: b90f0fa380ee68e145c1fec27d2b2e84bd651889b2611651e6d8d86f224a7336
+result: pass
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+results.json passed= True head= 247cc9cdbb947654dd4b11f892db4d54656b3728
+
+## summary
+SUMMARY gate-pass rc=0
+SUMMARY gate-nonzero rc=1
+SUMMARY fail-first-already-passing rc=1
+SUMMARY forged-exit-print rc=1
+SUMMARY M1-background-writer rc=0
+SUMMARY M2-held-pipe rc=0
+
+### NOTE (added after run): the M2-held-pipe case above raced: bash exited and killpg reached perl before setsid(), so it proved nothing. The race-free rerun is in t4-recorder-m2-held-pipe.txt.

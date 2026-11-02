@@ -1,0 +1,35 @@
+$ date -u; git rev-parse HEAD
+Mon Nov  2 18:07:06 UTC 2026
+4f324e172f22fed3cfdbc705cbd787c8c2419767
+$ bin/fm-lint.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: bin/fm-spawn.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+fm-lint-workflows.sh: 5 workflow files valid
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+lint rc=0
+$ python3 bin/fm-duration.py check-literals --report | grep fm-test-weakening (expect none)
+0
+$ nice -n20 bin/fm-test-run.sh tests/fm-duration.test.sh
+FM_TEST_BEGIN 2026-11-02T18:14:39Z tests/fm-duration.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - the test runner waits on a held per-key slot, names the holder, runs once the bounded wait ends, and leaves the wait out of the sample
+ok - empty home variables are unset and never resolve against the caller directory
+ok - a ledger or lock location inside a project work tree is refused without writing
+ok - a declared home that is a project work tree is refused without writing
+ok - the calibration scratch file never lands in a project work tree
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - repeated-timeout work routes to the registered project, else to firstmate
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, progress stops, pipeline imports and literal guard
+ok - detector help examples are inert and the same shape elsewhere still counts
+ok - a test.* key admits at most the configured copies, names its holders while waiting, frees a killed holder, reports its wait, keeps the log descriptor, never stops a command, and stays out of the sample
+ok - measured command behavior
+FM_TEST_END 2026-11-02T18:16:44Z tests/fm-duration.test.sh exit=0 duration_ms=125009 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=140941
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=125009 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-duration.test.sh duration_ms=125009
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+test rc=0

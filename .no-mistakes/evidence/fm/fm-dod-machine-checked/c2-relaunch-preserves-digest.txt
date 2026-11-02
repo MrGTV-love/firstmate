@@ -1,0 +1,29 @@
+### meta dod_ before relaunch
+dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### $ bin/fm-spawn.sh dodlab-ok --relaunch --harness claude   (brief DoD was mutated after spawn)
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M66XMEPXZ32Q6S0PRPRTF8V3/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: configured backend 'tmux' is not herdr; refusing to replace task dodlab-ok's proven-gone tmux endpoint
+### exit: 1
+### meta dod_ after relaunch
+dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### snapshot files in state
+dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### (first relaunch refused: test harness killed the worker window; recreated endpoint window and retried)
+### meta dod_ before relaunch
+dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### $ bin/fm-spawn.sh dodlab-ok --relaunch --harness claude   (brief DoD was mutated after spawn)
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned dodlab-ok harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-dodlab-ok worktree=/Users/charlesabrooker/tmp/fmlab-pool/.treehouse/labproj-88426f/1/labproj
+### exit: 0
+### meta dod_ after relaunch
+dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### snapshot files in state
+dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md

@@ -1,0 +1,5 @@
+### head: 77d3e2dd294e7b9509be2c432c2feb7c69028ab4
+### $ nice -n 20 bash bin/fm-test-run.sh tests/fm-task-delivery.test.sh
+FM_TEST_BEGIN 2026-11-01T06:48:17Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
+### STOPPED: run stopped by the test agent after the structured result was submitted; this log is incomplete and is not a pass.

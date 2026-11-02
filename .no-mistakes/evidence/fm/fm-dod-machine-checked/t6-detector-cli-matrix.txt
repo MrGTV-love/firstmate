@@ -1,0 +1,159 @@
+### checker source head: c0ddaa13e0796df94a76e715bcb4e9479c2d91d3
+### Real bin/fm-test-weakening.py CLI on disposable repos. Advisory contract: flags printed, exit 0.
+## case=deleted-assertion
+$ fm-test-weakening.py --repo <repo> --base 672c4a47a3da47f7aef906c25d5823fcde29c686 --head 9290627fe29e7df70b2c518c6963ea8a299f8708 --output <json>
+flags: 1
+flag: "lib/check.sh:1"
+reason: "removed assertion/check"
+id: c130131f431472f95baeeca49fbb17909016cf5ce9afb3d3cc6d3ce8d0f34468
+### exit: 0
+### verdict: as-expected 
+## case=deleted-test-file
+$ fm-test-weakening.py --repo <repo> --base 7d9e666144826e4a99e7c7a2d23be9720e12dd80 --head 83537b50156a67f55c1d5b1d302441957c3673ff --output <json>
+flags: 2
+flag: "tests/a.test.sh:1"
+reason: "removed test or fixture code/row"
+id: 307c2179da1e48a3ceb04340c59921fb7f92fe700d6b1d9b52964ad958ea504a
+flag: "tests/a.test.sh:2"
+reason: "removed test or fixture code/row"
+id: ae49f76a929ad318b84e7d1c1cd94c43a626ee82d8eee1f367ba0823d6e6cd41
+### exit: 0
+### verdict: as-expected 
+## case=deleted-fixture-row
+$ fm-test-weakening.py --repo <repo> --base d6f02a5f5b719f61180d6c29ba9db80dc5f8ece7 --head 6b6e9404aa48cc7129bd0c9604ab764c23fdcec9 --output <json>
+flags: 1
+flag: "fixtures/rows.csv:2"
+reason: "removed test or fixture code/row"
+id: dd7e257104fdb8cfcc0cb13e319574415d3e204e80fa2801adb64797b93d8b35
+### exit: 0
+### verdict: as-expected 
+## case=raised-timeout
+$ fm-test-weakening.py --repo <repo> --base 76f213c75941a71cac18f23329a5c6e6ad2ac410 --head ea89c1a0928d12775a272a63330e1e38b2517968 --output <json>
+flags: 1
+flag: "app.py:1"
+reason: "increased time/retry/iteration bound"
+id: ff1afb9676bb8c79926338adff6a85f73242d99a5625ca4fc37a2121e8b4c93d
+### exit: 0
+### verdict: as-expected 
+## case=raised-retry
+$ fm-test-weakening.py --repo <repo> --base ffd5a543681027d950d61f6b10165e1971c23c02 --head 129dac15ae6d9a86035049787f1c68a194b39413 --output <json>
+flags: 1
+flag: "app.py:1"
+reason: "increased time/retry/iteration bound"
+id: bb8965792b9186a2069668cecc38a055dc1ce75bcdcdbc4b585604893d9f09ad
+### exit: 0
+### verdict: as-expected 
+## case=raised-iteration
+$ fm-test-weakening.py --repo <repo> --base dd8ee7df9bbbd2f8f263fa981327405c7aae4a6a --head 15204b380aff8c46d4ae4ae67a7c542d445abe9d --output <json>
+flags: 1
+flag: "app.py:1"
+reason: "increased time/retry/iteration bound"
+id: db7529bc4702495a7dc03a68381a8a8da1d5d741733d3c629dd8a87892eab8eb
+### exit: 0
+### verdict: as-expected 
+## case=raised-sleep
+$ fm-test-weakening.py --repo <repo> --base 4da7aba93aadd872612df09abc3e36673572ee18 --head 984d2867889ae7063c75d3481c843fceb91280fd --output <json>
+flags: 1
+flag: "app.sh:1"
+reason: "increased time/retry/iteration bound"
+id: 576102d2b64f4610127960aac39c04e079a80cebae8d549a01aac4eb9a4501e6
+### exit: 0
+### verdict: as-expected 
+## case=clean-diff
+$ fm-test-weakening.py --repo <repo> --base 7d2ca8bd1411f3d1dbdd2c5006f6424dfcc1b7fe --head 7b031d51ee17f91731276b10fa3bcbb7873a66ab --output <json>
+flags: 0
+### exit: 0
+### verdict: as-expected 
+## case=lowered-only-single-line-no-flag
+$ fm-test-weakening.py --repo <repo> --base b233a007f4dccec2467f1808053dfea9f5a01810 --head e0128f9f768efad67f0648f61db0dff56280a9f4 --output <json>
+flags: 0
+### exit: 0
+### verdict: as-expected 
+## case=observed-any-raised-number-on-same-shape-line-flags
+$ fm-test-weakening.py --repo <repo> --base 7e8b0e76f91a6a269f12e83211d11505170643c5 --head 04d6f35669e59dd1a13e5bf95267fd4e0632975b --output <json>
+flags: 1
+flag: "app.py:1"
+reason: "increased time/retry/iteration bound"
+id: b6cef9abf0feefc480e55122fc03c0ac707cf9643fd377e6d6c74330f8fd5b36
+### exit: 0
+### verdict: as-expected 
+## case=adds-assertion-only
+$ fm-test-weakening.py --repo <repo> --base 27f4102ea5f3a8dc4a90f6c576ef9c78a02613df --head b3f34c32457effbff6b086daebdeee6e87971c79 --output <json>
+flags: 0
+### exit: 0
+### verdict: as-expected 
+## case=disclosed-limit-lowered-only-false-flag
+$ fm-test-weakening.py --repo <repo> --base 775a423bb1ef73413e28ae86bb6c97f0b05ee2b7 --head 2ed77a22fb5dd60c5848052bd8981ed46c40a9dd --output <json>
+flags: 1
+flag: "app.py:1"
+reason: "increased time/retry/iteration bound"
+id: 1536cf9769914d6e1f18aac5f19b7a396dfc79c26ca546e2181ea690defa77c8
+### exit: 0
+### verdict: as-expected 
+## case=disclosed-limit-renamed-raise-miss
+$ fm-test-weakening.py --repo <repo> --base 35ad0ae88cd3045630384e5856e0ec9622ba21e4 --head b3e70376de086ce75df49d3e571e43e7714212a9 --output <json>
+flags: 0
+### exit: 0
+### verdict: as-expected 
+## case=renamed-test-file-not-hidden
+$ fm-test-weakening.py --repo <repo> --base cd3f70550a3c21427cd78e397549d36081e21a6b --head 31a4f65b662a13074ec21501f2c963956423e1a0 --output <json>
+flags: 1
+flag: "tests/a.test.sh:1"
+reason: "removed test or fixture code/row"
+id: 307c2179da1e48a3ceb04340c59921fb7f92fe700d6b1d9b52964ad958ea504a
+### exit: 0
+### verdict: as-expected 
+## case=invalid-sha (expect exit 2)
+error: "base and head must be exact full commit shas"
+help: Supply readable repository and exact base/head commits.
+### exit: 2
+### verdict: as-expected 
+## case=unreadable-repo (expect exit 2)
+error: "fatal: cannot change to '<tmp>/nope': No such file or directory"
+help: Supply readable repository and exact base/head commits.
+### exit: 2
+### verdict: as-expected 
+## case=non-utf8-diff (detector cannot read diff; expect exit 2, no traceback)
+error: "'utf-8' codec can't decode byte 0xe9 in position 105: invalid continuation byte"
+help: Supply readable repository and exact base/head commits.
+### exit: 2
+### verdict: as-expected 
+## case=help-discloses-both-limits
+$ fm-test-weakening.py --help
+usage: fm-test-weakening.py [-h] --repo REPO --base BASE --head HEAD
+                            [--output OUTPUT]
+
+Print potential test weakening as advisory output for an independent reviewer.
+
+Usage: fm-test-weakening.py --repo DIR --base SHA --head SHA [--output FILE]
+
+Advisory only: flags inform the reviewer, no flag needs a ruling, and no DoD
+consumer refuses on them. Exit 0 means the diff was read, with or without flags,
+and 2 means invalid input/unreadable diff.
+
+Reads the git diff from the merge base of the exact base and head commits to
+the head, so later base-branch changes are never reported as PR removals, with
+renames disabled so a move cannot hide a removed test. Deliberately conservative: any deleted non-comment test/fixture
+line is flagged, including data rows and test bodies without an assert keyword.
+Assertion removals in other files and increased numeric time/retry/iteration
+bounds are also flagged. This is a review signal, not a design-quality verdict.
+Flags identify the base file:line and old/new content digest. JSON is only the
+artifact format; stdout lists every flagged file:line.
+
+Known limits, because bounds are matched by name:
+- False flag: a diff that only lowers bounds can read as an increase when a
+  removed line pairs with another added line of the same kind, for example
+  TIMEOUT_SECONDS 10->5 with CONNECT_TIMEOUT 30->20, retries 3->2 with
+  retry_delay 10->5, or sleep 10 and 30 lowered to 5 and 20.
+- Miss: outside test paths, a raised bound renamed to another kind is not
+  flagged, for example timeout=5->poll_timeout=50, max_attempts=3->max_retries=9,
+  timeout=5->deadline=50, or seq 1 3->range(30).
+
+options:
+  -h, --help       show this help message and exit
+  --repo REPO
+  --base BASE
+  --head HEAD
+  --output OUTPUT
+### exit: 0
+### verdict: as-expected 

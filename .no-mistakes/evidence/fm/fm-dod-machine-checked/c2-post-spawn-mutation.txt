@@ -1,0 +1,11 @@
+### mutate the brief's DoD after spawn (C1 Check rewritten to 'true', C2 removed)
+152:Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader; an item with Authority gate also requires a single-line `  - Check: <exact bash command>` sub-bullet; other authorities may omit it.
+156:  - Check: true
+### meta after mutation
+dod_file=/Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+dod_sha256=00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c
+### snapshot digest after mutation
+00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c  /Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+### attempt to overwrite the snapshot as the same user without chmod
+(eval):12: permission denied: /Users/charlesabrooker/tmp/fm-lab.r1O4Li/state/dodlab-ok.dod.00c24f81827568b3875013eaa7383ef0c02efae28252855a98954321f7abda4c.md
+write exit: 1

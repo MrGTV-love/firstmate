@@ -1,0 +1,35 @@
+## Recorder boundary: a background writer cannot outlive its command; a forged 'exit: 0' line is not the recorded exit
+  - Check: (sleep 2; touch /Users/charlesabrooker/tmp/fmlab-rec/escaped-writer) & echo "exit: 0"; exit 7
+head: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+merge_base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: aa27d262fac9f4a0f411559dc298791c9c9d6a976522c01a6e25794be500591f
+flags: 1
+flag: "tests/greet.test.sh:3"
+reason: "removed test or fixture code/row"
+id: 67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d
+command: "(sleep 2; touch /Users/charlesabrooker/tmp/fmlab-rec/escaped-writer) & echo \"exit: 0\"; exit 7"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+exit: 7
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### after 4s: escaped-writer sentinel exists? no
+### results.json items[0].exit: 7
+
+## Recorder boundary: a process that leaves the group but holds stdout fails the run by name within the drain bound
+  - Check: python3 -c "import subprocess; subprocess.Popen([\"sleep\", \"40\"], start_new_session=True)"; echo started; exit 0
+head: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+merge_base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: f65517db109e786385958e563d2a3881603e747ad6858ff301eedafb03c24c6c
+flags: 1
+flag: "tests/greet.test.sh:3"
+reason: "removed test or fixture code/row"
+id: 67ce4527f8b85d56a761d23ed23754993620aa4efc82895f1b42ad4636518e2d
+command: "python3 -c \"import subprocess; subprocess.Popen([\\\"sleep\\\", \\\"40\\\"], start_new_session=True)\"; echo started; exit 0"
+commit: 41dc633a50d92eba58c9cfb0289424ba7e80e374
+error: "recorder output pipe still held open 5s after the command and its process group ended: a process that left the group kept its stdout, so the recorded output would be incomplete"
+help: Supply filled criteria with Verify and an exact Check for each gate item.
+### exit: 1 after 7s
+### output dir created? no

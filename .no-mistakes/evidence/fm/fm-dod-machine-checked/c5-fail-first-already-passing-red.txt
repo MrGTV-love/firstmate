@@ -1,0 +1,30 @@
+## C5 edge: changed named test already passes on base -> red, names the test
+### $ python3 bin/fm-dod-check.py run --dod dod-ff.md --repo ff --base main(92f193476fc5366e2aca4fd5c2df38d2a57b0c2c) --head nofail --output out-nofail
+head: 8093d66d160f9511bca03879c27bdc3f2dc22b05
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+merge_base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: d2f49c535941715c1043285a066dc769c6f19ae0fc02cebacc553138cd1a5c70
+flags: 1
+flag: "tests/greet.test.sh:4"
+reason: "removed test or fixture code/row"
+id: be95a39917893b075375e905475ff0ca05f6483d416c6d53135d7da1d5b434a5
+command: "bash tests/greet.test.sh"
+commit: 8093d66d160f9511bca03879c27bdc3f2dc22b05
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+exit: 0
+command: "bash tests/greet.test.sh"
+commit: 8093d66d160f9511bca03879c27bdc3f2dc22b05
+exit: 0
+test: "tests/greet.test.sh"
+fail_first: fail
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
+### exit: 1
+### summary.log
+head: 8093d66d160f9511bca03879c27bdc3f2dc22b05
+base: 92f193476fc5366e2aca4fd5c2df38d2a57b0c2c
+dod_sha256: d2f49c535941715c1043285a066dc769c6f19ae0fc02cebacc553138cd1a5c70
+result: fail
+semantics: unassessed; exit codes prove only each command's own assertions, not an item's Expected outcome
