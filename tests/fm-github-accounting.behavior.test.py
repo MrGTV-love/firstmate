@@ -44,10 +44,13 @@ class ObserverTests(unittest.TestCase):
     def records(self, kind):
         return [json.loads(line) for line in self.cli("records", "--kind", kind).stdout.splitlines()]
 
-    def scaled_owner(self, duration, keep_fake_ps=False):
+    def scaled_owner(self, duration, hung_ps=False):
         # A labeled scaled clock runs the real 15 s cadence and a labeled 30 s
         # no-progress interval twenty times faster. The real ps samples CPU.
-        if not keep_fake_ps:
+        env = dict(self.env, FM_DURATION_NO_PROGRESS_SECS="30")
+        if hung_ps:
+            env["FM_PROC_ROOT_OVERRIDE"] = str(self.root / "no-proc")
+        else:
             (self.fakebin / "ps").unlink()
         launcher = self.root / "scaled-clock.py"
         launcher.write_text(f'''import runpy,sys,time
@@ -60,7 +63,7 @@ owner=runpy.run_path(sys.argv[1])
 owner["run"](owner["private_root"](),duration={duration},process_source=lambda:{{}})
 ''')
         reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], capture_output=True, text=True, timeout=120,
-                               env=dict(self.env, FM_DURATION_NO_PROGRESS_SECS="30"))
+                               env=env)
         self.assertEqual(reply.returncode, 0, reply.stderr)
         return self.records("quota")
 
@@ -243,14 +246,15 @@ exec sleep 600
         self.assertHungPsEnded()
 
     def test_hung_ps_does_not_grow_verdicts_across_repeated_requests(self):
-        # A request lasting past the first CPU sample reaches the hung ps; the
-        # injected table keeps this count to the quota verdict's own samples.
+        # A request lasting past the first CPU sample reaches the hung ps: the missing
+        # proc root sends the sampler to ps on every host, and the injected table keeps
+        # this count to the quota verdict's own samples.
         self.hung_ps_fixture()
         self.tool("gh-axi", '''printf 'x\\n' >> "$FIXTURE_ROOT/requests"
 sleep 0.3
 printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
 ''')
-        rows = self.scaled_owner(100, keep_fake_ps=True)
+        rows = self.scaled_owner(100, hung_ps=True)
         requests = len((self.root / "requests").read_text().splitlines())
         self.assertGreaterEqual(requests, 3, rows)
         self.assertGreaterEqual([row["status"] for row in rows].count("observed"), 3, rows)
