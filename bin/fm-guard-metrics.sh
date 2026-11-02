@@ -2,7 +2,8 @@
 # fm-guard-metrics.sh - read-only guard/rule metrics and retirement nominations.
 # Usage: fm-guard-metrics.sh [--log <jsonl>] [--registry <json>]
 #   [--min-opportunities <n>] [--guards <id,id,...>] [--json] [--undecided]
-#   [--workarounds <jsonl>] [--days <n>]
+#   [--workarounds <jsonl>]
+# zero_events_days and window_days report a fixed 30-day quiet window.
 # --workarounds accepts fm-guard-workarounds.py --json output, without modifying
 # the event log. Distinct signatures count once per task, head, rule and kind.
 # No durable signature feed exists yet: without --workarounds, workarounds is
@@ -45,10 +46,10 @@ p.add_argument('--guards', default='')
 p.add_argument('--json', action='store_true')
 p.add_argument('--undecided', action='store_true')
 p.add_argument('--workarounds')
-p.add_argument('--days', type=int, default=30)
 a = p.parse_args(args)
-if a.min_opportunities < 1 or a.days < 1:
-    p.error('opportunities and days must be positive')
+if a.min_opportunities < 1:
+    p.error('opportunities must be positive')
+WINDOW_DAYS = 30
 
 
 STRING_FIELDS = ('ts', 'rule', 'task', 'session', 'actor', 'decision', 'head', 'kind')
@@ -85,7 +86,7 @@ entries = {row['id']: row for row in registry.get('guards', [])}
 only = set(filter(None, a.guards.split(',')))
 rows = [row for row in json_lines(a.log) if not only or row['guard'] in only]
 signatures = list(json_lines(a.workarounds)) if a.workarounds else []
-cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=a.days)).strftime('%Y-%m-%dT%H:%M:%SZ')
+cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=WINDOW_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 def metric(guard, events, rule=None):
@@ -144,7 +145,7 @@ def metric(guard, events, rule=None):
                                               **({'rule': task_rule} if rule is None else {}))
                                           for (task_rule, task), count in sorted(tasks.items()) if count > 1],
                   deny_only=denies > 0 and allows == 0,
-                  zero_events_days=a.days if not any(e.get('ts', '') >= cutoff for e in events) else 0)
+                  zero_events_days=WINDOW_DAYS if not any(e.get('ts', '') >= cutoff for e in events) else 0)
     if rule is not None:
         result['rule'] = rule
     return result
@@ -186,7 +187,7 @@ if a.undecided:
             print(g['id'])
 elif a.json:
     print(json.dumps(dict(log=a.log, present=present, guards=guards, rules=rules,
-                          zero_event_guards=quiet, window_days=a.days, summary=summary)))
+                          zero_event_guards=quiet, window_days=WINDOW_DAYS, summary=summary)))
 else:
     for label, metrics in (('METRIC', guards), ('RULE', rules)):
         for g in metrics:
@@ -199,7 +200,7 @@ else:
                 for task in g['repeat_denies_per_task']:
                     print(f"REPEAT {g['id']} rule={g['rule']} task={task['task']} denies={task['denies']} repeat_denies={task['repeat_denies']}")
     for guard in quiet:
-        print(f'QUIET {guard} zero_events_days={a.days}')
+        print(f'QUIET {guard} zero_events_days={WINDOW_DAYS}')
     print('METRICS_SUMMARY ' + ' '.join(f'{key}={value}' for key, value in summary.items())
           + (' log_absent=true' if not present else ''))
 PY
