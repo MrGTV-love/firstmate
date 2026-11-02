@@ -60,7 +60,7 @@ A no-mistakes task is refused when the pipeline's own registration names another
 An authorized contribution then flows through the task's normal delivery contract - usually no-mistakes - like any other project; for publication, the grant answers only "may this publish", never "how".
 Landing is a separate step: `bin/fm-pr-merge.sh`'s header owns which home may land a Firstmate PR.
 
-A gate refusal names the exact remedy: write `maintainer <scope>` into `config/firstmate-role`, or pass `--upstream-consent <scope>` for that one task with the captain's explicit approval.
+A refusal for missing authority names the exact remedy: write `maintainer <scope>` into `config/firstmate-role`, or pass `--upstream-consent <scope>` for that one task with the captain's explicit approval.
 Never work around a refusal by pointing the task at a second checkout, fork, or parent clone; `fm_role_self_repo` treats every repository sharing firstmate's lineage as firstmate's own.
 
 ## Updating is not contributing

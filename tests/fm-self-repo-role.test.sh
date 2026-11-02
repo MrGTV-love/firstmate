@@ -937,6 +937,56 @@ test_nomistakes_refuses_when_registration_disagrees_with_origin() {
   pass "no-mistakes gate: origin A with registration B is refused, repair re-authorizes, gh delivery is unaffected"
 }
 
+# A grant cannot clear a registration refusal, so only a refusal for missing
+# authority tells the operator to obtain one.
+test_grant_advice_only_follows_authority_refusal() {
+  local proj home out rc advice='to let this home publish' entry
+  proj=$(make_two_remote_project nm-reg-advice "$URL_A" "$URL_B" "$URL_B")
+  home=$(make_role_home nm-reg-advice-home)
+  mkdir -p "$home/data/nm-reg-advice-promote"
+  printf 'project=%s\nkind=scout\nwindow=fm-nm-reg-advice-promote\nworktree=/tmp/wt\n' "$proj" > "$home/state/nm-reg-advice-promote.meta"
+  printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nInvestigate.\n\n## Firstmate spec\nReport.\n' \
+    > "$home/data/nm-reg-advice-promote/brief.md"
+  write_ship_brief "$home" nm-reg-advice-spawn " upstream-consent=$TARGET_A"
+
+  # run_gate_entry <brief|spawn|promote> <consent-args...> sets out and rc.
+  run_gate_entry() {
+    local which=$1
+    shift
+    rc=0
+    case $which in
+    brief)
+      out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+        "$BRIEF" nm-reg-advice-brief some-proj --mode no-mistakes --project "$proj" "$@" 2>&1) || rc=$?
+      ;;
+    spawn)
+      out=$(run_spawn "$home" nm-reg-advice-spawn "$proj" claude --mode no-mistakes --yolo off "$@") || rc=$?
+      ;;
+    promote)
+      out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+        FM_CONFIG_OVERRIDE="$home/config" \
+        "$PROMOTE" nm-reg-advice-promote --mode no-mistakes --yolo off "$@" 2>&1) || rc=$?
+      ;;
+    esac
+  }
+
+  for entry in brief spawn promote; do
+    run_gate_entry "$entry" --upstream-consent "$TARGET_A"
+    [ "$rc" -ne 0 ] || fail "$entry must refuse a registration that disagrees with origin (got: $out)"
+    assert_contains "$out" "registration for $proj publishes to $TARGET_B" "$entry must print the registration refusal"
+    assert_not_contains "$out" "$advice" "$entry must not offer a grant after a registration refusal"
+  done
+
+  nm_register "$proj" "$URL_A"
+  write_ship_brief "$home" nm-reg-advice-spawn
+  for entry in brief spawn promote; do
+    run_gate_entry "$entry"
+    [ "$rc" -ne 0 ] || fail "$entry must refuse with no grant (got: $out)"
+    assert_contains "$out" "$advice to $TARGET_A" "$entry must offer the grant after an authority refusal"
+  done
+  pass "brief, spawn and promote: grant advice follows only an authority refusal"
+}
+
 test_nomistakes_unregistered_project_keeps_origin() {
   local proj home out rc
   proj=$(make_two_remote_project nm-reg-origin-only "$URL_A" "" none)
@@ -1028,6 +1078,7 @@ test_nomistakes_gate_refuses_unknown_destination
 test_gh_delivery_resolution_is_unchanged
 test_nomistakes_ignores_github_and_upstream_remotes
 test_nomistakes_refuses_when_registration_disagrees_with_origin
+test_grant_advice_only_follows_authority_refusal
 test_nomistakes_unregistered_project_keeps_origin
 test_nomistakes_refuses_unreadable_registration
 test_role_check_rejects_bad_mode_arguments

@@ -69,7 +69,8 @@
 # Global outputs: FM_ROLE (user|maintainer), FM_ROLE_SCOPE (maintainer scope),
 # FM_ROLE_SOURCE (absent|local|inherited), FM_ROLE_DIAG (narrow refusal or
 # malformed-input reason), FM_ROLE_PUB_TARGET, FM_ROLE_PUB_AUTHORITY,
-# FM_ROLE_PUB_DENIAL.
+# FM_ROLE_PUB_DENIAL, FM_ROLE_PUB_NEEDS_GRANT (1 when a grant would clear the
+# refusal, else empty).
 
 # fm_role_file <config-dir>
 fm_role_file() {
@@ -597,6 +598,8 @@ fm_role_gate_self_publish() {
   FM_ROLE_PUB_AUTHORITY=
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_ROLE_PUB_DENIAL=
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_ROLE_PUB_NEEDS_GRANT=
   fm_role_self_repo "$proj" "$root" || lineage=$?
   if [ "$lineage" -eq 1 ]; then
     return 2
@@ -637,6 +640,8 @@ fm_role_gate_self_publish() {
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_ROLE_PUB_DENIAL="this home runs as firstmate user/operator and holds no publication authority for $FM_ROLE_PUB_TARGET; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in $config/firstmate-role, or one-task consent recorded at dispatch as --upstream-consent <host>/<owner>/<repo>"
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_ROLE_PUB_NEEDS_GRANT=1
   fm_role_pub_deny_event
   return 1
 }
