@@ -1093,7 +1093,7 @@ Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
 Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
-Its own start/stop commands manage only its private owner and quota child group, never a shared service.
+Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.
 No wall-clock limit stops a quota request or a `ps`: each is killed only on `bin/fm-duration.py`'s no-progress verdict (15 quiet minutes by default, `FM_DURATION_NO_PROGRESS_SECS`), a killed request is recorded unavailable with `reason=timeout`, and a killed `ps` counts as a sampling failure.
 Each `ps` runs off the owner's loop, so a slow or hung one delays neither the quota stream nor `stop`.
 A hung `ps` leaves at most one scan and one quota verdict waiting, a later request has no no-progress verdict until `ps` recovers, and an owner that exits normally ends its remaining child processes, including a hung `ps`.
