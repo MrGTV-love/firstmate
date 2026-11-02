@@ -113,7 +113,9 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
-if [ "${FM_GATE_REFUSE_BYPASS:-}" != 1 ]; then
+if [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ]; then
+  fm_gate_refuse_event bypass --rule FM_GATE_REFUSE_BYPASS --override
+else
   case "$SCRIPT_DIR/:$(cd "$SCRIPT_DIR" && pwd -P)/" in
     */.no-mistakes/worktrees/*)
       lab_root=$(cd -P -- "${FM_HOME:-/nonexistent}" 2>/dev/null && pwd -P || true)

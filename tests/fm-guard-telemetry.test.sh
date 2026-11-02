@@ -18,6 +18,8 @@
 #   - a recurrence after a clear cuts even an irreversible guard
 #   - a dated decision stands until the evidence changes, not on its date alone
 #   - a missing log reports every guard unmeasured and exits 0
+#   - one guarded operation counts as one guard-level opportunity
+#   - only an allow from the same actor class clears a deny
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -27,6 +29,8 @@ METRICS="$ROOT/bin/fm-guard-metrics.sh"
 TMP=$(fm_test_tmproot fm-guard-telemetry)
 trap 'fm_test_cleanup' EXIT
 LOG="$TMP/events.jsonl"
+unset FM_TASK_ID
+export FM_GUARD_EVENT_LOG="$LOG"
 
 registry_with_harm() {  # <path> <id> <harm>
   cat >"$1" <<JSON
@@ -42,6 +46,40 @@ verdict_of() {  # <log> <registry> <id>
   "$METRICS" --log "$1" --registry "$2" --guards "$3" --min-opportunities 1 2>/dev/null \
     | sed -n "s/^METRIC $3 .*verdict=\([a-z]*\).*/\1/p"
 }
+
+test_claude_session_attribution() {
+  local named="$TMP/claude" log="$TMP/claude-sessions.jsonl" session
+  # Use the existing session-lock suite's real named-process fixture, not a
+  # fake ancestry function. The native Claude classifier remains its owner.
+  ln -sf /bin/bash "$named"
+  for session in claude-one claude-two; do
+    # shellcheck disable=SC2016 # The named process expands its own arguments.
+    env -u FM_TASK_ID -u FM_SESSION_ID -u CLAUDE_SESSION_ID \
+      -u CODEX_THREAD_ID -u PI_SESSION_ID -u OMP_SESSION_ID -u GROK_SESSION_ID \
+      FM_HOME="$TMP" "$named" -c '
+        export CLAUDE_CODE_SESSION_ID="$1" CLAUDE_PID=$$
+        "$2" gclaude deny --task "" --log "$3"
+        "$2" gclaude allow --task "" --log "$3"
+        "$2" gclaude allow --task task-wins --log "$3"
+        :
+      ' _ "$session" "$EVENT" "$log" || fail "Claude process fixture failed"
+  done
+  jq -se --arg home "$TMP" '
+    .[0].session == ($home + ":claude-one") and .[1].session == .[0].session
+    and .[3].session == ($home + ":claude-two") and .[4].session == .[3].session
+    and .[0].session != .[3].session and .[0].task == "" and .[3].task == ""
+    and .[2].session == "task-wins" and .[5].session == "task-wins"' "$log" >/dev/null \
+    || fail "two trusted Claude sessions must stay distinct and task identity must take precedence"
+  env -u FM_TASK_ID -u FM_SESSION_ID -u CODEX_THREAD_ID -u PI_SESSION_ID \
+    -u OMP_SESSION_ID -u GROK_SESSION_ID FM_HOME="$TMP" \
+    CLAUDE_CODE_SESSION_ID=stale-session CLAUDE_PID=99999999 \
+    "$EVENT" gstale allow --task '' --log "$log"
+  jq -se --arg home "$TMP" '.[6].session == ($home + ":unattributed")' "$log" >/dev/null \
+    || fail "an inherited Claude id without matching process ancestry must be ignored"
+  pass "trusted Claude session IDs are stable, distinct, and never borrowed from unrelated ancestry"
+}
+
+fm_test_only
 
 # --- writer schema ----------------------------------------------------------
 "$EVENT" gschema deny --log "$LOG" --session s1 --elapsed-ms 14 --cleared-by retry --repeat 2 --override
@@ -203,6 +241,17 @@ dated_rows "$ERRWIN" 2026-03-10 30
 got=$(undecided_for "$ERRWIN" "$TMP/dated-keep.json")
 [ -z "$got" ] || fail "an error in the judged window is not a fire, so a quiet window after it must not re-nominate, got '$got'"
 
+BYPASSWIN="$TMP/bypass-window.jsonl"
+: >"$BYPASSWIN"
+for k in deny allow deny allow; do
+  printf '{"ts":"2026-01-09T12:00:00Z","guard":"gquiet","session":"jan-recur","decision":"%s","override":false}\n' "$k" >>"$BYPASSWIN"
+done
+dated_rows "$BYPASSWIN" 2026-01-10 26
+dated_rows "$BYPASSWIN" 2026-01-11 30 bypass
+dated_rows "$BYPASSWIN" 2026-03-10 30
+got=$(undecided_for "$BYPASSWIN" "$TMP/dated-keep.json")
+[ "$got" = gquiet ] || fail "a bypass is not an opportunity, so it must not push a fire out of the judged window, got '$got'"
+
 decided_with "keep: no date recorded" "$TMP/undated.json"
 got=$(undecided_for "$ZERO" "$TMP/undated.json")
 [ "$got" = gquiet ] || fail "a decision without an outcome and date must not retire a nomination, got '$got'"
@@ -264,5 +313,353 @@ for mode in --undecided "--undecided --json"; do
   [ -z "$got" ] || fail "$mode on a missing log must print nothing, got '$got'"
 done
 pass "--undecided on a missing log prints nothing"
+
+test_claude_session_attribution
+
+# Task identity survives a harness restart; unrelated homes cannot collide.
+ATTR="$TMP/attributed.jsonl"
+"$EVENT" merge-green-head deny --rule base-containment --task task-a --session before --log "$ATTR"
+"$EVENT" merge-green-head allow --rule base-containment --task task-a --session after --log "$ATTR"
+jq -se 'all(.[]; .task == "task-a" and .rule == "base-containment" and .session == "task-a")' "$ATTR" >/dev/null \
+  || fail "task attribution must survive a session change"
+FM_HOME="$TMP" FM_SESSION_ID=stable "$EVENT" ghome deny --log "$ATTR"
+FM_HOME="$TMP" FM_SESSION_ID=stable "$EVENT" ghome allow --log "$ATTR"
+FM_HOME="$TMP/other" FM_SESSION_ID=stable "$EVENT" ghome allow --log "$ATTR"
+jq -se '.[2].session == .[3].session and .[3].session != .[4].session and .[2].task == ""' "$ATTR" >/dev/null \
+  || fail "harness sessions must be stable and home-scoped"
+"$EVENT" gcontrol deny --task $'task\nwith\tcontrols' --log "$ATTR"
+jq -se '.[5].task == "task\nwith\tcontrols"' "$ATTR" >/dev/null || fail "JSON control characters were not escaped"
+"$EVENT" malformed deny --rule >/dev/null || fail "missing option value failed its caller"
+mkfifo "$TMP/events.fifo"
+"$EVENT" fifo deny --log "$TMP/events.fifo" || fail "a nonregular log failed its caller"
+pass "rule/task attribution, home-scoped sessions, and nonblocking malformed or FIFO logs"
+
+# Different rules and tasks cannot clear each other's refusals. Extra denies
+# for the same task remain measurable even when legacy sessions differ.
+RULES="$TMP/rules.jsonl"
+"$EVENT" grules deny --rule base --task task-a --session one --log "$RULES"
+"$EVENT" grules allow --rule checks --task task-a --log "$RULES"
+"$EVENT" grules allow --rule base --task task-b --log "$RULES"
+"$EVENT" grules deny --rule base --task task-a --session two --log "$RULES"
+"$EVENT" grules allow --rule base --task task-a --log "$RULES"
+"$EVENT" grules deny --rule base --task task-a --session three --log "$RULES"
+"$EVENT" grules bypass --rule base --task task-a --override --log "$RULES"
+"$EVENT" grules allow --rule checks --task task-a --override --log "$RULES"
+# The detector output may contain duplicate snapshots of the same signature.
+printf '%s\n%s\n' \
+  '{"guard":"grules","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' \
+  '{"guard":"grules","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' > "$TMP/workarounds.jsonl"
+# Historical callers may have recorded a new harness session for each row.
+jq -sc 'to_entries[] | .value.session = ("harness-" + (.key | tostring)) | .value' "$RULES" > "$TMP/cross-session.jsonl"
+"$METRICS" --log "$TMP/cross-session.jsonl" --workarounds "$TMP/workarounds.jsonl" --json > "$TMP/rules.json"
+jq -e '.rules[] | select(.rule == "base") | .opportunities == 5 and .denies == 3 and .bypasses == 1
+  and .workarounds == 1 and .refusal_to_bypass_ratio == 0.667 and .recurrences == 1
+  and .median_clear_attempts == 2 and .repeat_denies == 2
+  and .repeat_denies_per_task == [{task:"task-a",denies:3,repeat_denies:2}]' "$TMP/rules.json" >/dev/null \
+  || fail "rule metrics lost task/rule isolation, deduplication, or ratio semantics"
+jq -e '.rules[] | select(.rule == "checks") | .denies == 0 and .refusal_to_bypass_ratio == null
+  and .recurrences == 0 and .repeat_denies == 0' "$TMP/rules.json" >/dev/null \
+  || fail "zero-deny ratio must be undefined, not fabricated"
+pass "per-rule metrics count cross-session task repeats and refusal-to-bypass ratios"
+
+# One malformed row cannot hide valid evidence, and an absent signature feed is
+# reported as not measured rather than as zero signatures.
+MALFORMED="$TMP/malformed-metrics.jsonl"
+"$EVENT" gmalformed deny --rule base --task task-a --log "$MALFORMED"
+printf '%s\n' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","decision":"deny","ts":null}' \
+  '{"guard":"gmalformed","rule":7,"task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":7,"rule":"base","task":"task-a","decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":["task-a"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","session":["s"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","actor":["main"],"decision":"deny","ts":"2026-10-31T00:00:00Z"}' >> "$MALFORMED"
+"$EVENT" gmalformed allow --rule base --task task-a --log "$MALFORMED"
+printf '{"guard":"gmalformed","note":"\303' >> "$MALFORMED"
+"$METRICS" --log "$MALFORMED" --json > "$TMP/malformed-metrics.json" || fail "a malformed event row aborted the metrics report"
+jq -e '(.guards[] | select(.id == "gmalformed") | .denies == 1 and .allows == 1 and .median_clear_attempts == 1
+  and .workarounds == null and .refusal_to_bypass_ratio == 0) and .summary.malformed_rows == 7' "$TMP/malformed-metrics.json" >/dev/null \
+  || fail "malformed rows hid valid evidence, went uncounted, or an absent feed was reported as measured: $(cat "$TMP/malformed-metrics.json")"
+printf '%s\n' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":"abc","kind":"tree-equal-merge"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":["abc"],"kind":"tree-equal-merge"}' \
+  '{"guard":"gmalformed","rule":"base","task":"task-a","head":"abd","kind":["tree-equal-merge"]}' > "$TMP/malformed-signatures.jsonl"
+"$METRICS" --log "$MALFORMED" --workarounds "$TMP/malformed-signatures.jsonl" --json > "$TMP/malformed-feed.json" \
+  || fail "a malformed signature row aborted the metrics report"
+jq -e '(.guards[] | select(.id == "gmalformed") | .workarounds == 1) and .summary.malformed_rows == 9' "$TMP/malformed-feed.json" >/dev/null \
+  || fail "malformed signature rows were counted as signatures or went uncounted: $(cat "$TMP/malformed-feed.json")"
+"$METRICS" --log "$MALFORMED" | grep -q '^METRIC gmalformed .*workarounds=null' \
+  || fail "the text report did not mark workaround signatures as not measured"
+pass "malformed event rows are skipped and an absent workaround feed reads as not measured"
+
+# A green merge writes three rule rows for one guarded operation. The guard row
+# counts one opportunity; each rule row keeps its own allow and its own clear.
+OPS="$TMP/operations.jsonl"
+"$EVENT" gops deny --rule checks-green --task task-a --log "$OPS"
+"$EVENT" gops allow --rule checks-green --task task-a --log "$OPS"
+"$EVENT" gops allow --rule required-reported --no-opportunity --task task-a --log "$OPS"
+"$EVENT" gops allow --rule base-containment --no-opportunity --task task-a --log "$OPS"
+"$METRICS" --log "$OPS" --json > "$TMP/operations.json"
+jq -e '.guards[] | select(.id == "gops") | .opportunities == 2 and .allows == 1 and .denies == 1
+  and .median_clear_attempts == 1 and .recurrences == 0' "$TMP/operations.json" >/dev/null \
+  || fail "one operation must be one guard-level opportunity, with its clear intact"
+jq -e '[.rules[] | select(.id == "gops")] | length == 3 and all(.[]; .allows == 1)
+  and (map(select(.rule == "checks-green"))[0].opportunities == 2)
+  and (map(select(.rule == "required-reported"))[0].opportunities == 1)' "$TMP/operations.json" >/dev/null \
+  || fail "each rule row must keep its own allow"
+pass "one guarded operation counts once at guard level and once per rule"
+
+# A relaunch child records no second gate allow for the operation its
+# fm-control parent already recorded.
+(
+  cd "$TMP" || exit 111
+  unset FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE FM_HOME
+  # shellcheck disable=SC2030 # This subshell owns its own gate environment.
+  export FM_GUARD_EVENT_LOG="$TMP/relaunch-child.jsonl" FM_CONTROL_RELAUNCH_TX=fixture-tx
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  fm_refuse_if_gate_agent
+) || fail "the relaunch child's gate check refused outside a gate"
+[ ! -s "$TMP/relaunch-child.jsonl" ] || fail "a relaunch child recorded a second gate allow: $(cat "$TMP/relaunch-child.jsonl")"
+
+# A clearing allow comes from the deny's actor class, through the real gate check.
+ACTOR_LAB=$("$ROOT/bin/fm-lab-home.sh" create "$TMP/actor-lab") || fail "could not create the actor lab home"
+gate_check_as() {  # <log> <gate|main|lab>
+  (
+    cd "$TMP" || exit 111
+    for override in "${!FM_@}"; do
+      case "$override" in *_OVERRIDE) unset "$override" ;; esac
+    done
+    unset FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE FM_TASK_ID FM_HOME ID
+    # shellcheck disable=SC2030,SC2031 # This subshell owns its own gate environment.
+    export FM_GUARD_EVENT_LOG="$1" FM_GATE_EVENT_TASK=actor-task
+    # shellcheck disable=SC2030,SC2031
+    case "$2" in
+      gate) export NO_MISTAKES_GATE=1 ;;
+      lab) export NO_MISTAKES_GATE=1 FM_HOME="$ACTOR_LAB" ;;
+    esac
+    # shellcheck source=bin/fm-gate-refuse-lib.sh
+    . "$ROOT/bin/fm-gate-refuse-lib.sh"
+    fm_refuse_if_gate_agent
+  ) >/dev/null 2>&1
+}
+recurrences_of() {  # <log> <guard>
+  "$METRICS" --log "$1" --json | jq -e --arg guard "$2" '.guards[] | select(.id == $guard) | .recurrences'
+}
+CROSS="$TMP/cross-actor.jsonl"
+rc=0; gate_check_as "$CROSS" gate || rc=$?
+[ "$rc" = 3 ] || fail "a gate call must be refused, got exit $rc"
+gate_check_as "$CROSS" main || fail "a call by Main must be allowed"
+rc=0; gate_check_as "$CROSS" gate || rc=$?
+[ "$rc" = 3 ] || fail "a repeated gate call must be refused, got exit $rc"
+jq -se '[.[].decision] == ["deny","allow","deny"] and [.[].actor] == ["gate","main","gate"]
+  and all(.[]; .task == "actor-task")' "$CROSS" >/dev/null || fail "gate decisions lost their actor class: $(cat "$CROSS")"
+[ "$(recurrences_of "$CROSS" gate-agent-containment)" = 0 ] \
+  || fail "an allow by Main must not clear a gate agent's deny"
+SAME="$TMP/same-actor.jsonl"
+rc=0; gate_check_as "$SAME" gate || rc=$?
+[ "$rc" = 3 ] || fail "a gate call must be refused, got exit $rc"
+gate_check_as "$SAME" lab || fail "a gate call against a marked lab home must be allowed"
+rc=0; gate_check_as "$SAME" gate || rc=$?
+[ "$rc" = 3 ] || fail "a repeated gate call must be refused, got exit $rc"
+[ "$(recurrences_of "$SAME" gate-agent-containment)" = 1 ] \
+  || fail "an allow by the same actor class must still clear a deny"
+WORKER="$TMP/worker-actor.jsonl"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+"$EVENT" gsend allow --rule explicit-home --task target --log "$WORKER"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+[ "$(recurrences_of "$WORKER" gsend)" = 0 ] || fail "an allow by Main must not clear a worker's deny"
+FM_TASK_ID=worker-task "$EVENT" gsend allow --rule explicit-home --task target --log "$WORKER"
+FM_TASK_ID=worker-task "$EVENT" gsend deny --rule explicit-home --task target --log "$WORKER"
+[ "$(recurrences_of "$WORKER" gsend)" = 1 ] || fail "an allow by the same worker class must still clear a deny"
+pass "only an allow from the same actor class clears a deny"
+
+# Exercise real library entrypoints. No credential contents enter the log.
+EMITTERS="$TMP/emitters.jsonl"
+(
+  # shellcheck disable=SC2031 # Each subshell sets its own log.
+  export FM_GUARD_EVENT_LOG="$EMITTERS" FM_TASK_ID=emitter-task
+  # shellcheck source=bin/fm-api-key-guard-lib.sh
+  . "$ROOT/bin/fm-api-key-guard-lib.sh"
+  unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+  fm_api_key_guard claude 0 '' 0 '' '' || fail "clean billing environment was refused"
+  fm_api_key_guard claude 1 '' 0 '' '' || fail "an unused billing option was refused"
+  [ "$(jq -s '[.[] | select(.guard == "claude-api-billing" and .override == true)] | length' "$EMITTERS")" = 0 ] \
+    || fail "an unused --allow-api-key recorded an escape"
+  ANTHROPIC_API_KEY=fixture-not-a-credential fm_api_key_guard claude 1 '' 0 '' '' \
+    || fail "existing explicit billing option was refused"
+  # shellcheck source=bin/fm-gate-refuse-lib.sh
+  . "$ROOT/bin/fm-gate-refuse-lib.sh"
+  FM_GATE_REFUSE_BYPASS=1 fm_refuse_if_gate_agent
+  # shellcheck source=bin/fm-compact-adviser-lib.sh
+  . "$ROOT/bin/fm-compact-adviser-lib.sh"
+  [ "$(FM_COMPACT_ADVISER_DISABLE=' True ' fm_compact_adviser_force_off)" = 1 ] || fail "compact disable result changed"
+  fm_compact_adviser_bypass_event emitter-task
+  # shellcheck source=bin/fm-tasks-axi-lib.sh
+  . "$ROOT/bin/fm-tasks-axi-lib.sh"
+  # shellcheck source=bin/fm-backlog-transition-lib.sh
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  mkdir -p "$TMP/manual-config"
+  printf 'manual\n' > "$TMP/manual-config/backlog-backend"
+  fm_backlog_transition_applies "$TMP/manual-config" "$TMP" ship
+  [ "$?" -eq 1 ] || fail "manual backlog admission result changed"
+  ! grep -q '"backlog-transition"' "$EMITTERS" 2>/dev/null || fail "the shared backlog predicate recorded a decision itself"
+  fm_backlog_transition_skip_event emitter-task
+)
+jq -se 'any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == false)
+  and any(.[]; .guard == "claude-api-billing" and .decision == "allow" and .override == true)
+  and any(.[]; .rule == "FM_GATE_REFUSE_BYPASS" and .decision == "bypass" and .override == true)
+  and any(.[]; .rule == "FM_COMPACT_ADVISER_DISABLE" and .decision == "bypass")
+  and any(.[]; .guard == "backlog-transition" and .decision == "bypass")
+  and all(.[]; .task == "emitter-task")' "$EMITTERS" >/dev/null || fail "existing allows and escapes were not attributed"
+pass "real billing, containment, compact, and manual-backlog paths emit without changing their results"
+
+# Real Git history, not a stub: a redundant base merge is distinguishable
+# from an implementation commit after a refusal, and reads preserve all refs.
+REPO="$TMP/workaround-repo"
+STATE_DIR="$TMP/workaround-state"
+mkdir -p "$REPO" "$STATE_DIR"
+git init -q -b main "$REPO"
+fm_git_identity fmtest fmtest@example.invalid
+git -C "$REPO" commit -q --allow-empty -m seed
+git -C "$REPO" checkout -qb feature
+printf 'same content\n' > "$REPO/change.txt"
+git -C "$REPO" add change.txt
+git -C "$REPO" commit -qm feature
+refused=$(git -C "$REPO" rev-parse HEAD)
+git -C "$REPO" checkout -q main
+printf 'same content\n' > "$REPO/change.txt"
+git -C "$REPO" add change.txt
+git -C "$REPO" commit -qm base
+git -C "$REPO" checkout -q feature
+"$EVENT" merge-green-head deny --task merge-task --rule base-containment --head "$refused" --base main --log "$STATE_DIR/guard-events.jsonl"
+git -C "$REPO" merge -q --no-ff main -m 'merge base'
+merged=$(git -C "$REPO" rev-parse HEAD)
+printf 'kind=ship\nworktree=%s\nbranch=feature\n' "$REPO" > "$STATE_DIR/merge-task.meta"
+before_refs=$(git -C "$REPO" show-ref)
+before_status=$(git -C "$REPO" status --porcelain)
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/signatures.jsonl" \
+  || fail "read-only workaround scan failed"
+jq -se --arg head "$merged" 'length == 2 and all(.[]; .head == $head and .task == "merge-task")
+  and any(.[]; .kind == "tree-equal-merge") and any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/signatures.jsonl" >/dev/null \
+  || fail "redundant base merge did not produce both signatures"
+# Malformed matching refusals ahead of a valid one are skipped and counted, not
+# fatal, and so is an undecodable torn final line.
+jq -c '.ts = null, (.base = 7 | .ts = "2000-01-01T00:00:00Z"), (.rule = ["x"]), .' \
+  "$STATE_DIR/guard-events.jsonl" > "$TMP/malformed-first.jsonl"
+printf '{"guard":"merge-green-head","note":"\303' >> "$TMP/malformed-first.jsonl"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$TMP/malformed-first.jsonl" --json \
+  > "$TMP/malformed-first-result.jsonl" 2> "$TMP/malformed-first.err" \
+  || fail "a malformed refusal aborted the workaround scan: $(cat "$TMP/malformed-first.err")"
+grep -q 'skipped 4 malformed event row' "$TMP/malformed-first.err" \
+  || fail "the detector did not count its skipped rows: $(cat "$TMP/malformed-first.err")"
+jq -se --arg head "$merged" 'any(.[]; .kind == "base-merge-only-after-refusal" and .head == $head)' "$TMP/malformed-first-result.jsonl" >/dev/null \
+  || fail "a malformed refusal hid a valid base-merge-only signature"
+[ "$(git -C "$REPO" show-ref)" = "$before_refs" ] && [ "$(git -C "$REPO" status --porcelain)" = "$before_status" ] \
+  || fail "workaround detection changed repository state"
+printf 'real work\n' > "$REPO/work.txt"
+git -C "$REPO" add work.txt
+git -C "$REPO" commit -qm implementation
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/real-work.jsonl"
+jq -se 'all(.[]; .kind != "base-merge-only-after-refusal")' "$TMP/real-work.jsonl" >/dev/null \
+  || fail "an implementation change was misreported as only a base merge"
+# Another task's refusal is not evidence for this branch.
+jq -c '.task = "other-task"' "$STATE_DIR/guard-events.jsonl" > "$TMP/other-task.jsonl"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$TMP/other-task.jsonl" --json > "$TMP/other-task-result.jsonl"
+jq -se 'length == 1 and .[0].kind == "tree-equal-merge"' "$TMP/other-task-result.jsonl" >/dev/null \
+  || fail "a refusal from another task was correlated with this head"
+git -C "$REPO" branch -f main "$merged"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/inherited-result.jsonl"
+jq -se 'length == 0' "$TMP/inherited-result.jsonl" >/dev/null || fail "base history was misreported as a task workaround"
+# A pooled copy may hold the base only as a fetched ref, and a local branch may
+# be stale. The origin ref wins for the exclusion and for the correlation.
+git -C "$REPO" branch -f main "$refused"
+git -C "$REPO" update-ref refs/remotes/origin/main "$merged"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/origin-first.jsonl"
+jq -se 'length == 0' "$TMP/origin-first.jsonl" >/dev/null || fail "a stale local base hid the fetched origin base"
+git -C "$REPO" update-ref refs/remotes/origin/release-1 "$merged"
+git -C "$REPO" update-ref -d refs/remotes/origin/main
+printf 'kind=ship\nworktree=%s\nbranch=feature\nbase_branch=release-1\n' "$REPO" > "$STATE_DIR/merge-task.meta"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$STATE_DIR" --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/origin-only.jsonl"
+jq -se 'length == 0' "$TMP/origin-only.jsonl" >/dev/null || fail "a base held only as an origin ref did not exclude its history"
+git -C "$REPO" update-ref refs/remotes/origin/main "$(git -C "$REPO" rev-parse "$merged^2")"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$REPO" --head "$merged" --task merge-task --log "$STATE_DIR/guard-events.jsonl" --json > "$TMP/stale-local-correlation.jsonl"
+jq -se 'any(.[]; .kind == "base-merge-only-after-refusal")' "$TMP/stale-local-correlation.jsonl" >/dev/null \
+  || fail "a stale local base hid a real base-merge-only change"
+# The writer never creates a home, so a fail-closed home check still refuses.
+TYPO_HOME="$TMP/typo-home/nested"
+typo_send() {  # <extra env assignment...>
+  (cd "$TMP" && env -u FM_GUARD_EVENT_LOG -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE "$@" FM_HOME="$TYPO_HOME" \
+    "$ROOT/bin/fm-send.sh" sess:win 'probe' 2>&1)
+}
+with_rc=0; with_out=$(typo_send) || with_rc=$?
+[ ! -e "$TMP/typo-home" ] || fail "the event writer created a missing home"
+[ "$with_rc" = 1 ] || fail "a missing home was not refused (rc=$with_rc): $with_out"
+case "$with_out" in *'is not a directory'*) ;; *) fail "the missing-home refusal changed: $with_out" ;; esac
+without_rc=0; without_out=$(typo_send FM_GUARD_EVENT_LOG="$TMP/typo-elsewhere.jsonl") || without_rc=$?
+[ "$with_rc:$with_out" = "$without_rc:$without_out" ] \
+  || fail "the home-default log changed the refusal: [$with_rc] $with_out / [$without_rc] $without_out"
+# The same holds when the home disappears after the writer's first look: a jq
+# shim removes it between the precheck and the append.
+RACE_HOME="$TMP/race-home"
+mkdir -p "$RACE_HOME/state" "$TMP/race-bin"
+real_jq=$(command -v jq)
+cat > "$TMP/race-bin/jq" <<SH
+#!/usr/bin/env bash
+rm -rf -- "$RACE_HOME"
+exec "$real_jq" "\$@"
+SH
+chmod +x "$TMP/race-bin/jq"
+race_rc=0
+env -u FM_GUARD_EVENT_LOG PATH="$TMP/race-bin:$PATH" FM_HOME="$RACE_HOME" "$EVENT" grace allow --task race-task 2>/dev/null || race_rc=$?
+[ "$race_rc" = 0 ] || fail "a home removed during the write failed the caller (rc=$race_rc)"
+[ ! -e "$RACE_HOME" ] || fail "the event writer recreated a home removed during its write"
+# An explicit log keeps creating its own directory.
+"$EVENT" grace allow --task race-task --log "$TMP/explicit-log-dir/events.jsonl"
+env -u FM_HOME FM_GUARD_EVENT_LOG="$TMP/explicit-env-dir/events.jsonl" "$EVENT" grace allow --task race-task
+for explicit_log in "$TMP/explicit-log-dir/events.jsonl" "$TMP/explicit-env-dir/events.jsonl"; do
+  jq -se 'length == 1' "$explicit_log" >/dev/null || fail "an explicit event log no longer creates its own directory: $explicit_log"
+done
+pass "the event writer leaves a missing home absent and its refusal unchanged"
+
+# A task's base follows the shared default-branch rule, so a local-only master
+# project is scanned past its base history; a base that resolves to no commit
+# is skipped with a stderr note and never reaches the report.
+LEGACY="$TMP/master-base-repo"
+git init -q -b master "$LEGACY"
+git -C "$LEGACY" commit -q --allow-empty -m seed
+git -C "$LEGACY" checkout -qb topic
+git -C "$LEGACY" commit -q --allow-empty -m topic
+git -C "$LEGACY" checkout -q master
+git -C "$LEGACY" merge -q --no-ff -s ours topic -m 'historic tree-equal merge'
+historic=$(git -C "$LEGACY" rev-parse HEAD)
+git -C "$LEGACY" checkout -qb feature-legacy
+printf 'work\n' > "$LEGACY/work.txt"
+git -C "$LEGACY" add work.txt
+git -C "$LEGACY" commit -qm ordinary
+mkdir -p "$TMP/master-state"
+printf 'kind=ship\nworktree=%s\nbranch=feature-legacy\n' "$LEGACY" > "$TMP/master-state/legacy-task.meta"
+python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/master-state" --log "$TMP/none.jsonl" \
+  > "$TMP/master.txt" 2> "$TMP/master.err" || fail "a master-default home scan failed"
+[ ! -s "$TMP/master.txt" ] && [ ! -s "$TMP/master.err" ] \
+  || fail "a master-default base was not resolved by the shared rule: $(cat "$TMP/master.txt" "$TMP/master.err")"
+UNRESOLVED="$TMP/unresolved-base-repo"
+git clone -q --no-hardlinks "$LEGACY" "$UNRESOLVED"
+git -C "$UNRESOLVED" checkout -q feature-legacy
+git -C "$UNRESOLVED" branch -q -m master trunk
+git -C "$UNRESOLVED" remote remove origin
+mkdir -p "$TMP/unresolved-state"
+printf 'kind=ship\nworktree=%s\nbranch=feature-legacy\n' "$UNRESOLVED" > "$TMP/unresolved-state/legacy-task.meta"
+for mode in text --json; do
+  # shellcheck disable=SC2046 # The JSON flag is deliberately absent in text mode.
+  python3 "$ROOT/bin/fm-guard-workarounds.py" --state "$TMP/unresolved-state" --log "$TMP/none.jsonl" $([ "$mode" = text ] || echo --json) \
+    > "$TMP/unresolved.out" 2> "$TMP/unresolved.err" || fail "an unresolved base aborted the $mode home scan"
+  [ ! -s "$TMP/unresolved.out" ] || fail "an unresolved base reached the $mode report: $(cat "$TMP/unresolved.out")"
+  grep -q 'skipped task=legacy-task: base unresolved' "$TMP/unresolved.err" \
+    || fail "the $mode home scan did not note the skipped task on stderr: $(cat "$TMP/unresolved.err")"
+done
+python3 "$ROOT/bin/fm-guard-workarounds.py" --repo "$LEGACY" --head master --task legacy-task --log "$TMP/none.jsonl" --json > "$TMP/explicit.jsonl"
+jq -se --arg head "$historic" 'length == 1 and .[0].head == $head' "$TMP/explicit.jsonl" >/dev/null \
+  || fail "explicit --repo mode no longer reports a tree-equal merge it is pointed at"
+pass "real tree-equal/base-only merges are detected read-only without blaming actual implementation or inherited base history"
 
 printf 'ok - fm-guard-telemetry\n'

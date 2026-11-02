@@ -985,6 +985,8 @@ if [ "$COMPACT_ADVISER_PRESENT" = 1 ]; then
 fi
 # shellcheck source=bin/fm-compact-adviser-lib.sh
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
+SPAWN_GUARD_TASK=${1:-}
+case "$SPAWN_GUARD_TASK" in -*|*=*) SPAWN_GUARD_TASK= ;; esac
 COMPACT_ADVISER_FORCE_OFF=$(fm_compact_adviser_force_off)
 # The override and an adviser-only hooks flag belong to this one invocation, so
 # no backend server or pane started below may inherit them.
@@ -1101,6 +1103,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
+FM_GATE_EVENT_TASK=$SPAWN_GUARD_TASK
 fm_refuse_if_gate_agent
 # The watcher guard runs after the read-only session launch policy preflight.
 KIND=ship
@@ -1529,8 +1532,15 @@ if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   case "$policy_harness" in *[[:space:]]*) policy_raw=1 ;; esac
   fm_session_launch_policy_check "$CONFIG" "$policy_harness" "$policy_raw" || exit 1
 fi
-# Skip the watcher guard when re-exec'd for one pair of a batch.
-[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/fm-guard.sh" || true
+# Skip the watcher guard when firstmate re-execs a spawn whose caller already
+# supervises it (a batch pair or a secondmate liveness relaunch, both marked
+# internal); any other value is an operator's switch and records an escape.
+if [ -n "${FM_SPAWN_NO_GUARD:-}" ]; then
+  [ "$FM_SPAWN_NO_GUARD" = internal ] \
+    || "$SCRIPT_DIR/fm-guard-event.sh" guard-watcher-down-warning bypass --rule FM_SPAWN_NO_GUARD --task "$SPAWN_GUARD_TASK" --override 2>/dev/null || true
+else
+  "$FM_ROOT/bin/fm-guard.sh" || true
+fi
 
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
@@ -2287,7 +2297,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_args=("${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}")
     [ "$KIND" != scout ] || pair_args+=(--scout)
     pair_rc=0
-    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
+    FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=internal "$FM_ROOT/bin/fm-spawn.sh" "${pair_args[@]}" || pair_rc=$?
     if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
       echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - the spawn was deferred and stays queued" >&2
       [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT
@@ -2299,6 +2309,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   exit "$rc"
 fi
 ID=${POS[0]}
+[ "$COMPACT_ADVISER_FORCE_OFF" = 0 ] || fm_compact_adviser_bypass_event "$ID"
 fm_task_id_creation_valid "$ID" || {
   echo "error: invalid task id" >&2
   exit 2
@@ -3329,7 +3340,7 @@ case "$ARG3" in
           if ! raw_claude_refusal=$(python3 "$SCRIPT_DIR/fm-raw-launch.py" render-claude "$LAUNCH" "" "" 2>&1 >/dev/null); then
             echo "error: $raw_claude_refusal" >&2
             echo "repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments" >&2
-            "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok true --session "$ID" 2>/dev/null || true
+            "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok true --task "$ID" 2>/dev/null || true
             exit 1
           fi
         else
@@ -4336,9 +4347,12 @@ if [ "$KIND" = secondmate ]; then
   # On a remote host this spawn is the host-local leg of a launch whose parent has
   # already synced the home to ITS primary commit, and $FM_ROOT here is only that
   # host's own Firstmate copy; syncing again would target the wrong checkout, so
-  # the caller turns this step off (bin/fm-remote-secondmate-control.sh).
-  if [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
+  # the caller turns this step off with the value internal
+  # (bin/fm-remote-secondmate-control.sh); only an operator's 1 is an escape.
+  if [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = internal ]; then
     :
+  elif [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" secondmate-sync bypass --rule FM_SKIP_SECONDMATE_SYNC --task "$ID" --override 2>/dev/null || true
   elif sm_primary_head=$(primary_head_commit "$FM_ROOT"); then
     sm_ff_out=$(ff_target "$PROJ_ABS" "secondmate $ID" "$sm_primary_head" yes yes "$ID" "$STATE" 2>&1 || true)
     case "$sm_ff_out" in
@@ -4356,7 +4370,7 @@ if [ "$KIND" = secondmate ]; then
     echo "error: could not create secondmate state directory for $PROJ_ABS" >&2
     exit 1
   }
-  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != internal ]; then
     CONFIG_INHERIT_LOCK=$(fm_config_inherit_lock_path "$PROJ_ABS") || {
       echo "error: could not resolve secondmate inheritance lock for $PROJ_ABS" >&2
       exit 1
@@ -4371,6 +4385,8 @@ if [ "$KIND" = secondmate ]; then
     FM_CONFIG_INHERIT_PAIR_DIR="${SPAWN_ROUTING_PAIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" FM_CONFIG_INHERIT_LIVE=1 \
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
+  elif [ "$FM_SKIP_SECONDMATE_INHERIT" = 1 ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" secondmate-inherit bypass --rule FM_SKIP_SECONDMATE_INHERIT --task "$ID" --override 2>/dev/null || true
   fi
   fm_session_launch_policy_admit_child "$CONFIG" "$PROJ_ABS" "$HARNESS" "$RAW_LAUNCH" || exit 1
   if [ -f "$PROJ_ABS/data/charter.md" ]; then
@@ -4654,23 +4670,23 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
       # One event per decision: this refusal is the decision each brief gate took.
       case "$DISPATCH_PROBLEMS" in
-      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --source-ok true 2>/dev/null || true ;;
+      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --task "$ID" --source-ok true 2>/dev/null || true ;;
       esac
       if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vqF '### Out of scope is empty'; then
-        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --task "$ID" --source-ok true 2>/dev/null || true
       fi
       exit 1
     fi
-    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --task "$ID" --cleared-by proceed 2>/dev/null || true
     if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --task "$ID" --cleared-by proceed 2>/dev/null || true
     fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi
   elif DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF" task-only); then
     print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --task "$ID" --source-ok true 2>/dev/null || true
     exit 1
   fi
   if ! fm_brief_task_content_valid "$BRIEF"; then
@@ -4722,10 +4738,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     TASK_EGRESS=$(jev_egress brief "$BRIEF") || TASK_EGRESS=
   fi
   case $TASK_EGRESS in
-    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-grant" 2>/dev/null || true ;;
+    '['*']') "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --task "$ID" --rule dispatch-grant 2>/dev/null || true ;;
     *)
       echo "error: task $ID egress policy returned no grant; dispatch refused" >&2
-      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-grant" 2>/dev/null || true
+      "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --task "$ID" --rule dispatch-grant 2>/dev/null || true
       exit 1 ;;
   esac
   # Use the existing launch-brief overlay for every worker kind, including
@@ -4928,9 +4944,10 @@ validate_spawn_worktree() { # <source> <inspect-target>
   if ! fm_task_copy_isolated "$WT" "$PROJ_ABS"; then
     echo "error: $source did not yield an isolated worktree (resolved '$WT'; worktree root '${FM_TASK_COPY_TOP:-none}'; spawning project '$PROJ_ABS'); refusing to launch to avoid tangling the primary checkout. Inspect target $inspect_target" >&2
     echo "error: repair: relaunch with the registered project clone and its exact flags: bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off>; for an existing task, re-point its record at the replacement copy instead: bin/fm-control.sh <task> reassociate --worktree <replacement-copy>" >&2
-    "$SCRIPT_DIR/fm-guard-event.sh" spawn-worktree-isolation deny --source-ok true 2>/dev/null || true
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-worktree-isolation deny --rule isolated-worktree --task "$ID" --source-ok true 2>/dev/null || true
     exit 1
   fi
+  "$SCRIPT_DIR/fm-guard-event.sh" spawn-worktree-isolation allow --rule isolated-worktree --task "$ID" 2>/dev/null || true
 }
 
 # A pooled slot whose only deviation is a submodule gitlink is stale, not dirty:
@@ -5207,6 +5224,7 @@ else
     echo "error: task $ID cannot be dispatched because its backlog data directory is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
+  fm_backlog_transition_skip_event "$ID"
 fi
 
 if [ "$SPAWN_META_LOCK_HELD" != 1 ]; then
@@ -6708,7 +6726,7 @@ confinement_refuse() {
   echo "error: $*" >&2
   echo "repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh $ID <project> --mode <mode> --yolo <on|off>" >&2
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
-    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" 2>/dev/null || true
 }
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
@@ -6788,7 +6806,7 @@ if [ "$KIND" != secondmate ]; then
         done
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
-        --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
+        --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
       ;;
     Darwin:*) WRITE_CONFINEMENT="unconfined-macos-$HARNESS" ;;
     Linux:*) WRITE_CONFINEMENT=unconfined-linux ;;
@@ -6797,7 +6815,7 @@ if [ "$KIND" != secondmate ]; then
   confinement_coverage_decision=warn
   [ "$WRITE_CONFINEMENT" != seatbelt-v1 ] || confinement_coverage_decision=allow
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-confinement-coverage "$confinement_coverage_decision" --source-ok true \
-    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by recorded 2>/dev/null || true
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by recorded 2>/dev/null || true
   printf 'confinement audit: harness=%s write_confinement=%s\n' "$HARNESS" "$WRITE_CONFINEMENT"
 fi
 # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
@@ -7168,10 +7186,10 @@ EOF
     [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
     native_find=$(jev_egress find "$TASK_EGRESS" "$guard_project" "$OMP_NO_HELPERS" "$KIND") || native_find=
     case $native_find in
-      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --session "$ID:dispatch-find" 2>/dev/null || true ;;
+      on|off) "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant allow --cleared-by proceed --task "$ID" --rule dispatch-find 2>/dev/null || true ;;
       *)
         echo "error: task $ID egress policy returned no find capability; dispatch refused" >&2
-        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --session "$ID:dispatch-find" 2>/dev/null || true
+        "$SCRIPT_DIR/fm-guard-event.sh" jev-egress-grant deny --source-ok false --task "$ID" --rule dispatch-find 2>/dev/null || true
         exit 1 ;;
     esac
     native_helpers='{}'
@@ -8284,7 +8302,8 @@ if [ "$HARNESS" = claude ]; then
 fi
 SPAWN_BRIEF_DELIVERED=1
 
-if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ] \
+  && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != internal ]; then
   if ! fm_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
     if fm_config_reread_quarantine_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
       echo "CONFIG_REREAD: secondmate $ID: quarantined pre-relaunch generations after cleanup failure (destination=$PROJ_ABS/state/.fm-inherited-config-reread-quarantine source=$FM_HOME/state/.fm-inherited-config-reread-quarantine)" >&2

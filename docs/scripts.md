@@ -71,7 +71,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-guard-sites.py`      | Enumerate every refusal site in the runtime code and map each to a registry entry for `fm-guard-lint.sh` ([signatures](guard-spec.md#refusal-sites)) |
 | `fm-guard-refcheck.sh`   | Prove every wired hook path resolves, every registry path exists, and no retired guard is referenced live |
 | `fm-guard-event.sh`      | Append one guard decision event per call, never influencing the decision it records |
-| `fm-guard-metrics.sh`    | Compute per-guard opportunities, fires, override rate, clear cost, and the retirement verdict |
+| `fm-guard-metrics.sh`    | Compute per-guard and per-rule opportunities, fires, override rate, refusal-to-bypass ratio, clear cost, and the retirement verdict |
+| `fm-guard-workarounds.py` | Report read-only evidence of tree-equal merges and base-merge-only head changes ([spec](guard-spec.md#instrumentation)) |
 | `fm-supervision-liveness-lib.sh` | Shared supervision-liveness predicate and reason vocabulary for the turn-end guards and the fleet guard |
 | `fm-primary-scope-lib.sh` | Shared marker-or-plain-checkout primary-home predicate for tracked hooks             |
 | `fm-session-lock-lib.sh` | Shared session-lock ownership from harness ancestry or a trusted Claude session id for fm-lock.sh and the Claude Stop auto-arm, plus the read-only lock inspection behind `fm-lock.sh status` and `fm-inbox.sh ready` |

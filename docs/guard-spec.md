@@ -86,7 +86,7 @@ trigger:       the precise condition, with the values that make it true
 decision:      allow | deny | warn, plus the fail direction when the source is unreadable
 remedy:        the exact runnable command that clears it, expanded for this home
 budget:        max consecutive blocks per turn, and what happens after
-telemetry:     one event per decision, guard_id, decision, source_ok, elapsed_ms, cleared_by
+telemetry:     one event per rule decision, guard, rule, task, session, decision, source_ok, elapsed_ms, cleared_by
 test:          the fixture that proves both the block and the pass
 ```
 
@@ -216,17 +216,44 @@ launch, so the cut threshold for reversible guards is cost 5, not cost 1.
 
 ## Instrumentation
 
-One JSON line per decision, appended to `state/guard-events.jsonl`:
+One JSON line per rule decision, appended to `state/guard-events.jsonl`:
 
 ```json
-{"ts":"2026-10-22T12:00:00Z","guard":"spawn-worktree-isolation","version":"1","system":"firstmate","session":"abc","decision":"deny","source_ok":true,"elapsed_ms":14,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-31T12:00:00Z","guard":"spawn-worktree-isolation","rule":"isolated-worktree","task":"task-a","version":"1","system":"firstmate","session":"task-a","decision":"deny","source_ok":true,"elapsed_ms":14,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
 ```
 
-`bin/fm-guard-event.sh` is the single writer.
-`bin/fm-guard-metrics.sh` is the single reader and computes the retirement nominations defined in this file.
-Turns-to-clear and tool-calls-to-clear are the real cost unit because an agent
-clears the block; `override` is the strongest false-positive signal available
-for free.
+`bin/fm-guard-event.sh` is the single best-effort writer; its header owns the CLI.
+An affected task supplied by the emitter takes precedence over the invoking worker's task.
+The session is that task id, otherwise the physical home plus the harness session; an unavailable harness session is explicitly `unattributed`, never a new process id.
+Claude's `CLAUDE_CODE_SESSION_ID` is accepted only through the ancestry validation owned by `bin/fm-session-lock-lib.sh`, so an inherited id from another harness is not borrowed.
+`rule` defaults to the guard id for legacy emitters, and legacy rows without a task cannot prove task-level recurrence.
+Merge refusals record `head` and `base` for the read-only detector; empty fields are missing evidence, not an inferred commit or branch.
+
+A guard records allows as well as denies so opportunities are observable.
+A waiver records `override: true` only when it changed the outcome, so an unused `--allow-red`, `--allow-missing`, `--allow-api-key` or `--attended-override` writes no escape; teardown `--force` skips the landed-work check without reading it, so each forced teardown that reaches that check records one escape; a skipped check records decision `bypass` and its activation rule, except that Firstmate's own supervised re-execs set `FM_SPAWN_NO_GUARD`, `FM_SKIP_SECONDMATE_INHERIT` or `FM_SKIP_SECONDMATE_SYNC` to `internal`, which skips the same check and records nothing.
+`actor` is the class of the caller: `gate`, `worker` (it has `FM_TASK_ID`) or `main`.
+An operation that writes one row per rule counts as one opportunity at guard level; its extra rule rows carry `opportunity: false`.
+A bypass is an escape record, not an additional inspected opportunity, and an override is a reassessment signal rather than proof of a false positive.
+The manual-backlog skip is selected by `config/backlog-backend`; `FM_BACKLOG_TRANSITION_SKIP` is its output reason, not an environment switch.
+The registry also names existing optional surfaces whose bypasses are visible but whose ordinary decisions remain uninstrumented.
+Telemetry failures, unavailable writers and nonregular log targets must never prevent the guarded action or change its verdict.
+The writer never creates a home: without an explicit log, a home with no state directory gets no row, so a later home check still refuses.
+
+`bin/fm-guard-metrics.sh` owns guard/rule metrics and the retirement rule; its header owns the CLI and output fields.
+It groups repeated denies by task and rule across harness sessions, and an allow for another task, rule or actor class cannot clear a refusal.
+The refusal-to-bypass ratio is escape records plus distinct workaround signatures divided by denies, with a record carrying both `bypass` and `override` counted once.
+No durable workaround feed exists yet, so the ratio counts escape records only unless detector JSON is supplied with `--workarounds`; without it `workarounds` is null (not measured), never zero evidence.
+The ratio is undefined (`null`) when there are no denies, rather than zero evidence of escapes.
+Deny-only rows and guards with no recorded events in the selected window remain visible without inventing opportunities.
+
+`bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
+Its header owns the bounded first-parent scan, local metadata scope, base resolution and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
+A tree-equal merge is a signature, not proof that a guard caused it, and a base-merge-only signature requires every intervening commit to be a merge from the recorded base lineage.
+The watcher runs the detector detached and single-flight at each heartbeat, so a slow worktree read cannot hold its poll, and leaves the latest finished report in `state/.guard-workarounds-next`.
+That report is file output only: no wake presents it to Main, so a new signature is seen only by reading that file or running the detector.
+Neither detection nor metrics changes refs, waives a refusal or disables a guard.
+The behavior entry point is `tests/fm-guard-telemetry.test.sh`.
+Turns-to-clear and tool-calls-to-clear remain the real cost unit because an agent clears the block.
 
 ## Required detection
 
@@ -235,24 +262,19 @@ The instrumentation example above describes the existing event shape; detection 
 
 ### Events
 
-`bin/fm-guard-event.sh` must add `rule` and `task` to the event schema.
-The session key must be the task id or the home plus the harness session, never `pid-$$`.
-Every waiver and force must pass `--override`, including `--allow-red`, `--allow-missing`, `--attended-override`, teardown `--force` and `--allow-api-key`.
-Each bypass switch must emit a `bypass` event.
-Deny-only emitters must also emit allow decisions so opportunities can be measured.
-These requirements expose existing escapes; they do not authorize their use or new bypass flags.
+[Instrumentation](#instrumentation) owns the implemented event schema, session key, override, bypass and allow contract.
+These records expose existing escapes; they do not authorize their use or new bypass flags.
 
 ### Metrics
 
-`bin/fm-guard-metrics.sh` must report per rule, with refusal-to-bypass ratio defined as `(overrides + workaround signatures) / denies`.
-It must count repeated denies per task across sessions and flag "deny-only" and "zero events in N days".
+[Instrumentation](#instrumentation) owns the implemented per-rule, refusal-to-bypass, repeated-deny, deny-only and zero-event metrics.
 
 ### Workaround detection
 
-Heartbeat detection must be read-only and flag:
+[Instrumentation](#instrumentation) owns the implemented tree-equal merge and base-merge-only detectors.
+Heartbeat detection must stay read-only and must also flag:
 
-- A merge commit on a PR branch or train whose tree equals its first parent's.
-- A PR head changed only by a base merge after a merge refusal.
+- A tree-equal merge on a train branch, because the heartbeat scan reads only ship and scout task records.
 - A widening PR, identified by the review record's `--widens-guard yes`.
 
 ### Lint

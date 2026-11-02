@@ -350,10 +350,15 @@ test_allow_red_still_waives_only_the_current_failure() {
     "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:01Z)" \
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:09Z)" \
     "$(check_run lint COMPLETED FAILURE 2026-01-01T00:00:09Z)"
-  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/96 \
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/96 \
     --allow-red lint > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "superseded-allow-red-named: the named waiver should merge"$'\n'"$(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 96 example/repo --squash
+  jq -se 'any(.[]; .guard == "merge-green-head" and .rule == "checks-green" and .task == "task-x1" and .decision == "bypass" and .override == true and .cleared_by == "allow-red")' "$case_dir/guard-events.jsonl" >/dev/null || fail "accepted red-check waiver was not attributed"
+  jq -se '[.[] | select(.guard == "merge-green-head" and .rule == "checks-green" and .decision == "allow")] | length == 0' \
+    "$case_dir/guard-events.jsonl" >/dev/null || fail "a waived red check was recorded as cleared by retry"
+  assert_equals 1 "$("$ROOT/bin/fm-guard-metrics.sh" --log "$case_dir/guard-events.jsonl" --guards merge-green-head --json | jq '.guards[0].opportunities')" \
+    "superseded-allow-red-named: a waived merge must still be one merge-green-head opportunity"
   pass "fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure"
 }
 
@@ -1012,9 +1017,10 @@ test_allow_missing_waives_only_the_named_unreported_check() {
   case_dir=$(make_case github-allow-missing-named)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" classic:ci ruleset:validate
-  run_required_case "$case_dir" 96 --allow-missing validate
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_required_case "$case_dir" 96 --allow-missing validate
   expect_code 0 "$RC" "allow-missing-named: the named waiver should merge: $(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 96 example/repo --squash
+  jq -se 'any(.[]; .rule == "required-reported" and .task == "task-x1" and .override == true and .cleared_by == "allow-missing")' "$case_dir/guard-events.jsonl" >/dev/null || fail "accepted missing-check waiver was not attributed"
 
   case_dir=$(make_case github-allow-missing-other-missing)
   add_gh_mocks "$case_dir" "$head"
@@ -1641,9 +1647,16 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
   assert_equals true "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
     "$case_dir/refused-guard-events.jsonl")" \
     "guard-events: the deny did not record a readable source"
-  assert_equals 0 "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].elapsed_ms' \
-    "$case_dir/refused-guard-events.jsonl")" \
-    "guard-events: the deny did not record elapsed-ms 0"
+
+  jq -se --arg head "$head" 'any(.[]; .guard == "merge-green-head" and .decision == "deny" and .task == "task-x1" and .rule == "checks-green" and .head == $head and .base == "main")' "$case_dir/refused-guard-events.jsonl" >/dev/null || fail "merge refusal lacks rule/task/head/base attribution"
+
+  rc=0
+  FM_GUARD_EVENT_LOG="$case_dir/refused-override-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" --attended-override -- --admin \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "guard-events: an attended override must not admit a red check"
+  jq -se '[.[] | select(.guard == "merge-away-waiver")] | length == 0' "$case_dir/refused-override-events.jsonl" >/dev/null \
+    || fail "guard-events: an attended override on a refused merge recorded an escape"
 
   mkdir -p "$case_dir/guard-events-dir"
   rc=0
@@ -1661,13 +1674,37 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     run_pr_merge "$case_dir" task-x1 "$url" \
       > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "guard-events: the green merge should have proceeded: $(cat "$case_dir/stderr")"
-  assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-green-head allow)" \
-    "guard-events: a green merge must append one merge-green-head allow"
+  jq -se '[.[] | select(.guard == "merge-green-head" and .decision == "allow") | .rule] | sort == ["base-containment","base-read","base-tip-changed","checks-green","required-reported"]' "$case_dir/allowed-guard-events.jsonl" >/dev/null || fail "green merge did not record each checked rule"
+  assert_equals 1 "$("$ROOT/bin/fm-guard-metrics.sh" --log "$case_dir/allowed-guard-events.jsonl" --guards merge-green-head --json | jq '.guards[0].opportunities')" \
+    "guard-events: a green merge must be one merge-green-head opportunity"
   assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-held-task allow)" \
     "guard-events: a green merge must append one merge-held-task allow"
   assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-green-head" and .decision == "allow")][0].cleared_by' \
     "$case_dir/allowed-guard-events.jsonl")" \
     "guard-events: the allow did not record cleared-by retry"
+
+  url=https://github.com/example/repo/pull/196
+  case_dir=$(make_case github-guard-events-unused-waivers)
+  add_gh_mocks "$case_dir" "$head"
+  FM_GUARD_EVENT_LOG="$case_dir/unused-guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" --allow-red not-red --allow-missing not-missing \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "guard-events: a merge naming unused waivers should have proceeded: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.decision == "bypass" or .override == true)] | length == 0' \
+    "$case_dir/unused-guard-events.jsonl" >/dev/null \
+    || fail "guard-events: a waiver that covered nothing recorded an escape"
+
+  url=https://github.com/example/repo/pull/197
+  case_dir=$(make_case github-guard-events-admitted-override)
+  add_gh_mocks "$case_dir" "$head"
+  FM_GUARD_EVENT_LOG="$case_dir/admitted-override-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" --attended-override -- --admin \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "guard-events: an attended override on a green merge should have proceeded: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "merge-away-waiver")] | length == 1 and .[0].decision == "bypass"
+    and .[0].override == true and .[0].task == "task-x1" and .[0].rule == "attended-override"' \
+    "$case_dir/admitted-override-events.jsonl" >/dev/null \
+    || fail "guard-events: an admitted attended override was not recorded once: $(cat "$case_dir/admitted-override-events.jsonl")"
   pass "fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge"
 }
 

@@ -234,7 +234,7 @@ SUP_EPISODE_UNHEALTHY=0
 # is the single writer and always exits 0, and both calls are best-effort, so
 # telemetry can never change this guard's decision or output.
 guard_event() {
-  "$SCRIPT_DIR/fm-guard-event.sh" turnend-supervision-block "$@" 2>/dev/null || true
+  "$SCRIPT_DIR/fm-guard-event.sh" turnend-supervision-block "$@" --session "$SESSION_ID" 2>/dev/null || true
 }
 
 # An allow is a recovery only when this episode was unhealthy earlier: either

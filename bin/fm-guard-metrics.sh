@@ -1,256 +1,205 @@
 #!/usr/bin/env bash
-# fm-guard-metrics.sh - the single reader of guard decision events; it computes
-# the retirement nominations, and which of them a recorded decision already
-# judged, as defined in docs/guard-spec.md.
-#
-# docs/guard-spec.md defines the numbers. This script computes them from
-# state/guard-events.jsonl so a cut is decided by measurement, not by a static
-# cost estimate, and so the operator can see which guards are quiet.
-#
-# Usage:
-#   fm-guard-metrics.sh [--log <path>] [--registry <path>] [--min-opportunities <n>]
-#                       [--json] [--undecided] [--guards <id,id,...>] [-h|--help]
-#
-# Numbers per guard:
-#   opportunities         every decision recorded for this guard (deny, warn,
-#                         allow, error), the retirement denominator
-#   denies, warns         fires by decision
-#   override_rate         overrides / fires, the strongest false-positive signal
-#   median_clear_attempts median count of consecutive denies in one session
-#                         before an allow, the units an agent spends clearing
-#   recurrences           denies that follow a cleared deny in the same session
-#   verdict               cut | keep | unmeasured, per the threshold below
-#
-# Retirement threshold, from docs/guard-spec.md: a guard enters the cut list when
-# any holds across at least --min-opportunities (default 30) decisions:
-#   - zero denies and zero warns
-#   - override rate above 20%
-#   - median clear attempts greater than 3
-#   - a recurrence after a clear
-# Irreversible harm exempts a guard from the first two conditions and never from
-# the third or fourth. The registry supplies each guard's harm.
-#
-# Output: one line per guard, sorted by id:
-#   METRIC <id> opportunities=<n> denies=<n> warns=<n> override_rate=<f>
-#          median_clear_attempts=<f> recurrences=<n> verdict=<v>
-# followed by METRICS_SUMMARY guards=<n> measured=<n> cut=<n> unmeasured=<n>.
-# With --json, one object carries the same fields.
-# With --undecided, print only the ids whose verdict is `cut` and whose registry
-# `retirement_decision` does not judge it, one per line: a nomination nobody has
-# judged yet. A decision starting `keep|redesign|cut YYYY-MM-DD` judges the
-# events through that day and stands until the evidence changes: the events after
-# it nominate the guard again only when they hold a deny, warn, override or other
-# non-allow decision, or meet the threshold on their own as a quiet window after
-# a judged window (the last --min-opportunities events through that day) that
-# held a fire. It is the question a session start asks, so the pass cannot sit
-# unread in a log forever.
-#
-# Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log
-# is not an error: every guard is simply unmeasured, because no evidence is not
-# evidence of a defect.
+# fm-guard-metrics.sh - read-only guard/rule metrics and retirement nominations.
+# Usage: fm-guard-metrics.sh [--log <jsonl>] [--registry <json>]
+#   [--min-opportunities <n>] [--guards <id,id,...>] [--json] [--undecided]
+#   [--workarounds <jsonl>] [--days <n>]
+# --workarounds accepts fm-guard-workarounds.py --json output, without modifying
+# the event log. Distinct signatures count once per task, head, rule and kind.
+# No durable signature feed exists yet: without --workarounds, workarounds is
+# null (not measured) and the ratio counts escape records only.
+# Opportunities exclude bypasses, and a guard row counts one per guarded
+# operation, not one per rule row; refusal_to_bypass_ratio is
+# (override/bypass events + supplied workaround signatures) / denies, null if no
+# denies. A row whose guard is not a nonempty string, or whose ts, rule, task,
+# session, actor, decision, head or kind is present and not a string, is skipped
+# like a torn or undecodable line; the summary counts them as malformed_rows.
+# Repeat denies count additional denies per task across sessions, per rule.
+# Session-only legacy events cannot establish task attribution.
+# Retirement remains the guard-level rule in docs/guard-spec.md; rule rows are
+# diagnostic only. No metric disables or changes a guard.
+# --undecided prints the cut nominations no registry retirement_decision judges.
+# A decision starting `keep|redesign|cut YYYY-MM-DD` judges the events through
+# that day and stands until the evidence changes: later events nominate the guard
+# again only when they hold a deny, warn, override or other non-allow decision,
+# or meet the threshold on their own as a quiet window after a judged window (the
+# last --min-opportunities opportunities through that day) that held a fire.
 set -u
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+exec python3 - "$ROOT" "${FM_GUARD_EVENT_LOG:-${FM_HOME:-${FM_ROOT:-$ROOT}}/state/guard-events.jsonl}" "$@" <<'PY'
+import argparse
+import collections
+import datetime
+import json
+import re
+import statistics
+import sys
+from pathlib import Path
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-LOG=''
-REGISTRY="$ROOT/docs/guards/registry.json"
-MIN_OPPS=30
-JSON=0
-UNDECIDED=0
-ONLY=''
+root, default_log, *args = sys.argv[1:]
+p = argparse.ArgumentParser(description='Read-only guard and rule metrics')
+p.add_argument('--log', default=default_log)
+p.add_argument('--registry', default=str(Path(root) / 'docs/guards/registry.json'))
+p.add_argument('--min-opportunities', type=int, default=30)
+p.add_argument('--guards', default='')
+p.add_argument('--json', action='store_true')
+p.add_argument('--undecided', action='store_true')
+p.add_argument('--workarounds')
+p.add_argument('--days', type=int, default=30)
+a = p.parse_args(args)
+if a.min_opportunities < 1 or a.days < 1:
+    p.error('opportunities and days must be positive')
 
-usage() { sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'; }
-die() { echo "error: $*" >&2; exit 2; }
 
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --log) [ $# -ge 2 ] || die "--log needs a value"; LOG=$2; shift 2 ;;
-    --registry) [ $# -ge 2 ] || die "--registry needs a value"; REGISTRY=$2; shift 2 ;;
-    --min-opportunities) [ $# -ge 2 ] || die "--min-opportunities needs a value"; MIN_OPPS=$2; shift 2 ;;
-    --guards) [ $# -ge 2 ] || die "--guards needs a value"; ONLY=$2; shift 2 ;;
-    --json) JSON=1; shift ;;
-    --undecided) UNDECIDED=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) die "unknown argument '$1'" ;;
-  esac
-done
+STRING_FIELDS = ('ts', 'rule', 'task', 'session', 'actor', 'decision', 'head', 'kind')
+malformed = 0
 
-case "$MIN_OPPS" in ''|*[!0-9]*|0) die "--min-opportunities must be a positive integer" ;; esac
-command -v jq >/dev/null 2>&1 || die "jq is required"
 
-[ -n "$LOG" ] || LOG="${FM_GUARD_EVENT_LOG:-${FM_HOME:-${FM_ROOT:-$ROOT}}/state/guard-events.jsonl}"
+def json_lines(path):
+    global malformed
+    try:
+        with open(path, encoding='utf-8', errors='replace') as stream:
+            for line in stream:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    row = None  # A torn final event must not hide earlier evidence.
+                if (isinstance(row, dict) and isinstance(row.get('guard'), str) and row['guard']
+                        and all(isinstance(row.get(key, ''), str) for key in STRING_FIELDS)):
+                    yield row
+                else:
+                    malformed += 1
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        p.error(f'cannot read {path}: {error.strerror}')
 
-# Harm per guard, so the irreversible exemption is data rather than judgment at
-# read time. A guard absent from the registry is treated as irreversible: an
-# unknown guard must never be cut by a metrics pass that cannot see what it
-# protects.
-harm_of() {
-  local id=$1 h
-  h=$(jq -r --arg id "$id" '.guards[]? | select(.id == $id) | (.harm // "")' "$REGISTRY" 2>/dev/null)
-  case "$h" in
-    irreversible) printf 'irreversible' ;;
-    reversible) printf 'reversible' ;;
-    style) printf 'style' ;;
-    *) printf 'unknown' ;;
-  esac
-}
 
-emit() {  # <id> <opps> <denies> <warns> <override_rate> <median> <recurrences> <verdict> <harm>
-  local id=$1 opps=$2 denies=$3 warns=$4 rate=$5 median=$6 recur=$7 verdict=$8 harm=$9
-  if [ "$JSON" -eq 1 ]; then
-    jq -n --arg id "$id" --argjson opps "$opps" --argjson denies "$denies" --argjson warns "$warns" \
-      --argjson rate "$rate" --argjson median "$median" --argjson recur "$recur" \
-      --arg verdict "$verdict" --arg harm "$harm" \
-      '{id:$id, opportunities:$opps, denies:$denies, warns:$warns, override_rate:$rate,
-        median_clear_attempts:$median, recurrences:$recur, verdict:$verdict, harm:$harm}'
-  else
-    printf 'METRIC %s opportunities=%s denies=%s warns=%s override_rate=%s median_clear_attempts=%s recurrences=%s verdict=%s\n' \
-      "$id" "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict"
-  fi
-}
+try:
+    registry = json.loads(Path(a.registry).read_text())
+except (OSError, ValueError):
+    registry = {}
+entries = {row['id']: row for row in registry.get('guards', [])}
+only = set(filter(None, a.guards.split(',')))
+rows = [row for row in json_lines(a.log) if not only or row['guard'] in only]
+signatures = list(json_lines(a.workarounds)) if a.workarounds else []
+cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=a.days)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-if [ ! -f "$LOG" ]; then
-  [ "$UNDECIDED" -eq 1 ] && exit 0
-  if [ "$JSON" -eq 1 ]; then
-    printf '{"guards":[],"summary":{"guards":0,"measured":0,"cut":0,"unmeasured":0},"log":"%s","present":false}\n' "$LOG"
-  else
-    printf 'METRICS_SUMMARY guards=0 measured=0 cut=0 unmeasured=0 log_absent=true\n'
-  fi
-  exit 0
-fi
 
-# One pass over the log, grouped by guard. The retirement rule needs every
-# guard's rows, and the previous shape rescanned the file once per guard, which
-# made a live 700 KB log cost seconds on the session-start path. `fromjson?`
-# drops a torn final line instead of failing the whole read.
-groups=$(jq -c -R 'fromjson? | objects | select((.guard // "") != "")' "$LOG" 2>/dev/null \
-  | jq -c -s --arg only "$ONLY" '
-      group_by(.guard)[]
-      | {id: .[0].guard, rows: .}
-      | . as $group
-      | select($only == "" or ($only | split(",") | index($group.id)))
-    ' 2>/dev/null || true)
+def metric(guard, events, rule=None):
+    denies = sum(e.get('decision') == 'deny' for e in events)
+    warns = sum(e.get('decision') == 'warn' for e in events)
+    # A guard row skips the extra rule rows of one operation. A rule row keeps its own.
+    counted = [e for e in events if rule is not None or e.get('opportunity') is not False]
+    allows = sum(e.get('decision') == 'allow' for e in counted)
+    bypasses = sum(e.get('decision') == 'bypass' for e in events)
+    overrides = sum(e.get('override') is True for e in events)
+    escapes = sum(e.get('override') is True or e.get('decision') == 'bypass' for e in events)
+    workarounds = len({(e.get('task'), e.get('head'), e.get('rule'), e.get('kind'))
+                       for e in signatures if e['guard'] == guard
+                       and (rule is None or e.get('rule', guard) == rule)}) if a.workarounds else None
+    opportunities = sum(e.get('decision') in ('deny', 'warn', 'allow', 'error') for e in counted)
+    rate = round(overrides / (denies + warns), 3) if denies + warns else 0
+    attempts, recurrences = [], 0
+    sessions = collections.defaultdict(list)
+    tasks = collections.Counter()
+    for event in events:
+        # Keep rules separate even in the aggregate: one rule's allow does not
+        # clear another rule's refusal, and one actor class's allow does not
+        # clear another's. Task identity survives harness restarts.
+        identity = event.get('task') or event.get('session', '')
+        sessions[(event.get('rule') or guard, identity, event.get('actor', ''))].append(event)
+        if event.get('task') and event.get('decision') == 'deny':
+            tasks[(event.get('rule') or guard, event['task'])] += 1
+    for session in sessions.values():
+        current, cleared = 0, False
+        # Log order resolves equal-second timestamps deterministically.
+        for event in sorted(session, key=lambda e: e.get('ts', '')):
+            if event.get('decision') == 'deny':
+                current += 1
+                if cleared and current == 1:
+                    recurrences += 1
+            elif event.get('decision') == 'allow':
+                if current:
+                    attempts.append(current)
+                    cleared = True
+                current = 0
+    median = statistics.median(attempts) if attempts else 0
+    harm = entries.get(guard, {}).get('harm', 'unknown')
+    verdict = 'unmeasured'
+    if opportunities >= a.min_opportunities:
+        verdict = 'keep'
+        if ((harm in ('reversible', 'style') and (denies + warns == 0 or rate > .2))
+                or median > 3 or recurrences):
+            verdict = 'cut'
+    result = dict(id=guard, opportunities=opportunities, denies=denies, warns=warns,
+                  override_rate=rate, median_clear_attempts=median,
+                  recurrences=recurrences, verdict=verdict, harm=harm,
+                  allows=allows, overrides=overrides, bypasses=bypasses, workarounds=workarounds,
+                  refusal_to_bypass_ratio=round((escapes + (workarounds or 0)) / denies, 3) if denies else None,
+                  repeat_denies=sum(max(0, count - 1) for count in tasks.values()),
+                  repeat_denies_per_task=[dict(task=task, denies=count, repeat_denies=count - 1,
+                                              **({'rule': task_rule} if rule is None else {}))
+                                          for (task_rule, task), count in sorted(tasks.items()) if count > 1],
+                  deny_only=denies > 0 and allows == 0,
+                  zero_events_days=a.days if not any(e.get('ts', '') >= cutoff for e in events) else 0)
+    if rule is not None:
+        result['rule'] = rule
+    return result
 
-# The registry's recorded retirement decision, when the pass already judged this
-# guard. A nomination without one is what a session start must surface.
-decision_of() {  # <id>
-  jq -r --arg id "$1" '.guards[]? | select(.id == $id) | (.retirement_decision // "")' "$REGISTRY" 2>/dev/null
-}
 
-# The metrics for one guard's rows, printed as one line:
-#   <opportunities> <denies> <warns> <override_rate> <median> <recurrences> <verdict>
-measure() {  # <rows-json-array> <harm>
-  local rows=$1 harm=$2 opps denies warns overrides fires rate attempts median recur verdict
-  opps=$(printf '%s' "$rows" | jq 'length')
-  denies=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "deny")] | length')
-  warns=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "warn")] | length')
-  overrides=$(printf '%s' "$rows" | jq '[.[] | select(.override == true)] | length')
-  fires=$((denies + warns))
-  if [ "$fires" -gt 0 ]; then
-    rate=$(jq -n --argjson o "$overrides" --argjson f "$fires" '$o / $f | . * 1000 | round | . / 1000')
-  else
-    rate=0
-  fi
-  # Median clear attempts: consecutive denies in one session before an allow.
-  attempts=$(printf '%s' "$rows" | jq -r '
-    sort_by(.ts) | group_by(.session)[]
-    | reduce .[] as $e ({runs: [], cur: 0};
-        if $e.decision == "deny" then .cur += 1
-        elif $e.decision == "allow" then (if .cur > 0 then .runs += [.cur] else . end) | .cur = 0
-        else . end)
-    | .runs[]' 2>/dev/null | sort -n || true)
-  if [ -n "$attempts" ]; then
-    median=$(printf '%s\n' "$attempts" | awk '{a[NR]=$1} END {if (NR % 2) print a[(NR+1)/2]; else print (a[NR/2] + a[NR/2+1]) / 2}')
-  else
-    median=0
-  fi
-  recur=$(printf '%s' "$rows" | jq -r '
-    sort_by(.ts) | group_by(.session)
-    | map(reduce .[] as $e ({cleared: false, n: 0};
-        if $e.decision == "deny" and .cleared then .n += 1
-        elif $e.decision == "allow" then .cleared = true
-        else . end) | .n)
-    | add // 0' 2>/dev/null || echo 0)
-  if [ "$opps" -lt "$MIN_OPPS" ]; then
-    verdict="unmeasured"
-  else
-    verdict="keep"
-    # Irreversible harm, and an unknown guard, are exempt from the zero-fire and
-    # override conditions and never from the recurrence conditions below.
-    case "$harm" in
-      reversible|style)
-        if [ "$fires" -eq 0 ]; then verdict="cut"; fi
-        if awk -v r="$rate" 'BEGIN {exit !(r > 0.2)}'; then verdict="cut"; fi
-        ;;
-    esac
-    if awk -v m="$median" 'BEGIN {exit !(m > 3)}'; then verdict="cut"; fi
-    if [ "$recur" -gt 0 ]; then verdict="cut"; fi
-  fi
-  printf '%s %s %s %s %s %s %s\n' "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict"
-}
+def judged(guard, events):
+    decision = entries.get(guard, {}).get('retirement_decision')
+    dated = re.match(r'(?:keep|redesign|cut) ([0-9]{4}-[0-9]{2}-[0-9]{2})', decision) if isinstance(decision, str) else None
+    if not dated:
+        return False
+    after = dated[1] + 'T23:59:59Z'
+    fresh = [e for e in events if e.get('ts', '') > after]
+    if any(e.get('decision') != 'allow' or e.get('override') is True for e in fresh):
+        return False
+    if metric(guard, fresh)['verdict'] != 'cut':
+        return True
+    window = sorted((e for e in events if e.get('ts', '') <= after and e.get('opportunity') is not False
+                     and e.get('decision') in ('deny', 'warn', 'allow', 'error')), key=lambda e: e.get('ts', ''))
+    return not any(e.get('decision') in ('deny', 'warn') for e in window[-a.min_opportunities:])
 
-# A recorded decision judges the evidence through its date and stands until the
-# events after that date differ from the window it judged. They differ when they
-# hold any decision other than a plain allow (a deny, warn, override or bypass),
-# or when they meet the retirement rule on their own as a quiet window while the
-# judged window, the last --min-opportunities events through that date, held a
-# fire: a fire rate that changed to zero. History older than the judged window
-# never re-nominates. A decision without a leading `keep|redesign|cut YYYY-MM-DD`
-# judges nothing.
-judged() {  # <id> <rows-json-array> <harm>
-  local day after fresh v
-  day=$(decision_of "$1" | jq -Rr 'capture("^(keep|redesign|cut) (?<d>[0-9]{4}-[0-9]{2}-[0-9]{2})").d // ""' 2>/dev/null)
-  [ -n "$day" ] || return 1
-  after="${day}T23:59:59Z"
-  fresh=$(printf '%s' "$2" | jq -c --arg after "$after" '[.[] | select((.ts // "") > $after)]')
-  printf '%s' "$fresh" | jq -e 'all(.[]; .decision == "allow" and .override != true)' >/dev/null 2>&1 || return 1
-  v=$(measure "$fresh" "$3")
-  [ "${v##* }" != cut ] && return 0
-  printf '%s' "$2" | jq -e --arg after "$after" --argjson n "$MIN_OPPS" '
-    [.[] | select((.ts // "") <= $after)] | sort_by(.ts) | .[-$n:]
-    | any(.[]; .decision == "deny" or .decision == "warn") | not' >/dev/null 2>&1
-}
 
-guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''
-if [ "$JSON" -eq 1 ]; then : >"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl" || die "cannot write temp"; fi
-while IFS= read -r group; do
-  [ -n "$group" ] || continue
-  id=$(printf '%s' "$group" | jq -r '.id')
-  rows=$(printf '%s' "$group" | jq -c '.rows')
-  guards_n=$((guards_n + 1))
-  harm=$(harm_of "$id")
-  read -r opps denies warns rate median recur verdict <<EOF_MEASURE
-$(measure "$rows" "$harm")
-EOF_MEASURE
-  if [ "$verdict" = unmeasured ]; then
-    unmeasured=$((unmeasured + 1))
-  else
-    measured=$((measured + 1))
-    if [ "$verdict" = cut ]; then
-      cut=$((cut + 1))
-      judged "$id" "$rows" "$harm" || undecided="$undecided$id
-"
-    fi
-  fi
-  [ "$UNDECIDED" -eq 1 ] && continue
-  if [ "$JSON" -eq 1 ]; then
-    emit "$id" "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict" "$harm" >>"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl"
-  else
-    emit "$id" "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict" "$harm"
-  fi
-done < <(printf '%s\n' "$groups")
-
-if [ "$UNDECIDED" -eq 1 ]; then
-  printf '%s' "$undecided"
-  exit 0
-fi
-
-if [ "$JSON" -eq 1 ]; then
-  jq -s --argjson g "$guards_n" --argjson m "$measured" --argjson c "$cut" --argjson u "$unmeasured" --arg log "$LOG" \
-    '{log:$log, present:true, guards: ., summary:{guards:$g, measured:$m, cut:$c, unmeasured:$u}}' \
-    "${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl"
-  rm -f "${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl"
-else
-  printf 'METRICS_SUMMARY guards=%s measured=%s cut=%s unmeasured=%s\n' "$guards_n" "$measured" "$cut" "$unmeasured"
-fi
-exit 0
+grouped = collections.defaultdict(list)
+by_rule = collections.defaultdict(list)
+for row in rows:
+    grouped[row['guard']].append(row)
+    by_rule[(row['guard'], row.get('rule') or row['guard'])].append(row)
+guards = [metric(guard, events) for guard, events in sorted(grouped.items())]
+rules = [metric(guard, events, rule) for (guard, rule), events in sorted(by_rule.items())]
+present = Path(a.log).is_file()
+# Absent registered guards are visible without inventing an opportunity count.
+quiet = sorted(guard for guard in entries if guard not in grouped and (not only or guard in only)) if present else []
+summary = dict(guards=len(guards), measured=sum(g['verdict'] != 'unmeasured' for g in guards),
+               cut=sum(g['verdict'] == 'cut' for g in guards),
+               unmeasured=sum(g['verdict'] == 'unmeasured' for g in guards),
+               malformed_rows=malformed)
+if a.undecided:
+    for g in guards:
+        if g['verdict'] == 'cut' and not judged(g['id'], grouped[g['id']]):
+            print(g['id'])
+elif a.json:
+    print(json.dumps(dict(log=a.log, present=present, guards=guards, rules=rules,
+                          zero_event_guards=quiet, window_days=a.days, summary=summary)))
+else:
+    for label, metrics in (('METRIC', guards), ('RULE', rules)):
+        for g in metrics:
+            fields = ['opportunities', 'denies', 'warns', 'override_rate', 'median_clear_attempts',
+                      'recurrences', 'verdict', 'allows', 'overrides', 'bypasses', 'workarounds',
+                      'refusal_to_bypass_ratio', 'repeat_denies', 'deny_only', 'zero_events_days']
+            prefix = f"{label} {g['id']}" + (f" rule={g['rule']}" if label == 'RULE' else '')
+            print(prefix + ' ' + ' '.join(f'{key}={json.dumps(g[key]) if not isinstance(g[key], str) else g[key]}' for key in fields))
+            if label == 'RULE':
+                for task in g['repeat_denies_per_task']:
+                    print(f"REPEAT {g['id']} rule={g['rule']} task={task['task']} denies={task['denies']} repeat_denies={task['repeat_denies']}")
+    for guard in quiet:
+        print(f'QUIET {guard} zero_events_days={a.days}')
+    print('METRICS_SUMMARY ' + ' '.join(f'{key}={value}' for key, value in summary.items())
+          + (' log_absent=true' if not present else ''))
+PY

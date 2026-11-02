@@ -2145,7 +2145,7 @@ SH
     lock=$(FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
       bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
       _ "$ROOT" "$case_dir/project")
-    FM_HOME="$case_dir/primary-home" FM_LATE_CASE="$case_dir" \
+    FM_HOME="$case_dir/primary-home" FM_LATE_CASE="$case_dir" FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
     actor=$!
     i=0
@@ -2192,8 +2192,36 @@ SH
     assert_grep 'work produced while return waits' "$slot/late.txt" "$shape: late bytes were changed"
     jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
       || fail "$shape: refused return released its durable reservation"
+    jq -se '([.[] | select(.guard == "teardown-unlanded" and .decision == "deny")] | length > 0)
+      and ([.[] | select(.guard == "teardown-unlanded" and .decision == "allow")] | length == 0)' \
+      "$case_dir/guard-events.jsonl" >/dev/null \
+      || fail "$shape: a teardown refused at its final recheck recorded a landed-work allow: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
   done
   pass 'ordinary pool return preserves dirt and new commits produced while final project custody is queued'
+}
+
+# A completed ship teardown records one landed-work allow; a forced one records
+# its escape and no allow.
+test_completed_teardown_records_one_landed_work_allow() {
+  local case_dir rc=0
+  case_dir=$(make_case landed-work-allow)
+  write_meta "$case_dir" local-only ship
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "landed-work-allow: a landed teardown should complete: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "teardown-unlanded")] | length == 1 and .[0].decision == "allow"
+    and .[0].rule == "landed-work" and .[0].task == "task-x1" and .[0].override == false' \
+    "$case_dir/guard-events.jsonl" >/dev/null \
+    || fail "a completed teardown did not record exactly one landed-work allow: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+
+  case_dir=$(make_case landed-work-forced)
+  write_meta "$case_dir" local-only ship
+  rc=0
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "landed-work-forced: a forced teardown should complete: $(cat "$case_dir/stderr")"
+  jq -se '[.[] | select(.guard == "teardown-unlanded")] | length == 1 and .[0].decision == "bypass" and .[0].override == true' \
+    "$case_dir/guard-events.jsonl" >/dev/null \
+    || fail "a forced teardown did not record only its escape: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+  pass "a completed teardown records one landed-work allow and a forced one only its escape"
 }
 
 # A "not ready yet" refusal must leave Treehouse state exactly as it found it.
@@ -3443,6 +3471,8 @@ PY
         assert_present "$common/vernant-worktree-lifecycle/$digest.json" 'refused sweep removed durable record'
         [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-events.jsonl" 2>/dev/null)" = 1 ] \
           || fail "refused sweep retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-events.jsonl" 2>/dev/null)"
+        jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .task == "task-x1" and .decision == "deny"' "$case_dir/sweep-events.jsonl" >/dev/null \
+          || fail "refused sweep retirement lost its rule or owner: $(cat "$case_dir/sweep-events.jsonl")"
         rm "$case_dir/called"
         rc=0
         FM_GUARD_EVENT_LOG="$case_dir/sweep-outer-events.jsonl" python3 "$ROOT/bin/fm-slot-manifest-retire.py" \
@@ -3451,6 +3481,8 @@ PY
         assert_grep 'next_step: verify Firstmate landing record' "$case_dir/sweep-outer.err" 'sweep outer refusal not reported'
         [ "$(grep -c '"teardown-unlanded"' "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)" = 1 ] \
           || fail "sweep outer refusal did not write exactly one teardown-unlanded event: $(cat "$case_dir/sweep-outer-events.jsonl" 2>/dev/null)"
+        jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .decision == "deny"' "$case_dir/sweep-outer-events.jsonl" >/dev/null \
+          || fail "sweep outer refusal lost its rule: $(cat "$case_dir/sweep-outer-events.jsonl")"
         rc=0
         "${sweep[@]}" --apply > "$case_dir/apply" || rc=$?
         expect_code 1 "$rc" 'apply should report the unproven owner'
@@ -3502,6 +3534,8 @@ PY
           assert_grep retain_slot "$case_dir/out" 'next_step was lost'
           [ "$(grep -c '"teardown-unlanded"' "$case_dir/guard-events.jsonl" 2>/dev/null)" = 1 ] \
             || fail "$variant refused retirement did not write exactly one teardown-unlanded event: $(cat "$case_dir/guard-events.jsonl" 2>/dev/null)"
+          jq -e 'select(.guard == "teardown-unlanded") | .rule == "landed-work" and .task == "task-x1" and .decision == "deny"' "$case_dir/guard-events.jsonl" >/dev/null \
+            || fail "$variant refused retirement lost its rule or task: $(cat "$case_dir/guard-events.jsonl")"
         else
           assert_absent "$case_dir/called" 'unproven owner called retire'
         fi
@@ -3536,6 +3570,7 @@ test_current_pool_copy_tears_down_without_a_status_listing
 test_current_pool_proof_asks_treehouse
 test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
+test_completed_teardown_records_one_landed_work_allow
 test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal

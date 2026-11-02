@@ -460,15 +460,19 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
 });
 await test('M4: each coverage and egress decision emits one content-free central guard event', async () => {
   delete process.env.FM_GUARD_EVENT_LOG;
+  mkdirSync(`${state}/state`, { recursive: true });
   const log = `${state}/state/guard-events.jsonl`;
   const events = () => { try { return readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)); } catch { return []; } };
   const decide = async (event, expected) => {
     const before = events().length;
     await handlers.tool_call(event, { cwd: state });
     const added = events().slice(before);
-    assert.deepEqual(added.map(e => [e.guard, e.decision, e.session, e.source_ok]), expected, event.toolName);
+    assert.deepEqual(added.map(e => [e.guard, e.decision, `${e.task}:${e.rule}`, e.source_ok]), expected, event.toolName);
     for (const e of added) {
-      assert.deepEqual(Object.keys(e).sort(), ['cleared_by', 'decision', 'elapsed_ms', 'guard', 'override', 'repeat', 'session', 'source_ok', 'system', 'ts', 'version']);
+      assert.equal(e.session, 'audit');
+      assert.equal(e.actor, 'worker');
+      assert.equal(e.opportunity, true);
+      assert.deepEqual(Object.keys(e).sort(), ['actor', 'base', 'cleared_by', 'decision', 'elapsed_ms', 'guard', 'head', 'opportunity', 'override', 'repeat', 'rule', 'session', 'source_ok', 'system', 'task', 'ts', 'version']);
       assert.equal(e.system, 'firstmate');
       assert.ok(Number.isInteger(e.elapsed_ms));
       assert.ok(!JSON.stringify(e).includes('private-event-canary'), 'events carry no call content');
@@ -619,9 +623,9 @@ exec "$real_bun" "\$@"
 SH
   chmod +x "$1/bun"
 }
-# Every jev-egress-grant event as "<session> <decision> <source_ok>", in order.
+# Every jev-egress-grant event as "<task>:<rule> <decision> <source_ok>", in order.
 egress_events() { # <log>
-  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.session) \(.decision) \(.source_ok)"' "$1"
+  [ ! -f "$1" ] || jq -r 'select(.guard == "jev-egress-grant") | "\(.task):\(.rule) \(.decision) \(.source_ok)"' "$1"
 }
 for posture in directive-only absent granted other-class no-helpers other-project invalid malformed duplicate indented silent-runtime silent-find failed-find failed-record; do
   world="$TMP_ROOT/dispatch-$posture"

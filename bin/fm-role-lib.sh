@@ -485,7 +485,7 @@ fm_role_inherit_payload() (
 fm_role_pub_deny_event() {
   local dir
   dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
-  "$dir/fm-guard-event.sh" upstream-publish-role deny --source-ok true 2>/dev/null || true
+  "$dir/fm-guard-event.sh" upstream-publish-role "${1:-deny}" --rule publication-authority --task "${ID:-${FM_TASK_ID:-}}" --source-ok true 2>/dev/null || true
 }
 
 # fm_role_gate_self_publish <home> <config-dir> <project-dir> <code-root> [consent]
@@ -510,6 +510,7 @@ fm_role_gate_self_publish() {
   if [ "$lineage" -eq 2 ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_DENIAL="cannot determine whether $proj shares firstmate's history (the code root $root has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work"
+    fm_role_pub_deny_event
     return 1
   fi
   fm_role_resolve "$home" "$config"
@@ -518,22 +519,26 @@ fm_role_gate_self_publish() {
     if ! fm_role_scope_valid "$consent"; then
       # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
       FM_ROLE_PUB_DENIAL="upstream consent '$consent' is not a valid <host>/<owner>/<repo> scope"
+      fm_role_pub_deny_event
       return 1
     fi
   fi
   if [ -z "$FM_ROLE_PUB_TARGET" ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_DENIAL="this task targets firstmate's own repository but no publication target can be determined (no upstream, github, or origin remote on $proj)"
+    fm_role_pub_deny_event
     return 1
   fi
   if [ -n "$consent" ] && [ "$consent" = "$FM_ROLE_PUB_TARGET" ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_AUTHORITY="task consent for $consent"
+    fm_role_pub_deny_event allow
     return 0
   fi
   if [ "$FM_ROLE" = maintainer ] && [ "$FM_ROLE_SCOPE" = "$FM_ROLE_PUB_TARGET" ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_AUTHORITY="maintainer scope $FM_ROLE_PUB_TARGET"
+    fm_role_pub_deny_event allow
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
