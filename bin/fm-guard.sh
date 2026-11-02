@@ -11,29 +11,19 @@
 # condition set) and that supervision is not healthy, prints a loud, clearly
 # delimited banner so the agent cannot skim past
 # it in the tool output of whatever it was doing - the one channel every harness
-# has. Supervision health is MODEL-AWARE (fm_supervision_pull_liveness in
-# bin/fm-supervision-liveness-lib.sh, the shared owner of the predicate and its
-# reason vocabulary; it delegates the primitives to bin/fm-wake-lib.sh's
-# fm_watcher_supervision_verdict): under the Claude Stop auto-arm model the watcher runs only
-# between turns, so mid-turn a fresh beacon with no live watcher is healthy, and
-# a stale beacon is still healthy while fm_autoarm_midturn_healthy proves a
-# Claude auto-arm generation explains the gap; only a stale beacon with no such
-# generation is a genuine lapse; under the Pi
-# extension model the extension tears the watcher down and respawns it on every
-# actionable wake, so a fresh beacon with a genuinely unheld lock is healthy
-# while that live Pi session provably owns continuity; any held but unhealthy
-# lock is down; under every
-# persistent-watcher harness a live identity-matched watcher with a fresh beacon
-# is required. The banner names the true failing condition (a missing live
+# has. Supervision health uses the turn-end predicate, fm_supervision_liveness
+# in bin/fm-supervision-liveness-lib.sh: an identity-matched watcher with a fresh
+# beacon, or away/quiet mode's identity-matched daemon and fresh beacon.
+# A leftover beacon or an extension/rewake hand-off alone proves no live owner.
+# The banner names the true failing condition (a missing live
 # watcher process vs a genuinely stale beacon). The full banner is emitted once
 # per distinct down-episode in this FM_HOME (keyed to the failing condition, not
 # the beacon mtime, which a healthy between-turns watcher advances every poll);
 # later guarded commands in the same episode print a one-line reminder instead.
 # Episode state lives only under state/.guard-watcher-stale-banner (volatile,
 # bounded). Independent alarms (queued wakes, worktree tangle) are never
-# suppressed by that dedup. Normal wake handling (watcher briefly down between a
-# wake and the next supervision resume) stays inside the grace window and stays
-# silent. The queued-wakes warning counts only the rows the calling actor can
+# suppressed by that dedup. A hand-off with no live owner warns even inside the
+# grace window. The queued-wakes warning counts only the rows the calling actor can
 # itself present or retire (fm_wake_actor_pending_count), so it is never an
 # instruction to run a drain with nothing to present. A row reserved by a live
 # supervision-branch grant is never a drain instruction for main; instead of
@@ -180,10 +170,8 @@ if [ -n "$tangle_branch" ]; then
   } >&2
 fi
 
-# Compute the need counts through the shared grace-based predicate
-# (bin/fm-supervision-lib.sh), then ask the shared liveness owner for the
-# model-aware verdict this warning branches on
-# (bin/fm-supervision-liveness-lib.sh).
+# Compute need through bin/fm-supervision-lib.sh, then use the same strict
+# liveness verdict as the turn-end guard.
 fm_supervision_in_flight "$STATE" "$GRACE"
 in_flight=$FM_SUP_IN_FLIGHT
 sources=$FM_SUP_SOURCES
@@ -193,7 +181,7 @@ beacon_desc=$FM_SUP_BEACON_DESC
 watcher_healthy=false
 watcher_down_reason=stale-beacon
 if [ "$needed" = true ]; then
-  fm_supervision_pull_liveness "$STATE" "$GRACE" "$WATCH" "$FM_HOME" "$FM_ROOT"
+  fm_supervision_liveness "$STATE" "$GRACE" "$WATCH" "$FM_HOME"
   if [ "$FM_SUP_LIVE" = live ]; then
     watcher_healthy=true
   else

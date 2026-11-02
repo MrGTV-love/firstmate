@@ -690,9 +690,6 @@ fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
 # problem, and return 0 when at least one exists; return 1 when none does.
 # Covers, in the order an operator fills them, unfenced standalone {TASK} and
 # {FIRSTMATE_SPEC} lines in their respective Task subsections,
-# an empty scaffolded `### Out of scope` exclusion list, which is dispatched
-# only as a stated answer (`None` is an answer) so independent review is never
-# handed a blank to fill with scope the task never had,
 # every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
@@ -702,8 +699,7 @@ fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
 # dispatches it.
 # The optional second argument `task-only` stops after the two Task bodies,
 # which is the scope a relaunch and scout promotion re-check: the Definition of
-# Done and its exclusion list were accepted at the fresh spawn, exactly as
-# before.
+# Done was accepted at the fresh spawn.
 fm_brief_dispatch_problems() {  # <brief> [task-only]
   local brief=$1 scope=${2:-all} intent spec span dod_file more line problems=1
   [ -f "$brief" ] || return 1
@@ -724,11 +720,6 @@ $(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
     problems=0
   fi
   [ "$scope" != task-only ] || return "$problems"
-  if fm_brief_task_heading_present "$brief" "### Out of scope" \
-    && [ -z "$(fm_brief_out_of_scope "$brief" | tr -d '[:space:]')" ]; then
-    printf '%s\n' "### Out of scope is empty: name the work this task does not do, or write None"
-    problems=0
-  fi
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return "$problems"
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
@@ -863,6 +854,9 @@ fm_brief_verification_plan() {  # <brief>
   printf '\n## Out-of-scope list%s\n' "$context"
   if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$scope"
+  elif fm_brief_heading_parse - "### Out of scope" present <<<"$(fm_brief_heading_body "$brief" "# Task")"; then
+    # A blank exclusion heading states no exclusions, the same as None.
+    printf "Out-of-scope list: stated: none (the \`### Out of scope\` subsection is blank).\n"
   else
     printf "Out-of-scope list: no recognized \`### Out of scope\` subsection or column-0 \`Out of scope:\` paragraph was found in this brief; check the Firstmate spec for inline exclusions.\n"
   fi

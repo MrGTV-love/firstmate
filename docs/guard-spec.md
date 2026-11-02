@@ -69,6 +69,10 @@ The retirement changelog is `docs/guards/retired.json`, owned by the same lint.
 The ratchet allowlist is `docs/guards/lint-allowlist.json`; it may only shrink.
 `bin/fm-guard-sites.py` is the discovery helper the lint calls for every refusal site in the runtime code; "Refusal sites" below owns what it finds.
 Guards registered after the audit are named in the registry's `beyond_audit_active` list, so `--counts` keeps the audited population arithmetic exact.
+An inventory family already represented by a registry id adds site mappings to that id rather than a duplicate registration.
+A separately named subpredicate can retain its own registry invariant even when its refusal already enforces a broader registered guard.
+Registration describes existing enforcement; it grants no runtime permission, adds no retry loop and does not imply new telemetry.
+Entries for uninstrumented families explicitly distinguish their existing caller diagnostics and per-invocation refusal from an implemented event emitter or cross-invocation counter.
 
 `bin/fm-guard-refcheck.sh` owns the wiring proof: every hook registration
 resolves to a file that exists, every retired guard has zero live references,
@@ -133,8 +137,8 @@ because the captain or the runtime creates them per home.
 6. **No post-hoc guard where a pre-check exists.** A guard that runs after the
    write carries `precheck_gap` naming why the condition was not knowable
    earlier, or it does not carry `layer: runtime-warn-after-write`.
-7. **Wiring is tested.** Every owner path, test path, and hook registration
-   resolves to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
+7. **Wiring is tested.** The registry's spec path and every owner path, test
+   path, and hook registration resolve to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
    one does not.
 8. **Every Firstmate guard decision point emits one event per decision.** An instrumented guard that
    emits no event, or that never fires across 30 real opportunities, enters the
@@ -169,9 +173,18 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   The decision is the writer's second argument (`<guard-id> <decision>`), or the first argument of a wrapper that takes the decision first.
   The call is split with shell quoting rules and ends at an unquoted `;`, `&`, `|`, `<`, `>`, parenthesis, lone closing brace, or `#` that starts a word.
   A quoted `}` or `|`, and a `#` inside a word, are literal arguments, so the guard id, a later option and a following command never decide.
+  In Python source files, the scan also parses `subprocess.run` list or tuple arguments whose first element is a literal writer path, an `os.path.join` call that ends in one, or a module-level binding to either.
+  It follows one module-local function wrapper that forwards a positional decision parameter to that writer, including calls that supply the decision by keyword.
+  The call site, not the wrapper's forwarding statement, is enumerated; a conditional decision is excluded only when both branches are exactly `allow`.
+  Wrapper calls must resolve to the module's function in Python's symbol table; parameter, local-import, local-variable, closure and comprehension bindings that shadow its name are not event calls.
+  A lambda or comprehension without exactly one symbol table on its line (a comprehension Python 3.12 and later inlines, or two of one kind on one line) is judged by its own parameters, loop targets and assignment-expression targets, and then by the enclosing scope.
+  Assignment expressions in a nested lambda's defaults or in a comprehension bind in the enclosing lambda, unlike assignments in the nested lambda's body.
+  A call in a default argument, decorator, base class or a comprehension's first iterable belongs to the enclosing scope, and a class body binds no name for the functions, lambdas and comprehensions inside it.
+  Unrelated functions named `record`, comments, strings and allow-only events are not Python event sites.
+  Python event discovery does not execute the source or resolve imports, arbitrary path builders, additional wrapper layers or embedded heredoc code; if parsing fails, the existing line-based signatures still apply.
 
 A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun`, `deno` or `perl` (or is delimited by `PERL`), in which case the body is scanned as that language (a perl body with the shell rules, like a `.pl` file).
-A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
+A site that carries none of these is outside the scan: a bare exit code or vocabulary-free message without a recognized hook or guard event is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
 That limit is deliberate, because every error exit would be a site, and it is why a new guard should use `fm_refuse` or the `REFUSED:` marker.
 The scan follows only Python triple-quoted strings across lines, so it does not reliably recognize the inner lines of a shell or JavaScript string that spans lines: some may be reported and others missed.
 A refusal message should therefore stay on one line, or carry the `REFUSED:` marker on a line the scan does not read as a comment (one that starts with `#` in shell and Python, or with `//`, `*` or `/*` in JavaScript).
@@ -179,9 +192,12 @@ A refusal message should therefore stay on one line, or carry the `REFUSED:` mar
 A site maps to a registry entry through the entry's `sites` list.
 Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
 The lint requires the item to match exactly `count` sites, so a new site that a marker would silently absorb changes the count and fails until a reviewer updates it.
+An item may also name a site `key` to select the lines with that text, and a `within` substring of the line that opens the site's block (the nearest earlier code line indented less than the site) to tell identical lines apart; `file`, `match` and `count` still apply to the selected sites.
+A marker key is the site id without its `~n` suffix, because that suffix counts identical lines in file order and changes when code moves; identical lines that enforce different invariants are told apart by `within`, never by order.
+A moved block keeps its owner, and a new identical refusal changes a marker's count (S2) or matches no marker (S1).
 Two entries may not map the same site, and a marker that matches nothing is stale.
 
-A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.
+A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves; the second and later identical lines in one file add `~2`, `~3` and so on in file order.
 The lint computes the unregistered count as the number of sites that map to nothing.
 A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 

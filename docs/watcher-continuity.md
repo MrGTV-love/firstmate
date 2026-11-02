@@ -207,7 +207,7 @@ The beacon is `state/.last-watcher-beat`, which only the watcher process touches
 - A refused notice commit stays silent for a later retry.
 - After a successful notice, later Stop cycles exit 2 without repeating it until the turn-end guard consumes the attended fail-open.
 
-The Claude turn-end guard owns that notice commit contract, the monotonic failure progression, one-time attended fail-open, post-alarm continuation suppression, and positive recovery reset described in [`turnend-guard.md`](turnend-guard.md#harness-integrations).
+The Claude turn-end guard owns that notice commit contract, the monotonic bounded failure progression, attended fail-open, post-alarm continuation suppression, and positive recovery reset described in [`turnend-guard.md`](turnend-guard.md#harness-integrations).
 
 ### Supervision host
 
@@ -608,8 +608,8 @@ The same suite covers ordinary same-process session replacement for `/new`, `/re
 It loads the watcher plus a re-exporting entrypoint, checks startup and idempotent arm-tool execution, and reloads with one live successor and no duplicate tool registration.
 All homes and agent configuration are disposable; the runner includes this guard in `live-harness-optin`.
 
-The guard and session-start suites prove that active generation evidence tolerates a fresh-beacon handoff.
-They also prove that a legacy or handoff-phase watcher marker from an absent replacement extension still raises the outage diagnostic.
+The session-start suite proves that a legacy or handoff-phase watcher marker from an absent replacement extension still raises the outage diagnostic.
+The pull guard suite proves that no extension hand-off evidence replaces the [shared strict liveness verdict](turnend-guard.md#pull-warning-verdict-by-supervision-model).
 
 ### Arm, recovery, triage, and lock suites
 

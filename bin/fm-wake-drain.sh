@@ -263,12 +263,10 @@ esac
 # every wake-handling and recovery turn, so assert supervision health here too. A
 # lapsed supervision chain then surfaces on a plain drain-and-handle turn, not
 # only when a guarded supervision script (fm-peek/fm-send/...) happens to run.
-# Reuse fm-guard.sh's model-aware alarm and FM_GUARD_GRACE instead of duplicating
-# its supervision verdict. Under Claude's between-turns auto-arm model, a normal
-# fire leaves a recent beacon well inside grace and stays silent mid-turn. Under
-# the Pi extension model, a fresh beacon also stays silent during a genuinely
-# unheld-lock hand-off only while the live session proves extension ownership.
-# Persistent-watcher models still require the live identity-matched watcher.
+# Reuse fm-guard.sh's alarm and FM_GUARD_GRACE instead of duplicating its
+# supervision verdict, the strict fm_supervision_liveness shared with the
+# turn-end guard: every supervision model needs an identity-matched watcher or
+# away/quiet daemon with a fresh beacon, so a hand-off with no live owner warns.
 # Never let a guard hiccup change the drain's exit status.
 assert_watcher_liveness() {
   "$SCRIPT_DIR/fm-guard.sh" || true

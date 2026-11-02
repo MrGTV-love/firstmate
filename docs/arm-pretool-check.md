@@ -12,7 +12,7 @@ A shell background operator, pipeline, redirection, wrapper, or unrelated comman
 The seatbelt rejects those command shapes before execution.
 
 This policy is not a post-arm liveness guarantee.
-`bin/fm-guard.sh` and `bin/fm-turnend-guard.sh` apply their respective post-arm supervision predicates to the watcher lock and beacon after an allowed call.
+`bin/fm-guard.sh` and `bin/fm-turnend-guard.sh` apply their shared post-arm supervision predicate to the watcher lock and beacon after an allowed call.
 
 The classifier never executes, sources, evaluates, or expands any part of the submitted command.
 It tokenizes the bytes and classifies lexical execution positions only.
