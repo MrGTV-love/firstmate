@@ -49,8 +49,10 @@
 # optional --origin records provenance in the new task's body and supplies the
 # default repo from that origin's metadata). Prefer holding the work item the
 # question gates over minting a new row. Creating a missing row uses
-# `tasks-axi add --kind captain`: that kind is backlog metadata, and the Beads
-# adapter maps it to native issue type `task`. Captain holds have no due
+# `bin/fm-tasks-axi.sh add --kind captain`, so the intake objective and
+# duplicate checks apply; docs/configuration.md ("Backlog intake and closing
+# proofs") owns them and the refused-hold guidance. The captain kind is backlog
+# metadata, and the Beads adapter maps it to native issue type `task`. Captain holds have no due
 # semantics (`--until` is the optional hold deferral), so the create waives
 # Beads `due.required` through `BD_DUE_REQUIRED` rather than inventing a due
 # date or registering a `types.custom` captain issue type. The command records
