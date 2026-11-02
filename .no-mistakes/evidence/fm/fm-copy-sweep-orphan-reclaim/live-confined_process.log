@@ -1,0 +1,65 @@
+
+===== confined_process =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.G9gJPM
+PASS  real ps is refused inside the sandbox (126)
+--- sandboxed report (exit 0)
+copy-sweep: mode=report containers=1 copies=2
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/dead-launcher	clean, no process, no record, content already in the default branch, Vernant launcher 64357 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:64472 launcher=64472 (launcher 64472 is alive; start age=unknowns; lock mtime=1793584719)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  confined: exited launcher proved absent (PENDING-DRIVER)
+PASS  confined: live launcher holds (HELD-LOCKED)
+PASS  confined: reason says alive
+--- sandboxed report with failed helper (exit 0)
+copy-sweep: mode=report containers=1 copies=2
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/dead-launcher	worktree lock: vernant-session-active owner=launcher:64357 launcher=64357 (launcher 64357 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:64472 launcher=64472 (launcher 64472 cannot be observed; absence is not proved)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  failed helper: dead launcher still holds (HELD-LOCKED)
+PASS  failed helper: absence not proved
+PASS  failed helper: apply keeps the copy
+--- sandboxed apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:64472 launcher=64472 (launcher 64472 is alive; start age=unknowns; lock mtime=1793584719)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/dead-launcher	branch detached at 4b3976e928b6, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 64357 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=1 freed=0.00
+PASS  confined apply reaps the exited-launcher copy
+PASS  confined apply keeps the live-launcher copy
+/Users/charlesabrooker/.no-mistakes/evidence/01M6BSCW898RTPSF34A73QBC6S/live-drive.sh: line 38: 64472 Terminated: 15          sleep 600
+PASS  lab removed
+
+scenario failures: 0

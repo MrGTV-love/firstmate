@@ -1,8 +1,6 @@
-tests/fm-copy-sweep.test.sh unchanged from base
-base blob c93702d90c7e3cc0ebdcf4582c014422115b2021
-head blob c93702d90c7e3cc0ebdcf4582c014422115b2021
-head 21075ef68384ba9097b7278ecce42ab84f58dc1b
-Sun Nov  1 21:09:34 UTC 2026
+existing suite bytes unchanged from base
+39ac3c212da19ca4d1cad605234807d3f1de0b387012e32df4c8700929e827ad  tests/fm-copy-sweep.test.sh
+d36081269c6539bbbce4057afdb42c57f38acf75
 ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
 ok - live nested copies are named once with lock/directory ages, below budget, without changing copies or locks
 ok - a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age
@@ -57,7 +55,7 @@ ok - new copies at the same path and HEAD retain both versions of their preserve
 ok - a removal whose size was not measured shows - and unmeasured, and the closing total counts it
 ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
 ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
-ok - a copy with one untracked file and a copy whose tip is on no remote are both kept
+ok - a dirty copy and an unpushed copy with a verified recorded bundle are both kept
 ok - a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule
 ok - a project clone under a Firstmate home is enumerated, budgeted as a container, and swept
 ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
@@ -93,6 +91,4 @@ ok - the host's own lsof finds a process whose working directory is inside a cop
 ok - arm binds the check to the existing watcher cadence and disarm removes it
 ok - help carries the hourly command and bad calls are refused
 ok - fm-copy-sweep
-env -u NO_MISTAKES_GATE bash tests/fm-copy-sweep.test.sh  272.54s user 365.31s system 37% cpu 28:14.22 total
-exit=0
-Sun Nov  1 21:37:48 UTC 2026
+exit=0 seconds=980

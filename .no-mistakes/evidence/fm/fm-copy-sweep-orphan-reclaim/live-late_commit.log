@@ -1,0 +1,77 @@
+
+===== late_commit =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.FPnf9H
+--- apply with a commit during preservation, unlocked (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/late	clean, no process, no record, content already in the default branch
+FAILED	<lab>/projects/vernant/.claude/worktrees/late	copy changed after preservation; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.06 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.06 reaped=0 freed=0.00
+PASS  unlocked: the watcher really committed
+PASS  unlocked: run reports a failure (1)
+PASS  unlocked: unique commit bytes intact (written during preservation)
+PASS  unlocked: commit still at HEAD (unique commit during preservation)
+PASS  unlocked: original payload intact (keep)
+PASS  unlocked: driver never executed
+PASS  unlocked: next run holds the unique commit (HELD-UNPUSHED)
+PASS  unlocked: no forced removal ()
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ozOCMY
+--- apply with a commit during preservation, locked (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/late	clean, no process, no record, content already in the default branch, Vernant launcher 9912 is gone
+FAILED	<lab>/projects/vernant/.claude/worktrees/late	the copy was left: REFUSED: <lab>/projects/vernant/.claude/worktrees/late is no longer proven after its plan: HELD-UNPUSHED, 3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote no preserve from this run is kept; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.06 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.06 reaped=0 freed=0.00
+PASS  locked: the watcher really committed
+PASS  locked: run reports a failure (1)
+PASS  locked: unique commit bytes intact (written during preservation)
+PASS  locked: commit still at HEAD (unique commit during preservation)
+PASS  locked: original payload intact (keep)
+PASS  locked: driver never executed
+PASS  locked: next run holds the unique commit (HELD-UNPUSHED)
+PASS  locked: no forced removal ()
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.E2J2TL
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	<lab>/projects/vernant/.claude/worktrees/named	branch fm/named at d768b36f8f7f, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+PASS  named branch copy reaped
+PASS  named branch survives the reap (d768b36f8f7f3049d46dfc4e29a2114e2157ed50)
+PASS  lab removed
+
+scenario failures: 0

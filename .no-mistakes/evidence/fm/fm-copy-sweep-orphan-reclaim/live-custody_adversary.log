@@ -1,0 +1,82 @@
+
+===== custody_adversary =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5OqyXf
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=9
+HELD-LIVE-TASK	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/cwd-inside	process 70846 is running inside it
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/hand-lock	worktree lock: operator hold, do not touch (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:70780 launcher=70780 (launcher 70780 is alive; start age=5s; lock mtime=1793584558)
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/outer	another registered copy is inside it: <lab>/projects/vernant/.claude/worktrees/outer/.claude/worktrees/inner
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/outer/.claude/worktrees/inner	1 uncommitted or untracked path(s), first: ?? inner.txt
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/pid-one	worktree lock: vernant-session-active owner=launcher:1 launcher=1 (launcher 1 is alive; start age=1060012s; lock mtime=1793584558)
+HELD-LIVE-TASK	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/record-held	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/retain-archive	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/stale-verify	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=5
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=9 GiB=0.00 reaped=0 freed=0.00
+PASS  launcher alive holds (HELD-LOCKED)
+PASS  reason says alive
+PASS  launcher pid 1 (other user) holds (HELD-LOCKED)
+PASS  hand lock holds (HELD-LOCKED)
+PASS  real process cwd inside holds (HELD-LIVE-TASK)
+PASS  active task record holds (HELD-LIVE-TASK)
+PASS  driver refusal holds (HELD-LOCKED)
+PASS  driver words shown
+PASS  archive_then_retain_tree holds (HELD-LOCKED)
+PASS  retain rule named
+PASS  inner copy held dirty (HELD-DIRTY)
+PASS  outer copy held by inner (HELD-DIRTY)
+PASS  live-launcher kept
+PASS  pid-one kept
+PASS  hand-lock kept
+PASS  cwd-inside kept
+PASS  record-held kept
+PASS  stale-verify kept
+PASS  retain-archive kept
+PASS  outer kept
+PASS  archive case: one .jsonl left in place (jsonl)
+PASS  archive case: no preserve (0)
+PASS  archive case: driver never executed
+PASS  refused case: driver never executed
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=9
+HELD-LIVE-TASK	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/cwd-inside	process 70846 is running inside it
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/hand-lock	worktree lock: operator hold, do not touch (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/live-launcher	worktree lock: vernant-session-active owner=launcher:70780 launcher=70780 (launcher 70780 is alive; start age=12s; lock mtime=1793584558)
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/outer	another registered copy is inside it: <lab>/projects/vernant/.claude/worktrees/outer/.claude/worktrees/inner
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/outer/.claude/worktrees/inner	1 uncommitted or untracked path(s), first: ?? inner.txt
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/pid-one	worktree lock: vernant-session-active owner=launcher:1 launcher=1 (launcher 1 is alive; start age=1060019s; lock mtime=1793584558)
+HELD-LIVE-TASK	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/record-held	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/retain-archive	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}
+HELD-LOCKED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/stale-verify	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=5
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=9 GiB=0.00 reaped=0 freed=0.00
+PASS  archive case: second run adds no preserve (0)
+PASS  archive case: no tar appeared in lab data ()
+/Users/charlesabrooker/.no-mistakes/evidence/01M6BSCW898RTPSF34A73QBC6S/live-drive.sh: line 38: 70780 Terminated: 15          sleep 600
+/Users/charlesabrooker/.no-mistakes/evidence/01M6BSCW898RTPSF34A73QBC6S/live-drive.sh: line 38: 70846 Terminated: 15          ( cd "$W/cwd-inside" && exec sleep 600 )
+PASS  lab removed
+
+scenario failures: 0

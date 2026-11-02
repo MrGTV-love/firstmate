@@ -1,0 +1,81 @@
+
+===== refused_growth =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.RZjg6L
+fatal: You are on a branch yet to be born
+fatal: unable to checkout submodule 'vendored'
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	vendored/
+
+nothing added to commit but untracked files present (use "git add" to track)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	<lab>/projects/vernant/.claude/worktrees/refused	branch detached at 1e6d90edeb8c, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+FAIL  run 1: exit: want [1] got [0]
+FAIL  run 1: git refused: missing [git worktree remove refused]
+FAIL  run 1: preserve count: want [0] got [1]
+shasum: /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/.claude/keep.bin: No such file or directory
+FAIL  run 1: original bytes: want [b220c36a51c9193b54ebf34ea682aab339a72348f7ef4a72cf0a249aeb105113] got []
+FAIL  run 1: regenerable intact: gone /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/node_modules/p/i.js
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=0 GiB=0.00 reaped=0 freed=0.00
+FAIL  run 2: exit: want [1] got [0]
+FAIL  run 2: git refused: missing [git worktree remove refused]
+FAIL  run 2: preserve count: want [0] got [1]
+shasum: /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/.claude/keep.bin: No such file or directory
+FAIL  run 2: original bytes: want [b220c36a51c9193b54ebf34ea682aab339a72348f7ef4a72cf0a249aeb105113] got []
+FAIL  run 2: regenerable intact: gone /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/node_modules/p/i.js
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=0 GiB=0.00 reaped=0 freed=0.00
+FAIL  run 3: exit: want [1] got [0]
+FAIL  run 3: git refused: missing [git worktree remove refused]
+FAIL  run 3: preserve count: want [0] got [1]
+shasum: /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/.claude/keep.bin: No such file or directory
+FAIL  run 3: original bytes: want [b220c36a51c9193b54ebf34ea682aab339a72348f7ef4a72cf0a249aeb105113] got []
+FAIL  run 3: regenerable intact: gone /Users/charlesabrooker/tmp/fm-lab.RZjg6L/projects/vernant/.claude/worktrees/refused/node_modules/p/i.js
+FAIL  data/copy-sweep has no leftover preserve bytes: want [] got [/Users/charlesabrooker/tmp/fm-lab.RZjg6L/data/copy-sweep/20261102T015646Z.35505-1e6d90edeb8c9dd690642820e30b20e91b56f76b/nested-copy-preserved/726e8f2c1b9520f75fda3f4ae0e695b383ae37951f2317d33cf207bfc16c6ba2/.claude/keep.bin
+/Users/charlesabrooker/tmp/fm-lab.RZjg6L/data/copy-sweep/20261102T015646Z.35505-1e6d90edeb8c9dd690642820e30b20e91b56f76b/nested-copy-preserved/726e8f2c1b9520f75fda3f4ae0e695b383ae37951f2317d33cf207bfc16c6ba2/copy-path
+/Users/charlesabrooker/tmp/fm-lab.RZjg6L/data/copy-sweep/20261102T015646Z.35505-1e6d90edeb8c9dd690642820e30b20e91b56f76b/nested-copy-preserved/726e8f2c1b9520f75fda3f4ae0e695b383ae37951f2317d33cf207bfc16c6ba2/SHA256SUMS]
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+
+scenario failures: 16

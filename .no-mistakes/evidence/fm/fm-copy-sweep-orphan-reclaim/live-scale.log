@@ -1,0 +1,15 @@
+
+===== scale =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.sPGzJt
+apply on 30000 regenerable + 3000 preserved files: exit=0 seconds=63
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.01 reaped=1 freed=0.00
+PASS  scale: exit (0)
+PASS  scale: copy reaped
+PASS  scale: preserve holds all 3000 logs (3000)
+PASS  lab removed
+
+scenario failures: 0

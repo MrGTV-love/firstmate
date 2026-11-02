@@ -1,0 +1,75 @@
+
+===== regenerable =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.4jms8Q
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=6
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/all-names	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/deep	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/link-out	clean, no process, no record, HEAD contained in a remote branch
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/locked-regen	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 28784 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/not-ignored	1 uncommitted or untracked path(s), first: ?? node_modules/p/i.js
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/root-cache	it holds ignored files that exist nowhere else: .cache
+summary: REAPABLE-PROVEN=3
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 3 proven copies, 0 proven copies not sized
+PASS  report row names regenerable bytes
+PASS  report row says not preserved
+PASS  report has the regenerable total line
+PASS  report: locked regenerable copy (PENDING-DRIVER)
+PASS  report: root .cache keeps holding (recorded rule) (HELD-DIRTY)
+PASS  report: held row has no regenerable claim
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/not-ignored	1 uncommitted or untracked path(s), first: ?? node_modules/p/i.js
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/root-cache	it holds ignored files that exist nowhere else: .cache
+REMOVED	<lab>/projects/vernant/.claude/worktrees/locked-regen	branch detached at 394f5ddace25, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 28784 is gone)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/link-out	branch detached at 394f5ddace25, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/deep	branch detached at 394f5ddace25, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/all-names	branch detached at 394f5ddace25, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=6 GiB=0.00 reaped=4 freed=0.00
+PASS  all class names: copy reaped
+PASS  all class names: one preserve (1)
+PASS  all class names: other ignored bytes preserved (keep)
+PASS  all class names: near name kept (near)
+PASS  all class names: no class dir preserved ()
+PASS  REMOVED line names the copy
+PASS  root .cache copy kept
+PASS  locked copy reaped through the driver
+PASS  locked copy: one preserve (1)
+PASS  locked copy: build bytes preserved (note)
+PASS  locked copy: unique bytes preserved (unique)
+PASS  locked copy: node_modules left out
+PASS  locked copy: nested node_modules left out
+PASS  deep copy reaped
+PASS  deep copy: sibling log preserved (keep)
+PASS  deep copy: node_modules left out at depth
+PASS  symlink copy reaped
+PASS  symlink target outside the copy intact (outside bytes)
+PASS  symlink itself preserved, not followed
+PASS  preserved entry is still a symlink
+PASS  not-ignored node_modules is kept
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+
+scenario failures: 0

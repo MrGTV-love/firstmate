@@ -1,0 +1,116 @@
+
+===== preserved_classes =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.cfy8g5
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=8
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/build-info	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/cache	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/generated	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/log	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/no-ignored	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/scratch	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/with space	clean, no process, no record, HEAD contained in a remote branch
+summary: REAPABLE-PROVEN=7
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  report: cache payload (REAPABLE-PROVEN)
+PASS  report: scratch payload (REAPABLE-PROVEN)
+PASS  report: log payload (REAPABLE-PROVEN)
+PASS  report: generated payload (REAPABLE-PROVEN)
+PASS  report: unique non-cache ignored (HELD-DIRTY)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	<lab>/projects/vernant/.claude/worktrees/with space	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/scratch	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/no-ignored	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/log	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/generated	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/cache	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/build-info	branch detached at 405e8fe6d6e1, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=8 GiB=0.00 reaped=7 freed=0.00
+PASS  apply exit (0)
+PASS  cache copy reaped
+PASS  cache exactly one preserve (1)
+PASS  cache preserved bytes exist
+PASS  cache manifest matches actual preserved bytes
+class=cache sha256=fa79d967af0593c97499391be636afa263a3600cf8654741750c66ae6b9a7b44 content=cache bytes
+PASS  scratch copy reaped
+PASS  scratch exactly one preserve (1)
+PASS  scratch preserved bytes exist
+PASS  scratch manifest matches actual preserved bytes
+class=scratch sha256=57f21ea0f4ffde511211240a89a46ab14a678f4eb9b9b06e58a7453f175de923 content=scratch bytes
+PASS  log copy reaped
+PASS  log exactly one preserve (1)
+PASS  log preserved bytes exist
+PASS  log manifest matches actual preserved bytes
+class=log sha256=e01842556da34ab2b752ab0e123d03238ae0a80f65a6ed9d45b098d613759de4 content=log bytes
+PASS  generated copy reaped
+PASS  generated exactly one preserve (1)
+PASS  generated preserved bytes exist
+PASS  generated manifest matches actual preserved bytes
+class=generated sha256=af1226cc146f19fac876fb97e900a6c6a1c0e11e7e540249579ee7c465605081 content=generated bytes
+PASS  build-info copy reaped
+PASS  build-info exactly one preserve (1)
+PASS  build-info preserved bytes exist
+PASS  build-info manifest matches actual preserved bytes
+class=build-info sha256=ad1359e6cbf7c52f37acdd638cfad565a1fbca901636432a2d7cbeded4f3a134 content=build info
+PASS  with space copy reaped
+PASS  with space exactly one preserve (1)
+PASS  with space preserved bytes exist
+PASS  with space manifest matches actual preserved bytes
+class=with space sha256=47391cb5e1ad56229c288fb7d4ace6309bb4f374dea7db9d0b3b8fe7d3d87f3a content=space bytes
+PASS  preserved cache content byte-exact (cache bytes)
+PASS  no-ignored copy leaves no preserve (0)
+PASS  no-ignored copy reaped
+PASS  unique non-cache ignored holds the copy
+PASS  unique bytes intact (unique bytes)
+PASS  held copy is not preserved (0)
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.aCElDJ
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unreadable	clean, no process, no record, HEAD contained in a remote branch
+FAILED	<lab>/projects/vernant/.claude/worktrees/unreadable	ignored payload could not be preserved; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+PASS  unreadable payload fails the run (1)
+PASS  FAILED line names the copy
+PASS  unreadable payload bytes intact (log)
+PASS  lab removed
+
+scenario failures: 0

@@ -1,0 +1,80 @@
+
+===== real_shapes =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.h4Yz52
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=5
+PENDING-DRIVER	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/fm-vernant-d1-corpus-xlsx-upload-v10	clean, no process, no record, content already in the default branch, Vernant launcher 75541 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/fm-vernant-d1-grounding-clock-baseline-v2	clean, no process, no record, content already in the default branch, Vernant launcher 75093 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LIVE-TASK	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/lane-record	task lane-task's active record names it as its worktree
+PENDING-DRIVER	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/retain-archive	clean, no process, no record, content already in the default branch, Vernant launcher 76127 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/stale-verify	clean, no process, no record, content already in the default branch, Vernant launcher 75672 is gone; driver verdict not checked in report mode, not yet proven removable
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=4
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <work>/lane-d1: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  lane: squash-merged orphan is found and proved (PENDING-DRIVER)
+PASS  lane: lane record holds its copy (HELD-LIVE-TASK)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LIVE-TASK	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/lane-record	task lane-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/retain-archive	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree"}
+HELD-LOCKED	0.00 GiB	<work>/lane-d1/projects/vernant/.claude/worktrees/stale-verify	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "reason": "verification_stale_or_uncovered_paths"}
+REMOVED	<work>/lane-d1/projects/vernant/.claude/worktrees/fm-vernant-d1-grounding-clock-baseline-v2	branch detached at b4cc0137beec, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 75093 is gone)
+REMOVED	<work>/lane-d1/projects/vernant/.claude/worktrees/fm-vernant-d1-corpus-xlsx-upload-v10	branch detached at b4cc0137beec, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 75541 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <work>/lane-d1: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=2 freed=0.00
+PASS  lane: PR-3159-shaped orphan reaped
+PASS  lane: second orphan reaped
+PASS  lane: driver-refused copy kept
+PASS  lane: archive-retain copy kept
+PASS  lane: lane-record copy kept
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5w5b8s
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	<work>/th/pool1/1/repo/.claude/worktrees/orphan	branch detached at 07f383d7ddae, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+PASS  pool slot: nested squash copy reaped
+PASS  pool slot: slot itself untouched
+PASS  pool state file unchanged (1fb5b67cd6daa8017c21c9a5f91e47d8b0548d342eabc9ebcbe5512c5a66eff2  /Users/charlesabrooker/tmp/fm-lab-work.8tiKNU/th/pool1/treehouse-state.json)
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.6EMVCr
+--- check (exit 0)
+copy-sweep: container <lab> is over its budget: 0.00 GiB against 0 GiB; largest copies: <lab>/projects/vernant/.claude/worktrees/orphan 0.00 GiB PENDING-DRIVER
+PASS  check names the candidate PENDING-DRIVER
+PASS  check removed nothing
+PASS  check never asks the driver ()
+PASS  lab removed
+
+scenario failures: 0

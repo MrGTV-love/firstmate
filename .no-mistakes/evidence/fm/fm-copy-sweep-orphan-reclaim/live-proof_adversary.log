@@ -1,0 +1,150 @@
+
+===== proof_adversary =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.02o4RO
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=6
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/control	clean, no process, no record, content already in the default branch, Vernant launcher 96590 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/local-only	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/partial	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/reverted	clean, no process, no record, content already in the default branch, Vernant launcher 96390 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/same-message	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=2
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=4
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  report before revert: same-message has no content proof (HELD-UNPUSHED)
+PASS  report before revert: partial has no content proof (HELD-UNPUSHED)
+PASS  report before revert: local-only has no content proof (HELD-UNPUSHED)
+PASS  report before revert: conflict has no content proof (HELD-UNPUSHED)
+PASS  report before revert: control is proved (PENDING-DRIVER)
+PASS  report before revert: delivered copy is proved (PENDING-DRIVER)
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=6
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/control	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/local-only	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/partial	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/reverted	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/same-message	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=6
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  report after revert: same-message held (HELD-UNPUSHED)
+PASS  report after revert: partial held (HELD-UNPUSHED)
+PASS  report after revert: local-only held (HELD-UNPUSHED)
+PASS  report after revert: reverted held (HELD-UNPUSHED)
+PASS  report after revert: conflict held (HELD-UNPUSHED)
+PASS  report after revert: control held (HELD-UNPUSHED)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=6
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/control	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/local-only	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/partial	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/reverted	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/same-message	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=6
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=6 GiB=0.00 reaped=0 freed=0.00
+PASS  apply kept same-message
+PASS  apply kept partial
+PASS  apply kept local-only
+PASS  apply kept reverted
+PASS  apply kept conflict
+PASS  apply kept control
+PASS  apply: no driver plan for an unproved copy ()
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.bjFAsf
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=2
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/rewound-locked	clean, no process, no record, content already in the default branch, Vernant launcher 15577 is gone; driver verdict not checked in report mode, not yet proven removable
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/rewound-unlocked	clean, no process, no record, content already in the default branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  report on stale local ref is only a prediction (PENDING-DRIVER)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/rewound-locked	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/rewound-unlocked	2 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=2
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+PASS  apply re-fetched and kept locked copy
+PASS  apply re-fetched and kept unlocked copy
+PASS  apply: rewound locked copy (HELD-UNPUSHED)
+PASS  apply: rewound unlocked copy (HELD-UNPUSHED)
+PASS  lab removed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.qpU1fK
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/nofetch-locked	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/nofetch-unlocked	2 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=2
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+PASS  fetch failure kept locked copy
+PASS  fetch failure kept unlocked copy
+PASS  fetch failure: locked copy class (HELD-UNPUSHED)
+PASS  fetch failure: unlocked copy class (HELD-UNPUSHED)
+PASS  lab removed
+
+scenario failures: 0

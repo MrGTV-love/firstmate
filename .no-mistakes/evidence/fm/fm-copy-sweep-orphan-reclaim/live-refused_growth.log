@@ -1,0 +1,74 @@
+
+===== refused_growth =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xVjJeP
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	<lab>/projects/vernant/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+PASS  run 1: exit (1)
+PASS  run 1: git refused
+PASS  run 1: preserve count (0)
+PASS  run 1: original bytes (784dfa85fc21adcf6bb850eb8a8055bba3390b4c4208eda42696daab181bcb65)
+PASS  run 1: regenerable intact
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	<lab>/projects/vernant/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+PASS  run 2: exit (1)
+PASS  run 2: git refused
+PASS  run 2: preserve count (0)
+PASS  run 2: original bytes (784dfa85fc21adcf6bb850eb8a8055bba3390b4c4208eda42696daab181bcb65)
+PASS  run 2: regenerable intact
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+FAILED	<lab>/projects/vernant/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+PASS  run 3: exit (1)
+PASS  run 3: git refused
+PASS  run 3: preserve count (0)
+PASS  run 3: original bytes (784dfa85fc21adcf6bb850eb8a8055bba3390b4c4208eda42696daab181bcb65)
+PASS  run 3: regenerable intact
+PASS  data/copy-sweep has no leftover preserve bytes ()
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+
+scenario failures: 0

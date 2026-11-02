@@ -1,9 +1,9 @@
-Sun Nov  1 21:13:03 UTC 2026
+d36081269c6539bbbce4057afdb42c57f38acf75
 copy-sweep: mode=report containers=1 copies=4
-PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/clean	clean, no process, no record, content already in the default branch, Vernant launcher 5816 is gone; driver verdict not checked in report mode, not yet proven removable
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/clean	clean, no process, no record, content already in the default branch, Vernant launcher 7807 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=1
@@ -14,14 +14,14 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=1
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home: 0.00 GiB of 20 GiB, ok
 regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
 exit=0
 copy-sweep: mode=apply containers=1 copies=3
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home/projects/example/.claude/worktrees/clean	branch fm/squashed at e0858ab80d3e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 5816 is gone)
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home/projects/example/.claude/worktrees/clean	branch fm/squashed at d19bd83559fa, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 7807 is gone)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -32,16 +32,16 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=1
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/squash/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/squash/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.00 reaped=1 freed=0.00
 exit=0
 ok - locked squash-contained orphan is reaped; a unique commit, tracked edit and untracked file are held
 copy-sweep: mode=report containers=1 copies=4
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/locked	clean, no process, no record, content already in the default branch, Vernant launcher 15627 is gone; driver verdict not checked in report mode, not yet proven removable
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, content already in the default branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/locked	clean, no process, no record, content already in the default branch, Vernant launcher 13785 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, content already in the default branch
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=1
@@ -52,14 +52,14 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=2
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home: 0.00 GiB of 20 GiB, ok
 regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
 exit=0
 copy-sweep: mode=apply containers=1 copies=2
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/unlocked	branch detached at d84bd83dc9f3, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home/projects/example/.claude/worktrees/locked	branch detached at d84bd83dc9f3, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 15627 is gone)
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/conflict	1 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/unique	2 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/unlocked	branch detached at 1f7884b9dff6, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home/projects/example/.claude/worktrees/locked	branch detached at 1f7884b9dff6, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 13785 is gone)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -70,22 +70,22 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=2
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/later-edit/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/later-edit/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.00 reaped=2 freed=0.00
 exit=0
 ok - after a later main edit to a squash-merged path, report and apply agree on every copy
 ok - live launcher holds, exited launcher is absent, failed or incomplete observations remain unknown
 copy-sweep: mode=apply containers=1 copies=3
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/missing	clean, no process, no record, HEAD contained in a remote branch
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/scratch	branch detached at 62bb5bab239a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/missing	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/mismatch	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/log	branch detached at 62bb5bab239a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/generated	branch detached at 62bb5bab239a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/projects/example/.claude/worktrees/cache	branch detached at 62bb5bab239a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/missing	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/scratch	branch detached at 2fe4d7a5d1c5, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/missing	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/mismatch	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/log	branch detached at 2fe4d7a5d1c5, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/generated	branch detached at 2fe4d7a5d1c5, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/projects/example/.claude/worktrees/cache	branch detached at 2fe4d7a5d1c5, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=2
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -96,20 +96,20 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=1
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=7 GiB=0.00 reaped=4 freed=0.00
 exit=1
-class=cache source_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/data/copy-sweep/20261101T211335Z.27586-62bb5bab239acbd7bc75c3bce614296e89d77085/nested-copy-preserved/77c2451145821166a24ad77243a5ae719d1aeae136630eb9386d210db91b51b6/.import_linter_cache/payload preserved_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d disposition=removed
-class=scratch source_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/data/copy-sweep/20261101T211335Z.27586-62bb5bab239acbd7bc75c3bce614296e89d77085/nested-copy-preserved/338aa874dd7c1cdbb59db178849e89026466df4257146815664262c507d21a20/.tac/tmp/payload preserved_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e disposition=removed
-class=log source_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/data/copy-sweep/20261101T211335Z.27586-62bb5bab239acbd7bc75c3bce614296e89d77085/nested-copy-preserved/c716c03487d970301cf30b4078eccaa8d4cf6f97badf6370faa126f0990f95bc/.claude/logs/payload preserved_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b disposition=removed
-class=generated source_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/preserved/home/data/copy-sweep/20261101T211335Z.27586-62bb5bab239acbd7bc75c3bce614296e89d77085/nested-copy-preserved/a8edb49ef04bd25f7554f09809c9b652b8ed1f4187b8cd79bc636872c841f041/graft/payload preserved_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c disposition=removed
+class=cache source_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/data/copy-sweep/20261102T015143Z.23305-2fe4d7a5d1c5106fa80c963398847d19489f9552/nested-copy-preserved/014d3cba17140b16bd5c1446ecd86b481019aa70343e5194f3792e455cff53e0/.import_linter_cache/payload preserved_sha256=bd8d14f348a1657d60ea2813a489debad40cb3087f544e4313bb065df9326c5d disposition=removed
+class=scratch source_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/data/copy-sweep/20261102T015143Z.23305-2fe4d7a5d1c5106fa80c963398847d19489f9552/nested-copy-preserved/82bb262afc1ed15487057f70d1929149f03fef6e0c18b83d659a06c9794cc911/.tac/tmp/payload preserved_sha256=e275ecc2d47bc1013b173243ae4784ae88ddf77169e2a6ba0a923cfcdd92ca3e disposition=removed
+class=log source_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/data/copy-sweep/20261102T015143Z.23305-2fe4d7a5d1c5106fa80c963398847d19489f9552/nested-copy-preserved/f921cca1fbf133940e0de3b9be25f369a008146b750281e94d7de91152a10d82/.claude/logs/payload preserved_sha256=ca2f53c1b8d87d88bc1838ec979557fdf8450deeb8644d0a7492e11d1e24740b disposition=removed
+class=generated source_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c preserved=/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/preserved/home/data/copy-sweep/20261102T015143Z.23305-2fe4d7a5d1c5106fa80c963398847d19489f9552/nested-copy-preserved/3ca47ea112d721b2873bbfaa96398a7cffe914905c7f251e398fb7b06d8ada79/graft/payload preserved_sha256=f322319b6aca8bfccfd6090b9ab284f47834efab2c2ab83607cb3e5e04fbc52c disposition=removed
 ok - cache, scratch, log and generated bytes survive by hash; unique, missing and mismatched preservation hold
 copy-sweep: mode=report containers=1 copies=4
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
-PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 46391 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
-REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.01 GiB removed with it, not preserved
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 32220 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+REAPABLE-PROVEN	0.01 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.01 GiB removed with it, not preserved
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=1
@@ -120,14 +120,14 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home: 0.01 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home: 0.01 GiB of 20 GiB, ok
 regenerable: 0.01 GiB in 2 proven copies, 0 proven copies not sized
 exit=0
 copy-sweep: mode=apply containers=1 copies=2
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/unlocked	branch detached at 2be403ab54b9, copy 0.01 GiB, preserved 0.00 GiB, net freed 0.01 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home/projects/example/.claude/worktrees/locked	branch detached at 2be403ab54b9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 46391 is gone)
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/held-cache	it holds ignored files that exist nowhere else: .cache
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/held-unique	it holds ignored files that exist nowhere else: unique.dat
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/unlocked	branch detached at eb6eb38dc7e0, copy 0.01 GiB, preserved 0.00 GiB, net freed 0.01 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home/projects/example/.claude/worktrees/locked	branch detached at eb6eb38dc7e0, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 32220 is gone)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -138,18 +138,18 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/class-world/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/class-world/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.01 reaped=2 freed=0.01
 exit=0
 ok - the closed regenerable class goes with a proven copy, other ignored paths survive by hash, and held copies are unchanged
 copy-sweep: mode=apply containers=1 copies=2
-REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 62133 is gone
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/held-unique	branch detached at bd2fe5851f28, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/held-cache	branch detached at bd2fe5851f28, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 44292 is gone
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/held-unique	branch detached at 576b1f257c89, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/held-cache	branch detached at 576b1f257c89, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=1
 summary: PENDING-DRIVER=0
@@ -160,13 +160,13 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.00 reaped=2 freed=0.00
 exit=1
 copy-sweep: mode=report containers=1 copies=2
-WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -177,12 +177,12 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home: 0.00 GiB of 20 GiB, ok
 regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
 exit=0
 copy-sweep: mode=apply containers=1 copies=1
-WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/unlocked	branch detached at bd2fe5851f28, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/unlocked	branch detached at 576b1f257c89, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -193,12 +193,12 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=2 GiB=0.00 reaped=1 freed=0.00
 exit=0
 copy-sweep: mode=apply containers=0 copies=0
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writer.cache/home/projects/example/.claude/worktrees/locked	branch detached at bd2fe5851f28, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 62133 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writer.cache/home/projects/example/.claude/worktrees/locked	branch detached at 576b1f257c89, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 44292 is gone)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -213,12 +213,12 @@ sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=1 GiB=0.00 reaped=1 freed=0.00
 exit=0
 copy-sweep: mode=apply containers=1 copies=2
-REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 84598 is gone
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/held-unique	branch detached at 9ef2d296c4b9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/held-cache	branch detached at 9ef2d296c4b9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 66834 is gone
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/unlocked	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/held-unique	branch detached at 099fa049c53b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/held-cache	branch detached at 099fa049c53b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=1
 summary: PENDING-DRIVER=0
@@ -229,13 +229,13 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.00 reaped=2 freed=0.00
 exit=1
 copy-sweep: mode=report containers=1 copies=2
-WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/unlocked	clean, no process, no record, HEAD contained in a remote branch; regenerable 0.00 GiB removed with it, not preserved
 summary: REAPABLE-PROVEN=1
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -246,12 +246,12 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home: 0.00 GiB of 20 GiB, ok
 regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
 exit=0
 copy-sweep: mode=apply containers=1 copies=1
-WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/unlocked	branch detached at 9ef2d296c4b9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/unlocked	branch detached at 099fa049c53b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -262,12 +262,12 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=2 GiB=0.00 reaped=1 freed=0.00
 exit=0
 copy-sweep: mode=apply containers=0 copies=0
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/writernode_modules/home/projects/example/.claude/worktrees/locked	branch detached at 9ef2d296c4b9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 84598 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/writernode_modules/home/projects/example/.claude/worktrees/locked	branch detached at 099fa049c53b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 66834 is gone)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -283,11 +283,11 @@ copies=1 GiB=0.00 reaped=1 freed=0.00
 exit=0
 ok - a write inside .cache or node_modules stops a release and keeps a locked copy WAITING until it is quiet
 copy-sweep: mode=apply containers=1 copies=1
-REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 6325 is gone
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/unlocked	branch detached at d9cb7ae2467a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/held-unique	branch detached at d9cb7ae2467a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
-REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/held-cache	branch detached at d9cb7ae2467a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 85035 is gone
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/unlocked	branch detached at 6721b6b0ee0b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked	the copy was left: REFUSED: the preservable ignored content of /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/held-unique	branch detached at 6721b6b0ee0b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/held-cache	branch detached at 6721b6b0ee0b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=1
 summary: PENDING-DRIVER=0
@@ -298,12 +298,12 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=4 GiB=0.00 reaped=3 freed=0.00
 exit=1
 copy-sweep: mode=report containers=1 copies=1
-PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 6325 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 85035 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=1
@@ -314,15 +314,15 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home: 0.00 GiB of 0 GiB, over
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home: 0.00 GiB of 0 GiB, over
 regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
 exit=0
-copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
+copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
 exit=0
-copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
+copy-sweep: container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked 0.00 GiB PENDING-DRIVER
 exit=0
 copy-sweep: mode=report containers=1 copies=1
-PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 6325 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
+PENDING-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home/projects/example/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 85035 is gone; driver verdict not checked in report mode, not yet proven removable; regenerable 0.00 GiB removed with it, not preserved
 summary: REAPABLE-PROVEN=0
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=1
@@ -333,19 +333,19 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=0
 summary: HELD-DIRTY=0
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/check-world/home: 0.00 GiB of 0 GiB, over
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/check-world/home: 0.00 GiB of 0 GiB, over
 regenerable: 0.00 GiB in 1 proven copies, 0 proven copies not sized
 exit=0
 ok - check and report give a quiet waiting copy with file bytes the same class
 copy-sweep: mode=apply containers=1 copies=5
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/changed	clean, no process, no record, HEAD contained in a remote branch
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/changed	copy changed after preservation; the copy was left
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/changed	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/changed	copy changed after preservation; the copy was left
 summary: REAPABLE-PROVEN=3
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -356,18 +356,18 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=1
 summary: HELD-DIRTY=1
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=5 GiB=0.00 reaped=0 freed=0.00
 exit=1
 copy-sweep: mode=apply containers=1 copies=5
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
 summary: REAPABLE-PROVEN=2
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -378,18 +378,18 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=1
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=5 GiB=0.00 reaped=0 freed=0.00
 exit=1
 copy-sweep: mode=apply containers=1 copies=5
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
-HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
-REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
-HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
-FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/changed	1 uncommitted or untracked path(s), first: ?? late.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/unique	1 commit(s) are on no remote and not in the default branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/refused	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home/projects/example/.claude/worktrees/evidence	git worktree remove refused and the copy was left: fatal: working trees containing submodules cannot be moved or removed
 summary: REAPABLE-PROVEN=2
 summary: REAPABLE-DRIVER=0
 summary: PENDING-DRIVER=0
@@ -400,12 +400,85 @@ summary: HELD-LOCKED=0
 summary: HELD-UNPUSHED=1
 summary: HELD-DIRTY=2
 summary: ORPHAN-NO-RECORD=0
-budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.maimIw/refused/home: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/refused/home: 0.00 GiB of 20 GiB, ok
 sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
 copies=5 GiB=0.00 reaped=0 freed=0.00
 exit=1
 ok - three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+FAILED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=2
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=0 freed=0.00
+exit=1
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/newcontent	branch detached at 89d7fc0e9854, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.q8LKQH/activity/home/projects/example/.claude/worktrees/activity	branch detached at 89d7fc0e9854, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=2 freed=0.00
+exit=0
+ok - three applies with only activity or new content add no preserve, and the quiet release preserves once
 diagnostic_exit1_state=2 expected_unknown=2
 ok - only the exact not-found line for this PID joins empty absence; every other diagnostic stays unknown
 exit=0
-Sun Nov  1 21:15:37 UTC 2026

@@ -1,0 +1,298 @@
+
+===== live_writer =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ADUyS9
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=4
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.25 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.25 reaped=0 freed=0.00
+PASS  activity run 1: exit (1)
+PASS  activity run 1: stopped
+PASS  activity run 1: preserve count (0)
+PASS  activity run 1: original intact (original activity)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=4
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.25 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.25 reaped=0 freed=0.00
+PASS  activity run 2: exit (1)
+PASS  activity run 2: stopped
+PASS  activity run 2: preserve count (0)
+PASS  activity run 2: original intact (original activity)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=4
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/activity	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/activity	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.25 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.25 reaped=0 freed=0.00
+PASS  activity run 3: exit (1)
+PASS  activity run 3: stopped
+PASS  activity run 3: preserve count (0)
+PASS  activity run 3: original intact (original activity)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/activity	branch detached at dec2340c550d, copy 0.06 GiB, preserved 0.06 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.19 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.25 reaped=1 freed=0.00
+PASS  activity: quiet run reaps
+PASS  activity: exactly one preserve after release (1)
+PASS  activity: preserve holds original (original activity)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.19 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.19 reaped=0 freed=0.00
+PASS  newcontent run 1: stopped
+PASS  newcontent run 1: preserve count (0)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.19 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.19 reaped=0 freed=0.00
+PASS  newcontent run 2: stopped
+PASS  newcontent run 2: preserve count (0)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/newcontent	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/newcontent	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.19 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.19 reaped=0 freed=0.00
+PASS  newcontent run 3: stopped
+PASS  newcontent run 3: preserve count (0)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	worktree lock: hold others off (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/newcontent	branch detached at dec2340c550d, copy 0.06 GiB, preserved 0.06 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.13 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.19 reaped=1 freed=0.00
+PASS  newcontent: quiet run reaps
+PASS  newcontent: exactly one preserve (1)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=2
+REAPABLE-PROVEN	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/mismatch	clean, no process, no record, HEAD contained in a remote branch
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+FAILED	<lab>/projects/vernant/.claude/worktrees/mismatch	ignored payload changed, or its preservation is missing, unreadable or differs by hash; the copy was left
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.13 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.13 reaped=0 freed=0.00
+PASS  mismatch: exit (1)
+PASS  mismatch: stopped
+PASS  mismatch: copy kept
+PASS  mismatch: preserve kept as evidence (1)
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.06 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	worktree lock: hold others off (not the supported Vernant creation-lock format)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/mismatch	branch detached at dec2340c550d, copy 0.06 GiB, preserved 0.06 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.06 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.13 reaped=1 freed=0.00
+PASS  mismatch: quiet run reaps
+PASS  mismatch: evidence preserve kept, final bytes preserved too (2)
+--- fm-copy-sweep.sh --apply (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.13 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 1115 is gone
+FAILED	<lab>/projects/vernant/.claude/worktrees/waiting	the copy was left: REFUSED: the preservable ignored content of <lab>/projects/vernant/.claude/worktrees/waiting changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.13 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.13 reaped=0 freed=0.00
+PASS  locked activity: exit (1)
+locked activity preserve count after run 1: 0
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.13 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.13 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.13 reaped=0 freed=0.00
+PASS  locked activity: WAITING while the writer runs (WAITING)
+PASS  locked activity: WAITING adds no preserve (0)
+PASS  locked activity: no execute while writing
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.13 GiB	<lab>/projects/vernant/.claude/worktrees/waiting	content changing: its preservable ignored content or regenerable directories changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.13 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.13 reaped=0 freed=0.00
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	<lab>/projects/vernant/.claude/worktrees/waiting	branch detached at dec2340c550d, copy 0.13 GiB, preserved 0.06 GiB, net freed 0.06 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 1115 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.13 reaped=1 freed=0.06
+PASS  locked activity: released once quiet
+PASS  locked activity: released through the driver
+locked activity preserves at the end: 1
+PASS  locked activity: bytes are in a preserve (1)
+PASS  real git trace shows no forced worktree removal ()
+PASS  lab removed
+
+scenario failures: 0

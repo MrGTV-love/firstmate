@@ -1,0 +1,87 @@
+
+===== m1_squash =====
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.UwAx5q
+--- fm-copy-sweep.sh  (exit 0)
+copy-sweep: mode=report containers=1 copies=5
+PENDING-DRIVER	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/locked-clean	clean, no process, no record, content already in the default branch, Vernant launcher 91968 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+REAPABLE-PROVEN	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unlocked-clean	clean, no process, no record, content already in the default branch
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+PASS  report exit (0)
+PASS  report: locked squash copy (PENDING-DRIVER)
+PASS  report: unlocked squash copy (REAPABLE-PROVEN)
+PASS  report: one unique commit (HELD-UNPUSHED)
+PASS  report: tracked edit (HELD-DIRTY)
+PASS  report: untracked file (HELD-DIRTY)
+PASS  report names the content proof
+PASS  report changed no ref, worktree, index, state or data file
+PASS  report removed nothing
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+REMOVED	<lab>/projects/vernant/.claude/worktrees/unlocked-clean	branch detached at aefcdb5f914e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch)
+REMOVED	<lab>/projects/vernant/.claude/worktrees/locked-clean	branch detached at aefcdb5f914e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, content already in the default branch, Vernant launcher 91968 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=2 freed=0.00
+PASS  apply exit (0)
+PASS  apply reaped locked squash copy
+PASS  apply reaped unlocked squash copy
+PASS  driver plan ran first, then execute
+PASS  driver execute ran
+PASS  apply: unique commit held (HELD-UNPUSHED)
+PASS  unique bytes intact (not delivered)
+PASS  tracked edit intact (dirty)
+PASS  untracked bytes intact (untracked bytes)
+PASS  worktree list has no reaped copy
+PASS  removal log names the copy
+PASS  REMOVED line reports freed bytes
+PASS  real git trace shows no forced worktree removal ()
+--- fm-copy-sweep.sh --apply (exit 0)
+copy-sweep: mode=apply containers=1 copies=3
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/tracked	1 uncommitted or untracked path(s), first:  M feature.txt
+HELD-UNPUSHED	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/unique	3 commit(s) are on no remote and their content is not proved in the default branch; without that proof a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	<lab>/projects/vernant/.claude/worktrees/untracked	1 uncommitted or untracked path(s), first: ?? new.txt
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget container <lab>: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.00 reaped=0 freed=0.00
+PASS  a second apply is idempotent (0)
+PASS  held copy survives a second apply
+PASS  lab removed
+
+scenario failures: 0
