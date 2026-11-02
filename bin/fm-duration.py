@@ -180,11 +180,15 @@ statement, not line number; existing limits that were only moved are listed in
 bin/fm-duration-existing-limits.tsv (path, value, exact statement). Added or
 changed bounds need an adjacent measured: note with value, ISO date, host and
 margin. --report lists all current literals without enforcing or changing them.
+The only inert prose is the two documented help examples in the module docstring
+of bin/fm-test-weakening.py, matched by path, position and exact statement. Any
+other docstring line, or the same text elsewhere, is still scanned.
 It recognizes shell bound calls including fm_duration_limit/fm_duration_timed
 fallbacks, timeout flags with optional unit suffixes, timeout/deadline/budget
 assignments and Python/JS timeout keyword values.
 """
 import argparse
+import ast
 import collections
 import contextlib
 import datetime
@@ -1221,11 +1225,35 @@ BOUND = re.compile(r'''(?ix)
 NOTE = re.compile(r'measured:.*value=([^\s,]+).*date=\d{4}-\d{2}-\d{2}.*host=\S+.*margin=\S+')
 
 
-def literals(text):
+# sha256 of each exact stripped help line, so this table is not itself a bound literal.
+INERT_HELP_EXAMPLES = {
+    'bin/fm-test-weakening.py': frozenset((
+        '602f31cde126a9ba8b22977da762e5a4c0fcfc3fc5635c69926a3962f32317b5',
+        '81d6fa284e5b54954c60993b196831138ceeeb25e93ce531d57702bab62f6f5d',
+    )),
+}
+
+
+def inert_help_lines(path, text):
+    examples = INERT_HELP_EXAMPLES.get(path)
+    if not examples:
+        return frozenset()
+    try:
+        body = ast.parse(text).body
+    except SyntaxError:
+        return frozenset()
+    if not body or not isinstance(body[0], ast.Expr) or not isinstance(body[0].value, ast.Constant) or not isinstance(body[0].value.value, str):
+        return frozenset()
     lines = text.splitlines()
+    return frozenset(number for number in range(body[0].lineno, body[0].end_lineno + 1) if hashlib.sha256(lines[number - 1].strip().encode()).hexdigest() in examples)
+
+
+def literals(text, path):
+    lines = text.splitlines()
+    inert = inert_help_lines(path, text)
     consumed_through = -1
     for index, line in enumerate(lines):
-        if index <= consumed_through or line.lstrip().startswith(('#', '//', '*')):
+        if index <= consumed_through or index + 1 in inert or line.lstrip().startswith(('#', '//', '*')):
             continue
         end = index
         while line.rstrip().endswith('\\') and end + 1 < len(lines):
@@ -1294,7 +1322,7 @@ def moved_limits():
 def check_literals(base, report):
     if report:
         for relative, current, _ in sources(None):
-            for line, statement, value, _ in literals(current):
+            for line, statement, value, _ in literals(current, relative):
                 print(f'{relative}:{line}\t{value}\t{statement}')
         return 0
     if not base:
@@ -1310,9 +1338,9 @@ def check_literals(base, report):
     moved = moved_limits()
     failures = []
     for relative, current, original in sources(base):
-        previous = collections.Counter((statement, value) for _, statement, value, _ in literals(original))
+        previous = collections.Counter((statement, value) for _, statement, value, _ in literals(original, relative))
         previous.update({(statement, value): count for (path, statement, value), count in moved.items() if path == relative})
-        for line, statement, value, annotated in literals(current):
+        for line, statement, value, annotated in literals(current, relative):
             identity = statement, value
             if previous[identity]:
                 previous[identity] -= 1

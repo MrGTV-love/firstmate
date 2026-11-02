@@ -814,6 +814,30 @@ cli('check-literals','--base','HEAD',expected=1,tool=guard)
 cli('check-literals','--base','HEAD',tool=guard)
 print('ok - sample-count limits, retention, progress, leader exit, progress stops, pipeline imports and literal guard')
 
+# The real detector's documented help examples are inert; the same shape anywhere else still counts.
+detector = repo / 'bin/fm-test-weakening.py'
+shutil.copyfile(root / 'bin/fm-test-weakening.py', detector)
+detector_text = detector.read_text()
+cli('check-literals','--base','HEAD',tool=guard)
+assert 'bin/fm-test-weakening.py' not in cli('check-literals','--report',tool=guard).stdout
+detector.write_text(detector_text + 'timeout=5\n')
+executed = cli('check-literals','--base','HEAD',expected=1,tool=guard).stdout
+executed_line = len(detector_text.splitlines()) + 1
+assert f'bin/fm-test-weakening.py:{executed_line}: new time limit 5;' in executed and executed.count('new time limit') == 1, executed
+assert f'bin/fm-test-weakening.py:{executed_line}\t5\ttimeout=5' in cli('check-literals','--report',tool=guard).stdout
+example = next(line for line in detector_text.splitlines() if 'timeout=5->deadline=50' in line)
+detector.write_text(detector_text + f'HELP = """\n{example}\n"""\n')
+assert cli('check-literals','--base','HEAD',expected=1,tool=guard).stdout.count('new time limit') == 2
+detector.write_text(detector_text.replace('timeout=5->deadline=50', 'timeout=5->deadline=99'))
+changed = cli('check-literals','--base','HEAD',expected=1,tool=guard).stdout
+assert 'new time limit 99;' in changed, changed
+detector.unlink()
+copied = repo / 'bin/other-help.py'
+copied.write_text(detector_text)
+assert cli('check-literals','--base','HEAD',expected=1,tool=guard).stdout.count('bin/other-help.py:') == 4
+copied.unlink()
+print('ok - detector help examples are inert and the same shape elsewhere still counts')
+
 # Per-key slot gate: at most FM_TEST_KEY_SLOTS concurrent copies of one test.* key, a clear
 # waiter notice, release on every exit path, a bounded wait, and no gate for other keys.
 slot_dir = tmp / 'slots'
