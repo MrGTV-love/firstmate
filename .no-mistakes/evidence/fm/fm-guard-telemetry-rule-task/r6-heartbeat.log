@@ -1,0 +1,25 @@
+== refusal rows in the lab home log
+{"guard":"merge-checks-green","decision":"deny","rule":"checks-green","task":"checks-red-then-basemerge","head":"b9f5650","base":"main"}
+{"guard":"merge-held-task","decision":"deny","rule":"captain-hold","task":"held-then-basemerge","head":"8c17700","base":"main"}
+{"guard":"merge-checks-green","decision":"deny","rule":"checks-green","task":"checks-red-then-real-fix","head":"5e03a38","base":"main"}
+== state/.guard-workarounds-next written by the heartbeat:
+GUARD_WORKAROUND task=checks-red-then-basemerge signatures=base-merge-only-after-refusal:dcff57cf757bb9ea83d676f9d3be7e82e00b1216 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+train-5 reported: yes
+checks-red-then-basemerge reported: yes
+held-then-basemerge reported: no
+checks-red-then-real-fix reported: no
+== same scan as JSON (detector feed)
+{"guard":"merge-checks-green","rule":"checks-green","task":"checks-red-then-basemerge","kind":"base-merge-only-after-refusal","head":"dcff57cf7","refused_head":"b9f5650"}
+{"guard":"merge-landing-tree-tested","rule":"base-containment","task":"train-5","kind":"tree-equal-merge","head":"5ad471a2b","refused_head":""}
+== wake queue has guard-workarounds: 0
+0
+== guard rows added by the scan: 0
+== gate worktree status lines 0 -> 0
+== metrics with the detector feed (merge-checks-green)
+METRIC merge-checks-green opportunities=2 denies=2 override_rate=0.0 allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=0.5 repeat_denies=0 deny_only=true zero_events_days=0
+METRIC merge-held-task opportunities=1 denies=1 override_rate=0.0 allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-checks-green rule=checks-green opportunities=2 denies=2 override_rate=0.0 allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=0.5 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-held-task rule=captain-hold opportunities=1 denies=1 override_rate=0.0 allows=0 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRICS_SUMMARY guards=2 measured=0 cut=0 unmeasured=2 malformed_rows=0
+lab torn down: yes

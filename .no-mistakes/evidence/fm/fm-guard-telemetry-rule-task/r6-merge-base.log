@@ -1,0 +1,47 @@
+
+=== M1 red check, no waiver: refused ===
+rc=1 merged=0
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-checks-green","decision":"deny","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M2 same red check, --allow-red lint: merged, bypass with override ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-checks-green","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-required-reported","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M3 required check absent, no waiver: refused ===
+rc=1 merged=0
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-required-reported","decision":"deny","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M4 required check absent, --allow-missing validate: merged, bypass with override ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-checks-green","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-required-reported","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M5 away record, --attended-override: merged, merge-away-waiver bypass ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-checks-green","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-required-reported","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M6 green head, no waiver: merged, one allow per rule ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-checks-green","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-required-reported","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":null,"task":null,"override":false,"head":"","base":null,"opportunity":null}
+
+=== M7 event log is a directory while the waiver merges: same merge outcome ===
+rc=0 merged=1
+
+=== Metrics on the combined rows ===
+METRIC merge-checks-green opportunities=5 denies=1 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured
+METRIC merge-landing-tree-tested opportunities=4 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured
+METRIC merge-required-reported opportunities=5 denies=1 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured
+METRICS_SUMMARY guards=3 measured=0 cut=0 unmeasured=3

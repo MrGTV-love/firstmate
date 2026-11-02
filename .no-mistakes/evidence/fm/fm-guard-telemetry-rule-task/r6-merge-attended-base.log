@@ -1,0 +1,9 @@
+
+=== no waiver -- --auto --merge ===
+rc=1 forge merge calls=0
+error: extra merge arguments must not request auto-merge, a protection bypass, or branch deletion; pass --attended-override only for an explicit captain instruction
+(no away/bypass/deny rows)
+
+=== --attended-override -- --auto --merge ===
+rc=0 forge merge calls=1
+(no away/bypass/deny rows)

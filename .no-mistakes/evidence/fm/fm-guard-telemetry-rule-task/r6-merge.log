@@ -1,0 +1,61 @@
+
+=== M1 red check, no waiver: refused ===
+rc=1 merged=0
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-checks-green","decision":"deny","rule":"checks-green","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+
+=== M2 same red check, --allow-red lint: merged, bypass with override ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-checks-green","decision":"bypass","rule":"checks-green","task":"task-x1","override":true,"head":"","base":"","opportunity":true}
+{"guard":"merge-required-reported","decision":"allow","rule":"required-reported","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-read","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-containment","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-tip-changed","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+
+=== M3 required check absent, no waiver: refused ===
+rc=1 merged=0
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-required-reported","decision":"deny","rule":"required-reported","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+
+=== M4 required check absent, --allow-missing validate: merged, bypass with override ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-checks-green","decision":"allow","rule":"checks-green","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-required-reported","decision":"bypass","rule":"required-reported","task":"task-x1","override":true,"head":"","base":"","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-read","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-containment","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-tip-changed","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+
+=== M5 away record, --attended-override: merged, merge-away-waiver bypass ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-checks-green","decision":"allow","rule":"checks-green","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-required-reported","decision":"allow","rule":"required-reported","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-read","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-containment","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-tip-changed","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+
+=== M6 green head, no waiver: merged, one allow per rule ===
+rc=0 merged=1
+{"guard":"merge-held-task","decision":"allow","rule":"captain-hold","task":"task-x1","override":false,"head":"","base":"","opportunity":true}
+{"guard":"merge-checks-green","decision":"allow","rule":"checks-green","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-required-reported","decision":"allow","rule":"required-reported","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-read","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":true}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-containment","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+{"guard":"merge-landing-tree-tested","decision":"allow","rule":"base-tip-changed","task":"task-x1","override":false,"head":"a5a5a5a","base":"main","opportunity":false}
+
+=== M7 event log is a directory while the waiver merges: same merge outcome ===
+rc=0 merged=1
+
+=== Metrics on the combined rows ===
+METRIC merge-checks-green opportunities=4 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=3 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+METRIC merge-landing-tree-tested opportunities=4 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=4 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC merge-required-reported opportunities=4 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=3 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-checks-green rule=checks-green opportunities=4 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=3 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-landing-tree-tested rule=base-containment opportunities=4 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=4 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-landing-tree-tested rule=base-read opportunities=4 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=4 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-landing-tree-tested rule=base-tip-changed opportunities=4 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=4 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-required-reported rule=required-reported opportunities=4 denies=1 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=3 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+QUIET merge-away-waiver zero_events_days=30
+METRICS_SUMMARY guards=3 measured=0 cut=0 unmeasured=3 malformed_rows=0

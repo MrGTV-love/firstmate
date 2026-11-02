@@ -1,0 +1,7 @@
+== --undecided (nominated, no decision covers the evidence):
+gcut
+rc=0
+== verdicts:
+{"id":"gcut","opportunities":30,"override_rate":1.0,"verdict":"cut"}
+{"id":"gjudged","opportunities":30,"override_rate":1.0,"verdict":"cut"}
+{"id":"gkeep","opportunities":30,"override_rate":0,"verdict":"keep"}

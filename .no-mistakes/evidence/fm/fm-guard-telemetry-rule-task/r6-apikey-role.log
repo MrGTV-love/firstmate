@@ -1,0 +1,11 @@
+base: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(no key)=0 role(user, no consent)=1 role(task consent)=0
+  base row: {"guard":"gate-agent-containment","decision":"deny","rule":null,"task":null,"override":false,"cleared_by":""}
+  base row: {"guard":"claude-api-billing","decision":"deny","rule":null,"task":null,"override":false,"cleared_by":""}
+  base row: {"guard":"upstream-publish-role","decision":"deny","rule":null,"task":null,"override":false,"cleared_by":""}
+head: gate-refuse(non-lab fm-send)=3 api-key(no waiver)=1 api-key(--allow-api-key)=0 api-key(no key)=0 role(user, no consent)=1 role(task consent)=0
+  head row: {"guard":"gate-agent-containment","decision":"deny","rule":"gate-context","task":"t","override":false,"cleared_by":""}
+  head row: {"guard":"claude-api-billing","decision":"deny","rule":"inherited-credential","task":"ak-nowaiver","override":false,"cleared_by":""}
+  head row: {"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"ak-waiver","override":true,"cleared_by":"allow-api-key"}
+  head row: {"guard":"claude-api-billing","decision":"allow","rule":"inherited-credential","task":"ak-clean","override":false,"cleared_by":""}
+  head row: {"guard":"upstream-publish-role","decision":"deny","rule":"publication-authority","task":"role-user","override":false,"cleared_by":""}
+  head row: {"guard":"upstream-publish-role","decision":"allow","rule":"publication-authority","task":"role-consent","override":false,"cleared_by":""}

@@ -1,0 +1,16 @@
+
+=== O1 firstmate landing from another home: refused, single-owner deny ===
+rc=1 merged=0
+{"guard":"merge-single-owner","decision":"deny","rule":"single-owner","task":"task-x1","override":false,"cleared_by":""}
+
+=== O2 same PR from the Main landing home: merged, single-owner allow ===
+rc=0 merged=1
+{"guard":"merge-single-owner","decision":"allow","rule":"single-owner","task":"task-x1","override":false,"cleared_by":"route-to-main"}
+
+=== A1 off-queue --auto on a CLEAN PR: merged, auto-not-armed allow ===
+rc=0 merged=1
+{"guard":"merge-auto-not-armed","decision":"allow","rule":"auto-not-armed","task":"task-x1","override":false,"cleared_by":"retry"}
+
+=== A2 off-queue --auto on a BLOCKED PR: refused, auto-not-armed deny ===
+rc=1 merged=0
+{"guard":"merge-auto-not-armed","decision":"deny","rule":"auto-not-armed","task":"task-x1","override":false,"cleared_by":""}

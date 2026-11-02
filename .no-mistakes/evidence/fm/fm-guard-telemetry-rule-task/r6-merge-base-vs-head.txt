@@ -1,0 +1,19 @@
+case | base (1c4e2929f) | head (f665f5583)
+=== M1 red check, no waiver: refused ===|=== M1 red check, no waiver: refused ===
+rc=1 merged=0|rc=1 merged=0
+=== M2 same red check, --allow-red lint: merged, bypass with override ===|=== M2 same red check, --allow-red lint: merged, bypass with override ===
+rc=0 merged=1|rc=0 merged=1
+=== M3 required check absent, no waiver: refused ===|=== M3 required check absent, no waiver: refused ===
+rc=1 merged=0|rc=1 merged=0
+=== M4 required check absent, --allow-missing validate: merged, bypass with override ===|=== M4 required check absent, --allow-missing validate: merged, bypass with override ===
+rc=0 merged=1|rc=0 merged=1
+=== M5 away record, --attended-override: merged, merge-away-waiver bypass ===|=== M5 away record, --attended-override: merged, merge-away-waiver bypass ===
+rc=0 merged=1|rc=0 merged=1
+=== M6 green head, no waiver: merged, one allow per rule ===|=== M6 green head, no waiver: merged, one allow per rule ===
+rc=0 merged=1|rc=0 merged=1
+=== M7 event log is a directory while the waiver merges: same merge outcome ===|=== M7 event log is a directory while the waiver merges: same merge outcome ===
+rc=0 merged=1|rc=0 merged=1
+=== no waiver -- --auto --merge ===|=== no waiver -- --auto --merge ===
+rc=1 forge merge calls=0|rc=1 forge merge calls=0
+=== --attended-override -- --auto --merge ===|=== --attended-override -- --auto --merge ===
+rc=0 forge merge calls=1|rc=0 forge merge calls=1

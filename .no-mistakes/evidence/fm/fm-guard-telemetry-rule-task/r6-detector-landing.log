@@ -1,0 +1,8 @@
+== text
+GUARD_WORKAROUND task=t-auto signatures=base-merge-only-after-refusal:c5e75abdf9b9d402cc7b8864b99f0d2e39ec23bf (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=t-contain signatures=base-merge-only-after-refusal:c5e75abdf9b9d402cc7b8864b99f0d2e39ec23bf (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=t-required signatures=base-merge-only-after-refusal:c5e75abdf9b9d402cc7b8864b99f0d2e39ec23bf (read-only evidence; reassess the guard)
+== json
+{"guard":"merge-auto-not-armed","rule":"auto-not-armed","task":"t-auto","kind":"base-merge-only-after-refusal"}
+{"guard":"merge-landing-tree-tested","rule":"base-containment","task":"t-contain","kind":"base-merge-only-after-refusal"}
+{"guard":"merge-required-reported","rule":"required-reported","task":"t-required","kind":"base-merge-only-after-refusal"}

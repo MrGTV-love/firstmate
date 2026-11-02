@@ -1,0 +1,32 @@
+
+=== M-A text, all guards ===
+METRIC gfresh opportunities=2 denies=1 override_rate=0.0 recurrences=0 allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=false zero_events_days=0
+METRIC gold opportunities=2 denies=2 override_rate=0.0 recurrences=0 allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=30
+METRIC merge-checks-green opportunities=4 denies=3 override_rate=0.333 recurrences=0 allows=1 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=0.333 repeat_denies=2 deny_only=false zero_events_days=0
+METRIC merge-landing-tree-tested opportunities=2 denies=1 override_rate=0.0 recurrences=0 allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=false zero_events_days=0
+METRIC teardown-unlanded opportunities=3 denies=2 override_rate=0.5 recurrences=1 allows=1 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=0.5 repeat_denies=1 deny_only=false zero_events_days=0
+RULE gfresh rule=r1 opportunities=2 denies=1 override_rate=0.0 recurrences=0 allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=false zero_events_days=0
+RULE gold rule=r1 opportunities=2 denies=2 override_rate=0.0 recurrences=0 allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=30
+RULE merge-checks-green rule=checks-green opportunities=4 denies=3 override_rate=0.333 recurrences=0 allows=1 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=0.333 repeat_denies=2 deny_only=false zero_events_days=0
+REPEAT merge-checks-green rule=checks-green task=t-red denies=3 repeat_denies=2
+RULE merge-landing-tree-tested rule=base-read opportunities=1 denies=0 override_rate=0 recurrences=0 allows=1 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE merge-landing-tree-tested rule=base-tip-changed opportunities=1 denies=1 override_rate=0.0 recurrences=0 allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE teardown-unlanded rule=landed-work opportunities=3 denies=2 override_rate=0.5 recurrences=1 allows=1 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=0.5 repeat_denies=1 deny_only=false zero_events_days=0
+REPEAT teardown-unlanded rule=landed-work task=t-rec denies=2 repeat_denies=1
+QUIET gnone zero_events_days=30
+METRICS_SUMMARY guards=5 measured=0 cut=0 unmeasured=5 malformed_rows=2
+
+=== M-B json: zero_event_guards, window, flags per guard ===
+{"window_days":30,"zero_event_guards":["gnone"],"summary":{"guards":5,"measured":0,"cut":0,"unmeasured":5,"malformed_rows":2},"guards":[{"id":"gfresh","denies":1,"recurrences":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":0,"deny_only":false,"zero_events_days":0},{"id":"gold","denies":2,"recurrences":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":0,"deny_only":true,"zero_events_days":30},{"id":"merge-checks-green","denies":3,"recurrences":0,"refusal_to_bypass_ratio":0.333,"repeat_denies":2,"deny_only":false,"zero_events_days":0},{"id":"merge-landing-tree-tested","denies":1,"recurrences":0,"refusal_to_bypass_ratio":0.0,"repeat_denies":0,"deny_only":false,"zero_events_days":0},{"id":"teardown-unlanded","denies":2,"recurrences":1,"refusal_to_bypass_ratio":0.5,"repeat_denies":1,"deny_only":false,"zero_events_days":0}]}
+
+=== M-C json: per-task repeat denies, rule level ===
+{"id":"merge-checks-green","rule":"checks-green","repeat_denies_per_task":[{"task":"t-red","denies":3,"repeat_denies":2}]}
+{"id":"teardown-unlanded","rule":"landed-work","repeat_denies_per_task":[{"task":"t-rec","denies":2,"repeat_denies":1}]}
+
+=== M-D --days is no longer accepted ===
+rc=2 -: error: unrecognized arguments: --days 7
+
+=== M-E absent log: no QUIET lines ===
+METRICS_SUMMARY guards=0 measured=0 cut=0 unmeasured=0 malformed_rows=0 log_absent=true
+
+=== M-F log unchanged by metrics: yes ===
