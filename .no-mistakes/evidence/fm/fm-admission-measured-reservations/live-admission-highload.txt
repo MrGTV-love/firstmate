@@ -1,0 +1,11 @@
+== highload: real load5 above the old limit of 36; head admits a burst of 3, base waits
+  real load now: (39.828125, 36.86474609375, 29.890625)
+  [head] fm-cpu-pass: pipeline-start waiting: another start is registering | fm-cpu-pass: pipeline-start admitted: counted=2 need=5368709120 budget=45164167168 reservation=1073741824 slack=2147483648 runs_measured=13 priority=other
+  [head] fm-cpu-pass: pipeline-start admitted: counted=1 need=4294967296 budget=44786352128 reservation=1073741824 slack=2147483648 runs_measured=13 priority=other
+  [head] fm-cpu-pass: pipeline-start admitted: counted=0 need=3221225472 budget=44694192128 reservation=1073741824 slack=2147483648 runs_measured=13 priority=other
+  [base] fm-cpu-pass: pipeline-start waiting: counted=0 limit=6 load5=37.51 ceiling=36 priority=other
+  real load after: (42.724609375, 37.51416015625, 30.16064453125)
+  CHECK PASS attempt 0: head admitted 3 starts at real load5 above 36
+  CHECK PASS attempt 0: base waited on the same host: True
+
+SUMMARY: 2 checks, 0 failed

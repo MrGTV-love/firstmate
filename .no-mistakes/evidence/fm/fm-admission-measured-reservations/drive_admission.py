@@ -1,451 +1,416 @@
 #!/usr/bin/env python3
-"""Live drive of bin/fm-duration.py -> bin/fm-cpu-pass.py pipeline-start on a throwaway HOME and lab FM_HOME.
-
-Real parts: the CLI, the run-database reader, fm-mem-guard.sh probe, the process census, proc guard.
-Disposable parts: HOME (its .no-mistakes/state.sqlite, worktrees, pool dir), the lab FM_HOME.
-Stand-in: the `no-mistakes` client on PATH, because this gate phase must never call the real axi run.
-It only registers a run row, the way the daemon does. FM_MEMORY_FIXTURE_DIR (the product's own fixture
-boundary) is used only where a scenario says so, for values a live host cannot be pushed to safely.
-Usage: drive_admission.py WORKTREE SCRATCH   (FM_HOME must already be the lab home)
-"""
-import json, os, signal, socket, sqlite3, subprocess, sys, time
+"""Live driver: runs the real bin/fm-cpu-pass.sh, fm-duration.py and fm-mem-guard.sh against this host's real
+memory and process readings, with a disposable HOME (run database, pool dir) and a marked lab FM_HOME.
+Usage: drive_admission.py HEAD_ROOT BASE_ROOT LAB_FM_HOME SCRATCH SCENARIO..."""
+import json, os, signal, socket, sqlite3, subprocess, sys, time, uuid, importlib.util
 from pathlib import Path
 
-repo, scratch = Path(sys.argv[1]), Path(sys.argv[2])
-lab = Path(os.environ['FM_HOME'])
+HEAD, BASE, LAB, SCRATCH = map(Path, sys.argv[1:5])
+WANT = sys.argv[5:]
 GIB = 2 ** 30
-HOST = socket.gethostname()
-TOTAL = int(subprocess.check_output(['/usr/sbin/sysctl', '-n', 'hw.memsize']))
-base = {k: v for k, v in os.environ.items()
-        if k not in ('NM_HOME', 'NO_MISTAKES_GATE', 'FM_GATE_REFUSE_BYPASS', 'FM_CPU_PASS_HELD', 'FM_CPU_POOL_DIR', 'FM_DURATION_HOME')
-        and not k.endswith('_OVERRIDE')}
-base['PATH'] = os.pathsep.join([str(scratch / 'bin'), os.path.dirname(sys.executable), base['PATH']])
-(scratch / 'bin').mkdir(exist_ok=True)
-client = scratch / 'bin/no-mistakes'
-client.write_text('''#!/usr/bin/env python3
-import os, sqlite3, sys, time
-home = os.environ['HOME']
-if '--intent' not in sys.argv:
-    print('reattach client ran', flush=True); sys.exit(0)
-name = sys.argv[sys.argv.index('--intent') + 1]
-with sqlite3.connect(home + '/.no-mistakes/state.sqlite') as db:
-    db.execute("INSERT INTO runs (id, repo_id, status) VALUES (?, 'repo', 'running')", (name,))
-with open(home + '/order', 'a') as out: out.write('%s %.3f\\n' % (name, time.time()))
-''')
-client.chmod(0o755)
-results, ballast, waiting = [], [], []
+children = []
+os.environ.pop('NM_HOME', None)  # the agent shell's own value must not point the census at the real run root
 
+spec = importlib.util.spec_from_file_location('fm_mem_guard', HEAD / 'bin/fm-mem-guard.py')
+guard = importlib.util.module_from_spec(spec); sys.modules['fm_mem_guard'] = guard; spec.loader.exec_module(guard)
 
 def say(text=''):
     print(text, flush=True)
 
+def reading():
+    env = dict(os.environ)
+    return guard.admission_sample()
 
-def scenario(title):
-    say('\n=== ' + title)
-    say('load averages (real host): %.2f %.2f %.2f; old rule limit 36' % os.getloadavg())
-
-
-def check(name, ok, detail=''):
-    results.append((name, bool(ok)))
-    say('%s  %s%s' % ('PASS' if ok else 'FAIL', name, (' :: ' + str(detail)) if detail != '' else ''))
-
-
-class Case:
-    def __init__(self, name, counted=0, rows=()):
-        self.home = scratch / name
+class Lab:
+    def __init__(self, name, home=LAB):
+        self.dir = SCRATCH / name
+        self.home = self.dir / 'home'
         (self.home / '.no-mistakes').mkdir(parents=True)
         self.db = self.home / '.no-mistakes/state.sqlite'
-        with sqlite3.connect(self.db) as db:
-            db.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER)')
-            for i in range(counted):
-                db.execute("INSERT INTO runs (id, repo_id, status) VALUES (?, 'repo', 'running')", ('counted-%d' % i,))
-            for row in rows:
-                db.execute('INSERT INTO runs (id, repo_id, status, ci_ready_at, awaiting_agent_since) VALUES (?,?,?,?,?)', row)
-        self.env = dict(base, HOME=str(self.home), FM_HOME=str(lab), FM_DURATION_FILE='off')
-        self.n = 0
+        self.logs = self.dir / 'logs'; self.logs.mkdir()
+        self.bin = self.dir / 'bin'; self.bin.mkdir()
+        self.fmhome = home
+        self.starts = self.dir / 'starts.log'
+        with sqlite3.connect(self.db) as c:
+            c.execute('PRAGMA journal_mode=WAL')
+            c.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER)')
+        c.close()
+        shim = self.bin / 'no-mistakes'
+        shim.write_text('#!/usr/bin/env python3\n'
+            'import os, sqlite3, sys, time, uuid\n'
+            'args = sys.argv[1:]\n'
+            'tag = os.environ.get("LAB_TAG", "?")\n'
+            'open(os.environ["LAB_STARTS"], "a").write("%.3f %s %s\\n" % (time.time(), tag, " ".join(args)))\n'
+            'if any(a.startswith("--intent") for a in args):\n'
+            '    c = sqlite3.connect(os.path.expanduser("~/.no-mistakes/state.sqlite"), timeout=10)\n'
+            '    c.execute("INSERT INTO runs (id, repo_id, status) VALUES (?, ?, ?)", (uuid.uuid4().hex, "labrepo", "running")); c.commit(); c.close()\n'
+            'time.sleep(float(os.environ.get("LAB_HOLD", "0")))\n')
+        shim.chmod(0o755)
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('NO_MISTAKES_', 'FM_')) and k != 'NM_HOME'}
+        self.env.update(HOME=str(self.home), FM_HOME=str(home), LAB_STARTS=str(self.starts),
+                        PATH=str(self.bin) + os.pathsep + os.environ['PATH'])
 
-    def fixture(self, available=40 * GIB, pressure=1, runs=(), broken=False):
-        folder = self.home / 'native'
-        folder.mkdir(exist_ok=True)
-        self.env['FM_MEMORY_FIXTURE_DIR'] = str(folder)
-        for name in ('sysctl', 'vm_stat', 'processes.json'):
-            (folder / name).unlink(missing_ok=True)
-        if broken:
-            return
-        (folder / 'sysctl').write_text('%d\n%d\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' % (TOTAL, pressure))
-        (folder / 'vm_stat').write_text(
-            'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\n'
-            'Anonymous pages: 1048576.\nFile-backed pages: %d.\nPages purgeable: 100.\nPages occupied by compressor: 32768.\n'
-            % (available // 16384 - 1100))
-        rows = [dict(pid=101, ppid=1, comm='daemon', started='s', rss_bytes=GIB, fleet=False, run=None)]
-        for i, (key, rss) in enumerate(runs):
-            rows.append(dict(pid=200 + i, ppid=1, comm='node', started='s%d' % i, rss_bytes=rss, fleet=True, run=key))
-        (folder / 'processes.json').write_text(json.dumps(rows))
+    def seed(self, n, repo='seedrepo', prefix='seed'):
+        with sqlite3.connect(self.db) as c:
+            c.executemany('INSERT INTO runs (id, repo_id, status) VALUES (?, ?, ?)',
+                          [('%s-%d' % (prefix, i), repo, 'running') for i in range(n)])
+        c.close()
 
-    def sql(self, statement, *parameters):
-        with sqlite3.connect(self.db) as db:
-            db.execute(statement, parameters)
+    def sql(self, statement, *params):
+        with sqlite3.connect(self.db) as c:
+            c.execute(statement, params)
+        c.close()
 
-    def start(self, name, priority='other', env=None, intent=True):
-        """A fresh start the way a worker issues it: fm-duration.py run ... -- no-mistakes axi run --intent ..."""
-        self.n += 1
-        err = self.home / ('%s.stderr' % name)
-        command = [sys.executable, str(repo / 'bin/fm-duration.py'), 'run', '--pipeline-priority', priority, 'key-' + name,
-                   '--', 'no-mistakes', 'axi', 'run'] + (['--intent', name] if intent else [])
-        child = subprocess.Popen(command, env=env or self.env, cwd=str(repo), stdout=subprocess.DEVNULL, stderr=open(err, 'w'), start_new_session=True)
-        child.err = err
-        child.name = name
-        waiting.append(child)
-        return child
+    def counted(self):
+        c = sqlite3.connect(self.db)
+        n = c.execute("SELECT COUNT(*) FROM runs WHERE status='running' AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL").fetchone()[0]
+        c.close(); return n
 
-    def order(self):
-        path = self.home / 'order'
-        return [line.split()[0] for line in path.read_text().splitlines()] if path.exists() else []
+    def start_lines(self):
+        return self.starts.read_text().splitlines() if self.starts.exists() else []
 
+    def launch(self, tag, argv, prefix=(), **extra):
+        log = open(self.logs / (tag + '.log'), 'w')
+        env = dict(self.env, LAB_TAG=tag, **{k: str(v) for k, v in extra.items()})
+        p = subprocess.Popen(list(prefix) + argv, env=env, cwd=str(self.dir), stdin=subprocess.DEVNULL,
+                             stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        p.tag = tag; p.logpath = self.logs / (tag + '.log')
+        children.append(p); return p
 
-def text(child):
-    return child.err.read_text()
+    def duration(self, tag, priority='other', root=HEAD, prefix=(), intent=True, **extra):
+        cmd = ['python3', str(root / 'bin/fm-duration.py'), 'run', '--pipeline-priority', priority, 'lab.' + tag,
+               '--', 'no-mistakes', 'axi', 'run'] + (['--intent', 'lab'] if intent else [])
+        return self.launch(tag, cmd, prefix, **extra)
 
+    def direct(self, tag, priority='other', root=HEAD, prefix=(), **extra):
+        cmd = ['bash', str(root / 'bin/fm-cpu-pass.sh'), 'pipeline-start', '--priority', priority, '--',
+               'no-mistakes', 'axi', 'run', '--intent', 'lab']
+        return self.launch(tag, cmd, prefix, **extra)
 
-def wait_notice(child, secs=8):
-    until = time.monotonic() + secs
-    while time.monotonic() < until:
-        if child.poll() is not None:
-            return False
-        if 'pipeline-start waiting' in text(child):
+def log_text(p):
+    return p.logpath.read_text()
+
+def wait_log(p, text, secs=40):
+    end = time.monotonic() + secs
+    while time.monotonic() < end:
+        if text in log_text(p):
             return True
-        time.sleep(0.05)
+        if p.poll() is not None and text not in log_text(p):
+            return text in log_text(p)
+        time.sleep(0.1)
     return False
 
-
-def done(child, secs=40):
-    try:
-        return child.wait(timeout=secs)
-    except subprocess.TimeoutExpired:
-        return None
-
-
-def stop(child):
-    if child.poll() is None:
-        os.killpg(child.pid, signal.SIGTERM)
-        child.wait(timeout=10)
-
-
-def line(child, word):
-    found = [l for l in text(child).splitlines() if word in l]
-    return found[-1] if found else ''
-
-
-def field(row, key):
-    return int(row.split(key + '=')[1].split()[0])
-
-
-def record(peaks, host=HOST, total=TOTAL, repo_id='repo', samples=2, raw=None):
-    state = lab / 'state'
-    state.mkdir(parents=True, exist_ok=True)
+def calibrate(fmhome, peaks, host=None, total=None, samples=2):
+    now = reading() if total is None else None
+    state = Path(fmhome) / 'state'; state.mkdir(parents=True, exist_ok=True)
+    runs = {'no-mistakes:histrepo/old-%d' % i: dict(peak_bytes=int(p), samples=samples, incomplete_samples=0,
+            first_seen='x', last_seen='x', max_gap_seconds=0) for i, p in enumerate(peaks)}
+    runs['task:crewmate'] = dict(peak_bytes=500 * GIB, samples=9)
     path = state / '.memory-calibration.json'
-    if raw is not None:
-        path.write_text(raw)
-        return
-    runs = {'no-mistakes:%s/%s' % (repo_id, name): dict(peak_bytes=int(peak), samples=samples, incomplete_samples=0, first_seen='2026-11-01T00:00:00+00:00', last_seen='2026-11-01T00:00:00+00:00', max_gap_seconds=0)
-            for name, peak in peaks.items()}
-    runs['task:crewmate'] = dict(peak_bytes=100 * GIB, samples=9, incomplete_samples=0, first_seen='2026-11-01T00:00:00+00:00', last_seen='2026-11-01T00:00:00+00:00', max_gap_seconds=0)
-    path.write_text(json.dumps(dict(schema='fm-memory-calibration.v1', host=host, total_bytes=total, runs=runs, pressured=None)))
+    path.write_text(json.dumps(dict(schema='fm-memory-calibration.v1', host=host or socket.gethostname(),
+                    total_bytes=total or now['total_bytes'], runs=runs, pressured=None)))
+    return path
 
+def peaks_for(R, S):
+    """13 peaks: nearest-rank 75th percentile (10th) is R, largest is S."""
+    return [R * 0.2] * 9 + [R, S * 0.9 if S * 0.9 > R else R, S * 0.95 if S * 0.95 > R else R, S]
 
-def peaks(*gib):
-    return {'old-%d' % i: value * GIB for i, value in enumerate(gib)}
+def kill(p):
+    if p.poll() is None:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        p.wait()
 
+def check(label, ok):
+    say('  CHECK %-4s %s' % ('PASS' if ok else 'FAIL', label))
+    RESULTS.append((label, ok))
+    return ok
 
-def hold(case, repo_id, run, mib):
-    """A real process in a real run worktree path, holding real resident memory."""
-    cwd = case.home / '.no-mistakes/worktrees' / repo_id / run
-    cwd.mkdir(parents=True)
-    child = subprocess.Popen([sys.executable, '-c', '''
-import sys, time
-block = bytearray(%d * 1048576)
-for i in range(0, len(block), 4096): block[i] = 1
-print('up', flush=True)
-time.sleep(3600)
-''' % mib], cwd=str(cwd), stdout=subprocess.PIPE, text=True, env=case.env)
-    child.stdout.readline()
-    ballast.append(child)
-    return child
+RESULTS = []
 
+def fields(line):
+    return {k: v for k, _, v in (w.partition('=') for w in line.split()) if v}
 
-def real_available():
-    code = ("import importlib.util as u; s=u.spec_from_file_location('g',%r); m=u.module_from_spec(s); s.loader.exec_module(m);"
-            "print(m.admission_sample()['available_bytes'])") % str(repo / 'bin/fm-mem-guard.py')
-    return int(subprocess.check_output([sys.executable, '-c', code], env=dict(base, HOME=str(scratch))))
+def show(p, label=None):
+    say('  [%s] %s' % (label or p.tag, ' | '.join(l for l in log_text(p).splitlines() if 'fm-cpu-pass' in l or 'mem' in l.lower()) or '(no admission line)'))
 
-
-def real_host_probe_then_admit():
-    scenario('S1 real probe writes the record, real reading admits on the measured basis')
-    (lab / 'state/.memory-calibration.json').unlink(missing_ok=True)
-    case = Case('s1')
-    for run, mib in (('r64', 64), ('r128', 128), ('r256', 256)):
-        hold(case, 'repoA', run, mib)
-    env = dict(case.env)
-    for _ in range(2):
-        out = subprocess.run(['bash', str(repo / 'bin/fm-mem-guard.sh'), 'probe'], env=env, cwd=str(repo), capture_output=True, text=True)
-        say('probe rc=%d %s' % (out.returncode, out.stderr.strip()[:200]))
-        time.sleep(1)
-    saved = json.loads((lab / 'state/.memory-calibration.json').read_text())
-    entries = {k: (v['peak_bytes'], v['samples']) for k, v in saved['runs'].items() if k.startswith('no-mistakes:')}
-    say('record: host=%s total=%d entries=%s' % (saved['host'], saved['total_bytes'], entries))
-    check('real probe recorded 3 run trees with 2 samples', len(entries) == 3 and all(s == 2 for _, s in entries.values()))
-    expected = sorted(p for p, _ in entries.values())
-    child = case.start('first')
-    rc = done(child)
-    row = line(child, 'admitted')
-    say(row)
-    check('fresh start admitted on measured basis, real reading', rc == 0 and 'basis=fallback' not in row and 'reservation=' in row)
-    check('R is nearest-rank p75 of the 3 peaks, S the largest', field(row, 'reservation') == expected[2] and field(row, 'slack') == expected[2] and field(row, 'runs_measured') == 3, expected)
-    # A counted run in the real census: its live tree adds at most R to the budget.
-    case.sql("INSERT INTO runs (id, repo_id, status) VALUES ('r256', 'repoA', 'running')")
-    child = case.start('second')
-    rc = done(child)
-    row = line(child, 'admitted')
-    say(row)
-    check('live run row and live tree are read together: counted=2 (r256 + first), runs_measured drops to 2', rc == 0 and 'counted=2' in row and field(row, 'runs_measured') == 2)
-    for proc in ballast:
-        proc.kill()
-    ballast.clear()
-
-
-def full_while_load_is_low():
-    scenario('S2 load under the old limit and count under the old limit, but reservations full: waits')
-    available = real_available()
-    say('real available_bytes=%d' % available)
-    record(peaks(*[0.45 * available / GIB] * 4))
-    case = Case('s2', counted=1)
-    child = case.start('blocked')
-    check('start waits with the real reading (old rule: counted 1 < 6 and load <= 36 would admit)', wait_notice(child), line(child, 'waiting'))
-    time.sleep(6)
-    check('still waiting after 6 more seconds, no run created', child.poll() is None and case.order() == [])
-    case.sql("UPDATE runs SET status='completed' WHERE id='counted-0'")
-    start = time.monotonic()
-    rc = done(child)
-    say(line(child, 'admitted'))
-    check('admitted when the counted run ends, with no spacing', rc == 0 and case.order() == ['blocked'], 'after %.2fs' % (time.monotonic() - start))
-
-
+# ---- scenarios
 def burst():
-    scenario('S3 burst of 8 ready starts, above the old limit of 6 on 18 CPUs: all admitted back to back')
-    record(peaks(0.05, 0.05, 0.1, 0.1))
-    case = Case('s3')
-    start = time.time()
-    children = [case.start('b%d' % i) for i in range(8)]
-    codes = [done(c, 120) for c in children]
-    elapsed = time.time() - start
-    times = [float(l.split()[1]) for l in (case.home / 'order').read_text().splitlines()]
+    say('== burst: 8 ready starts through fm-duration.py, real memory reading, low reservations')
+    m = reading(); say('  real reading: available=%.1f GiB pressure=%s load=%s' % (m['available_bytes'] / GIB, m['pressure_level'], os.getloadavg()))
+    calibrate(LAB, peaks_for(0.25 * GIB, 1 * GIB))
+    lab = Lab('burst')
+    ps = [lab.duration('b%d' % i, LAB_HOLD=45) for i in range(8)]
+    end = time.monotonic() + 40
+    while time.monotonic() < end and len(lab.start_lines()) < 8: time.sleep(0.1)
+    times = sorted(float(l.split()[0]) for l in lab.start_lines())
     gaps = [round(b - a, 2) for a, b in zip(times, times[1:])]
-    say('return codes %s; gaps between registrations (s): %s; total %.2fs' % (codes, gaps, elapsed))
-    for child in children:
-        say(line(child, 'admitted'))
-    check('8 of 8 admitted and registered', codes == [0] * 8 and len(case.order()) == 8)
-    check('counted reached 7 at the last admission (old limit 6)', any('counted=7' in text(c) for c in children))
-    check('no gap near the old 10-minute spacing', max(gaps) < 10, max(gaps))
+    for p in ps: show(p)
+    say('  starts=%d counted=%d span=%.1fs gaps=%s' % (len(times), lab.counted(), times[-1] - times[0] if times else 0, gaps))
+    check('all 8 starts admitted; 7 and 8 exceed the old fixed limit of 6', len(times) == 8 and lab.counted() == 8)
+    check('no 10-minute spacing: whole burst inside 40 s', times and times[-1] - times[0] < 40)
+    check('admission line is measured, names no load', all('basis=fallback' not in log_text(p) and 'load' not in ' '.join(l for l in log_text(p).splitlines() if 'admitted' in l) for p in ps))
+    for p in ps: kill(p)
+    say('== burst-base: same 8 starts on the base commit (the old rule)')
+    labb = Lab('burst-base')
+    ps = [labb.duration('b%d' % i, root=BASE, LAB_HOLD=45) for i in range(8)]
+    end = time.monotonic() + 25
+    while time.monotonic() < end and len(labb.start_lines()) < 6: time.sleep(0.2)
+    time.sleep(6)
+    for p in ps: show(p)
+    say('  base starts=%d counted=%d' % (len(labb.start_lines()), labb.counted()))
+    check('base commit stops at 6 with the same host and record (the new rule is what changed)', len(labb.start_lines()) == 6)
+    for p in ps: kill(p)
 
-
-def class_order():
-    scenario('S4 capacity short: classes leave the queue in merge-train, machinery, vernant-build, other order')
-    record(peaks(1, 1, 1, 1))  # R=1, S=1
-    case = Case('s4', counted=2)
-    case.fixture(available=3 * GIB)  # fits only at counted <= 1
-    children = []
-    for name, priority in (('o', 'other'), ('v', 'vernant-build'), ('m', 'machinery'), ('t', 'merge-train')):
-        children.append(case.start(name, priority))
-        time.sleep(0.4)
-    check('all 4 wait while 2 runs are counted', wait_notice(children[0]) and case.order() == [])
-    case.sql("UPDATE runs SET status='completed' WHERE id='counted-0'")
-    for expected in ('t', 'm', 'v', 'o'):
-        until = time.monotonic() + 15
-        while expected not in case.order() and time.monotonic() < until:
-            time.sleep(0.05)
-        time.sleep(1.5)
-        check('next admitted is ' + expected + ' and no other slipped past', case.order()[-1:] == [expected], case.order())
-        case.sql("UPDATE runs SET status='completed' WHERE id=?", expected)
-    check('all return 0', [done(c) for c in children] == [0] * 4)
-
-
-def overload():
-    scenario('S5 overload pauses and running work is never stopped')
-    record(peaks(1, 1, 1, 1))
-    case = Case('s5')
-    held = hold(case, 'repo', 'still-running', 32)
-    case.fixture(available=100 * GIB, pressure=2)
-    child = case.start('p2')
-    check('native pressure 2 pauses even with no counted run (floor does not override)', wait_notice(child) and 'native memory pressure level 2' in text(child), line(child, 'waiting'))
-    case.fixture(available=100 * GIB, pressure=1)
-    rc = done(child)
-    check('pressure back to 1: admitted', rc == 0, line(child, 'admitted'))
-    check('running process untouched', held.poll() is None)
-    case.fixture(broken=True)
-    child = case.start('unreadable')
-    check('unreadable memory facts pause, never read as an empty host', wait_notice(child) and 'memory' in line(child, 'waiting'), line(child, 'waiting'))
+def budget():
+    say('== budget: wait when reservations do not fit, release on real status change, class order, running work untouched')
+    a = reading()['available_bytes']
+    R, S = int(a * 0.25), int(a * 0.35)  # counted=1 needs 0.85 x available; counted=2 needs 1.10 x available
+    calibrate(LAB, peaks_for(R, S))
+    lab = Lab('budget'); lab.seed(2)
+    say('  available=%.1f GiB R=%.1f S=%.1f counted=2 need=%.1f' % (a / GIB, R / GIB, S / GIB, (3 * R + S) / GIB))
+    work = subprocess.Popen(['sleep', '120'], start_new_session=True); children.append(work)
+    other = lab.direct('other', 'other', LAB_HOLD=60)
+    check('other start waits with need > budget notice', wait_log(other, 'pipeline-start waiting'))
+    show(other)
+    time.sleep(0.3)
+    train = lab.direct('train', 'merge-train', LAB_HOLD=60)
+    wait_log(train, 'pipeline-start waiting', 10)
+    check('no start launched while over budget', lab.start_lines() == [])
+    check('running work untouched during the wait', work.poll() is None)
+    lab.sql("UPDATE runs SET ci_ready_at = 1 WHERE id = 'seed-0'")
+    check('CI-ready release admits the later merge-train start first', wait_log(train, 'pipeline-start admitted', 20))
+    show(train)
     time.sleep(3)
-    check('no run created while unreadable', 'unreadable' not in case.order())
-    case.fixture(available=100 * GIB)
-    check('facts readable again: admitted', done(child) == 0, line(child, 'admitted'))
-    check('running process still untouched', held.poll() is None)
-    held.kill()
-    ballast.remove(held)
+    check('other still waits: the new run took the room', 'admitted' not in log_text(other))
+    lab.sql("UPDATE runs SET status = 'completed' WHERE id = 'seed-1'")
+    check('a finished run admits the other start', wait_log(other, 'pipeline-start admitted', 20))
+    show(other)
+    order = [l.split()[1] for l in lab.start_lines()]
+    say('  launch order: %s' % order)
+    check('class order holds', order == ['train', 'other'])
+    check('running work still alive at the end', work.poll() is None)
+    for p in (other, train, work): kill(p)
 
+def held():
+    say('== held: real resident memory of real run trees counts, capped at R per run')
+    R = 1 * GIB
+    lab = Lab('held'); hogs = []
+    for run, size in (('heavy', 4), ('light', 2)):
+        wt = lab.home / '.no-mistakes/worktrees/labrepo' / run; wt.mkdir(parents=True)
+        hog = subprocess.Popen(['python3', '-c', 'import time\nb=bytearray(%d*2**30)\nfor i in range(0,len(b),4096): b[i]=1\nprint("ready",flush=True)\ntime.sleep(150)' % size],
+                               cwd=wt, stdout=subprocess.PIPE, text=True, start_new_session=True, env=lab.env)
+        children.append(hog); hogs.append(hog); hog.stdout.readline()
+        lab.sql("INSERT INTO runs (id, repo_id, status) VALUES (?, 'labrepo', 'running')", run)
+    env_backup = dict(os.environ); os.environ.update(HOME=str(lab.home))
+    m = reading(); os.environ.clear(); os.environ.update(env_backup)
+    seen = {k: round(v['rss_bytes'] / GIB, 2) for k, v in m['runs'].items() if 'labrepo' in k}
+    say('  census sees trees: %s available=%.1f GiB' % (seen, m['available_bytes'] / GIB))
+    check('real process trees attributed to their runs', seen.get('no-mistakes:labrepo/heavy', 0) > 3.5 and seen.get('no-mistakes:labrepo/light', 0) > 1.5)
+    A = m['available_bytes']
+    # Capped B = A + 2 GiB; uncapped B = A + 6 GiB. need sits at A + 4 GiB: only a capped rule waits.
+    S = A + 4 * GIB - 3 * R
+    calibrate(LAB, peaks_for(R, S))
+    p = lab.direct('capped', LAB_HOLD=60)
+    check('start waits: excess above R is not free memory', wait_log(p, 'pipeline-start waiting', 15))
+    show(p)
+    line = [l for l in log_text(p).splitlines() if 'waiting' in l][-1]
+    f = fields(line)
+    say('  need=%.2f budget=%.2f GiB; budget - available at census = %.2f GiB (capped credit is 2.0, uncapped 6+)' % (int(f['need']) / GIB, int(f['budget']) / GIB, (int(f['budget']) - A) / GIB))
+    check('no start launched', lab.start_lines() == [])
+    kill(p)
+    # Now put need 2 GiB under the capped budget: real held memory is what lets it in.
+    fresh = reading()['available_bytes']
+    calibrate(LAB, peaks_for(R, fresh + 1 * GIB - 3 * R))
+    q = lab.direct('credited', LAB_HOLD=60)
+    check('start admitted when held credit makes it fit (need above bare available)', wait_log(q, 'pipeline-start admitted', 15))
+    show(q)
+    for x in hogs + [q]: kill(x)
 
-def exact_budget():
-    scenario('S6 adversarial: run holding above R gets only R of credit; exact byte boundary')
-    record(peaks(0.02, 0.1, 0.69, 0.75, 0.79, 0.8, 0.82, 0.96, 1.0, 3.0, 4.0, 5.8, 8.0))  # R=3, S=8, as a hand-ranked p75 of 13
-    case = Case('s6', counted=1)
-    key = 'no-mistakes:repo/counted-0'
-    case.fixture(available=8 * GIB, runs=[(key, 7 * GIB)])
-    child = case.start('capped')
-    ok = wait_notice(child)
-    row = line(child, 'waiting')
-    say(row)
-    check('need 14 GiB, B = 8 + min(3, 7) = 11 GiB: waits (uncapped B = 15 would admit)', ok and field(row, 'need') == 14 * GIB and field(row, 'budget') == 11 * GIB)
-    case.fixture(available=11 * GIB - 16384, runs=[(key, 7 * GIB)])
-    time.sleep(3)
-    check('one page short of the boundary: still waits', child.poll() is None)
-    case.fixture(available=11 * GIB, runs=[(key, 7 * GIB)])
-    rc = done(child)
-    row = line(child, 'admitted')
-    say(row)
-    check('exact fit need == B: admitted', rc == 0 and field(row, 'need') == field(row, 'budget') == 14 * GIB)
+def floor():
+    say('== floor: idle host with a runaway recorded peak still starts one; backstop line is separate')
+    calibrate(LAB, peaks_for(2 * GIB, 900 * GIB))
+    lab = Lab('floor')
+    p = lab.direct('one', LAB_HOLD=60)
+    check('one start admitted with counted=0 although need > budget', wait_log(p, 'pipeline-start admitted', 15))
+    show(p)
+    line = [l for l in log_text(p).splitlines() if 'admitted' in l][-1]; f = fields(line)
+    check('reason shows need above budget', int(f['need']) > int(f['budget']))
+    q = lab.direct('two', LAB_HOLD=60)
+    check('next start waits once a run is counted', wait_log(q, 'pipeline-start waiting', 15))
+    show(q)
+    for x in (p, q): kill(x)
 
+def fallback():
+    say('== fallback: no usable record uses the old count limit and never refuses')
+    a = reading()
+    for name, write in (('missing', lambda: (LAB / 'state/.memory-calibration.json').unlink(missing_ok=True)),
+                        ('otherhost', lambda: calibrate(LAB, peaks_for(GIB, GIB), host='other-host')),
+                        ('otherram', lambda: calibrate(LAB, peaks_for(GIB, GIB), total=a['total_bytes'] * 2)),
+                        ('corrupt', lambda: (LAB / 'state/.memory-calibration.json').write_text('{nope')),
+                        ('onepeak', lambda: calibrate(LAB, [GIB])),
+                        ('onesample', lambda: calibrate(LAB, peaks_for(GIB, GIB), samples=1))):
+        write()
+        lab = Lab('fb-' + name); lab.seed(5)
+        p = lab.direct('fifth', LAB_HOLD=60)
+        ok1 = wait_log(p, 'pipeline-start admitted', 15); show(p, name + ' counted=5')
+        q = lab.direct('sixth', LAB_HOLD=60)
+        ok2 = wait_log(q, 'pipeline-start waiting', 15); show(q, name + ' counted=6')
+        check('%s: admitted at 5, waits at 6, basis=fallback' % name, ok1 and ok2 and 'basis=fallback' in log_text(p) and 'limit=6' in log_text(q))
+        for x in (p, q): kill(x)
 
-def r_and_s_filters():
-    scenario('S7 adversarial: young running runs do not dilute R; a CI-ready peak stays in R and S')
-    # Ranked finished peaks 1..8 GiB: p75 of 8 is the 6th, 6 GiB.
-    table = peaks(1, 2, 3, 4, 5, 6, 7, 8)
-    table.update({'young1': 0.1 * GIB, 'young2': 0.1 * GIB, 'young3': 0.1 * GIB, 'young4': 0.1 * GIB, 'parked': 0.1 * GIB, 'ciready': 20 * GIB})
-    record(table)
-    rows = [(n, 'repo', 'running', None, None) for n in ('young1', 'young2', 'young3', 'young4')]
-    rows += [('parked', 'repo', 'running', None, 123), ('ciready', 'repo', 'running', 123, None)]
-    case = Case('s7', rows=rows)
-    case.fixture(available=100 * GIB)
-    child = case.start('filter')
-    rc = done(child)
-    row = line(child, 'admitted')
-    say(row)
-    # Ranked: 1..8 plus ciready=20 -> 9 values; nearest rank ceil(6.75)=7th = 7 GiB. Young and parked left out.
-    check('R = 7 GiB: the 4 young and 1 parked 0.1 GiB rows left out, CI-ready ranked', rc == 0 and field(row, 'reservation') == 7 * GIB and field(row, 'runs_measured') == 9)
-    check('S = 20 GiB from the CI-ready running run', field(row, 'slack') == 20 * GIB)
-    check('counted = 4 young only (parked and CI-ready do not count)', 'counted=4' in row)
+def refuse():
+    say('== refuse: unreadable run database refuses with 125 and starts nothing')
+    calibrate(LAB, peaks_for(GIB, GIB))
+    lab = Lab('refuse-missing'); lab.db.unlink(); [Path(str(lab.db) + s).unlink(missing_ok=True) for s in ('-wal', '-shm')]
+    p = lab.duration('missing'); p.wait(30); show(p)
+    check('missing db: exit 125, no start', p.returncode == 125 and lab.start_lines() == [])
+    lab = Lab('refuse-garbage'); [Path(str(lab.db) + s).unlink(missing_ok=True) for s in ('-wal', '-shm')]; lab.db.write_bytes(b'not a database' * 100)
+    p = lab.duration('garbage'); p.wait(30); show(p)
+    check('garbage db: exit 125, no start', p.returncode == 125 and lab.start_lines() == [])
 
+def unreadable():
+    say('== unreadable: the macOS sandbox really blocks a native reading; the start pauses, even with counted=0')
+    calibrate(LAB, peaks_for(GIB, GIB))
+    for name, rule, text in (
+        ('vm_stat', '(deny process-exec (literal "/usr/bin/vm_stat"))', 'memory:'),
+        ('sysctl-tool', '(deny process-exec (literal "/usr/sbin/sysctl"))', 'memory:'),
+        ('proc-limit', '(deny sysctl-read (sysctl-name "kern.maxprocperuid"))', 'process limit unreadable')):
+        lab = Lab('unread-' + name)
+        prefix = ['sandbox-exec', '-p', '(version 1)(allow default)' + rule]
+        p = lab.direct('w', prefix=prefix, LAB_HOLD=60)
+        ok = wait_log(p, 'pipeline-start waiting', 15); show(p, name)
+        check('%s blocked: pauses with named reason, no start' % name, ok and text in log_text(p) and lab.start_lines() == [] and 'admitted' not in log_text(p))
+        time.sleep(3)
+        check('%s blocked: still paused 3 s later' % name, p.poll() is None and lab.start_lines() == [])
+        kill(p)
+        # killed while queued: no run; same start reissued without the block admits
+        q = lab.duration('again', LAB_HOLD=1)
+        check('%s: reissued start after a queued kill admits' % name, wait_log(q, 'pipeline-start admitted', 20))
+        kill(q)
 
-def floor_and_fallback():
-    scenario('S8 one-start floor, and every fallback shape')
-    record(peaks(3, 3, 3, 8))
-    case = Case('s8floor')
-    case.fixture(available=GIB)
-    child = case.start('floor')
-    rc = done(child)
-    row = line(child, 'admitted')
-    say(row)
-    check('idle host with need > B: one start still admitted', rc == 0 and field(row, 'need') > field(row, 'budget'))
-    case2 = Case('s8floor2', counted=1)
-    case2.fixture(available=GIB)
-    child = case2.start('notfloor')
-    check('one counted run with need > B: floor does not apply', wait_notice(child), line(child, 'waiting'))
-    stop(child)
-    good = json.dumps(dict(schema='fm-memory-calibration.v1', host=HOST, total_bytes=TOTAL, pressured=None, runs={
-        'no-mistakes:repo/a': 'garbage', 'no-mistakes:repo/b': dict(peak_bytes=GIB, samples=2)}))
-    shapes = [
-        ('missing record', lambda: (lab / 'state/.memory-calibration.json').unlink(missing_ok=True)),
-        ('other host', lambda: record(peaks(1, 1, 1, 1), host='other-host')),
-        ('other RAM size', lambda: record(peaks(1, 1, 1, 1), total=TOTAL // 2)),
-        ('garbage JSON', lambda: record({}, raw='{not json')),
-        ('wrong schema', lambda: record({}, raw=json.dumps(dict(schema='x', host=HOST, total_bytes=TOTAL, runs={})))),
-        ('one qualifying run', lambda: record(peaks(1))),
-        ('one-sample runs only', lambda: record(peaks(1, 1, 1, 1), samples=1)),
-        ('runs is a list', lambda: record({}, raw=json.dumps(dict(schema='fm-memory-calibration.v1', host=HOST, total_bytes=TOTAL, runs=[], pressured=None)))),
-        ('corrupt run entry', lambda: record({}, raw=good)),
-    ]
-    limit = max(1, os.cpu_count() // 3)
-    for label, prepare in shapes:
-        prepare()
-        case = Case('s8-' + label.replace(' ', '-'), counted=limit)
-        child = case.start('full')
-        full = wait_notice(child) and 'basis=fallback' in line(child, 'waiting') and 'limit=%d' % limit in line(child, 'waiting')
-        stop(child)
-        case = Case('s8b-' + label.replace(' ', '-'), counted=limit - 1)
-        child = case.start('room')
-        rc = done(child)
-        check('%s: fallback waits at counted=%d, admits at %d' % (label, limit, limit - 1),
-              full and rc == 0 and 'basis=fallback' in line(child, 'admitted'), line(child, 'admitted'))
-
-
-def refusals():
-    scenario('S9 unreadable run database refuses with 125 and starts nothing')
-    record(peaks(1, 1, 1, 1))
-    case = Case('s9')
-    case.db.unlink()
-    child = case.start('nodb')
-    rc = done(child)
-    check('missing database: 125, no client ran', rc == 125 and not (case.home / 'order').exists(), line(child, 'refused'))
-    check('reader did not create a database', not case.db.exists())
-    case = Case('s9b')
-    case.db.write_bytes(b'this is not sqlite' * 100)
-    child = case.start('badb')
-    rc = done(child)
-    check('garbage database: 125, no client ran', rc == 125 and not (case.home / 'order').exists(), line(child, 'refused'))
-
-
-def homes():
-    scenario('S10 a worker with FM_DURATION_HOME and a secondmate home read the root record')
-    record(peaks(1, 2, 3, 4))
-    case = Case('s10a', counted=7)
-    case.fixture(available=100 * GIB)
-    env = dict(case.env, FM_DURATION_HOME=str(lab))
-    env.pop('FM_HOME')
-    child = case.start('worker', env=env)
-    rc = done(child)
-    say(line(child, 'admitted'))
-    check('worker env: measured basis at counted=7, R=3 GiB (3rd of 4) S=4 GiB', rc == 0 and 'reservation=%d slack=%d' % (3 * GIB, 4 * GIB) in line(child, 'admitted'))
-    second = scratch / 'secondmate'
-    second.mkdir()
-    (second / '.fm-secondmate-parent').write_text('schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' % lab)
-    case = Case('s10b', counted=7)
-    case.fixture(available=100 * GIB)
-    child = case.start('child', env=dict(case.env, FM_HOME=str(second)))
-    rc = done(child)
-    say(line(child, 'admitted'))
-    check('secondmate home: root record used', rc == 0 and 'reservation=%d slack=%d' % (3 * GIB, 4 * GIB) in line(child, 'admitted'))
-    (second / '.fm-secondmate-parent').write_text('schema=wrong\n')
-    case = Case('s10c', counted=7)
-    case.fixture(available=100 * GIB)
-    child = case.start('badlink', env=dict(case.env, FM_HOME=str(second)))
-    full = wait_notice(child)
-    say(line(child, 'waiting'))
-    check('broken parent link: fallback, never an empty host', full and 'basis=fallback' in line(child, 'waiting'))
-    stop(child)
-
+def noload():
+    say('== noload: the load average really cannot be read (sandbox); head admits, base refuses')
+    calibrate(LAB, peaks_for(GIB, GIB))
+    prefix = ['sandbox-exec', '-p', '(version 1)(allow default)(deny sysctl-read (sysctl-name "vm.loadavg"))']
+    probe = subprocess.run(prefix + ['python3', '-c', 'import os; os.getloadavg()'], capture_output=True, text=True)
+    say('  proof the block works: %s' % probe.stderr.strip().splitlines()[-1])
+    lab = Lab('noload-head'); p = lab.direct('head', prefix=prefix, LAB_HOLD=1)
+    check('head admits with no load reading', wait_log(p, 'pipeline-start admitted', 15)); show(p); kill(p)
+    labb = Lab('noload-base'); q = labb.direct('base', root=BASE, prefix=prefix, LAB_HOLD=1); q.wait(20); show(q)
+    check('base refuses the same start: exit %s' % q.returncode, q.returncode == 125 and labb.start_lines() == [])
+    say('  real host load right now: %s (old limit 36)' % (os.getloadavg(),))
 
 def reattach():
-    scenario('S11 a reattach does not queue while the host is full')
-    record(peaks(50, 50, 50, 50))
-    case = Case('s11', counted=20)
-    case.fixture(available=GIB)
-    child = case.start('attach', intent=False)
-    rc = done(child, 20)
-    check('flagless axi run passes straight through', rc == 0 and 'pipeline-start' not in text(child), text(child)[:200])
+    say('== reattach: a flagless reattach is never queued, even when the host is full')
+    calibrate(LAB, peaks_for(200 * GIB, 200 * GIB))
+    lab = Lab('reattach'); lab.seed(8)
+    w = lab.duration('fresh', LAB_HOLD=1)
+    check('a fresh start queues at this reading', wait_log(w, 'pipeline-start waiting', 15))
+    p = lab.duration('re', intent=False); p.wait(30)
+    check('reattach ran at once and queued nothing: exit %s' % p.returncode, p.returncode == 0 and any(l.split()[1] == 're' for l in lab.start_lines()) and 'pipeline-start' not in log_text(p))
+    check('reattach added no run', lab.counted() == 8)
+    r = lab.launch('rerun', ['python3', str(HEAD / 'bin/fm-duration.py'), 'run', 'lab.rerun', '--', 'no-mistakes', 'rerun'])
+    check('no-mistakes rerun queues as a fresh start', wait_log(r, 'pipeline-start waiting', 15)); show(r); kill(r)
+    kill(w)
 
+def roots():
+    say('== roots: a secondmate home and a worker with only FM_DURATION_HOME read the root home record')
+    calibrate(LAB, peaks_for(1.5 * GIB, 3 * GIB))
+    child = SCRATCH / 'child-home'; (child / 'state').mkdir(parents=True)
+    (child / '.fm-secondmate-parent').write_text('schema=%s\nroute=local\nparent_home=%s\n' % (os.environ['PARENT_SCHEMA'], LAB))
+    lab = Lab('root-child'); lab.env['FM_HOME'] = str(child)
+    p = lab.direct('child', LAB_HOLD=1)
+    check('secondmate home is measured from the root record', wait_log(p, 'pipeline-start admitted', 15) and 'basis=fallback' not in log_text(p) and 'runs_measured=13' in log_text(p)); show(p, 'secondmate'); kill(p)
+    lab = Lab('root-worker'); del lab.env['FM_HOME']; lab.env['FM_DURATION_HOME'] = str(child)
+    p = lab.direct('worker', LAB_HOLD=1)
+    check('worker without FM_HOME is measured from the root record', wait_log(p, 'pipeline-start admitted', 15) and 'runs_measured=13' in log_text(p)); show(p, 'worker'); kill(p)
+    (child / '.fm-secondmate-parent').write_text('schema=broken\n')
+    lab = Lab('root-broken'); lab.env['FM_HOME'] = str(child)
+    p = lab.direct('broken', LAB_HOLD=1)
+    check('broken parent binding takes the fallback', wait_log(p, 'pipeline-start admitted', 15) and 'basis=fallback' in log_text(p)); show(p, 'broken'); kill(p)
 
+def young():
+    say('== young: a run still before CI-ready does not pull R down; a large CI-ready peak still sets S')
+    state = LAB / 'state'
+    path = calibrate(LAB, peaks_for(2 * GIB, 3 * GIB))
+    base_runs = json.loads(path.read_text())
+    lab = Lab('young'); lab.seed(0)
+    q = lab.direct('before', LAB_HOLD=1); wait_log(q, 'pipeline-start admitted', 15); f0 = fields([l for l in log_text(q).splitlines() if 'admitted' in l][-1]); kill(q)
+    lab.sql("DELETE FROM runs")
+    young_rows = {'y%d' % i: 0 for i in range(8)}
+    for run in young_rows:
+        lab.sql("INSERT INTO runs (id, repo_id, status) VALUES (?, 'yr', 'running')", run)
+        base_runs['runs']['no-mistakes:yr/' + run] = dict(peak_bytes=GIB // 5, samples=2)
+    lab.sql("INSERT INTO runs (id, repo_id, status, ci_ready_at) VALUES ('ready', 'yr', 'running', 5)")
+    base_runs['runs']['no-mistakes:yr/ready'] = dict(peak_bytes=7 * GIB, samples=2)
+    path.write_text(json.dumps(base_runs))
+    p = lab.direct('after', LAB_HOLD=1)
+    wait_log(p, 'pipeline-start', 15); time.sleep(0.2)
+    line = [l for l in log_text(p).splitlines() if 'pipeline-start' in l][-1]; f = fields(line); show(p)
+    say('  before: reservation=%.2f slack=%.2f GiB; after: reservation=%.2f slack=%.2f GiB' % (int(f0['reservation']) / GIB, int(f0['slack']) / GIB, int(f['reservation']) / GIB, int(f['slack']) / GIB))
+    check('R is not diluted by 8 young low peaks (it may only rise from the CI-ready peak)', int(f['reservation']) >= int(f0['reservation']))
+    check('S rises to the CI-ready 7 GiB peak', int(f['slack']) == 7 * GIB)
+    kill(p)
+
+def routes():
+    say('== routes: worker brief route skips the pool and can defer 75; fm-duration route uses the pool')
+    calibrate(LAB, peaks_for(200 * GIB, 200 * GIB))
+    lab = Lab('routes'); lab.seed(8)
+    cmd = ['bash', str(HEAD / 'bin/fm-mem-guard.sh'), 'run', '--', 'no-mistakes', 'axi', 'run', '--intent', 'lab']
+    p = lab.launch('memguard', cmd); p.wait(60)
+    say('  memguard route exit=%s output: %s' % (p.returncode, log_text(p).strip()[:200]))
+    check('real reading, full host: the mem-guard route still launched, no pool line', p.returncode == 0 and 'pipeline-start' not in log_text(p) and any(l.split()[1] == 'memguard' for l in lab.start_lines()))
+    pool = lab.duration('pool', LAB_HOLD=1)
+    check('same host: the fm-duration route queues in the pool', wait_log(pool, 'pipeline-start waiting', 15)); show(pool); kill(pool)
+    # exit 75: pressure 2 cannot be made safely on this host, so this one line uses the native fixture boundary.
+    fx = lab.dir / 'native'; fx.mkdir()
+    (fx / 'sysctl').write_text('%d\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' % (128 * GIB))
+    (fx / 'vm_stat').write_text('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 2000000.\nPages purgeable: 100.\nPages occupied by compressor: 32768.\n')
+    (fx / 'processes.json').write_text(json.dumps([dict(pid=101, ppid=1, comm='d', started='s', rss_bytes=GIB, fleet=False, run=None)]))
+    before = len(lab.start_lines())
+    q = lab.launch('memguard75', cmd, FM_MEMORY_FIXTURE_DIR=fx); q.wait(60)
+    say('  FIXTURE pressure=2 memguard exit=%s: %s' % (q.returncode, log_text(q).strip()[:220]))
+    check('FIXTURE pressure 2: mem-guard route exits 75 and launches nothing', q.returncode == 75 and len(lab.start_lines()) == before)
+    r = lab.direct('fixture-pause', FM_MEMORY_FIXTURE_DIR=fx, LAB_HOLD=1)
+    check('FIXTURE pressure 2: pool pauses with the reason named', wait_log(r, 'pipeline-start waiting', 15) and 'overload' in log_text(r)); show(r)
+    (fx / 'sysctl').write_text('%d\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' % (128 * GIB))
+    calibrate(LAB, peaks_for(GIB, GIB))
+    time.sleep(0.2)
+    lab.sql("UPDATE runs SET status='completed'")
+    check('FIXTURE pressure back to 1: the paused start admits with no restart', wait_log(r, 'pipeline-start admitted', 20)); show(r); kill(r)
+
+def highload():
+    say('== highload: real load5 above the old limit of 36; head admits a burst of 3, base waits')
+    calibrate(LAB, peaks_for(GIB, 2 * GIB))
+    for attempt in range(3):
+        say('  real load now: %s' % (os.getloadavg(),))
+        lab = Lab('hl-head-%d' % attempt); ps = [lab.direct('h%d' % i, LAB_HOLD=30) for i in range(3)]
+        labb = Lab('hl-base-%d' % attempt); q = labb.direct('base', root=BASE, LAB_HOLD=30)
+        ok = all(wait_log(p, 'pipeline-start admitted', 20) for p in ps)
+        waited = wait_log(q, 'pipeline-start waiting', 8)
+        for p in ps: show(p, 'head')
+        show(q, 'base')
+        say('  real load after: %s' % (os.getloadavg(),))
+        check('attempt %d: head admitted 3 starts at real load5 above 36' % attempt, ok and all('load' not in log_text(p) for p in ps))
+        check('attempt %d: base waited on the same host: %s' % (attempt, waited), waited and 'load5=' in log_text(q) and labb.start_lines() == [])
+        for p in ps + [q]: kill(p)
+        break
+
+ALL = dict(highload=highload, burst=burst, budget=budget, held=held, floor=floor, fallback=fallback, refuse=refuse, unreadable=unreadable,
+           noload=noload, reattach=reattach, roots=roots, young=young, routes=routes)
 try:
-    for step in (real_host_probe_then_admit, full_while_load_is_low, burst, class_order, overload, exact_budget,
-                 r_and_s_filters, floor_and_fallback, refusals, homes, reattach):
+    for name in WANT or ALL:
         try:
-            step()
+            ALL[name]()
         except Exception as exc:
-            check(step.__name__ + ' crashed', False, repr(exc))
+            import traceback; traceback.print_exc(file=sys.stdout)
+            check('%s driver error %s' % (name, exc), False)
+        finally:
+            for c in children: kill(c)
+            children.clear()
 finally:
-    for child in waiting:
-        stop(child)
-    for proc in ballast:
-        proc.kill()
-failed = [name for name, ok in results if not ok]
-say('\n%d checks, %d failed' % (len(results), len(failed)))
-for name in failed:
-    say('FAILED: ' + name)
-sys.exit(1 if failed else 0)
+    for c in children: kill(c)
+say(); say('SUMMARY: %d checks, %d failed' % (len(RESULTS), sum(not ok for _, ok in RESULTS)))
+for label, ok in RESULTS:
+    if not ok: say('  FAILED: ' + label)

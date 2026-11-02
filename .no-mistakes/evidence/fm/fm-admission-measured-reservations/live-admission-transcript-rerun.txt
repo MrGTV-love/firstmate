@@ -1,0 +1,31 @@
+== budget: wait when reservations do not fit, release on real status change, class order, running work untouched
+  available=45.6 GiB R=11.4 S=16.0 counted=2 need=50.1
+  CHECK PASS other start waits with need > budget notice
+  [other] fm-cpu-pass: pipeline-start waiting: counted=2 need=53835179622 budget=47822323712 reservation=12235268096 slack=17129375334 runs_measured=13 priority=other
+  CHECK PASS no start launched while over budget
+  CHECK PASS running work untouched during the wait
+  CHECK PASS CI-ready release admits the later merge-train start first
+  [train] fm-cpu-pass: pipeline-start waiting: counted=2 need=53835179622 budget=48537518080 reservation=12235268096 slack=17129375334 runs_measured=13 priority=merge-train | fm-cpu-pass: pipeline-start admitted: counted=1 need=41599911526 budget=47966699520 reservation=12235268096 slack=17129375334 runs_measured=13 priority=merge-train
+  CHECK PASS other still waits: the new run took the room
+  CHECK PASS a finished run admits the other start
+  [other] fm-cpu-pass: pipeline-start waiting: counted=2 need=53835179622 budget=47822323712 reservation=12235268096 slack=17129375334 runs_measured=13 priority=other | fm-cpu-pass: pipeline-start admitted: counted=1 need=41599911526 budget=47820668928 reservation=12235268096 slack=17129375334 runs_measured=13 priority=other
+  launch order: ['train', 'other']
+  CHECK PASS class order holds
+  CHECK PASS running work still alive at the end
+== held: real resident memory of real run trees counts, capped at R per run
+  census sees trees: {'no-mistakes:labrepo/light': 2.01, 'no-mistakes:labrepo/heavy': 4.01} available=39.0 GiB
+  CHECK PASS real process trees attributed to their runs
+  CHECK PASS start waits: excess above R is not free memory
+  [capped] fm-cpu-pass: pipeline-start waiting: counted=2 need=46185136128 budget=43451514880 reservation=1073741824 slack=42963910656 runs_measured=13 priority=other
+  need=43.01 budget=40.47 GiB; budget - available at census = 1.45 GiB (capped credit is 2.0, uncapped 6+)
+  CHECK PASS no start launched
+  CHECK PASS start admitted when held credit makes it fit (need above bare available)
+  [credited] fm-cpu-pass: pipeline-start admitted: counted=2 need=41942958080 budget=43065475072 reservation=1073741824 slack=38721732608 runs_measured=13 priority=other
+== reattach: a flagless reattach is never queued, even when the host is full
+  CHECK PASS a fresh start queues at this reading
+  CHECK PASS reattach ran at once and queued nothing: exit 0
+  CHECK PASS reattach added no run
+  CHECK PASS no-mistakes rerun queues as a fresh start
+  [rerun] fm-cpu-pass: pipeline-start waiting: counted=8 priority=other behind a higher-priority or earlier start
+
+SUMMARY: 16 checks, 0 failed
