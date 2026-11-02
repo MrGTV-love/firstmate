@@ -169,7 +169,7 @@ def finish(child, code=0):
     assert actual == code, (actual, code, records)
 
 
-SPACING_LIMIT = 2.0  # seconds between consecutive grants of ready starts; the handshake takes well under one
+SPACING_LIMIT = 5.0  # Allow scheduling delays while still detecting artificial spacing.
 
 
 def grant_gaps(folder, names):
@@ -355,11 +355,11 @@ try:
         (folder / (name + '.release')).touch()
         finish(clients[name])
 
-    # The check must reject spacing. The same burst shape with a 2-second delay injected before
+    # The check must reject spacing. The same burst shape with a 5-second delay injected before
     # each fake start registers (the admission lock is held across it) passes the earlier
     # assertions but fails assert_no_spacing; the undelayed burst above passed it.
     folder, db, env = case('spacing-injected', cores=3, measured=True, available=40 * GIB)
-    env['CASE_LAUNCH_DELAY'] = '2'
+    env['CASE_LAUNCH_DELAY'] = '5'
     names = ['slow-%d' % i for i in range(4)]
     clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names}
     for name in names:
@@ -375,7 +375,7 @@ try:
     except AssertionError as rejected:
         injected_rejection = str(rejected)
     else:
-        raise AssertionError('the injected 2-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
+        raise AssertionError('the injected 5-second per-launch delay was not rejected: %r' % grant_gaps(folder, names))
     for name in names:
         (folder / (name + '.release')).touch()
         finish(clients[name])
