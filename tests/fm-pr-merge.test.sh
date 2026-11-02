@@ -14,10 +14,11 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 
 test_derived_author_coverage() {
-  local scenario case_dir head base url rc before after groups expected command rewritten
+  local scenario case_dir head base url rc before after groups unknown_groups expected command rewritten
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group; do
+  unknown_groups='{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}'
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group unknown-two-families unknown-fail-clears; do
     if [ "$scenario" = denied-parent ] && [ "$(id -u)" = 0 ]; then
       printf 'skip: denied-parent (chmod 0 does not deny root)\n'
       continue
@@ -61,7 +62,7 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run-a', 'repo', 'fm/fixture', sys.argv[3], sys.argv[7], sys.argv[7], sys.argv[5]))
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run-a', 'rebase', 'claude', 'claude-sonnet-5-5', 'anthropic', 'completed'))
     step = 'rebase' if sys.argv[6].startswith('rebase-') else 'review'
-    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean'):
+    if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean', 'unknown-two-families', 'unknown-fail-clears'):
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'mystery-9' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', None, None, 'completed'))
@@ -69,6 +70,8 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'claude', '', None, 'cancelled'))
     if sys.argv[6] == 'errored-omp':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'error'))
+    if sys.argv[6] in ('unknown-two-families', 'unknown-fail-clears'):
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'completed'))
     if sys.argv[6] == 'rebase-unreadable':
         db.execute('DROP TABLE agent_invocations')
     if sys.argv[6] == 'query-fails':
@@ -154,6 +157,13 @@ PY
         record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null || fail 'record newest unknown-family read' ;;
       unreadable|unknown-captain-word)
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown pipeline read' ;;
+      unknown-two-families)
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record first-family read of the unknown group' ;;
+      unknown-fail-clears)
+        # The OpenAI PASS predates the FAIL, so only the later Claude PASS counts.
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" --reader-model gpt-5.1-codex >/dev/null || fail 'record pre-FAIL OpenAI read'
+        record_review "$case_dir" "$url" "$head" --verdict FAIL --author-groups "$unknown_groups" --reader-model gemini-3-pro >/dev/null || fail 'record FAIL of the unknown group'
+        record_review "$case_dir" "$url" "$head" --author-groups "$unknown_groups" >/dev/null || fail 'record later Claude read' ;;
       *)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail "record Claude read for $scenario"
         if [ "$scenario" != claude-only ] && [ "$scenario" != mixed-unknown ]; then
@@ -199,14 +209,14 @@ PY
     fi
     if [ "$scenario" = mixed-unknown ]; then
       expect_code 1 "$rc" "a mixed known and unknown pipeline must refuse: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'the un-coverable unknown group is reported first'
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the unknown group is reported first'
       assert_grep 'captain-word --pr' "$case_dir/stderr" 'the unknown group names the captain-word route'
       assert_no_grep 'OUTSIDE_FAMILY_MODEL' "$case_dir/stderr" 'no known-family read is requested ahead of the unknown group'
     fi
     if [ "$scenario" = unknown-captain-word ]; then
-      expect_code 1 "$rc" "an unknown pipeline family must refuse every PASS: $(cat "$case_dir/stderr")"
-      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'unknown group is named accurately'
-      assert_no_grep 'covered-groups' "$case_dir/stderr" 'no PASS recording command is offered for an unknown family'
+      expect_code 1 "$rc" "an unknown pipeline family must refuse a one-family PASS: $(cat "$case_dir/stderr")"
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'unknown group is named accurately'
+      assert_grep 'SECOND_KNOWN_FAMILY_MODEL' "$case_dir/stderr" 'the unknown group names the second-family review route'
       command=$(sed -n 's/.* in place of FRESH_CAPTAIN_WORDS with: //p' "$case_dir/stderr")
       command=${command%; inspect review-records.jsonl in the PR task home before retrying}
       [ -n "$command" ] || fail "unknown-family refusal printed no captain-word command: $(cat "$case_dir/stderr")"
@@ -214,6 +224,26 @@ PY
       eval "$command" > "$case_dir/captain.out" 2>&1 || fail "the printed captain-word command failed: $(cat "$case_dir/captain.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    if [ "$scenario" = unknown-two-families ] || [ "$scenario" = unknown-fail-clears ]; then
+      expect_code 1 "$rc" "$scenario must refuse before the second family reads: $(cat "$case_dir/stderr")"
+      if [ "$scenario" = unknown-two-families ]; then
+        assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families' "$case_dir/stderr" 'the real unknown group is refused on one family'
+      else
+        assert_grep 'no later exact-head PASS covers group no-mistakes:unknown, family unknown, that this FAIL read' "$case_dir/stderr" 'a PASS from before the FAIL does not count toward two families'
+      fi
+      assert_grep "set each read's actual trigger answers and local report" "$case_dir/stderr" 'the refusal asks for the real trigger answers'
+      command=$(sed -n 's/.*then record each with: //p' "$case_dir/stderr")
+      command=${command%%; or *}
+      [ -n "$command" ] || fail "$scenario refusal printed no recording command: $(cat "$case_dir/stderr")"
+      printf 'VERDICT: PASS head=%s\nOpenAI read of the unknown-family commits.\n' "$head" > "$case_dir/second-family.md"
+      command=${command//SECOND_KNOWN_FAMILY_MODEL/gpt-5.1-codex}
+      command=${command//LOCAL_READER_REPORT/$case_dir/second-family.md}
+      eval "$command" > "$case_dir/second-family.out" 2>&1 || fail "the printed second-family command failed: $(cat "$case_dir/second-family.out")"
+      rc=0
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      "$JQ_BIN" -s -e 'all(.kind != "captain-word")' "$case_dir/state/review-records.jsonl" >/dev/null \
+        || fail "$scenario must merge without a captain-word record"
     fi
     if [ "$scenario" = fail-typed-group ]; then
       expect_code 1 "$rc" "a FAIL of a typed group must refuse: $(cat "$case_dir/stderr")"
@@ -243,7 +273,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|exact-head-fail|rebase-deepseek|rebase-two-readers|missing-db-direct|fail-typed-group|unknown-two-families|unknown-fail-clears)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
