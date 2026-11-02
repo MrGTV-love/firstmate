@@ -1650,12 +1650,26 @@ test_ship_scaffolds_teach_the_closes_line() {
       FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" --forge "$forge" >/dev/null 2>&1 \
         || fail "fm-brief.sh --mode $mode --forge $forge exited non-zero"
       brief="$home/data/$id/brief.md"
-      assert_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief did not teach the Closes: line"
-      assert_grep 'in your commit message and in the PR body' "$brief" "$mode/$forge ship brief did not say where the line goes"
+      assert_grep "Closes: $id" "$brief" "$mode/$forge ship brief did not teach the Closes: line with this task's id"
+      assert_no_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief left the placeholder instead of the task id"
+      assert_grep 'in your commit message' "$brief" "$mode/$forge ship brief did not say where the line goes"
       assert_grep 'A merge through bin/fm-pr-merge.sh closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
-      assert_grep 'The pipeline can rewrite the PR body after your commit' "$brief" "$mode/$forge ship brief did not warn about pipeline body writes"
-      assert_grep 'read the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body last"
+      assert_grep 'ead the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body"
       assert_grep "then read the body again and confirm each line is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+      if [ "$mode" = no-mistakes ]; then
+        # The pipeline writes the PR body after the handoff, so the check belongs after the
+        # CI-ready return point and before the CI-ready done, never before the handoff done.
+        handoff=$(grep -n 'is the handoff that starts the pipeline' "$brief" | head -1 | cut -d: -f1)
+        ready=$(grep -n 'After /no-mistakes reports CI green' "$brief" | head -1 | cut -d: -f1)
+        check=$(grep -n 'Before that done, check the PR body' "$brief" | head -1 | cut -d: -f1)
+        final=$(grep -n 'checks green` and stop' "$brief" | head -1 | cut -d: -f1)
+        [ -n "$handoff" ] && [ -n "$ready" ] && [ -n "$check" ] && [ -n "$final" ] \
+          || fail "$mode/$forge brief is missing a stage line the body check is ordered against"
+        [ "$check" -gt "$ready" ] && [ "$check" -lt "$final" ] && [ "$check" -gt "$handoff" ] \
+          || fail "$mode/$forge brief puts the PR body check outside the window after CI green"
+      else
+        assert_grep 'as the last step before your final done' "$brief" "$mode/$forge ship brief did not order the body check last"
+      fi
     done
     assert_grep 'gh-axi pr edit <number> --body-file' "$home/data/brief-closes-$mode-none/brief.md" "$mode ship brief did not name the GitHub edit route"
     assert_grep 'tea pulls edit <number>' "$home/data/brief-closes-$mode-forgejo/brief.md" "$mode Forgejo brief did not name the Forgejo edit route"
@@ -1663,13 +1677,13 @@ test_ship_scaffolds_teach_the_closes_line() {
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-local alpha --mode local-only >/dev/null 2>&1 \
     || fail "fm-brief.sh --mode local-only exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes: brief-closes-local' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-gerrit alpha --mode direct-PR --forge gerrit --shape squash >/dev/null 2>&1 \
     || fail "fm-brief.sh --forge gerrit exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes: brief-closes-gerrit' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes: line"
+  assert_no_grep 'Closes: brief-closes-scout' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes: line"
   pass "fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not"
 }
 
