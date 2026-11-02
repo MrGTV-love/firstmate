@@ -30,14 +30,23 @@ every 15 seconds. Records identify REST resources.graphql, not GraphQL response
 headers. This observer intentionally uses the REST counter rather than spending
 points on a GraphQL accounting query. REST shard agreement is not established.
 A slow request is not overlapped or retried in a burst; pending ticks are recorded.
-A request still running after QUOTA_TIMEOUT has its private process group killed
-and is recorded unavailable with reason=timeout; the next normal tick sends a new one.
+A request is stopped only on bin/fm-duration.py's no-progress verdict (no process-tree
+CPU growth and no runnable member for FM_DURATION_NO_PROGRESS_SECS, default 15 minutes),
+never by wall clock, and without CPU telemetry it is not stopped. Its private process
+group is then killed and it is recorded unavailable with reason=timeout; the next
+normal tick sends a new one.
+Limit: a SIGKILL of the owner while a gh-axi quota child hangs can leave that child alive, and a new owner can overlap it until it exits; a normal stop kills the group.
 The owner inherits PATH: a gh-axi it cannot launch records unavailable with
 reason=command_unavailable on each tick, which fails neither start nor the owner.
 
 Process source: one LC_ALL=C ps table every 0.2 seconds in the root home's
-watcher context, not a confined worker. A ps past PS_TIMEOUT is killed and counts
-as a sampling failure. run's process_source callable is a test
+watcher context, not a confined worker. Each scan runs off the owner's loop and scans
+never overlap, so a slow or hung ps delays neither the quota stream nor stop. A ps
+with no output or CPU progress for the same interval is killed and counts as a
+sampling failure. Where that CPU sample itself needs ps (Darwin) and ps hangs, no
+verdict exists: only stop ends the scan, the sampler's own ps stays until it exits,
+and sampling summaries show the gap as missing scans.
+run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
 Injected rows prove output behavior, not actual host observations. New gh/gh-axi
 PID/start identities retain sanitized argv and the observed ancestor chain. Payloads and
@@ -55,26 +64,28 @@ counts/gaps and failures, not an assurance that every requested tick ran on time
 import argparse
 from contextlib import contextmanager
 import fcntl
+import functools
 import json
 import os
 from pathlib import Path
 import re
+import runpy
 import signal
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 
 QUOTA_INTERVAL = 15.0
-QUOTA_TIMEOUT = 30.0
-PS_TIMEOUT = 5.0
 PROCESS_INTERVAL = 0.2
 RETENTION = 48 * 60 * 60
 APPLICATION_ID = 0x464D4748
 LOG_LIMIT = 64 * 1024
 BUSY = 75
+SAMPLE_ERRORS = (OSError, subprocess.SubprocessError, RuntimeError)
 QUOTA_JQ = '.resources.graphql | "used=\\(.used) reset=\\(.reset) limit=\\(.limit) remaining=\\(.remaining)"'
 QUOTA_BODY = re.compile(r'''^  body: ["']?used=(\d+) reset=(\d+) limit=(\d+|null) remaining=(\d+|null)["']?$''', re.MULTILINE)
 ROW = re.compile(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)")
@@ -217,13 +228,48 @@ def safe_argv(argv):
     return result
 
 
+@functools.lru_cache(maxsize=1)
+def progress_api():
+    # bin/fm-duration.py owns the no-progress verdict, its interval and the blind-telemetry rule.
+    return runpy.run_path(str(Path(__file__).resolve().with_name("fm-duration.py")))
+
+
+def wait_for_progress(child):
+    """Wait for a private child; TimeoutExpired only on the shared no-progress verdict."""
+    api = progress_api()
+    return api["communicate_progress"](child, api["positive_override"]("FM_DURATION_NO_PROGRESS_SECS",
+                                                                       api["NO_PROGRESS_LIMIT"]))
+
+
+def end_child(child):
+    if child.poll() is None:
+        # The unreaped child owns a fresh session/group, so its numeric
+        # group cannot be reused by an unrelated caller.
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    child.wait()
+
+
+LIVE_PS = None
+
+
 def process_table():
-    reply = subprocess.run(["ps", "-axo", "pid=,ppid=,lstart=,command="],
-                           env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
-                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True,
-                           timeout=PS_TIMEOUT)
+    global LIVE_PS
+    LIVE_PS = child = subprocess.Popen(["ps", "-axo", "pid=,ppid=,lstart=,command="],
+                                       env=dict(os.environ, LC_ALL="C", COLUMNS="100000"),
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                       stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    try:
+        stdout, _ = wait_for_progress(child)
+    except subprocess.TimeoutExpired:
+        end_child(child)
+        raise
+    if child.returncode:
+        raise RuntimeError("process table unavailable")
     rows = {}
-    for line in reply.stdout.splitlines():
+    for line in stdout.splitlines():
         match = ROW.fullmatch(line)
         if match:
             pid, ppid, start, command = match.groups()
@@ -269,15 +315,27 @@ def owner_status(root):
     return {"state": "stopped"}
 
 
-def end_quota_child(child):
-    if child.poll() is None:
-        # The unreaped quota child owns a fresh session/group, so its numeric
-        # group cannot be reused by an unrelated caller.
+class Scan(threading.Thread):
+    """One process-table read off the owner's loop; the loop judges its result."""
+
+    def __init__(self, source):
+        super().__init__(daemon=True)
+        self.source = source
+        self.rows = self.error = None
+
+    def run(self):
         try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
-    child.wait()
+            self.rows = self.source()
+        except Exception as error:
+            self.error = error
+
+
+def stop_without_progress(child, expired):
+    try:
+        wait_for_progress(child)
+    except subprocess.TimeoutExpired:
+        expired.set()
+        end_child(child)
 
 
 def quota_result(db, child, stream, began, run_id, timed_out):
@@ -304,6 +362,7 @@ def run(root, duration=None, ready=None, *, process_source=None):
     # Root-home execution uses ps; deterministic callers inject the same table
     # shape without changing filtering, ancestry, identity or storage behavior.
     source = process_table if process_source is None else process_source
+    progress_api()
     with ownership(root, fcntl.LOCK_EX) as lock:
         lock.truncate(0)
         db = database(root)
@@ -319,12 +378,25 @@ def run(root, duration=None, ready=None, *, process_source=None):
 
         for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(number, stop_requested)
-        child = stream = None
+        child = stream = expired = scan = None
         seen = set()
         scans = failures = 0
         max_gap = 0.0
         previous = None
         started = next_process = next_quota = time.monotonic()
+
+        def finish_scan():
+            nonlocal scan, seen, failures
+            finished, scan = scan, None
+            if isinstance(finished.error, SAMPLE_ERRORS):
+                failures += 1
+            elif finished.error is not None:
+                raise finished.error
+            else:
+                found, seen = process_records(finished.rows, seen)
+                for item in found:
+                    record(db, "process", dict(item, run_id=run_id))
+
         try:
             prune(db, time.time())
             record(db, "owner", dict(metadata, action="start", process_interval=PROCESS_INTERVAL, quota_interval=QUOTA_INTERVAL))
@@ -342,27 +414,22 @@ def run(root, duration=None, ready=None, *, process_source=None):
                         break
                 except FileNotFoundError:
                     pass
-                if child is not None:
-                    timed_out = child.poll() is None and now - requested >= QUOTA_TIMEOUT
-                    if timed_out:
-                        end_quota_child(child)
-                    if child.returncode is not None:
-                        quota_result(db, child, stream, began, run_id, timed_out)
-                        child = stream = None
-                        db.commit()
-                if now >= next_process:
-                    if previous is not None:
-                        max_gap = max(max_gap, now - previous)
-                    previous = now
-                    scans += 1
-                    try:
-                        found, seen = process_records(source(), seen)
-                        for item in found:
-                            record(db, "process", dict(item, run_id=run_id))
-                    except (OSError, subprocess.SubprocessError, RuntimeError):
-                        failures += 1
-                    next_process = now + PROCESS_INTERVAL
+                if child is not None and child.poll() is not None:
+                    quota_result(db, child, stream, began, run_id, expired.is_set())
+                    child = stream = None
                     db.commit()
+                if scan is not None and not scan.is_alive():
+                    finish_scan()
+                    db.commit()
+                if now >= next_process:
+                    next_process = now + PROCESS_INTERVAL
+                    if scan is None:
+                        if previous is not None:
+                            max_gap = max(max_gap, now - previous)
+                        previous = now
+                        scans += 1
+                        scan = Scan(source)
+                        scan.start()
                 if now >= next_quota:
                     record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
                                              "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
@@ -371,7 +438,6 @@ def run(root, duration=None, ready=None, *, process_source=None):
                     prune(db, time.time())
                     if child is None:
                         began = time.time()
-                        requested = time.monotonic()
                         stream = tempfile.TemporaryFile(dir=root)
                         try:
                             child = subprocess.Popen(["gh-axi", "api", "rate_limit", "--jq", QUOTA_JQ, "--full"],
@@ -382,6 +448,9 @@ def run(root, duration=None, ready=None, *, process_source=None):
                             stream = None
                             record(db, "quota", {"run_id": run_id, "status": "unavailable", "endpoint": "rate_limit",
                                                  "source": "REST rate_limit resources.graphql", "reason": "command_unavailable"})
+                        else:
+                            expired = threading.Event()
+                            threading.Thread(target=stop_without_progress, args=(child, expired), daemon=True).start()
                     else:
                         record(db, "quota", {"run_id": run_id, "status": "pending", "endpoint": "rate_limit",
                                              "source": "REST rate_limit resources.graphql", "request_pid": child.pid})
@@ -392,8 +461,12 @@ def run(root, duration=None, ready=None, *, process_source=None):
             if ready is not None:
                 os.close(ready)
             if child is not None:
-                end_quota_child(child)
+                end_child(child)
                 stream.close()
+            if LIVE_PS is not None:
+                end_child(LIVE_PS)
+            if scan is not None and scan.rows is not None:
+                finish_scan()
             record(db, "sampling", {"run_id": run_id, "scans": scans, "failures": failures,
                                      "max_gap_seconds": max_gap, "process_interval": PROCESS_INTERVAL})
             record(db, "owner", {"run_id": run_id, "action": "stop"})

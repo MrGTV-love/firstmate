@@ -4,6 +4,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -42,6 +43,25 @@ class ObserverTests(unittest.TestCase):
 
     def records(self, kind):
         return [json.loads(line) for line in self.cli("records", "--kind", kind).stdout.splitlines()]
+
+    def scaled_owner(self, duration):
+        # A labeled scaled clock runs the real 15 s cadence and a labeled 30 s
+        # no-progress interval twenty times faster. The real ps samples CPU.
+        (self.fakebin / "ps").unlink()
+        launcher = self.root / "scaled-clock.py"
+        launcher.write_text(f'''import runpy,sys,time
+scale=20.0
+real_monotonic,real_sleep=time.monotonic,time.sleep
+base=real_monotonic()
+time.monotonic=lambda: base+(real_monotonic()-base)*scale
+time.sleep=lambda seconds: real_sleep(seconds/scale)
+owner=runpy.run_path(sys.argv[1])
+owner["run"](owner["private_root"](),duration={duration},process_source=lambda:{{}})
+''')
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], capture_output=True, text=True, timeout=120,
+                               env=dict(self.env, FM_DURATION_NO_PROGRESS_SECS="30"))
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        return self.records("quota")
 
     def assertProcessGone(self, pid):
         # A killed orphan can briefly remain a zombie; /proc on Linux or the
@@ -150,7 +170,7 @@ owner["run"](owner["private_root"](),duration=0.5,process_source=lambda:table)
         ])
         self.assertNotIn("fixture-secret", json.dumps(rows))
 
-    def test_hung_quota_request_is_killed_and_the_next_tick_sends_a_new_one(self):
+    def test_quiet_quota_request_is_killed_and_the_next_tick_sends_a_new_one(self):
         self.tool("gh-axi", '''n=0
 [ ! -e "$FIXTURE_ROOT/count" ] || n=$(cat "$FIXTURE_ROOT/count")
 n=$((n+1)); printf '%s' "$n" > "$FIXTURE_ROOT/count"
@@ -165,20 +185,7 @@ if [ "$n" = 1 ]; then
 fi
 printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
 ''')
-        # A labeled scaled clock runs the real 15 s and 30 s constants twenty times faster.
-        launcher = self.root / "scaled-clock.py"
-        launcher.write_text('''import runpy,sys,time
-scale=20.0
-real_monotonic,real_sleep=time.monotonic,time.sleep
-base=real_monotonic()
-time.monotonic=lambda: base+(real_monotonic()-base)*scale
-time.sleep=lambda seconds: real_sleep(seconds/scale)
-owner=runpy.run_path(sys.argv[1])
-owner["run"](owner["private_root"](),duration=100,process_source=lambda:{})
-''')
-        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True, timeout=120)
-        self.assertEqual(reply.returncode, 0, reply.stderr)
-        rows = self.records("quota")
+        rows = self.scaled_owner(100)
         expired = [index for index, row in enumerate(rows) if row.get("reason") == "timeout"]
         self.assertEqual(len(expired), 1, rows)
         timeout = rows[expired[0]]
@@ -190,19 +197,36 @@ owner["run"](owner["private_root"](),duration=100,process_source=lambda:{})
         self.assertFalse((self.root / "overlap").exists(), "a new request overlapped the timed-out one")
         self.assertProcessGone(int((self.root / "quota-child").read_text()))
 
-    def test_hung_ps_is_killed_and_does_not_stop_the_quota_stream(self):
-        self.tool("ps", '''printf '%s' "$$" > "$FIXTURE_ROOT/ps-pid"
-exec sleep 600
+    def test_quota_request_still_using_cpu_is_not_killed(self):
+        self.tool("gh-axi", '''end=$(( $(date +%s) + 3 ))
+while [ "$(date +%s)" -lt "$end" ]; do :; done
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        rows = self.scaled_owner(200)
+        self.assertEqual([row for row in rows if row.get("reason") == "timeout"], [], rows)
+        self.assertIn("observed", [row["status"] for row in rows])
+
+    def test_quiet_ps_is_killed_and_does_not_stop_the_quota_stream(self):
+        # Only the owner's table read hangs; the shared CPU sampler reads the real ps.
+        self.tool("ps", f'''[ "$1" != -axo ] || {{ printf '%s' "$$" > "$FIXTURE_ROOT/ps-pid"; exec sleep 600; }}
+exec {shutil.which("ps")} "$@"
 ''')
         self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
 printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
 ''')
-        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "6"], env=self.env,
-                               capture_output=True, text=True, timeout=60)
+        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "6"], capture_output=True, text=True,
+                               timeout=60, env=dict(self.env, FM_DURATION_NO_PROGRESS_SECS="1"))
         self.assertEqual(reply.returncode, 0, reply.stderr)
         self.assertGreaterEqual(sum(row["failures"] for row in self.records("sampling")), 1)
         self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
         self.assertProcessGone(int((self.root / "ps-pid").read_text()))
+
+    def test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working(self):
+        self.tool("ps", "exec sleep 20\n")
+        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "3"], env=self.env,
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        self.assertIn("observed", [row["status"] for row in self.records("quota")])
 
     def test_malformed_quota_is_unavailable_not_zero(self):
         self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")

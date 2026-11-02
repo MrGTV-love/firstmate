@@ -462,7 +462,10 @@ esac
 LAVISH_AUTO_RETIRE_BIN=${FM_LAVISH_AUTO_RETIRE_BIN:-$SCRIPT_DIR/fm-procevent-lavish.sh}
 LAVISH_AUTO_RETIRE_NEXT=
 GITHUB_ACCOUNTING_BIN=${FM_GITHUB_ACCOUNTING_BIN:-$SCRIPT_DIR/fm-github-accounting.py}
-GITHUB_ACCOUNTING_RETRY_SECS=3600
+# Pace of silent retries after a failed start; it stops no running work.
+GITHUB_ACCOUNTING_RETRY_FALLBACK=3600
+GITHUB_ACCOUNTING_RETRY_SECS=$(python3 "$SCRIPT_DIR/fm-duration.py" limit github-accounting.start-retry \
+  --fallback "$GITHUB_ACCOUNTING_RETRY_FALLBACK" 2>/dev/null) || GITHUB_ACCOUNTING_RETRY_SECS=$GITHUB_ACCOUNTING_RETRY_FALLBACK
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake

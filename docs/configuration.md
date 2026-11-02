@@ -1092,7 +1092,8 @@ That source was explicitly selected instead of the original GraphQL-query/header
 Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
 Its own start/stop commands manage only its private owner and quota child group, never a shared service.
-A quota request still running after 30 seconds has that group killed and is recorded unavailable with `reason=timeout`, and a `ps` still running after 5 seconds is killed and counted as a sampling failure, so neither can stop the observer.
+No wall-clock limit stops a quota request or a `ps`: each is killed only on `bin/fm-duration.py`'s no-progress verdict (15 quiet minutes by default, `FM_DURATION_NO_PROGRESS_SECS`), a killed request is recorded unavailable with `reason=timeout`, and a killed `ps` counts as a sampling failure.
+Each `ps` runs off the owner's loop, so a slow or hung one delays neither the quota stream nor `stop`.
 Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tests/fm-github-accounting.test.sh) and, for the watcher's lifecycle, [`tests/fm-watch-github-accounting.test.sh`](../tests/fm-watch-github-accounting.test.sh); controlled fixtures do not establish live counter accuracy or universal caller capture.
 
 ### Completion and discard
