@@ -904,10 +904,13 @@ teardown_friction_outcome retried
 
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
-# the record's own prior_worktree= pool slot that encloses its recorded path -
-# what a nested teardown leaves when it stops after removing that copy.
+# the record's own prior_worktree= pool slot that encloses its recorded path,
+# else the pool slot that strictly contains that path through its nearest
+# existing ancestor - what a nested teardown leaves when it stops after removing
+# that copy. The place decides it, never a prior_worktree= line; who the slot
+# claim names is teardown_nested_slot's question.
 teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
-  local meta=$1 project=$2 worktree=$3 copy line prior prior_real
+  local meta=$1 project=$2 worktree=$3 copy line prior prior_real tail=
   if copy=$(fm_task_copy_canonical_dir "$worktree"); then
     fm_task_copy_enclosing_pool_slot "$project" "$copy"
     return
@@ -922,7 +925,13 @@ teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
     printf '%s\n' "$prior_real"
     return 0
   done < "$meta"
-  return 1
+  case "$worktree" in /*) ;; *) return 1 ;; esac
+  while [ -n "$worktree" ] && [ ! -d "$worktree" ]; do
+    tail=/${worktree##*/}$tail
+    worktree=${worktree%/*}
+  done
+  copy=$(fm_task_copy_canonical_dir "$worktree") || return 1
+  fm_task_copy_enclosing_pool_slot "$project" "$copy$tail"
 }
 
 # True when a record's worktree is a pool slot of its project or a slot
@@ -1988,6 +1997,14 @@ teardown_preserves_reassociated_copy() {
   return 1
 }
 
+# A current copy that is not itself a pool slot but sits inside one, whatever
+# the record's lines say. Its slot is the one owner above's answer.
+teardown_current_copy_nested_in_slot() {  # <meta> <kind> <backend> <project> <worktree>
+  [ "$2" != secondmate ] && [ "$3" != orca ] || return 1
+  ! fm_treehouse_pool_slot "$4" "$5" || return 1
+  teardown_record_enclosing_slot "$1" "$4" "$5" >/dev/null
+}
+
 # A record that bin/fm-control.sh reassociate re-pointed at a replacement copy
 # names every copy the task worked in before in prior_worktree=, or in
 # released_worktree= when the copy's pool slot was released. Teardown never
@@ -1998,9 +2015,10 @@ teardown_preserves_reassociated_copy() {
 # applies to it and its branch and hook files are not Firstmate's to remove:
 # after the ordinary landed-work test it is left exactly as it is. A current
 # copy that is a pool slot takes the ordinary return path below. So does a
-# current copy nested inside a pool slot this task still claims: it is removed
-# and that slot is returned, since the slot would otherwise stay held by a task
-# that no longer exists (teardown_nested_slot).
+# current copy nested inside a pool slot this task still claims, with or
+# without a prior_worktree= line: it is removed and that slot is returned, since
+# the slot would otherwise stay held by a task that no longer exists
+# (teardown_nested_slot).
 TEARDOWN_PRIOR_COPIES=()
 while IFS= read -r teardown_prior_line || [ -n "$teardown_prior_line" ]; do
   case "$teardown_prior_line" in
@@ -2010,7 +2028,8 @@ done < "$META"
 TEARDOWN_KEEP_COPY=0
 TEARDOWN_ENCLOSING_SLOT=
 TEARDOWN_RECORD_SLOT=
-if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
+if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT" \
+   || teardown_current_copy_nested_in_slot "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
   TEARDOWN_KEEP_COPY=1
   TEARDOWN_RECORD_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") \
     || TEARDOWN_RECORD_SLOT=
@@ -6797,7 +6816,11 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
         FM_TASK_COPY_POOL_STATE_FILE=
         FM_TASK_COPY_POOL_STATE_ENTRIES=
         fm_task_copy_pool_slot_held "$TEARDOWN_RETURN_SLOT" || {
-          echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          if [ -n "$TEARDOWN_RETURN_SLOT" ]; then
+            echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          else
+            echo "REFUSED: no pool slot was resolved for task $ID's return, so no durable lease can be proved; retaining the task record and contents" >&2
+          fi
           exit 1
         }
       fi
