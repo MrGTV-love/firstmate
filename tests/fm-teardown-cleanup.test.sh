@@ -5419,27 +5419,45 @@ held_marker_case() {  # <label> <enclosing|plain>
 }
 
 test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
-  local rc shape mode label
+  local rc shape mode label fragment
   for shape in plain enclosing; do
-    for mode in no-lease-command lease-fails; do
+    for mode in no-lease-command lease-fails held-record-is-a-directory; do
       label="held-marker-$shape-$mode"
       held_marker_case "$label" "$shape"
-      : > "$FOREIGN_CASE/$mode"
+      case "$mode" in
+        held-record-is-a-directory)
+          mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
+          fragment="REFUSED: the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log could not be written"
+          ;;
+        *)
+          : > "$FOREIGN_CASE/$mode"
+          fragment="REFUSED: pool slot $FOREIGN_SLOT could not be durably leased"
+          ;;
+      esac
       held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
       run_foreign_teardown rc
-      expect_code 1 "$rc" "$label: a held close that cannot lease its slot must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "REFUSED: pool slot $FOREIGN_SLOT could not be durably leased" "$FOREIGN_CASE/stderr" \
-        "$label: the refusal did not name the slot"
+      expect_code 1 "$rc" "$label: a held close that cannot lease its slot or write its record must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "$fragment" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
       cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" \
         || fail "$label: the refusal changed the pending-close record"
       cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" \
         || fail "$label: the refusal changed the return-pending record"
       assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
-      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+      if [ "$mode" = held-record-is-a-directory ]; then
+        # The slot was leased before the record was tried, and a refusal keeps that
+        # durable custody so a later treehouse get cannot reset the held copies.
+        jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "task-x1"' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+          || fail "$label: the refusal did not keep the slot's durable lease: $(cat "$FOREIGN_CASE/pool/treehouse-state.json")"
+        held_assert_copies_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+      else
+        jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+          || fail "$label: the slot's lease record changed"
+        held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+      fi
     done
   done
-  pass "a held close that cannot durably lease its slot leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
+  pass "a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
 }
 
 test_a_held_close_that_leases_retires_an_earlier_pending_close_record() {
