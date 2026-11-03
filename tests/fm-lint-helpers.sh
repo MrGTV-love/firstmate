@@ -27,6 +27,11 @@ REQUIRED=$("$LINT" --required-version)
 export FM_LINT_CACHE_DIR=off
 # Nor may they queue on the operator's shared host-wide ShellCheck slots.
 export FM_LINT_SLOT_DIR=off
+# A cold lint root takes a CPU pass: these regressions use a private pool and
+# never inherit an outer runner's pass count, which would cut their --jobs.
+unset FM_CPU_PASS_HELD
+FM_CPU_POOL_DIR=$(fm_test_tmproot fm-lint-pool)
+export FM_CPU_POOL_DIR
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests

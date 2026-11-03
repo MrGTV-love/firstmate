@@ -167,16 +167,29 @@ seconds after the recorded epoch (the pid was reused; ps start times have
 one-second resolution, hence the slack), so a reused pid is never taken for the
 holder. Only a held lock reads as a busy slot: a flock that fails any other way
 runs the command without a slot, like any unusable slot file. A waiter prints
-its first notice after 2 seconds and another every 60, waits at most
-FM_TEST_SLOT_WAIT_SECONDS (default 7200), and then runs without a slot and says
-so: the gate shapes throughput and is not a safety boundary, so it never blocks
-a test for good and never stops one when the slot directory or a slot file is
-unusable or this Python has no POSIX file locks: it runs without a slot and says
-so. A command run under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab
-separated), so the same key nested inside it takes no second slot. A malformed
-FM_TEST_KEY_SLOTS or FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit
-125 from gate).
+its first notice after 2 seconds and another every 60, and waits until a holder
+ends: no elapsed time admits it, so a further copy never runs beside the limit
+because a holder is slow (the retired FM_TEST_SLOT_WAIT_SECONDS is no longer
+read). A holder that never ends is bounded only by its own stop rules, as it is
+for the CPU passes it holds. The gate shapes throughput and is not a safety
+boundary, so it never blocks a test for good and never stops one when the slot
+directory or a slot file is unusable or this Python has no POSIX file locks: it
+runs without a slot and says so. A command run under a slot exports
+FM_TEST_SLOT_HELD (the keys it holds, tab separated), so the same key nested
+inside it takes no second slot. A process that holds CPU passes
+(FM_CPU_PASS_HELD above 0) takes no slot at all, so it never waits behind a
+slot whose holder waits for a pass. A malformed FM_TEST_KEY_SLOTS or
+FM_CPU_PASS_HELD refuses the command by name (exit 125 from gate).
 docs/configuration.md "Test slots per key" owns the sizing rationale.
+
+CPU pass for test.* keys. run takes one pass of the host-wide CPU pass pool
+(bin/fm-cpu-pass.py; docs/cpu-pass-pool.md owns the protocol) for a test.* key
+after its slot and before it starts its clock, so a queued run counts toward
+neither the clock nor the stop rules, and exports FM_CPU_PASS_HELD=1 to COMMAND.
+A run already inside a pass takes none. A pool that cannot be used (no
+bin/fm-cpu-pass.py beside this helper is silent; no flock, no pool directory or
+a foreign-owned one is reported once) runs COMMAND without a pass. gate takes no
+pass: bin/fm-test-run.sh takes its own inside the slot.
 
 A timeout is a real limit that stopped a command, reported by the owner of that
 limit (run's no-progress or absolute stop, fm_run_timed, the lint root bound, the
@@ -211,6 +224,7 @@ try:
 except ImportError:
     fcntl = None  # Native Windows Python cannot use the POSIX timing runner.
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -909,12 +923,11 @@ def calibration_scratch():
 SLOT_PREFIX = 'test.'
 SLOT_DEFAULT = 2  # sizing: docs/configuration.md "Test slots per key"
 SLOT_MAX = 16
-# measured: value=7200 date=2026-10-17 host=Mac-Studio.local margin=1.05 (longest fm-teardown run in the last 24 hours was 6884 s)
-SLOT_WAIT_DEFAULT_SECONDS = 7200
 SLOT_FIRST_NOTICE = 2.0
 SLOT_NOTICE_EVERY = 60.0
 SLOT_START_SLACK = 2  # ps start times have one-second resolution
 SLOT_HELD_ENV = 'FM_TEST_SLOT_HELD'
+CPU_HELD_ENV = 'FM_CPU_PASS_HELD'
 
 
 def slot_limit():
@@ -926,12 +939,16 @@ def slot_limit():
     return int(value)
 
 
-def slot_wait():
-    value = os.environ.get('FM_TEST_SLOT_WAIT_SECONDS', '')
-    if not value:
-        return SLOT_WAIT_DEFAULT_SECONDS
-    if not (value.isascii() and value.isdecimal()) or int(value) < 1:
-        raise ValueError(f'FM_TEST_SLOT_WAIT_SECONDS={value!r} must be a whole number of seconds of at least 1')
+def cpu_passes_held():
+    """The CPU passes this process inherited (docs/cpu-pass-pool.md rule 6), or None when it holds none.
+
+    0 marks degraded work that holds no pass. A malformed marker is refused by name.
+    """
+    value = os.environ.get(CPU_HELD_ENV)
+    if value is None:
+        return None
+    if not (value.isascii() and value.isdecimal()):
+        raise ValueError(f'{CPU_HELD_ENV}={value!r} must be a nonnegative decimal integer')
     return int(value)
 
 
@@ -1016,20 +1033,22 @@ def acquire_slot(key, log_fd=2, queued=None):
     if not key.startswith(SLOT_PREFIX):
         return None
     limit = slot_limit()
-    wait = slot_wait()
-    if limit == 0 or key in os.environ.get(SLOT_HELD_ENV, '').split('\t'):
+    held = cpu_passes_held()
+    # A pass holder never waits for a slot: the holder of a slot may be waiting for the very pass it holds.
+    if limit == 0 or held or key in os.environ.get(SLOT_HELD_ENV, '').split('\t'):
         return None
     if fcntl is None or os.name != 'posix':
         slot_log(log_fd, f'running {key} without a slot: this Python has no POSIX file locks')
         return None
     try:
-        return queue_for_slot(key, slot_directory(key), limit, wait, log_fd, queued)
+        return queue_for_slot(key, slot_directory(key), limit, log_fd, queued)
     except (OSError, ValueError) as error:
         slot_log(log_fd, f'running {key} without a slot: {error}')
         return None
 
 
-def queue_for_slot(key, directory, limit, wait, log_fd, queued=None):
+def queue_for_slot(key, directory, limit, log_fd, queued=None):
+    """Wait for one of the key's slots; only a holder that ends admits the waiter, never elapsed time."""
     started = time.monotonic()
     next_notice = started + SLOT_FIRST_NOTICE
     delay = 0.05
@@ -1061,21 +1080,47 @@ def queue_for_slot(key, directory, limit, wait, log_fd, queued=None):
         now = time.monotonic()
         if queued is not None:
             queued[:] = [now - started]
-        expired = now - started >= wait
-        if now >= next_notice or (expired and next_notice == started + SLOT_FIRST_NOTICE):
+        if now >= next_notice:
             holders = '; '.join(text for _, text in slot_holders(directory, limit)) or 'holders unknown'
-            slot_log(log_fd, f'waiting {int(now - started)}s for a free slot of {key} (limit {limit}, FM_TEST_KEY_SLOTS; gives up after {wait}s); holders: {holders}')
+            slot_log(log_fd, f'waiting {int(now - started)}s for a free slot of {key} (limit {limit}, FM_TEST_KEY_SLOTS); holders: {holders}')
             next_notice = now + SLOT_NOTICE_EVERY
-        if expired:
-            slot_log(log_fd, f'waited {int(now - started)}s for a free slot of {key} (limit {limit}); running it without a slot')
-            return None
-        time.sleep(min(delay, max(0.0, wait - (now - started))))
+        time.sleep(delay)
         delay = min(2.0, delay * 2)
 
 
 def release_slot(fd):
     if fd is not None:
         os.close(fd)
+
+
+def take_cpu_pass(key, log_fd=2):
+    """The descriptors holding this command's one CPU pass, taken before its clock starts; empty when it takes none.
+
+    Only a test.* key is CPU-bound test work, and a process already inside a pass takes no further
+    one (docs/cpu-pass-pool.md rule 6). Whatever the pool does, the command runs: an unusable pool
+    runs it without a pass, says so once and marks the work degraded with FM_CPU_PASS_HELD=0.
+    """
+    if not key.startswith(SLOT_PREFIX) or cpu_passes_held() is not None:
+        return []
+    tool = ROOT / 'bin' / 'fm-cpu-pass.py'
+    if not tool.is_file():
+        return []
+    held = []
+    try:
+        spec = importlib.util.spec_from_file_location('fm_cpu_pass', tool)
+        pool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pool)
+        directory = pool.pool_dir()
+        pool.ensure_pool_dir(directory)
+        held = pool.acquire(directory, pool.pool_size(), 1, f'fm-duration run {key}', log_fd)
+    except KeyboardInterrupt:
+        raise
+    except Exception as error:  # pool unusable: PoolUnavailable, OSError, or a helper that cannot load
+        slot_log(log_fd, f'running {key} without a CPU pass: {error}')
+        os.environ[CPU_HELD_ENV] = '0'
+        return []
+    os.environ[CPU_HELD_ENV] = '1'
+    return held
 
 
 def gate(key, command, log_fd, wait_file=None, cpu_file=None):
@@ -1521,10 +1566,17 @@ def main():
             return 125
         except KeyboardInterrupt:
             return 130
+        passes = []
         try:
+            try:
+                passes = take_cpu_pass(args.key)
+            except KeyboardInterrupt:
+                return 130
             with calibration_scratch() as calibration_file:
                 return run(args.key, command, calibration_file)
         finally:
+            for fd in passes:
+                os.close(fd)
             release_slot(slot)
     elif args.action == 'gate':
         command = args.command[1:] if args.command[:1] == ['--'] else args.command

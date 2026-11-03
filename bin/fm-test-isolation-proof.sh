@@ -33,6 +33,10 @@
 #                relative to the scout-proposed parallel pool, then exit 0
 #   -h, --help   print this header
 #
+# Each worker takes one pass of the host-wide CPU pool (docs/cpu-pass-pool.md), so a
+# proof never runs more candidate scripts together than the pool holds; the wait is
+# left out of each recorded duration, and a proof inside a pass runs at most that many.
+#
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
 #   - TMPDIR/TMP point only at that root so mktemp/fm_test_tmproot stay private
@@ -399,6 +403,27 @@ fi
 
 [ "${#CANDIDATES[@]}" -gt 0 ] || die "candidate set is empty; refusing isolation proof"
 
+# Each proof worker runs one candidate script, so it takes one pass of the host-wide
+# CPU pool (docs/cpu-pass-pool.md) outside the duration it records. A proof already
+# inside a pass takes none and runs at most that many workers; without the pool
+# tool or python3 the workers run without a pass.
+exec 8>&2
+POOL_PASS=0
+if [ -n "${FM_CPU_PASS_HELD+x}" ]; then
+  case "$FM_CPU_PASS_HELD" in
+    ''|*[!0-9]*)
+      log "FM_CPU_PASS_HELD must be a nonnegative decimal integer"
+      exit 125 ;;
+  esac
+  if [ "${#FM_CPU_PASS_HELD}" -le 2 ] && [ "$((10#$FM_CPU_PASS_HELD))" -gt 0 ] \
+    && [ "$((10#$FM_CPU_PASS_HELD))" -lt "$JOBS" ]; then
+    log "reducing --jobs $JOBS to inherited FM_CPU_PASS_HELD=$FM_CPU_PASS_HELD"
+    JOBS=$((10#$FM_CPU_PASS_HELD))
+  fi
+elif [ -x "$ROOT/bin/fm-cpu-pass.sh" ] && [ -r "$ROOT/bin/fm-cpu-pass.py" ]; then
+  POOL_PASS=1
+fi
+
 for s in "${CANDIDATES[@]}"; do
   [ -f "$s" ] || die "candidate not found: $s"
 done
@@ -528,10 +553,21 @@ for script in "${CANDIDATES[@]}"; do
       FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
-    bash "$script" >"$work/out/output" 2>&1
+    if [ "$POOL_PASS" -eq 1 ]; then
+      "$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-isolation-proof $script" --log-fd 8 \
+        --wait-file "$work/out/pass.wait" -- bash "$script" >"$work/out/output" 2>&1
+    else
+      bash "$script" >"$work/out/output" 2>&1
+    fi
     rc=$?
     end_ms=$(now_ms)
     duration=$((end_ms - begin_ms))
+    queued=0
+    if [ -r "$work/out/pass.wait" ]; then
+      read -r queued <"$work/out/pass.wait" || queued=0
+      case "$queued" in ''|*[!0-9]*) queued=0 ;; esac
+    fi
+    duration=$((duration - queued))
     if [ "$duration" -lt 0 ]; then
       duration=0
     fi

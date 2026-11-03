@@ -5,6 +5,11 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# The proof takes CPU passes: use a private pool and never inherit an outer runner's pass count.
+unset FM_CPU_PASS_HELD
+FM_CPU_POOL_DIR=$(fm_test_tmproot fm-isolation-proof-pool)
+export FM_CPU_POOL_DIR
+
 PROOF="$ROOT/bin/fm-test-isolation-proof.sh"
 RUNNER="$ROOT/bin/fm-test-run.sh"
 

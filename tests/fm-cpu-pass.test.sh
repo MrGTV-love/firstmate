@@ -4,7 +4,9 @@
 # degraded runs, and the behavior-test runner's use of the pool.
 #
 # Every case drives bin/fm-cpu-pass.sh or bin/fm-test-run.sh as a separate
-# process against a private pool directory, so the host's real pool is never
+# process against a private pool directory (tests/fm-cpu-pass-concurrency.py
+# and tests/fm-cpu-pass-admission.py do the same for the concurrency and
+# pipeline-start proofs), so the host's real pool is never
 # touched and no case reads implementation source.
 # Child commands are single-quoted on purpose: they expand in the child bash.
 # shellcheck disable=SC2016
@@ -598,6 +600,14 @@ PY
 python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
   || fail "pipeline admission and child-descriptor regression failed"
 pass "pipeline admission follows measured reservations, the fallback count, the pause-only backstop, priority, start registration, timing and descriptor ownership"
+
+# Concurrency proofs: nested runners, different suites, lint roots, waiting by capacity, the drain of a burst
+# and a short soak, each sampled from synthetic busy-loop workers. The fixture owns the cases and prints the
+# sampled maxima; it builds its own private pools, so the host's real pool is never touched.
+FM_CONC_N=2 FM_CONC_LANES=4 FM_CONC_ROUNDS=5 FM_CONC_WORK=0.15 FM_CONC_BURNERS=1 \
+  "$ROOT/bin/fm-proc-budget.sh" -- python3 "$ROOT/tests/fm-cpu-pass-concurrency.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
+  || fail "concurrency, nesting, waiting and drain scenarios failed"
+pass "never more workers than passes across nested runners, different suites and lint roots; waiting is by capacity; bursts drain; killed holders free the queue; a soak under forced load admits every start"
 
 test_size_follows_host
 test_run_passes_status_and_marks_child
