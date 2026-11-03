@@ -1,0 +1,5 @@
+# E1: bash 3.2 'printf: write error: Interrupted system call' from fm_pr_closes_unfenced (new in this diff)
+# Seen once in the real CLI sweep (PR 294 body, 28853 bytes). Exact-content check (cmp against expected), 150 runs each:
+lib=fm-pr-closes-lib.sh bash=3.2.57(1)-release runs=150 | Closes ids: content-mismatch=0 write-errors=2 | linked PRs (has=1): content-mismatch=0 write-errors=0
+lib=lib-base.sh bash=3.2.57(1)-release runs=150 | Closes ids: content-mismatch=0 write-errors=0 | linked PRs (has=0): content-mismatch=0 write-errors=0
+# earlier: 200 runs on PR 294 body + 2 Closes lines: 1 write error, 0 wrong outputs; 150 runs x 1500 Closes ids (line count): 5 write errors, 0 missing ids

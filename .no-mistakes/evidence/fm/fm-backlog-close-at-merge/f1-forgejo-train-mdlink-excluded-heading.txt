@@ -1,0 +1,67 @@
+# F1: live Forgejo 11 (local container) train PR 5. Body:
+    ## Train 9
+    
+    | Component | Head | Result |
+    | --- | --- | --- |
+    | [PR 1](https://localhost/fixture/repo/pulls/1) | `a1` | merged |
+    | [PR 2](https://localhost/fixture/repo/pulls/2) | `b2` | merged |
+    | https://localhost/fixture/repo/pulls/4 | `d4` | merged |
+    
+    ## Dropped candidates
+    
+    | Component | Head | Result |
+    | --- | --- | --- |
+    | https://localhost/fixture/repo/pulls/3 | `c3` | dropped |
+    
+    Context only: https://github.com/MrGTV-love/firstmate/pull/353 was an earlier train.
+--- member bodies: PR1 'Closes: fj-a', PR2 'Closes: fj-b', PR3 (dropped table only) 'Closes: fj-dropped', PR4 no Closes line; state/fj-rec.meta pr=https://localhost/fixture/repo/pulls/4 (kind docs, live record)
+## step 1: close before merge
+$ bin/fm-pr-close-items.sh pre-merge https://localhost/fixture/repo/pulls/5
+--- stdout
+close-at-merge: 0 closed, 3 left open
+--- stderr
+actionable: close-at-merge: not closed fj-a: https://localhost/fixture/repo/pulls/5 is not merged, so nothing was closed (named by the body of train member https://localhost/fixture/repo/pulls/1); retry once it has merged: bin/fm-pr-close-items.sh pre-merge https://localhost/fixture/repo/pulls/5
+actionable: close-at-merge: not closed fj-b: https://localhost/fixture/repo/pulls/5 is not merged, so nothing was closed (named by the body of train member https://localhost/fixture/repo/pulls/2); retry once it has merged: bin/fm-pr-close-items.sh pre-merge https://localhost/fixture/repo/pulls/5
+actionable: close-at-merge: not closed fj-rec: https://localhost/fixture/repo/pulls/5 is not merged, so nothing was closed (named by the task record that holds train member https://localhost/fixture/repo/pulls/4); retry once it has merged: bin/fm-pr-close-items.sh pre-merge https://localhost/fixture/repo/pulls/5
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=3
+## step 2: merge PR 5 on the forge
+{"number":5,"merged":true,"state":"closed"}
+--- backlog before close
+fj-a fj-b fj-dropped fj-rec fj-dep fj-dep2 fj-open: state:  deps: 
+$ bin/fm-pr-close-items.sh train-9 https://localhost/fixture/repo/pulls/5
+--- stdout
+close-at-merge: closed fj-a with https://localhost/fixture/repo/pulls/5 (named by the body of train member https://localhost/fixture/repo/pulls/1)
+close-at-merge: unblocked: fj-dep no longer waits on fj-a; it still waits on fj-direct
+close-at-merge: closed fj-b with https://localhost/fixture/repo/pulls/5 (named by the body of train member https://localhost/fixture/repo/pulls/2)
+close-at-merge: unblocked: fj-dep2 no longer waits on fj-b; it still waits on fj-open
+close-at-merge: closed fj-rec with https://localhost/fixture/repo/pulls/5 (named by the task record that holds train member https://localhost/fixture/repo/pulls/4)
+close-at-merge: 3 closed, 0 left open
+--- stderr
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0
+--- backlog after
+fj-a fj-b fj-dropped fj-rec fj-dep fj-dep2 fj-open: state:  deps: 
+--- forge after (merge stands)
+{"number":5,"merged":true,"state":"closed"}
+## step 3: rerun
+$ bin/fm-pr-close-items.sh train-9 https://localhost/fixture/repo/pulls/5
+--- stdout
+close-at-merge: fj-a is already done
+close-at-merge: fj-b is already done
+close-at-merge: fj-rec is already done
+--- stderr
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0
+--- proof URL lines in backlog: 3
+21:- [x] fj-rec - item fj-rec https://localhost/fixture/repo/pulls/5 (kind: docs) (merged 2026-11-03)
+22:- [x] fj-b - item fj-b https://localhost/fixture/repo/pulls/5 (kind: docs) (merged 2026-11-03)
+23:- [x] fj-a - item fj-a https://localhost/fixture/repo/pulls/5 (kind: docs) (merged 2026-11-03)
+--- backlog after F1 (addendum; the in-run state print failed from shell word splitting)
+fj-a: state: done deps: none
+fj-b: state: done deps: none
+fj-dropped: state: queued deps: none
+fj-rec: state: done deps: none
+fj-dep: state: queued deps: "blocked-by:fj-direct"
+fj-dep2: state: queued deps: "blocked-by:fj-open"
+fj-open: state: queued deps: none

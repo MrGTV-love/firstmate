@@ -1,0 +1,15 @@
+# G1/G2: real merged NON-train PRs. 111 has heading '### Slot 42: two root records and component-aware scout custody' and links vernant/pull/3215 and /3208.
+52:The finished record carries https://github.com/MrGTV-love/vernant/pull/3215.
+56:### Slot 42: two root records and component-aware scout custody
+75:The finished root record carries https://github.com/MrGTV-love/vernant/pull/3208.
+121:# Slot 42, only after the outside-recovery checks above:
+$ bin/fm-pr-close-items.sh x-111 https://github.com/MrGTV-love/firstmate/pull/111
+--- stdout
+--- stderr
+--- exit=0
+
+# PR 89
+$ bin/fm-pr-close-items.sh x-89 https://github.com/MrGTV-love/firstmate/pull/89
+--- stdout
+--- stderr
+--- exit=0

@@ -1,0 +1,31 @@
+# F3: live Forgejo train PR 6, exact 'Component' header but a row the reader cannot read. Body:
+    ## Train 10
+    
+    | Component | Head |
+    | --- | --- |
+    | merged: https://github.com/MrGTV-love/firstmate/pull/343 | `x` |
+{"number":6,"merged":true,"state":"closed"}
+$ bin/fm-pr-close-items.sh train-10 https://localhost/fixture/repo/pulls/6
+--- stdout
+--- stderr
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/343: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0
+
+# F4: live Forgejo non-train PR 7 (longer heading that mentions component, two linked PRs). Body:
+    ## Recovery
+    
+    ### Slot 42: two root records and component-aware scout custody
+    
+    The finished record carries https://github.com/MrGTV-love/firstmate/pull/343.
+    Another record carries https://github.com/MrGTV-love/firstmate/pull/344.
+{"number":7,"merged":false,"state":"open"}
+$ bin/fm-pr-close-items.sh slot-42 https://localhost/fixture/repo/pulls/7
+--- stdout
+--- stderr
+--- exit=0
+# F4 retry after the forge finished its mergeability check
+{"number":7,"merged":true,"state":"closed"}
+$ bin/fm-pr-close-items.sh slot-42 https://localhost/fixture/repo/pulls/7
+--- stdout
+--- stderr
+--- exit=0

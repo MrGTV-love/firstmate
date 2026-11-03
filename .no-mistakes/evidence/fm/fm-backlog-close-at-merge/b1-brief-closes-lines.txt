@@ -1,0 +1,12 @@
+===== data/b-nm/brief.md: lines that mention Closes:
+141:Name the backlog items your change finishes: put `Closes: b-nm` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item from the PR body (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline writes the PR body after this handoff, so you check the body only after /no-mistakes reports CI green, as described below.
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes: b-nm`), because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr view <number> --full`; if any `Closes:` line is missing, write the whole body, with the missing lines added, to a file and run `gh-axi pr edit <number> --body-file <file>`, then read the body again and confirm each line is there. This edits only the PR body: commit nothing.
+(count of literal <task-id> placeholder in Closes lines: 0)
+===== data/b-dpr/brief.md: lines that mention Closes:
+139:Name the backlog items your change finishes: put `Closes: b-dpr` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline can rewrite the PR body after your commit, so as the last step before your final done, Read the PR body back with `gh-axi
+(count of literal <task-id> placeholder in Closes lines: 0)
+===== data/b-ger/brief.md: lines that mention Closes:
+(count of literal <task-id> placeholder in Closes lines: 0)
+===== b-nm order: line of post-CI body check vs final done line
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes: b-nm`), because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr v
+195:Then append `done [at=<epoch>]: PR {url} checks green` and stop. You are finished.

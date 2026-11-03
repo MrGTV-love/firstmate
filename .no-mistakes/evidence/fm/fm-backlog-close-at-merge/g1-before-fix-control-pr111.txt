@@ -1,0 +1,5 @@
+# Before-fix control: the same PR 111 run with bin/ from d38b99b46 (parent of the R7-1 fix c9db1d88a)
+$ <d38b99b46>/bin/fm-pr-close-items.sh x-111 https://github.com/MrGTV-love/firstmate/pull/111
+actionable: close-at-merge: not read https://github.com/MrGTV-love/vernant/pull/3215: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/vernant/pull/3208: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0

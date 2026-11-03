@@ -1,0 +1,78 @@
+# G3: real CLI on every merged PR body (72) that mentions 'omponent'. Lab backlog holds none of their items, so this only reads.
+# cols: PR | members parsed (HEAD) | 'not read' lines HEAD | 'not read' lines at d38b99b46 (pre-fix) | HEAD exit | HEAD stderr other than not-read
+362 | 7 | 8 | 8 | 3 | none
+353 | 5 | 2 | 2 | 3 | actionable: close-at-merge: not closed g-ship: bin/fm-tasks-axi.sh done did not close it: g-ship has a live task record; complete it with bin/fm-teardown.sh g-ship, which owns the landing proof 
+350 | 4 | 9 | 9 | 0 | none
+349 | 0 | 0 | 0 | 0 | none
+341 | 2 | 0 | 0 | 0 | none
+332 | 0 | 0 | 0 | 0 | none
+327 | 2 | 5 | 5 | 0 | none
+326 | 3 | 4 | 4 | 0 | none
+325 | 3 | 3 | 3 | 0 | none
+324 | 4 | 2 | 2 | 0 | none
+323 | 0 | 0 | 0 | 0 | none
+320 | 0 | 0 | 0 | 0 | none
+316 | 0 | 0 | 0 | 0 | none
+312 | 0 | 0 | 0 | 0 | none
+294 | 0 | 0 | 0 | 0 | /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FWE2VVTSRMMWE8TCETMCMR/bin/fm-pr-closes-lib.sh: line 77: printf: write error: Interrupted system call 
+291 | 0 | 0 | 0 | 0 | none
+262 | 0 | 0 | 0 | 0 | none
+261 | 0 | 0 | 0 | 0 | none
+250 | 0 | 0 | 0 | 0 | none
+236 | 0 | 0 | 0 | 0 | none
+217 | 0 | 0 | 0 | 0 | none
+215 | 0 | 0 | 0 | 0 | none
+211 | 0 | 0 | 0 | 0 | none
+198 | 0 | 0 | 0 | 0 | none
+196 | 0 | 0 | 0 | 0 | none
+185 | 0 | 0 | 0 | 0 | none
+183 | 0 | 0 | 0 | 0 | none
+173 | 0 | 0 | 0 | 0 | none
+172 | 0 | 0 | 0 | 0 | none
+167 | 0 | 0 | 0 | 0 | none
+164 | 0 | 0 | 0 | 0 | none
+161 | 0 | 0 | 0 | 0 | none
+157 | 0 | 0 | 0 | 0 | none
+154 | 0 | 0 | 0 | 0 | none
+153 | 0 | 0 | 0 | 0 | none
+147 | 0 | 0 | 0 | 0 | none
+146 | 0 | 0 | 0 | 0 | none
+145 | 0 | 0 | 0 | 0 | none
+144 | 0 | 0 | 0 | 0 | none
+141 | 0 | 0 | 0 | 0 | none
+133 | 0 | 0 | 0 | 0 | none
+131 | 0 | 0 | 0 | 0 | none
+111 | 0 | 0 | 2 | 0 | none  <- changed
+109 | 0 | 0 | 0 | 0 | none
+104 | 0 | 0 | 0 | 0 | none
+103 | 0 | 0 | 0 | 0 | none
+97 | 0 | 0 | 0 | 0 | none
+89 | 0 | 0 | 0 | 0 | none
+87 | 0 | 0 | 0 | 0 | none
+84 | 0 | 0 | 0 | 0 | none
+78 | 0 | 0 | 0 | 0 | none
+77 | 0 | 0 | 0 | 0 | none
+76 | 0 | 0 | 0 | 0 | none
+71 | 0 | 0 | 0 | 0 | none
+69 | 0 | 0 | 0 | 0 | none
+68 | 0 | 0 | 0 | 0 | none
+60 | 0 | 0 | 0 | 0 | none
+56 | 0 | 0 | 0 | 0 | none
+54 | 0 | 0 | 0 | 0 | none
+41 | 0 | 0 | 0 | 0 | none
+38 | 0 | 0 | 0 | 0 | none
+34 | 0 | 0 | 0 | 0 | none
+33 | 0 | 0 | 0 | 0 | none
+27 | 0 | 0 | 0 | 0 | none
+23 | 0 | 0 | 0 | 0 | none
+21 | 0 | 0 | 0 | 0 | none
+17 | 0 | 0 | 0 | 0 | none
+14 | 0 | 0 | 0 | 0 | none
+12 | 0 | 0 | 0 | 0 | none
+10 | 0 | 0 | 0 | 0 | none
+8 | 0 | 0 | 0 | 0 | none
+5 | 0 | 0 | 0 | 0 | none
+# note: the "not read" columns count every stderr line containing "not read", which also matches the
+# unknown-id text "(an archived item is not read)". That is why PR 362 shows 8 here but 6 URL lines in g6.
+# The only row that changed between pre-fix (d38b99b46) and HEAD is PR 111: 2 false lines -> 0.
+# PR 294's extra stderr is the bash 3.2 EINTR noise; see e1-bash32-eintr-write-error-noise.txt.

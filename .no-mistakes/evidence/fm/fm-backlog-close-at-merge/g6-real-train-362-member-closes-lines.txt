@@ -1,0 +1,34 @@
+# G6: real merged train PR 362. Its member 358 body names Closes: lines.
+362 state=MERGED
+471:Closes: crlf-a^M
+650:Closes: fm-backlog-close-at-merge
+651:Closes: fm-backlog-finished-blocker-auto-clear
+## step 1: lab backlog does not hold those ids
+close-at-merge: 0 closed, 2 left open
+exit=
+rows created for unknown id: 0
+## step 2: add both ids (ship kind, no live record) and a dependent of one, plus a held owner-call item
+fm-backlog-close-at-merge: state: queued deps: none
+fm-backlog-finished-blocker-auto-clear: state: queued deps: none
+waits-on-cam: state: queued deps: "blocked-by:fm-backlog-close-at-merge"
+$ bin/fm-pr-close-items.sh train-362 https://github.com/MrGTV-love/firstmate/pull/362
+--- stdout
+close-at-merge: closed fm-backlog-close-at-merge with https://github.com/MrGTV-love/firstmate/pull/362 (named by the body of train member https://github.com/MrGTV-love/firstmate/pull/358)
+close-at-merge: unblocked: waits-on-cam no longer waits on fm-backlog-close-at-merge; no stored blocked-by edge remains
+close-at-merge: closed fm-backlog-finished-blocker-auto-clear with https://github.com/MrGTV-love/firstmate/pull/362 (named by the body of train member https://github.com/MrGTV-love/firstmate/pull/358)
+close-at-merge: 2 closed, 0 left open
+--- stderr
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/364: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/347: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/361: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/o/r/pull/347: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/o/r/pull/9: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0
+--- after
+fm-backlog-close-at-merge: state: done deps: none
+fm-backlog-finished-blocker-auto-clear: state: done deps: none
+waits-on-cam: state: queued deps: none
+11:- [x] fm-backlog-finished-blocker-auto-clear - auto clear https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+12:- [x] fm-backlog-close-at-merge - close at merge https://github.com/MrGTV-love/firstmate/pull/362 (kind: ship) (merged 2026-11-03)
+# note: the step-1 "exit=" is blank because the shell's PIPESTATUS differs under zsh; step 1 only shows nothing was created.
