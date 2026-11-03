@@ -3610,7 +3610,7 @@ The same last resort covers an old thread that `retarget` can never read or judg
 First read that thread in Slack by hand and record any answer it holds with `bin/fm-captain-hold.sh answer`; only then run `bin/fm-slack-check.sh disarm` and remove `state/slack-watch/`.
 The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
-When there are neither open calls nor tracked threads needing resolution, a poll makes one Slack request, the read of the owner DM's history for new requests, plus the owner-DM proof, the reply lookup, and the post for each request it takes in.
+When there are neither open calls nor tracked threads needing resolution, an armed plane's poll makes one history read of the owner DM for new requests, and more than one when new messages span more than one page, plus the owner-DM proof, the reply lookup, and the post for each request it takes in; a bound plane that was never armed has no stored owner DM and makes none.
 
 Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
 Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
@@ -3638,7 +3638,7 @@ Firstmate handles the wake under `check-result-handling`.
 The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed.
 Each `arm` starts again from the newest message, so a message typed before an arm is never taken in.
 A new install first needs one app setting that the code cannot change: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it (while it is off, Slack itself refuses a message with "Sending messages to this app has been turned off.").
-They need no new scope or Slack method.
+Requests need no new scope or Slack method.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
 Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
