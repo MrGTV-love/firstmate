@@ -36,20 +36,30 @@ Usage:
   fm_slack_watch_test.py split-transcript <transcript.json> <out.json> <post-channel> <owner-dm>
   fm_slack_watch_test.py add-failure <transcript.json> <out.json> <method[:ts]> <status>
   fm_slack_watch_test.py outbound-targets <outbound.jsonl> <method>
+  fm_slack_watch_test.py owner-message <replay-state.json> <ts> <user> <text|json:VALUE> [extra-json]
+  fm_slack_watch_test.py edit-message <replay-state.json> <ts> <text>
+  fm_slack_watch_test.py distinct-texts <outbound.jsonl> <method>
+  fm_slack_watch_test.py drop-state-field <state.json> <field>
+  fm_slack_watch_test.py state-field <state.json> <field>
+  fm_slack_watch_test.py set-transcript <transcript.json> <out.json> <key> <json-value>
+  fm_slack_watch_test.py request-lines <min-count>   (reads wake lines on stdin)
 """
 from contextlib import contextmanager
 import glob
 import json
 import os
+import re
 import sys
+import unicodedata
 import unittest
 import tempfile
 from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bin'))
+import fm_slack_watch as plane
 from fm_slack_watch import CARD_LIMIT, SlackError, Watch
-from fm_slack_replay import Replay
+from fm_slack_replay import Replay, ts_key
 
 
 class CardRenderingTest(unittest.TestCase):
@@ -416,6 +426,247 @@ class CardRefreshTest(unittest.TestCase):
             self.assertEqual(methods.count('chat.postMessage'), 2)
 
 
+class ReplayShapeTest(unittest.TestCase):
+    """The replay must deliver history, order, and scopes the way Slack does."""
+
+    def replay(self, directory, extra=None, messages=()):
+        transcript = Path(directory) / 'transcript.json'
+        transcript.write_text(json.dumps({'schema': 'fm-slack-replay.v1', 'messages': list(messages), **(extra or {})}))
+        return Replay(transcript, Path(directory) / 'slack-watch')
+
+    def test_history_lists_roots_and_broadcasts_but_not_ordinary_replies(self):
+        thread = [{'ts': '10.000001', 'user': 'U0TESTOWNER', 'text': 'root'},
+                  {'ts': '10.000002', 'user': 'U0TESTOWNER', 'text': 'reply', 'thread_ts': '10.000001'},
+                  {'ts': '10.000003', 'user': 'U0TESTOWNER', 'text': 'broadcast', 'thread_ts': '10.000001',
+                   'subtype': 'thread_broadcast'},
+                  {'ts': '11.000001', 'user': 'U0TESTOWNER', 'text': 'self root', 'thread_ts': '11.000001'},
+                  {'ts': '12.000001', 'user': 'U0TESTOWNER', 'text': 'elsewhere', 'channel': 'D0OTHERDM001'}]
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
+            replay = self.replay(directory, messages=thread)
+            texts = [m['text'] for m in replay.call('conversations.history', channel='D0123456789')['messages']]
+            self.assertEqual(texts, ['self root', 'broadcast', 'root'])
+            replies = [m['text'] for m in replay.call('conversations.replies', channel='D0123456789',
+                                                      ts='10.000001')['messages']]
+            self.assertEqual(replies, ['root', 'reply', 'broadcast'])
+
+    def test_history_oldest_is_exclusive_and_numeric(self):
+        stamps = ['9.000001', '10.000001', '10.000002', '100.000001']
+        rows = [{'ts': ts, 'user': 'U0TESTOWNER', 'text': ts} for ts in stamps]
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
+            replay = self.replay(directory, messages=rows)
+            after = lambda oldest, **more: [m['ts'] for m in replay.call(
+                'conversations.history', channel='D0123456789', oldest=oldest, **more)['messages']]
+            self.assertEqual(after('10.000001'), ['100.000001', '10.000002'])
+            self.assertEqual(after('10.000001', inclusive=True), ['100.000001', '10.000002', '10.000001'])
+            self.assertEqual(after('0'), ['100.000001', '10.000002', '10.000001', '9.000001'])
+            self.assertEqual(ts_key('10.000001') > ts_key('9.000001'), True)
+
+    def test_scopes_are_enforced_only_when_the_transcript_asks(self):
+        calls = (('users.info', {'user': 'U0TESTOWNER'}),
+                 ('reactions.get', {'channel': 'D0123456789', 'timestamp': '10.000001'}),
+                 ('reactions.add', {'channel': 'D0123456789', 'timestamp': '10.000001', 'name': 'one'}))
+        row = [{'ts': '10.000001', 'user': 'U0TESTOWNER', 'text': 'root'}]
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
+            strict = self.replay(directory, {'scopes': ['chat:write', 'im:write', 'im:history'],
+                                             'enforce_scopes': True}, row)
+            for method, fields in calls:
+                with self.subTest(method=method), self.assertRaisesRegex(SlackError, '^missing_scope$'):
+                    strict.call(method, **fields)
+            for method, fields in (('conversations.history', {'channel': 'D0123456789'}),
+                                   ('conversations.replies', {'channel': 'D0123456789', 'ts': '10.000001'}),
+                                   ('conversations.open', {'users': 'U0TESTOWNER', 'return_im': True}),
+                                   ('chat.postMessage', {'channel': 'D0123456789', 'text': 'x'})):
+                with self.subTest(method=method):
+                    self.assertTrue(strict.call(method, **fields)['ok'])
+            self.assertEqual([e['method'] for e in strict.state['log'] if e.get('error') == 'missing_scope'],
+                             ['users.info', 'reactions.get', 'reactions.add'])
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
+             patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
+            lax = self.replay(directory, {'scopes': ['chat:write']}, row)
+            self.assertTrue(lax.call('users.info', user='U0TESTOWNER')['ok'])
+
+
+class IntakeTest(unittest.TestCase):
+    """New top-level owner messages: what is taken in, in what order, and what carries no authority."""
+
+    OWNER = 'U0TESTOWNER'
+
+    @contextmanager
+    def fixture(self, cap='20', scopes=('chat:write', 'im:write', 'im:history')):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            home = Path(directory)
+            transcript = home / 'transcript.json'
+            transcript.write_text(json.dumps({
+                'schema': 'fm-slack-replay.v1', 'team': 'T0123456789', 'channel': 'D0123456789',
+                'scopes': list(scopes), 'enforce_scopes': True,
+                'messages': [{'ts': '100.000100', 'user': self.OWNER, 'text': 'already there'}]}))
+            env = {'FM_HOME': directory, 'FM_STATE_OVERRIDE': directory, 'FM_SLACK_DM_USER': self.OWNER,
+                   'FM_SLACK_ALLOWED_AUTHORS': self.OWNER, 'FM_SLACK_POLL_MAX_ANSWERS': cap,
+                   'SLACK_BOT_TOKEN': 'fixture-token-not-a-secret'}
+            with patch.dict(os.environ, env):
+                replay = Replay(transcript, home / 'slack-watch')
+                watch = Watch(replay=replay)
+                with patch.object(watch, 'bound', return_value=True), \
+                     patch.object(watch, 'backlog', return_value=[]):
+                    try:
+                        watch.prepare()
+                        yield watch, replay
+                    finally:
+                        watch.lock.close()
+
+    def say(self, replay, ts, text='hello', user=None, **more):
+        replay.state['messages'].append({'ts': ts, 'user': user or self.OWNER, 'text': text, **more})
+
+    def acks(self, replay):
+        return [e['thread_ts'] for e in replay.state['log'] if e['method'] == 'chat.postMessage']
+
+    def wakes(self, watch):
+        return [line for line in watch.output if line.startswith('check: slack request ')]
+
+    def test_arming_sets_the_cursor_from_the_latest_message_and_takes_in_no_history(self):
+        with self.fixture() as (watch, replay):
+            self.assertEqual(watch.state['intake_cursor'], '100.000100')
+            watch.poll()
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+
+    def test_new_messages_are_taken_in_oldest_first_within_the_cap(self):
+        with self.fixture(cap='2') as (watch, replay):
+            for ts in ('200.000300', '200.000100', '200.000500', '200.000200', '200.000400'):
+                self.say(replay, ts, 'message ' + ts)
+            order = []
+            for expected in (2, 2, 1, 0):
+                watch.output, watch.state['outbox'] = [], []
+                watch.advanced = 0
+                watch.poll()
+                order += [line.split()[3] for line in self.wakes(watch)]
+                self.assertEqual(len(self.wakes(watch)), expected)
+                watch.state = watch.load_state()
+            self.assertEqual(order, ['200.000100', '200.000200', '200.000300', '200.000400', '200.000500'])
+            self.assertEqual(sorted(self.acks(replay)), order)
+
+    def test_only_a_top_level_allowlisted_human_message_is_a_request(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'stranger', user='U0STRANGER01')
+            self.say(replay, '200.000200', 'bot id', bot_id='BLOOKALIKE')
+            self.say(replay, '200.000300', 'app id', app_id='ALOOKALIKE')
+            self.say(replay, '200.000400', 'bot profile', bot_profile={'id': 'BPROFILE'})
+            self.say(replay, '200.000500', 'broadcast reply', thread_ts='100.000100', subtype='thread_broadcast')
+            self.say(replay, '200.000600', 'ordinary reply', thread_ts='100.000100')
+            self.say(replay, '200.000700', '   ')
+            self.say(replay, '200.000800', '\u2028\u200b\u0085')
+            self.say(replay, '200.000900', 'in another channel', channel='D0OTHERDM001')
+            self.say(replay, '200.001000', 'ordinary root')
+            self.say(replay, '200.001100', 'self-thread root', thread_ts='200.001100')
+            watch.poll()
+            self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.001000', '200.001100'])
+            self.assertEqual(self.acks(replay), ['200.001000', '200.001100'])
+            self.assertEqual(watch.state['intake_cursor'], '200.001100')
+
+    def test_mutation_control_without_the_top_level_predicate_the_broadcast_is_taken_in(self):
+        def taken(mutated):
+            with self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'broadcast reply', thread_ts='100.000100', subtype='thread_broadcast')
+                self.say(replay, '200.000200', 'ordinary root')
+                self.say(replay, '200.000300', 'self-thread root', thread_ts='200.000300')
+                predicate = (lambda self, message: True) if mutated else Watch.top_level
+                with patch.object(Watch, 'top_level', predicate):
+                    watch.poll()
+                return sorted(line.split()[3] for line in self.wakes(watch))
+        self.assertEqual(taken(False), ['200.000200', '200.000300'])
+        self.assertEqual(taken(True), ['200.000100', '200.000200', '200.000300'])
+
+    def test_mutation_control_a_user_lookup_prerequisite_blocks_every_request_on_this_replay(self):
+        original = Watch.request_from
+
+        def needs_lookup(self, message):
+            self.api.call('users.info', user=message['user'])
+            return original(self, message)
+
+        def run(mutated):
+            with self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'please check the status of vernant d7')
+                with patch.object(Watch, 'request_from', needs_lookup if mutated else original):
+                    try:
+                        watch.poll()
+                    except SlackError as error:
+                        self.assertEqual(str(error), 'missing_scope')
+                return self.acks(replay), self.wakes(watch)
+        self.assertEqual(run(False)[0], ['200.000100'])
+        self.assertEqual(run(True), ([], []))
+
+    def test_the_cursor_never_passes_a_message_that_is_not_journaled(self):
+        with self.fixture(cap='1') as (watch, replay):
+            self.say(replay, '200.000100', 'ignored', user='U0STRANGER01')
+            self.say(replay, '200.000200', 'first')
+            self.say(replay, '200.000300', 'second')
+            watch.poll()
+            saved = watch.load_state()
+            self.assertEqual(saved['intake_cursor'], '200.000200')
+            self.assertEqual(saved['pending'], [])
+            self.assertEqual(self.acks(replay), ['200.000200'])
+            watch.state = saved
+            watch.advanced = 0
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000200', '200.000300'])
+
+    def test_a_request_is_acknowledged_once_across_every_crash_point(self):
+        for point in ('after-stage', 'after-ack', 'after-cursor'):
+            with self.subTest(point=point), self.fixture() as (watch, replay):
+                self.say(replay, '200.000100', 'please check the status of vernant d7')
+                with patch.dict(os.environ, {'FM_SLACK_FAULT': point}), self.assertRaises(RuntimeError):
+                    watch.poll()
+                watch.state, watch.dm_proven = watch.load_state(), False
+                watch.output = list(watch.state['outbox'])
+                watch.poll()
+                self.assertEqual(self.acks(replay), ['200.000100'])
+                self.assertEqual(len(self.wakes(watch)), 1)
+                self.assertEqual(watch.state['pending'], [])
+
+    def test_a_request_path_runs_no_repository_script_and_posts_no_text_of_the_message(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'secret words 12345')
+            with patch.object(plane, 'run', side_effect=AssertionError('the request path ran a script')):
+                watch.take_requests(20)
+            posts = [e for e in replay.state['log'] if e['method'] == 'chat.postMessage']
+            self.assertEqual([p['text'] for p in posts], [plane.REQUEST_ACK])
+            self.assertNotIn('secret', plane.REQUEST_ACK)
+            self.assertEqual(sorted(e['method'] for e in replay.state['log']),
+                             ['chat.postMessage', 'conversations.history', 'conversations.history',
+                              'conversations.open', 'conversations.replies'])
+
+    def test_request_text_is_one_printable_line(self):
+        hostile = 'a\nb\r\nc\td\u2028e\u2029f\u0085g\x0bh\x0ci\u202ej\u200bk\x00l\x7fm \u00a0n'
+        self.assertEqual(plane.request_text(hostile), 'a b c d e f g h i j k l m n')
+        self.assertEqual(plane.request_text('1 &lt; 2 &amp;&amp; <https://example.com|a link> &gt; 0'),
+                         '1 < 2 && a link > 0')
+        self.assertEqual(plane.request_text('\u2028\u200b\u0085 \t'), '')
+
+    def test_request_line_is_bounded_labeled_and_names_the_thread_when_cut(self):
+        whole = plane.request_line('200.000100', self.OWNER, 'please check the status of vernant d7')
+        self.assertEqual(whole, 'check: slack request 200.000100 from U0TESTOWNER: ' + plane.REQUEST_LABEL
+                         + ' please check the status of vernant d7')
+        room = plane.WAKE_LIMIT - plane.QUEUE_RESERVE - len(whole.partition(' please check')[0] + ' ')
+        for size in (1, room - 1, room, room + 1, room + 60, 5000):
+            with self.subTest(size=size):
+                line = plane.request_line('200.000100', self.OWNER, 'x' * size)
+                self.assertLessEqual(len(line), plane.WAKE_LIMIT - plane.QUEUE_RESERVE)
+                self.assertIn(plane.REQUEST_LABEL, line)
+                self.assertEqual(line.endswith(' [cut; full text in Slack thread 200.000100]'), size > room)
+                self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER: '))
+
+    def test_a_removed_allowlist_member_loses_the_pending_request(self):
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'hello')
+            with patch.dict(os.environ, {'FM_SLACK_FAULT': 'after-stage'}), self.assertRaises(RuntimeError):
+                watch.poll()
+            watch.state, watch.authors = watch.load_state(), {'U0SOMEONEELSE'}
+            watch.poll()
+            self.assertEqual((self.acks(replay), self.wakes(watch), watch.state['pending']), ([], [], []))
+
+
 def messages(path):
     return json.load(open(path))['messages']
 
@@ -582,6 +833,36 @@ def main(argv):
         rows = [json.loads(line) for line in open(argv[1])]
         print(' '.join(sorted({'%s@%s' % (r.get('recipient'), r.get('channel'))
                                for r in rows if r.get('method') == argv[2]})))
+    elif command == 'owner-message':
+        text = json.loads(argv[4][5:]) if argv[4].startswith('json:') else argv[4]
+        extra = json.loads(argv[5]) if len(argv) > 5 else {}
+        edit(argv[1], lambda data: data['messages'].append(
+            {'ts': argv[2], 'user': argv[3], 'text': text, **extra}))
+    elif command == 'edit-message':
+        def reword(data):
+            message = next(m for m in data['messages'] if m['ts'] == argv[2])
+            message.update(text=argv[3], edited={'user': message['user'], 'ts': message['ts'] + '1'})
+        edit(argv[1], reword)
+    elif command == 'distinct-texts':
+        rows = [json.loads(line) for line in open(argv[1])]
+        print(len({row.get('text') for row in rows if row.get('method') == argv[2]}))
+    elif command == 'drop-state-field':
+        edit(argv[1], lambda data: data.pop(argv[2], None))
+    elif command == 'state-field':
+        print(json.load(open(argv[1])).get(argv[2], ''))
+    elif command == 'set-transcript':
+        data = json.load(open(argv[1]))
+        data[argv[3]] = json.loads(argv[4])
+        json.dump(data, open(argv[2], 'w'))
+    elif command == 'request-lines':
+        lines = sys.stdin.read().splitlines()
+        shape = re.compile(r'check: slack request [0-9]+\.[0-9]+ from U[A-Z0-9]+: ' + re.escape(plane.REQUEST_LABEL) + ' ')
+        for line in lines:
+            assert shape.match(line), 'not a request line: ' + line
+            assert len(line) <= plane.WAKE_LIMIT - plane.QUEUE_RESERVE, 'line too long: %d' % len(line)
+            assert all(c == ' ' or unicodedata.category(c)[0] not in 'CZ' for c in line), 'control or separator in a line'
+        assert len(lines) >= int(argv[1]), 'expected at least %s request lines, got %d' % (argv[1], len(lines))
+        print(len(lines))
     elif command == 'replay-file':
         paths = glob.glob(os.path.join(argv[1], 'replay-state-*.json'))
         print(paths[0] if paths else '')

@@ -169,6 +169,9 @@ EOF
         ;;
     esac
     ;;
+  intake)
+    # No open decisions: the plane is otherwise idle, so only the owner's typed messages move it.
+    ;;
   no-token)
     task no-token-call "No token call" "$(body_for no-token <<'EOF'
 No-token decision.

@@ -11,6 +11,25 @@ from pathlib import Path
 
 from fm_slack import SlackError
 
+# The scope Slack requires for each method the plane calls. A transcript that sets
+# "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does.
+METHOD_SCOPES = {
+    'chat.postMessage': 'chat:write',
+    'chat.update': 'chat:write',
+    'conversations.open': 'im:write',
+    'conversations.history': 'im:history',
+    'conversations.replies': 'im:history',
+    'reactions.get': 'reactions:read',
+    'reactions.add': 'reactions:write',
+    'users.info': 'users:read',
+}
+
+
+def ts_key(ts):
+    """Order Slack timestamps as numbers, never as floats."""
+    seconds, _, fraction = str(ts or 0).partition('.')
+    return int(seconds or 0), int((fraction + '000000000')[:9])
+
 
 class Replay:
     def __init__(self, transcript_path, state_dir, token_present=True):
@@ -67,6 +86,10 @@ class Replay:
     def call(self, method, **fields):
         if not self.token_present:
             raise SlackError('missing_token')
+        needed = METHOD_SCOPES.get(method)
+        if self.transcript.get('enforce_scopes') and needed and needed not in self.scopes:
+            self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
+            raise SlackError('missing_scope')
         rule = self.fail(method, fields.get('ts') or fields.get('timestamp'))
         if rule:
             status = int(rule.get('status', 503))
@@ -88,11 +111,28 @@ class Replay:
             channel = fields.get('channel')
             if channel != self.transcript.get('channel', 'D0123456789'):
                 raise SlackError('channel_not_found')
+            # A message may name its own channel; the default is the transcript's DM.
+            here = [m for m in self.state['messages']
+                    if m.get('channel', self.transcript.get('channel', 'D0123456789')) == channel]
             if method.endswith('history'):
-                messages = [m for m in reversed(self.state['messages']) if not m.get('thread_ts')]
+                # Slack's history lists the channel's top-level messages, newest first: a thread
+                # root (thread_ts equal to its own ts, once it has replies) and a reply that was
+                # also sent to the channel (subtype thread_broadcast, thread_ts different from ts).
+                # An ordinary thread reply is read through conversations.replies only.
+                messages = [m for m in reversed(here)
+                            if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
+                            or m.get('subtype') == 'thread_broadcast']
+                oldest, latest = fields.get('oldest'), fields.get('latest')
+                inclusive = str(fields.get('inclusive')).lower() == 'true'
+                if oldest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)
+                                or (inclusive and ts_key(m.get('ts')) == ts_key(oldest))]
+                if latest:
+                    messages = [m for m in messages if ts_key(m.get('ts')) < ts_key(latest)
+                                or (inclusive and ts_key(m.get('ts')) == ts_key(latest))]
             else:
                 root = fields.get('ts')
-                messages = [m for m in self.state['messages']
+                messages = [m for m in here
                             if m.get('ts') == root or m.get('thread_ts') == root]
             if not fields.get('include_all_metadata'):
                 messages = [{k: v for k, v in m.items() if k != 'metadata'} for m in messages]
@@ -100,7 +140,8 @@ class Replay:
             size = int(fields.get('limit') or 100)
             page = messages[start:start + size]
             self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
-                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start})
+                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start,
+                      **({'oldest': fields['oldest']} if fields.get('oldest') else {})})
             data = {'ok': True, 'messages': page,
                     'response_metadata': {'next_cursor': str(start + size)
                                           if len(messages) > start + size else ''}}
