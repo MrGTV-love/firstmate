@@ -255,7 +255,7 @@ while IFS= read -r candidate; do
   done < <(tasks_recording_pr "$member")
 done < <(fm_pr_closes_train_members "$WORK/body")
 
-if [ "$n" -gt 0 ]; then
+if [ "$n" -gt 0 ] || [ -n "$(fm_pr_closes_train_members "$WORK/body" --declared)" ]; then
   while IFS= read -r linked; do
     fm_pr_url_parse "$linked" || continue
     [ "$FM_PR_URL" != "$URL" ] || continue

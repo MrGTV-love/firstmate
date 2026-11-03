@@ -867,6 +867,54 @@ test_a_table_under_a_component_heading_keeps_the_bullets_after_it() {
   pass "a table does not end a Component heading's list, and it does end a lead-in's list"
 }
 
+test_a_markdown_link_in_the_component_column_is_a_member() {
+  local case_dir
+  case_dir=$(gh_case c2-md-link 80)
+  cx_add "$case_dir" markdown-member
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  printf '%s\n' 'Closes: markdown-member' > "$case_dir/bodies/71"
+  # shellcheck disable=SC2016 # Backticks in the fixture row are literal Markdown.
+  printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| [PR 71]($REPO_URL/71) | \`a\` |" > "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" markdown-member)" = "done" ] || fail "c2-md-link: a Markdown-link member was lost"
+  assert_grep "closed markdown-member with $REPO_URL/80" "$case_dir/stdout" "c2-md-link: the proof is not the train URL"
+  pass "a Component cell holding a Markdown link is a member"
+}
+
+test_a_component_table_under_an_exclusion_heading_closes_nothing() {
+  local case_dir
+  case_dir=$(gh_case c2-excluded 80)
+  cx_add "$case_dir" actually-landed
+  cx_add "$case_dir" explicitly-excluded
+  cx_add "$case_dir" waits-on-excluded
+  cx "$case_dir" block waits-on-excluded --by explicitly-excluded >/dev/null
+  printf '%s\n' 71 91 >> "$case_dir/merged-prs"
+  printf '%s\n' 'Closes: actually-landed' > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes: explicitly-excluded' > "$case_dir/bodies/91"
+  # shellcheck disable=SC2016 # Backticks in the fixture rows are literal Markdown.
+  printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| $REPO_URL/71 | \`a\` |" '' \
+    '## Excluded Components' '' 'The following PR did not land:' '' '| Component | Reason |' '| --- | --- |' "| $REPO_URL/91 | excluded |" \
+    > "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" actually-landed)" = "done" ] || fail "c2-excluded: the legitimate member was not closed"
+  [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "c2-excluded: an excluded PR's item was closed"
+  case "$(cx_deps "$case_dir" waits-on-excluded)" in *explicitly-excluded*) ;; *) fail "c2-excluded: an excluded item's dependency edge was cleared" ;; esac
+  pass "a Component table under an exclusion heading is no member list, so its items and edges stay"
+}
+
+test_a_declared_member_list_with_no_readable_member_reports_the_links() {
+  local case_dir
+  case_dir=$(gh_case c2-declared-zero 80)
+  cx_add "$case_dir" unread-member
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  printf '%s\n' 'Closes: unread-member' > "$case_dir/bodies/71"
+  printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" > "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" unread-member)" = queued ] || fail "c2-declared-zero: an unrecognized cell closed an item"
+  assert_grep "not read $REPO_URL/71" "$case_dir/stderr" "c2-declared-zero: the unread link was not reported"
+  pass "a body that declares a member list but yields no member still names each linked PR as not read"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -888,6 +936,9 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result
 test_the_closes_parser_reads_real_ids_and_ignores_examples
 test_a_data_row_that_mentions_component_is_no_member_list
+test_a_markdown_link_in_the_component_column_is_a_member
+test_a_component_table_under_an_exclusion_heading_closes_nothing
+test_a_declared_member_list_with_no_readable_member_reports_the_links
 test_a_table_under_a_component_heading_keeps_the_bullets_after_it
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
