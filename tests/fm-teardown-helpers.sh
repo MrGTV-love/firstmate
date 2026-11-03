@@ -2432,9 +2432,10 @@ SH
 # make_nested_slot_case <name> <shape>: a ship whose copies are a Treehouse
 # pool slot S it claims and a clean worktree N nested in S on fm/task-x1-v2,
 # both at the landed main. shape=enclosing records worktree=N and
-# prior_worktree=S (the task moved into N); shape=reverse records worktree=S and
-# prior_worktree=N (the task moved back). Sets NESTED_CASE, NESTED_SLOT and
-# NESTED_COPY. Its Treehouse stand-in logs every call except the read-only
+# prior_worktree=S (the task moved into N); shape=plain records worktree=N and
+# no prior_worktree= line (the task started in N); shape=reverse records
+# worktree=S and prior_worktree=N (the task moved back). Sets NESTED_CASE,
+# NESTED_SLOT and NESTED_COPY. Its Treehouse stand-in logs every call except the read-only
 # pool-dir and status queries, which it answers with nothing.
 make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   local case_dir mode=${4:-no-mistakes}
@@ -2461,6 +2462,11 @@ SH
       "worktree=$NESTED_COPY" "branch=fm/task-x1-v2" "project=$case_dir/project" \
       "kind=ship" "mode=$mode" "spawn_gen=teardown-test-task-x1" \
       "prior_worktree=$NESTED_SLOT"
+  elif [ "$2" = plain ]; then
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$NESTED_COPY" "branch=fm/task-x1-v2" "project=$case_dir/project" \
+      "kind=ship" "mode=$mode" "spawn_gen=teardown-test-task-x1"
   else
     fm_write_meta "$case_dir/state/task-x1.meta" \
       "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
@@ -2490,6 +2496,175 @@ exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
   add_lsof_no_holder "$case_dir"
+}
+
+# nested_evidence <name> <line>: keeps one observed line under
+# NESTED_EVIDENCE_DIR when a run asks for it.
+nested_evidence() {
+  [ -z "${NESTED_EVIDENCE_DIR:-}" ] || printf '%s\n' "$2" >> "$NESTED_EVIDENCE_DIR/$1.txt"
+  return 0
+}
+
+# nested_seed_task_files <case-dir>: the files a live task leaves behind that a
+# teardown retires - an inbox with a message, a status file and a tasktmp - and
+# a tmux stand-in that logs only the close calls it receives.
+nested_seed_task_files() {
+  local case_dir=$1
+  mkdir -p "$case_dir/state/task-x1.inbox" "$case_dir/tasktmp"
+  printf 'steer\n' > "$case_dir/state/task-x1.inbox/001.msg"
+  printf 'working: fixture\n' > "$case_dir/state/task-x1.status"
+  printf 'scratch\n' > "$case_dir/tasktmp/scratch.txt"
+  printf 'tasktmp=%s\n' "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint.log" ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+}
+
+# nested_place_leftovers <case-dir>: the two files a failed forced teardown of
+# the recorded gate-409 task left in its state directory.
+nested_place_leftovers() {
+  local case_dir=$1
+  printf 'id=task-x1\ndata=%s\nspawn_gen=teardown-test-task-x1\ncleanup_incomplete=0\narg=--note\narg=dropped\n' \
+    "$case_dir/data" > "$case_dir/state/task-x1.backlog-close"
+  printf 'spawn_gen=teardown-test-task-x1\nslot=\n' > "$case_dir/state/task-x1.teardown-return-pending"
+}
+
+# nested_fixture <label> <shape> <claim: mine|other|none> <variant>: a nested
+# slot case with the task files seeded, the claim set as asked and one fixture
+# variant applied: landed (nothing more), slot-unlanded (a commit only in the
+# slot root), copy-dirty (a staged change in the nested copy) or copy-unlanded
+# (a commit only in the nested copy).
+nested_fixture() {
+  local label=$1 shape=$2 claim=$3 variant=$4 case_dir
+  make_nested_slot_case "$label" "$shape" .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  nested_seed_task_files "$case_dir"
+  case "$claim" in
+    other) printf 'task=other-task\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner" ;;
+    none) rm -f "$case_dir/pool/1/.fm-slot-owner" ;;
+  esac
+  case "$variant" in
+    slot-unlanded)
+      printf 'slot work\n' > "$NESTED_SLOT/slot.txt"
+      git -C "$NESTED_SLOT" add slot.txt
+      git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "slot work"
+      ;;
+    copy-dirty)
+      printf 'dirty\n' > "$NESTED_COPY/dirty.txt"
+      git -C "$NESTED_COPY" add dirty.txt
+      ;;
+    copy-unlanded)
+      printf 'copy work\n' > "$NESTED_COPY/copy.txt"
+      git -C "$NESTED_COPY" add copy.txt
+      git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -qm "copy work"
+      ;;
+  esac
+}
+
+# nested_snapshot <case-dir> <out>: everything an entry-time refusal must leave
+# alone, as a listing with a SHA-256 for each file: the record, inbox, status,
+# tasktmp and markers under state/, the nested copy and its branch, the slot
+# root and its HEAD, the claim, the pool state and the endpoint close calls.
+nested_snapshot() {
+  local case_dir=$1 out=$2 dir file closes
+  {
+    for dir in "$case_dir/state" "$case_dir/tasktmp" "$case_dir/data"; do
+      [ -d "$dir" ] || continue
+      while IFS= read -r file; do
+        if [ -f "$file" ]; then
+          printf 'file %s %s\n' "$file" "$(shasum -a 256 < "$file" | awk '{print $1}')"
+        else
+          printf 'dir %s\n' "$file"
+        fi
+      done < <(find "$dir" ! -name '*.lock' ! -path '*.lock/*' ! -name '.last-watcher-beat' ! -name '.guard-watcher-stale-banner' | LC_ALL=C sort)
+    done
+    printf 'copy %s %s\n' "$(git -C "$NESTED_COPY" rev-parse HEAD 2>/dev/null || echo absent)" \
+      "$(git -C "$NESTED_COPY" status --porcelain=v1 --untracked-files=all 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+    git -C "$case_dir/project" for-each-ref --format='ref %(refname) %(objectname)'
+    printf 'slot %s %s\n' "$(git -C "$NESTED_SLOT" rev-parse HEAD 2>/dev/null || echo absent)" \
+      "$(git -C "$NESTED_SLOT" status --porcelain=v1 --untracked-files=all 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+    for file in "$case_dir/pool/1/.fm-slot-owner" "$case_dir/pool/treehouse-state.json" \
+        "$case_dir/endpoint.log" "$case_dir/treehouse.log"; do
+      if [ -f "$file" ]; then
+        printf 'aux %s %s\n' "$file" "$(shasum -a 256 < "$file" | awk '{print $1}')"
+      else
+        printf 'aux %s absent\n' "$file"
+      fi
+    done
+    closes=$(grep -c '^pane close' "$case_dir/herdr.log" 2>/dev/null || true)
+    printf 'herdr-pane-close-calls %s closed-marker %s\n' "${closes:-0}" \
+      "$([ -e "$case_dir/herdr-closed" ] && echo present || echo absent)"
+  } > "$out"
+}
+
+# nested_observe <case-dir> <rc>: the observable result of one teardown on one
+# line, for comparing shapes.
+nested_observe() {
+  local case_dir=$1 rc=$2 class markers= returns name
+  case "$rc" in 0) class=0 ;; *) class=nonzero ;; esac
+  for name in backlog-close teardown-return-pending; do
+    [ ! -e "$case_dir/state/task-x1.$name" ] || markers="$markers${markers:+,}$name"
+  done
+  returns=$(grep -c '^return' "$case_dir/treehouse.log" 2>/dev/null || true)
+  printf 'exit=%s copy=%s claim=%s record=%s inbox=%s status=%s tasktmp=%s returns=%s markers=%s' \
+    "$class" \
+    "$([ -e "$NESTED_COPY" ] && echo kept || echo removed)" \
+    "$([ -e "$case_dir/pool/1/.fm-slot-owner" ] && echo kept || echo removed)" \
+    "$([ -e "$case_dir/state/task-x1.meta" ] && echo kept || echo removed)" \
+    "$([ -e "$case_dir/state/task-x1.inbox" ] && echo kept || echo removed)" \
+    "$([ -e "$case_dir/state/task-x1.status" ] && echo kept || echo removed)" \
+    "$([ -e "$case_dir/tasktmp" ] && echo kept || echo removed)" \
+    "${returns:-0}" "${markers:-none}"
+}
+
+# nested_run <case-dir> [--force]: one teardown (with the fake Herdr's files
+# named, which only a Herdr-backed record reads). --force carries the suite's
+# drop words. Returns its exit status and leaves stdout and stderr in the case.
+nested_run() {
+  local case_dir=$1 rc=0
+  shift
+  if [ "${1:-}" = --force ]; then
+    FM_HOME="$case_dir/home" FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/herdr-closed" \
+      run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  else
+    FM_HOME="$case_dir/home" FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/herdr-closed" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  fi
+  return "$rc"
+}
+
+# assert_nested_closed <case-dir> <label>: the copy is gone, the slot was
+# returned exactly once, and the claim, record, task files and markers are gone.
+assert_nested_closed() {
+  local case_dir=$1 label=$2 name
+  assert_absent "$NESTED_COPY" "$label: the nested copy was not removed"
+  assert_equals 1 "$(grep -c "^return --force $NESTED_SLOT\$" "$case_dir/treehouse.log" 2>/dev/null || true)" \
+    "$label: the slot was not returned exactly once"
+  assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+  for name in meta status inbox backlog-close teardown-return-pending; do
+    assert_absent "$case_dir/state/task-x1.$name" "$label: task-x1.$name survived"
+  done
+  assert_absent "$case_dir/tasktmp" "$label: the tasktmp survived"
+}
+
+# assert_nested_refused_untouched <case-dir> <rc> <label> <stderr-fragment>: an
+# entry refusal that named its cause and changed nothing nested_snapshot covers,
+# measured against <case-dir>/snapshot.before.
+assert_nested_refused_untouched() {
+  local case_dir=$1 rc=$2 label=$3 fragment=$4
+  expect_code 1 "$rc" "$label: the teardown must refuse: $(cat "$case_dir/stderr")"
+  assert_grep "$fragment" "$case_dir/stderr" "$label: the refusal did not name its cause"
+  nested_snapshot "$case_dir" "$case_dir/snapshot.after"
+  if ! cmp -s "$case_dir/snapshot.before" "$case_dir/snapshot.after"; then
+    diff "$case_dir/snapshot.before" "$case_dir/snapshot.after" >&2 || true
+    fail "$label: the refusal changed state"
+  fi
+  nested_evidence n2-after "== $label: exit nonzero, stderr names '$fragment'; snapshot before == after ($(wc -l < "$case_dir/snapshot.after" | tr -d ' ') entries)"
+  nested_evidence n2-after "$(sed 's/^/   /' "$case_dir/snapshot.after")"
 }
 
 # nested_pipeline_input_case <name>: make_nested_slot_case's enclosing shape

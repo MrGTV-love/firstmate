@@ -2727,6 +2727,39 @@ test_verified_bundle_preserves_unlanded_copy() {
   pass 'ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle'
 }
 
+# The recorded gate-409 case held its commits in a verified recorded bundle:
+# the nested copy's commit, and in the second mode an independent tip at the
+# slot root's HEAD. A record with no prior_worktree= line finishes exactly as
+# the prior shape does on the identical fixture.
+test_plain_nested_bundle_held_commits_match_the_prior_shape() {
+  local mode shape case_dir rc second obs_enclosing obs_plain
+  for mode in single multiple; do
+    for shape in enclosing plain; do
+      nested_fixture "bundle-pair-$mode-$shape" "$shape" mine landed
+      case_dir=$NESTED_CASE
+      printf 'recoverable work\n' > "$NESTED_COPY/work.txt"
+      git -C "$NESTED_COPY" add work.txt
+      git -C "$NESTED_COPY" commit -qm 'unpublished work'
+      BUNDLE_PATH="$case_dir/bundles/work.bundle"
+      if [ "$mode" = multiple ]; then
+        second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'independent unpublished tip')
+        git -C "$NESTED_SLOT" reset --hard -q "$second"
+      fi
+      record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create bundle fixture'
+      rc=0
+      nested_run "$case_dir" || rc=$?
+      expect_code 0 "$rc" "bundle-pair-$mode-$shape: verified preservation must allow teardown: $(cat "$case_dir/stderr")"
+      assert_nested_closed "$case_dir" "bundle-pair-$mode-$shape"
+      if [ "$shape" = plain ]; then obs_plain=$(nested_observe "$case_dir" "$rc"); else obs_enclosing=$(nested_observe "$case_dir" "$rc"); fi
+    done
+    nested_evidence n1-bundle "bundle $mode (nested copy commit held by the bundle${second:+; slot root HEAD $second also held}):"
+    nested_evidence n1-bundle "   prior: $obs_enclosing"
+    nested_evidence n1-bundle "   plain: $obs_plain"
+    assert_equals "$obs_enclosing" "$obs_plain" "bundle-pair-$mode: the plain shape must equal the prior shape"
+  done
+  pass 'a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does'
+}
+
 test_invalid_preservation_bundle_refuses() {
   local shape case_dir rc reason refusal record second digest first size stock_bash_path
   for shape in missing-tip missing-slot-tip recorded-tip verify thin truncated hash no-record symlink malformed two-lines empty-field blank-tips; do
@@ -3913,6 +3946,7 @@ test_persistent_index_lock_exhausts_retries_and_refuses_loudly
 test_empty_retry_wait_uses_default_without_aborting
 test_fractional_legacy_retry_wait_refuses_without_arithmetic_error
 test_verified_bundle_preserves_unlanded_copy
+test_plain_nested_bundle_held_commits_match_the_prior_shape
 test_invalid_preservation_bundle_refuses
 test_bundle_storage_inside_removal_root_refuses
 test_bundle_storage_failure_keeps_copy
