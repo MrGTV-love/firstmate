@@ -140,7 +140,10 @@ A report that says `EXIT: pass` while it holds such a note is reconciled to `nee
 ### Cutting a criterion
 
 Cut a criterion only after naming the criterion that keeps the same protection.
-Then show that the keeper rejects the failure the cut criterion rejected.
+Then show that the keeper, as it is written now, rejects the failure the cut criterion rejected.
+A keeper that needs an edit before it rejects that failure is not a keeper.
+Also check what else the cut item does: any other text that refers to it by name, and any duty it carries under the installed skill, such as an assumption that Verification Complete must close.
+A cut that leaves a reference with no target, or drops such a duty, is not a cut of a duplicate.
 A criterion with no keeper stays, whatever its wording.
 A repair that demands an artifact the task's stage cannot produce is excess whatever protection it points at.
 Keep the protection, and change the evidence form to what the stage can produce.
@@ -180,12 +183,15 @@ No round number, finding count, word count or timer decides any exit.
 4. The round has progress when at least one earlier finding closed by independent verification, or at least one finding is newly substantiated, not equivalent to a recorded one, and not repair-induced.
    A recurrence and a repair-induced failure are not progress.
 5. Take the first test that holds:
-   - `conflicting`: repairing a finding would break another binding requirement.
+   - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
+     Two readings of one text are a dispute for Main, not a conflict.
+     A settlement made after the round does not change that round's exit.
    - `pass`: no substantiated finding remains, and the register supports closure of the earlier ones.
    - `needs-revision`: substantiated findings remain, and the round has progress.
    - `stalled`: substantiated findings remain, and the round has no progress.
 
 A round with progress is never `stalled`, whatever else it found.
+A round recorded before this policy existed is decided on its content, and any leak it contained is recorded as its cause.
 The reviewer reports `pass`, `needs-revision` or `conflicting`.
 The author or Main decides `stalled` from the register.
 A round record carries exactly one `EXIT:` value.
