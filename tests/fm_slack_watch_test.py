@@ -532,6 +532,18 @@ class IntakeTest(unittest.TestCase):
             watch.poll()
             self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
 
+    def test_an_unreadable_history_page_sets_no_cursor_and_is_never_an_empty_dm(self):
+        with self.fixture() as (watch, replay):
+            watch.state.pop('intake_cursor')
+            self.say(replay, '200.000100', 'sent before the first poll with this code')
+            with patch.object(replay, 'call', return_value={'ok': True}), \
+                 self.assertRaisesRegex(SlackError, '^unreadable_dm_history$'):
+                watch.take_requests(20)
+            self.assertNotIn('intake_cursor', watch.state)
+            watch.take_requests(20)
+            self.assertEqual(watch.state['intake_cursor'], '200.000100')
+            self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+
     def test_new_messages_are_taken_in_oldest_first_within_the_cap(self):
         with self.fixture(cap='2') as (watch, replay):
             for ts in ('200.000300', '200.000100', '200.000500', '200.000200', '200.000400'):

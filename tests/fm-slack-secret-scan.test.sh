@@ -43,8 +43,8 @@ INTAKE="$FIX/intake/transcript.json"
 run_plane "${HOMES[2]}" arm "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE"
 replay=$(python3 "$HELPER" replay-file "${HOMES[2]}/state/slack-watch")
 python3 "$HELPER" owner-message "$replay" 2000.000100 U0TESTOWNER 'a request typed while the plane is armed'
-python3 "$HELPER" owner-message "$replay" 2000.000200 U0TESTOWNER 'a second request, taken in by the standing check'
 run_plane "${HOMES[2]}" request-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE"
+python3 "$HELPER" owner-message "$replay" 2000.000200 U0TESTOWNER 'a second request, taken in by the standing check'
 run_plane "${HOMES[2]}" request-check "$ROOT/bin/fm-slack-check.sh" check --replay "$INTAKE"
 
 # The scan is only meaningful if the plane really ran with the token.
