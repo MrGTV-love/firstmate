@@ -15,16 +15,18 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
      changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
      never counted (bin/fm-review-record.py binds every record to its exact head);
-  2. collects the reads it requested earlier: a finished report is recorded through
-     `fm-review-record.py review`, an INCOMPLETE report is held, and a crashed or unusable read
-     burns that model for the head;
+  2. collects the reads it requested earlier for any head, so a read still out never stops a newer
+     head from being read: a finished report is recorded through `fm-review-record.py review` for its
+     own head, an INCOMPLETE report is held, a FAIL that cannot be recorded still ends the head at
+     fail, and a crashed or unusable read burns that model for the head;
   3. stops unless the PR is open, not a draft, mergeable and reported CLEAN or HAS_HOOKS by the forge
      with no check pending. This is a fail-closed prefilter for spending a read, never the merge
      gate: bin/fm-pr-merge.sh re-reads every condition live and stays the only authority;
   4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS goes to
      bin/fm-pr-merge.sh <task> <url> with no other argument, never an override, waiver or captain word,
      and a captain-word basis is left to Main. Otherwise `fm-review-record.py plan` names the author
-     families still uncovered and one read is requested for them.
+     families still uncovered and one read is requested for them. While the PR sits in a merge
+     queue that fm-pr-merge.sh reported, nothing is called again until the queue lets it go.
 Counting rule: for one head and one reader model there is at most one request, whether it is
 outstanding, finished or failed, so a repeat pass, a restart or a second caller makes no duplicate.
 While a read is outstanding no further read is requested for that head. A model whose read failed
@@ -41,23 +43,28 @@ line of config/review-runner. Unset or not executable makes no request and recor
 `review runner unavailable: <why>` line per head.
 
 Everything durable is under <state>/.pr-auto-review/: <task>.json is the sidecar (request, outstanding
-read, verdict, merge attempt, events) and <task>.d/ holds one directory per request with the
-review pack the runner reads, its lock and its report. The reader runs detached under a flock the
+read, verdict, merge attempt, events, next due time) and <task>.d/ holds one directory per request with
+the review pack the runner reads, its lock and its report. The pack's diff is used only when the PR
+head fm-review-diff.sh fetched is the head being read. The reader runs detached under a flock the
 sidecar test can probe, so a restart neither loses a read nor repeats it. Outcomes are sidecar events
-(read requested, verdict recorded, merged with the full PR URL, fail, held with its reason, no eligible
-reader, runner unavailable) and, when Main must act, one check wake; the merge itself also writes the
-merge outcome and fleet-ledger record that bin/fm-pr-merge.sh owns. `state` prints reading, merged, fail,
-held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
+(read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no
+eligible reader, runner unavailable) and, for every lasting hold, one check wake per head and reason;
+the merge itself also writes the merge outcome and fleet-ledger record that bin/fm-pr-merge.sh owns.
+`state` prints reading, queued, merged, fail, held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
 because a `note:` there would replace the worker's `done:` as the latest event.
 
-A report is accepted only when its first line is `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>`, its
-last line is `VERDICT: <same word>`, and the three facts each stand on a line that names the fact
-followed by yes or no: `loosens a deny or allow list`, `widens what a guard permits`, `touches
-customer data, billing or spend`. A PASS missing a fact is unusable. A line
-`Protected class: destructive|irreversible|security-sensitive`, or a `protected=<class>` field in the
-task's meta, holds the merge for Main with that class named. A local-only task never reaches this
-script's merge path, and while an away-posture record exists the merge step holds
-(`held: away posture ...`) so the supervision session keeps reading the captain's away words. Exit status: 0 for every pass that ran, 2 for a usage error.
+A report is accepted only when its raw first line is exactly `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>`
+(the rule `fm-review-record.py review` applies), its last line is `VERDICT: <same word>`, and the three
+facts each stand on a line that names the fact followed by yes or no: `loosens a deny or allow list`,
+`widens what a guard permits`, `touches customer data, billing or spend`. A PASS missing a fact is
+unusable. The runner asks the reader for one line exactly `Protected class: yes - <why>` or
+`Protected class: no - <why>`: yes, a missing line or a malformed one holds the merge for Main, and only
+no lets a covering PASS merge; a `protected=<class>` field in the task's meta also holds it. The model
+that served a read is read only from one runner stdout line exactly `served-model: <model id>`; with
+none the read is never recorded, the head is held as `served model unknown` for Main, and no further
+read is requested for it. Today's runner prints no such line, so until it does every read holds for
+Main. A local-only task never reaches this script's merge path, and an away record is left to
+bin/fm-pr-merge.sh's own away handling. Exit status: 0 for every pass that ran, 2 for a usage error.
 """
 import fcntl
 import hashlib
@@ -157,7 +164,15 @@ class Sidecar:
             pass
 
     def head(self, sha):
-        return self.data["heads"].setdefault(sha, {"attempts": {}, "emitted": [], "outcome": None})
+        return self.data["heads"].setdefault(sha, {"attempts": {}, "emitted": [], "outcome": None, "seen": time.time()})
+
+    def prune(self, current):
+        """Keep the five most recently seen heads, the current and phase heads, and every head with a read out."""
+        heads = self.data["heads"]
+        keep = {current, self.data.get("phase", {}).get("head")}
+        for old in sorted(heads, key=lambda sha: heads[sha].get("seen", 0), reverse=True)[5:]:
+            if old not in keep and not any(a["state"] == "requested" for a in heads[old]["attempts"].values()):
+                del heads[old]
 
     def save(self):
         write_atomic(self.path, json.dumps(self.data, sort_keys=True, indent=1) + "\n")
@@ -196,6 +211,18 @@ def gh_view(url):
     except ValueError:
         view = None
     return view if isinstance(view, dict) and SHA.fullmatch(str(view.get("headRefOid", ""))) else None
+
+
+def still_queued(url):
+    """False only when the forge answers that the PR has left the merge queue; the query is bin/fm-pr-merge.sh's."""
+    owner, repo, number = PR_URL.fullmatch(url).groups()
+    result = run(["gh", "api", "graphql", "-f",
+                  "query=query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo)"
+                  "{pullRequest(number:$number){state merged isInMergeQueue baseRefName}}}",
+                  "-F", f"owner={owner}", "-F", f"repo={repo}", "-F", f"number={number}", "--jq",
+                  '.data.repository.pullRequest | "state=" + (.state // ""), "merged=" + (.merged | tostring), '
+                  '"queued=" + (.isInMergeQueue | tostring), "base=" + (.baseRefName // "")'])
+    return not (result.returncode == 0 and "queued=false" in result.stdout.splitlines())
 
 
 def ready_reason(view):
@@ -313,40 +340,67 @@ def latest_review(home, url):
 
 
 def parse_report(path, sha):
-    """(verdict, facts, classes, problem): problem is None for a usable report."""
+    """(verdict, facts, protected, problem): problem is None for a usable report.
+
+    A report whose exact first line names this head keeps its verdict even when a later part is
+    unusable, so a FAIL is never mistaken for a read that said nothing. protected is "no",
+    "yes - <why>", "missing" or "malformed".
+    """
     try:
-        text = Path(path).read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return None, {}, [], "no readable report"
-    lines = [line for line in text.splitlines() if line.strip()]
-    if not lines:
-        return None, {}, [], "empty report"
-    first = re.fullmatch(r"VERDICT: (PASS|FAIL|INCOMPLETE) head=([0-9a-f]{40}|[0-9a-f]{64})", lines[0].strip())
+        raw = Path(path).read_bytes()
+    except OSError:
+        return None, {}, None, "no readable report"
+    first = re.fullmatch(rb"VERDICT: (PASS|FAIL|INCOMPLETE) head=([0-9a-f]{40}|[0-9a-f]{64})", raw.partition(b"\n")[0])
     if not first:
-        return None, {}, [], "first line is not 'VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>'"
-    verdict, named = first.groups()
+        return None, {}, None, "first line is not exactly 'VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>'"
+    verdict, named = first.group(1).decode(), first.group(2).decode()
     if named != sha:
-        return None, {}, [], f"report names head {named}, not {sha}"
-    if lines[-1].strip() != f"VERDICT: {verdict}":
-        return None, {}, [], "last line does not repeat the first line's verdict"
+        return None, {}, None, f"report names head {named}, not {sha}"
+    try:
+        lines = [line for line in raw.partition(b"\n")[2].decode("utf-8").splitlines() if line.strip()]
+    except UnicodeError:
+        return verdict, {}, None, "the report is not UTF-8"
+    if not lines or lines[-1].strip() != f"VERDICT: {verdict}":
+        return verdict, {}, None, "last line does not repeat the first line's verdict"
     facts = {}
     for key, phrase in FACTS:
         answers = set()
-        for line in lines[1:-1]:
+        for line in lines[:-1]:
             match = re.search(phrase + r"[\s:|*_`()=\-–—]*\b(yes|no)\b", line, re.IGNORECASE)
             if match:
                 answers.add(match.group(1).lower())
         if len(answers) == 1:
             facts[key] = answers.pop()
-    classes = sorted({c for line in lines if re.match(r"\W*protected class\W", line, re.IGNORECASE)
-                      for c in CLASSES if c in line.lower()})
-    return verdict, facts, classes, None
+    named_lines = [line.strip() for line in lines[:-1] if re.match(r"\W*protected class\b", line, re.IGNORECASE)]
+    answer = re.fullmatch(r"Protected class: (yes|no) - (\S.*)", named_lines[0]) if len(named_lines) == 1 else None
+    if answer:
+        protected = "no" if answer.group(1) == "no" else f"yes - {answer.group(2)}"
+    else:
+        protected = "malformed" if named_lines else "missing"
+    return verdict, facts, protected, None
 
 
 def collect(home, task, url, sha, base, side, meta):
-    """Fold finished reads into the sidecar and record their verdicts; True while one is still outstanding."""
+    """Fold finished reads of one head into the sidecar and record their verdicts; True while one is still outstanding."""
     head = side.head(sha)
     outstanding = False
+
+    def mark(name, detail):
+        # A read of an older head never takes the current state away from a newer one.
+        if side.data.get("phase", {}).get("head") in (None, sha):
+            phase(side, sha, name, detail)
+
+    def burn(att, model_id, text, reason, key=None, wake=None):
+        att.update(state="failed", reason=reason)
+        emit(home, task, side, sha, key or f"failed:{model_id}", text, wake)
+
+    def stand_failed(att, actual, report, why=""):
+        att["state"] = "returned" if why else "recorded"
+        head["outcome"] = {"kind": "fail", "detail": report}
+        mark("fail", f"report {report}")
+        emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report}" + (f" (not recorded: {why})" if why else ""),
+             f"FAIL at {sha[:12]} read by {actual}; findings are in {report}")
+
     for model_id, att in sorted(head["attempts"].items(), key=lambda item: item[1]["at"]):
         if att["state"] != "requested":
             continue
@@ -361,7 +415,7 @@ def collect(home, task, url, sha, base, side, meta):
                         att.update(state="failed", reason="the read ended without a result")
             except BlockingIOError:
                 outstanding = True
-                phase(side, sha, "reading", f"{sha[:12]} by {model_id}")
+                mark("reading", f"{sha[:12]} by {model_id}")
                 continue
             except OSError:
                 att.update(state="failed", reason="the read left no lock or result")
@@ -372,67 +426,78 @@ def collect(home, task, url, sha, base, side, meta):
             outcome = json.loads(result_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             outcome = {}
-        actual = outcome.get("actual_model") or model_id
+        served = outcome.get("served_model")
+        named = served or model_id
         report = outcome.get("report") or ""
-        verdict, facts, classes, problem = parse_report(report, sha) if report else (None, {}, [], "the runner wrote no report")
+        verdict, facts, protected, problem = parse_report(report, sha) if report else (None, {}, None, "the runner wrote no report")
         quota = " (usage limit reached)" if "usage_limit_reached" in str(outcome.get("tail", "")) else ""
-        if problem:
-            att.update(state="failed", reason=problem + quota)
-            emit(home, task, side, sha, f"failed:{model_id}", f"read of {sha[:12]} by {actual} unusable: {problem}{quota}")
+        if problem and verdict == "FAIL":
+            stand_failed(att, named, report, problem)
             continue
-        att.update(report=report, verdict=verdict, actual_model=actual, protected=classes)
+        if problem:
+            burn(att, model_id, f"read of {sha[:12]} by {named} unusable: {problem}{quota}", problem + quota)
+            continue
+        if not served:
+            att.update(state="returned", report=report, verdict=verdict)
+            head["outcome"] = {"kind": "served-model-unknown", "detail": report}
+            mark("held", f"served model unknown for the read requested from {model_id}, report {report}")
+            emit(home, task, side, sha, "served-model-unknown",
+                 f"held: served model unknown at {sha[:12]}: the runner printed no 'served-model:' line for the read requested from {model_id}, report {report}",
+                 f"served model unknown for the read of {sha[:12]} requested from {model_id}; not recorded, report {report}, the merge is Main's")
+            continue
+        att.update(report=report, verdict=verdict, actual_model=served, protected=protected)
         if verdict == "INCOMPLETE":
             att["state"] = "returned"
             head["outcome"] = {"kind": "incomplete", "detail": report}
-            phase(side, sha, "held", f"review INCOMPLETE, report {report}")
-            emit(home, task, side, sha, "incomplete", f"held: review INCOMPLETE at {sha[:12]} by {actual}, report {report}",
-                 f"INCOMPLETE read of {sha[:12]} by {actual}; missing evidence or decision is in {report}")
+            mark("held", f"review INCOMPLETE, report {report}")
+            emit(home, task, side, sha, "incomplete", f"held: review INCOMPLETE at {sha[:12]} by {served}, report {report}",
+                 f"INCOMPLETE read of {sha[:12]} by {served}; missing evidence or decision is in {report}")
             continue
-        if len(facts) < 3 and verdict == "PASS":
-            names = ", ".join(k for k, _ in FACTS if k not in facts)
-            att.update(state="failed", reason=f"PASS report states no clear yes or no for: {names}")
-            emit(home, task, side, sha, f"failed:{model_id}", f"read of {sha[:12]} by {actual} unusable: {att['reason']}")
-            continue
-        if verdict == "FAIL" and len(facts) < 3:
-            att["state"] = "returned"
-            head["outcome"] = {"kind": "fail", "detail": report}
-            phase(side, sha, "fail", f"report {report}")
-            emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report} (not recorded: the report states no clear yes or no for every fact)",
-                 f"FAIL at {sha[:12]} read by {actual}; findings are in {report}")
+        if len(facts) < 3:
+            if verdict == "FAIL":
+                stand_failed(att, served, report, "the report states no clear yes or no for every fact")
+            else:
+                names = ", ".join(k for k, _ in FACTS if k not in facts)
+                reason = f"PASS report states no clear yes or no for: {names}"
+                burn(att, model_id, f"read of {sha[:12]} by {served} unusable: {reason}", reason)
             continue
         plan, why = author_plan(home, task, url, sha, base)
         if plan is None:
-            outstanding = True
-            emit(home, task, side, sha, f"plan:{why}", f"held: cannot record the {verdict} of {sha[:12]}: {why}")
+            if verdict == "FAIL":
+                stand_failed(att, served, report, why)
+            else:
+                burn(att, model_id, f"held: cannot record the PASS of {sha[:12]}: {why}", why, f"plan:{why}", f"cannot record the PASS of {sha[:12]}: {why}")
             continue
-        reader_family = family(actual)
+        reader_family = family(served)
         covered = sorted(g for g, authors in plan["groups"].items() if any(a["family"] != reader_family for a in authors))
-        if not covered:
-            att.update(state="failed", reason=f"reader family {reader_family} covers none of the author groups")
-            emit(home, task, side, sha, f"failed:{model_id}", f"read of {sha[:12]} by {actual} covers nothing: {att['reason']}")
+        if not covered and verdict == "PASS":
+            reason = f"reader family {reader_family} covers none of the author groups"
+            burn(att, model_id, f"read of {sha[:12]} by {served} covers nothing: {reason}", reason)
             continue
+        # A FAIL counts whatever the reader's family, so it names every group it read.
+        covered = covered or sorted(plan["groups"])
         newest = latest_review(home, url)
         if not (newest and newest.get("head") == sha and newest.get("report") == report and newest.get("verdict") == verdict):
             groups = {g: sorted({a["model"] for a in authors}) for g, authors in plan["groups"].items()}
             command = [sys.executable, str(BIN / "fm-review-record.py"), "review", "--pr", url, "--head", sha,
-                       "--verdict", verdict, "--reader-model", actual, "--author-groups", json.dumps(groups),
+                       "--verdict", verdict, "--reader-model", served, "--author-groups", json.dumps(groups),
                        "--covered-groups", json.dumps(covered), "--report", report]
             for key, _ in FACTS:
                 command += [f"--{key.replace('_', '-')}", facts[key]]
             recorded = run(command, home)
             if recorded.returncode != 0:
-                outstanding = True
-                emit(home, task, side, sha, f"record:{verdict}", f"held: could not record the {verdict} of {sha[:12]}: "
-                     f"{(recorded.stdout or recorded.stderr).strip()[:200]}", f"could not record {verdict} for {sha[:12]}")
+                why = f"the record owner refused it: {(recorded.stdout or recorded.stderr).strip()[:200]}"
+                if verdict == "FAIL":
+                    stand_failed(att, served, report, why)
+                else:
+                    burn(att, model_id, f"read of {sha[:12]} by {served} unusable: {why}", why, "record:PASS",
+                         f"could not record the PASS of {sha[:12]} by {served}: {why}")
                 continue
-        att["state"] = "recorded"
         if verdict == "FAIL":
-            head["outcome"] = {"kind": "fail", "detail": report}
-            phase(side, sha, "fail", f"report {report}")
-            emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report}",
-                 f"FAIL at {sha[:12]} read by {actual}; findings are in {report}")
+            stand_failed(att, served, report)
         else:
-            emit(home, task, side, sha, f"recorded:{actual}", f"verdict recorded: PASS for {sha[:12]} by {actual}, report {report}")
+            att["state"] = "recorded"
+            emit(home, task, side, sha, f"recorded:{served}", f"verdict recorded: PASS for {sha[:12]} by {served}, report {report}")
     side.save()
     return outstanding
 
@@ -476,10 +541,18 @@ def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, c
     runner, _ = runner_path(home)
     review_dir = home.root / f"{task}.d" / f"{sha[:12]}-{slug(model_id)}"
     review_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    worktree, number = meta.get("worktree", ""), PR_URL.fullmatch(url).group(3)
+    if not os.path.isabs(worktree):
+        return "diff unavailable: the task records no absolute worktree"
+    pulled = f"refs/fm-review/pull/{number}/head"
+    run(["git", "-C", worktree, "update-ref", "-d", pulled])
     diff = run([str(BIN / "fm-review-diff.sh"), task], home)
     if diff.returncode != 0 or not diff.stdout.strip():
         errors = [line for line in diff.stderr.splitlines() if line.startswith("error:")]
         return f"diff unavailable: {(errors[-1] if errors else 'fm-review-diff.sh printed no diff')[:160]}"
+    fetched = run(["git", "-C", worktree, "rev-parse", "--verify", "--quiet", f"{pulled}^{{commit}}"]).stdout.strip()
+    if fetched != sha:
+        return f"diff unavailable: the PR head fm-review-diff.sh fetched is {fetched[:12] or 'none'}, not {sha[:12]}"
     (review_dir / "pr.diff").write_text(diff.stdout, encoding="utf-8")
     (review_dir / "contract.md").write_text(contract_text(home, task), encoding="utf-8")
     (review_dir / "ci-evidence.md").write_text(ci_text(sha, view), encoding="utf-8")
@@ -514,17 +587,10 @@ def read_worker(run_dir, fd):
     done = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False,
                           pass_fds=(int(fd),))
     out = (done.stdout or "") + (done.stderr or "")
-    try:
-        out += (Path(request["dir"]) / "review-run.log").read_text(encoding="utf-8", errors="replace")[-2000:]
-    except OSError:
-        pass
-    actual = request["argv_model"]
-    for pattern in (r"switching to (\S+) now", r"using (\S+)\s*$"):
-        for match in re.finditer(pattern, out, re.MULTILINE):
-            actual = match.group(1)
+    served = re.findall(r"(?m)^served-model: (\S+)$", done.stdout or "")
     report = Path(request["dir"]) / "review.md"
     write_atomic(run_dir / "result.json", json.dumps({
-        "rc": done.returncode, "actual_model": actual, "tail": out[-3000:],
+        "rc": done.returncode, "served_model": served[0] if len(served) == 1 else None, "tail": out[-3000:],
         "report": str(report) if report.is_file() and report.stat().st_size else ""}) + "\n")
 
 
@@ -546,27 +612,21 @@ def step(home, task):
         advance(home, task, url, meta, side)
     finally:
         side.save()
-        # The housekeeping pass skips a task before it starts this program while nothing is due.
-        marker = home.root / f"{task}.next"
-        reading = any(a["state"] == "requested" for h in side.data["heads"].values() for a in h["attempts"].values())
-        if reading or side.data.get("phase", {}).get("state") == "merged":
-            marker.unlink(missing_ok=True)
-        else:
-            write_atomic(marker, f"{side.data.get('next_at', 0)}\n")
         guard.close()
 
 
 def advance(home, task, url, meta, side):
-    view = None
     head_sha = side.data.get("phase", {}).get("head")
     prior = side.head(head_sha) if head_sha else None
     if prior and prior.get("outcome") and prior["outcome"]["kind"] == "merged":
         return
-    due = side.data.get("next_at", 0)
-    working = bool(head_sha) and any(a["state"] == "requested" for a in prior["attempts"].values())
-    if working and collect(home, task, url, head_sha, side.data.get("base", ""), side, meta):
-        return
-    if not working and time.time() < due:
+    # Every head's outstanding reads are collected each pass; one still out never stops the forge read.
+    working = outstanding = False
+    for old in list(side.data["heads"]):
+        if any(a["state"] == "requested" for a in side.data["heads"][old]["attempts"].values()):
+            working = True
+            outstanding = collect(home, task, url, old, side.data.get("base", ""), side, meta) or outstanding
+    if time.time() < side.data.get("next_at", 0) and (outstanding or not working):
         return
     # A forge read that fails is spaced like one that answers, so an outage is not hammered.
     side.data["next_at"] = int(time.time()) + INTERVAL
@@ -576,8 +636,7 @@ def advance(home, task, url, meta, side):
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
     head = side.head(sha)
-    for old in list(side.data["heads"])[:-5]:
-        del side.data["heads"][old]
+    side.prune(sha)
     if str(view.get("state", "")).upper() == "MERGED":
         if not head.get("outcome"):
             head["outcome"] = {"kind": "merged", "detail": url}
@@ -588,8 +647,10 @@ def advance(home, task, url, meta, side):
     if head.get("outcome") or str(view.get("state", "")).upper() != "OPEN":
         side.save()
         return
+    if side.data.get("phase", {}).get("head") == sha and side.data["phase"]["state"] == "queued" and still_queued(url):
+        return
     ensure_objects(meta, sha, base)
-    if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):
+    if any(a["state"] == "requested" for a in head["attempts"].values()):
         return
     reason = ready_reason(view)
     if reason:
@@ -615,23 +676,24 @@ def advance(home, task, url, meta, side):
     if error.get("kind") != "not-qualified":
         reason = f"review record {error.get('kind') or 'unavailable'}: {str(error.get('message', ''))[:160]}"
         phase(side, sha, "held", reason)
-        emit(home, task, side, sha, f"verify:{reason}", f"held: {reason}")
+        emit(home, task, side, sha, f"verify:{reason}", f"held: {reason}", f"{reason} at {sha[:12]}")
         return
     plan, why = author_plan(home, task, url, sha, base)
     if plan is None:
         phase(side, sha, "held", why)
-        emit(home, task, side, sha, f"plan:{why}", f"held: {why}")
+        emit(home, task, side, sha, f"plan:{why}", f"held: {why}", f"{why} at {sha[:12]}")
         return
     owed = sorted({f for item in plan["uncovered"] for f in item["families"]})
     if "unknown" in owed:
-        head["outcome"] = {"kind": "unknown-family", "detail": ""}
         phase(side, sha, "held", "author family unknown")
         emit(home, task, side, sha, "unknown-family", f"held: author family unknown at {sha[:12]}",
              f"author family unknown at {sha[:12]}; no read can cover it, repair the author evidence or give the merge word")
         return
     if not owed:
-        phase(side, sha, "held", "review record leaves nothing to read")
-        side.save()
+        reason = "review record leaves nothing to read"
+        phase(side, sha, "held", reason)
+        emit(home, task, side, sha, "nothing-to-read", f"held: {reason} at {sha[:12]}",
+             f"{reason} at {sha[:12]}, yet verify does not accept it: {str(error.get('message', ''))[:160]}")
         return
     runner, why = runner_path(home)
     if not runner:
@@ -642,43 +704,45 @@ def advance(home, task, url, meta, side):
     tiers, why = candidate_models(home)
     pick = choose_reader(tiers, set(head["attempts"]), owed) if tiers else None
     if not pick:
-        why = why or f"no model outside {','.join(owed)} is left for {sha[:12]}"
-        head["outcome"] = {"kind": "no-eligible-reader", "detail": why}
+        if tiers:
+            # Only an exhaustion of the eligible models ends the head; a config read that fails is retried.
+            why = f"no model outside {','.join(owed)} is left for {sha[:12]}"
+            head["outcome"] = {"kind": "no-eligible-reader", "detail": why}
         phase(side, sha, "held", f"no eligible reader: {why}")
-        emit(home, task, side, sha, "no-eligible-reader", f"held: no eligible reader: {why}", f"no eligible reader at {sha[:12]}: {why}")
+        emit(home, task, side, sha, f"no-eligible-reader:{why}", f"held: no eligible reader: {why}", f"no eligible reader at {sha[:12]}: {why}")
         return
     problem = request_read(home, task, url, sha, base, side, meta, view, plan, pick[0], pick[1])
     if problem:
         phase(side, sha, "held", f"review pack not built: {problem}")
-        emit(home, task, side, sha, f"pack:{problem}", f"held: review pack not built for {sha[:12]}: {problem}")
+        emit(home, task, side, sha, f"pack:{problem}", f"held: review pack not built for {sha[:12]}: {problem}",
+             f"review pack not built for {sha[:12]}: {problem}")
     side.save()
-
-
-def away_posture(home):
-    """True while an away-posture record exists; bin/fm-afk-contract.sh owns the reading."""
-    script = '. "$1/fm-afk-contract.sh" && fm_afk_contract_away_present "$2"'
-    # Status 1 is "no away record"; an unreadable record holds, as bin/fm-pr-merge.sh refuses on one.
-    return run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), str(home.state)], home).returncode != 1
 
 
 def merge(home, task, url, sha, side, meta):
     head = side.head(sha)
-    classes = sorted({c for c in (meta.get("protected", "").split(",")) if c in CLASSES}
-                     | {c for att in head["attempts"].values() for c in att.get("protected", [])})
-    if classes:
-        head["outcome"] = {"kind": "protected", "detail": ",".join(classes)}
-        phase(side, sha, "held", f"protected class {','.join(classes)}")
-        emit(home, task, side, sha, "protected", f"held: protected class {','.join(classes)} at {sha[:12]}; the merge is the captain's",
-             f"{url} is marked {','.join(classes)}; not merged, Main takes it to the captain")
-        return
-    if away_posture(home):
-        phase(side, sha, "held", "away posture: the supervision session decides this merge")
-        emit(home, task, side, sha, "away", f"held: away posture at {sha[:12]}; the supervision session decides this merge")
+    classes = sorted({c for c in (meta.get("protected", "").split(",")) if c in CLASSES})
+    answers = [att.get("protected") for att in head["attempts"].values() if att["state"] == "recorded" and att.get("verdict") == "PASS"]
+    reasons = [f"protected class {','.join(classes)}"] if classes else []
+    reasons += sorted({f"protected class {a}" if str(a).startswith("yes") else f"protected class line {a} in a report"
+                       for a in answers if a != "no"})
+    if not answers:
+        reasons.append("no read this lane recorded for the head answered the protected-class question")
+    if reasons:
+        reason = "; ".join(reasons)
+        head["outcome"] = {"kind": "protected", "detail": reason}
+        phase(side, sha, "held", reason)
+        emit(home, task, side, sha, "protected", f"held: {reason} at {sha[:12]}; the merge is Main's",
+             f"{url} held: {reason}; not merged, Main decides it and takes a protected class to the captain")
         return
     attempt = head.get("merge") or {}
     if time.time() < attempt.get("next_at", 0):
         return
     done = run([str(BIN / "fm-pr-merge.sh"), task, url], home)
+    if done.returncode == 0 and re.search(rf"(?m)^verified: {re.escape(url)} is queued ", done.stdout):
+        phase(side, sha, "queued", url)
+        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue")
+        return
     if done.returncode == 0:
         head["outcome"] = {"kind": "merged", "detail": url}
         phase(side, sha, "merged", url)
@@ -689,7 +753,8 @@ def merge(home, task, url, sha, side, meta):
     reason = (errors[0][6:].strip() if errors else output[-1] if output else f"fm-pr-merge.sh exited {done.returncode}")[:240]
     head["merge"] = {"next_at": int(time.time()) + MERGE_RETRY, "reason": reason}
     phase(side, sha, "held", f"merge refused: {reason}")
-    emit(home, task, side, sha, f"merge:{hashlib.sha256(reason.encode()).hexdigest()[:12]}", f"held: merge refused at {sha[:12]}: {reason}")
+    emit(home, task, side, sha, f"merge:{hashlib.sha256(reason.encode()).hexdigest()[:12]}", f"held: merge refused at {sha[:12]}: {reason}",
+         f"merge of {url} at {sha[:12]} refused: {reason}")
 
 
 def sweep(home):
@@ -698,8 +763,7 @@ def sweep(home):
     for path in home.root.glob("*.json"):
         if not (home.state / f"{path.stem}.meta").exists():
             path.unlink(missing_ok=True)
-            for leftover in ("next", "lock"):
-                (home.root / f"{path.stem}.{leftover}").unlink(missing_ok=True)
+            (home.root / f"{path.stem}.lock").unlink(missing_ok=True)
             shutil.rmtree(home.root / f"{path.stem}.d", ignore_errors=True)
 
 
@@ -710,8 +774,8 @@ def state_line(home, task):
     except (OSError, ValueError, KeyError):
         return "idle"
     name, detail = current["state"], current.get("detail", "")
-    return {"reading": f"reading {detail}", "merged": f"merged {detail}", "fail": f"fail {detail}",
-            "held": f"held: {detail}"}.get(name, f"waiting: {detail}")
+    return {"reading": f"reading {detail}", "queued": f"queued {detail}", "merged": f"merged {detail}",
+            "fail": f"fail {detail}", "held": f"held: {detail}"}.get(name, f"waiting: {detail}")
 
 
 def events_text(home, task):

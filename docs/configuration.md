@@ -2607,6 +2607,8 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 
 - `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
 - The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
+- `pr.diff` comes from `bin/fm-review-diff.sh` and is used only when the PR head it fetched is the head being read; otherwise the pack is not built.
+- The model that served the read is taken only from one runner stdout line exactly `served-model: <model id>`, never from prose notices or logs. With none, the read is not recorded, the head is held as `served model unknown` with the report path and the requested model, Main is woken, and no further read is requested for that head. Today's runner prints no such line, so until it does every read holds for Main.
 - No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
 - Unset, relative or not executable makes no request and records one `review runner unavailable: <why>` event and one check wake per head.
 
@@ -2620,21 +2622,23 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 
 **Report format**
 
-- The first line is `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>` for the requested head, and the last line repeats the verdict word.
+- The raw first line is exactly `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>` for the requested head, the rule `fm-review-record.py review` applies, and the last line repeats the verdict word.
 - Each fact stands on its own line that names it, followed by `yes` or `no`: `loosens a deny or allow list`, `widens what a guard permits`, `touches customer data, billing or spend`.
-- A PASS missing a fact, naming another head, or from a reader whose family covers no author group is not recorded and burns that reader for the head.
-- A FAIL is recorded as FAIL, an INCOMPLETE is held and never recorded as PASS, and each tells Main through a check wake with the report path.
-- A line `Protected class: destructive|irreversible|security-sensitive`, or `protected=<class>[,<class>]` in the task meta, holds the merge for Main with that class named; the runner's prompt does not ask for the line.
+- A PASS missing a fact, naming another head, from a reader whose family covers no author group, or one that cannot be recorded is not recorded and burns that reader for the head.
+- A FAIL from any reader is recorded as FAIL against every group it read; a FAIL that cannot be recorded still ends the head at `fail`. An INCOMPLETE is held and never recorded as PASS, and each tells Main through a check wake with the report path.
+- The runner asks the reader for one line exactly `Protected class: yes - <why>` or `Protected class: no - <why>`. `yes`, a missing line or a malformed one holds the merge and wakes Main; only `no` lets a covering PASS merge. `protected=<class>[,<class>]` in the task meta also holds it with that class named.
 
 **Records**
 
 - The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
 - A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
-- Outcomes are sidecar events (read requested, verdict recorded, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `merged`, `fail`, `held: <reason>` or `idle`; a check wake `check: pr-review <task>: ...` tells Main about a FAIL, an INCOMPLETE, a held class or a missing reader or runner.
+- Outcomes are sidecar events (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `queued`, `merged`, `fail`, `held: <reason>` or `idle`.
+- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a held protected class or missing protected-class answer, an unknown served model, a missing reader or runner, a refused merge, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built.
+- A read still out for an older head never stops a newer head from being read on the normal cadence; the older read is collected and recorded for its own head when it returns.
 - Nothing is written to the task's status log: a trailing `note:` there would replace the worker's `done:` as the latest event and change how `bin/fm-crew-state.sh` reads a ship whose PR is in review.
-- The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes.
-- While an away-posture record exists (quiet mode is a present captain and holds nothing) the merge step holds with `held: away posture` and the verdict is still recorded, so the supervision session keeps reading the captain's away words; a captain-word recorded for the head is likewise left to Main.
-- `state/.pr-auto-review/<task>.next` names the next due time, and the housekeeping pass starts nothing for a task before it; a task is swept with its meta.
+- The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes, and an away record is left to `bin/fm-pr-merge.sh`'s own away handling. A captain-word recorded for the head is left to Main.
+- When `bin/fm-pr-merge.sh` reports the PR queued, the state reads `queued` and nothing is called again until the forge reports it merged or out of the queue.
+- The sidecar's next due time spaces each task's forge read; a task is swept with its meta.
 - `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
