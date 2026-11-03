@@ -4,7 +4,8 @@ fm-cpu-pass.py - host-wide CPU pass pool for CPU-heavy test bursts.
 
 Usage:
   fm-cpu-pass.sh run [--passes K] [--label TEXT] [--log-fd N] -- COMMAND [ARGS...]
-  fm-cpu-pass.sh pipeline-start [--priority CLASS] -- COMMAND [ARGS...]
+  fm-cpu-pass.sh pipeline-start [--priority CLASS] [--only-fresh] -- COMMAND [ARGS...]
+  fm-cpu-pass.sh launch-gate -- AGENT [ARGS...]
   fm-cpu-pass.sh status [--json]
   fm-cpu-pass.sh size
 
@@ -49,29 +50,36 @@ Running:
 
 Pipeline starts:
   - `pipeline-start` uses this pool directory's pipeline-start.lock and locked
-    priority waiter files. The start policy, formula and class order are owned
+    priority waiter files. The start policy, rule and class order are owned
     by docs/cpu-pass-pool.md. The counted runs always come from the host's
     ~/.no-mistakes/state.sqlite, opened only with mode=ro (plus immutable=1 when
     mode=ro cannot open a stopped WAL database with no -wal file): status = 'running'
-    AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Notices go to stderr.
-  - Admission is by measured memory reservations, never by load average. The
-    first waiter is admitted when, as bytes, (counted + 1) x R + S fits
-    B = available memory + the resident memory each counted run holds now, at
-    most R per run (memory a run holds above R is not free for new starts), or
-    when nothing is counted (a one-start minimum). S is the largest per-run
-    peak of every recorded no-mistakes run with at least 2 readings, and R the
-    75th percentile (nearest rank) of those peaks leaving out runs that are
-    status-running with ci_ready_at IS NULL (not CI-ready yet, so its peak may
-    still rise), read from the
-    root home's .memory-calibration.json (written by fm-mem-guard.sh probe; the
+    AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL. Each run's open
+    step is its highest-ordered step_results row in running or fixing; an
+    unreadable step table reads no run as idle. Notices go to stderr.
+  - Admission is by measured memory, never by load average. The first waiter is
+    admitted when the projection fits the budget, available memory plus the
+    resident memory the counted runs hold (never capped), or when no other run
+    is counted (a one-start minimum). The projection is S for the new run plus,
+    per counted run: only what it holds when it waits on remote CI (open step ci
+    in running, no recorded agent pid, no live launch reservation); its resident
+    memory or A, whichever is larger, when the reading sees it; R while the
+    reading cannot see it. S is the largest per-run peak of every recorded
+    no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
+    rank) of those peaks leaving out runs that are status-running with
+    ci_ready_at IS NULL, read from the root home's .memory-calibration.json
+    (written by fm-mem-guard.sh probe). A is the largest (sum - largest) /
+    (count - 1) of no-mistakes run memory over the error-free readings of this
+    host and RAM size with at least 2 runs in the root home's
+    memory-readings.jsonl, so k x A + S covers every recorded k-run total. The
     root home comes from fm_firstmate_root_home in fm-secondmate-parent-lib.sh,
-    kept once resolved, and a failed walk falls back). available
-    and each run's resident memory come from one fm-mem-guard.py admission_sample
-    reading, re-taken at most every 2 s while waiting and always taken anew
-    at the moment of a grant (both backstop signals included). With fewer than 2
-    recorded runs left to rank for R, or no native memory facts on this platform, the
-    start falls back to counted < max(1, floor(logical CPUs / 3)); a missing
-    record never refuses a start and never reads as an empty host.
+    kept once resolved, and a failed walk falls back. available and each run's
+    resident memory come from one fm-mem-guard.py admission_sample reading,
+    re-taken at most every 2 s while waiting and always taken anew at the moment
+    of a grant (both backstop signals included). With fewer than 2 recorded runs
+    left to rank for R, no qualifying reading for A, or no native memory facts on
+    this platform, the start falls back to counted < max(1, floor(logical CPUs /
+    3)); a missing record never refuses a start and never reads as an empty host.
   - Pause-only backstop: while that reading is unreadable or reports a reason to
     defer (the same list that makes fm-mem-guard.sh admit exit 75, such as native
     pressure level 2 or higher) or fm-proc-guard.py reports a pile-up (user
@@ -79,20 +87,59 @@ Pipeline starts:
     admitted. Nothing running is stopped, and waiting here only delays the start.
   - Admission is before COMMAND (including any measured execution wrapper).
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
+    With --only-fresh, a COMMAND that fresh_pipeline_start does not judge a new
+    run runs at once without admission. An admitted COMMAND receives
+    FM_PIPELINE_START_ADMITTED, a digest of its no-mistakes invocation; an inner
+    route that would admit the identical invocation again runs it at once, and
+    any other start still queues.
   - A short start lock bridges the check-to-registration race until a new
     running run ID appears, or COMMAND returns. It does not reserve a run's
     lifetime or poll after registration; status changes release capacity.
-    Participating starts serialize this handshake, not their required checks.
-    A registered run whose process tree the reading cannot see yet holds no
-    memory in B, so it reserves its full R in the next decision.
+    At registration the new run's class is kept as run-class-<run>.json in the
+    pool directory for its later fix rounds; files of runs no longer running are
+    removed then. Participating starts serialize this handshake, not their
+    required checks. A registered run whose process tree the reading cannot see
+    yet reserves its full R in the next decision.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
   - An unreadable run database or CPU count refuses with 125 instead of
     guessing headroom. If a read fails after launch, retain the start lock until
     COMMAND returns; never stop running work because the observer lost its source.
 
-Exit status of `run` and `pipeline-start`: COMMAND's own status; 126 when COMMAND cannot be
-executed, 127 when it is not found, 125 for a usage error.
+Launch gate:
+  - `launch-gate -- AGENT [ARGS...]` is the no-mistakes agent launcher's final
+    exec. It first maps its working directory to exactly one runs.worktree_dir
+    (the directory or its real path); none, more than one, or an unreadable
+    database refuses. A launch whose run's open step is not ci execs AGENT at
+    once, unchanged. Any other launch (ci, or a step it cannot read) queues as
+    a pipeline-start waiter in the class recorded for its run (other when none)
+    and asks the same rule for one more active run, its own run counted as a
+    waiter. On a grant, still under the start lock, it publishes the run's
+    reservation (a locked launch-*.lock entry it holds while AGENT lives),
+    starts AGENT at once as its child in its own process group, then releases
+    the lock; it never waits for AGENT to appear in memory. A launch entry
+    whose holder is gone reserves nothing and is removed by the next scan;
+    several live attempts of one run count once.
+  - Hold bound: the daemon's per-invocation budget (agent_timeout in
+    ~/.no-mistakes/config.yaml, else the daemon's 30-minute default) minus the
+    nearest-rank 99th percentile of completed (exit_status ok) agent_invocations
+    durations of step ci; no hold when that is not positive or either input is
+    unreadable. At the bound, or on a mapping refusal, it does not start AGENT,
+    prints one "launch-gate refused: <cause>: run <id>; <detail>; next action:
+    <action>" line and exits 75; every number in it carries a unit suffix and
+    it uses none of the daemon's retry or fallback phrases. The first hold, an
+    admission after a hold and every refusal also append one check wake
+    (launch-gate-<run>) to the root home's wake queue through fm_wake_append.
+  - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
+    gate are forwarded to it; its exit status is returned and a death by signal
+    is re-raised. A missing or non-executable AGENT returns 127 or 126. A
+    forked watcher, holding only a pipe the gate writes, SIGKILLs AGENT (and the
+    process group the gate leads) if the gate dies without finishing; an
+    internal error after the start kills AGENT before the gate exits.
+
+Exit status of `run`, `pipeline-start` and `launch-gate`: COMMAND's own status; 126 when
+COMMAND cannot be executed, 127 when it is not found, 125 for a usage error; launch-gate
+returns 75 when it refuses.
 """
 
 import argparse
@@ -946,8 +993,10 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
 
 
 NO_MISTAKES_CONFIG = "~/.no-mistakes/config.yaml"
-# The daemon's own default when config.yaml sets no agent_timeout: config.DefaultAgentTimeout
-# in the no-mistakes fork (internal/config/config.go:47; internal/pipeline/agent_run.go:23-27).
+# Not a limit of this gate: the daemon's own default budget when config.yaml sets no
+# agent_timeout, read from config.DefaultAgentTimeout in the no-mistakes fork
+# (internal/config/config.go:47; internal/pipeline/agent_run.go:23-27, fork commit 935aedf).
+# measured: value=30m date=2026-11-03 host=Mac-Studio.local margin=1
 DEFAULT_AGENT_TIMEOUT_SECS = 30 * 60
 CI_FIX_QUANTILE = 0.99  # the contract's bound: budget minus the p99 of recorded CI-fix invocations
 
