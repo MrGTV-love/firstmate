@@ -5418,6 +5418,15 @@ held_marker_case() {  # <label> <enclosing|plain>
   cp "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$FOREIGN_CASE/return-pending.before"
 }
 
+# held_task_files <case-dir>: the inbox, status and tasktmp files with a SHA-256
+# for each.
+held_task_files() {
+  find "$1/state/task-x1.inbox" "$1/state/task-x1.status" "$1/tasktmp" -type f -print 2>/dev/null \
+    | LC_ALL=C sort | while IFS= read -r file; do
+      printf '%s %s\n' "$file" "$(shasum -a 256 < "$file" | awk '{print $1}')"
+    done
+}
+
 test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
   local rc shape mode label fragment
   for shape in plain enclosing; do
@@ -5427,6 +5436,8 @@ test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
       case "$mode" in
         held-record-is-a-directory)
           mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
+          nested_seed_task_files "$FOREIGN_CASE"
+          held_task_files "$FOREIGN_CASE" > "$FOREIGN_CASE/task-files.before"
           fragment="REFUSED: the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log could not be written"
           ;;
         *)
@@ -5445,16 +5456,14 @@ test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
       assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
       if [ "$mode" = held-record-is-a-directory ]; then
-        # The slot was leased before the record was tried, and a refusal keeps that
-        # durable custody so a later treehouse get cannot reset the held copies.
-        jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "task-x1"' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
-          || fail "$label: the refusal did not keep the slot's durable lease: $(cat "$FOREIGN_CASE/pool/treehouse-state.json")"
-        held_assert_copies_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
-      else
-        jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
-          || fail "$label: the slot's lease record changed"
-        held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+        assert_absent "$FOREIGN_CASE/lease.log" "$label: the refusal took a lease"
+        held_task_files "$FOREIGN_CASE" | cmp -s - "$FOREIGN_CASE/task-files.before" \
+          || fail "$label: the refusal changed the inbox, status or tasktmp"
+        assert_absent "$FOREIGN_CASE/endpoint.log" "$label: the refusal closed the endpoint"
       fi
+      jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+        || fail "$label: the slot's lease record changed"
+      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
     done
   done
   pass "a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
@@ -5481,9 +5490,10 @@ test_a_held_close_that_leases_retires_an_earlier_pending_close_record() {
 # never hands it out over the held copies, even once that folder is current
 # again. A lease an earlier teardown took by name on a same-named slot of the
 # current pool is released after the reservation and the held-copy record
-# checks, so a close those checks refuse releases no such lease, and its rerun,
-# whose own slot is by then leased by path, releases it, whether the rerun is
-# still a held close or, once the held copy is gone, an ordinary one. Without lease --path
+# checks, so a close those checks refuse takes no lease and releases no such
+# lease, and its rerun releases it, whether the rerun is still a held close,
+# which first leases its own slot by path, or, once the held copy is gone, an
+# ordinary one. Without lease --path
 # the close refuses and the copies stay held.
 held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
   local cur
@@ -5565,17 +5575,16 @@ test_a_refused_held_close_releases_no_misdirected_lease() {
   expect_code 1 "$rc" "held-superseded-refused: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep "could not be written" "$FOREIGN_CASE/stderr" "held-superseded-refused: the refusal did not say why"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-refused: the task record was removed"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-refused: the refusal leased anything but the exact slot it keeps held"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-refused: the refusal took a lease"
   assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
-  held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  held_assert_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
   rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
   run_foreign_teardown rc
   expect_code 0 "$rc" "held-superseded-refused: the rerun must close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
     "held-superseded-refused: the rerun did not release the misdirected lease by the conditional return alone"
   assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-refused: the rerun leased the slot again"
+    "held-superseded-refused: the rerun did not lease the slot once, by its exact path"
   pass "a held close that refuses releases no misdirected lease, and its rerun, with its own slot leased by path, releases it"
 }
 
@@ -5585,8 +5594,9 @@ test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease
   mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
   run_foreign_teardown rc
   expect_code 1 "$rc" "held-superseded-then-ordinary: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-then-ordinary: the refused close did not lease its own slot by path"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-then-ordinary: the refused close took a lease"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-then-ordinary: the refused close returned or released a slot"
+  held_assert_untouched "held-superseded-then-ordinary" "$FOREIGN_CASE" "$FOREIGN_COPY"
   rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
   git -C "$FOREIGN_CASE/project" worktree remove --force "$FOREIGN_COPY"
   run_foreign_teardown rc
@@ -5596,8 +5606,7 @@ test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease
     "held-superseded-then-ordinary: the rerun was still a held close"
   assert_equals 1 "$(grep -c "^return $HELD_CURRENT_SLOT --if-lease-holder task-x1\$" "$FOREIGN_CASE/treehouse.log" || true)" \
     "held-superseded-then-ordinary: the ordinary rerun did not release the misdirected lease by the conditional return: $(cat "$FOREIGN_CASE/treehouse.log" 2>/dev/null)"
-  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
-    "held-superseded-then-ordinary: the rerun leased a slot again"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-then-ordinary: the rerun leased a slot"
   pass "an ordinary rerun after a refused held close releases the misdirected lease its task still holds"
 }
 

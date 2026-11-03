@@ -1968,7 +1968,6 @@ ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
 CLEANUP_RECOVERY=$TEARDOWN_CLEANUP_RECOVERY
 
 KIND=$TEARDOWN_META_KIND
-TEARDOWN_PENDING_MARK_SLOT=
 TEARDOWN_POOL_SLOT_LOST=0
 EXPECTED_TREEHOUSE_PROJECT_LOCK=
 if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] \
@@ -4697,13 +4696,34 @@ teardown_held_copies_report() {
   echo "notice: each held copy is also listed in $record."
 }
 
+# Succeeds when the held-copy record can be written: it is a regular file that
+# is not a symlink and is writable, or it does not exist yet and the nearest
+# existing directory above it is writable. It writes nothing.
+teardown_held_copies_record_writable() {
+  local record="$DATA/held-foreign-copies.log" dir=$DATA
+  [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
+  if [ -e "$record" ] || [ -L "$record" ]; then
+    [ -f "$record" ] && [ ! -L "$record" ] && [ -w "$record" ]
+    return
+  fi
+  while [ ! -e "$dir" ] && [ ! -L "$dir" ] && [ "$dir" != / ] && [ -n "$dir" ]; do
+    dir=$(dirname "$dir")
+  done
+  [ -d "$dir" ] && [ -w "$dir" ]
+}
+
 # Writes the held-copy record before anything is removed, and refuses the close
 # when it cannot, so a close that happened never lacks its inventory. A line
-# already there for the same copy is not repeated.
-teardown_held_copies_record_or_refuse() {
+# already there for the same copy is not repeated. With check, it only proves
+# the record can be written, before the slot is reserved, and writes nothing.
+teardown_held_copies_record_or_refuse() {  # [check]
   [ -n "$TEARDOWN_HELD_SLOT" ] || return 0
   teardown_owns_worktree || return 0
-  teardown_held_copies_record && return 0
+  if [ "${1:-}" = check ]; then
+    teardown_held_copies_record_writable && return 0
+  else
+    teardown_held_copies_record && return 0
+  fi
   echo "REFUSED: the held-copy record $DATA/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed." >&2
   return 1
 }
@@ -6418,6 +6438,7 @@ fi
 # copies it holds; a slot in a superseded pool folder is leased by its exact
 # path. This task's misdirected leases are released after the reservation and
 # the held-copy record checks below.
+[ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse check || exit 1
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
@@ -6440,7 +6461,7 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
       [ -z "$TEARDOWN_HELD_SLOT" ] || echo "REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed." >&2
       exit 1
     fi
-    TEARDOWN_PENDING_MARK_SLOT=$TEARDOWN_RESERVED_SLOT
+    teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ] || teardown_release_project_lock || exit 1
   teardown_owns_worktree || teardown_reprove_reassigned_slot
@@ -6458,13 +6479,9 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
     teardown_release_project_lock || exit 1
   fi
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
-  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || TEARDOWN_PENDING_MARK_SLOT=$TEARDOWN_SHARED_SLOT
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
-# The return-pending record is written only now, after every refusal that is
-# decidable from the state at entry, so such a refusal leaves an earlier record
-# as it was; a refusal from here on leaves it for the retry.
-[ -z "$TEARDOWN_PENDING_MARK_SLOT" ] || teardown_mark_return_pending "$TEARDOWN_PENDING_MARK_SLOT" || exit 1
 if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
   teardown_release_misdirected_leases "$PROJ" "$ID" "$TEARDOWN_SLOT_SUPERSEDED_NAME"
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
