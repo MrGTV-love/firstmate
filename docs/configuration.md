@@ -15,6 +15,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
+| Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -2595,6 +2596,43 @@ The script header owns flags, the output block, and exit status.
 - With `--log`, every run appends one `fm-review-agent-select.v1` JSON line to `state/review-agent-select.jsonl`, errors included.
 - A record holds the status, reason, rule, task horizon, selection, the live `current` agent order read from the no-mistakes config, and every candidate with its eligibility, exhaustion, scalar, headroom, runway, and uncertainty.
 - The watcher starts one detached `--dry-run --log` run on each heartbeat tick when the home has `config/crew-dispatch.json`, and starts no new run while its previous run is still alive.
+
+## Automatic review and merge (config/review-runner)
+
+When a registered ship PR turns green, the watcher's housekeeping pass requests the independent exact-head read the standing merge rule needs and merges on a covering PASS.
+`bin/fm-pr-auto-review.py`'s header owns the sequence, the counting rule and the report format; this section owns the setting and what it records.
+The merge poll is a static program that prints only `merged`, so it makes no request; the single caller is [`bin/fm-pr-ready-reconcile.sh`](../bin/fm-pr-ready-reconcile.sh), which adds no daemon, check or schedule.
+
+**The review runner setting**
+
+- `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
+- The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
+- No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
+- Unset, relative or not executable makes no request and appends one `review-lane review runner unavailable: <why>` status line and one check wake per head.
+
+**What is read, and by whom**
+
+- Reader models come from the review rule in `config/crew-dispatch.json` (see Review-agent selection): its `use` entries in order, then its `fallback` entries.
+- A model covers every uncovered author family but its own, and the model covering most is taken, rule order breaking a tie.
+- Uncovered families come from `bin/fm-review-record.py plan`, which applies the verifier's own coverage rule to the author groups derived from the exact head.
+- A model whose read failed without a usable report is not asked again for that head; none left records `no eligible reader`, and an unknown author family records `author family unknown`, each once per head.
+- The contract text is the task's `data/<task>/brief.md` and `dod.md` plus every steering message in `state/<task>.inbox/`; a ruling given only in chat is not in it.
+
+**Report format**
+
+- The first line is `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>` for the requested head, and the last line repeats the verdict word.
+- Each fact stands on its own line that names it, followed by `yes` or `no`: `loosens a deny or allow list`, `widens what a guard permits`, `touches customer data, billing or spend`.
+- A PASS missing a fact, naming another head, or from a reader whose family covers no author group is not recorded and burns that reader for the head.
+- A FAIL is recorded as FAIL, an INCOMPLETE is held and never recorded as PASS, and each tells Main through a check wake with the report path.
+- A line `Protected class: destructive|irreversible|security-sensitive`, or `protected=<class>[,<class>]` in the task meta, holds the merge for Main with that class named; the runner's prompt does not ask for the line.
+
+**Records**
+
+- The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
+- A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
+- Outcomes are status lines `note: review-lane ...` (reading, verdict recorded, merged with the full PR URL, fail, held with its reason), which the fleet ledger captures, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `merged`, `fail`, `held: <reason>` or `idle`.
+- The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes.
+- `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
