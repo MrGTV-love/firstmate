@@ -439,6 +439,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
 HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 INTENT_OPTIONS = ("--intent", "--intent-file")
+SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
 
 
 ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
@@ -473,8 +474,9 @@ def fresh_pipeline_start(command: List[str]) -> bool:
     only with an intent input (--intent TEXT, --intent -, --intent-file PATH or
     their = forms); without one it reattaches an active run or exits 2. The
     no-mistakes binary is found at any position and by basename, so a wrapper
-    prefix (env, fm-mem-guard.sh run --, an absolute path) or a shell -c string
-    does not hide it. respond, status and every other subcommand are not starts.
+    prefix (env, fm-mem-guard.sh run --, an absolute path) or a shell's -c
+    command string does not hide it; other arguments are data. respond, status
+    and every other subcommand are not starts.
     """
     for index, part in enumerate(command):
         if os.path.basename(part) == "no-mistakes":
@@ -484,13 +486,14 @@ def fresh_pipeline_start(command: List[str]) -> bool:
             return rest[:2] == ["axi", "run"] and any(
                 option in INTENT_OPTIONS or option.startswith(tuple(name + "=" for name in INTENT_OPTIONS))
                 for option in rest[2:])
-        if " " in part and "no-mistakes" in part:
+        shell_flags = part.startswith("-") and not part.startswith("--") and "c" in part[1:]
+        if shell_flags and index and os.path.basename(command[index - 1]) in SHELLS and index + 1 < len(command):
+            # A shell's -c string is a command line; any other argument is data, such as a commit message.
             try:
                 import shlex
-                if fresh_pipeline_start(shlex.split(part)):
-                    return True
+                return fresh_pipeline_start(shlex.split(command[index + 1]))
             except ValueError:
-                continue
+                return False
     return False
 
 

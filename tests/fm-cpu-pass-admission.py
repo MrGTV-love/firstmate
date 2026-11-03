@@ -40,6 +40,8 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
             def limit(self): return self.reading()['limit'], 'case'
             def count(self): return self.reading()['count']
         guard.open_source = lambda: Fake()
+    if os.environ.get('CASE_PLATFORM'):
+        sys.platform = os.environ['CASE_PLATFORM']
     if os.environ.get('CASE_GATE_RAISE'):
         import subprocess
         real_wait = subprocess.Popen.wait
@@ -567,6 +569,8 @@ try:
     for label, bad, good, expected in (
             ('pressure', lambda: facts(folder, available=100 * GIB, pressure=2, runs=[(None, 'already-running', GIB)]),
              lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 2'),
+            ('pressure-3', lambda: facts(folder, available=100 * GIB, pressure=3, runs=[(None, 'already-running', GIB)]),
+             lambda: facts(folder, available=100 * GIB, runs=[(None, 'already-running', GIB)]), 'memory: native memory pressure level 3'),
             ('pileup', lambda: procs(folder, count=6400), lambda: procs(folder, count=6399), 'process pile-up: 6400 of 10666'),
             ('memory-unreadable', lambda: facts(folder, broken=True), lambda: facts(folder, available=100 * GIB), 'memory: '),
             ('procs-unreadable', lambda: procs(folder, error=True), lambda: procs(folder), 'process count unreadable'),
@@ -584,6 +588,23 @@ try:
         assert marker.exists(), label
     (folder / 'already-running.release').touch()
     finish(running)
+
+    # A platform with no native memory source and no fixture has no memory hold: the absent source
+    # never holds a start, and the count fallback decides (3 cores: limit 1). Below the limit a start
+    # is admitted; at the limit it waits and is admitted by itself when the counted run ends.
+    folder, db, env = case('no-native-source', cores=3, measured=True)
+    env.pop('FM_MEMORY_FIXTURE_DIR')
+    env['CASE_PLATFORM'] = 'linux'
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'below')], env, folder / 'below'))
+    assert 'admitted: counted=0 limit=1 basis=fallback' in (folder / 'below.stderr').read_text(), (folder / 'below.stderr').read_text()
+    change(db, "INSERT INTO runs (id, status) VALUES ('held', 'running')")
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'at')], env, folder / 'at')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=1 limit=1 basis=fallback' in (folder / 'at.stderr').read_text(), 'count limit without a memory source')
+    assert 'memory' not in (folder / 'at.stderr').read_text() and not (folder / 'at').exists()
+    change(db, "UPDATE runs SET status='completed' WHERE id='held'")
+    finish(child)
+    assert (folder / 'at').exists()
 
     # A reading that was healthy a moment ago cannot admit a start after the signal turns bad:
     # the grant takes a new reading. Each case first lets a waiter see healthy inputs (it waits
@@ -886,6 +907,7 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         'absolute': [str(fake), 'axi', 'run', '--intent', 'goal'],
         'env-wrapped': ['env', 'A=B', 'no-mistakes', 'axi', 'run', '--intent', 'goal'],
         'shell-string': ['sh', '-c', 'no-mistakes axi run --intent goal'],
+        'shell-flags': ['bash', '-ec', 'no-mistakes axi run --intent goal'],
         'rerun': ['no-mistakes', 'rerun'],
         # PR 366's recorded fresh start (nm-r2-1.log): fm-duration around env around fm-mem-guard.sh run.
         'pr-366': ['env', 'FM_HOME=HOME_PLACEHOLDER'] + mem_guard[1:] + ['no-mistakes', 'axi', 'run', '--intent-file', str(intent),
@@ -898,6 +920,8 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         'status': (['no-mistakes', 'axi', 'status'], 0, True),
         'no-intent-no-run': (['no-mistakes', 'axi', 'run'], 2, False),
         'other-command': (['true'], 0, True),
+        # Data that mentions a start, such as a commit message, is not a start.
+        'start-as-data': (['echo', 'no-mistakes axi run --intent goal'], 0, True),
     }
     for route_name, route in (('measured', measured_run), ('mem-guard', mem_guard)):
         for name, shape in list(fresh_shapes.items()) + [(n, v[0]) for n, v in not_starts.items()]:
@@ -942,10 +966,10 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
     agent.write_text("""import json, os, pathlib, signal, sys, time
 folder, run = pathlib.Path(os.environ['CASE_FOLDER']), sys.argv[1]
 mode = os.environ.get('CASE_AGENT', 'wait')
-(folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
-    cwd=os.getcwd(), argv=sys.argv[2:], stdin=sys.stdin.read() if mode != 'wait' else '')))
-if mode == 'trap':
+if mode == 'trap':  # installed before the marker that tells the test to signal
     signal.signal(signal.SIGTERM, lambda *a: (folder / (run + '.got-term')).touch() or sys.exit(0))
+(folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
+    cwd=os.getcwd(), argv=sys.argv[2:], stdin=sys.stdin.read() if mode not in ('wait', 'trap') else '')))
 if mode.startswith('exit-'): sys.exit(int(mode[5:]))
 if mode == 'self-term': os.kill(os.getpid(), signal.SIGTERM)
 while not (folder / (run + '.release')).exists(): time.sleep(0.025)
