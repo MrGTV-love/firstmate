@@ -7051,7 +7051,7 @@
       "trigger": "bin/fm-tasks-axi.sh done --duplicate-of or --moved-to on an item that is absent or closed, has a live task record, is an open owner call, quotes the owner or captain, or still blocks an open item",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "bin/fm-tasks-axi.sh unblock <dependent> --by <id> for a dependent, bin/fm-teardown.sh <id> for a live task, or bin/fm-tasks-axi.sh done <id> --drop-file <words-file> with the owner's words",
+      "remedy": "bin/fm-tasks-axi.sh unblock <dependent> --by <id> for a dependent, bin/fm-teardown.sh <id> for a live task, or, with the owner's words, bin/fm-tasks-axi.sh done <id> --drop-file <words-file> for a ship or scout row and bin/fm-tasks-axi.sh done <id> --note \"<the owner's words>\" for any other row",
       "budget": 1,
       "telemetry": "state/guard-events.jsonl",
       "test": "tests/fm-tasks-axi.test.sh",
