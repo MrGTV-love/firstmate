@@ -400,7 +400,7 @@ try:
         # A ready start may queue behind the registration handshake of the starts
         # before it; it is never told to wait for capacity, overload or spacing.
         waits = [line for line in text.splitlines() if 'waiting' in line]
-        assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
+        assert all('projected=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
     assert any('projected=%d budget=%d' % (3 * GIB * 9 + 8 * GIB, 37 * GIB) in (folder / (name + '.stderr')).read_text() for name in names[:10])
     # No artificial wait: the grants follow each other by the registration handshake alone.
@@ -431,7 +431,7 @@ try:
     for name in names:
         text = (folder / (name + '.stderr')).read_text()
         waits = [line for line in text.splitlines() if 'waiting' in line]
-        assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
+        assert all('projected=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
     assert all(c.poll() is None for c in clients.values())
     try:
