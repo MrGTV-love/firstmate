@@ -476,7 +476,11 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       printf '; fallback reason=%s rc=%s\n' "$reason" "$invocation_rc" \
         >> "$output_dir/shard.$shard_index.out"
     fi
-    cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
+    if [ "$(cat "$fallback_rss.cache" 2>/dev/null || true)" = cache-hit ]; then
+      cat "$fallback_err" >&2
+    else
+      cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
+    fi
   else
     rss_kib=$(fm_lint_root_rss "$rss_file")
     if [ "$cache_outcome" = cache-hit ]; then

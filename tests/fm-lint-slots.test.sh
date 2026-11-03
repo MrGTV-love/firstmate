@@ -1427,6 +1427,44 @@ PL
   pass "a cache-key wait longer than the root deadline preserves its memory retry budget"
 }
 
+test_memory_fallback_cache_hit_leaves_stdout_uncached() {
+  local tmp repo fakebin attempt
+  tmp=$(fm_test_tmproot fm-lint-fallback-cache-stdout)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  cat > "$fakebin/shellcheck" <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+for arg in "$@"; do
+  if [ "$arg" = --external-sources ]; then
+    printf 'shellcheck: Heap exhausted;\n' >&2
+    exit 251
+  fi
+done
+exit 0
+STUB
+  chmod +x "$fakebin/shellcheck"
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/library.sh > "$tmp/off.out" 2> "$tmp/off.err" \
+    || fail "the cache-off fallback failed: $(cat "$tmp/off.out" "$tmp/off.err")"
+  assert_grep 'fallback passed with cross-file codes excluded' "$tmp/off.out" \
+    "the cache-off run did not disclose the fallback on stdout"
+  for attempt in cold warm; do
+    PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/library.sh > "$tmp/$attempt.out" 2> "$tmp/$attempt.err" \
+      || fail "the $attempt fallback failed: $(cat "$tmp/$attempt.out" "$tmp/$attempt.err")"
+    cmp -s "$tmp/off.out" "$tmp/$attempt.out" \
+      || fail "the $attempt fallback changed stdout"$'\n'"$(diff "$tmp/off.out" "$tmp/$attempt.out")"
+  done
+  assert_grep 'cache hit bin/library.sh' "$tmp/warm.err" "the warm retry did not hit its own cache key"
+  pass "a memory retry's cache hit reports on stderr and leaves stdout as a cache-off run"
+}
+
 # A ShellCheck stand-in whose source-following run grows resident memory by
 # 8 MiB every 50 ms for FM_TEST_GROW_STEPS steps, then sleeps up to 20 s
 # (FM_TEST_GROW_HOLD=<seconds> holds the memory that long and exits 0 instead).
@@ -1914,6 +1952,7 @@ test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death
 test_memory_failure_retries_without_external_sources
+test_memory_fallback_cache_hit_leaves_stdout_uncached
 test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
 test_unbounded_root_under_resident_bound_is_untouched
 test_resident_watch_ends_its_command_when_its_owner_dies
