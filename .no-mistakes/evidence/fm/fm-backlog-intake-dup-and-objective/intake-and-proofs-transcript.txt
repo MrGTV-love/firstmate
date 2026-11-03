@@ -1,0 +1,1014 @@
+
+=== S1 objective is required at intake
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=2c9dc99b-d47b-41fe-85b3-a0e339705395 FM_FRICTION_EPISODE_ID=2c9dc99b-d47b-41fe-85b3-a0e339705395 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+check ok: refusal names objective flag
+check ok: not filed
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective O9 
+REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+completing-command: FM_FRICTION_OPERATION_ID=3bb28cd8-cab3-4b40-9553-53385d7e2d2a FM_FRICTION_EPISODE_ID=3bb28cd8-cab3-4b40-9553-53385d7e2d2a bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+[exit 2]
+check ok: unknown id refused
+check ok: not filed
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective none 
+REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+completing-command: FM_FRICTION_OPERATION_ID=533ef213-5de8-464e-97f0-6b0b477aa0a0 FM_FRICTION_EPISODE_ID=533ef213-5de8-464e-97f0-6b0b477aa0a0 bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective none --objective-reason \ \ \  
+REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+completing-command: FM_FRICTION_OPERATION_ID=8075dbc0-8cd2-4312-8d25-4af8bbadccc9 FM_FRICTION_EPISODE_ID=8075dbc0-8cd2-4312-8d25-4af8bbadccc9 bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective= 
+fm-tasks-axi: --objective requires a value; run tasks-axi directly for other grammar
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective --not-dup 
+fm-tasks-axi: --objective requires a value; run tasks-axi directly for other grammar
+[exit 2]
+check ok: still not filed
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective O7 
+ok: added obj-a -> Queued
+task:
+  id: obj-a
+  title: Alpha beta gamma
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start obj-a` to move it to in flight
+  - Run `tasks-axi block obj-a --by <other>` to record a dependency
+[exit 0]
+check ok: filed
+check ok: sidecar row
+
+$ bin/fm-tasks-axi.sh add obj-b Delta\ epsilon\ zeta --objective none --objective-reason $'one-off cleanup\twith tab' 
+ok: added obj-b -> Queued
+task:
+  id: obj-b
+  title: Delta epsilon zeta
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start obj-b` to move it to in flight
+  - Run `tasks-axi block obj-b --by <other>` to record a dependency
+[exit 0]
+check ok: reason row
+
+$ bin/fm-tasks-axi.sh create obj-c Eta\ theta\ iota --objective=O1 
+ok: added obj-c -> Queued
+task:
+  id: obj-c
+  title: Eta theta iota
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start obj-c` to move it to in flight
+  - Run `tasks-axi block obj-c --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh task add obj-d Kappa\ lambda\ sigma --objective O2 --json 
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "obj-d",
+    "title": "Kappa lambda sigma",
+    "state": "queued",
+    "kind": null,
+    "repo": null,
+    "priority": null,
+    "created": "2026-11-02",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add --mint Omega\ upsilon\ chi --objective O3 
+ok: added omega-upsilon-chi-08 -> Queued
+task:
+  id: omega-upsilon-chi-08
+  title: Omega upsilon chi
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start omega-upsilon-chi-08` to move it to in flight
+  - Run `tasks-axi block omega-upsilon-chi-08 --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add --title Psi\ rho\ tau obj-e --objective O4 
+ok: added obj-e -> Queued
+task:
+  id: obj-e
+  title: Psi rho tau
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start obj-e` to move it to in flight
+  - Run `tasks-axi block obj-e --by <other>` to record a dependency
+[exit 0]
+
+sidecar data/backlog-review.tsv (id, review-by, objective, reason):
+obj-a^I^IO7^I
+obj-b^I^Inone^Ione-off cleanup with tab
+obj-c^I^IO1^I
+obj-d^I^IO2^I
+omega-upsilon-chi-08^I^IO3^I
+obj-e^I^IO4^I
+check ok: json add recorded
+check ok: minted id recorded
+check ok: alias create recorded
+check ok: --title form recorded
+
+$ bin/fm-tasks-axi.sh add obj-a Alpha\ beta\ gamma --objective O7 
+ok: add obj-a already exists -> Queued
+already: true
+task:
+  id: obj-a
+  title: Alpha beta gamma
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start obj-a` to move it to in flight
+  - Run `tasks-axi block obj-a --by <other>` to record a dependency
+[exit 0]
+sidecar rows for obj-a: 1
+
+=== S2 duplicate check, documented worked pairs
+
+$ bin/fm-tasks-axi.sh add lock-1 Lock\ holder\ crash --objective O7 
+ok: added lock-1 -> Queued
+task:
+  id: lock-1
+  title: Lock holder crash
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-1` to move it to in flight
+  - Run `tasks-axi block lock-1 --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add lock-2 Lock\ holder\ crash\ recovery --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as lock-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  lock-1 (Queued, overlap 0.75) Lock holder crash
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to lock-1 and file nothing:
+    bin/fm-tasks-axi.sh add lock-2 Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-1
+  the work is different from lock-1 - file it:
+    bin/fm-tasks-axi.sh add lock-2 Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-1
+[exit 2]
+check ok: 0.75 shown
+check ok: not filed
+printed --not-dup: bin/fm-tasks-axi.sh add lock-2 Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-1
+printed --dup-of: bin/fm-tasks-axi.sh add lock-2 Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-1
+
+$ bin/fm-tasks-axi.sh add lock-3 Lock\ timeout --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as lock-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  lock-1 (Queued, overlap 0.25) Lock holder crash
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to lock-1 and file nothing:
+    bin/fm-tasks-axi.sh add lock-3 Lock\ timeout --objective O7 --dup-of lock-1
+  the work is different from lock-1 - file it:
+    bin/fm-tasks-axi.sh add lock-3 Lock\ timeout --objective O7 --not-dup lock-1
+[exit 2]
+check ok: 0.25 refused at threshold
+
+$ bin/fm-tasks-axi.sh add lock-4 Lock\ timeout\ retry\ loop --objective O7 
+ok: added lock-4 -> Queued
+task:
+  id: lock-4
+  title: Lock timeout retry loop
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-4` to move it to in flight
+  - Run `tasks-axi block lock-4 --by <other>` to record a dependency
+[exit 0]
+check ok: 0.17 filed
+
+=== S3 the printed overrides work when run verbatim
+$ <printed --dup-of command>
+ok: merged into lock-1 (nothing filed)
+[exit 0]
+check ok: dup-of exit 0
+check ok: dup-of files nothing
+check ok: body got merge note
+$ <printed --not-dup command>
+ok: added lock-2 -> Queued
+task:
+  id: lock-2
+  title: Lock holder crash recovery
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-2` to move it to in flight
+  - Run `tasks-axi block lock-2 --by <other>` to record a dependency
+[exit 0]
+check ok: not-dup exit 0
+check ok: not-dup files
+check ok: not-dup sidecar
+
+=== S4 override flags resist misuse
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --not-dup obj-a 
+REFUSED: guard=backlog-intake-not-dup rule=not-a-neighbour missing=a neighbour of this title
+completing-command: FM_FRICTION_OPERATION_ID=4a32d7be-3ba5-4eaa-9765-616eb23f8491 FM_FRICTION_EPISODE_ID=4a32d7be-3ba5-4eaa-9765-616eb23f8491 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+fm-tasks-axi: --not-dup obj-a names an item whose title does not overlap this one enough to be a neighbour; nothing was filed
+[exit 2]
+check ok: non-neighbour refused
+check ok: not filed
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --not-dup nosuch 
+REFUSED: guard=backlog-intake-not-dup rule=item-missing missing=an item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=5d491e77-02c5-4eb6-b8bc-c384670ff532 FM_FRICTION_EPISODE_ID=5d491e77-02c5-4eb6-b8bc-c384670ff532 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+fm-tasks-axi: --not-dup nosuch names no item in this backlog; nothing was filed
+[exit 2]
+check ok: missing refused
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --not-dup lock-1 --not-dup lock-2 
+fm-tasks-axi: --not-dup takes one neighbour id; give it once
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --not-dup lock-1 --dup-of lock-1 
+fm-tasks-axi: give --dup-of or --not-dup, not both
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --not-dup lock-1 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=8def4164-5204-49ec-8f51-a3e8700dbae2 FM_FRICTION_EPISODE_ID=8def4164-5204-49ec-8f51-a3e8700dbae2 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --dup-of lock-1 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=c84004db-fd24-40ff-a7c8-0c11c0d7ec0c FM_FRICTION_EPISODE_ID=c84004db-fd24-40ff-a7c8-0c11c0d7ec0c bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --dup-of x1 
+REFUSED: guard=backlog-intake-dup-of rule=kept-is-self missing=a kept item other than this add
+completing-command: FM_FRICTION_OPERATION_ID=471a9794-c1e8-4954-b7d5-f9fe55104c6e FM_FRICTION_EPISODE_ID=471a9794-c1e8-4954-b7d5-f9fe55104c6e bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>
+fm-tasks-axi: --dup-of names this add's own id x1; an item cannot be a duplicate of itself, so nothing was filed or appended
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --dup-of nosuch 
+REFUSED: guard=backlog-intake-dup-of rule=kept-missing missing=a kept item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=b7393874-2d9d-478e-9c13-34fd7a537ae5 FM_FRICTION_EPISODE_ID=b7393874-2d9d-478e-9c13-34fd7a537ae5 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>
+fm-tasks-axi: the kept item nosuch does not exist in this backlog
+[exit 2]
+
+$ bin/fm-tasks-axi.sh add x1 Lock\ holder\ crash\ again --objective O7 --dup-of= 
+fm-tasks-axi: --dup-of requires a value; run tasks-axi directly for other grammar
+[exit 2]
+check ok: nothing filed through misuse
+
+=== S5 Done rows, the done archive, and the 50-newest window
+
+$ bin/fm-tasks-axi.sh add dn-1 Rotate\ signing\ material --objective O5 
+ok: added dn-1 -> Queued
+task:
+  id: dn-1
+  title: Rotate signing material
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dn-1` to move it to in flight
+  - Run `tasks-axi block dn-1 --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done dn-1 --note finished 
+ok: done dn-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add dn-2 Rotate\ signing\ material\ quarterly --objective O5 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as dn-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  dn-1 (Done, overlap 0.75) Rotate signing material
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to dn-1 and file nothing:
+    bin/fm-tasks-axi.sh add dn-2 Rotate\ signing\ material\ quarterly --objective O5 --dup-of dn-1
+  the work is different from dn-1 - file it:
+    bin/fm-tasks-axi.sh add dn-2 Rotate\ signing\ material\ quarterly --objective O5 --not-dup dn-1
+[exit 2]
+check ok: kept Done row is a neighbour
+
+$ bin/fm-tasks-axi.sh add old-0 Zebra\ quokka\ ostrich --objective O7 
+ok: added old-0 -> Queued
+task:
+  id: old-0
+  title: Zebra quokka ostrich
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start old-0` to move it to in flight
+  - Run `tasks-axi block old-0 --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add edge-1 Marmot\ walrus\ bison --objective O7 
+ok: added edge-1 -> Queued
+task:
+  id: edge-1
+  title: Marmot walrus bison
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start edge-1` to move it to in flight
+  - Run `tasks-axi block edge-1 --by <other>` to record a dependency
+[exit 0]
+archive rows: 52  blocks: 51  kept Done rows: 0
+
+$ bin/fm-tasks-axi.sh add edge-2 Marmot\ walrus --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as edge-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  edge-1 (Done, archived, overlap 0.67) Marmot walrus bison
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from edge-1 - file it:
+    bin/fm-tasks-axi.sh add edge-2 Marmot\ walrus --objective O7 --not-dup edge-1
+[exit 2]
+check ok: archived neighbour labelled
+
+$ bin/fm-tasks-axi.sh add edge-3 Marmot\ walrus --objective O7 --dup-of edge-1 
+REFUSED: guard=backlog-intake-dup-of rule=kept-archived missing=a kept item in the active backlog
+completing-command: FM_FRICTION_OPERATION_ID=03795056-4a2e-42ab-9c63-4f17bfd4f4a2 FM_FRICTION_EPISODE_ID=03795056-4a2e-42ab-9c63-4f17bfd4f4a2 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup edge-1
+fm-tasks-axi: the kept item edge-1 is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup edge-1
+[exit 2]
+check ok: archived kept refused with pointer
+check ok: not filed
+
+$ bin/fm-tasks-axi.sh add edge-4 Marmot\ walrus --objective O7 --not-dup edge-1 
+ok: added edge-4 -> Queued
+task:
+  id: edge-4
+  title: Marmot walrus
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start edge-4` to move it to in flight
+  - Run `tasks-axi block edge-4 --by <other>` to record a dependency
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add past-window Zebra\ quokka --objective O7 
+ok: added past-window -> Queued
+task:
+  id: past-window
+  title: Zebra quokka
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start past-window` to move it to in flight
+  - Run `tasks-axi block past-window --by <other>` to record a dependency
+[exit 0]
+check ok: row past the 50 newest is not compared
+
+=== S6 archive tails tasks-axi really writes are stripped; real title words stay
+
+$ bin/fm-tasks-axi.sh add pc-1 Fix\ boiler\ crash\ \(process\ cleanup\) --objective O7 
+ok: added pc-1 -> Queued
+task:
+  id: pc-1
+  title: Fix boiler crash (process cleanup)
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start pc-1` to move it to in flight
+  - Run `tasks-axi block pc-1 --by <other>` to record a dependency
+[exit 0]
+209:- [x] pc-1 - Fix boiler crash (process cleanup) (done 2026-11-02)
+
+$ bin/fm-tasks-axi.sh add pc-2 Process\ cleanup --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as pc-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  pc-1 (Done, archived, overlap 0.40) Fix boiler crash (process cleanup)
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from pc-1 - file it:
+    bin/fm-tasks-axi.sh add pc-2 Process\ cleanup --objective O7 --not-dup pc-1
+[exit 2]
+check ok: (process cleanup) kept, 0.40
+
+$ bin/fm-tasks-axi.sh add hu-1 Sandbox\ escape\ audit --objective O7 
+ok: added hu-1 -> Queued
+task:
+  id: hu-1
+  title: Sandbox escape audit
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start hu-1` to move it to in flight
+  - Run `tasks-axi block hu-1 --by <other>` to record a dependency
+[exit 0]
+215:- [x] hu-1 - Sandbox escape audit (done 2026-11-02) (hold: wait) (hold-until: 2027-12-01)
+
+$ bin/fm-tasks-axi.sh add hu-2 Sandbox\ probe --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as hu-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  hu-1 (Done, archived, overlap 0.25) Sandbox escape audit
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from hu-1 - file it:
+    bin/fm-tasks-axi.sh add hu-2 Sandbox\ probe --objective O7 --not-dup hu-1
+[exit 2]
+check ok: hold-until tail stripped, 0.25
+
+$ bin/fm-tasks-axi.sh add pr-1 Quantum\ ledger\ migration --objective O7 --repo firstmate --kind task 
+ok: added pr-1 (task, repo firstmate) -> Queued
+task:
+  id: pr-1
+  title: Quantum ledger migration
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: firstmate
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start pr-1` to move it to in flight
+  - Run `tasks-axi block pr-1 --by <other>` to record a dependency
+[exit 0]
+219:- [x] pr-1 - Quantum ledger migration https://github.com/x/y/pull/1 (repo: firstmate) (kind: task) (merged 2026-11-02)
+
+$ bin/fm-tasks-axi.sh add pr-2 Quantum\ ledger --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as pr-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  pr-1 (Done, archived, overlap 0.67) Quantum ledger migration
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from pr-1 - file it:
+    bin/fm-tasks-axi.sh add pr-2 Quantum\ ledger --objective O7 --not-dup pr-1
+[exit 2]
+check ok: pr tail stripped, 0.67
+
+=== S7 unreadable archive stops the add
+
+$ bin/fm-tasks-axi.sh add ar-1 Novel\ unrelated\ words --objective O7 
+fm-backlog-intake: a done archive row cannot be interpreted: - [x]bad row
+fm-tasks-axi: the duplicate check could not read the backlog or its done archive, so nothing was filed; fix what is named above, then file the item again
+[exit 2]
+check ok: stop names the archive
+check ok: not filed
+
+=== S8 done --duplicate-of closes on checked proof, with no owner words
+
+$ bin/fm-tasks-axi.sh done dupe-1 --duplicate-of kept-1 
+ok: done dupe-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+- [x] dupe-1 - Harbor crane calendar (done 2026-11-02)
+check ok: closing note records proof
+  body: "Kept body text.\n\n---\nMerged from duplicate dupe-1: Harbor crane calendar\nDupe body text."
+check ok: kept keeps own body
+check ok: kept took dupe title
+check ok: kept took dupe body
+
+$ bin/fm-tasks-axi.sh done dupe-1 --duplicate-of kept-1 
+REFUSED: guard=backlog-close-item-eligible rule=item-closed missing=an open item to close
+completing-command: FM_FRICTION_OPERATION_ID=b4b65557-d1f0-4802-a9a9-ead7da95b09b FM_FRICTION_EPISODE_ID=b4b65557-d1f0-4802-a9a9-ead7da95b09b bin/fm-tasks-axi.sh show dupe-1
+fm-tasks-axi: dupe-1 is already closed
+[exit 2]
+check ok: second close refused
+
+=== S9 --duplicate-of guards, adversarial
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of g-self 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-is-self missing=a kept item other than this one
+completing-command: FM_FRICTION_OPERATION_ID=b7373e0f-fa09-467b-bc4f-ad6960b9ea23 FM_FRICTION_EPISODE_ID=b7373e0f-fa09-467b-bc4f-ad6960b9ea23 bin/fm-tasks-axi.sh done g-self --duplicate-of <kept-id>
+fm-tasks-axi: an item cannot be a duplicate of itself
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of nosuch 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-missing missing=a kept item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=93467162-61ae-48de-8de3-3e3cfa33cc68 FM_FRICTION_EPISODE_ID=93467162-61ae-48de-8de3-3e3cfa33cc68 bin/fm-tasks-axi.sh done g-self --duplicate-of <kept-id>
+fm-tasks-axi: the kept item nosuch does not exist in this backlog
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of kd-1 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-not-open missing=a Queued or In flight kept item
+completing-command: FM_FRICTION_OPERATION_ID=194d87a0-a5b0-4214-a964-a95d0863610c FM_FRICTION_EPISODE_ID=194d87a0-a5b0-4214-a964-a95d0863610c bin/fm-tasks-axi.sh done g-self --duplicate-of <kept-id>
+fm-tasks-axi: the kept item kd-1 is not Queued or In flight; a duplicate closes into open work only
+[exit 2]
+check ok: kept must be open
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of k2 --note hi 
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of k2 --pr https://github.com/x/y/pull/1 
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of k2 --moved-to h i 
+fm-tasks-axi: give --duplicate-of or --moved-to, not both
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done g-self --duplicate-of 
+fm-tasks-axi: --duplicate-of requires a value; run tasks-axi directly for other grammar
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done nosuch --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=item-missing missing=an item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=fa04c663-d377-4560-bd44-3d9c37303308 FM_FRICTION_EPISODE_ID=fa04c663-d377-4560-bd44-3d9c37303308 bin/fm-tasks-axi.sh list
+fm-tasks-axi: no item nosuch in this backlog to close
+[exit 2]
+check ok: missing item refused
+check ok: g-self still open
+
+$ bin/fm-tasks-axi.sh done own-1 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-1, and in what words?
+fm-tasks-axi: own-1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Owner 2026-11-01: keep this forever
+check ok: own-1 still open
+
+$ bin/fm-tasks-axi.sh done own-2 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-2, and in what words?
+fm-tasks-axi: own-2 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain's words, 2026-10-20 (via /kun): do it
+check ok: own-2 still open
+
+$ bin/fm-tasks-axi.sh done own-3 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-3, and in what words?
+fm-tasks-axi: own-3 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain's ask 2026-09-22 on /bearings lavish: show board
+check ok: own-3 still open
+
+$ bin/fm-tasks-axi.sh done own-4 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-4, and in what words?
+fm-tasks-axi: own-4 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain chose this on the Lavish page
+check ok: own-4 still open
+
+$ bin/fm-tasks-axi.sh done own-5 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-5, and in what words?
+fm-tasks-axi: own-5 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain direction 2026-10-22, verbatim in the notes
+check ok: own-5 still open
+
+$ bin/fm-tasks-axi.sh done own-6 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-6, and in what words?
+fm-tasks-axi: own-6 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain: yes on both
+check ok: own-6 still open
+
+$ bin/fm-tasks-axi.sh done own-7 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-7, and in what words?
+fm-tasks-axi: own-7 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Owner: please
+check ok: own-7 still open
+
+$ bin/fm-tasks-axi.sh done own-8 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-8, and in what words?
+fm-tasks-axi: own-8 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain decision on routing
+check ok: own-8 still open
+
+$ bin/fm-tasks-axi.sh done own-9 --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-9, and in what words?
+fm-tasks-axi: own-9 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item refused: Captain 2026 note here
+check ok: own-9 still open
+
+$ bin/fm-tasks-axi.sh done own-t --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-t, and in what words?
+fm-tasks-axi: own-t quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner marker in title refused
+check ok: k2 untouched by refused closes
+
+$ bin/fm-tasks-axi.sh done nown-1 --duplicate-of k2 
+ok: done nown-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done nown-2 --duplicate-of k2 
+ok: done nown-2 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done g-meta --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+completing-command: FM_FRICTION_OPERATION_ID=06140287-c261-4b3e-acc1-d645eceaa596 FM_FRICTION_EPISODE_ID=06140287-c261-4b3e-acc1-d645eceaa596 bin/fm-teardown.sh g-meta
+fm-tasks-axi: g-meta has a live task record; complete it with bin/fm-teardown.sh g-meta, which owns the landing proof
+[exit 2]
+check ok: live task refused
+hold rc=0
+
+$ bin/fm-tasks-axi.sh done g-hold --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+human-only-exit: what is the owner's answer to the call g-hold?
+fm-tasks-axi: g-hold is an open owner call; answer it with bin/fm-captain-hold.sh answer g-hold --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close g-hold
+[exit 2]
+check ok: open owner call refused
+
+$ bin/fm-tasks-axi.sh done g-blocker --duplicate-of k2 
+REFUSED: guard=backlog-close-item-eligible rule=open-dependents missing=no open item blocked by this one
+completing-command: FM_FRICTION_OPERATION_ID=2809f8d9-a516-4f5f-94f1-8e50678c4790 FM_FRICTION_EPISODE_ID=2809f8d9-a516-4f5f-94f1-8e50678c4790 bin/fm-tasks-axi.sh unblock <dependent> --by g-blocker
+fm-tasks-axi: g-blocker still blocks open items: g-dep. Closing it would release them while its work is still open, so nothing was closed. Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by k2, then bin/fm-tasks-axi.sh unblock <dependent> --by g-blocker (the kept item k2 itself needs only the unblock step).
+[exit 2]
+check ok: dependent named
+check ok: advice names block and unblock
+
+$ bin/fm-tasks-axi.sh block g-dep --by k2 
+ok: block g-dep -> blocked-by k2
+help[2]:
+  - Run `tasks-axi unblock g-dep --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+[exit 0]
+
+$ bin/fm-tasks-axi.sh unblock g-dep --by g-blocker 
+ok: unblock g-dep -> cleared g-blocker
+help[1]:
+  - Run `tasks-axi ready` to see newly unblocked work
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done g-blocker --duplicate-of k2 
+ok: done g-blocker -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+=== S10 done --moved-to, local registered home
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to nope dest-open 
+REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+completing-command: FM_FRICTION_OPERATION_ID=6f5e53bf-b99e-4b87-a428-84d8bbc2cf4a FM_FRICTION_EPISODE_ID=6f5e53bf-b99e-4b87-a428-84d8bbc2cf4a bin/fm-tasks-axi.sh done mv-1 --moved-to <home> <item-id>
+fm-tasks-axi: nope is not one registered home in $FM_HOME/data/secondmates.md
+[exit 2]
+check ok: unregistered refused
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 nosuch 
+REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=48909549-7049-4272-8371-0fb0af1b27d1 FM_FRICTION_EPISODE_ID=48909549-7049-4272-8371-0fb0af1b27d1 bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 <item-id>
+fm-tasks-axi: sm-h2's backlog has no item nosuch
+[exit 2]
+check ok: missing item refused
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 dest-done 
+REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=778c75d1-a658-4f24-a86d-079d59b61ce0 FM_FRICTION_EPISODE_ID=778c75d1-a658-4f24-a86d-079d59b61ce0 bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 <item-id>
+fm-tasks-axi: sm-h2's item dest-done is not open (Queued or In flight); moved work must be open in the new home
+[exit 2]
+check ok: closed dest refused
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 
+fm-tasks-axi: --moved-to takes two values: --moved-to <home> <item-id>
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to=sm-h2 
+fm-tasks-axi: --moved-to takes two values: --moved-to <home> <item-id>
+[exit 2]
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 dest-open --report data/x.md 
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit 2]
+check ok: mv-1 still open
+
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-h2 dest-open 
+ok: done mv-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+- [x] mv-1 - Gull derrick oakum (done 2026-11-02)
+check ok: note records move
+check ok: dest still open
+
+$ bin/fm-tasks-axi.sh done mv-own --moved-to sm-h2 dest-open 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close mv-own, and in what words?
+fm-tasks-axi: mv-own quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit 2]
+check ok: owner item stops moved-to too
+
+$ bin/fm-tasks-axi.sh done mv-2 --moved-to sm-self mv-2 
+REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+completing-command: FM_FRICTION_OPERATION_ID=261f7ffa-fd3c-4e9e-9b87-3b7cefba5607 FM_FRICTION_EPISODE_ID=261f7ffa-fd3c-4e9e-9b87-3b7cefba5607 bin/fm-tasks-axi.sh done mv-2 --moved-to <home> <item-id>
+fm-tasks-axi: sm-self is this backlog itself; a moved item must live in a different backlog
+[exit 2]
+check ok: same backlog refused
+
+$ bin/fm-tasks-axi.sh done mv-2 --moved-to sm-h2 dest-open 
+REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+completing-command: FM_FRICTION_OPERATION_ID=b59a2ad7-cbe8-43f8-a200-d8bd57c69c75 FM_FRICTION_EPISODE_ID=b59a2ad7-cbe8-43f8-a200-d8bd57c69c75 bin/fm-tasks-axi.sh done mv-2 --moved-to <home> <item-id>
+fm-tasks-axi: sm-h2 is not one registered home in $FM_HOME/data/secondmates.md
+[exit 2]
+check ok: twice registered refused
+
+$ bin/fm-tasks-axi.sh done mv-2 --moved-to sm-h2 dest-open 
+fm-tasks-axi: cannot read sm-h2's backlog, so nothing was closed: data directory cannot be resolved: /Users/charlesabrooker/tmp/fm-lab-h2.OwpnCq/data
+[exit 2]
+check ok: vanished home closes nothing
+
+=== S11 old proofs still behave
+
+$ bin/fm-tasks-axi.sh done sh-1 
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+[exit 2]
+check ok: ship needs proof
+
+$ bin/fm-tasks-axi.sh done sh-1 --drop-file $FM_HOME/words.txt 
+ok: done sh-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+check ok: drop words kept
+
+=== S12 telemetry and ledger
+state/.fm-lab-tmux-dir
+state/fleet-ledger.jsonl
+state/friction.jsonl
+state/guard-events.jsonl
+{"v":1,"ts":1793660437,"at":"2026-11-02T23:00:37Z","event":"task.filed","task":"lg-1","repo":null,"kind":"task","priority":null}
+{"v":1,"ts":1793660439,"at":"2026-11-02T23:00:39Z","event":"task.filed","task":"lg-kept","repo":null,"kind":"task","priority":null}
+{"v":1,"ts":1793660446,"at":"2026-11-02T23:00:46Z","event":"task.closed","task":"lg-1","evidence":"none","pr":null}
+check ok: ledger task.filed
+check ok: ledger task.closed evidence none
+5 ('backlog-close-duplicate-of', 'allow', False, '', True)
+3 ('backlog-close-duplicate-of', 'deny', False, '', True)
+6 ('backlog-close-item-eligible', 'allow', False, '', True)
+16 ('backlog-close-item-eligible', 'deny', False, '', True)
+1 ('backlog-close-moved-to', 'allow', False, '', True)
+1 ('backlog-close-moved-to', 'deny', False, '', False)
+5 ('backlog-close-moved-to', 'deny', False, '', True)
+1 ('backlog-intake-dup-of', 'allow', False, '', True)
+3 ('backlog-intake-dup-of', 'deny', False, '', True)
+91 ('backlog-intake-duplicate', 'allow', False, '', True)
+1 ('backlog-intake-duplicate', 'allow', False, 'dup-of', True)
+3 ('backlog-intake-duplicate', 'allow', True, 'not-dup', True)
+1 ('backlog-intake-duplicate', 'deny', False, '', False)
+7 ('backlog-intake-duplicate', 'deny', False, '', True)
+3 ('backlog-intake-not-dup', 'allow', False, '', True)
+2 ('backlog-intake-not-dup', 'deny', False, '', True)
+109 ('backlog-intake-objective', 'allow', False, '', True)
+6 ('backlog-intake-objective', 'deny', False, '', True)
+check ok: not-dup override recorded
+check ok: dup-of cleared_by recorded
+check ok: friction refusals recorded
+      42 state/friction.jsonl
+
+TOTAL checks ok=168 fail=0

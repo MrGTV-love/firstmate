@@ -1,0 +1,46 @@
+ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+ok - bootstrap stays silent when the code root is the home
+ok - bare tasks-axi replaced the code-root link and bootstrap reported the fork
+ok - fm-tasks-axi.sh writes, holds, archives, and reads relative body files through to the home from the code root
+ok - fm-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves the dashboard
+ok - fm-tasks-axi.sh refuses caller --file, a symlinked home backlog, and an unresolvable home
+ok - fm-tasks-axi.sh refuses add --start while plain add and start <id> pass through
+ok - fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog
+ok - fm-tasks-axi.sh closes a ship or scout only with its proved deliverable
+ok - fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task
+ok - all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence
+ok - public reopen and start with either noun retire drop provenance in home and caller-relative data, preserving body and words
+ok - real snapshot and landed projection distinguish resumed deliveries from untouched captain drops
+ok - restart handles sole dropped bodies and refuses failed retirement updates without changing the row
+ok - unsupported leading global forms are refused by the wrapper without changing the task
+ok - bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving
+ok - bounded backend refusals preserve rows and retained captain words under default, environment beads, and home beads configuration
+ok - only exact unconsumed help tokens reach production help without completion or restart side effects
+ok - documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion
+ok - completion and restart spellings wait for control then metadata custody before authoritative reads
+ok - a concurrent hold serializes before admission or after proved completion, never inside its evidence-to-mutation window
+ok - start and reopen keep body updates outside retirement, failed-command readback, and rollback custody
+ok - failed start and reopen with either noun read back home and caller-relative data before restoring only proved unchanged drops
+ok - nested relative FM_HOME and caller-relative state/config keep filed and closed records in the original home
+ok - ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged
+ok - ledger off writes nothing, and an unwritable ledger costs one stderr line without changing the add
+ok - ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone
+ok - fm-tasks-axi.sh refuses an add with no objective, an unknown id, or none without a reason, accepts each listed id with an exact row, and reads the ids from docs/objectives.md
+ok - an objective row is written for the stored id in the addressed data directory, keeps earlier rows, and a sidecar that cannot take it stops the add
+ok - an item whose objective row cannot be written is removed again and the add fails
+ok - a --json add on a home without jq still records the objective row
+ok - fm-tasks-axi.sh refuses near-duplicate titles with the three best neighbours and both overrides, in every spelling, over the addressed backlog and a non-Markdown adapter
+ok - the duplicate check counts the 50 newest Done items across a multi-row prune and stops when a source cannot be read
+ok - --dup-of appends to an open or retained Done item and --not-dup files past a qualifying neighbour, and neither runs without an objective or beside a lost update
+ok - --dup-of counts a repeat only when the whole block is already there, so a second body or a prefix title is never lost
+ok - an archived row's unparenthesized blocked-by tail is not scored as title words
+ok - an archived row's merged, priority, and hold tails are not scored as title words
+ok - an archived row keeps the parenthesized words of its title and loses only the tails tasks-axi writes
+ok - the intake flags refuse an empty or option-like value in the = form, and --not-dup can be given only once
+ok - the intake and closing-proof guards log every refusal, pass, and escape, and keep their refusal text
+ok - fm-tasks-axi.sh closes a duplicate into a Queued or In flight item on checked proof and leaves both items alone when a check or the append fails
+ok - fm-tasks-axi.sh closes a moved item on checked proof, local, remote, and adapter, from the source's own registry, and stops on every unproved case
+ok - fm-tasks-axi.sh refuses a proof close while the item still blocks open items, and closes once they are re-pointed
+ok - both closing proofs stop at every owner-filed marker, open owner call, unreadable hold, and live task, and close an item that only mentions the owner
+ok - a hold or a live-task record published during a closing proof waits for the close, and a committed hold stops the proof

@@ -1,0 +1,69 @@
+=== S21 spellings and read paths
+
+$ bin/fm-tasks-axi.sh close a1 --duplicate-of=k9
+ok: done a1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ bin/fm-tasks-axi.sh task done a2 --duplicate-of k9 --json
+{
+  "ok": true,
+  "action": "done",
+  "pruned": 0,
+  "task": {
+    "id": "a2",
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done a3 --duplicate-of k9 --no-prune --keep 5
+ok: done a3 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add ff-1 Weasel spar lanyard --objective O6 --body-file $FM_HOME/b.txt
+ok: added ff-1 -> Queued
+task:
+  id: ff-1
+  title: Weasel spar lanyard
+  state: queued
+  blocked: no
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add --help
+usage: tasks-axi add <id> "<title>" [flags]
+aliases: create
+flags:
+  --kind <ship|scout|docs|...>, --repo <name>, --body <text> or --body-file <path>
+  --start (place in In flight) | --queue (place in Queued, default)
+  --blocked-by <id> (repeatable, must exist), --pr <url>, --report <path>, --priority <0-4>
+[exit 0]
+
+$ bin/fm-tasks-axi.sh done --help
+usage: tasks-axi done <id> [flags]
+aliases: close
+Re-running on an already Done task backfills links/notes without changing the close date.
+flags:
+  --pr <url>, --report <path>, --note "<text>"
+  --keep <n> (default from config), --no-prune
+[exit 0]
+
+=== S22 a missing objective list stops every add
+
+$ $COPY/bin/fm-tasks-axi.sh add nx-1 Bittern purlin girder --objective O7
+fm-tasks-axi: cannot read the objective list $COPY/bin/../docs/objectives.md
+[exit 2]
+nx-1 rows: 0
+
+
+=== S24 sidecar that cannot take a line files nothing
+
+$ bin/fm-tasks-axi.sh add ro-1 Ibis stanchion grommet --objective O7
+fm-tasks-axi: cannot record the objective: $FM_HOME/data/backlog-review.tsv is not a writable regular file; fix it, then file the item again (nothing was filed)
+[exit 2]
+ro-1 rows: 0
+
+$ bin/fm-spawn.sh nosuch-task $FM_HOME/projects/p --mode local-only ... (brief present, no backlog row)
+warning: $FM_HOME/data/nosuch-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: nosuch-task ships mode=local-only while the standing posture for p is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: task nosuch-task has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/fm-tasks-axi.sh add nosuch-task '<title>' --kind ship --objective <O1..O7|none --objective-reason ...>) and re-run

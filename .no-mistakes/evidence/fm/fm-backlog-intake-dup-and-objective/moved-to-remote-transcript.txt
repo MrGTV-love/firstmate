@@ -1,0 +1,33 @@
+=== S19 --moved-to with a remote home: real ssh, real fm-remote-entrypoint.sh, real Linux job worker, real remote fm-tasks-axi.sh
+
+$ bin/fm-tasks-axi.sh done rmv-1 --moved-to rm1 nosuch-item
+REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+fm-tasks-axi: rm1's backlog has no item nosuch-item
+
+$ bin/fm-tasks-axi.sh done rmv-1 --moved-to rm1 remote-done
+REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+fm-tasks-axi: rm1's item remote-done is not open (Queued or In flight); moved work must be open in the new home
+rmv-1 rows still open: 1
+
+$ bin/fm-tasks-axi.sh done rmv-1 --moved-to rm1 remote-open
+ok: done rmv-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+$ bin/fm-tasks-axi.sh show rmv-1 --full
+  state: done
+  body: moved to rm1 as remote-open
+
+--- remote backlog is not changed by the close:
+## Queued
+
+- [ ] remote-open - Remote open item
+
+## Done
+
+- [x] remote-done - Remote closed item (done 2026-11-01)
+
+=== S20 a stopped remote closes nothing
+
+$ bin/fm-tasks-axi.sh done rmv-2 --moved-to rm1 remote-open
+fm-tasks-axi: cannot read rm1's backlog, so nothing was closed: ssh: connect to host 127.0.0.1 port 64327: Connection refused
+rmv-2 rows still open: 1

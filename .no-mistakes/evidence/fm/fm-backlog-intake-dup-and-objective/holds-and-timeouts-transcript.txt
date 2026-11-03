@@ -1,0 +1,105 @@
+
+=== S13 a new captain hold files through intake and records its objective
+
+$ bin/fm-captain-hold.sh hold alpha-one --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ alpha-one --reason Land\ or\ drop\ alpha-one\? 
+alpha-one
+[exit 0]
+check ok: row exists and held
+alpha-one^I^Inone^Icaptain hold record: tracks a captain decision, not a work item
+check ok: objective none with reason
+task.filed records for alpha-one: 1
+check ok: one task.filed
+
+=== S14 a templated second hold is refused with hold-correct guidance
+
+$ bin/fm-captain-hold.sh hold beta-two --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ beta-two --reason Land\ or\ drop\ beta-two\? 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as alpha-one?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  alpha-one (Queued, overlap 0.71) Land or drop the bundle-preserved commits of alpha-one
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to alpha-one and file nothing:
+    bin/fm-tasks-axi.sh add beta-two Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ beta-two --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --dup-of alpha-one
+  the work is different from alpha-one - file it:
+    bin/fm-tasks-axi.sh add beta-two Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ beta-two --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup alpha-one
+fm-captain-hold: the duplicate check stopped task beta-two, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.
+fm-captain-hold: could not create task beta-two
+[exit 1]
+check ok: guidance forbids --dup-of
+check ok: guidance names due waiver
+check ok: guidance says re-run hold
+check ok: wrapper refusal shows neighbour
+check ok: nothing filed
+printed --not-dup: bin/fm-tasks-axi.sh add beta-two Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ beta-two --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup alpha-one
+
+=== S15 following the guidance verbatim files and holds the call
+$ BD_DUE_REQUIRED=false <printed --not-dup command>
+ok: added beta-two (captain, repo firstmate) -> Queued
+task:
+  id: beta-two
+  title: Land or drop the bundle-preserved commits of beta-two
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+check ok: printed not-dup ran
+
+$ bin/fm-captain-hold.sh hold beta-two --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ beta-two --reason Land\ or\ drop\ beta-two\? 
+beta-two
+[exit 0]
+check ok: held
+
+$ bin/fm-captain-hold.sh open beta-two 
+
+[exit 0]
+
+$ bin/fm-captain-hold.sh answer beta-two --decision-file $FM_HOME/w.txt 
+answered: beta-two
+[exit 0]
+check ok: answer closes the call
+
+=== S16 a hold on an existing work item never meets the duplicate check
+
+$ bin/fm-captain-hold.sh hold wk-1 --reason Which\ gamma-three\ first\? 
+wk-1
+[exit 0]
+check ok: existing row held
+
+=== S17 the retired decision-hold shim reaches the same behaviour
+
+$ bin/fm-decision-hold.sh hold orig1 keyone --title Pick\ the\ umbrella\ vendor --reason Which\ vendor\? 
+orig1-decision-keyone
+[exit 0]
+
+$ bin/fm-decision-hold.sh hold orig1 keytwo --title Pick\ the\ umbrella\ colour --reason Which\ colour\? 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as orig1-decision-keyone?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  orig1-decision-keyone (Queued, overlap 0.50) Pick the umbrella vendor
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to orig1-decision-keyone and file nothing:
+    bin/fm-tasks-axi.sh add orig1-decision-keytwo Pick\ the\ umbrella\ colour --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --body Origin:\ orig1 --dup-of orig1-decision-keyone
+  the work is different from orig1-decision-keyone - file it:
+    bin/fm-tasks-axi.sh add orig1-decision-keytwo Pick\ the\ umbrella\ colour --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --body Origin:\ orig1 --not-dup orig1-decision-keyone
+fm-captain-hold: the duplicate check stopped task orig1-decision-keytwo, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.
+fm-captain-hold: could not create task orig1-decision-keytwo
+[exit 1]
+check ok: shim gets guidance
+
+=== S18 repeated timeouts file with O7 and only self-clear for timeout neighbours
+timeout_work: "fm-timeout-4ef60f327169db36"
+rc=0
+13:- [ ] fm-timeout-4ef60f327169db36 - Measure and repair repeated timeout: lab/driver worker.lintkey (repo: firstmate) (kind: ship) (since 2026-11-02)
+check ok: first key filed
+check ok: objective O7 row
+timeout_work: "fm-timeout-28c15a37d3847fe4"
+rc=0
+fm-timeout rows after a second key (the title overlaps the first): 2
+check ok: second key self-clears through --not-dup
+hand-filed same-work item added
+error: "timeout work could not be filed: REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours\nhuman-only-exit: is this add the same work as fm-timeout-4ef60f327169db36?\nfm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:\n  fm-timeout-4ef60f327169db36 (Queued, overlap 0.78) Measure and repair repeated timeout: l
+[exit 1]
+check ok: operator sees refusal naming hand item
+check ok: not filed over a hand item
+
+TOTAL checks ok=26 fail=0
