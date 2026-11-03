@@ -115,7 +115,9 @@ SH
   cat > "$fakebin/muse" <<'SH'
 #!/usr/bin/env bash
 set -u
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
 [ -n "${FM_FAKE_HARNESS_RESULT:-}" ] || exit 0
+export FM_FAKE_HARNESS_PROBE FM_FAKE_HARNESS_RESULT
 exec "$FM_FAKE_MUSE_VERSIONED" -c 'result=$($FM_FAKE_HARNESS_PROBE); printf "%s" "$result" > "$FM_FAKE_HARNESS_RESULT"'
 SH
   chmod +x "$fakebin/muse"
@@ -132,7 +134,10 @@ make_spawn_case() {
   fakebin=$(make_spawn_fakebin "$case_dir/fake")
   id="muse-$name-x1"
   mkdir -p "$home/data/$id" "$home/projects" "$home/state" "$home/config" \
-    "$home/xdgconfig" "$home/xdgdata"
+    "$home/xdgconfig/muse" "$home/xdgdata"
+  # The default launch keeps no META_API_KEY, so a stored login is the route an
+  # ordinary case uses. A credential-refusal case removes it.
+  printf '{"schema_version":1}\n' > "$home/xdgconfig/muse/auth.json"
   cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
 ## Captain's intent
@@ -220,6 +225,8 @@ test_spawn_clears_inherited_foreign_harness_markers() {
 $rec
 EOF
   result="$case_dir/harness-result"
+  fm_fake_config "$fakebin" FM_FAKE_HARNESS_RESULT="$result" \
+    FM_FAKE_MUSE_VERSIONED="$fakebin/muse-bin-test-version" FM_FAKE_HARNESS_PROBE="$HARNESS"
   out=$(CLAUDECODE=1 PI_CODING_AGENT=true GROK_AGENT=1 FM_PI_HARNESS=pi-signed \
     CURSOR_AGENT=1 CURSOR_INVOKED_AS=cursor-agent \
     FM_FAKE_EXECUTE_MUSE_LAUNCH=1 FM_FAKE_HARNESS_RESULT="$result" \
@@ -259,9 +266,9 @@ EOF
   # The captain accepted muse's self-update risk, so firstmate must not pin it.
   assert_not_contains "$launch" 'MUSE_NO_AUTO_UPDATE' \
     "muse launch pinned auto-update, which the captain declined"
-  assert_contains "$launch" "XDG_CONFIG_HOME='$home/xdgconfig'" \
+  assert_launch_contains "$launch" "XDG_CONFIG_HOME='$home/xdgconfig'" \
     "muse launch did not forward its non-secret config root"
-  assert_contains "$launch" "XDG_DATA_HOME='$home/xdgdata'" \
+  assert_launch_contains "$launch" "XDG_DATA_HOME='$home/xdgdata'" \
     "muse launch did not forward its non-secret data root"
   assert_not_contains "$launch" 'META_API_KEY' "muse launch exposed META_API_KEY in worker argv"
   assert_not_contains "$launch" 'test-key' "muse launch exposed the credential value in worker argv"
@@ -291,8 +298,8 @@ EOF
       --mode no-mistakes --yolo off --model muse-spark-1.2 --effort "$effort" >/dev/null \
       || fail "muse spawn with effort $effort failed"
     launch=$(cat "$home/launch.log")
-    assert_contains "$launch" "$expect" "muse effort $effort did not map to '$expect'"
-    assert_contains "$launch" "--model 'muse-spark-1.2'" "muse spawn dropped the model axis"
+    assert_launch_contains "$launch" "$expect" "muse effort $effort did not map to '$expect'"
+    assert_launch_contains "$launch" "--model 'muse-spark-1.2'" "muse spawn dropped the model axis"
   done
   # ultra is muse's max-class level and must be reachable ONLY through an
   # explicit max, never as the fallback when no effort was chosen.
@@ -316,7 +323,7 @@ test_spawn_refuses_without_credential() {
   IFS='|' read -r case_dir home proj wt fakebin id <<EOF
 $rec
 EOF
-  mkdir -p "$home/xdgconfig/muse"
+  rm "$home/xdgconfig/muse/auth.json"
   out=$(FM_TEST_MUSE_KEY='' FM_TEST_MUSE_WORKER_KEY='' run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" \
     --mode no-mistakes --yolo off)
   status=$?
@@ -332,6 +339,7 @@ test_spawn_refuses_caller_only_environment_credential() {
   IFS='|' read -r case_dir home proj wt fakebin id <<EOF
 $rec
 EOF
+  rm "$home/xdgconfig/muse/auth.json"
   out=$(FM_TEST_MUSE_KEY='caller-only-secret' FM_TEST_MUSE_WORKER_KEY='' \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off)
   status=$?
@@ -376,9 +384,9 @@ EOF
   status=$?
   expect_code 0 "$status" "muse spawn with relative XDG roots should succeed: $out"
   launch=$(cat "$home/launch.log")
-  assert_contains "$launch" "XDG_CONFIG_HOME='$resolved_caller/cfg'" \
+  assert_launch_contains "$launch" "XDG_CONFIG_HOME='$resolved_caller/cfg'" \
     "muse launch did not forward the resolved config root"
-  assert_contains "$launch" "XDG_DATA_HOME='$resolved_caller/data'" \
+  assert_launch_contains "$launch" "XDG_DATA_HOME='$resolved_caller/data'" \
     "muse launch did not forward the resolved data root"
   binding="$home/state/$id.muse-session"
   assert_grep "sessions_root=$resolved_caller/data/muse/sessions" "$binding" \
@@ -927,13 +935,8 @@ test_spawn_environment_allowlist_credential_preflight() {
 $rec
 EOF
     : > "$home/config/launch-env-allowlist"
-    case "$setting" in
-      allowed) printf 'META_API_KEY\n' > "$home/config/launch-env-allowlist" ;;
-      stored)
-        mkdir -p "$home/xdgconfig/muse"
-        printf '{"schema_version":1}\n' > "$home/xdgconfig/muse/auth.json"
-        ;;
-    esac
+    [ "$setting" = stored ] || rm "$home/xdgconfig/muse/auth.json"
+    [ "$setting" != allowed ] || printf 'META_API_KEY\n' > "$home/config/launch-env-allowlist"
     out=$(run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off)
     status=$?
     if [ "$setting" = withheld ]; then

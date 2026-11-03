@@ -1127,6 +1127,7 @@ tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 954
 tests/fm-sessionstart-nudge.test.sh 87368
 tests/fm-shared-captain-inheritance.test.sh 14855
 tests/fm-skill-pick.test.sh 142156
+tests/fm-slack-deadline.test.sh 198406
 tests/fm-slack-intake-unchanged.test.sh 4517
 tests/fm-slack-secret-scan.test.sh 25525
 tests/fm-slack-watch.test.sh 696773

@@ -64,7 +64,9 @@
 # finished row closes instead of reopening unheld work. If an answer already
 # closed a retained row, replay simply retires the satisfied record.
 
-# Set by fm_backlog_transition_applies for a return-1 exemption.
+# Set by fm_backlog_transition_applies for a return-1 exemption; the manual
+# backend exemption also sets FM_BACKLOG_TRANSITION_BYPASS, which the transition
+# owner records once per operation through fm_backlog_transition_skip_event.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_TRANSITION_SKIP=
 # Set by the mutating helpers when they return non-zero.
@@ -325,15 +327,22 @@ fm_backlog_tasks_axi_addressing() {  # <data-dir>
   fi
 }
 
+fm_backlog_transition_skip_event() {  # <task>
+  [ -n "${FM_BACKLOG_TRANSITION_BYPASS:-}" ] || return 0
+  "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" backlog-transition bypass --rule "$FM_BACKLOG_TRANSITION_BYPASS" --task "${1:-}" --override 2>/dev/null || true
+}
+
 fm_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   local config=$1 data authorized_data=$2 kind=$3 file root backend authorized_root
   FM_BACKLOG_TRANSITION_SKIP=
+  FM_BACKLOG_TRANSITION_BYPASS=
   if [ "$kind" = secondmate ]; then
     FM_BACKLOG_TRANSITION_SKIP="secondmates are not backlog items"
     return 1
   fi
   if fm_backlog_backend_manual "$config"; then
     FM_BACKLOG_TRANSITION_SKIP="config/backlog-backend selects manual editing"
+    FM_BACKLOG_TRANSITION_BYPASS=manual-backend
     return 1
   fi
   if ! data=$(fm_backlog_data_absolute "$2"); then
@@ -712,7 +721,63 @@ fm_backlog_done() {  # <data-dir> <id> [flag...]
     fi
     previous_arg=$arg
   done
-  fm_backlog_mutate "$data" "done" "$id" "${done_args[@]+"${done_args[@]}"}"
+  fm_backlog_mutate "$data" "done" "$id" "${done_args[@]+"${done_args[@]}"}" || return $?
+  fm_backlog_unblock_dependents "$data" "$id" >&2
+  return 0
+}
+
+# A finished item stops blocking the items that waited on it. Every route that moves
+# an item to Done calls this once the move succeeded: fm_backlog_done above (teardown
+# and every other transition) and bin/fm-tasks-axi.sh done/close. tasks-axi keeps a
+# blocked-by edge after its blocker is done, so the edge is read from each item's
+# stored `deps` field (the `blocked_by` view already hides a done blocker) and cleared
+# with tasks-axi's own `unblock <dependent> --by <id>`. An edge naming another,
+# unfinished blocker is untouched: only the finished id is removed. Prints one
+# `unblocked: <dependent> no longer waits on <id>; ...` line per cleared edge (it ends
+# with the dependent's remaining blocked-by ids, or says no stored blocked-by edge
+# remains; that is the stored edge list only, never a readiness claim, because a state or
+# hold can still keep the dependent from dispatch) and one
+# `actionable:` line per failure, on stdout; callers send it to stderr. Always returns
+# 0, because the item is already done and a clear that failed is repaired by the next
+# completion or by running `tasks-axi unblock` by hand; it leaves
+# FM_BACKLOG_TRANSITION_ERROR empty.
+fm_backlog_unblock_dependents() {  # <data-dir> <id>
+  local data=$1 id=$2 out line dep deps rest cleared=0 listed=0 left edge
+  out=$(fm_backlog_row_list "$data" --fields deps --limit 100000) && listed=1
+  if [ "$listed" = 0 ]; then
+    printf 'actionable: %s is done, but the items it blocked could not be listed (%s); clear them with tasks-axi unblock <item> --by %s\n' \
+      "$id" "$(printf '%s\n' "$out" | sed -n '1p')" "$id"
+    FM_BACKLOG_TRANSITION_ERROR=
+    return 0
+  fi
+  while IFS= read -r line; do
+    case "$line" in '  '[!\ ]*) ;; *) continue ;; esac
+    line=${line#  }
+    dep=${line%%,*}
+    case "$line" in
+      *'"') rest=${line%\"}; deps=${rest##*,\"} ;;
+      *) deps=${line##*,} ;;
+    esac
+    case ",$deps," in *",blocked-by:$id,"*) ;; *) continue ;; esac
+    [ "$dep" != "$id" ] || continue
+    if fm_backlog_mutate "$data" unblock "$dep" --by "$id"; then
+      left=
+      for edge in ${deps//,/ }; do
+        case "$edge" in "blocked-by:$id") ;; blocked-by:*) left="$left${left:+,}${edge#blocked-by:}" ;; esac
+      done
+      if [ -n "$left" ]; then
+        printf 'unblocked: %s no longer waits on %s; it still waits on %s\n' "$dep" "$id" "$left"
+      else
+        printf 'unblocked: %s no longer waits on %s; no stored blocked-by edge remains\n' "$dep" "$id"
+      fi
+      cleared=$((cleared + 1))
+    else
+      printf 'actionable: %s is done, but %s could not be unblocked (%s); run tasks-axi unblock %s --by %s\n' \
+        "$id" "$dep" "$FM_BACKLOG_TRANSITION_ERROR" "$dep" "$id"
+    fi
+  done <<< "$out"
+  FM_BACKLOG_TRANSITION_ERROR=
+  return 0
 }
 
 fm_backlog_row_artifact_supported() {
