@@ -1088,14 +1088,33 @@ class Collector:
             return re.sub(r"\s", "", first[0]) if first else "secondmate"
         return "firstmate"
 
-    def merge_prune_refusal(self, task_id):
-        """The last refusal bin/fm-merge-prune.sh kept for this task's plain teardown, or empty."""
+    def teardown_refusal(self, task_id):
+        """The newest refusal of this task's plain teardown on record, or empty.
+
+        Two owners record one: bin/fm-merge-prune.sh keeps it in state/<id>.merge-prune (state=retained), and
+        bin/fm-idle-session-reap.sh in state/.idle-reap/<id>.refused (fm-idle-reap-refused-v1: epoch, status line,
+        reason). A manual teardown records nothing.
+        """
+        found = []
+        prune = self.state / (task_id + ".merge-prune")
         try:
-            lines = (self.state / (task_id + ".merge-prune")).read_text().splitlines()
+            fields = dict(line.split("=", 1) for line in prune.read_text().splitlines() if "=" in line)
+            if fields.get("state") == "retained" and fields.get("reason"):
+                found.append((mtime(prune) or 0, fields["reason"]))
         except OSError:
-            return ""
-        fields = dict(line.split("=", 1) for line in lines if "=" in line)
-        return fields.get("reason", "") if fields.get("state") == "retained" else ""
+            pass
+        try:
+            memo = (self.state / ".idle-reap" / (task_id + ".refused")).read_text().splitlines()
+            if len(memo) >= 4 and memo[0] == "fm-idle-reap-refused-v1" and memo[3] and memo[1].isdigit():
+                found.append((int(memo[1]), memo[3]))
+        except OSError:
+            pass
+        return max(found)[1] if found else ""
+
+    def covering_rows(self, ident, pr_url):
+        """The rows another source already raised for this task: its own subject, a keyed subject, or its PR."""
+        return [r for r in self.rows.values() if r["category"] not in ("silent_report", "coverage")
+                and (r["subject"] == ident or r["subject"].startswith(ident + ":") or (pr_url and r["subject"] == pr_url))]
 
     def finished_class(self, task):
         """Why a task whose deliverable is landed counts as finished, in words for the row's evidence."""
@@ -1116,24 +1135,25 @@ class Collector:
         acceptance (pending_acceptance). Both are derived from the records alone, so a restart finds the same
         rows. A declared wait, an unanswered decision and a worker that is still running (a no-mistakes pipeline
         runs after the handoff `done`) own the task's next move and add neither; a persistent secondmate is not in
-        self.tasks.
+        self.tasks. A recorded teardown refusal stays on the task's own row, else on every row that covers the task.
         """
         owner = "home:" + self.home_label()
         for task in self.tasks:
             ident = task["id"]
+            pr_url = task["pr"].get("url")
+            refusal = self.teardown_refusal(ident)
+            refused = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that cause and "
+                       "runs it again (dropping the work needs the captain's own words)") if refusal else ""
             _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
             state = task["current_state"].get("state")
             closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog) \
                 or self.captain_dropped(task)
-            if not (closed or verb == "done" or state == "done") or open_decision or pause_limit:
-                continue
-            if state in ("working", "paused", "blocked", "parked") and not closed:
+            if not (closed or verb == "done" or state == "done") or open_decision or pause_limit \
+                    or (state in ("working", "paused", "blocked", "parked") and not closed):
+                self.attach_refusal(ident, pr_url, refusal, refused)
                 continue
             since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
             landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
-            refusal = self.merge_prune_refusal(ident)
-            refused = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that cause and "
-                       "runs it again (dropping the work needs the captain's own words)") if refusal else ""
             if landed:
                 why, merged_at = self.finished_class(task)
                 row_owner = owner
@@ -1154,14 +1174,14 @@ class Collector:
                         action = (f"the copy of {ident} holds work no PR or default branch carries and no captain's drop "
                                   f"words are recorded at {words}: Main needs the captain's own words before an attended "
                                   f"bin/fm-teardown.sh {ident} --force --drop-file")
+                    if refusal:
+                        action = f"{action}; the last plain teardown was refused: {refusal}"
                 self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
-                         evidence=f"finished: {why}; the record is still open")
+                         evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                                  + f"finished: {why}; the record is still open")
                 continue
-            pr_url = task["pr"].get("url")
-            covered = any(r["category"] not in ("silent_report", "coverage")
-                          and (r["subject"] == ident or r["subject"].startswith(ident + ":") or r["subject"] == pr_url)
-                          for r in self.rows.values())
-            if covered:
+            if self.covering_rows(ident, pr_url):
+                self.attach_refusal(ident, pr_url, refusal, refused)
                 continue
             gone = task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing")
             action = (f"review and accept the delivered work of {ident}, or relaunch its worker with "
@@ -1173,6 +1193,14 @@ class Collector:
                      evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
                               + "the last report was done and no accepted or landed deliverable is on record"
                               + ("; landing could not be read" if landed is None else ""))
+
+    def attach_refusal(self, ident, pr_url, refusal, refused):
+        """A recorded teardown refusal stays on every row that already covers the task."""
+        if not refusal:
+            return
+        for row in self.covering_rows(ident, pr_url):
+            row["next_action"] = f"{row['next_action']}; {refused}"
+            row["evidence"] = f"last teardown refusal: {refusal}; {row['evidence']}"[:400]
 
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""

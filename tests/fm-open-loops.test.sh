@@ -2019,6 +2019,13 @@ dirty_refusal = f'REFUSED: worktree {fin_dirty} has uncommitted changes.'
 (v4 / 'state/fin-dirty.merge-prune').write_text(
     f'version=fm-merge-prune-v1\npr={V4_PR}13\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={dirty_refusal}\n'
     f'wake_sent=1\ncopy={fin_dirty}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+unl_refused = v4_copy('unl-refused'); v4_merged_pr(14, unl_refused)
+(unl_refused / 'later.txt').write_text('later\n')
+git_('-C', unl_refused, 'add', '.'); git_('-C', unl_refused, 'commit', '-q', '-m', 'work the merged PR never carried')
+v4_task('unl-refused', copy=unl_refused, pr=14, note=f'{V4_PR}14 merged by another lane')
+reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the ship deliverable is not landed'
+(v4 / 'state/.idle-reap').mkdir()
+(v4 / 'state/.idle-reap/unl-refused.refused').write_text(f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{reap_refusal}\n')
 wait_paused = v4_copy('wait-paused', work=False)
 v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
 wait_held = v4_copy('wait-held', work=False)
@@ -2094,6 +2101,10 @@ dirty = by_cat('pending_acceptance').get('fin-dirty')
 assert dirty and dirty['owner'] == 'home:firstmate', ('a refused dirty copy needs its row', mine('fin-dirty'))
 assert dirty_refusal in dirty['next_action'] and dirty_refusal in dirty['evidence'], ('the refusal text must stay on the row', dirty)
 assert 'fin-dirty' not in cleanup, cleanup.get('fin-dirty')
+# When another row covers the task, the recorded refusal (here the idle reaper's memo) stays on that row.
+unl = by_cat('unlanded_commit').get('unl-refused')
+assert unl and reap_refusal in unl['next_action'] and reap_refusal in unl['evidence'], ('the covering row lost the refusal', mine('unl-refused'))
+assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('unl-refused')), mine('unl-refused')
 # A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
 for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate', 'pend-run'):
     assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))

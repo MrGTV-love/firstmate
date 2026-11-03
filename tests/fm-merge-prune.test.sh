@@ -3538,11 +3538,20 @@ test_xlane_same_lane_path_completes_as_before() {
 # reported, and the merge is reported once; the retried teardown then removes it.
 xl_merge_reported() { [ -e "$STATE/t1.pr-poll-merge-notified" ] && xl_has_event task.merged; }
 xl_event_count() { xl_ledger_events | tr ' ' '\n' | grep -cx "$1" || true; }
+# A stopped watcher's poll step can still hold t1's control lock for a moment.
+xl_wait_control_free() {
+  local deadline=$((SECONDS + 60))
+  while [ -e "$STATE/.control-t1.lock" ] || [ -L "$STATE/.control-t1.lock" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || fail "t1's control lock stayed held after the watcher stopped"
+    sleep 0.2
+  done
+}
 xl_merge_wakes() { { grep -F 'check: merge landed: t1 ' "$STATE/.wake-queue" 2>/dev/null || true; } | wc -l | tr -d ' '; }
 
 test_xlane_late_teardown_failure_reports_the_merge_once() {
-  local rc=0 cursor="$STATE/.status-presentation-cursor"
+  local rc=0 cursor
   make_xlane_world
+  cursor="$STATE/.status-presentation-cursor"
   printf 'done [at=%s]: PR %s head %s\n' "$NOW" "$XL_PR" "$XL_HEAD" >> "$STATE/t1.status"
   xl_env "$BIN_DIR/fm-pr-check.sh" t1 "$XL_PR" > "$W/pr-check.out" 2>&1 || fail "the worker's fm-pr-check.sh was refused: $(cat "$W/pr-check.out")"
   xl_merge_in_lane_m
@@ -3552,6 +3561,7 @@ test_xlane_late_teardown_failure_reports_the_merge_once() {
   # stops at the status retirement, after the poll cleanup and before the record goes.
   cp "$cursor" "$W/cursor.saved" 2>/dev/null || : > "$W/cursor.saved"
   printf 'bogus\tident\tnot-an-offset\t0\n' >> "$cursor"
+  xl_wait_control_free
   xl_env FM_MERGE_PRUNE=0 "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$W/teardown.err" || rc=$?
   cp "$W/cursor.saved" "$cursor"
   xl_print_state "after the late teardown failure"
@@ -3564,6 +3574,7 @@ test_xlane_late_teardown_failure_reports_the_merge_once() {
   XL_BOUND=8 XL_MERGE_PRUNE=0 xl_supervise_until false || true
   [ "$(xl_event_count task.merged)" -eq 1 ] || fail "the merge was reported twice to the ledger: $(xl_ledger_events)"
   [ "$(xl_merge_wakes)" -le 1 ] || fail "the merge raised a second wake"
+  xl_wait_control_free
   xl_plain_teardown "$W/retry.err" || fail "the retried teardown failed: $(tail -3 "$W/retry.err")"
   [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.pr-poll-merge-notified" ] || fail "the retried teardown left the record or the marker"
   assert_nothing_forced "xlane late failure"
@@ -3621,6 +3632,47 @@ test_xlane_protections_still_refuse() {
   assert_nothing_forced "xlane conflicting owner merged"
   cleanup_workers
   pass "a merged cross-lane PR with a resolving branch, link and pr= never turns a changed file, an unlanded commit or a conflicting slot owner into a removal"
+}
+
+# Another lane merges t1's PR and the copy still holds work the merged head does
+# not carry. O's own merge prune runs plain teardown, which refuses, and keeps the
+# refusal; the ledger row that owns the task (unlanded_commit for the commit,
+# pending_acceptance for the changed file) carries that exact refusal text.
+test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row() {
+  local what reason ledger category
+  for what in unlanded-commit dirty; do
+    xl_protection_case "$what"
+    printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$STATE/t1.pr-poll-merge-notified"
+    chmod 0600 "$STATE/t1.pr-poll-merge-notified"
+    prune_real arm t1
+    prune_real run t1 --now > /dev/null 2>&1
+    [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "$what: the prune removed unsafe work"
+    grep -qx 'state=retained' "$STATE/t1.merge-prune" || fail "$what: the prune kept no refusal: $(cat "$STATE/t1.merge-prune" 2>/dev/null)"
+    reason=$(sed -n 's/^reason=//p' "$STATE/t1.merge-prune")
+    [ -n "$reason" ] || fail "$what: the kept record names no refusal"
+    printf '%s: kept refusal: %s\n' "$what" "$reason"
+    python3 - "$W" "$XL_HEAD" "$(git -C "$W/project" rev-parse origin/main)" "$XL_PR" <<'PYJ'
+import json, sys
+w, head, base, pr7 = sys.argv[1:]
+pull = dict(number=7, html_url=pr7, state='open', draft=False, merged_at=None, updated_at='2026-11-03T00:00:00Z',
+            head=dict(sha=head, ref='fm/t1'), base=dict(sha=base, ref='main'))
+json.dump(dict(pulls=[pull], checks={}, single={'7': pull}), open(w + '/rest.json', 'w'))
+PYJ
+    xl_install_rest_double
+    git -C "$W/project" remote set-url origin https://github.com/acme/widget.git
+    ledger="$W/ledger-$what.json"
+    xl_env GIT_CONFIG_COUNT=1 "GIT_CONFIG_KEY_0=url.$ORIGIN.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/acme/widget.git \
+      "$ROOT/bin/fm-open-loops.sh" --json > "$ledger" 2> "$W/ledger.err" || fail "$what: the ledger failed: $(cat "$W/ledger.err")"
+    category=unlanded_commit
+    [ "$what" != dirty ] || category=pending_acceptance
+    jq -r '.rows[] | select(.subject == "t1") | [.category, .owner, .next_action] | @tsv' "$ledger"
+    jq -e --arg c "$category" --arg r "$reason" \
+      'any(.rows[]; .subject == "t1" and .category == $c and (.next_action | contains($r)) and (.evidence | contains($r[0:120])))' \
+      "$ledger" > /dev/null || fail "$what: the $category row for t1 does not carry the kept refusal: $(jq -c '[.rows[] | select(.subject == "t1")]' "$ledger")"
+    assert_nothing_forced "xlane refused prune $what"
+    cleanup_workers
+  done
+  pass "a merged cross-lane PR whose copy still holds unlanded or changed work keeps the prune's refusal text on the task's ledger row"
 }
 
 # --- the owner's representative scenario (V5) ---------------------------------------
@@ -3978,6 +4030,7 @@ ALL_TESTS=(
   test_xlane_same_lane_path_completes_as_before
   test_xlane_late_teardown_failure_reports_the_merge_once
   test_xlane_protections_still_refuse
+  test_xlane_refused_prune_keeps_its_reason_on_the_ledger_row
   test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
 )
 if [ "$#" -gt 0 ]; then
