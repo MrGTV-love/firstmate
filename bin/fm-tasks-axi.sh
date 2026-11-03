@@ -435,24 +435,29 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
 # command substitution, so both values reach the caller.
 REMOTE_ITEM_STATE=
 REMOTE_ITEM_ERROR=
-# True when a remote registry record can only reach this very backlog: its host
-# is this machine (a loopback name, this machine's own name, or an SSH alias that
-# resolves to one of them) and its home holds the same data directory or
-# backlog file this operation addresses. A move to the item itself is no move.
-remote_is_this_backlog() {  # <host> <home>
-  local host=$1 home=$2 name resolved here=0
-  case "$home" in /*) ;; *) return 1 ;; esac
-  [ "$home/data" -ef "$DATA" ] || { [ -e "$home/data/backlog.md" ] && [ "$home/data/backlog.md" -ef "$DATA/backlog.md" ]; } || return 1
-  resolved=$("${FM_SSH_BIN:-ssh}" -G "$host" 2>/dev/null </dev/null | sed -n 's/^hostname //p' | sed -n '1p') || resolved=
-  for name in "$host" "$resolved"; do
-    [ -n "$name" ] || continue
-    case "$name" in
-      localhost|localhost.*|127.*|::1|\[::1\]) here=1 ;;
-    esac
-    [ "$name" != "$(hostname 2>/dev/null)" ] || here=1
-    [ "$name" != "$(hostname -s 2>/dev/null)" ] || here=1
-  done
-  [ "$here" = 1 ]
+# A move may close the source item only when the target is proved to be a
+# different physical backlog. The proof is the backlog's own identity (machine,
+# canonical data directory, device and inode), read through the same transport
+# that reads the target's item, and never a host name or an address.
+# Returns 0 for a proved different backlog, 1 for the same backlog, and 2 when
+# either identity cannot be read. Sets IDENTITY_ERROR on 2.
+IDENTITY_ERROR=
+identity_complete() {  # <identity text>
+  printf '%s\n' "$1" | grep -q '^machine=.' || return 1
+  printf '%s\n' "$1" | grep -q '^data=/' || return 1
+  printf '%s\n' "$1" | grep -q '^dev_ino=[0-9]*:[0-9]*$'
+}
+remote_backlog_differs() {  # <home>
+  local mine theirs
+  IDENTITY_ERROR=
+  mine=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-backlog-identity.sh" 2>&1 </dev/null) \
+    || { IDENTITY_ERROR="cannot read this backlog's identity: $(printf '%s\n' "$mine" | sed -n '1p')"; return 2; }
+  theirs=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-on.sh" "$1" fm-backlog-identity.sh 2>&1 </dev/null) \
+    || { IDENTITY_ERROR="cannot read $1's backlog identity: $(printf '%s\n' "$theirs" | sed -n '1p')"; return 2; }
+  if ! identity_complete "$mine"; then IDENTITY_ERROR="this backlog's identity is not complete"; return 2; fi
+  if ! identity_complete "$theirs"; then IDENTITY_ERROR="the identity answered by $1 is not complete"; return 2; fi
+  [ "$mine" != "$theirs" ]
 }
 
 remote_item_state() {  # <home> <item>
@@ -554,9 +559,12 @@ guard_closing_proof() {
     secondmate_registry_line_for_id "$DATA/secondmates.md" "$home_id" \
       || backlog_refuse backlog-close-moved-to home-not-registered "one registered home" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is not one registered home in $DATA/secondmates.md"
     if [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ]; then
-      if remote_is_this_backlog "$SECONDMATE_REGISTRY_HOST" "$SECONDMATE_REGISTRY_HOME"; then
-        backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id reaches this backlog itself (host $SECONDMATE_REGISTRY_HOST, home $SECONDMATE_REGISTRY_HOME); a moved item must live in a different backlog"
-      fi
+      remote_backlog_differs "$home_id"
+      case $? in
+        0) ;;
+        1) backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id reaches this backlog itself (the same machine, data directory and inode); a moved item must live in a different backlog" ;;
+        *) backlog_source_stop backlog-close-moved-to "cannot prove $home_id is a different backlog, so nothing was closed: $IDENTITY_ERROR" ;;
+      esac
       remote_item_state "$home_id" "$item"
       case $? in
         0) dest_state=$REMOTE_ITEM_STATE ;;
@@ -797,41 +805,119 @@ list_ids() {
   awk '/^  [^ ]/ { sub(/^  /, ""); n = index($0, ","); if (n > 0) print substr($0, 1, n - 1) }'
 }
 
-# The add's own output could not be read. Find the item it filed by comparing the
-# backlog now with the ids the duplicate check saw before the add. Sets ADDED_ID
-# to the one new id; returns 1, naming the candidate items and removing nothing,
-# when the add cannot be tied to exactly one new item.
+# Each add carries an attribution token the add itself writes: a hidden comment
+# at the end of the item's body. When tasks-axi's answer cannot be read, the new
+# item is claimed only if its stored body carries this invocation's token, so a
+# second writer's item is never recorded as this add's and never removed by it.
+ADD_NONCE=
+ADD_BODY_TMP=
+ADD_HAD_BODY=0
+
+# Rewrite ARGS so the body (from --body or --body-file, or empty) ends with the
+# token, through one scratch --body-file. A body given to a flag pair that cannot
+# be read cleanly is left alone, and the add then has no token to prove itself.
+tag_add_body() {
+  local args=("${ARGS[@]}") kept=() i=0 token body='' have_body=0 body_file=''
+  ADD_NONCE=$(python3 -c 'import secrets; print(secrets.token_hex(12))' 2>/dev/null) || ADD_NONCE=
+  [ -n "$ADD_NONCE" ] || return 0
+  while [ "$i" -lt "${#args[@]}" ]; do
+    token=${args[$i]}
+    case "$token" in
+      --body) body=${args[$((i + 1))]:-}; have_body=$((have_body + 1)); i=$((i + 2)); continue ;;
+      --body=*) body=${token#*=}; have_body=$((have_body + 1)); i=$((i + 1)); continue ;;
+      --body-file) body_file=${args[$((i + 1))]:-}; have_body=$((have_body + 1)); i=$((i + 2)); continue ;;
+      --body-file=*) body_file=${token#*=}; have_body=$((have_body + 1)); i=$((i + 1)); continue ;;
+    esac
+    kept+=("$token")
+    i=$((i + 1))
+  done
+  if [ "$have_body" -gt 1 ]; then ADD_NONCE=; return 0; fi
+  ADD_HAD_BODY=$have_body
+  ADD_BODY_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-body.XXXXXX" 2>/dev/null) || { ADD_NONCE=; return 0; }
+  if [ -n "$body_file" ]; then
+    cat -- "$body_file" > "$ADD_BODY_TMP" 2>/dev/null || { rm -f -- "$ADD_BODY_TMP"; ADD_BODY_TMP=; ADD_NONCE=; return 0; }
+  else
+    printf '%s' "$body" > "$ADD_BODY_TMP"
+  fi
+  [ ! -s "$ADD_BODY_TMP" ] || printf '\n' >> "$ADD_BODY_TMP"
+  printf '<!-- fm-add:%s -->\n' "$ADD_NONCE" >> "$ADD_BODY_TMP"
+  ARGS=("${kept[@]}" --body-file "$ADD_BODY_TMP")
+}
+
+# The stored text of one item, read the way the other backlog reads are.
+item_text() {  # <id>
+  fm_backlog_tasks_axi_addressing "$DATA" || return 1
+  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
+    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && fm_tasks_axi show "$1" --full --file "$FM_BACKLOG_AXI_FILE" 2>&1)
+  else
+    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && fm_tasks_axi show "$1" --full 2>&1)
+  fi
+}
+
+# Print the add's answer without the token, so the caller sees what tasks-axi
+# would have printed for the body it gave (a body-less add still shows no body).
+print_add_answer() {  # <captured-add-stdout-file>
+  if [ -z "$ADD_NONCE" ]; then cat -- "$1"; return; fi
+  python3 -I -c '
+import re, sys
+text = sys.stdin.read()
+token = r"(?:\\n)?<!-- fm-add:" + re.escape(sys.argv[1]) + r" -->"
+text = re.sub(token, "", text)
+if sys.argv[2] == "0":
+    text = text.replace(chr(34) + "body" + chr(34) + ": " + chr(34) + chr(34), chr(34) + "body" + chr(34) + ": null")
+sys.stdout.write(text)
+' "$ADD_NONCE" "$ADD_HAD_BODY" < "$1" || cat -- "$1"
+}
+
+# The add's own answer could not be read. Claim the item this invocation filed by
+# its token, never by "the only new id". Sets ADDED_ID, or leaves it empty when
+# nothing new was filed (the id already existed). Returns 1, changing nothing,
+# when the item cannot be proved to be this add's.
 recover_added_id() {
-  local after new count
+  local after new id text proven='' count=0 unproven
   ADDED_ID=
-  if after=$(fm_backlog_row_list "$DATA") && [ -n "${ADD_PRE_IDS+x}" ]; then
-    new=$(printf '%s\n' "$after" | list_ids | grep -Fxv -f <(printf '%s\n' "$ADD_PRE_IDS") || true)
-    count=$(printf '%s' "$new" | grep -c . || true)
-    if [ "$count" -eq 1 ]; then
-      ADDED_ID=$new
-      return 0
-    fi
-    new=$(printf '%s' "$new" | tr '\n' ' ' | sed 's/ $//')
-    printf 'fm-tasks-axi: the answer of the add%s could not be read, and the backlog now holds %s new items (%s), so no objective was recorded; check them with tasks-axi list and data/backlog-review.tsv\n' \
-      "${ADD_ID:+ of $ADD_ID}" "$count" "${new:-none}" >&2
+  # A named id that existed before the add was not filed by it.
+  if [ -n "$ADD_ID" ] && printf '%s\n' "$ADD_PRE_IDS" | grep -Fxq -- "$ADD_ID"; then
+    return 0
+  fi
+  if [ -z "$ADD_NONCE" ] || [ -z "${ADD_PRE_IDS+x}" ] || ! after=$(fm_backlog_row_list "$DATA"); then
+    printf 'fm-tasks-axi: the answer of the add%s could not be read and this add cannot be tied to an item, so no objective was recorded and nothing was changed; check %s with tasks-axi list and data/backlog-review.tsv\n' \
+      "${ADD_ID:+ of $ADD_ID}" "${ADD_ID:-the new item}" >&2
     return 1
   fi
-  printf 'fm-tasks-axi: the answer of the add%s could not be read and the backlog could not be listed, so no objective was recorded; check %s with tasks-axi list and data/backlog-review.tsv\n' \
-    "${ADD_ID:+ of $ADD_ID}" "${ADD_ID:-the new item}" >&2
+  new=$(printf '%s\n' "$after" | list_ids | grep -Fxv -f <(printf '%s\n' "$ADD_PRE_IDS") || true)
+  for id in $new; do
+    if text=$(item_text "$id") && printf '%s' "$text" | grep -Fq -- "fm-add:$ADD_NONCE"; then
+      proven=$id
+      count=$((count + 1))
+    fi
+  done
+  if [ "$count" -eq 1 ]; then
+    ADDED_ID=$proven
+    return 0
+  fi
+  unproven=$(printf '%s' "$new" | tr '\n' ' ' | sed 's/ $//')
+  printf 'fm-tasks-axi: the answer of the add%s could not be read, and no new item (%s) carries this add'"'"'s token, so the objective could not be tied to one of them and nothing was changed; check them with tasks-axi list and data/backlog-review.tsv\n' \
+    "${ADD_ID:+ of $ADD_ID}" "${unproven:-none}" >&2
   return 1
 }
 
 # One line per filed item in data/backlog-review.tsv: id, review-by (empty),
-# objective, and reason. A row that cannot be written removes the item again, an
-# add whose answer cannot be read is matched to the one new item by id, and an add
-# that cannot be matched fails, naming the items to check, and removes nothing.
+# objective, and reason. A row that cannot be written removes the item again, but
+# only an item proved to be this add's: its own answer names it, or its stored body
+# carries this add's token. An add that cannot be proved fails, naming the items to
+# check, and removes nothing.
 intake_record() {  # <captured-add-stdout-file>
   local reason row status=0
   added_fields "$1" || status=$?
   case "$status" in
     0) ;;
     3) return 0 ;;
-    *) recover_added_id || return 1 ;;
+    *)
+      recover_added_id || return 1
+      # Nothing new was filed (the id already existed): there is no row to write.
+      [ -n "$ADDED_ID" ] || return 0
+      ;;
   esac
   reason=$(printf '%s' "$ADD_REASON" | tr '\t\n' '  ')
   row=$(printf '%s\t\t%s\t%s' "$ADDED_ID" "$ADD_OBJECTIVE" "$reason")
@@ -1053,17 +1139,18 @@ case "$TASK_COMMAND" in
       # need the id tasks-axi stored, and a failed capture must not file unrecorded.
       add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null) \
         || fail "cannot create a scratch file to record the add's objective"
+      tag_add_body
       tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$add_out"
       add_status=$?
       if [ "$add_status" -eq 0 ] && ! intake_record "$add_out"; then
-        rm -f -- "$add_out"
+        rm -f -- "$add_out" ${ADD_BODY_TMP:+"$ADD_BODY_TMP"}
         exit 1
       fi
-      cat -- "$add_out"
+      print_add_answer "$add_out"
       if [ "$add_status" -eq 0 ]; then
         [ ! -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] || ledger_task_filed "$add_out" || true
       fi
-      rm -f -- "$add_out"
+      rm -f -- "$add_out" ${ADD_BODY_TMP:+"$ADD_BODY_TMP"}
       exit "$add_status"
     fi
     ;;

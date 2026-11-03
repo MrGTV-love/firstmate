@@ -455,6 +455,9 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   An add names `--objective O1` to `O7`, the ids [`docs/objectives.md`](objectives.md) lists, or `--objective none --objective-reason "<why>"`.
   An unknown id, or `none` with no reason, is refused, and so is an add with no objective at all.
   Each filed item adds one tab-separated line to `data/backlog-review.tsv` in the data directory the add addresses: `id`, `review-by` (left empty), `objective`, and `reason`.
+  Each add ends the item's body with a hidden comment, `<!-- fm-add:<token> -->`, the attribution token of that one invocation; the add's printed answer does not show it.
+  When tasks-axi's answer cannot be read, the wrapper claims a new item only if its stored body carries the token, so it never records or removes another writer's item.
+  An add it cannot prove fails without changing anything and names the items to check.
   tasks-axi has no field for these values.
   The line is written for the id tasks-axi stored, a minted one included.
   An add stops before filing when the file cannot take a line, and an item whose line fails to write is removed again.
@@ -487,8 +490,10 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered exactly once in the `data/secondmates.md` of the operation's own data directory, when that home's own backlog, a different one from this, holds `<item-id>` open.
   A local home is read through tasks-axi in its own data directory.
   A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
-  A remote record whose host is this machine (a loopback name, this machine's own name, or an SSH alias that resolves to one of them) and whose home holds this very backlog is the same backlog and proves nothing; the same path on another host is a different backlog.
-  A different name for this machine that neither the record nor `ssh -G` resolves to one of those is not recognized, so register such a home as a local home.
+  A move closes the source item only when two things are proved: the target is a different physical backlog, and the target's backlog holds the item open.
+  The first proof is the backlog's own identity, which is the machine id, the canonical data directory and its device and inode, printed by [`bin/fm-backlog-identity.sh`](../bin/fm-backlog-identity.sh) and read through the same transport that reads the item, never judged from a host name or an address.
+  The same machine, directory and inode is the same backlog, whatever name reaches it, and an identity that cannot be read or is not complete refuses the move.
+  The same path on another machine is a different backlog.
   Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
   A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
   For `--duplicate-of`, every dependent, held or not, is re-pointed with `block <dependent> --by <kept-id>` and then `unblock <dependent> --by <id>`; the kept item itself needs only the unblock step.

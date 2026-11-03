@@ -1433,15 +1433,86 @@ test_add_keeps_its_row_when_the_answer_cannot_be_read() {
   id=$ids
   assert_grep "$id" "$dir/home/data/backlog.md" "the minted row names an id that is not in the backlog"
   assert_contains "$rows" "$(printf '%s\t\tO4\t' "$id")" "the minted add recorded the wrong objective"
-  # A repeat add of an existing id leaves no new item to tie the objective to: it
-  # fails, names what to check, adds no row, and removes nothing.
-  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 2>&1) \
-    && fail "a repeat add with an unreadable answer succeeded: $out"
-  assert_contains "$out" "0 new items (none)" "the failure did not say no new item appeared"
-  assert_contains "$out" "of cap-plain" "the failure did not name the item to check"
+  # A repeat add of an existing id filed nothing: it succeeds, adds no row, removes nothing.
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 >/dev/null 2>&1 \
+    || fail "a repeat add of an existing id failed when its answer could not be read"
   assert_equals 3 "$(wc -l < "$dir/home/data/backlog-review.tsv" | tr -d ' ')" "a repeat add of an existing id added a row"
   assert_grep "cap-plain" "$dir/home/data/backlog.md" "the failed repeat add removed the existing item"
-  pass "an add whose answer cannot be read still gets its objective row, and an add tied to no new item fails and removes nothing"
+  pass "an add whose answer cannot be read still gets its objective row, and a repeat add of an existing id adds none and removes nothing"
+}
+
+# Two writers at once. The wrapper claims an item only by the token its own add
+# wrote into the item, so a second writer's item is never given this add's
+# objective and is never removed by this add's rollback. A shim runs a real second
+# add of `other-b` (objective O7) right after the first add's own tasks-axi call,
+# while every `python3 -I` call of the first add fails (its answer cannot be read).
+make_interleave_shims() {  # <case-dir> <fakebin> <trigger-id> [strip-body]
+  local dir=$1 fakebin=$2 trigger=$3 strip=${4:-} real
+  real=$(command -v tasks-axi)
+  # shellcheck disable=SC2016 # the shim's own "$1" and "$@" must stay literal
+  printf '#!/bin/sh\nif [ "$1" = -I ]; then exit 1; fi\nexec %s "$@"\n' "$(command -v python3)" > "$fakebin/python3"
+  chmod +x "$fakebin/python3"
+  cat > "$fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = add ] && [ "\${2:-}" = $trigger ]; then
+  args=("\$@")
+  if [ -n "$strip" ]; then
+    kept=()
+    skip=0
+    for a in "\${args[@]}"; do
+      if [ "\$skip" = 1 ]; then skip=0; continue; fi
+      if [ "\$a" = --body-file ]; then skip=1; continue; fi
+      kept+=("\$a")
+    done
+    args=("\${kept[@]}")
+  fi
+  "$real" "\${args[@]}"
+  rc=\$?
+  (cd "$dir/code" && PATH="$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" add other-b "$(ftitle other-b)" --objective O7 >/dev/null 2>&1) || exit 91
+  if [ -f "$dir/break-sidecar" ]; then rm -f "$dir/home/data/backlog-review.tsv"; mkdir "$dir/home/data/backlog-review.tsv"; fi
+  exit "\$rc"
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/tasks-axi"
+}
+
+test_add_claims_only_the_item_its_own_token_marks() {
+  local dir fakebin out rc
+  # 1. The named id already exists: nothing was filed, and the other writer's row is not rewritten.
+  dir=$(make_split objective-token-existing)
+  wrapper_from_code "$dir" add existing-a "$(ftitle existing-a)" --objective O1 >/dev/null || fail "could not file existing-a"
+  fakebin=$(fm_fakebin "$dir")
+  make_interleave_shims "$dir" "$fakebin" existing-a
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add existing-a "$(ftitle existing-a)" --objective O2 >/dev/null 2>&1 \
+    || fail "a repeat add of an existing id failed beside another writer"
+  assert_equals 1 "$(grep -c '^other-b' "$dir/home/data/backlog-review.tsv")" "the other writer's row was written more than once"
+  assert_contains "$(cat "$dir/home/data/backlog-review.tsv")" "$(printf 'other-b\t\tO7\t')" "the other writer lost its own row"
+  assert_no_grep "$(printf 'other-b\t\tO2')" "$dir/home/data/backlog-review.tsv" "the other writer's item got this add's objective"
+  # 2. A new named id beside the other writer, with the sidecar breaking after both adds:
+  #    only this add's own item is rolled back, the other writer's item stays.
+  dir=$(make_split objective-token-rollback)
+  fakebin=$(fm_fakebin "$dir")
+  make_interleave_shims "$dir" "$fakebin" new-c
+  : > "$dir/break-sidecar"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add new-c "$(ftitle new-c)" --objective O2 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an add whose row could not be written reported success: $out"
+  assert_no_grep "new-c" "$dir/home/data/backlog.md" "this add's own item was not rolled back"
+  assert_grep "other-b" "$dir/home/data/backlog.md" "the other writer's item was removed by this add"
+  rmdir "$dir/home/data/backlog-review.tsv"
+  # 3. The item carries no token (the body never reached it): nothing can be proved, so nothing changes.
+  dir=$(make_split objective-token-missing)
+  fakebin=$(fm_fakebin "$dir")
+  make_interleave_shims "$dir" "$fakebin" ghost-c strip
+  rc=0
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add ghost-c "$(ftitle ghost-c)" --objective O2 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an add that could not be proved reported success: $out"
+  assert_contains "$out" "nothing was changed" "an unproved add did not say it changed nothing"
+  assert_grep "ghost-c" "$dir/home/data/backlog.md" "an unproved add removed its item"
+  assert_grep "other-b" "$dir/home/data/backlog.md" "an unproved add removed the other writer's item"
+  assert_no_grep "ghost-c" "$dir/home/data/backlog-review.tsv" "an unproved add recorded a row"
+  pass "an add claims only the item its own token marks: it never records or removes another writer's item and changes nothing when it cannot prove its item"
 }
 
 # A title with no searchable word has nothing to compare, but a malformed or
@@ -1473,22 +1544,34 @@ test_empty_search_words_still_check_the_sources() {
 # not prove a move: the item would close with nothing delivered anywhere. The same
 # path on a different host is a different backlog and still proves the move.
 test_moved_to_refuses_a_remote_alias_of_this_backlog() {
-  local dir out fakebin
+  local dir out fakebin alias
   dir=$(make_split proof-moved-loopback)
   fakebin=$(fm_fakebin "$dir")
   make_fake_ssh "$fakebin"
   make_peer_home "$dir/remote-fs$dir/home" lb-item
   {
     printf -- '- sm-loop - Loopback alias of this home (host: localhost; root: %s; home: %s; scope: loop scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
+    printf -- '- sm-v6 - An alias that resolves to the expanded IPv6 loopback of this home (host: loopv6; root: %s; home: %s; scope: v6 scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
+    printf -- '- sm-name - Another name for this machine (host: studio-two.example; root: %s; home: %s; scope: name scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
     printf -- '- sm-far - Same path on another host (host: far-box; root: %s; home: %s; scope: far scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
   } > "$dir/home/data/secondmates.md"
   wrapper_from_code "$dir" add lb-item "$(ftitle lb-item)" --objective O7 --kind ship >/dev/null || fail "could not file the item"
-  out=$(FM_SSH_BIN="$fakebin/fake-ssh" FAKE_REMOTE_PREFIX="" wrapper_from_code "$dir" "done" lb-item --moved-to sm-loop lb-item 2>&1) && fail "a loopback alias of this backlog proved a move to itself: $out"
-  assert_contains "$out" "this backlog itself" "the loopback alias was not named"
-  [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed on a move to itself"
+  # Any name that reaches this backlog is refused, whatever its host looks like.
+  for alias in sm-loop sm-v6 sm-name; do
+    out=$(FM_SSH_BIN="$fakebin/fake-ssh" FAKE_REMOTE_PREFIX="" wrapper_from_code "$dir" "done" lb-item --moved-to "$alias" lb-item 2>&1) && fail "$alias proved a move to the item itself: $out"
+    assert_contains "$out" "this backlog itself" "$alias was not named as this backlog"
+    [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed on a move through $alias"
+  done
+  # An identity that cannot be read or is not an identity proves nothing: nothing closes.
+  out=$(FAKE_SSH_MODE=garbled moved_close "$dir" lb-item sm-far lb-item) && fail "a remote answer that is not an identity proved a move: $out"
+  assert_contains "$out" "cannot prove sm-far is a different backlog" "an unreadable identity was not named"
+  out=$(FAKE_SSH_MODE=unreachable moved_close "$dir" lb-item sm-far lb-item) && fail "an unreachable remote proved a move: $out"
+  assert_contains "$out" "cannot prove sm-far is a different backlog" "an unreachable identity was not named"
+  [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed without a proved identity"
+  # The same path on another host is a different backlog and still proves the move.
   out=$(moved_close "$dir" lb-item sm-far lb-item) || fail "the same path on another host was refused: $out"
   [ "$(row_state "$dir" lb-item)" = x ] || fail "the move to another host did not close the item"
-  pass "a remote alias of this backlog cannot prove a move, while the same path on another host still can"
+  pass "a move closes the source only when the target's own identity, read through the transport, is a different backlog and the target holds the item open"
 }
 
 # A fake non-Markdown adapter: tasks-axi answers from files under .stubdata when
@@ -2079,6 +2162,7 @@ home=$(printf '%s' "$5" | base64 -d)
 argv=()
 while IFS= read -r -d '' a; do argv+=("$a"); done < <(printf '%s' "$6" | base64 -d)
 cmd=${argv[0]}
+[ "${FAKE_SSH_MODE:-}" != garbled-item ] || [ "$cmd" != fm-tasks-axi.sh ] || { echo 'welcome to far-box'; exit 0; }
 unset 'argv[0]'
 exec env -i PATH="$PATH" HOME="$HOME" FM_HOME="${FAKE_REMOTE_PREFIX:-}$home" "$root/bin/$cmd" "${argv[@]}"
 SH
@@ -2145,7 +2229,7 @@ test_moved_to_closes_on_checked_proof() {
   assert_contains "$out" "cannot read sm-far's backlog" "an unreachable remote home was not named"
   out=$(FAKE_SSH_MODE=refused moved_close "$dir" mv-item0 sm-far mv-far) && fail "a remote error was accepted"
   assert_contains "$out" "remote says: backlog is locked" "the remote's own error was lost"
-  out=$(FAKE_SSH_MODE=garbled moved_close "$dir" mv-item0 sm-far mv-far) && fail "a remote answer that is not a task record was accepted"
+  out=$(FAKE_SSH_MODE=garbled-item moved_close "$dir" mv-item0 sm-far mv-far) && fail "a remote answer that is not a task record was accepted"
   assert_contains "$out" "the answer from sm-far is not a task record" "the not-a-record reason was lost"
   out=$(moved_close "$dir" mv-item0 sm-far mv-decoy) && fail "a local decoy path counted for a remote home"
   assert_contains "$out" "has no item mv-decoy" "the decoy local path was read"
@@ -2536,6 +2620,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_failed_row_write_removes_the_filed_item
   test_json_add_records_its_objective_without_jq
   test_add_keeps_its_row_when_the_answer_cannot_be_read
+  test_add_claims_only_the_item_its_own_token_marks
   test_empty_search_words_still_check_the_sources
   test_add_judges_near_duplicate_titles
   test_add_backend_value_and_piped_body_file
