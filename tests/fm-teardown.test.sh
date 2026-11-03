@@ -4266,6 +4266,117 @@ test_train_route_never_reads_the_run_record() {
   pass "the train route never reads the run record, so a silent reader neither delays nor admits it"
 }
 
+# Reachability from the default branch is not a carry proof (Main 3237 F1): an
+# `ours` merge puts a commit in the default history without its change. Each case
+# below hides one commit K that the flat train never carried behind such a merge,
+# so the helper that skipped default-reachable commits proved the rest and
+# accepted. K sits under the member's replayed commits, so they stay candidates.
+
+# train_ours_merge_into_main <case-dir> <origin ref>: merge that ref into origin's
+# main with the ours strategy, then fetch main into the project and the copy.
+train_ours_merge_into_main() {
+  local case_dir=$1 ref=$2 tmp="$1/_ours"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" merge -q -s ours --no-edit "origin/${ref#refs/heads/}" >/dev/null
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  [ ! -d "$case_dir/wt" ] || git -C "$case_dir/wt" fetch -q origin
+}
+
+# train_hide_commit <case-dir> <member|copy>: build K (extra.txt on the old main)
+# followed by the member's two commits replayed, push K as a branch, and hide K
+# in main behind an ours merge. "member" publishes the rebuilt head as the member
+# PR head (TRAIN_MEMBER_HEAD changes); "copy" leaves the member alone and sets
+# HIDDEN_COPY_HEAD for the caller to reset the copy to. Sets HIDDEN_COMMIT.
+train_hide_commit() {
+  local case_dir=$1 target=$2 tmp="$1/_member" rebuilt
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" fetch -q origin refs/pull/7/head
+  git -C "$tmp" checkout -q -b hidden origin/main~1
+  printf '%s\n' hidden > "$tmp/extra.txt"
+  git -C "$tmp" add -- extra.txt
+  git -C "$tmp" commit -q -m "hidden follow-up"
+  HIDDEN_COMMIT=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/heads/hidden-k"
+  git -C "$tmp" cherry-pick "$TRAIN_MEMBER_HEAD~1" "$TRAIN_MEMBER_HEAD" >/dev/null
+  rebuilt=$(git -C "$tmp" rev-parse HEAD)
+  case "$target" in
+    member)
+      TRAIN_MEMBER_HEAD=$rebuilt
+      git -C "$tmp" push -q -f origin "HEAD:refs/pull/7/head" ;;
+    copy)
+      HIDDEN_COPY_HEAD=$rebuilt
+      git -C "$tmp" push -q origin "HEAD:refs/heads/hidden-copy" ;;
+    *) fail "train_hide_commit: unknown target $target" ;;
+  esac
+  rm -rf "$tmp"
+  train_ours_merge_into_main "$case_dir" refs/heads/hidden-k
+  git -C "$case_dir/project" fetch -q origin refs/pull/7/head
+  [ ! -d "$case_dir/wt" ] || git -C "$case_dir/wt" fetch -q origin refs/pull/7/head
+}
+
+test_train_ours_merged_commit_in_a_copy_never_counts_as_carried() {
+  local copy_head
+  # Copy route: the copy is K plus the member's replayed commits.
+  train_case train-ours-copy none head "" flat
+  train_hide_commit "$TRAIN_CASE" copy
+  git -C "$TRAIN_CASE/wt" reset -q --hard "$HIDDEN_COPY_HEAD"
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$HIDDEN_COMMIT" origin/main \
+    || fail "train-ours-copy: the hidden commit is not reachable from the default branch"
+  if git -C "$TRAIN_CASE/wt" cat-file -e "origin/main:extra.txt" 2>/dev/null; then
+    fail "train-ours-copy: the default branch holds the hidden change"
+  fi
+  assert_train_refused "$TRAIN_CASE" "train-ours-copy" "copy's work is not proven present"
+  assert_grep "hidden follow-up" "$TRAIN_CASE/stderr" "train-ours-copy: refusal did not name the hidden commit"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-copy: the train was accepted"
+  [ "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" = "$copy_head" ] || fail "train-ours-copy: refusal moved the copy"
+  pass "a commit hidden in the default history by an ours merge is not carried by the train, in the copy route"
+}
+
+test_train_ours_merged_commit_in_a_member_never_counts_as_carried() {
+  # Record-only route: the listed member head holds K, which the train never carried.
+  train_absent_case train-ours-record flat
+  train_hide_commit "$TRAIN_CASE" member
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  train_default_list "$TRAIN_CASE"
+  assert_train_refused "$TRAIN_CASE" "train-ours-record" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-ours-record: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-ours-record: refusal closed the backlog"
+  pass "a commit hidden in the default history by an ours merge is not carried by the train, in the record-only route"
+}
+
+# The same rule must still accept work the train genuinely carries, also when the
+# default history holds an ours merge of some unrelated commit.
+test_train_flat_carried_work_is_accepted_beside_an_ours_merge() {
+  local tmp
+  train_case train-ours-carried none head "" flat
+  tmp="$TRAIN_CASE/_other"
+  git clone -q "$TRAIN_CASE/origin.git" "$tmp"
+  git -C "$tmp" config user.email t@t
+  git -C "$tmp" config user.name t
+  git -C "$tmp" checkout -q -b unrelated origin/main~1
+  printf '%s\n' other > "$tmp/other.txt"
+  git -C "$tmp" add -- other.txt
+  git -C "$tmp" commit -q -m "unrelated work"
+  git -C "$tmp" push -q origin HEAD:refs/heads/unrelated
+  rm -rf "$tmp"
+  train_ours_merge_into_main "$TRAIN_CASE" refs/heads/unrelated
+  assert_train_allowed "$TRAIN_CASE" "train-ours-carried"
+
+  train_absent_case train-ours-carried-record flat
+  run_teardown "$TRAIN_CASE" > "$TRAIN_CASE/stdout" 2> "$TRAIN_CASE/stderr" \
+    || fail "train-ours-carried-record: a carried flat train was refused: $(cat "$TRAIN_CASE/stderr")"
+  assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-ours-carried-record: stderr did not name the train PR"
+  assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-ours-carried-record: accepted teardown left the task record"
+  pass "a flat train that carries every member commit is accepted in both routes beside an ours merge of unrelated work"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -4333,6 +4444,9 @@ test_train_refuses_a_listing_that_is_not_the_members_head
 test_train_refuses_copy_work_the_train_does_not_carry
 test_train_run_record_never_stands_in_for_carried_work
 test_train_route_never_reads_the_run_record
+test_train_ours_merged_commit_in_a_copy_never_counts_as_carried
+test_train_ours_merged_commit_in_a_member_never_counts_as_carried
+test_train_flat_carried_work_is_accepted_beside_an_ours_merge
 test_train_flattened_rebase_carries_the_listed_head
 test_train_flattened_rebase_missing_a_member_commit_refuses
 test_train_flat_missing_with_a_stale_remote_ref_refuses

@@ -67,10 +67,13 @@
 # member PR's recorded head, whose head carries that sha (an ancestor, or every
 # commit of it replayed there by equivalent patch ids, as a flat pipeline rebase
 # leaves it), and whose head carries the copy's work by the same ancestor or
-# rebased-commit proof above (teardown_train_landed owns the rule). The no-mistakes
-# run record is never a train proof: it shows what a run pushed, not that the copy's
-# own commits survived into the train. The record-only routes (copy gone, slot
-# reassigned) apply the same train rule and read no copy. The train is found by searching the forge for the
+# rebased-commit proof above (teardown_train_landed owns the rule), except that a
+# commit reachable from the default branch is not skipped: its own patch must be in
+# the train, because an ours merge makes a commit reachable without its change.
+# The no-mistakes run record is never a train proof: it shows what a run pushed,
+# not that the copy's own commits survived into the train. The record-only routes
+# (copy gone, slot reassigned) apply the same train rule and read no copy.
+# The train is found by searching the forge for the
 # member URL, never by a title, branch name or comment text, and a forge or fetch
 # read that fails is unknown (retry), never landed. The archive-branch reaper
 # keeps its own MERGED-PR proof, so a train member's archive branches stay.
@@ -2451,6 +2454,11 @@ rebased_commits_are_in_pr_head() {
       | sed '/^$/d' \
       | sort -u
   ) || return 1
+  # The train route sets TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP: a commit reachable
+  # from the default branch is then still proven by its own patch, because
+  # reachability alone does not say the train carried it (an `ours` merge puts a
+  # commit in the default history without its change).
+  [ -z "${TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP:-}" ] || default_ref=
   candidates=$(git -C "$dir" rev-list "$current" --not "$pr_head" ${default_ref:+"$default_ref"} -- 2>/dev/null) || return 1
   [ -n "$candidates" ] || return 1
   while IFS= read -r commit; do
@@ -2691,9 +2699,12 @@ pr_is_merged() {
 # the pipeline rebased flat does not contain the member head itself). Work mode (a
 # copy in TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that
 # train head; both tests are teardown_train_carries: an ancestor, or every commit
-# that neither the train head nor the default branch holds proven by the
-# rebased-patch proof pr_is_merged applies to the PR head. No run record stands in
-# for that proof. Record mode (copy gone or slot reassigned) reads no copy.
+# the train head does not hold proven by the rebased-patch proof pr_is_merged
+# applies to the PR head, except that a commit reachable from the default branch
+# is not skipped: reachability does not show the train carried it (an `ours` merge
+# puts a commit in the default history without its change), so its own patch must
+# be among the train head's. No run record stands in for that proof.
+# Record mode (copy gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
 # A forge or fetch read that fails sets TEARDOWN_TRAIN_UNASKED (unknown, retry);
@@ -2706,7 +2717,7 @@ TEARDOWN_TRAIN_PR_URL=
 TEARDOWN_TRAIN_MEMBER_URL=
 # Is <ref> carried by <train head>: an ancestor of it, or its commits replayed there?
 teardown_train_carries() {  # <ref> <train head>
-  local TEARDOWN_LANDED_REF=$1
+  local TEARDOWN_LANDED_REF=$1 TEARDOWN_PATCH_PROOF_NO_DEFAULT_SKIP=1
   TEARDOWN_UNPROVEN_COMMITS=
   git -C "${TEARDOWN_LANDED_DIR:-$WT}" merge-base --is-ancestor "$1" "$2" 2>/dev/null \
     || rebased_commits_are_in_pr_head "$2"
