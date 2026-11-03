@@ -122,14 +122,9 @@ class Replay:
                 messages = [m for m in reversed(here)
                             if not m.get('thread_ts') or m['thread_ts'] == m.get('ts')
                             or m.get('subtype') == 'thread_broadcast']
-                oldest, latest = fields.get('oldest'), fields.get('latest')
-                inclusive = str(fields.get('inclusive')).lower() == 'true'
+                oldest = fields.get('oldest')
                 if oldest:
-                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)
-                                or (inclusive and ts_key(m.get('ts')) == ts_key(oldest))]
-                if latest:
-                    messages = [m for m in messages if ts_key(m.get('ts')) < ts_key(latest)
-                                or (inclusive and ts_key(m.get('ts')) == ts_key(latest))]
+                    messages = [m for m in messages if ts_key(m.get('ts')) > ts_key(oldest)]
             else:
                 root = fields.get('ts')
                 messages = [m for m in here

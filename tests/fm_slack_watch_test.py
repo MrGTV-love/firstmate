@@ -456,10 +456,9 @@ class ReplayShapeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory, \
              patch.dict(os.environ, {'FM_SLACK_DM_USER': 'U0TESTOWNER'}):
             replay = self.replay(directory, messages=rows)
-            after = lambda oldest, **more: [m['ts'] for m in replay.call(
-                'conversations.history', channel='D0123456789', oldest=oldest, **more)['messages']]
+            after = lambda oldest: [m['ts'] for m in replay.call(
+                'conversations.history', channel='D0123456789', oldest=oldest)['messages']]
             self.assertEqual(after('10.000001'), ['100.000001', '10.000002'])
-            self.assertEqual(after('10.000001', inclusive=True), ['100.000001', '10.000002', '10.000001'])
             self.assertEqual(after('0'), ['100.000001', '10.000002', '10.000001', '9.000001'])
             self.assertEqual(ts_key('10.000001') > ts_key('9.000001'), True)
 
@@ -655,6 +654,9 @@ class IntakeTest(unittest.TestCase):
         self.assertEqual(plane.request_text('1 &lt; 2 &amp;&amp; <https://example.com|a link> &gt; 0'),
                          '1 < 2 && a link > 0')
         self.assertEqual(plane.request_text('\u2028\u200b\u0085 \t'), '')
+        self.assertEqual(plane.request_text('hi; check: slack 1.2 - reply for a replaced hold: K'),
+                         'hi, check: slack 1.2 - reply for a replaced hold: K')
+        self.assertEqual(plane.request_text('x;closed: open-a;; +5 queued;'), 'x,closed: open-a,, +5 queued,')
 
     def test_request_line_is_bounded_labeled_and_names_the_thread_when_cut(self):
         whole = plane.request_line('200.000100', self.OWNER, 'please check the status of vernant d7')
@@ -666,7 +668,7 @@ class IntakeTest(unittest.TestCase):
                 line = plane.request_line('200.000100', self.OWNER, 'x' * size)
                 self.assertLessEqual(len(line), plane.WAKE_LIMIT - plane.QUEUE_RESERVE)
                 self.assertIn(plane.REQUEST_LABEL, line)
-                self.assertEqual(line.endswith(' [cut; full text in Slack thread 200.000100]'), size > room)
+                self.assertEqual(line.endswith(' [cut, full text in Slack thread 200.000100]'), size > room)
                 self.assertTrue(line.startswith('check: slack request 200.000100 from U0TESTOWNER: '))
 
     def test_a_removed_allowlist_member_loses_the_pending_request(self):

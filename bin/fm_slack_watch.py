@@ -129,8 +129,9 @@ def ts_key(ts):
 
 def request_text(value):
     """One printable line: Slack's escaping is undone, and every control, format, and
-    separator character (including line breaks such as U+0085 and U+2028) becomes a space."""
-    value = typed_text(value)
+    separator character (including line breaks such as U+0085 and U+2028) becomes a space,
+    and each ';' becomes ','."""
+    value = typed_text(value).replace(';', ',')
     return ' '.join(''.join(' ' if unicodedata.category(ch)[0] in 'CZ' else ch for ch in value).split())
 
 
@@ -139,7 +140,7 @@ def request_line(ts, user, text):
     head = 'check: slack request %s from %s: %s ' % (ts, user, REQUEST_LABEL)
     room = WAKE_LIMIT - QUEUE_RESERVE - len(head)
     if len(text) > room:
-        tail = ' [cut; full text in Slack thread %s]' % ts
+        tail = ' [cut, full text in Slack thread %s]' % ts
         text = text[:max(0, room - len(tail))].rstrip() + tail
     return head + text
 

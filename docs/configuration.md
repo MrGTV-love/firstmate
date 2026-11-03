@@ -3632,10 +3632,11 @@ Option cards retain one short tap-versus-type disagreement line, and missing rea
 Only replies inside the card's thread map to that decision.
 A new top-level message that an allowlisted human types in the main DM window is a request, never an answer: the poll takes it in oldest first within `FM_SLACK_POLL_MAX_ANSWERS`, posts one fixed acknowledgement, which never repeats the text, in a thread on that message, and prints one `check: slack request <ts> from <member id>: <text>` wake line.
 A thread reply, including one also sent to the main window, a bot-marked message, a message from anyone off the allowlist, an edit of a message already taken in, and a message with no text are never requests.
-The text is carried as labeled unverified data on one line, with controls replaced, Slack's escaping undone as for typed answers, and the line cut to the wake limit, saying so and naming the thread when it cuts.
+The text is carried as labeled unverified data on one line, with controls and semicolons replaced, Slack's escaping undone as for typed answers, and the line cut to the wake limit, saying so and naming the thread when it cuts.
 A request reaches no record: it writes nothing outside `state/slack-watch/`, runs no repository script, and gives the captain-hold intake nothing.
 Firstmate handles the wake under `check-result-handling`.
-The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed, so no earlier message is taken in, including one typed while the check was disarmed.
+The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed.
+Each `arm` starts again from the newest message, so a message typed before an arm is never taken in.
 A new install first needs one app setting that the code cannot change: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it (while it is off, Slack itself refuses a message with "Sending messages to this app has been turned off.").
 They need no new scope or Slack method.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
