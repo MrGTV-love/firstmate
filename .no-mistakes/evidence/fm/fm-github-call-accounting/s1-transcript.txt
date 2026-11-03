@@ -1,0 +1,48 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.X5DA1I
+--- before start status
+{"state": "stopped"}
+--- start
+1793735593
+{"state": "running", "pid": 29002, "run_id": "ca2e8b4e14d04a4493e6f0ada09851f8", "started_at": 1793735594.0401769}
+start_exit=0
+--- start again (idempotent)
+{"state": "running", "pid": 29002, "run_id": "ca2e8b4e14d04a4493e6f0ada09851f8", "started_at": 1793735594.0401769}
+start2_exit=0
+--- second run refused
+fm-github-accounting: busy (owner lock held); retry
+second_run_exit=75
+--- records while running is busy
+fm-github-accounting: busy (owner lock held); retry
+records_exit=75
+--- status
+{"state": "running", "pid": 29002, "run_id": "ca2e8b4e14d04a4493e6f0ada09851f8", "started_at": 1793735594.0401769}
+--- stop
+{"state": "stopped"}
+
+real	0m0.474s
+user	0m0.041s
+sys	0m0.020s
+stop_exit=0
+--- status after stop
+{"state": "stopped"}
+c3_alive_after_stop_pid=28595
+records_exit=0
+--- new owner sees survivor as new process row
+/Users/charlesabrooker/.no-mistakes/evidence/01M6HDY33NJ72475RP7K009NKC/drivers/s1-real-owner.sh: line 14: 28595 Terminated: 15          FIX_SECS=120 GH_TOKEN=CANARY_G_env "$FIX/fixture-parent.sh" "$FIX/gh" issue list --repo CANARY_E_org/repo
+--- leftover owner processes
+none
+--- canary scan of raw state
+no CANARY in any state file
+total 480
+drwx------@ 7 charlesabrooker  staff     224 Nov  3 13:53 .
+drwxr-xr-x@ 4 charlesabrooker  staff     128 Nov  3 13:53 ..
+-rw-------@ 1 charlesabrooker  staff  225280 Nov  3 13:53 observations.sqlite
+-rw-------@ 1 charlesabrooker  staff     113 Nov  3 13:53 owner.lock
+-rw-------@ 1 charlesabrooker  staff       0 Nov  3 13:53 owner.log
+-rw-------@ 1 charlesabrooker  staff       0 Nov  3 13:53 start.lock
+-rw-------@ 1 charlesabrooker  staff      32 Nov  3 13:53 stop
+700 /Users/charlesabrooker/tmp/fm-lab.X5DA1I/state/github-accounting
+600 /Users/charlesabrooker/tmp/fm-lab.X5DA1I/state/github-accounting/observations.sqlite
+FIX_PREFIX=/Users/charlesabrooker/tmp/fm-lab.X5DA1I/fixtures
+/Users/charlesabrooker/.no-mistakes/evidence/01M6HDY33NJ72475RP7K009NKC/drivers/s1-real-owner.sh: line 42: fm-lab-home:: command not found
+teardown_exit=127

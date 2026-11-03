@@ -1,0 +1,9 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.F03Wo9
+process 4242 Mon Nov 2 10:00:00 2026 ['gh', 'api', 'graphql', '--field', '[REDACTED]'] ancestor_end=root chain=[['bash', 'cron.sh', '[REDACTED]'], ['launchd']]
+process 5000 Mon Nov 2 10:00:00 2026 ['gh', 'pr', 'view', '[REDACTED]'] ancestor_end=unobserved chain=[]
+process_end 4242 Mon Nov 2 10:00:00 2026  ancestor_end= chain=[]
+process 4242 Mon Nov 2 11:00:00 2026 ['gh', 'issue', 'list'] ancestor_end=root chain=[['bash', 'cron.sh', '[REDACTED]'], ['launchd']]
+process_end 4242 Mon Nov 2 11:00:00 2026  ancestor_end= chain=[]
+process_end 5000 Mon Nov 2 10:00:00 2026  ancestor_end= chain=[]
+ASSERTIONS PASS: a reused pid with a new start is a new identity with its own end row; a process that stops being a caller ends; a missing parent stays unobserved
+teardown_exit=0

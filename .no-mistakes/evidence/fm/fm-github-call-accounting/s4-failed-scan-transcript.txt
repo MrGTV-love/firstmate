@@ -1,0 +1,9 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.qzWJbG
+scans fail from t+3
+scans recover at t+10 epoch=1793736068
+sampling failures per row: [0, 24, 0] worst gap 0.349
+['sh', 'gh', 'pr', 'list', '--repo', '[REDACTED]'] first=1793736058.54 end=1793736068.98 secs after recovery=0.98
+['sh', 'gh', 'issue', 'view', '--repo', '[REDACTED]'] first=1793736058.54 end=None secs after recovery=None
+ASSERTIONS PASS: failed scans counted; live caller has no end row; ended caller's end row comes after recovery
+/Users/charlesabrooker/.no-mistakes/evidence/01M6HDY33NJ72475RP7K009NKC/drivers/s4-failed-scan.sh: line 18: 45637 Terminated: 15          FIX_SECS=40 "$FIX/fixture-parent.sh" "$FIX/gh" issue view --repo stays-alive
+teardown_exit=0

@@ -1,0 +1,26 @@
+kinds: {'owner': 6, 'process': 37, 'process_end': 35, 'quota': 5, 'sampling': 8} runs: 3
+run1 quota rows:
+  observed source= REST rate_limit resources.graphql endpoint= rate_limit host= github.com exit= 0 started=1793735594.043 gap=- used= 683 reset= 1793735871 limit= 5000 remaining= 4317
+  observed source= REST rate_limit resources.graphql endpoint= rate_limit host= github.com exit= 0 started=1793735609.074 gap=15.031 used= 688 reset= 1793735871 limit= 5000 remaining= 4312
+  observed source= REST rate_limit resources.graphql endpoint= rate_limit host= github.com exit= 0 started=1793735624.101 gap=15.027 used= 689 reset= 1793735871 limit= 5000 remaining= 4311
+run1 sampling rows:
+  scans=1 failures=0 max_gap=0.000 interval=0.2
+  scans=49 failures=0 max_gap=0.350 interval=0.2
+  scans=47 failures=0 max_gap=0.350 interval=0.2
+  scans=8 failures=0 max_gap=0.349 interval=0.2
+fixture process rows (script basename gh, run under sh):
+ pid 28601 run 1 argv ['sh', 'gh', 'api', 'graphql', '--field', '[REDACTED]'] src ps-command-line-projection first_seen=1793735594.38 end=['1793735602.38(run1)'] ancestor_end root
+    ancestors: [(28597, 28594, ['bash', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--field', '[REDACTED]', '[REDACTED]']), (28594, 28042, ['bash', 's1-real-owner.sh', '[REDACTED]']), (28042, 28028, ['bash', 's1-real-owner.sh', '[REDACTED]'])]
+ pid 28745 run 1 argv ['sh', 'gh', 'issue', 'list', '--repo', '[REDACTED]'] src ps-command-line-projection first_seen=1793735594.38 end=[] ancestor_end root
+    ancestors: [(28595, 28592, ['sh', 'fixture-parent.sh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--repo', '[REDACTED]']), (28592, 28042, ['bash', 's1-real-owner.sh', '[REDACTED]']), (28042, 28028, ['bash', 's1-real-owner.sh', '[REDACTED]'])]
+ pid 28746 run 1 argv ['sh', 'gh', 'pr', 'create', '--title', '[REDACTED]', '--body', '[REDACTED]'] src ps-command-line-projection first_seen=1793735594.38 end=['1793735597.26(run1)'] ancestor_end root
+    ancestors: [(28593, 28590, ['sh', 'fixture-parent.sh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--title', '[REDACTED]', '--body', '[REDACTED]']), (28590, 28042, ['bash', 's1-real-owner.sh', '[REDACTED]']), (28042, 28028, ['bash', 's1-real-owner.sh', '[REDACTED]'])]
+ pid 28747 run 1 argv ['sh', 'gh', 'api', 'graphql', '--field', '[REDACTED]', '[REDACTED]', '[REDACTED]'] src ps-command-line-projection first_seen=1793735594.38 end=['1793735616.29(run1)'] ancestor_end root
+    ancestors: [(28591, 28589, ['sh', 'fixture-parent.sh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--field', '[REDACTED]', '[REDACTED]', '[REDACTED]']), (28589, 28042, ['bash', 's1-real-owner.sh', '[REDACTED]']), (28042, 28028, ['bash', 's1-real-owner.sh', '[REDACTED]'])]
+ pid 28745 run 2 argv ['sh', 'gh', 'issue', 'list', '--repo', '[REDACTED]'] src ps-command-line-projection first_seen=1793735627.91 end=[] ancestor_end root
+    ancestors: [(28595, 28592, ['sh', 'fixture-parent.sh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '--repo', '[REDACTED]']), (28592, 28042, ['bash', 's1-real-owner.sh', '[REDACTED]']), (28042, 28028, ['bash', 's1-real-owner.sh', '[REDACTED]'])]
+gh-axi rows 5 of which observer's own quota child: 5
+total process rows 37 process_end rows 35 sampling scans total 117
+max process rows per identity per run: 1
+process_end keys: ['kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'kind', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'observed_at', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'pid', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'run_id', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'start']
+CANARY in records: False

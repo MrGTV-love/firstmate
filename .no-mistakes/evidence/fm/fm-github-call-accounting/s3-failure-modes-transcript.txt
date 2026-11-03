@@ -1,0 +1,52 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.fkobJU
+=== A. gh-axi not on PATH: owner keeps running and says command_unavailable
+gh-axi absent from this PATH
+{"state": "running", "pid": 91219, "run_id": "377f5a938d5b4422b7d2b0a6b48e68ca", "started_at": 1793735996.5082161}
+start_exit=0
+{"state": "running", "pid": 91219, "run_id": "377f5a938d5b4422b7d2b0a6b48e68ca", "started_at": 1793735996.5082161}
+{"state": "stopped"}
+stop_exit=0
+   {'reason': 'command_unavailable', 'status': 'unavailable'}
+   {'reason': 'command_unavailable', 'status': 'unavailable'}
+=== B. gh-axi hung: next tick says pending, no overlap; stop ends the private group fast
+{"state": "stopped"}
+
+real	0m0.393s
+user	0m0.034s
+sys	0m0.011s
+stop_exit=0
+   {'status': 'pending'}
+gh-axi launches:        1 (expect 1 across 2 ticks)
+hung child 6821 gone
+=== C. gh-axi hung, no-progress verdict at 4 s: timeout row, next tick sends a new request
+   {'exit_code': -9, 'graphql': {}, 'reason': 'timeout', 'status': 'unavailable'}
+   {'exit_code': -9, 'graphql': {}, 'reason': 'timeout', 'status': 'unavailable'}
+gh-axi launches:        2 (expect 2)
+=== D. SIGKILL the owner: status stopped, new start works, database intact
+{"state": "stopped"}
+{"state": "running", "pid": 44327, "run_id": "4c39cdd09c5e45a88323c894a5277380", "started_at": 1793736056.0893319}
+restart_exit=0
+=== E. SIGTERM ends it cleanly with an owner stop row
+{"state": "stopped"}
+   {'action': 'start'}
+   {'action': 'start'}
+   {'action': 'stop'}
+ok
+1
+1179469640
+=== F. usage errors
+fm-github-accounting.py: error: --duration must be finite, positive and used with run
+exit=2
+fm-github-accounting.py: error: --duration must be finite, positive and used with run
+exit=2
+fm-github-accounting.py: error: --kind is for records
+exit=2
+usage: fm-github-accounting.py [-h] [--duration DURATION] [--kind KIND]
+                               {start,run,status,stop,prune,records}
+
+Standing GitHub quota and caller observer (no caller control or attribution verdict).
+
+Usage: fm-github-accounting.py {start,run,status,stop,prune,records}
+help_exit=0
+no lab processes left
+teardown_exit=0

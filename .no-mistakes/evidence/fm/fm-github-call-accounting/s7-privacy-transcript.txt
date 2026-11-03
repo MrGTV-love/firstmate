@@ -1,0 +1,27 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.AyzBqS
+Invalid -W option ignored: invalid action: 'CANARY22'
+fixture callers seen: 15
+--- canaries in records:
+count=0
+--- canaries in raw state bytes:
+none
+0
+--- token-shaped in records:
+0
+['sh', 'gh', 'api', 'graphql', '-f', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]', '--header', '[REDACTED]', '[REDACTED]', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'api', '--header=[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'pr', 'create', '--title', '[REDACTED]', '--body=[REDACTED]', '--body-file', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'auth', '[REDACTED]', '[REDACTED]', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', '[REDACTED]', '--repo=[REDACTED]', '-R', '[REDACTED]', '--jq', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'] parent ['bash', 's7-privacy.sh', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]'] parent ['bash', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'pr', 'view', '[REDACTED]'] parent ['sh', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'pr', 'view', '[REDACTED]'] parent ['zsh', '-f', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]'] parent ['perl', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]'] parent ['python3', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]'] parent ['python3', '-c', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+['sh', 'gh', 'api', '[REDACTED]', '[REDACTED]'] parent ['sh', 'fixture-parent.sh', '[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]']
+CANARY21
+teardown_exit=0

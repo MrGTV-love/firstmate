@@ -1,0 +1,38 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.u2sIQ5
+=== foreign SQLite with a row
+  start exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  bytes identical
+keep me
+{"state": "stopped"}
+=== nonempty garbage
+  start exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  bytes identical
+=== symlink at the database path
+  start exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  prune exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  records exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+  run exit=1 fm-github-accounting: operation unavailable (check owner status/state permissions)
+target
+=== symlink state directory
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+  status exit=1
+=== zero-size file (interrupted start): treated as new
+  size 0
+{"state": "running", "pid": 70423, "run_id": "bdec06097caf406db702b720174068e9", "started_at": 1793736099.018}
+  start exit=0
+1179469640
+7
+=== owner's own populated database reopens and keeps rows
+{"removed": 0}
+  prune exit=0
+  rows before=7 after=11
+--- owner.log (fixed text only)
+   2 fm-github-accounting: operation unavailable (check owner status/state permissions)
+no lab processes left
+teardown_exit=0

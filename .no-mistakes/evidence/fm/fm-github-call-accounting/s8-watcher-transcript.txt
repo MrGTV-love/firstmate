@@ -1,0 +1,38 @@
+=== 1. marked lab home: watcher never starts an owner
+watcher alive after 8 s
+no state/github-accounting dir: owner never ran
+0
+lab_teardown=0
+=== 2. disposable primary-shape home: watcher starts an absent owner, leaves it alone
+owner started by watcher
+same run after 4 more cycles
+=== 3. plain stop lasts until the next cycle (documented)
+{"state": "stopped"}
+new owner after plain stop: differs=yes
+=== 4. SIGKILL recovers at the next cycle, with no wake
+recovered: differs=yes
+wake queue empty
+=== 5. owner outlives the watcher
+running
+=== 6. FM_GITHUB_ACCOUNTING=0 keeps a stopped owner off
+{"state": "stopped"}
+=== 7. foreign database: one wake, no start loop, reason in owner.log, file unchanged
+watcher closed its cycle with a wake
+check: github-accounting owner failed to start: exit=1; owner stderr: /Users/charlesabrooker/tmp/fm-s8-home.DzigkW/state/github-accounting/owner.log; retries every 3600s without another wake
+1
+marker present: <home>/state/.github-accounting-start-failed
+fm-github-accounting: operation unavailable (check owner status/state permissions)
+foreign file bytes identical
+=== 8. next watcher holds the retry without another wake
+drain presents the failed start
+ack_exit=0
+watcher alive after 8 s
+accounting lines in watcher output: 0
+queued accounting wakes: 0
+marker untouched: no attempt inside the hour
+{"state": "stopped"}
+=== 9. operator remedy: move the file, age the marker, start recovers
+marker cleared
+running
+{"state": "stopped"}
+no home processes left

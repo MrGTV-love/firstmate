@@ -1,0 +1,20 @@
+quota rows in order:
+  t=1793735826.75 status=observed exit=0 reason=None graphql={'limit': 5000, 'remaining': 4900, 'reset': 1794000000, 'used': 100}
+  t=1793735841.88 status=observed exit=0 reason=None graphql={'limit': 5000, 'remaining': 4880, 'reset': 1794000000, 'used': 120}
+  t=1793735856.98 status=observed exit=0 reason=None graphql={'limit': 5000, 'remaining': 100, 'reset': 1794000000, 'used': 4900}
+  t=1793735872.11 status=observed exit=0 reason=None graphql={'limit': 5000, 'remaining': 0, 'reset': 1794000000, 'used': 5000}
+  t=1793735887.21 status=unavailable exit=1 reason=None graphql={}
+  t=1793735902.30 status=unavailable exit=0 reason=None graphql={}
+  t=1793735917.50 status=observed exit=0 reason=None graphql={'reset': 1794003600, 'used': 7}
+  t=1793735932.47 status=observed exit=0 reason=None graphql={'limit': 5000, 'remaining': 4991, 'reset': 1794003600, 'used': 9}
+labeled fixture callers:
+   {'pid': 10086, 'begin': 1793735830.7184079, 'end': 1793735834.728866, 'argv': ['sh', 'gh', 'pr', 'view'], 'parent': ['sh', 'fixture-parent.sh'], 'cmd': 'pr view'}
+   {'pid': 13942, 'begin': 1793735845.261253, 'end': 1793735851.701594, 'argv': ['sh', 'gh', 'api', 'graphql', '--paginate'], 'parent': ['sh', 'fixture-parent.sh'], 'cmd': 'api graphql'}
+intervals between successive observed quota rows (fixture callers only):
+   1793735826.75 -> 1793735841.88 used 100 -> 120 delta=20 callers=['pr view']
+   1793735841.88 -> 1793735856.98 used 120 -> 4900 delta=4780 callers=['api graphql']
+   1793735856.98 -> 1793735872.11 used 4900 -> 5000 delta=100 callers=[]
+   1793735872.11 -> 1793735917.50 used 5000 -> 7 delta=-4993 callers=[]
+   1793735917.50 -> 1793735932.47 used 7 -> 9 delta=2 callers=[]
+sampling: rows=9 scans=345 failures=0 worst_gap=0.350
+ASSERTIONS PASS: burst caller alone overlaps the big jump; quiet caller alone overlaps the small one; failed and malformed reads are unavailable with no fields; null stays absent; exhausted reads remaining=0

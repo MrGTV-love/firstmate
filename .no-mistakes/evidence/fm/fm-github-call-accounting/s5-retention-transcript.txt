@@ -1,0 +1,35 @@
+lab_home=/Users/charlesabrooker/tmp/fm-lab.w9p9ck
+{"removed": 0}
+first_prune_exit=0
+--- before prune
+    old-quota quota age_h=49.0000
+    old-process process age_h=48.0334
+    old-end process_end age_h=48.0334
+    old-sampling sampling age_h=48.0167
+    old-owner owner age_h=48.0167
+    keep-inside-48h quota age_h=47.9167
+    keep-recent process age_h=0.0167
+    keep-recent-end process_end age_h=0.0167
+{"removed": 5}
+prune_exit=0
+--- after prune (old rows must be gone, keep rows must stay)
+    keep-inside-48h quota age_h=47.9168
+    keep-recent process age_h=0.0168
+    keep-recent-end process_end age_h=0.0168
+/Users/charlesabrooker/tmp/fm-lab.w9p9ck/state/github-accounting/unrelated-in-dir.sentinel
+/Users/charlesabrooker/tmp/fm-lab.w9p9ck/state/unrelated.sentinel
+--- startup prune: old row seeded while stopped
+    keep-inside-48h quota age_h=47.9173
+    keep-recent process age_h=0.0173
+    keep-recent-end process_end age_h=0.0173
+--- tick prune: row 8 s inside the cutoff at start, expires during a run, the next 15 s tick removes it
+run_exit=0
+    keep-inside-48h quota age_h=47.9222
+    keep-recent process age_h=0.0222
+    keep-recent-end process_end age_h=0.0222
+/Users/charlesabrooker/tmp/fm-lab.w9p9ck/state/github-accounting/unrelated-in-dir.sentinel
+/Users/charlesabrooker/tmp/fm-lab.w9p9ck/state/unrelated.sentinel
+--- file does not grow unbounded after delete: auto_vacuum
+1
+2
+teardown_exit=0
