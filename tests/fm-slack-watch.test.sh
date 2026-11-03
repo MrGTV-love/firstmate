@@ -1886,6 +1886,26 @@ assert_eq "$(outbound_count chat.postMessage)" 0 "INTAKE-3 a legacy plane acknow
 assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 2000.000100 "INTAKE-3 the legacy cursor"
 say_owner 2000.000200 'sent after the first poll'
 expect_requests "legacy plane" 2000.000200
+# A plane armed before requests existed that is busy on its first upgraded poll (a delivered answer uses the whole
+# per-poll cap) still gets its starting point at that poll, takes in no history, and takes in a later request once.
+new_home typed-reply
+bind
+TR="$FIX/typed-reply/transcript.json"
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$TR" >/dev/null
+python3 "$HELPER" drop-state-field "$(state_file)" intake_cursor
+python3 "$HELPER" owner-message "$(replay_file)" 2000.000100 U0TESTOWNER 'sent before the first upgraded poll'
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TR")
+assert_eq "$(closed_count "$out")" 1 "INTAKE-3 [busy legacy] the answer did not use the whole cap"
+assert_eq "$(request_count "$out")" 0 "INTAKE-3 [busy legacy] history from before the upgrade was woken"
+assert_eq "$(posts_in 2000.000100)" 0 "INTAKE-3 [busy legacy] history from before the upgrade was acknowledged"
+assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 2000.000100 \
+  "INTAKE-3 [busy legacy] the first upgraded poll set no starting point"
+python3 "$HELPER" owner-message "$(replay_file)" 2000.000200 U0TESTOWNER 'sent after the first upgraded poll'
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TR")
+assert_eq "$(request_count "$out")" 1 "INTAKE-3 [busy legacy] a request sent after the first upgraded poll was not woken once"
+assert_contains "$out" 'check: slack request 2000.000200 from U0TESTOWNER: ' "INTAKE-3 [busy legacy] wrong request woken"
+assert_eq "$(posts_in 2000.000200)" 1 "INTAKE-3 [busy legacy] acknowledgements in the later request's thread"
+assert_eq "$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TR")" "" "INTAKE-3 [busy legacy] a later poll woke again"
 intake_home
 say_owner 2000.000100 'sent before a re-arm'
 "$ROOT/bin/fm-slack-check.sh" arm --replay "$INTAKE" >/dev/null
@@ -2020,6 +2040,27 @@ assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 100.0
 out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$INTAKE" 2>&1)
 assert_contains "$out" 'retargeted:' "INTAKE-5 retarget refused"
 assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" "" "INTAKE-5 retarget kept the old DM's cursor"
+# An empty journal does not prove the old DM is drained: retarget refuses while the old DM still holds an owner
+# request that was never taken in, and it never takes one in itself; polling until it accepts delivers each once.
+intake_home
+say_owner 2000.000100 'first request'
+say_owner 2000.000200 'second request'
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE")
+assert_eq "$(request_count "$out")" 1 "INTAKE-5 [drain] the capped poll woke the wrong number of requests"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "INTAKE-5 [drain] the journal was not empty after the capped poll"
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$INTAKE" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "INTAKE-5 [drain] retarget accepted while an owner request was still unread"
+assert_contains "$out" 'dm_user_changed_with_unread_requests' "INTAKE-5 [drain] the refusal did not name its reason"
+assert_eq "$(python3 "$HELPER" state-field "$(state_file)" intake_cursor)" 2000.000100 "INTAKE-5 [drain] a refused retarget moved the starting point"
+assert_eq "$(outbound_count chat.postMessage)" 1 "INTAKE-5 [drain] a refused retarget posted"
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$INTAKE")
+assert_eq "$(request_count "$out")" 1 "INTAKE-5 [drain] the second poll did not wake the second request"
+assert_eq "$(posts_in 2000.000200)" 1 "INTAKE-5 [drain] acknowledgements in the second request's thread"
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$INTAKE" 2>&1)
+assert_contains "$out" 'retargeted:' "INTAKE-5 [drain] retarget refused after the old DM was drained"
+assert_eq "$(outbound_count chat.postMessage)" 2 "INTAKE-5 [drain] retarget acknowledged or posted something itself"
 printf 'ok - INTAKE-5\n'
 
 printf 'ok - all Slack watch checks\n'

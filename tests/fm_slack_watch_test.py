@@ -537,11 +537,63 @@ class IntakeTest(unittest.TestCase):
             self.say(replay, '200.000100', 'sent before the first poll with this code')
             with patch.object(replay, 'call', return_value={'ok': True}), \
                  self.assertRaisesRegex(SlackError, '^unreadable_dm_history$'):
-                watch.take_requests(20)
+                watch.poll()
             self.assertNotIn('intake_cursor', watch.state)
-            watch.take_requests(20)
+            watch.poll()
             self.assertEqual(watch.state['intake_cursor'], '200.000100')
             self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+
+    def test_the_first_upgraded_poll_sets_the_starting_point_even_when_the_cap_is_used_up(self):
+        for cap_left in (0, 1):
+            with self.subTest(cap_left=cap_left), self.fixture(cap='1') as (watch, replay):
+                watch.state.pop('intake_cursor')
+                self.say(replay, '200.000100', 'sent before the first upgraded poll')
+                # Existing work (a delivered answer) used up what the per-poll cap leaves.
+                with patch.object(watch, 'resume', return_value=(cap_left, None)):
+                    watch.poll()
+                self.assertEqual(watch.load_state()['intake_cursor'], '200.000100')
+                self.assertEqual((self.acks(replay), self.wakes(watch)), ([], []))
+                self.say(replay, '200.000200', 'sent after the first upgraded poll')
+                watch.state, watch.advanced = watch.load_state(), 0
+                watch.poll()
+                self.assertEqual(self.acks(replay), ['200.000200'])
+                self.assertEqual([line.split()[3] for line in self.wakes(watch)], ['200.000200'])
+
+    def test_retarget_refuses_while_the_old_dm_holds_unread_requests(self):
+        other = {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}
+        with self.fixture(cap='1') as (watch, replay):
+            self.say(replay, '200.000100', 'first request')
+            self.say(replay, '200.000200', 'second request')
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100'])
+            self.assertEqual(watch.load_state()['pending'], [])
+            before = watch.load_state()
+            with patch.dict(os.environ, other), self.assertRaisesRegex(
+                    SlackError, '^dm_user_changed_with_unread_requests$'):
+                watch.retarget()
+            self.assertEqual(watch.load_state(), before)
+            watch.state, watch.advanced = watch.load_state(), 0
+            watch.poll()
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+            with patch.dict(os.environ, other):
+                self.assertTrue(watch.retarget())
+            self.assertNotIn('intake_cursor', watch.load_state())
+            self.assertEqual(self.acks(replay), ['200.000100', '200.000200'])
+
+    def test_retarget_ignores_what_is_not_a_request_and_never_takes_one_in_itself(self):
+        other = {'FM_SLACK_DM_USER': 'U0OTHEROWNER1'}
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'stranger', user='U0STRANGER01')
+            self.say(replay, '200.000200', 'bot', bot_id='BLOOKALIKE')
+            self.say(replay, '200.000300', 'reply', thread_ts='100.000100')
+            self.say(replay, '200.000400', '   ')
+            with patch.dict(os.environ, other):
+                self.assertTrue(watch.retarget())
+        with self.fixture() as (watch, replay):
+            self.say(replay, '200.000100', 'a real request')
+            with patch.dict(os.environ, other), self.assertRaises(SlackError):
+                watch.retarget()
+            self.assertEqual((self.acks(replay), self.wakes(watch), watch.load_state()['pending']), ([], [], []))
 
     def test_new_messages_are_taken_in_oldest_first_within_the_cap(self):
         with self.fixture(cap='2') as (watch, replay):
