@@ -2525,14 +2525,14 @@ nested_place_leftovers() {
   printf 'spawn_gen=teardown-test-task-x1\nslot=\n' > "$case_dir/state/task-x1.teardown-return-pending"
 }
 
-# nested_fixture <label> <shape> <claim: mine|other|none> <variant>: a nested
-# slot case with the task files seeded, the claim set as asked and one fixture
-# variant applied: landed (nothing more), slot-unlanded (a commit only in the
-# slot root), copy-dirty (a staged change in the nested copy) or copy-unlanded
-# (a commit only in the nested copy).
+# nested_fixture <label> <shape> <claim: mine|other|none> <variant> [<nested
+# path in the slot>]: a nested slot case with the task files seeded, the claim
+# set as asked and one fixture variant applied: landed (nothing more),
+# slot-unlanded (a commit only in the slot root), copy-dirty (a staged change in
+# the nested copy) or copy-unlanded (a commit only in the nested copy).
 nested_fixture() {
-  local label=$1 shape=$2 claim=$3 variant=$4 case_dir
-  make_nested_slot_case "$label" "$shape" .claude/worktrees/x
+  local label=$1 shape=$2 claim=$3 variant=$4 nested=${5:-.claude/worktrees/x} case_dir
+  make_nested_slot_case "$label" "$shape" "$nested"
   case_dir=$NESTED_CASE
   nested_seed_task_files "$case_dir"
   case "$claim" in
@@ -2559,8 +2559,10 @@ nested_fixture() {
 
 # nested_snapshot <case-dir> <out>: everything an entry-time refusal must leave
 # alone, as a listing with a SHA-256 for each file: the record, inbox, status,
-# tasktmp and markers under state/, the nested copy and its branch, the slot
-# root and its HEAD, the claim, the pool state and the endpoint close calls.
+# tasktmp and markers under state/, every file of the nested copy and of the slot
+# root by content (tracked, untracked and ignored, apart from the .git entries),
+# their HEADs and the branch refs, the claim, the pool state and the endpoint
+# close calls. Lock files and the watcher beacon are left out.
 nested_snapshot() {
   local case_dir=$1 out=$2 dir file closes
   {
@@ -2574,11 +2576,19 @@ nested_snapshot() {
         fi
       done < <(find "$dir" ! -name '*.lock' ! -path '*.lock/*' ! -name '.last-watcher-beat' ! -name '.guard-watcher-stale-banner' | LC_ALL=C sort)
     done
-    printf 'copy %s %s\n' "$(git -C "$NESTED_COPY" rev-parse HEAD 2>/dev/null || echo absent)" \
-      "$(git -C "$NESTED_COPY" status --porcelain=v1 --untracked-files=all 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+    printf 'copy-head %s\n' "$(git -C "$NESTED_COPY" rev-parse HEAD 2>/dev/null || echo absent)"
     git -C "$case_dir/project" for-each-ref --format='ref %(refname) %(objectname)'
-    printf 'slot %s %s\n' "$(git -C "$NESTED_SLOT" rev-parse HEAD 2>/dev/null || echo absent)" \
-      "$(git -C "$NESTED_SLOT" status --porcelain=v1 --untracked-files=all 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+    printf 'slot-head %s\n' "$(git -C "$NESTED_SLOT" rev-parse HEAD 2>/dev/null || echo absent)"
+    for dir in "$NESTED_COPY" "$NESTED_SLOT"; do
+      [ -d "$dir" ] || { printf 'tree %s absent\n' "$dir"; continue; }
+      while IFS= read -r file; do
+        if [ -L "$file" ]; then
+          printf 'link %s %s\n' "$file" "$(readlink "$file")"
+        else
+          printf 'file %s %s\n' "$file" "$(shasum -a 256 < "$file" | awk '{print $1}')"
+        fi
+      done < <(find "$dir" -name .git -prune -o \( -type f -o -type l \) -print | LC_ALL=C sort)
+    done
     for file in "$case_dir/pool/1/.fm-slot-owner" "$case_dir/pool/treehouse-state.json" \
         "$case_dir/endpoint.log" "$case_dir/treehouse.log"; do
       if [ -f "$file" ]; then
@@ -3115,15 +3125,21 @@ exit 1
 SH
 }
 
-# make_own_locked_copy_case <name> <enclosing|reverse> [launcher-pid]: the foreign
+# make_own_locked_copy_case <name> <enclosing|plain|reverse> [launcher-pid]: the foreign
 # copy case with the copy recorded as the task's own. enclosing records the copy as
-# worktree= and the slot as prior_worktree=; reverse records the slot as worktree=
+# worktree= and the slot as prior_worktree=; plain records the copy as worktree= with
+# no prior_worktree= line; reverse records the slot as worktree=
 # and the copy as prior_worktree=. A launcher pid locks the copy as Vernant's
 # start_task_worktree.py does. Sets the FOREIGN_* variables and snapshots Treehouse's
 # state and the slot claim.
 make_own_locked_copy_case() {
   make_foreign_copy_case "$1" ${3:+"$3"}
-  if [ "$2" = enclosing ]; then
+  if [ "$2" = plain ]; then
+    fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$FOREIGN_COPY" "branch=fm/task-x1-v2" "project=$FOREIGN_CASE/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+  elif [ "$2" = enclosing ]; then
     fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
       "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
       "worktree=$FOREIGN_COPY" "branch=fm/task-x1-v2" "project=$FOREIGN_CASE/project" \

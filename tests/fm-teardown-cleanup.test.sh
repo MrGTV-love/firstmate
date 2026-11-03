@@ -5400,6 +5400,63 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
   pass "a held close refuses before it removes anything when the slot cannot be durably leased, and says why"
 }
 
+# A held close that cannot durably lease its slot is an entry-decidable refusal,
+# so it leaves a pending-close record from an earlier failed run, and the return
+# record beside it, byte for byte, for a prior and a plain record; the same
+# fixture with a slot that leases closes normally and retires both.
+held_marker_case() {  # <label> <enclosing|plain>
+  make_own_locked_copy_case "$1" "$2"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  HELD_COPY=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$HELD_COPY" main
+  held_foreign_unlanded "$HELD_COPY"
+  held_plain_get_slot "$FOREIGN_CASE"
+  nested_place_leftovers "$FOREIGN_CASE"
+  cp "$FOREIGN_CASE/state/task-x1.backlog-close" "$FOREIGN_CASE/backlog-close.before"
+  cp "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$FOREIGN_CASE/return-pending.before"
+}
+
+test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
+  local rc shape mode label
+  for shape in plain enclosing; do
+    for mode in no-lease-command lease-fails; do
+      label="held-marker-$shape-$mode"
+      held_marker_case "$label" "$shape"
+      : > "$FOREIGN_CASE/$mode"
+      held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
+      run_foreign_teardown rc
+      expect_code 1 "$rc" "$label: a held close that cannot lease its slot must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "REFUSED: pool slot $FOREIGN_SLOT could not be durably leased" "$FOREIGN_CASE/stderr" \
+        "$label: the refusal did not name the slot"
+      cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" \
+        || fail "$label: the refusal changed the pending-close record"
+      cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" \
+        || fail "$label: the refusal changed the return-pending record"
+      assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
+    done
+  done
+  pass "a held close that cannot durably lease its slot leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
+}
+
+test_a_held_close_that_leases_retires_an_earlier_pending_close_record() {
+  local rc shape label
+  for shape in plain enclosing; do
+    label="held-marker-close-$shape"
+    held_marker_case "$label" "$shape"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "$label: a held close whose slot leases must finish: $(cat "$FOREIGN_CASE/stderr")"
+    held_assert_closed "$label"
+    assert_absent "$FOREIGN_CASE/state/task-x1.backlog-close" "$label: the earlier pending-close record survived"
+    assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: the return-pending record survived"
+    assert_no_grep "dropped" "$FOREIGN_CASE/data/backlog.md" "$label: the earlier record's drop note was replayed"
+  done
+  pass "a held close whose slot leases finishes and retires the pending-close record an earlier run left"
+}
+
 # A held close of a copy in a superseded pool folder: the project's current pool
 # is another folder that reuses its slot names, so the close leases the slot by
 # its exact path in the folder that holds it, never by name, and Treehouse then
@@ -6544,6 +6601,8 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
+test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was
+test_a_held_close_that_leases_retires_an_earlier_pending_close_record
 test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
 test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path
 test_a_refused_held_close_releases_no_misdirected_lease

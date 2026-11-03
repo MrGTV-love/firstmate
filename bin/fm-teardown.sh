@@ -926,6 +926,7 @@ teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
     return 0
   done < "$meta"
   case "$worktree" in /*) ;; *) return 1 ;; esac
+  [ "$(fm_meta_get "$meta" kind)" != scout ] || return 1
   while [ -n "$worktree" ] && [ ! -d "$worktree" ]; do
     tail=/${worktree##*/}$tail
     worktree=${worktree%/*}
@@ -1998,10 +1999,11 @@ teardown_preserves_reassociated_copy() {
   return 1
 }
 
-# A current copy that is not itself a pool slot but sits inside one, whatever
-# the record's lines say. Its slot is the one owner above's answer.
+# A ship's current copy that is not itself a pool slot but sits inside one,
+# whatever the record's lines say; a scout or secondmate keeps its own route.
+# Its slot is the one owner above's answer.
 teardown_current_copy_nested_in_slot() {  # <meta> <kind> <backend> <project> <worktree>
-  [ "$2" != secondmate ] && [ "$3" != orca ] || return 1
+  [ "$2" != secondmate ] && [ "$2" != scout ] && [ "$3" != orca ] || return 1
   ! fm_treehouse_pool_slot "$4" "$5" || return 1
   teardown_record_enclosing_slot "$1" "$4" "$5" >/dev/null
 }
@@ -6399,10 +6401,6 @@ else
     BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
   fi
 fi
-if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
-  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
-  exit 1
-fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
 # them). Fix 1, Fix 3, and Fix 2 (see script header) run here, unconditionally on
@@ -6465,6 +6463,13 @@ fi
 if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
   teardown_release_misdirected_leases "$PROJ" "$ID" "$TEARDOWN_SLOT_SUPERSEDED_NAME"
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+fi
+# The previous pending-close record is retired only now, after the reservation
+# and held-copy refusals above, so a refusal that is decidable from the state at
+# entry leaves its bytes as they were.
+if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
+  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
+  exit 1
 fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
