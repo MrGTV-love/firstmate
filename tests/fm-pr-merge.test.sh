@@ -2302,7 +2302,7 @@ slug=$(printf '%s' "$MODEL" | tr -c 'A-Za-z0-9._-' '_')
 mode=$(cat "$C/runner/$slug.mode" 2>/dev/null || cat "$C/runner/default.mode" 2>/dev/null || echo pass)
 named=$H
 served=$MODEL
-if [ "$mode" = hang ]; then
+if [ "$mode" = hang ] || [ "$(cat "$C/hang-head" 2>/dev/null)" = "$H" ]; then
   printf '%s\n' "$$" > "$C/runner.pid"
   while [ ! -e "$C/runner.release" ] && [ -d "$C" ]; do sleep 0.1; done
   mode=pass
@@ -2795,10 +2795,34 @@ test_auto_review_survives_slow_hung_and_killed_readers() {
   case $(auto_state "$case_dir") in "reading ${state:0:12} by $AUTO_SONNET") ;; *) fail "hung: current state should read the new head, got: $(auto_state "$case_dir")" ;; esac
   : > "$case_dir/runner.release"
   auto_wait "$case_dir"; auto_step "$case_dir"
-  expect_code 2 "$(auto_reviews "$case_dir")" "hung: each returned read is recorded for its own head"
+  expect_code 1 "$(auto_reviews "$case_dir")" "hung: only the live head's read is recorded; the superseded head's read is not"
   expect_code 1 "$(auto_merges "$case_dir")" "hung: only the new head merges, once"
   assert_logged_gh_merge "$case_dir" 9 example/repo --squash
   auto_dump "$case_dir" "G5 hung reader, new head read meanwhile, both released late"
+  # The old head's read returns after the new head's PASS is recorded: it is never recorded and the new head still merges.
+  case_dir=$(auto_case late-old)
+  auto_sha "$case_dir" h1 > "$case_dir/hang-head"
+  printf '1\n' > "$case_dir/github-merge-rc"
+  auto_step "$case_dir"
+  for n in $(seq 1 50); do [ -s "$case_dir/runner.pid" ] && break; sleep 0.1; done
+  auto_push "$case_dir"
+  auto_step "$case_dir"
+  state=$(auto_sha "$case_dir" h2)
+  for n in $(seq 1 150); do [ -f "$case_dir/state/.pr-auto-review/task-x1.d/${state:0:12}-$(auto_slug "$AUTO_SONNET").run/result.json" ] && break; sleep 0.2; done
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_reviews "$case_dir")" "late-old: the new head's PASS is recorded"
+  expect_code 1 "$(auto_merges "$case_dir")" "late-old: the first merge attempt is refused"
+  : > "$case_dir/runner.release"
+  auto_wait "$case_dir"
+  rm -f "$case_dir/github-merge-rc"
+  jq '.heads |= map_values(.merge.next_at = 0)' "$case_dir/state/.pr-auto-review/task-x1.json" > "$case_dir/s" && mv "$case_dir/s" "$case_dir/state/.pr-auto-review/task-x1.json"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_reviews "$case_dir")" "late-old: the superseded head's late read must not be recorded"
+  expect_code 2 "$(auto_merges "$case_dir")" "late-old: the new head must still merge after the old read returns"
+  expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "late-old: the live head merges"
+  state=$(auto_sha "$case_dir" h1)
+  expect_code 0 "$(auto_count "pr-review:task-x1:${state:0:12}" "$case_dir/state/.wake-queue")" "late-old: the superseded head must not wake Main"
+  auto_dump "$case_dir" "G5 old head's read returns after the new head's PASS"
   # A reader killed after its request: the model is not retried, the next eligible model is.
   case_dir=$(auto_case killed)
   auto_mode "$case_dir" "$AUTO_SONNET" hang

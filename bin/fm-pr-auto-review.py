@@ -15,10 +15,11 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
      changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
      never counted (bin/fm-review-record.py binds every record to its exact head);
-  2. collects the reads it requested earlier for any head, so a read still out never stops a newer
-     head from being read: a finished report is recorded through `fm-review-record.py review` for its
-     own head, an INCOMPLETE report is held, a FAIL that cannot be recorded still ends the head at
-     fail, and a crashed or unusable read burns that model for the head;
+  2. collects the reads it requested earlier for the live head: a finished report is recorded through
+     `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
+     ends the head at fail, and a crashed or unusable read burns that model for the head. A read of an
+     older head never stops the live head from being read; once it ends it is marked returned and is
+     never recorded, planned or reported;
   3. stops unless the PR is open, not a draft, mergeable and reported CLEAN or HAS_HOOKS by the forge
      with no check pending. This is a fail-closed prefilter for spending a read, never the merge
      gate: bin/fm-pr-merge.sh re-reads every condition live and stays the only authority;
@@ -380,15 +381,34 @@ def parse_report(path, sha):
     return verdict, facts, protected, None
 
 
+def read_status(att):
+    """'running' while the detached reader holds its lock, 'done' once it wrote its result, else why it ended without one."""
+    adir = Path(att["dir"]).parent / (Path(att["dir"]).name + ".run")
+    if (adir / "result.json").exists():
+        return "done"
+    try:
+        with open(adir / "lock", "a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # The reader writes its result before it lets go of the lock, so look again.
+            return "done" if (adir / "result.json").exists() else "the read ended without a result"
+    except BlockingIOError:
+        return "running"
+    except OSError:
+        return "the read left no lock or result"
+
+
+def retire(side, live):
+    """Mark every ended read of a head that is no longer live as returned, unrecorded and unreported."""
+    for sha, head in side.data["heads"].items():
+        for att in head["attempts"].values() if sha != live else ():
+            if att["state"] == "requested" and read_status(att) != "running":
+                att.update(state="returned", reason="the head was superseded before the read ended")
+
+
 def collect(home, task, url, sha, base, side, meta):
-    """Fold finished reads of one head into the sidecar and record their verdicts; True while one is still outstanding."""
+    """Fold the live head's finished reads into the sidecar and record their verdicts; True while one is still outstanding."""
     head = side.head(sha)
     outstanding = False
-
-    def mark(name, detail):
-        # A read of an older head never takes the current state away from a newer one.
-        if side.data.get("phase", {}).get("head") in (None, sha):
-            phase(side, sha, name, detail)
 
     def burn(att, model_id, text, reason, key=None, wake=None):
         att.update(state="failed", reason=reason)
@@ -397,31 +417,23 @@ def collect(home, task, url, sha, base, side, meta):
     def stand_failed(att, actual, report, why=""):
         att["state"] = "returned" if why else "recorded"
         head["outcome"] = {"kind": "fail", "detail": report}
-        mark("fail", f"report {report}")
+        phase(side, sha, "fail", f"report {report}")
         emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report}" + (f" (not recorded: {why})" if why else ""),
              f"FAIL at {sha[:12]} read by {actual}; findings are in {report}")
 
     for model_id, att in sorted(head["attempts"].items(), key=lambda item: item[1]["at"]):
         if att["state"] != "requested":
             continue
-        adir = Path(att["dir"]).parent / (Path(att["dir"]).name + ".run")
-        result_path = adir / "result.json"
-        if not result_path.exists():
-            try:
-                with open(adir / "lock", "a+") as lock:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    # The reader writes its result before it lets go of the lock, so look again.
-                    if not result_path.exists():
-                        att.update(state="failed", reason="the read ended without a result")
-            except BlockingIOError:
-                outstanding = True
-                mark("reading", f"{sha[:12]} by {model_id}")
-                continue
-            except OSError:
-                att.update(state="failed", reason="the read left no lock or result")
-            if att["state"] == "failed":
-                emit(home, task, side, sha, f"failed:{model_id}", f"read of {sha[:12]} by {model_id} failed: {att['reason']}")
-                continue
+        status = read_status(att)
+        if status == "running":
+            outstanding = True
+            phase(side, sha, "reading", f"{sha[:12]} by {model_id}")
+            continue
+        if status != "done":
+            att.update(state="failed", reason=status)
+            emit(home, task, side, sha, f"failed:{model_id}", f"read of {sha[:12]} by {model_id} failed: {status}")
+            continue
+        result_path = Path(att["dir"]).parent / (Path(att["dir"]).name + ".run") / "result.json"
         try:
             outcome = json.loads(result_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -440,7 +452,7 @@ def collect(home, task, url, sha, base, side, meta):
         if not served:
             att.update(state="returned", report=report, verdict=verdict)
             head["outcome"] = {"kind": "served-model-unknown", "detail": report}
-            mark("held", f"served model unknown for the read requested from {model_id}, report {report}")
+            phase(side, sha, "held", f"served model unknown for the read requested from {model_id}, report {report}")
             emit(home, task, side, sha, "served-model-unknown",
                  f"held: served model unknown at {sha[:12]}: the runner printed no 'served-model:' line for the read requested from {model_id}, report {report}",
                  f"served model unknown for the read of {sha[:12]} requested from {model_id}; not recorded, report {report}, the merge is Main's")
@@ -449,7 +461,7 @@ def collect(home, task, url, sha, base, side, meta):
         if verdict == "INCOMPLETE":
             att["state"] = "returned"
             head["outcome"] = {"kind": "incomplete", "detail": report}
-            mark("held", f"review INCOMPLETE, report {report}")
+            phase(side, sha, "held", f"review INCOMPLETE, report {report}")
             emit(home, task, side, sha, "incomplete", f"held: review INCOMPLETE at {sha[:12]} by {served}, report {report}",
                  f"INCOMPLETE read of {sha[:12]} by {served}; missing evidence or decision is in {report}")
             continue
@@ -620,13 +632,7 @@ def advance(home, task, url, meta, side):
     prior = side.head(head_sha) if head_sha else None
     if prior and prior.get("outcome") and prior["outcome"]["kind"] == "merged":
         return
-    # Every head's outstanding reads are collected each pass; one still out never stops the forge read.
-    working = outstanding = False
-    for old in list(side.data["heads"]):
-        if any(a["state"] == "requested" for a in side.data["heads"][old]["attempts"].values()):
-            working = True
-            outstanding = collect(home, task, url, old, side.data.get("base", ""), side, meta) or outstanding
-    if time.time() < side.data.get("next_at", 0) and (outstanding or not working):
+    if time.time() < side.data.get("next_at", 0):
         return
     # A forge read that fails is spaced like one that answers, so an outage is not hammered.
     side.data["next_at"] = int(time.time()) + INTERVAL
@@ -636,6 +642,7 @@ def advance(home, task, url, meta, side):
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
     head = side.head(sha)
+    retire(side, sha)
     side.prune(sha)
     if str(view.get("state", "")).upper() == "MERGED":
         if not head.get("outcome"):
@@ -650,7 +657,7 @@ def advance(home, task, url, meta, side):
     if side.data.get("phase", {}).get("head") == sha and side.data["phase"]["state"] == "queued" and still_queued(url):
         return
     ensure_objects(meta, sha, base)
-    if any(a["state"] == "requested" for a in head["attempts"].values()):
+    if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):
         return
     reason = ready_reason(view)
     if reason:
