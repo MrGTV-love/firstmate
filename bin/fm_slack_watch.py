@@ -570,10 +570,43 @@ class Watch:
             self.staging_only = False
         if self.state['pending']:
             raise SlackError('dm_user_changed_with_pending_work')
+        # An empty journal does not prove the old DM was drained either: a poll takes in at most
+        # the per-poll cap, so owner requests may still wait in the old DM. Only look, never take in.
+        if self.unread_requests():
+            raise SlackError('dm_user_changed_with_unread_requests')
         # The old DM's threads stop being tracked and nothing more is posted there.
         self.state.update(user='', channel='', team='', scopes=[], threads={})
         # The request cursor belongs to the old DM; the new DM starts from its own latest message.
         self.state.pop('intake_cursor', None)
+        self.commit()
+        return True
+
+    def newer_messages(self, channel, cursor):
+        """The messages of the DM window newer than the starting point, in Slack's order (newest first)."""
+        for message in self.api.pages('conversations.history', 'messages', channel=channel, oldest=cursor):
+            if (isinstance(message, dict) and isinstance(message.get('ts'), str)
+                    and SLACK_TS.fullmatch(message['ts']) and ts_key(message['ts']) > ts_key(cursor)):
+                yield message
+
+    def unread_requests(self):
+        """Whether the stored DM still holds an owner request newer than the starting point that was never taken in."""
+        channel, cursor = self.state.get('channel'), self.state.get('intake_cursor')
+        if not channel or cursor is None:
+            return False
+        for message in self.newer_messages(channel, cursor):
+            row = self.request_from(message)
+            if row and row['event'] not in self.state['seen']:
+                return True
+        return False
+
+    def start_requests(self):
+        """A plane armed before requests existed starts at the DM's latest message on its first poll, never at
+        its history, and whatever the per-poll cap leaves for other work; returns whether it started here."""
+        channel = self.state.get('channel')
+        if not channel or self.state.get('intake_cursor') is not None:
+            return False
+        latest = self.api.call('conversations.history', channel=channel, limit=1)
+        self.state['intake_cursor'] = self.newest(latest.get('messages'))
         self.commit()
         return True
 
@@ -897,7 +930,15 @@ class Watch:
     def poll(self):
         if not self.bound():
             return
+        # The starting point of requests is set before anything uses the per-poll cap, so that a busy first
+        # upgraded poll cannot skip a request sent after it; a failed read is held back like a mirror failure.
+        started, start_error = False, None
+        try:
+            started = self.start_requests()
+        except SlackError as error:
+            start_error = error
         remaining, deferred = self.resume()
+        deferred = deferred or start_error
         if remaining <= 0:
             if deferred:
                 raise deferred
@@ -929,8 +970,10 @@ class Watch:
                 deferred = deferred or error
         deferred = self.resolve() or deferred
         # Last, so that the replies on tracked threads and the resolutions are never held back by it.
+        # A poll that has just set the starting point takes nothing in; the next poll reads from it.
         try:
-            self.take_requests(remaining)
+            if not started:
+                self.take_requests(remaining)
         except SlackError as error:
             if str(error) not in THREAD_ERRORS:
                 raise
@@ -940,21 +983,11 @@ class Watch:
 
     def take_requests(self, remaining):
         """Take in new owner messages from the DM window, oldest first, at most remaining of them."""
-        channel = self.state.get('channel')
-        if remaining <= 0 or not channel:
+        channel, cursor = self.state.get('channel'), self.state.get('intake_cursor')
+        if remaining <= 0 or not channel or cursor is None:
             return
-        cursor = self.state.get('intake_cursor')
-        if cursor is None:
-            # A plane armed before requests existed: start at the DM's latest message, never at its history.
-            latest = self.api.call('conversations.history', channel=channel, limit=1)
-            self.state['intake_cursor'] = self.newest(latest.get('messages'))
-            self.commit()
-            return
-        new = [m for m in self.api.pages('conversations.history', 'messages', channel=channel, oldest=cursor)
-               if isinstance(m, dict) and isinstance(m.get('ts'), str) and SLACK_TS.fullmatch(m['ts'])
-               and ts_key(m['ts']) > ts_key(cursor)]
         moved = False
-        for message in sorted(new, key=lambda m: ts_key(m['ts'])):
+        for message in sorted(self.newer_messages(channel, cursor), key=lambda m: ts_key(m['ts'])):
             row = self.request_from(message)
             if row and row['event'] not in self.state['seen']:
                 if remaining <= 0:
