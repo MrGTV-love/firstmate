@@ -221,13 +221,15 @@ def archive_rows(path, count):
 def neighbours(title, text, archive=None, own=""):
     """Every open item and newest-Done item whose title overlaps `title`, best first."""
     mine = words(title[:TITLE_LIST_LIMIT])
-    if not mine:
-        return []
+    # Both sources are read and checked first, so a malformed or unreadable
+    # source stops the add even when the title has no searchable word.
     rows = list_rows(text)
     for row in rows:
         row["source"] = "active"
     kept_done = sum(1 for r in rows if r.get("state") == "done")
     rows = rows + archive_rows(archive, RECENT_DONE - kept_done)
+    if not mine:
+        return []
     found = []
     done_seen = 0
     for row in rows:

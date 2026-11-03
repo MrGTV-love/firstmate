@@ -430,6 +430,26 @@ append_to_kept() {  # <kept-id> <origin label> <title> <body>
 # command substitution, so both values reach the caller.
 REMOTE_ITEM_STATE=
 REMOTE_ITEM_ERROR=
+# True when a remote registry record can only reach this very backlog: its host
+# is this machine (a loopback name, this machine's own name, or an SSH alias that
+# resolves to one of them) and its home holds the same data directory or
+# backlog file this operation addresses. A move to the item itself is no move.
+remote_is_this_backlog() {  # <host> <home>
+  local host=$1 home=$2 name resolved here=0
+  case "$home" in /*) ;; *) return 1 ;; esac
+  [ "$home/data" -ef "$DATA" ] || { [ -e "$home/data/backlog.md" ] && [ "$home/data/backlog.md" -ef "$DATA/backlog.md" ]; } || return 1
+  resolved=$("${FM_SSH_BIN:-ssh}" -G "$host" 2>/dev/null </dev/null | sed -n 's/^hostname //p' | sed -n '1p') || resolved=
+  for name in "$host" "$resolved"; do
+    [ -n "$name" ] || continue
+    case "$name" in
+      localhost|localhost.*|127.*|::1|\[::1\]) here=1 ;;
+    esac
+    [ "$name" != "$(hostname 2>/dev/null)" ] || here=1
+    [ "$name" != "$(hostname -s 2>/dev/null)" ] || here=1
+  done
+  [ "$here" = 1 ]
+}
+
 remote_item_state() {  # <home> <item>
   local out status state
   out=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
@@ -524,6 +544,9 @@ guard_closing_proof() {
     secondmate_registry_line_for_id "$DATA/secondmates.md" "$home_id" \
       || backlog_refuse backlog-close-moved-to home-not-registered "one registered home" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is not one registered home in $DATA/secondmates.md"
     if [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ]; then
+      if remote_is_this_backlog "$SECONDMATE_REGISTRY_HOST" "$SECONDMATE_REGISTRY_HOME"; then
+        backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id reaches this backlog itself (host $SECONDMATE_REGISTRY_HOST, home $SECONDMATE_REGISTRY_HOME); a moved item must live in a different backlog"
+      fi
       remote_item_state "$home_id" "$item"
       case $? in
         0) dest_state=$REMOTE_ITEM_STATE ;;
@@ -694,6 +717,7 @@ guard_intake() {
   [ -n "$ADD_TITLE" ] || return 0
   list=$(fm_backlog_row_list "$DATA") \
     || backlog_source_stop backlog-intake-duplicate "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
+  ADD_PRE_IDS=$(printf '%s\n' "$list" | list_ids)
   ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(intake_archive)" "$ADD_ID")
   status=$?
   case "$status" in
@@ -771,13 +795,53 @@ NEIGHBOURS
   exit 2
 }
 
+# The item ids in a `tasks-axi list` answer, one per line.
+list_ids() {
+  awk '/^  [^ ]/ { sub(/^  /, ""); n = index($0, ","); if (n > 0) print substr($0, 1, n - 1) }'
+}
+
+# The add's own output could not be read. Find the item it filed by comparing the
+# backlog now with the ids the duplicate check saw before the add. Sets ADDED_ID
+# to the one new id, or leaves it empty when nothing new appeared; returns 1 when
+# the add cannot be tied to one item, after removing what it can.
+recover_added_id() {
+  local after new count
+  ADDED_ID=
+  if after=$(fm_backlog_row_list "$DATA") && [ -n "${ADD_PRE_IDS+x}" ]; then
+    new=$(printf '%s\n' "$after" | list_ids | grep -Fxv -f <(printf '%s\n' "$ADD_PRE_IDS") || true)
+    count=$(printf '%s' "$new" | grep -c . || true)
+    if [ "$count" -eq 0 ]; then
+      return 0
+    elif [ "$count" -eq 1 ]; then
+      ADDED_ID=$new
+      return 0
+    fi
+    printf 'fm-tasks-axi: tasks-axi added an item but its answer could not be read, and %s new items now exist, so the objective could not be tied to one of them; check data/backlog-review.tsv against tasks-axi list\n' "$count" >&2
+    return 1
+  fi
+  if [ -n "$ADD_ID" ] && fm_backlog_mutate "$DATA" rm "$ADD_ID" 2>/dev/null; then
+    printf 'fm-tasks-axi: tasks-axi added %s but its answer could not be read and the backlog could not be listed, so the item was removed again; nothing is filed\n' "$ADD_ID" >&2
+  else
+    printf 'fm-tasks-axi: tasks-axi added an item but its answer could not be read and the backlog could not be listed, so its objective was not recorded; run tasks-axi list, remove the item, and file it again\n' >&2
+  fi
+  return 1
+}
+
 # One line per filed item in data/backlog-review.tsv: id, review-by (empty),
-# objective, and reason. A row
-# that cannot be written removes the item again, so an item never stays filed
-# without its row.
+# objective, and reason. An item never stays filed without its row: a row that
+# cannot be written removes the item again, an add whose answer cannot be read is
+# matched to the new item by id, and an add that cannot be matched fails.
 intake_record() {  # <captured-add-stdout-file>
-  local reason row
-  added_fields "$1" || return 0
+  local reason row status=0
+  added_fields "$1" || status=$?
+  case "$status" in
+    0) ;;
+    3) return 0 ;;
+    *)
+      recover_added_id || return 1
+      [ -n "$ADDED_ID" ] || return 0
+      ;;
+  esac
   reason=$(printf '%s' "$ADD_REASON" | tr '\t\n' '  ')
   row=$(printf '%s\t\t%s\t%s' "$ADDED_ID" "$ADD_OBJECTIVE" "$reason")
   printf '%s\n' "$row" >> "$DATA/backlog-review.tsv" && return 0
@@ -929,14 +993,16 @@ case "$TASK_COMMAND" in
 esac
 # Read the item an `add` just created from the add's own captured stdout, so a
 # minted id and every defaulted field are the ones tasks-axi stored. Sets
-# ADDED_ID/REPO/KIND/PRIORITY and returns 0 only for a newly created item: an add
-# that found its id already present (`already`) or failed returns 1.
+# ADDED_ID/REPO/KIND/PRIORITY and returns 0 for a newly created item, 3 when
+# tasks-axi says the id was already present (nothing new was filed), and 1 when
+# the output cannot be read, which is not proof that nothing was filed.
 added_fields() {  # <captured-stdout-file>
   local out fields key value json_status
   ADDED_ID=
   ADDED_REPO=
   ADDED_KIND=
   ADDED_PRIORITY=
+  ADDED_ALREADY=0
   out=$(cat -- "$1") || return 1
   # JSON output is read with python3, which the intake checks already require,
   # so a home without jq still records the objective of a --json add.
@@ -948,8 +1014,10 @@ try:
     doc = json.load(sys.stdin)
 except ValueError:
     sys.exit(3)
-if not (isinstance(doc, dict) and doc.get("ok") is True and doc.get("action") == "add" and not doc.get("already")):
-    sys.exit(0)
+if not (isinstance(doc, dict) and doc.get("ok") is True and doc.get("action") == "add"):
+    sys.exit(4)
+if doc.get("already"):
+    print("already\ttrue")
 task = doc.get("task") or {}
 for key in ("id", "repo", "kind", "priority"):
     value = task.get(key)
@@ -959,8 +1027,9 @@ for key in ("id", "repo", "kind", "priority"):
     0) ;;
     3)
       fields=$(printf '%s\n' "$out" | awk '
-        /^ok: added / { added = 1; next }
-        added && /^  (id|kind|repo|priority): / {
+        /^ok: add .* already exists/ { seen = 1; print "already\ttrue"; next }
+        /^ok: added / { seen = 1; next }
+        seen && /^  (id|kind|repo|priority): / {
           key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
           gsub(/^"|"$/, "", value); if (value == "-") value = ""
           printf "%s\t%s\n", key, value
@@ -969,8 +1038,10 @@ for key in ("id", "repo", "kind", "priority"):
     *) return 1 ;;
   esac
   while IFS=$'\t' read -r key value; do
-    case "$key" in id) ADDED_ID=$value ;; repo) ADDED_REPO=$value ;; kind) ADDED_KIND=$value ;; priority) ADDED_PRIORITY=$value ;; esac
+    case "$key" in already) ADDED_ALREADY=1 ;; id) ADDED_ID=$value ;; repo) ADDED_REPO=$value ;; kind) ADDED_KIND=$value ;; priority) ADDED_PRIORITY=$value ;; esac
   done <<< "$fields"
+  # An add that tasks-axi reports as already present filed nothing new.
+  [ "$ADDED_ALREADY" = 0 ] || return 3
   [ -n "$ADDED_ID" ]
 }
 

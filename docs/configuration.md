@@ -487,6 +487,8 @@ The script header owns the flags, the refusals, and their exit status; [`bin/fm-
   `done <id> --moved-to <home> <item-id>` closes an item whose work moved to a home registered exactly once in the `data/secondmates.md` of the operation's own data directory, when that home's own backlog, a different one from this, holds `<item-id>` open.
   A local home is read through tasks-axi in its own data directory.
   A remote home is read through [`bin/fm-on.sh`](../bin/fm-on.sh), which owns the route and the transport, and an unreachable remote closes nothing.
+  A remote record whose host is this machine (a loopback name, this machine's own name, or an SSH alias that resolves to one of them) and whose home holds this very backlog is the same backlog and proves nothing; the same path on another host is a different backlog.
+  A different name for this machine that neither the record nor `ssh -G` resolves to one of those is not recognized, so register such a home as a local home.
   Both proofs stop at an item the owner filed, an item whose owner call is open, an item with a live task record, a closed item, and an item that still blocks an open item, and each refusal names what to do next.
   A proof close leaves the work open elsewhere, so the refusal names the open items it would release and tells the operator to re-point them first; the tool never re-points them itself.
   For `--duplicate-of`, every dependent, held or not, is re-pointed with `block <dependent> --by <kept-id>` and then `unblock <dependent> --by <id>`; the kept item itself needs only the unblock step.

@@ -7104,13 +7104,13 @@
         {
           "file": "bin/fm-tasks-axi.sh",
           "match": "backlog_refuse backlog-close-moved-to",
-          "count": 5
+          "count": 6
         }
       ],
       "invariant": "a moved item closes only when a different registered home holds its work open",
       "layer": "runtime-block",
       "source": "data/secondmates.md through bin/fm-secondmate-registry-lib.sh, then the other home's backlog through tasks-axi or bin/fm-on.sh",
-      "trigger": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id> where the home is not registered exactly once, is this backlog, holds no such item, or holds it closed",
+      "trigger": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id> where the home is not registered exactly once, is this backlog (also through a remote record that reaches it), holds no such item, or holds it closed",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "bin/fm-tasks-axi.sh done <id> --moved-to <home> <item-id>",

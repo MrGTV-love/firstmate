@@ -1408,6 +1408,85 @@ test_json_add_records_its_objective_without_jq() {
   pass "a --json add on a home without jq still records the objective row"
 }
 
+# The add succeeds but the wrapper cannot read tasks-axi's answer (every
+# `python3 -I` call fails). The item must still get its row: the wrapper finds the
+# new id by comparing the backlog with what it saw before the add, for a named id,
+# --json, and a minted id, and a repeat add of an existing id adds no row.
+test_add_keeps_its_row_when_the_answer_cannot_be_read() {
+  local dir fakebin out rows ids id
+  dir=$(make_split objective-capture)
+  fakebin=$(fm_fakebin "$dir")
+  # shellcheck disable=SC2016 # the shim's own "$1" and "$@" must stay literal
+  printf '#!/bin/sh\nif [ "$1" = -I ]; then exit 1; fi\nexec %s "$@"\n' "$(command -v python3)" > "$fakebin/python3"
+  chmod +x "$fakebin/python3"
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 >/dev/null 2>&1 \
+    || fail "a plain add failed when its answer could not be read"
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-json "$(ftitle cap-json)" --objective O3 --json >/dev/null 2>&1 \
+    || fail "a --json add failed when its answer could not be read"
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add "$(ftitle cap-mint)" --mint --objective O4 >/dev/null 2>&1 \
+    || fail "a minted add failed when its answer could not be read"
+  rows=$(cat "$dir/home/data/backlog-review.tsv")
+  assert_contains "$rows" "$(printf 'cap-plain\t\tO2\t')" "the plain add lost its objective row"
+  assert_contains "$rows" "$(printf 'cap-json\t\tO3\t')" "the --json add lost its objective row"
+  ids=$(cut -f1 "$dir/home/data/backlog-review.tsv" | grep -v '^cap-plain$' | grep -v '^cap-json$')
+  assert_equals 1 "$(printf '%s\n' "$ids" | grep -c .)" "the minted add did not leave exactly one more row"
+  id=$ids
+  assert_grep "$id" "$dir/home/data/backlog.md" "the minted row names an id that is not in the backlog"
+  assert_contains "$rows" "$(printf '%s\t\tO4\t' "$id")" "the minted add recorded the wrong objective"
+  # A repeat add of an existing id is proved already present and adds no row.
+  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 >/dev/null 2>&1 \
+    || fail "a repeat add of an existing id failed"
+  assert_equals 3 "$(wc -l < "$dir/home/data/backlog-review.tsv" | tr -d ' ')" "a repeat add of an existing id added a row"
+  pass "an add whose answer cannot be read still gets its objective row, a repeat add adds none"
+}
+
+# A title with no searchable word has nothing to compare, but a malformed or
+# unreadable backlog or archive must still stop the add with nothing filed.
+test_empty_search_words_still_check_the_sources() {
+  local dir out before
+  dir=$(make_split intake-empty-words)
+  wrapper_from_code "$dir" add ew-base "$(ftitle ew-base)" --objective O7 >/dev/null || fail "could not file the base item"
+  rm -f "$dir/home/data/backlog-review.tsv"
+  before=$(cat "$dir/home/data/backlog.md")
+  printf '\n## Archived 2026-11-01\n- [x] malformed row without the required delimiter\n' > "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "malformed archive and no searchable words" add ew-new AI --objective O7)
+  assert_contains "$out" "could not read the backlog or its done archive" "a malformed archive was not reported for a title with no searchable word"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "an add filed an item beside a malformed archive"
+  assert_absent "$dir/home/data/backlog-review.tsv" "an add recorded a row beside a malformed archive"
+  rm -f "$dir/home/data/done-archive.md"
+  mkdir "$dir/home/data/done-archive.md"
+  out=$(refusal_of "$dir" "unreadable archive and no searchable words" add ew-new AI --objective O7)
+  assert_contains "$out" "could not read the backlog or its done archive" "an unreadable archive was not reported for a title with no searchable word"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "an add filed an item beside an unreadable archive"
+  rmdir "$dir/home/data/done-archive.md"
+  # Healthy sources keep the no-overlap behaviour.
+  wrapper_from_code "$dir" add ew-new AI --objective O7 >/dev/null 2>&1 || fail "a title with no searchable word was refused beside healthy sources"
+  assert_grep "ew-new" "$dir/home/data/backlog.md" "a title with no searchable word was not filed beside healthy sources"
+  pass "a title with no searchable word still stops on a malformed or unreadable source and files beside healthy ones"
+}
+
+# A registered remote home that reaches this very backlog (a loopback alias) can
+# not prove a move: the item would close with nothing delivered anywhere. The same
+# path on a different host is a different backlog and still proves the move.
+test_moved_to_refuses_a_remote_alias_of_this_backlog() {
+  local dir out fakebin
+  dir=$(make_split proof-moved-loopback)
+  fakebin=$(fm_fakebin "$dir")
+  make_fake_ssh "$fakebin"
+  make_peer_home "$dir/remote-fs$dir/home" lb-item
+  {
+    printf -- '- sm-loop - Loopback alias of this home (host: localhost; root: %s; home: %s; scope: loop scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
+    printf -- '- sm-far - Same path on another host (host: far-box; root: %s; home: %s; scope: far scope; projects: p; added 2026-11-01)\n' "$ROOT" "$dir/home"
+  } > "$dir/home/data/secondmates.md"
+  wrapper_from_code "$dir" add lb-item "$(ftitle lb-item)" --objective O7 --kind ship >/dev/null || fail "could not file the item"
+  out=$(FM_SSH_BIN="$fakebin/fake-ssh" FAKE_REMOTE_PREFIX="" wrapper_from_code "$dir" "done" lb-item --moved-to sm-loop lb-item 2>&1) && fail "a loopback alias of this backlog proved a move to itself: $out"
+  assert_contains "$out" "this backlog itself" "the loopback alias was not named"
+  [ "$(row_state "$dir" lb-item)" = " " ] || fail "the item closed on a move to itself"
+  out=$(moved_close "$dir" lb-item sm-far lb-item) || fail "the same path on another host was refused: $out"
+  [ "$(row_state "$dir" lb-item)" = x ] || fail "the move to another host did not close the item"
+  pass "a remote alias of this backlog cannot prove a move, while the same path on another host still can"
+}
+
 # A fake non-Markdown adapter: tasks-axi answers from files under .stubdata when
 # the working directory's .tasks.toml names the beads backend, and is the real
 # tasks-axi anywhere else.
@@ -2415,6 +2494,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_objective_rows_land_in_the_addressed_home
   test_failed_row_write_removes_the_filed_item
   test_json_add_records_its_objective_without_jq
+  test_add_keeps_its_row_when_the_answer_cannot_be_read
+  test_empty_search_words_still_check_the_sources
   test_add_judges_near_duplicate_titles
   test_duplicate_check_boundaries_and_unreadable_sources
   test_dup_of_and_not_dup_do_what_the_refusal_says
@@ -2426,6 +2507,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_backlog_guards_log_each_refusal_and_escape
   test_duplicate_of_closes_on_checked_proof
   test_moved_to_closes_on_checked_proof
+  test_moved_to_refuses_a_remote_alias_of_this_backlog
   test_closing_proofs_keep_open_dependents_blocked
   test_closing_proofs_leave_the_owners_items_alone
   test_closing_proofs_serialize_with_holds_and_live_tasks || exit "$?"
