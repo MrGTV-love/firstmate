@@ -1,0 +1,9 @@
+ok - a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr and on the backlog close
+ok - a pre-rebase copy whose patches the train head carries is accepted by the patch proof
+ok - a train landed by squash is accepted
+ok - a copy later than the listed head but inside the verified train is accepted
+ok - a closed member no merged PR lists at a 40-hex sha is refused (no list, other member, number prefix, no sha)
+ok - a train listing another sha, or a sha its head does not contain, is refused
+ok - a copy holding a commit the train head never carried is refused with the commit named
+ok - a matching run record never carries a copy whose commits the train head lacks; the copy and the record stay
+ok - the train route never reads the run record, so a silent reader neither delays nor admits it

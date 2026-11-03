@@ -1,0 +1,22 @@
+ok - a flattened-rebase train that replays every member commit is accepted although it does not contain the member head
+ok - a flattened train missing one commit of the member head is refused
+ok - a flat train missing a member commit refuses even when a stale remote-tracking ref holds that commit
+ok - a failed re-read of the CLOSED member is unknown, retry
+ok - a dirty copy refuses before any forge read, even when its train is verified
+ok - an open or closed-unmerged train is refused
+ok - the train must be merged into the task's base: the default branch, or its recorded base_branch
+ok - a failed forge search or fetch of the train is unknown, retry, never accepted and never 'not landed'
+ok - a train that lists an OPEN member does not make it landed
+ok - a MERGED member is decided by the existing route, with no train read
+ok - a CLOSED member whose clean content is already in the default branch is still accepted by the content proof
+ok - a closed member with no train and unlanded work keeps the existing refusal
+ok - a removed copy is accepted only on a verified merged train, and every unverified or unread train refuses
+ok - a removed copy's branch in a pool slot is landed by a verified train only
+rc=0
+ok - a train member on a reassigned slot retires on a verified merged train only, leaving the claimant alone
+pool-rc=0
+ok - recovery replays only the merge-train close shape and refuses every wider note or argument shape
+atom-rc=0
+ok - an answer before cleanup replay records the merge train PR and the closed member
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+hold-rc=0

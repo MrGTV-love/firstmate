@@ -1,0 +1,13 @@
+== T5 live forge read: Vernant member PR 3528 (expect ACCEPTED via train PR 3599)
+Tue Nov  3 19:21:20 UTC 2026
+worktree commit: a4643e9c3e1e78862e951d3aaa526d807ac9e2c9
+call: teardown_recorded_pr_landed  PR_URL=https://github.com/MrGTV-love/vernant/pull/3528  PROJ=<disposable blobless clone>  BASE_BRANCH=main
+landed by a merged train: merged train PR https://github.com/MrGTV-love/vernant/pull/3599 lists https://github.com/MrGTV-love/vernant/pull/3528 at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3; https://github.com/MrGTV-love/vernant/pull/3528 itself is closed, not merged
+RESULT: ACCEPTED (rc=0) train=https://github.com/MrGTV-love/vernant/pull/3599 member=https://github.com/MrGTV-love/vernant/pull/3528
+
+== T5 live forge read: Vernant PR 3567 (CLOSED, unmerged, listed by no other PR; expect REFUSED)
+forge: state=CLOSED mergedAt=null head=873afc3ad9a2329a0fda03b65e6a207a87fff5af
+call: teardown_recorded_pr_landed  PR_URL=https://github.com/MrGTV-love/vernant/pull/3567  PROJ=<disposable blobless clone>  BASE_BRANCH=main
+RESULT: REFUSED (rc=1)
+no merge-train proof:
+https://github.com/MrGTV-love/vernant/pull/3567 is CLOSED and no PR found by the forge lists it at a 40-hex sha
