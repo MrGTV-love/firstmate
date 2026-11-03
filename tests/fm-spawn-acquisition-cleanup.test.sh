@@ -3,6 +3,7 @@
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 # The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
+# FM_TEST_ACQUISITION_CASES=cleanup-writer leaves a detached child writing during this script's own cleanup.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -24,9 +25,21 @@ B_SPAWN_PID=
 A_POLL_READY=
 B_ALLOW=
 SESSION_LOCK=
+# fm-spawn.sh detaches a refresh, and panes leave programs behind. Any tmux client
+# they start recreates tmux-<uid> in the socket directory, so stop what this test
+# owns first. A process can fork after a sweep reads the process list, so only a
+# sweep that finds nothing proves that nothing is left to write.
+stop_owned_children() {
+  local swept
+  for _ in $(seq 1 50); do
+    swept=$("$ROOT/bin/fm-test-reap-orphans.sh" --owner-pid "$$" --root "$TMP_ROOT") || return 1
+    [ -n "$swept" ] || return 0
+  done
+  return 1
+}
 cleanup_acquisition() {
   local rc=$?
-  local pid alive gate
+  local pid alive gate lab_server
   [ -z "$SESSION_LOCK" ] || fm_lock_release "$SESSION_LOCK" || rc=1
   for gate in "$A_POLL_READY" "$B_ALLOW"; do
     [ -z "$gate" ] || touch "$gate"
@@ -50,7 +63,16 @@ cleanup_acquisition() {
     done
   fi
   if [ -n "$LAB_TMUX_DIR" ]; then
+    lab_server=$(TMUX_TMPDIR="$LAB_TMUX_DIR" "$REAL_TMUX" display-message -p '#{pid}' 2>/dev/null) || lab_server=
     TMUX_TMPDIR="$LAB_TMUX_DIR" "$REAL_TMUX" kill-server 2>/dev/null || true
+    # The sweep reaches a pane's program only once the server is gone. A server
+    # that outlives this wait makes teardown refuse, so it cannot pass unseen.
+    for _ in $(seq 1 500); do
+      [ -n "$lab_server" ] || break
+      kill -0 "$lab_server" 2>/dev/null || break
+      /bin/sleep 0.02
+    done
+    stop_owned_children || rc=1
     "$LAB_HOME_HELPER" teardown "$FM_HOME" || rc=1
   fi
   if [ -n "$HERDR_LAB_SESSION" ]; then
@@ -204,6 +226,20 @@ load_acquisition_herdr() {
   # shellcheck source=/dev/null
   . "$ROOT/bin/backends/herdr.sh"
 }
+
+# Leave a detached child writing into the socket directory, then exit into the
+# real cleanup trap. Its parent is gone and only its working directory names this
+# fixture, the same shape as the refresh that fm-spawn.sh detaches.
+if [ "${FM_TEST_ACQUISITION_CASES:-all}" = cleanup-writer ]; then
+  [ "$BACKEND" = tmux ] || fail 'cleanup-writer runs on tmux only'
+  printf '%s\n' "$LAB_TMUX_DIR" > "$FM_TEST_CLEANUP_WRITER_CASE/socket-dir" || fail 'cannot record the socket directory'
+  (nohup bash "$FM_TEST_CLEANUP_WRITER_CASE/child-write.sh" "$LAB_TMUX_DIR" "$FM_TEST_CLEANUP_WRITER_CASE" >/dev/null 2>&1 </dev/null &)
+  for _ in $(seq 1 500); do
+    [ ! -s "$FM_TEST_CLEANUP_WRITER_CASE/writer.proc" ] || [ ! -e "$LAB_TMUX_DIR/child-write.0" ] || exit 0
+    /bin/sleep 0.02
+  done
+  fail 'the writing child never started'
+fi
 
 if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   load_acquisition_herdr "$@"
@@ -578,6 +614,33 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
 fi
 
 if [ "$BACKEND" = tmux ]; then
+  # An owned child still writing must not make cleanup fail or leave the socket
+  # directory behind. The child recreates the directory if it goes first, so a
+  # cleanup that removes it too early fails either way the race lands.
+  WRITER_CASE="$TMP_ROOT/case-cleanup-writer"
+  mkdir -p "$WRITER_CASE"
+  cat > "$WRITER_CASE/child-write.sh" <<'SH'
+fm_test_record_process "$2/writer.proc"
+i=0
+while [ "$SECONDS" -lt "$FM_TEST_STUB_MAX_BLOCK_SECONDS" ]; do
+  { : > "$1/child-write.$((i % 64))"; } 2>/dev/null || mkdir -p "$1"
+  i=$((i + 1))
+done
+SH
+  fm_test_track_process "$WRITER_CASE/writer.proc" child-write
+  out=$(FM_TEST_ACQUISITION_CASES=cleanup-writer FM_TEST_CLEANUP_WRITER_CASE="$WRITER_CASE" bash "$ROOT/tests/fm-spawn-acquisition-cleanup.test.sh" tmux 2>&1)
+  rc=$?
+  writer_dir=$(cat "$WRITER_CASE/socket-dir") || fail "cleanup-writer case recorded no socket directory: $out"
+  writer_dir_left=no
+  if [ -e "$writer_dir" ]; then
+    writer_dir_left=yes
+    rm -rf "$writer_dir"
+  fi
+  ! fm_test_process_alive "$WRITER_CASE/writer.proc" child-write || fail 'cleanup left its writing child alive'
+  expect_code 0 "$rc" "cleanup did not stop its writing child before removing the socket directory: $out"
+  [ "$writer_dir_left" = no ] || fail "the writing child kept the socket directory after cleanup: $out"
+  pass 'tmux cleanup stops its writing child before removing the socket directory'
+
   # A provisioner models the actual ownership requirement with real process
   # ancestry: the acquired get process must be an ancestor of its invocation.
   # Supervisor-side execution fails even though the pane is a valid isolated copy.
