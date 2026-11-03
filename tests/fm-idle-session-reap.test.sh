@@ -22,7 +22,8 @@ STUB="$TMP_ROOT/teardown-stub.sh"
 STUB_LOG="$TMP_ROOT/teardown-calls.log"
 STUB_MODE_FILE="$TMP_ROOT/teardown-mode"
 STUB_ADMIT_LOG="$TMP_ROOT/teardown-admission.log"
-export STUB_LOG STUB_MODE_FILE STUB_ADMIT_LOG
+STUB_ARCHIVE_DIR="$TMP_ROOT/driver-archives"
+export STUB_LOG STUB_MODE_FILE STUB_ADMIT_LOG STUB_ARCHIVE_DIR
 CLOSEOUT_OUT_FILE="$TMP_ROOT/closeout-output.txt"
 export CLOSEOUT_OUT_FILE
 export ROOT
@@ -48,6 +49,23 @@ case "$mode" in
       echo "REFUSED: automatic reap ineligible: $class" >&2
       exit 1
     fi
+    cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
+  closeout-archive)
+    # The closeout driver as the incident showed it: each admitted try writes one
+    # more archive of the copy's ignored files and keeps the tree.
+    memo=0
+    [ ! -e "$FM_STATE_OVERRIDE/.idle-reap/$1.refused" ] || memo=1
+    class=$(. "$ROOT/bin/fm-idle-reap-lib.sh"
+      fm_idle_reap_classify "$FM_HOME" "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE" "$1"
+      printf '%s' "$IDLE_REAP_CLASS")
+    printf 'memo=%s class=%s\n' "$memo" "$class" >> "$STUB_ADMIT_LOG"
+    if [ "$class" != reap ]; then
+      echo "REFUSED: automatic reap ineligible: $class" >&2
+      exit 1
+    fi
+    mkdir -p "$STUB_ARCHIVE_DIR"
+    n=$(find "$STUB_ARCHIVE_DIR" -type f | wc -l | tr -d ' ')
+    printf 'ignored payload\n' > "$STUB_ARCHIVE_DIR/archive.$((n + 1))"
     cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
   nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
@@ -1248,6 +1266,40 @@ test_closeout_wake_survives_a_drained_queue_and_a_failed_append() {
   pass "the one closeout wake does not depend on the queue and is raised again after a failed append"
 }
 
+# T3 (H2): disk growth is bounded by changes, not by sweeps. Each admitted try
+# of the driver writes one archive, so the number of archives must follow the
+# number of distinct fingerprints of the copy: an unchanged copy gets one, however
+# many sweeps run and however old the refusal memo is, and a changed copy gets
+# exactly one more try, which the new record then holds.
+test_closeout_archives_grow_with_changes_not_with_sweeps() {
+  local n
+  closeout_home closeout-growth own
+  printf 'closeout-archive\n' > "$STUB_MODE_FILE"
+  : > "$STUB_ADMIT_LOG"
+  rm -rf "$STUB_ARCHIVE_DIR"
+  archives() { find "$STUB_ARCHIVE_DIR" -type f 2>/dev/null | wc -l | tr -d ' '; }
+  run_reap "$HOME_C" reap >/dev/null || fail "first reap failed"
+  [ "$(archives)" = 1 ] || fail "the first try writes one archive (got $(archives))"
+  # T1 (H2, unchanged): a fresh memo and an unchanged fingerprint make no further try.
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  [ "$(archives)" = 1 ] || fail "a fresh memo with an unchanged copy was tried again (archives=$(archives))"
+  for n in 1 2 3; do
+    age_refusal_memo "$HOME_C" cl $((100000 * n))
+    run_reap "$HOME_C" reap >/dev/null || fail "aged reap $n failed"
+  done
+  [ "$(archives)" = 1 ] || fail "an unchanged copy gained an archive while its memo aged (archives=$(archives))"
+  [ "$(calls)" = 1 ] || fail "an unchanged copy reached teardown again (calls=$(calls))"
+  printf 'more\n' > "$COPY_C/more.txt"
+  git -C "$COPY_C" add more.txt
+  git -C "$COPY_C" -c user.name=t -c user.email=t@example.invalid commit -qm more
+  for n in 1 2 3; do
+    run_reap "$HOME_C" reap >/dev/null || fail "changed reap $n failed"
+  done
+  [ "$(archives)" = 2 ] || fail "a changed copy must get exactly one more try, then be held (archives=$(archives))"
+  [ "$(sed -n 2p "$STUB_ADMIT_LOG")" = "memo=0 class=reap" ] || fail "the changed copy was held by the old memo at admission: $(sed -n 2p "$STUB_ADMIT_LOG")"
+  pass "the closeout driver's archives follow the copy's changes: one for an unchanged copy however many sweeps run, one more for each change"
+}
+
 test_closeout_changed_copy_is_retried() {
   local change
   for change in commit untracked modified; do
@@ -1352,6 +1404,7 @@ test_closeout_orphan_record_is_pruned_on_the_first_reap() {
   assert_present "$rec" "a record for a task that still exists is kept"
   pass "a stale closeout record is pruned by the first reap, with or without the refusal memo directory"
 }
+test_closeout_archives_grow_with_changes_not_with_sweeps
 test_closeout_orphan_record_is_pruned_on_the_first_reap
 test_closeout_retained_copy_is_not_retried_while_unchanged
 test_closeout_wake_survives_a_drained_queue_and_a_failed_append

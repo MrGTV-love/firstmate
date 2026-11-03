@@ -410,7 +410,7 @@ raise_wake() {  # <text>
 }
 
 # A copy that stays: one wake and one log line per reason, a quiet retry later.
-retain() {  # <copy> <reason>
+retain() {  # <copy> <reason> [<nowake>: the caller already settled the wake]
   local copy=$1 reason=$2 changed=1
   [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0
   R_ATTEMPTS=$((R_ATTEMPTS + 1))
@@ -418,7 +418,7 @@ retain() {  # <copy> <reason>
   R_REASON=$reason
   R_COPY=$copy
   R_NEXT=$((NOW + RETAINED_RETRY))
-  raise_wake "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"
+  [ -n "${3-}" ] || raise_wake "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"
   rec_save "$ID" || true
   if [ "$changed" = 1 ]; then
     log_line "retained $copy: $reason"
@@ -426,13 +426,20 @@ retain() {  # <copy> <reason>
 }
 
 # A copy the closeout driver retained is kept with one wake across both sweeps:
-# the shared record, not R_WAKE, says whether this fingerprint's wake was sent.
+# the shared record, not R_WAKE, says whether this fingerprint's wake was sent,
+# and fm_closeout_retained_wake makes that disposition durable before it appends.
 retain_closeout() {  # <copy> <wake-sent: 0|1, from the record>
+  local copy=$1 reason
+  reason=$(fm_closeout_retained_reason)
   R_WAKE=$2
-  retain "$1" "$(fm_closeout_retained_reason)"
-  if [ "$2" = 0 ] && [ "$R_WAKE" = 1 ]; then
-    fm_closeout_retained_mark_wake "$STATE" "$ID" || true
+  if [ "$2" = 0 ]; then
+    if fm_closeout_retained_wake "$STATE" "$ID" "merge-prune:$ID" "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"; then
+      R_WAKE=1
+    else
+      log_line "wake could not be raised; the next attempt raises it again"
+    fi
   fi
+  retain "$copy" "$reason" nowake
 }
 
 # The classifier must still call the finished worker reapable. It is asked

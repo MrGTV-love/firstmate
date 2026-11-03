@@ -225,21 +225,28 @@ fm_closeout_lock_drop() {  # <state> <id>
   fm_lock_release "$1/.closeout-lock/$2" || true
 }
 
-# Marks the wake as sent. Call it only after the queue took the wake.
-fm_closeout_retained_mark_wake() {  # <state> <id>
+# Rewrites the record's wake flag; the entries come from the last read.
+fm_closeout_retained_mark_wake() {  # <state> <id> [<wake-sent: 1, default>]
   fm_closeout_retained_read "$1" "$2" || return 1
-  fm_closeout_retained_write "$1" "$2" 1
+  fm_closeout_retained_write "$1" "$2" "${3:-1}"
 }
 
-# The one wake of a record: appended only while wake_sent is 0 and marked only
-# after the append succeeded, so a failed append is raised again next time. The
-# caller holds the task's closeout lock, so the read, the append and the mark
-# are one step across both sweeps.
+# The one wake of a record. The sent disposition is made durable first and the
+# wake is appended second, so a failed marker write appends nothing (the next
+# sweep tries both again) and a wake the queue accepted can never be raised a
+# second time, even once it is drained. A real failed append puts the flag back
+# to 0, so the next sweep raises it again. The caller holds the task's closeout
+# lock, so the read, the marker, the append and the rollback are one step
+# across both sweeps. Only the double fault, an append that fails and then a
+# rollback that cannot be written, loses the wake; it prints that on stderr.
 fm_closeout_retained_wake() {  # <state> <id> <wake-key> <wake-text>
   fm_closeout_retained_read "$1" "$2" || return 1
   [ "$CLOSEOUT_RETAINED_WAKE" = 0 ] || return 0
-  fm_wake_append check "$3" "$4" || return 1
-  fm_closeout_retained_mark_wake "$1" "$2"
+  fm_closeout_retained_write "$1" "$2" 1 || return 1
+  fm_wake_append check "$3" "$4" && return 0
+  fm_closeout_retained_write "$1" "$2" 0 \
+    || echo "fm: the closeout wake for $2 could not be appended and its sent marker could not be put back; it is not raised again" >&2
+  return 1
 }
 
 fm_closeout_retained_clear() {  # <state> <id>
