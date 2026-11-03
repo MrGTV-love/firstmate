@@ -3610,7 +3610,7 @@ The same last resort covers an old thread that `retarget` can never read or judg
 First read that thread in Slack by hand and record any answer it holds with `bin/fm-captain-hold.sh answer`; only then run `bin/fm-slack-check.sh disarm` and remove `state/slack-watch/`.
 The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
-No Slack request runs when there are neither open calls nor tracked threads needing resolution.
+When there are neither open calls nor tracked threads needing resolution, a poll makes one Slack request, the read of the owner DM's history for new requests, plus the owner-DM proof, the reply lookup, and the post for each request it takes in.
 
 Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
 Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
@@ -3629,7 +3629,15 @@ Missing fields are omitted, never filled with `none recorded`; an `Evidence:` po
 On legacy cards, a recommendation or evidence line removed from the question appears as a plain line when the card does not already show that value as its recommendation or evidence link; with the hold reason as the question this adds no line, and with a fresh board question it shows the board question's own `Recommendation:` and `Evidence:` lines. When a fresh board question replaces the hold reason, the reason's question text, unlabeled and option lines, brief, and alternatives are not shown; its recommendation and first valid evidence pointer still fill those fields, and every other nonempty hold-reason `Evidence:` value except `none recorded` appears as a plain line after the board question's lines. Plain lines carry no link or answer binding.
 One answer line directs the reader to tap a number reaction or type the option number in that thread, to type the number when reaction scopes are missing, or to type an answer when there are no options.
 Option cards retain one short tap-versus-type disagreement line, and missing reaction scopes retain their operator warning.
-Only replies inside the card's thread map to that decision; messages typed in the main DM window are not read.
+Only replies inside the card's thread map to that decision.
+A new top-level message that an allowlisted human types in the main DM window is a request, never an answer: the poll takes it in oldest first within `FM_SLACK_POLL_MAX_ANSWERS`, posts one fixed acknowledgement, which never repeats the text, in a thread on that message, and prints one `check: slack request <ts> from <member id>: <text>` wake line.
+A thread reply, including one also sent to the main window, a bot-marked message, a message from anyone off the allowlist, an edit of a message already taken in, and a message with no text are never requests.
+The text is carried as labeled unverified data on one line, with controls replaced, Slack's escaping undone as for typed answers, and the line cut to the wake limit, saying so and naming the thread when it cuts.
+A request reaches no record: it writes nothing outside `state/slack-watch/`, runs no repository script, and gives the captain-hold intake nothing.
+Firstmate handles the wake under `check-result-handling`.
+The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed, so no earlier message is taken in, including one typed while the check was disarmed.
+Requests need an owner action that the code cannot take: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it; until then Slack refuses the owner's message with "Sending messages to this app has been turned off."
+They need no new scope or Slack method.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
 Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
@@ -3663,7 +3671,7 @@ Anything the intake writes to its error stream, such as a parent-channel deliver
 A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
 A closed tracked call receives one resolution notice naming the task and pointing to its local resolution record, without copying the task body, and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
 
-`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, the wake lines not yet printed, and the last reported failure class.
+`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, the newest main-window message already read, the wake lines not yet printed, and the last reported failure class.
 It is transport state, not a second decision store; `fm-captain-hold.sh answers` still owns record creation and answer replay detection.
 Recovery repeats an unfinished intake row through that same intake before committing its cursor; the intake accepts an exact replay of a row it already applied, in both close modes, so the acknowledgement says the answer was recorded.
 The test-only `after-delivery` fault fires after the intake has applied the row and before that is journaled; `after-answer` fires after it is journaled and before the acknowledgement.
