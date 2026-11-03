@@ -1,0 +1,631 @@
+  step -> state=[reading f7e7d4a26ac1 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G1/G3 green uncovered PR
+  fake runner argv:
+    argv: <tmp>/auto-green-uncovered/state/.pr-auto-review/task-x1.d/f7e7d4a26ac1-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f7e7d4a26ac10420f49ff7b6af2644da885902df|pr.diff|<tmp>/auto-green-uncovered/project|claude-sonnet-5-5[1m] contract=584 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715628 f7e7d4a26ac1 reading f7e7d4a26ac1 by claude-sonnet-5-5[1m] for openai
+    1793715630 f7e7d4a26ac1 verdict recorded: PASS for f7e7d4a26ac1 by claude-sonnet-5-5[1m], report <tmp>/auto-green-uncovered/state/.pr-auto-review/task-x1.d/f7e7d4a26ac1-claude-sonnet-5-5_1m_/review.md
+    1793715644 f7e7d4a26ac1 merged: https://github.com/example/repo/pull/9 at f7e7d4a26ac1
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"f7e7d4a26ac1","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit f7e7d4a26ac10420f49ff7b6af2644da885902df --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - a green uncovered PR gets one read with its pack, a recorded PASS and one merge through fm-pr-merge.sh
+  step -> state=[waiting: pull request is a draft] reads=0 reviews=0 merges=0
+  step -> state=[waiting: pull request is a draft] reads=0 reviews=0 merges=0
+## G1/G4 no request: draft
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: waiting: pull request is a draft
+  step -> state=[waiting: forge merge state is UNSTABLE, not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: forge merge state is UNSTABLE, not green] reads=0 reviews=0 merges=0
+## G1/G4 no request: red
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: waiting: forge merge state is UNSTABLE, not green
+  step -> state=[waiting: a check is still pending] reads=0 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending] reads=0 reviews=0 merges=0
+## G1/G4 no request: pending
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: waiting: a check is still pending
+  step -> state=[waiting: forge merge state is BLOCKED, not green] reads=0 reviews=0 merges=0
+  step -> state=[waiting: forge merge state is BLOCKED, not green] reads=0 reviews=0 merges=0
+## G1/G4 no request: unreported
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: waiting: forge merge state is BLOCKED, not green
+  step -> state=[waiting: pull request is CONFLICTING] reads=0 reviews=0 merges=0
+  step -> state=[waiting: pull request is CONFLICTING] reads=0 reviews=0 merges=0
+## G1/G4 no request: conflicting
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: waiting: pull request is CONFLICTING
+  step -> state=[idle] reads=0 reviews=0 merges=0
+  step -> state=[idle] reads=0 reviews=0 merges=0
+## G1/G4 no request: unregistered
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: idle
+  step -> state=[idle] reads=0 reviews=0 merges=0
+  step -> state=[idle] reads=0 reviews=0 merges=0
+## G1/G4 no request: local-only
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: idle
+  step -> state=[idle] reads=0 reviews=0 merges=0
+  step -> state=[idle] reads=0 reviews=0 merges=0
+## G1/G4 no request: closed
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: idle
+  step -> state=[held: a captain merge word is recorded for this head] reads=0 reviews=0 merges=0
+  step -> state=[held: a captain merge word is recorded for this head] reads=0 reviews=0 merges=0
+## G1/G4 no request: covered-by-captain-word
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715733 fabef9a73a9c held: a captain merge word is recorded at fabef9a73a9c; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":null,"head":"fabef9a73a9c","reader_model":null,"reader_family":null,"covered_groups":null,"loosens":null,"widens":null,"data":null}
+  forge merge calls (fake gh log):
+  current state: held: a captain merge word is recorded for this head
+  step -> state=[held: review pack not built: diff unavailable: the PR head fm-review-diff.sh fetched is 36963e877a5e, not 333333333333] reads=0 reviews=0 merges=0
+  step -> state=[held: review pack not built: diff unavailable: the PR head fm-review-diff.sh fetched is 36963e877a5e, not 333333333333] reads=0 reviews=0 merges=0
+## G1/G4 no request: stale-diff
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715742 333333333333 held: review pack not built for 333333333333: diff unavailable: the PR head fm-review-diff.sh fetched is 36963e877a5e, not 333333333333
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: review pack not built: diff unavailable: the PR head fm-review-diff.sh fetched is 36963e877a5e, not 333333333333
+ok - a draft, red, pending, unreported, conflicting, unregistered, local-only, closed or captain-worded PR, or one whose fetched diff is another head's, gets no read and no merge
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset] reads=0 reviews=0 merges=0
+## G1 runner unset
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715761 afaf02959492 review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset
+  step -> state=[held: review runner unavailable: <tmp>/auto-runner-missing/not-there.sh is not an executable file] reads=0 reviews=0 merges=0
+  step -> state=[held: review runner unavailable: <tmp>/auto-runner-missing/not-there.sh is not an executable file] reads=0 reviews=0 merges=0
+## G1 runner path not executable
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715790 47a850b3a8d8 review runner unavailable: <tmp>/auto-runner-missing/not-there.sh is not an executable file
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: review runner unavailable: <tmp>/auto-runner-missing/not-there.sh is not an executable file
+  step -> state=[held: review runner unavailable: relative/run-review.sh is not an absolute path] reads=0 reviews=0 merges=0
+  step -> state=[reading 5f7ad438c2e9 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## G1 runner from FM_REVIEW_RUNNER
+  fake runner argv:
+    argv: <tmp>/auto-runner-env/state/.pr-auto-review/task-x1.d/5f7ad438c2e9-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|5f7ad438c2e9a75d918af0a3bab05f27a898846f|pr.diff|<tmp>/auto-runner-env/project|claude-sonnet-5-5[1m] contract=569 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715805 5f7ad438c2e9 reading 5f7ad438c2e9 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 5f7ad438c2e9 by claude-sonnet-5-5[1m]
+ok - an unset, relative or non-executable runner makes no request and records one reason per head; the setting is FM_REVIEW_RUNNER or config/review-runner
+  step -> state=[reading 0d90321b9965 by openai-codex/gpt-6.1-terra] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G2 anthropic-authored
+  fake runner argv:
+    argv: <tmp>/auto-fam-anthropic/state/.pr-auto-review/task-x1.d/0d90321b9965-openai-codex_gpt-6.1-terra|https://github.com/example/repo/pull/9|0d90321b99659e6523f7ddf9fd75310d176e9aee|pr.diff|<tmp>/auto-fam-anthropic/project|openai-codex/gpt-6.1-terra contract=578 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715815 0d90321b9965 reading 0d90321b9965 by openai-codex/gpt-6.1-terra for anthropic
+    1793715816 0d90321b9965 verdict recorded: PASS for 0d90321b9965 by openai-codex/gpt-6.1-terra, report <tmp>/auto-fam-anthropic/state/.pr-auto-review/task-x1.d/0d90321b9965-openai-codex_gpt-6.1-terra/review.md
+    1793715826 0d90321b9965 merged: https://github.com/example/repo/pull/9 at 0d90321b9965
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"0d90321b9965","reader_model":"openai-codex/gpt-6.1-terra","reader_family":"openai","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 0d90321b99659e6523f7ddf9fd75310d176e9aee --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 88c9b8736d28 by openai-codex/gpt-6.1-terra] reads=1 reviews=0 merges=0
+  step -> state=[reading 88c9b8736d28 by claude-sonnet-5-5[1m]] reads=2 reviews=1 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=2 merges=1
+## G2 mixed OpenAI+Anthropic (complementary pair)
+  fake runner argv:
+    argv: <tmp>/auto-fam-mixed/state/.pr-auto-review/task-x1.d/88c9b8736d28-openai-codex_gpt-6.1-terra|https://github.com/example/repo/pull/9|88c9b8736d28b19b42a296328d993fc8445dae67|pr.diff|<tmp>/auto-fam-mixed/project|openai-codex/gpt-6.1-terra contract=566 ci=117 diff=205
+    argv: <tmp>/auto-fam-mixed/state/.pr-auto-review/task-x1.d/88c9b8736d28-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|88c9b8736d28b19b42a296328d993fc8445dae67|pr.diff|<tmp>/auto-fam-mixed/project|claude-sonnet-5-5[1m] contract=566 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715832 88c9b8736d28 reading 88c9b8736d28 by openai-codex/gpt-6.1-terra for anthropic
+    1793715833 88c9b8736d28 verdict recorded: PASS for 88c9b8736d28 by openai-codex/gpt-6.1-terra, report <tmp>/auto-fam-mixed/state/.pr-auto-review/task-x1.d/88c9b8736d28-openai-codex_gpt-6.1-terra/review.md
+    1793715834 88c9b8736d28 reading 88c9b8736d28 by claude-sonnet-5-5[1m] for openai
+    1793715836 88c9b8736d28 verdict recorded: PASS for 88c9b8736d28 by claude-sonnet-5-5[1m], report <tmp>/auto-fam-mixed/state/.pr-auto-review/task-x1.d/88c9b8736d28-claude-sonnet-5-5_1m_/review.md
+    1793715846 88c9b8736d28 merged: https://github.com/example/repo/pull/9 at 88c9b8736d28
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"88c9b8736d28","reader_model":"openai-codex/gpt-6.1-terra","reader_family":"openai","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"88c9b8736d28","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 88c9b8736d28b19b42a296328d993fc8445dae67 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading efc4e5b5e68b by deepseek/deepseek-v4-flash] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G2 mixed, one third-family reader
+  fake runner argv:
+    argv: <tmp>/auto-fam-third/state/.pr-auto-review/task-x1.d/efc4e5b5e68b-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|efc4e5b5e68bd8dea97700552e349967b215d985|pr.diff|<tmp>/auto-fam-third/project|deepseek/deepseek-v4-flash contract=566 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715853 efc4e5b5e68b reading efc4e5b5e68b by deepseek/deepseek-v4-flash for anthropic,openai
+    1793715854 efc4e5b5e68b verdict recorded: PASS for efc4e5b5e68b by deepseek/deepseek-v4-flash, report <tmp>/auto-fam-third/state/.pr-auto-review/task-x1.d/efc4e5b5e68b-deepseek_deepseek-v4-flash/review.md
+    1793715863 efc4e5b5e68b merged: https://github.com/example/repo/pull/9 at efc4e5b5e68b
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"efc4e5b5e68b","reader_model":"deepseek/deepseek-v4-flash","reader_family":"deepseek","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit efc4e5b5e68bd8dea97700552e349967b215d985 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[held: no eligible reader: no model outside openai is left for 6a8459415d32] reads=0 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for 6a8459415d32] reads=0 reviews=0 merges=0
+## G2 lone same-family gap
+  fake runner argv:
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715877 6a8459415d32 held: no eligible reader: no model outside openai is left for 6a8459415d32
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: no eligible reader: no model outside openai is left for 6a8459415d32
+  step -> state=[held: no eligible reader: config/crew-dispatch.json is unreadable] reads=0 reviews=0 merges=0
+  step -> state=[held: no eligible reader: config/crew-dispatch.json is unreadable] reads=0 reviews=0 merges=0
+  step -> state=[reading 2b9fd4e03bdc by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: author family unknown] reads=0 reviews=0 merges=0
+  step -> state=[held: author family unknown] reads=0 reviews=0 merges=0
+  step -> state=[held: author family unknown] reads=0 reviews=0 merges=0
+  step -> state=[reading 96acabd7e030 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+## G2 unknown author family
+  fake runner argv:
+    argv: <tmp>/auto-fam-unknown/state/.pr-auto-review/task-x1.d/96acabd7e030-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|96acabd7e030ed600844427760233a1f776d57a3|pr.diff|<tmp>/auto-fam-unknown/project|claude-sonnet-5-5[1m] contract=572 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715902 96acabd7e030 held: author family unknown at 96acabd7e030
+    1793715911 96acabd7e030 reading 96acabd7e030 by claude-sonnet-5-5[1m] for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 96acabd7e030 by claude-sonnet-5-5[1m]
+ok - readers differ from the family they cover, mixed heads use the complementary pair or one third-family reader, unknown and same-family gaps request nothing
+  step -> state=[reading bd9f35a869d3 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading bd9f35a869d3 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+## G2 first model quota-failed, next eligible used
+  fake runner argv:
+    argv: <tmp>/auto-switch/state/.pr-auto-review/task-x1.d/bd9f35a869d3-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|bd9f35a869d3e3c87135a04402f44df5b64ff36d|pr.diff|<tmp>/auto-switch/project|claude-sonnet-5-5[1m] contract=557 ci=117 diff=205
+    argv: <tmp>/auto-switch/state/.pr-auto-review/task-x1.d/bd9f35a869d3-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|bd9f35a869d3e3c87135a04402f44df5b64ff36d|pr.diff|<tmp>/auto-switch/project|deepseek/deepseek-v4-flash contract=557 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715919 bd9f35a869d3 reading bd9f35a869d3 by claude-sonnet-5-5[1m] for openai
+    1793715921 bd9f35a869d3 read of bd9f35a869d3 by claude-sonnet-5-5[1m] unusable: the runner wrote no report (usage limit reached)
+    1793715924 bd9f35a869d3 reading bd9f35a869d3 by deepseek/deepseek-v4-flash for openai
+    1793715927 bd9f35a869d3 verdict recorded: PASS for bd9f35a869d3 by deepseek/deepseek-v4-flash, report <tmp>/auto-switch/state/.pr-auto-review/task-x1.d/bd9f35a869d3-deepseek_deepseek-v4-flash/review.md
+    1793715938 bd9f35a869d3 merged: https://github.com/example/repo/pull/9 at bd9f35a869d3
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"bd9f35a869d3","reader_model":"deepseek/deepseek-v4-flash","reader_family":"deepseek","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit bd9f35a869d3e3c87135a04402f44df5b64ff36d --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading c7d1d3d373e4 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading c7d1d3d373e4 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for c7d1d3d373e4] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for c7d1d3d373e4] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for c7d1d3d373e4] reads=2 reviews=0 merges=0
+## G2 every model failed
+  fake runner argv:
+    argv: <tmp>/auto-switch-none/state/.pr-auto-review/task-x1.d/c7d1d3d373e4-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|c7d1d3d373e48cbc55b6a89e19ec1bf70f0b08f1|pr.diff|<tmp>/auto-switch-none/project|claude-sonnet-5-5[1m] contract=572 ci=117 diff=205
+    argv: <tmp>/auto-switch-none/state/.pr-auto-review/task-x1.d/c7d1d3d373e4-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|c7d1d3d373e48cbc55b6a89e19ec1bf70f0b08f1|pr.diff|<tmp>/auto-switch-none/project|deepseek/deepseek-v4-flash contract=572 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715946 c7d1d3d373e4 reading c7d1d3d373e4 by claude-sonnet-5-5[1m] for openai
+    1793715947 c7d1d3d373e4 read of c7d1d3d373e4 by claude-sonnet-5-5[1m] unusable: the runner wrote no report (usage limit reached)
+    1793715949 c7d1d3d373e4 reading c7d1d3d373e4 by deepseek/deepseek-v4-flash for openai
+    1793715950 c7d1d3d373e4 read of c7d1d3d373e4 by deepseek/deepseek-v4-flash unusable: the runner wrote no report
+    1793715952 c7d1d3d373e4 held: no eligible reader: no model outside openai is left for c7d1d3d373e4
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: no eligible reader: no model outside openai is left for c7d1d3d373e4
+  step -> state=[reading 4d4d7fd66ca3 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 4d4d7fd66ca3 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+## G2/G3 runner served a same-family model
+  fake runner argv:
+    argv: <tmp>/auto-switch-actual/state/.pr-auto-review/task-x1.d/4d4d7fd66ca3-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|4d4d7fd66ca3fe3d879dd68fa5f47cbd85022721|pr.diff|<tmp>/auto-switch-actual/project|claude-sonnet-5-5[1m] contract=578 ci=117 diff=205
+    argv: <tmp>/auto-switch-actual/state/.pr-auto-review/task-x1.d/4d4d7fd66ca3-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|4d4d7fd66ca3fe3d879dd68fa5f47cbd85022721|pr.diff|<tmp>/auto-switch-actual/project|deepseek/deepseek-v4-flash contract=578 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715973 4d4d7fd66ca3 reading 4d4d7fd66ca3 by claude-sonnet-5-5[1m] for openai
+    1793715974 4d4d7fd66ca3 read of 4d4d7fd66ca3 by openai-codex/gpt-6.1-sol covers nothing: reader family openai covers none of the author groups
+    1793715975 4d4d7fd66ca3 reading 4d4d7fd66ca3 by deepseek/deepseek-v4-flash for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 4d4d7fd66ca3 by deepseek/deepseek-v4-flash
+  step -> state=[reading d1ce348b98f9 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-switch-fail/state/.pr-auto-review/task-x1.d/d1ce348b98f9-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+  step -> state=[fail report <tmp>/auto-switch-fail/state/.pr-auto-review/task-x1.d/d1ce348b98f9-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+## G3 same-family FAIL stands
+  fake runner argv:
+    argv: <tmp>/auto-switch-fail/state/.pr-auto-review/task-x1.d/d1ce348b98f9-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|d1ce348b98f9cb302dddb3bfc52f39c4a08918fd|pr.diff|<tmp>/auto-switch-fail/project|claude-sonnet-5-5[1m] contract=572 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793715982 d1ce348b98f9 reading d1ce348b98f9 by claude-sonnet-5-5[1m] for openai
+    1793715989 d1ce348b98f9 fail: d1ce348b98f9 read by openai-codex/gpt-6.1-sol, report <tmp>/auto-switch-fail/state/.pr-auto-review/task-x1.d/d1ce348b98f9-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+    {"verdict":"FAIL","head":"d1ce348b98f9","reader_model":"openai-codex/gpt-6.1-sol","reader_family":"openai","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: fail report <tmp>/auto-switch-fail/state/.pr-auto-review/task-x1.d/d1ce348b98f9-claude-sonnet-5-5_1m_/review.md
+ok - a failed or exhausted reader is not retried, the next eligible model is used, none left records no eligible reader, and the model that actually ran is the one judged
+  step -> state=[reading 17e22e7a9a43 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-verdict-fail/state/.pr-auto-review/task-x1.d/17e22e7a9a43-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=1 merges=0
+## G3 report verdict: fail
+  fake runner argv:
+    argv: <tmp>/auto-verdict-fail/state/.pr-auto-review/task-x1.d/17e22e7a9a43-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|17e22e7a9a43398637ce059e2ba54f6de7794df1|pr.diff|<tmp>/auto-verdict-fail/project|claude-sonnet-5-5[1m] contract=575 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716002 17e22e7a9a43 reading 17e22e7a9a43 by claude-sonnet-5-5[1m] for openai
+    1793716004 17e22e7a9a43 fail: 17e22e7a9a43 read by claude-sonnet-5-5[1m], report <tmp>/auto-verdict-fail/state/.pr-auto-review/task-x1.d/17e22e7a9a43-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+    {"verdict":"FAIL","head":"17e22e7a9a43","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: fail report <tmp>/auto-verdict-fail/state/.pr-auto-review/task-x1.d/17e22e7a9a43-claude-sonnet-5-5_1m_/review.md
+  step -> state=[reading 328447349b9c by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[fail report <tmp>/auto-verdict-fail-truncated/state/.pr-auto-review/task-x1.d/328447349b9c-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+## G3 report verdict: fail-truncated
+  fake runner argv:
+    argv: <tmp>/auto-verdict-fail-truncated/state/.pr-auto-review/task-x1.d/328447349b9c-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|328447349b9ce1588a7bf78f58d6e32f683eabfb|pr.diff|<tmp>/auto-verdict-fail-truncated/project|claude-sonnet-5-5[1m] contract=605 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716011 328447349b9c reading 328447349b9c by claude-sonnet-5-5[1m] for openai
+    1793716013 328447349b9c fail: 328447349b9c read by claude-sonnet-5-5[1m], report <tmp>/auto-verdict-fail-truncated/state/.pr-auto-review/task-x1.d/328447349b9c-claude-sonnet-5-5_1m_/review.md (not recorded: last line does not repeat the first line's verdict)
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: fail report <tmp>/auto-verdict-fail-truncated/state/.pr-auto-review/task-x1.d/328447349b9c-claude-sonnet-5-5_1m_/review.md
+  step -> state=[fail report <tmp>/auto-verdict-fail-truncated/state/.pr-auto-review/task-x1.d/328447349b9c-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+  step -> state=[reading 31d99023dc04 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: review INCOMPLETE, report <tmp>/auto-verdict-incomplete/state/.pr-auto-review/task-x1.d/31d99023dc04-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+## G3 report verdict: incomplete
+  fake runner argv:
+    argv: <tmp>/auto-verdict-incomplete/state/.pr-auto-review/task-x1.d/31d99023dc04-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|31d99023dc048c24a834d6c4ce7645eea9631eb3|pr.diff|<tmp>/auto-verdict-incomplete/project|claude-sonnet-5-5[1m] contract=593 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716044 31d99023dc04 reading 31d99023dc04 by claude-sonnet-5-5[1m] for openai
+    1793716048 31d99023dc04 held: review INCOMPLETE at 31d99023dc04 by claude-sonnet-5-5[1m], report <tmp>/auto-verdict-incomplete/state/.pr-auto-review/task-x1.d/31d99023dc04-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: review INCOMPLETE, report <tmp>/auto-verdict-incomplete/state/.pr-auto-review/task-x1.d/31d99023dc04-claude-sonnet-5-5_1m_/review.md
+  step -> state=[reading 63a35541721d by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 63a35541721d by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+## G3 report verdict: wrong-head
+  fake runner argv:
+    argv: <tmp>/auto-verdict-wrong-head/state/.pr-auto-review/task-x1.d/63a35541721d-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|63a35541721d8d29301950a04cc99995027efedc|pr.diff|<tmp>/auto-verdict-wrong-head/project|claude-sonnet-5-5[1m] contract=593 ci=117 diff=205
+    argv: <tmp>/auto-verdict-wrong-head/state/.pr-auto-review/task-x1.d/63a35541721d-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|63a35541721d8d29301950a04cc99995027efedc|pr.diff|<tmp>/auto-verdict-wrong-head/project|deepseek/deepseek-v4-flash contract=593 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716057 63a35541721d reading 63a35541721d by claude-sonnet-5-5[1m] for openai
+    1793716058 63a35541721d read of 63a35541721d by claude-sonnet-5-5[1m] unusable: report names head 0000000000000000000000000000000000000000, not 63a35541721d8d29301950a04cc99995027efedc
+    1793716060 63a35541721d reading 63a35541721d by deepseek/deepseek-v4-flash for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading 63a35541721d by deepseek/deepseek-v4-flash
+  step -> state=[held: no eligible reader: no model outside openai is left for 63a35541721d] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for 63a35541721d] reads=2 reviews=0 merges=0
+  step -> state=[reading dbbb43c59cd6 by claude-sonnet-5-5[1m]] reads=0 reviews=0 merges=0
+  step -> state=[reading dbbb43c59cd6 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+## G3 report verdict: no-facts
+  fake runner argv:
+    argv: <tmp>/auto-verdict-no-facts/state/.pr-auto-review/task-x1.d/dbbb43c59cd6-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|dbbb43c59cd6e8677106b74404b32d10b5a82089|pr.diff|<tmp>/auto-verdict-no-facts/project|claude-sonnet-5-5[1m] contract=587 ci=117 diff=205
+    argv: <tmp>/auto-verdict-no-facts/state/.pr-auto-review/task-x1.d/dbbb43c59cd6-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|dbbb43c59cd6e8677106b74404b32d10b5a82089|pr.diff|<tmp>/auto-verdict-no-facts/project|deepseek/deepseek-v4-flash contract=587 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716080 dbbb43c59cd6 reading dbbb43c59cd6 by claude-sonnet-5-5[1m] for openai
+    1793716082 dbbb43c59cd6 read of dbbb43c59cd6 by claude-sonnet-5-5[1m] unusable: PASS report states no clear yes or no for: loosens_deny_allow_list, widens_guard, customer_data_billing_spend
+    1793716084 dbbb43c59cd6 reading dbbb43c59cd6 by deepseek/deepseek-v4-flash for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading dbbb43c59cd6 by deepseek/deepseek-v4-flash
+  step -> state=[held: no eligible reader: no model outside openai is left for dbbb43c59cd6] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for dbbb43c59cd6] reads=2 reviews=0 merges=0
+  step -> state=[reading f7238aeead26 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading f7238aeead26 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+## G3 report verdict: crlf
+  fake runner argv:
+    argv: <tmp>/auto-verdict-crlf/state/.pr-auto-review/task-x1.d/f7238aeead26-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f7238aeead262cf074d3fae08816df925dcebf38|pr.diff|<tmp>/auto-verdict-crlf/project|claude-sonnet-5-5[1m] contract=575 ci=117 diff=205
+    argv: <tmp>/auto-verdict-crlf/state/.pr-auto-review/task-x1.d/f7238aeead26-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|f7238aeead262cf074d3fae08816df925dcebf38|pr.diff|<tmp>/auto-verdict-crlf/project|deepseek/deepseek-v4-flash contract=575 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716095 f7238aeead26 reading f7238aeead26 by claude-sonnet-5-5[1m] for openai
+    1793716096 f7238aeead26 read of f7238aeead26 by claude-sonnet-5-5[1m] unusable: first line is not exactly 'VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>'
+    1793716097 f7238aeead26 reading f7238aeead26 by deepseek/deepseek-v4-flash for openai
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: reading f7238aeead26 by deepseek/deepseek-v4-flash
+  step -> state=[held: no eligible reader: no model outside openai is left for f7238aeead26] reads=2 reviews=0 merges=0
+  step -> state=[held: no eligible reader: no model outside openai is left for f7238aeead26] reads=2 reviews=0 merges=0
+  step -> state=[reading 3c4d692ec466 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G3 PASS with a yes declaration
+  fake runner argv:
+    argv: <tmp>/auto-verdict-loosens/state/.pr-auto-review/task-x1.d/3c4d692ec466-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|3c4d692ec466034c1170f7c14e41f2b95cd826d6|pr.diff|<tmp>/auto-verdict-loosens/project|claude-sonnet-5-5[1m] contract=584 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716110 3c4d692ec466 reading 3c4d692ec466 by claude-sonnet-5-5[1m] for openai
+    1793716113 3c4d692ec466 verdict recorded: PASS for 3c4d692ec466 by claude-sonnet-5-5[1m], report <tmp>/auto-verdict-loosens/state/.pr-auto-review/task-x1.d/3c4d692ec466-claude-sonnet-5-5_1m_/review.md
+    1793716131 3c4d692ec466 merged: https://github.com/example/repo/pull/9 at 3c4d692ec466
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"3c4d692ec466","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"yes","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 3c4d692ec466034c1170f7c14e41f2b95cd826d6 --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - FAIL and INCOMPLETE merge nothing and reach the owner, an unusable, CRLF or wrong-head PASS is never recorded, and a yes declaration is a fact not a hold
+  step -> state=[reading c99d15587fb7 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending] reads=1 reviews=1 merges=0
+  step -> state=[reading c57c64465ef7 by claude-sonnet-5-5[1m]] reads=2 reviews=1 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=2 merges=1
+## G4 head moved after the PASS
+  fake runner argv:
+    argv: <tmp>/auto-head-moves/state/.pr-auto-review/task-x1.d/c99d15587fb7-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|c99d15587fb703aef8b861543eed849fcecf984e|pr.diff|<tmp>/auto-head-moves/project|claude-sonnet-5-5[1m] contract=569 ci=117 diff=205
+    argv: <tmp>/auto-head-moves/state/.pr-auto-review/task-x1.d/c57c64465ef7-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|c57c64465ef70f5afdd609c31e197c511bc850af|pr.diff|<tmp>/auto-head-moves/project|claude-sonnet-5-5[1m] contract=569 ci=117 diff=215
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716138 c99d15587fb7 reading c99d15587fb7 by claude-sonnet-5-5[1m] for openai
+    1793716141 c99d15587fb7 verdict recorded: PASS for c99d15587fb7 by claude-sonnet-5-5[1m], report <tmp>/auto-head-moves/state/.pr-auto-review/task-x1.d/c99d15587fb7-claude-sonnet-5-5_1m_/review.md
+    1793716148 c57c64465ef7 reading c57c64465ef7 by claude-sonnet-5-5[1m] for openai
+    1793716151 c57c64465ef7 verdict recorded: PASS for c57c64465ef7 by claude-sonnet-5-5[1m], report <tmp>/auto-head-moves/state/.pr-auto-review/task-x1.d/c57c64465ef7-claude-sonnet-5-5_1m_/review.md
+    1793716158 c57c64465ef7 merged: https://github.com/example/repo/pull/9 at c57c64465ef7
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"c99d15587fb7","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"c57c64465ef7","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit c57c64465ef70f5afdd609c31e197c511bc850af --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 338682ae83e9 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: merge refused: armed: state/task-x1.check.sh] reads=1 reviews=1 merges=1
+  step -> state=[held: merge refused: armed: state/task-x1.check.sh] reads=1 reviews=1 merges=1
+  step -> state=[held: merge refused: armed: state/task-x1.check.sh] reads=1 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=2
+## G4 merge refused, back-off, one retry
+  fake runner argv:
+    argv: <tmp>/auto-merge-refused/state/.pr-auto-review/task-x1.d/338682ae83e9-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|338682ae83e9b02bf0b03ab47fafdb00eda03bd3|pr.diff|<tmp>/auto-merge-refused/project|claude-sonnet-5-5[1m] contract=578 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716165 338682ae83e9 reading 338682ae83e9 by claude-sonnet-5-5[1m] for openai
+    1793716169 338682ae83e9 verdict recorded: PASS for 338682ae83e9 by claude-sonnet-5-5[1m], report <tmp>/auto-merge-refused/state/.pr-auto-review/task-x1.d/338682ae83e9-claude-sonnet-5-5_1m_/review.md
+    1793716179 338682ae83e9 held: merge refused at 338682ae83e9: armed: state/task-x1.check.sh
+    1793716198 338682ae83e9 merged: https://github.com/example/repo/pull/9 at 338682ae83e9
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"338682ae83e9","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 338682ae83e9b02bf0b03ab47fafdb00eda03bd3 --squash
+    pr merge 9 --repo example/repo --match-head-commit 338682ae83e9b02bf0b03ab47fafdb00eda03bd3 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 02288591402a by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: protected class destructive] reads=1 reviews=1 merges=0
+## G4 protected class from the task meta
+  fake runner argv:
+    argv: <tmp>/auto-protected-task/state/.pr-auto-review/task-x1.d/02288591402a-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|02288591402a763c015965d631ef042a7cf3431d|pr.diff|<tmp>/auto-protected-task/project|claude-sonnet-5-5[1m] contract=581 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716206 02288591402a reading 02288591402a by claude-sonnet-5-5[1m] for openai
+    1793716208 02288591402a verdict recorded: PASS for 02288591402a by claude-sonnet-5-5[1m], report <tmp>/auto-protected-task/state/.pr-auto-review/task-x1.d/02288591402a-claude-sonnet-5-5_1m_/review.md
+    1793716209 02288591402a held: protected class destructive at 02288591402a; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"02288591402a","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class destructive
+  step -> state=[reading 374aa2dc685e by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=1 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=1 merges=0
+## G4 report protected-class answer: protected-yes
+  fake runner argv:
+    argv: <tmp>/auto-protected-yes/state/.pr-auto-review/task-x1.d/374aa2dc685e-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|374aa2dc685e1c763cf14cdbb8aa40a8dac5b7a7|pr.diff|<tmp>/auto-protected-yes/project|claude-sonnet-5-5[1m] contract=578 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716217 374aa2dc685e reading 374aa2dc685e by claude-sonnet-5-5[1m] for openai
+    1793716219 374aa2dc685e verdict recorded: PASS for 374aa2dc685e by claude-sonnet-5-5[1m], report <tmp>/auto-protected-yes/state/.pr-auto-review/task-x1.d/374aa2dc685e-claude-sonnet-5-5_1m_/review.md
+    1793716220 374aa2dc685e held: protected class yes - security-sensitive fixture at 374aa2dc685e; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"374aa2dc685e","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class yes - security-sensitive fixture
+  step -> state=[reading 1a9255864ee7 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: protected class line missing in a report] reads=1 reviews=1 merges=0
+  step -> state=[held: protected class line missing in a report] reads=1 reviews=1 merges=0
+## G4 report protected-class answer: protected-missing
+  fake runner argv:
+    argv: <tmp>/auto-protected-missing/state/.pr-auto-review/task-x1.d/1a9255864ee7-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|1a9255864ee7c7461636ea8dc0a931ef1522d00b|pr.diff|<tmp>/auto-protected-missing/project|claude-sonnet-5-5[1m] contract=590 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716228 1a9255864ee7 reading 1a9255864ee7 by claude-sonnet-5-5[1m] for openai
+    1793716232 1a9255864ee7 verdict recorded: PASS for 1a9255864ee7 by claude-sonnet-5-5[1m], report <tmp>/auto-protected-missing/state/.pr-auto-review/task-x1.d/1a9255864ee7-claude-sonnet-5-5_1m_/review.md
+    1793716233 1a9255864ee7 held: protected class line missing in a report at 1a9255864ee7; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"1a9255864ee7","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class line missing in a report
+  step -> state=[reading 0fce8c9bb9d7 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: protected class line malformed in a report] reads=1 reviews=1 merges=0
+  step -> state=[held: protected class line malformed in a report] reads=1 reviews=1 merges=0
+## G4 report protected-class answer: protected-malformed
+  fake runner argv:
+    argv: <tmp>/auto-protected-malformed/state/.pr-auto-review/task-x1.d/0fce8c9bb9d7-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|0fce8c9bb9d7be877025cbbfd18f441de7f47084|pr.diff|<tmp>/auto-protected-malformed/project|claude-sonnet-5-5[1m] contract=596 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716244 0fce8c9bb9d7 reading 0fce8c9bb9d7 by claude-sonnet-5-5[1m] for openai
+    1793716247 0fce8c9bb9d7 verdict recorded: PASS for 0fce8c9bb9d7 by claude-sonnet-5-5[1m], report <tmp>/auto-protected-malformed/state/.pr-auto-review/task-x1.d/0fce8c9bb9d7-claude-sonnet-5-5_1m_/review.md
+    1793716248 0fce8c9bb9d7 held: protected class line malformed in a report at 0fce8c9bb9d7; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"0fce8c9bb9d7","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class line malformed in a report
+ok - a new head voids the old PASS, a refused merge backs off and retries once, and a protected class, or a missing or malformed answer, is held and named
+  step -> state=[reading 1e31079d7d96 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 1e31079d7d96 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 1e31079d7d96 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading be5f21d263f2 by claude-sonnet-5-5[1m]] reads=2 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+## G5 hung reader, new head read meanwhile, both released late
+  fake runner argv:
+    argv: <tmp>/auto-hung/state/.pr-auto-review/task-x1.d/1e31079d7d96-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|1e31079d7d96c2f674a15ba27500034c88ab0232|pr.diff|<tmp>/auto-hung/project|claude-sonnet-5-5[1m] contract=551 ci=117 diff=205
+    argv: <tmp>/auto-hung/state/.pr-auto-review/task-x1.d/be5f21d263f2-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|be5f21d263f2347ca9005e856034e706f7e3d6eb|pr.diff|<tmp>/auto-hung/project|claude-sonnet-5-5[1m] contract=551 ci=117 diff=215
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716256 1e31079d7d96 reading 1e31079d7d96 by claude-sonnet-5-5[1m] for openai
+    1793716262 be5f21d263f2 reading be5f21d263f2 by claude-sonnet-5-5[1m] for openai
+    1793716264 be5f21d263f2 verdict recorded: PASS for be5f21d263f2 by claude-sonnet-5-5[1m], report <tmp>/auto-hung/state/.pr-auto-review/task-x1.d/be5f21d263f2-claude-sonnet-5-5_1m_/review.md
+    1793716272 be5f21d263f2 merged: https://github.com/example/repo/pull/9 at be5f21d263f2
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"be5f21d263f2","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit be5f21d263f2347ca9005e856034e706f7e3d6eb --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading c79d35f724e2 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 44cdf4ebffd8 by claude-sonnet-5-5[1m]] reads=2 reviews=0 merges=0
+  step -> state=[held: merge refused: armed: state/task-x1.check.sh] reads=2 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=2
+## G5 old head's read returns after the new head's PASS
+  fake runner argv:
+    argv: <tmp>/auto-late-old/state/.pr-auto-review/task-x1.d/c79d35f724e2-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|c79d35f724e2c64cd0991344c303d1b7f7083e53|pr.diff|<tmp>/auto-late-old/project|claude-sonnet-5-5[1m] contract=563 ci=117 diff=205
+    argv: <tmp>/auto-late-old/state/.pr-auto-review/task-x1.d/44cdf4ebffd8-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|44cdf4ebffd825d63f552312abb94fb2297060c8|pr.diff|<tmp>/auto-late-old/project|claude-sonnet-5-5[1m] contract=563 ci=117 diff=215
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716298 c79d35f724e2 reading c79d35f724e2 by claude-sonnet-5-5[1m] for openai
+    1793716309 44cdf4ebffd8 reading 44cdf4ebffd8 by claude-sonnet-5-5[1m] for openai
+    1793716313 44cdf4ebffd8 verdict recorded: PASS for 44cdf4ebffd8 by claude-sonnet-5-5[1m], report <tmp>/auto-late-old/state/.pr-auto-review/task-x1.d/44cdf4ebffd8-claude-sonnet-5-5_1m_/review.md
+    1793716333 44cdf4ebffd8 held: merge refused at 44cdf4ebffd8: armed: state/task-x1.check.sh
+    1793716343 44cdf4ebffd8 merged: https://github.com/example/repo/pull/9 at 44cdf4ebffd8
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"44cdf4ebffd8","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit 44cdf4ebffd825d63f552312abb94fb2297060c8 --squash
+    pr merge 9 --repo example/repo --match-head-commit 44cdf4ebffd825d63f552312abb94fb2297060c8 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading f831688fb500 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading f831688fb500 by deepseek/deepseek-v4-flash] reads=2 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=1 merges=1
+## G5 reader killed after its request
+  fake runner argv:
+    argv: <tmp>/auto-killed/state/.pr-auto-review/task-x1.d/f831688fb500-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f831688fb5004fdf6d6b7fe592c7c2ed6066d383|pr.diff|<tmp>/auto-killed/project|claude-sonnet-5-5[1m] contract=557 ci=117 diff=205
+    argv: <tmp>/auto-killed/state/.pr-auto-review/task-x1.d/f831688fb500-deepseek_deepseek-v4-flash|https://github.com/example/repo/pull/9|f831688fb5004fdf6d6b7fe592c7c2ed6066d383|pr.diff|<tmp>/auto-killed/project|deepseek/deepseek-v4-flash contract=557 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716350 f831688fb500 reading f831688fb500 by claude-sonnet-5-5[1m] for openai
+    1793716352 f831688fb500 read of f831688fb500 by claude-sonnet-5-5[1m] failed: the read ended without a result
+    1793716354 f831688fb500 reading f831688fb500 by deepseek/deepseek-v4-flash for openai
+    1793716356 f831688fb500 verdict recorded: PASS for f831688fb500 by deepseek/deepseek-v4-flash, report <tmp>/auto-killed/state/.pr-auto-review/task-x1.d/f831688fb500-deepseek_deepseek-v4-flash/review.md
+    1793716366 f831688fb500 merged: https://github.com/example/repo/pull/9 at f831688fb500
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"f831688fb500","reader_model":"deepseek/deepseek-v4-flash","reader_family":"deepseek","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit f831688fb5004fdf6d6b7fe592c7c2ed6066d383 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading adfe2a65b155 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: merge refused: armed: state/task-x1.check.sh] reads=1 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=2
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=2
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=2
+## G5 replay after record, after merge
+  fake runner argv:
+    argv: <tmp>/auto-replay/state/.pr-auto-review/task-x1.d/adfe2a65b155-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|adfe2a65b155f37eb9c149353ee822d072fde70c|pr.diff|<tmp>/auto-replay/project|claude-sonnet-5-5[1m] contract=557 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716374 adfe2a65b155 reading adfe2a65b155 by claude-sonnet-5-5[1m] for openai
+    1793716381 adfe2a65b155 verdict recorded: PASS for adfe2a65b155 by claude-sonnet-5-5[1m], report <tmp>/auto-replay/state/.pr-auto-review/task-x1.d/adfe2a65b155-claude-sonnet-5-5_1m_/review.md
+    1793716393 adfe2a65b155 held: merge refused at adfe2a65b155: armed: state/task-x1.check.sh
+    1793716402 adfe2a65b155 merged: https://github.com/example/repo/pull/9 at adfe2a65b155
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"adfe2a65b155","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit adfe2a65b155f37eb9c149353ee822d072fde70c --squash
+    pr merge 9 --repo example/repo --match-head-commit adfe2a65b155f37eb9c149353ee822d072fde70c --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - a hung reader stalls nothing and is not duplicated, a killed reader is not retried, and a replay after a kill records and merges exactly once
+  step -> state=[reading e32c3864758a by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G4 away record left to fm-pr-merge.sh
+  fake runner argv:
+    argv: <tmp>/auto-away/state/.pr-auto-review/task-x1.d/e32c3864758a-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|e32c3864758a1882c0dda409aa2b2ef3d5ebec65|pr.diff|<tmp>/auto-away/project|claude-sonnet-5-5[1m] contract=551 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716410 e32c3864758a reading e32c3864758a by claude-sonnet-5-5[1m] for openai
+    1793716412 e32c3864758a verdict recorded: PASS for e32c3864758a by claude-sonnet-5-5[1m], report <tmp>/auto-away/state/.pr-auto-review/task-x1.d/e32c3864758a-claude-sonnet-5-5_1m_/review.md
+    1793716421 e32c3864758a merged: https://github.com/example/repo/pull/9 at e32c3864758a
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"e32c3864758a","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit e32c3864758a1882c0dda409aa2b2ef3d5ebec65 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 20f7413d5f6f by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+ok - an away record is left to fm-pr-merge.sh's own away handling, and quiet mode holds nothing
+  step -> state=[reading 5b6118551eb1 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-no-served/state/.pr-auto-review/task-x1.d/5b6118551eb1-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-no-served/state/.pr-auto-review/task-x1.d/5b6118551eb1-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+## G2/G3 served model: no-served
+  fake runner argv:
+    argv: <tmp>/auto-served-no-served/state/.pr-auto-review/task-x1.d/5b6118551eb1-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|5b6118551eb14c8c80171697aa5accfe17fc9034|pr.diff|<tmp>/auto-served-no-served/project|claude-sonnet-5-5[1m] contract=587 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716454 5b6118551eb1 reading 5b6118551eb1 by claude-sonnet-5-5[1m] for openai
+    1793716456 5b6118551eb1 held: served model unknown at 5b6118551eb1: the runner printed no 'served-model:' line for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-no-served/state/.pr-auto-review/task-x1.d/5b6118551eb1-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-no-served/state/.pr-auto-review/task-x1.d/5b6118551eb1-claude-sonnet-5-5_1m_/review.md
+  step -> state=[reading 7842dc102d24 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-bad-served/state/.pr-auto-review/task-x1.d/7842dc102d24-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-bad-served/state/.pr-auto-review/task-x1.d/7842dc102d24-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+## G2/G3 served model: bad-served
+  fake runner argv:
+    argv: <tmp>/auto-served-bad-served/state/.pr-auto-review/task-x1.d/7842dc102d24-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|7842dc102d2486702883a366c7261dfbcd075a96|pr.diff|<tmp>/auto-served-bad-served/project|claude-sonnet-5-5[1m] contract=590 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716462 7842dc102d24 reading 7842dc102d24 by claude-sonnet-5-5[1m] for openai
+    1793716463 7842dc102d24 held: served model unknown at 7842dc102d24: the runner printed no 'served-model:' line for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-bad-served/state/.pr-auto-review/task-x1.d/7842dc102d24-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-bad-served/state/.pr-auto-review/task-x1.d/7842dc102d24-claude-sonnet-5-5_1m_/review.md
+  step -> state=[reading 92bc47dc75b1 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-prose-only/state/.pr-auto-review/task-x1.d/92bc47dc75b1-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+  step -> state=[held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-prose-only/state/.pr-auto-review/task-x1.d/92bc47dc75b1-claude-sonnet-5-5_1m_/review.md] reads=1 reviews=0 merges=0
+## G2/G3 served model: prose-only
+  fake runner argv:
+    argv: <tmp>/auto-served-prose-only/state/.pr-auto-review/task-x1.d/92bc47dc75b1-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|92bc47dc75b1cf0ee9556ee20388a9eb5f3a9ca5|pr.diff|<tmp>/auto-served-prose-only/project|claude-sonnet-5-5[1m] contract=590 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716469 92bc47dc75b1 reading 92bc47dc75b1 by claude-sonnet-5-5[1m] for openai
+    1793716470 92bc47dc75b1 held: served model unknown at 92bc47dc75b1: the runner printed no 'served-model:' line for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-prose-only/state/.pr-auto-review/task-x1.d/92bc47dc75b1-claude-sonnet-5-5_1m_/review.md
+  review records (state/review-records.jsonl):
+  forge merge calls (fake gh log):
+  current state: held: served model unknown for the read requested from claude-sonnet-5-5[1m], report <tmp>/auto-served-prose-only/state/.pr-auto-review/task-x1.d/92bc47dc75b1-claude-sonnet-5-5_1m_/review.md
+ok - only one exact 'served-model:' stdout line names the reader; a missing, malformed or prose-only notice holds the head for Main
+  step -> state=[reading f404d33f5831 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+  step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+  step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G5 merge queue
+  fake runner argv:
+    argv: <tmp>/auto-queued/state/.pr-auto-review/task-x1.d/f404d33f5831-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f404d33f58313a47d8f5e67c7d1fa1fff0eee959|pr.diff|<tmp>/auto-queued/project|claude-sonnet-5-5[1m] contract=557 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716476 f404d33f5831 reading f404d33f5831 by claude-sonnet-5-5[1m] for openai
+    1793716477 f404d33f5831 verdict recorded: PASS for f404d33f5831 by claude-sonnet-5-5[1m], report <tmp>/auto-queued/state/.pr-auto-review/task-x1.d/f404d33f5831-claude-sonnet-5-5_1m_/review.md
+    1793716484 f404d33f5831 queued: https://github.com/example/repo/pull/9 at f404d33f5831 is in the merge queue
+    1793716488 f404d33f5831 merged: https://github.com/example/repo/pull/9 at f404d33f5831
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"f404d33f5831","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit f404d33f58313a47d8f5e67c7d1fa1fff0eee959 --squash
+  current state: merged https://github.com/example/repo/pull/9
+  step -> state=[reading 6f2e0c39f60c by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 6f2e0c39f60c by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 6f2e0c39f60c by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+ok - a queued PR reads queued and is not merged again until the forge resolves it, and pruning never drops the head being read
+  step -> state=[reading acf24a193d47 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
+## G5 merge reaches the fleet ledger, events stay in the sidecar
+  fake runner argv:
+    argv: <tmp>/auto-ledger/state/.pr-auto-review/task-x1.d/acf24a193d47-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|acf24a193d47c6fe31be5bf8fd861c9af62f7780|pr.diff|<tmp>/auto-ledger/project|claude-sonnet-5-5[1m] contract=557 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1793716513 acf24a193d47 reading acf24a193d47 by claude-sonnet-5-5[1m] for openai
+    1793716515 acf24a193d47 verdict recorded: PASS for acf24a193d47 by claude-sonnet-5-5[1m], report <tmp>/auto-ledger/state/.pr-auto-review/task-x1.d/acf24a193d47-claude-sonnet-5-5_1m_/review.md
+    1793716522 acf24a193d47 merged: https://github.com/example/repo/pull/9 at acf24a193d47
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"acf24a193d47","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+    pr merge 9 --repo example/repo --match-head-commit acf24a193d47c6fe31be5bf8fd861c9af62f7780 --squash
+  current state: merged https://github.com/example/repo/pull/9
+ok - the merge reaches the fleet ledger, the events stay in the sidecar, and the worker's status log is never written
+g6 FAKE reader, fake forge, real housekeeping pass, record and merge scripts
+g6 P1 green+uncovered : state=merged https://github.com/example/repo/pull/9 merges=1 reviews=1
+g6 P2 green+FAIL      : state=fail report /Users/charlesabrooker/tmp/fm-pr-merge-tests.CDkwt0/auto-e2e-p2/state/.pr-auto-review/task-x1.d/1f5afe2e40aa-claude-sonnet-5-5_1m_/review.md merges=0 reviews=1 wake=1
+g6 P3 head moved      : state=merged https://github.com/example/repo/pull/9 merges=1 reviews=1 reads=2 merged-head=47a17a3b197b512bf0048c716795eabc1c0da491
+ok - three registered PRs run through the housekeeping pass: P1 merged, P2 FAIL not merged and owner told, P3 old PASS voided and new head merged once

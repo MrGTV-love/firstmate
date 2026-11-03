@@ -1,0 +1,28 @@
+== scenario A: 6 housekeeping passes started at the same moment, read not yet returned
+pass 1 rc=0
+pass 4 rc=0
+pass 6 rc=0
+pass 3 rc=0
+pass 2 rc=0
+pass 5 rc=0
+reads requested (fake runner argv lines): 1
+argv: <tmp>/auto-concurrent/state/.pr-auto-review/task-x1.d/b16bac32c4ea-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|b16bac32c4eac8843e8736485dfa752ed94cc259|pr.diff|<tmp>/auto-concurrent/project|claude-sonnet-5-5[1m] contract=569 ci=117 diff=205
+state now: reading b16bac32c4ea by claude-sonnet-5-5[1m]
+== scenario B: 6 housekeeping passes at once after the read returned
+pass 10 rc=0
+pass 8 rc=0
+pass 9 rc=0
+pass 7 rc=0
+pass 12 rc=0
+pass 11 rc=0
+reads requested: 1
+review records: 1
+forge merge calls: 1
+pr merge 9 --repo example/repo --match-head-commit b16bac32c4eac8843e8736485dfa752ed94cc259 --squash
+state now: merged https://github.com/example/repo/pull/9
+events:
+  1793716259 b16bac32c4ea reading b16bac32c4ea by claude-sonnet-5-5[1m] for openai
+  1793716262 b16bac32c4ea verdict recorded: PASS for b16bac32c4ea by claude-sonnet-5-5[1m], report <tmp>/auto-concurrent/state/.pr-auto-review/task-x1.d/b16bac32c4ea-claude-sonnet-5-5_1m_/review.md
+  1793716268 b16bac32c4ea merged: https://github.com/example/repo/pull/9 at b16bac32c4ea
+pass outputs (non-empty):
+RESULT: PASS
