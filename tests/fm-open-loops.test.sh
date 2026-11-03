@@ -1948,7 +1948,8 @@ for name in ('state', 'data', 'config', 'projects'):
     (v4 / name).mkdir(parents=True)
 (v4 / 'data/backlog.md').write_text(
     '## In flight\n\n## Queued\n\n## Done\n'
-    '- [x] fin-moot - Ruled moot (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n')
+    '- [x] fin-moot - Ruled moot (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n'
+    '- [x] fin-moot-clean - Ruled moot with nothing left in its copy (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n')
 v4_origin = world / 'v4-origin.git'
 git_ = lambda *a, **k: subprocess.run(['git', *map(str, a)], check=True, capture_output=True, text=True, **k).stdout.strip()
 git_('init', '-q', '--bare', v4_origin)
@@ -2001,12 +2002,23 @@ v4_task('fin-content', copy=fin_content, note='landed on main by squash')
 v4_task('fin-scout', kind='scout', copy=None, note='report delivered')
 fin_moot = v4_copy('fin-moot')
 v4_task('fin-moot', copy=fin_moot, note='ruled moot by Main')
+(v4 / 'data/fin-moot').mkdir()
+moot_words = v4 / 'data/fin-moot/captain-drop.md'
+moot_words.write_text('Drop fin-moot; the work is superseded.\n')
+fin_moot_clean = v4_copy('fin-moot-clean', work=False)
+v4_task('fin-moot-clean', copy=fin_moot_clean, note='ruled moot by Main')
 fin_refused = v4_copy('fin-refused'); v4_merged_pr(12, fin_refused)
 v4_task('fin-refused', copy=fin_refused, pr=12, note=f'{V4_PR}12 merged')
 refusal = 'REFUSED: worktree /pool/9 has uncommitted changes.'
 (v4 / 'state/fin-refused.merge-prune').write_text(
     f'version=fm-merge-prune-v1\npr={V4_PR}12\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={refusal}\n'
     f'wake_sent=1\ncopy={fin_refused}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+fin_dirty = v4_copy('fin-dirty', dirty=True); v4_merged_pr(13, fin_dirty)
+v4_task('fin-dirty', copy=fin_dirty, pr=13, note=f'{V4_PR}13 merged by another lane')
+dirty_refusal = f'REFUSED: worktree {fin_dirty} has uncommitted changes.'
+(v4 / 'state/fin-dirty.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}13\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={dirty_refusal}\n'
+    f'wake_sent=1\ncopy={fin_dirty}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
 wait_paused = v4_copy('wait-paused', work=False)
 v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
 wait_held = v4_copy('wait-held', work=False)
@@ -2060,8 +2072,8 @@ print('V4 ledger rows (category, subject, owner, overdue, next action):')
 for r in sorted(report4['rows'], key=lambda r: (r['category'], r['subject'])):
     print('  ', r['category'], r['subject'], r['owner'], 'overdue' if r['overdue'] else '-', '|', r['next_action'][:110])
 cleanup = by_cat('pending_cleanup')
-assert {'fin-merged', 'fin-content', 'fin-scout', 'fin-moot', 'fin-refused'} <= set(cleanup), ('finished classes need a row', sorted(cleanup))
-for name in ('fin-merged', 'fin-content', 'fin-scout', 'fin-moot'):
+assert {'fin-merged', 'fin-content', 'fin-scout', 'fin-moot', 'fin-moot-clean', 'fin-refused'} <= set(cleanup), ('finished classes need a row', sorted(cleanup))
+for name in ('fin-merged', 'fin-content', 'fin-scout', 'fin-moot-clean'):
     row = cleanup[name]
     assert row['owner'] == 'home:firstmate', row
     assert f'bin/fm-teardown.sh {name}' in row['next_action'] and '--force' not in row['next_action'] and '--drop-file' not in row['next_action'], row
@@ -2069,9 +2081,19 @@ for name in ('fin-merged', 'fin-content', 'fin-scout', 'fin-moot'):
     assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['interrupted_teardown'], ('cleanup must follow the existing teardown age class', row)
 assert 'pending_cleanup' not in DEFAULT_AGES_FOR_TEST and 'pending_acceptance' not in DEFAULT_AGES_FOR_TEST, 'a new age class was added'
 assert 'accept' in cleanup['fin-scout']['next_action'], cleanup['fin-scout']
+# A drop ruling over a copy that still holds unlanded work names the attended drop path with the recorded words.
+moot = cleanup['fin-moot']
+assert moot['owner'] == 'firstmate' and 'Main' in moot['next_action'], ('the drop path belongs to Main', moot)
+assert f'bin/fm-teardown.sh fin-moot --force --drop-file {moot_words}' in moot['next_action'], moot
+assert 'run plain' not in moot['next_action'], ('plain teardown refuses this copy, so it is not the next action', moot)
 refused = cleanup['fin-refused']
 assert refused['owner'] == 'home:firstmate' and refusal in refused['next_action'], ('the refusal text must stay on the row', refused)
 assert 'bin/fm-teardown.sh fin-refused' in refused['next_action'], refused
+# A merged PR over a dirty copy is not landed; its row still carries the kept teardown refusal.
+dirty = by_cat('pending_acceptance').get('fin-dirty')
+assert dirty and dirty['owner'] == 'home:firstmate', ('a refused dirty copy needs its row', mine('fin-dirty'))
+assert dirty_refusal in dirty['next_action'] and dirty_refusal in dirty['evidence'], ('the refusal text must stay on the row', dirty)
+assert 'fin-dirty' not in cleanup, cleanup.get('fin-dirty')
 # A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
 for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate', 'pend-run'):
     assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))

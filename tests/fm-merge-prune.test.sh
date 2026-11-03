@@ -3384,7 +3384,7 @@ xl_write_done_note() {
 
 xl_start_watcher() {
   xl_env FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=999999 FM_CHECK_INTERVAL=1 \
-    FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=1 FM_IDLE_REAP_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
+    FM_MERGE_PRUNE="${XL_MERGE_PRUNE:-1}" FM_MERGE_PRUNE_INTERVAL=1 FM_IDLE_REAP_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
     FM_LAVISH_AUTO_RETIRE_INTERVAL=0 FM_CHECK_TIMEOUT=20 \
     bash "$ROOT/bin/fm-watch.sh" > "$W/watch.out" 2>&1 &
   XL_WATCH_PID=$!
@@ -3530,6 +3530,45 @@ test_xlane_same_lane_path_completes_as_before() {
   [ ! -e "$COPY" ] || fail "the same-lane copy is still on disk"
   assert_nothing_forced "xlane same lane"
   pass "the same-lane path (fm-pr-check.sh, own-home fm-pr-merge.sh, prune) still ends pr_ready, merged, cleaned_up with the copy and record gone"
+}
+
+# A teardown that fails after it cleared the merge poll but before it retired the
+# record leaves pr= on the record. The merge-notified marker stays until the record
+# is gone, so reconciliation does not re-arm a poll for the merge it already
+# reported, and the merge is reported once; the retried teardown then removes it.
+xl_merge_reported() { [ -e "$STATE/t1.pr-poll-merge-notified" ] && xl_has_event task.merged; }
+xl_event_count() { xl_ledger_events | tr ' ' '\n' | grep -cx "$1" || true; }
+xl_merge_wakes() { { grep -F 'check: merge landed: t1 ' "$STATE/.wake-queue" 2>/dev/null || true; } | wc -l | tr -d ' '; }
+
+test_xlane_late_teardown_failure_reports_the_merge_once() {
+  local rc=0 cursor="$STATE/.status-presentation-cursor"
+  make_xlane_world
+  printf 'done [at=%s]: PR %s head %s\n' "$NOW" "$XL_PR" "$XL_HEAD" >> "$STATE/t1.status"
+  xl_env "$BIN_DIR/fm-pr-check.sh" t1 "$XL_PR" > "$W/pr-check.out" 2>&1 || fail "the worker's fm-pr-check.sh was refused: $(cat "$W/pr-check.out")"
+  xl_merge_in_lane_m
+  XL_MERGE_PRUNE=0 xl_supervise_until xl_merge_reported || { xl_print_state "late failure"; fail "the merge poll did not report the merge"; }
+  [ "$(xl_event_count task.merged)" -eq 1 ] && [ "$(xl_merge_wakes)" -eq 1 ] || fail "the first merge report is not single: $(xl_ledger_events)"
+  # The status presenter's cursor holds a row teardown cannot parse, so teardown
+  # stops at the status retirement, after the poll cleanup and before the record goes.
+  cp "$cursor" "$W/cursor.saved" 2>/dev/null || : > "$W/cursor.saved"
+  printf 'bogus\tident\tnot-an-offset\t0\n' >> "$cursor"
+  xl_env FM_MERGE_PRUNE=0 "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$W/teardown.err" || rc=$?
+  cp "$W/cursor.saved" "$cursor"
+  xl_print_state "after the late teardown failure"
+  [ "$rc" -ne 0 ] || fail "the injected late failure did not stop teardown"
+  xl_has_event task.cleaned_up || fail "teardown stopped before the poll cleanup, not after it: $(tail -3 "$W/teardown.err")"
+  grep -qx "pr=$XL_PR" "$STATE/t1.meta" || fail "the late failure did not leave pr= on the record"
+  [ -e "$STATE/t1.pr-poll-merge-notified" ] || fail "teardown removed the merge-notified marker before the record was retired"
+  [ -z "$(xl_env bash "$ROOT/bin/fm-pr-ready-reconcile.sh" 2>&1)" ] || fail "reconciliation acted on a record whose merge was reported"
+  [ ! -e "$STATE/t1.check.sh" ] || fail "reconciliation re-armed a poll for the merge it already reported"
+  XL_BOUND=8 XL_MERGE_PRUNE=0 xl_supervise_until false || true
+  [ "$(xl_event_count task.merged)" -eq 1 ] || fail "the merge was reported twice to the ledger: $(xl_ledger_events)"
+  [ "$(xl_merge_wakes)" -le 1 ] || fail "the merge raised a second wake"
+  xl_plain_teardown "$W/retry.err" || fail "the retried teardown failed: $(tail -3 "$W/retry.err")"
+  [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.pr-poll-merge-notified" ] || fail "the retried teardown left the record or the marker"
+  assert_nothing_forced "xlane late failure"
+  cleanup_workers
+  pass "a teardown that fails late keeps the merge-notified marker with the record, so the merge is reported once and the retry removes both"
 }
 
 # The protections still refuse when the cross-lane PR is merged and its branch
@@ -3937,6 +3976,7 @@ ALL_TESTS=(
   test_xlane_merge_by_another_lane_reaches_safe_closeout
   test_xlane_open_or_closed_pr_keeps_the_record
   test_xlane_same_lane_path_completes_as_before
+  test_xlane_late_teardown_failure_reports_the_merge_once
   test_xlane_protections_still_refuse
   test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
 )

@@ -94,12 +94,13 @@ crew_state_ready_url() {  # <id>
   printf '%s' "${component##*: }"
 }
 
-# 0 when <id> has a recorded pr= but never had a merge poll published and nothing
-# marks the poll as ended: a merge-notified marker, a pending retirement, an armed
-# prune record and a pending slot return all leave the record alone.
+# 0 when <id> has a recorded pr= but no part of a merge poll was ever published and
+# nothing marks the poll as ended: a merge-notified marker, a pending retirement,
+# an armed prune record, a pending slot return and any published poll file
+# (sidecar, registration or check) all leave the record alone.
 pr_poll_lost() {  # <id>
   local id=$1 suffix
-  for suffix in pr-poll-merge-notified pr-poll-retirement merge-prune teardown-return-pending check.sh pr-poll; do
+  for suffix in pr-poll-merge-notified pr-poll-retirement merge-prune teardown-return-pending check.sh pr-poll pr-poll-registration; do
     [ ! -e "$STATE/$id.$suffix" ] && [ ! -L "$STATE/$id.$suffix" ] || return 1
   done
   return 0

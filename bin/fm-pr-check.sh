@@ -3,10 +3,30 @@
 # exact pr_head=<sha> when available, then atomically arm a static merge poll.
 # Refuses when bin/fm-dod-lib.sh will not accept the named head as reachable
 # outside the worker's disposable copy; in no-mistakes mode a forge-reported
-# head is that named head and is already stored on the forge. In any mode a
-# forge-reported PR head that is exactly this copy's HEAD is held by the forge
-# too, so it passes even after the forge deleted the PR branch at merge and a
-# fetch pruned its remote-tracking ref; a differing HEAD still takes the gate.
+# head is that named head and is already stored on the forge.
+# Harm model of the named-head gate: it protects against registering a PR whose
+# head exists only in the worker's disposable copy, which a later teardown would
+# then discard.
+# (a) In any mode, a forge whose headRefOid is exactly this copy's HEAD holds that
+#     commit, so the harm is disproven by that direct forge read instead of by the
+#     remote-tracking-ref proxy, and the gate is skipped on that exact match only;
+#     it also holds after the forge deleted the PR branch at merge and a fetch
+#     pruned its ref. A forge head that differs from the copy's HEAD, a forge read
+#     that fails or yields no valid head, and a head that neither the forge nor
+#     any remote ref holds still take the gate and refuse.
+# (b) A done note whose first word is the PR URL names that PR to
+#     bin/fm-dod-lib.sh fm_dod_accept_ship_done exactly as `PR <url>` does. With
+#     the copy missing it is accepted only when fm_dod_pr_merged_on_forge proves
+#     the PR merged (the merge poll's notified marker for that PR); otherwise it
+#     still refuses with the worktree missing.
+# (c) bin/fm-pr-ready-reconcile.sh calls this registrar again for a record that
+#     already has pr= but no merge poll and no sign that the poll ended. The call
+#     takes every gate here exactly as a first registration does, so it accepts
+#     nothing new; once the poll is published, retired or marked merged the record
+#     is not called again, so nothing registers twice.
+# (d) bin/fm-teardown.sh's lookup for a detached copy (the record's branch=, else
+#     fm/<id>) only finds the PR; pr_is_merged's containment proofs are unchanged
+#     and still refuse a copy whose work the PR's head does not carry.
 # A merge call (FM_PR_CHECK_MERGE=1) on a GitHub task that owns several pull
 # requests (bin/fm-dod-lib.sh fm_dod_task_owns_several_prs) is judged on the
 # forge's head for the PR it names instead, because the worker copy's HEAD

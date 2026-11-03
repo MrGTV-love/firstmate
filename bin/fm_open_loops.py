@@ -693,8 +693,10 @@ class Collector:
         return any(record["id"] == task["id"] and record.get("captain_drop") for record in self.backlog)
 
     def deliverable_landed(self, task):
-        if self.captain_dropped(task):
-            return True
+        return self.captain_dropped(task) or self.copy_landed(task)
+
+    def copy_landed(self, task):
+        """The task's own report or copy carries its deliverable, whatever a recorded ruling says."""
         if task["kind"] == "scout":
             report = self.data / task["id"] / "report.md"
             return report.is_file() and not report.is_symlink() and report.stat().st_size > 0
@@ -1129,16 +1131,30 @@ class Collector:
                 continue
             since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
             landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
+            refusal = self.merge_prune_refusal(ident)
+            refused = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that cause and "
+                       "runs it again (dropping the work needs the captain's own words)") if refusal else ""
             if landed:
                 why, merged_at = self.finished_class(task)
-                refusal = self.merge_prune_refusal(ident)
+                row_owner = owner
                 action = f"run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
                 if task["kind"] == "scout":
                     action = f"accept the delivered report, then run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
-                if refusal:
-                    action = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that "
-                              "cause and runs it again (dropping the work needs the captain's own words)")
-                self.add("pending_cleanup", ident, action, merged_at or since, owner,
+                if refused:
+                    action = refused
+                if self.captain_dropped(task) and task["kind"] != "scout" \
+                        and not self.source("dropped copy " + ident, self.copy_landed, task):
+                    words = self.data / ident / "captain-drop.md"
+                    row_owner = "firstmate"
+                    if words.is_file() and not words.is_symlink() and words.stat().st_size > 0:
+                        action = (f"Main runs bin/fm-teardown.sh {ident} --force --drop-file {words} attended, citing the "
+                                  "recorded drop ruling, because the copy holds work no PR or default branch carries; "
+                                  "the ledger never runs it")
+                    else:
+                        action = (f"the copy of {ident} holds work no PR or default branch carries and no captain's drop "
+                                  f"words are recorded at {words}: Main needs the captain's own words before an attended "
+                                  f"bin/fm-teardown.sh {ident} --force --drop-file")
+                self.add("pending_cleanup", ident, action, merged_at or since, row_owner,
                          evidence=f"finished: {why}; the record is still open")
                 continue
             pr_url = task["pr"].get("url")
@@ -1151,8 +1167,11 @@ class Collector:
             action = (f"review and accept the delivered work of {ident}, or relaunch its worker with "
                       f"bin/fm-control.sh {ident} relaunch if it is incomplete" if gone else
                       f"review and accept the delivered work of {ident}; its worker is still live")
+            if refused:
+                action = f"{action}; {refused}"
             self.add("pending_acceptance", ident, action, since, owner,
-                     evidence="the last report was done and no accepted or landed deliverable is on record"
+                     evidence=(f"last teardown refusal: {refusal}; " if refusal else "")
+                              + "the last report was done and no accepted or landed deliverable is on record"
                               + ("; landing could not be read" if landed is None else ""))
 
     def interrupted_teardown_rows(self):
