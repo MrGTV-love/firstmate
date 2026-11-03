@@ -2316,6 +2316,8 @@ case $mode in
   prose-only) served=; echo 'Terra quota exhausted (marker x); using openai-codex/gpt-6.1-sol' >&2; echo "switching to $MODEL now"; mode=pass ;;
   no-served) served=; mode=pass ;;
   bad-served) served="$MODEL extra"; mode=pass ;;
+  rc17) exit_rc=17; mode=pass ;;
+  rc17-fail) exit_rc=17; mode=fail ;;
 esac
 word=PASS; case $mode in fail|fail-truncated) word=FAIL ;; incomplete) word=INCOMPLETE ;; esac
 loosens=no; [ "$mode" != loosens-yes ] || loosens=yes
@@ -2337,7 +2339,8 @@ eol='\n'; [ "$mode" != crlf ] || eol='\r\n'
   [ "$mode" = fail-truncated ] || printf 'VERDICT: %s\n' "$word"
 } > "$D/review.md"
 [ -z "$served" ] || echo "served-model: $served"
-echo "rc=0 report=$D/review.md"
+echo "rc=${exit_rc:-0} report=$D/review.md"
+exit "${exit_rc:-0}"
 SH
   chmod +x "$1/fake-runner.sh"
 }
@@ -2951,27 +2954,265 @@ test_auto_review_events_reach_the_fleet_ledger() {
 }
 
 test_auto_review_three_prs_through_the_housekeeping_pass() {
-  local p1 p2 p3 saved=$PR_MERGE
-  # FAKE reader, fake forge, the real housekeeping pass, fm-review-record.py and fm-pr-merge.sh. One home per PR.
+  local p1 p2 p3 p4 n saved=$PR_MERGE
+  # FAKE reader, fake forge, the real housekeeping pass, fm-pr-check.sh registration, fm-review-record.py and fm-pr-merge.sh. One home per PR.
   auto_reconcile() { PR_MERGE=$ROOT/bin/fm-pr-ready-reconcile.sh; FM_AUTO_CASE="$1" FM_PR_AUTO_REVIEW_INTERVAL=0 FM_PR_READY_RECONCILE_TIMEOUT=60 run_pr_merge "$1" > "$1/pass.out" 2>&1 || fail "$1: the housekeeping pass failed: $(cat "$1/pass.out")"; PR_MERGE=$saved; }
+  # Each ship has reported its PR in a done line and has no pr= yet, so the real fm-pr-check.sh must register it.
+  auto_unregistered() { sed -i.bak '/^pr=/d' "$1/state/task-x1.meta"; printf 'done [at=1792479210]: PR %s checks green at %s\n' "$AUTO_URL" "$(auto_sha "$1" h1)" > "$1/state/task-x1.status"; }
   p1=$(auto_case e2e-p1); p2=$(auto_case e2e-p2); p3=$(auto_case e2e-p3)
+  auto_unregistered "$p1"; auto_unregistered "$p2"; auto_unregistered "$p3"
   auto_mode "$p2" "$AUTO_SONNET" fail
   auto_reconcile "$p1"; auto_reconcile "$p2"; auto_reconcile "$p3"
-  auto_wait "$p1"; auto_wait "$p2"; auto_wait "$p3"
-  auto_push "$p3"
+  for n in "$p1" "$p2" "$p3"; do
+    grep -q "^pr=$AUTO_URL\$" "$n/state/task-x1.meta" || fail "e2e: fm-pr-check.sh did not register $AUTO_URL for $n: $(cat "$n/pass.out")"
+    assert_grep 'registered' "$n/pass.out" "e2e: the housekeeping pass did not report a registration"
+  done
+  expect_code 0 "$(auto_calls "$p1")" "e2e: registration alone requests no read"
+  # The fail case of the same path: a draft PR is not registered by fm-pr-check.sh, so it is never read.
+  p4=$(auto_case e2e-p4)
+  auto_unregistered "$p4"
+  jq '.isDraft = true' "$p4/github-view.json" > "$p4/v" && mv "$p4/v" "$p4/github-view.json"
+  auto_reconcile "$p4"
+  if grep -q '^pr=' "$p4/state/task-x1.meta"; then fail "e2e P4: a draft PR was registered: $(cat "$p4/pass.out")"; fi
+  grep -q 'registration refused' "$p4/pass.out" || fail "e2e P4: the refusal is not reported: $(cat "$p4/pass.out")"
+  expect_code 0 "$(auto_calls "$p4")" "e2e P4: an unregistered draft is never read"
+  expect_code 0 "$(auto_merges "$p4")" "e2e P4: an unregistered draft never merges"
   auto_reconcile "$p1"; auto_reconcile "$p2"; auto_reconcile "$p3"
+  auto_wait "$p1"; auto_wait "$p2"; auto_wait "$p3"
+  # P3's check is still running when its read returns, so the pass that collects the read records the PASS and merges nothing.
+  jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$p3/github-view.json" > "$p3/v" && mv "$p3/v" "$p3/github-view.json"
+  auto_reconcile "$p1"; auto_reconcile "$p2"; auto_reconcile "$p3"
+  expect_code 1 "$(auto_reviews "$p3")" "e2e P3: the old head's PASS is recorded before the push"
+  expect_code 0 "$(auto_merges "$p3")" "e2e P3: nothing merges while its check is pending"
+  auto_push "$p3"
+  auto_reconcile "$p3"
   auto_wait "$p3"
   auto_reconcile "$p3"
-  printf 'g6 FAKE reader, fake forge, real housekeeping pass, record and merge scripts\n'
+  printf 'g6 FAKE reader, fake forge, real housekeeping pass with fm-pr-check.sh registration, record and merge scripts\n'
   printf 'g6 P1 green+uncovered : state=%s merges=%s reviews=%s\n' "$(auto_state "$p1")" "$(auto_merges "$p1")" "$(auto_reviews "$p1")"
   printf 'g6 P2 green+FAIL      : state=%s merges=%s reviews=%s wake=%s\n' "$(auto_state "$p2")" "$(auto_merges "$p2")" "$(auto_reviews "$p2")" "$(grep -c 'pr-review:task-x1' "$p2/state/.wake-queue")"
   printf 'g6 P3 head moved      : state=%s merges=%s reviews=%s reads=%s merged-head=%s\n' "$(auto_state "$p3")" "$(auto_merges "$p3")" "$(auto_reviews "$p3")" "$(auto_calls "$p3")" "$(sed -n 's/.*--match-head-commit \([0-9a-f]*\).*/\1/p' "$p3/gh.log")"
   expect_code 1 "$(auto_merges "$p1")" "e2e P1: read, PASS, merge"
   expect_code 0 "$(auto_merges "$p2")" "e2e P2: a FAIL must not merge"
   expect_code 1 "$(auto_merges "$p3")" "e2e P3: only the new head's PASS merges"
+  expect_code 2 "$(auto_reviews "$p3")" "e2e P3: the old head's PASS and the new head's PASS are both recorded"
   expect_code 2 "$(auto_calls "$p3")" "e2e P3: the old head and the new head are each read once"
   expect_code "$(auto_sha "$p3" h2)" "$(sed -n 's/.*--match-head-commit \([0-9a-f]*\).*/\1/p' "$p3/gh.log")" "e2e P3: the merge names the new head"
   pass "three registered PRs run through the housekeeping pass: P1 merged, P2 FAIL not merged and owner told, P3 old PASS voided and new head merged once"
+}
+
+# Round 4 (Main 3137): behavior tests, each with a fail case and a pass case.
+
+auto_report() {  # <file> <head> <PASS|FAIL> [<protected line>]: a complete exact-head report that this lane did not write
+  local file=$1 head=$2 word=$3 line=${4-}
+  {
+    printf 'VERDICT: %s head=%s\n' "$word" "$head"
+    printf 'External reader report.\n'
+    printf -- '- Loosens a deny or allow list: no - fixture\n'
+    printf -- '- Widens what a guard permits: no - fixture\n'
+    printf -- '- Touches customer data, billing or spend: no - fixture\n'
+    [ -z "$line" ] || printf '%s\n' "$line"
+    printf 'VERDICT: %s\n' "$word"
+  } > "$file"
+}
+
+auto_record_external() {  # <case_dir> <report> <PASS|FAIL> <reader-model> <authors-json> <covered-json>
+  local case_dir=$1 report=$2 word=$3 reader=$4 groups=$5 covered=$6
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-review-record.py" review \
+    --pr "$AUTO_URL" --head "$(cat "$case_dir/github-head")" --verdict "$word" --reader-model "$reader" \
+    --author-groups "$groups" --covered-groups "$covered" --loosens-deny-allow-list no --widens-guard no \
+    --customer-data-billing-spend no --report "$report" > "$case_dir/external.out" 2>&1 \
+    || fail "recording an external review failed: $(cat "$case_dir/external.out")"
+}
+
+auto_wakes() { auto_count 'pr-review:task-x1' "$1/state/.wake-queue"; }
+
+test_auto_review_protected_class_counts_every_recorded_review() {
+  local case_dir head authors='{"ship":["gpt-5.1-codex","claude-opus-5-5"]}'
+  # F1, fail case: an earlier recorded PASS that said yes is never cleared by a later reader that said no.
+  case_dir=$(auto_case prot-ext-yes)
+  auto_mixed_authors "$case_dir"
+  head=$(auto_sha "$case_dir" h1)
+  auto_report "$case_dir/external.md" "$head" PASS 'Protected class: yes - security-sensitive fixture'
+  auto_record_external "$case_dir" "$case_dir/external.md" PASS "$AUTO_TERRA" "$authors" '["ship"]'
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code "$AUTO_SONNET" "$(auto_runner_models "$case_dir")" "prot-ext-yes: the lane reads only the family the external PASS left uncovered"
+  expect_code 2 "$(auto_reviews "$case_dir")" "prot-ext-yes: the covering PASS is recorded beside the external one"
+  expect_code 0 "$(auto_merges "$case_dir")" "prot-ext-yes: a later 'no' must not merge a head an earlier review marked protected"
+  case $(auto_state "$case_dir") in "held: protected class yes - security-sensitive fixture"*) ;;
+    *) fail "prot-ext-yes: current state should name the earlier answer, got: $(auto_state "$case_dir")" ;; esac
+  expect_code 1 "$(auto_count ':protected' "$case_dir/state/.wake-queue")" "prot-ext-yes: Main is woken once for the hold"
+  auto_dump "$case_dir" "F1 earlier recorded review said yes, later lane review said no"
+  # F1, pass case: when every recorded review said no, the same sequence merges.
+  case_dir=$(auto_case prot-ext-no)
+  auto_mixed_authors "$case_dir"
+  head=$(auto_sha "$case_dir" h1)
+  auto_report "$case_dir/external.md" "$head" PASS 'Protected class: no - routine'
+  auto_record_external "$case_dir" "$case_dir/external.md" PASS "$AUTO_TERRA" "$authors" '["ship"]'
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 2 "$(auto_reviews "$case_dir")" "prot-ext-no: both reviews are recorded"
+  expect_code 1 "$(auto_merges "$case_dir")" "prot-ext-no: every recorded answer is no, so the covering PASS merges"
+  auto_dump "$case_dir" "F1 every recorded review said no"
+  # F1, fail case: an external FAIL or PASS with no protected-class line is insufficient evidence.
+  case_dir=$(auto_case prot-ext-missing)
+  auto_mixed_authors "$case_dir"
+  head=$(auto_sha "$case_dir" h1)
+  auto_report "$case_dir/external.md" "$head" PASS ''
+  auto_record_external "$case_dir" "$case_dir/external.md" PASS "$AUTO_TERRA" "$authors" '["ship"]'
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 0 "$(auto_merges "$case_dir")" "prot-ext-missing: an external review with no protected-class answer holds the merge"
+  assert_grep 'protected class line missing' "$(auto_event_file "$case_dir")" "prot-ext-missing: the hold does not say what is missing"
+  pass "every exact-head recorded review counts: any yes or missing protected-class answer holds, and all-no evidence merges"
+}
+
+test_auto_review_reaches_the_merge_gate_on_a_recorded_routine_pass() {
+  local case_dir scenario report
+  # F5, pass case: an applicable recorded routine PASS that verify accepts proceeds to the merge gate with no sidecar attempt.
+  case_dir=$(auto_case prot-recorded-routine)
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_reviews "$case_dir")" "prot-recorded-routine: the PASS is recorded while a check is pending"
+  expect_code 0 "$(auto_merges "$case_dir")" "prot-recorded-routine: nothing merges while a check is pending"
+  rm -f "$case_dir/state/.pr-auto-review/task-x1.json"
+  jq '.statusCheckRollup[0].status = "COMPLETED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_merges "$case_dir")" "prot-recorded-routine: a recorded routine PASS with an explicit 'no' reaches the merge gate"
+  expect_code 1 "$(auto_calls "$case_dir")" "prot-recorded-routine: no second read is requested"
+  auto_dump "$case_dir" "F5 recorded routine PASS, no sidecar attempt"
+  # F5, fail cases: a recorded PASS whose report changed after it was recorded, or is gone, is insufficient evidence.
+  for scenario in tampered gone; do
+    case_dir=$(auto_case "prot-recorded-$scenario")
+    auto_step "$case_dir"; auto_wait "$case_dir"
+    jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+    auto_step "$case_dir"
+    rm -f "$case_dir/state/.pr-auto-review/task-x1.json"
+    jq '.statusCheckRollup[0].status = "COMPLETED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+    for report in "$case_dir"/state/.pr-auto-review/task-x1.d/*/review.md; do
+      if [ "$scenario" = tampered ]; then sed -i.bak 's/read the pack/read another pack/' "$report"; else rm -f "$report"; fi
+    done
+    auto_step "$case_dir"; auto_step "$case_dir"
+    expect_code 0 "$(auto_merges "$case_dir")" "prot-recorded-$scenario: unverifiable report evidence must hold the merge"
+    case $(auto_state "$case_dir") in "held: "*) ;; *) fail "prot-recorded-$scenario: current state should be a hold, got: $(auto_state "$case_dir")" ;; esac
+    expect_code 1 "$(auto_count ':protected' "$case_dir/state/.wake-queue")" "prot-recorded-$scenario: Main is woken once"
+  done
+  pass "a recorded routine PASS that verify accepts reaches the merge gate with no sidecar attempt, and unverifiable report evidence holds"
+}
+
+test_auto_review_incomplete_review_pack_is_held_and_never_dispatched() {
+  local case_dir scenario n
+  # F2: a contract source that is absent holds the head and surfaces it; no reader is dispatched.
+  for scenario in no-brief empty-brief no-dod missing-pointer; do
+    case_dir=$(auto_case "pack-$scenario")
+    case $scenario in
+      no-brief) rm "$case_dir/home/data/task-x1/brief.md" ;;
+      empty-brief) : > "$case_dir/home/data/task-x1/brief.md" ;;
+      no-dod) rm "$case_dir/home/data/task-x1/dod.md" "$case_dir/home/data/dod/task-x1.md" ;;
+      missing-pointer) rm "$case_dir/home/data/extra-dod.md" ;;
+    esac
+    auto_step "$case_dir"; auto_step "$case_dir"
+    expect_code 0 "$(auto_calls "$case_dir")" "pack-$scenario: no reader may be dispatched on an incomplete contract"
+    n=$(ls -d "$case_dir"/state/.pr-auto-review/task-x1.d/*.run 2>/dev/null | wc -l | tr -d ' ')
+    expect_code 0 "$n" "pack-$scenario: no request may be written"
+    expect_code 0 "$(auto_merges "$case_dir")" "pack-$scenario: nothing may merge"
+    case $(auto_state "$case_dir") in "held: review pack not built: "*) ;;
+      *) fail "pack-$scenario: current state should read held: review pack not built, got: $(auto_state "$case_dir")" ;; esac
+    expect_code 1 "$(auto_wakes "$case_dir")" "pack-$scenario: Main is woken once"
+  done
+  # F2, pass case: a complete contract is dispatched, and a repaired contract is read on the same head.
+  case_dir=$(auto_case pack-repaired)
+  mv "$case_dir/home/data/task-x1/brief.md" "$case_dir/brief.saved"
+  auto_step "$case_dir"
+  expect_code 0 "$(auto_calls "$case_dir")" "pack-repaired: nothing dispatched while the brief is absent"
+  mv "$case_dir/brief.saved" "$case_dir/home/data/task-x1/brief.md"
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  expect_code 1 "$(auto_calls "$case_dir")" "pack-repaired: the complete contract is read on the same head"
+  pass "an incomplete review pack is held with its missing source and never dispatched; a complete or repaired one is read"
+}
+
+test_auto_review_judges_each_check_before_spending_a_read() {
+  local case_dir head scenario
+  # F3: the readiness decision looks at each check and status context; the aggregate CLEAN state is not enough.
+  for scenario in red-check cancelled-check red-context error-context required-unreported required-ruleset-unreported; do
+    case_dir=$(auto_case "ready-$scenario")
+    head=$(auto_sha "$case_dir" h1)
+    case $scenario in
+      red-check) write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED FAILURE)" ;;
+      cancelled-check) write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED SUCCESS)" "$(check_run lint COMPLETED CANCELLED)" ;;
+      red-context) write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED SUCCESS)" "$(status_context deploy FAILURE)" ;;
+      error-context) write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED SUCCESS)" "$(status_context deploy ERROR)" ;;
+      required-unreported) write_github_required "$case_dir" classic:lint ;;
+      required-ruleset-unreported) write_github_required "$case_dir" ruleset:lint ;;
+    esac
+    auto_step "$case_dir"; auto_step "$case_dir"
+    expect_code 0 "$(auto_calls "$case_dir")" "ready-$scenario: no read may be requested"
+    expect_code 0 "$(auto_merges "$case_dir")" "ready-$scenario: nothing may merge"
+    case $(auto_state "$case_dir") in "waiting: "*) ;; *) fail "ready-$scenario: current state should read waiting, got: $(auto_state "$case_dir")" ;; esac
+  done
+  # F3, pass cases: a green head is read, a re-run that superseded a red run is read, and a reported required check is read.
+  case_dir=$(auto_case ready-superseded)
+  head=$(auto_sha "$case_dir" h1)
+  write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:00Z)" "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:05:00Z)"
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  expect_code 1 "$(auto_calls "$case_dir")" "ready-superseded: a red run superseded by a later green run of the same check is ready"
+  case_dir=$(auto_case ready-required-reported)
+  write_github_required "$case_dir" classic:ci
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  expect_code 1 "$(auto_calls "$case_dir")" "ready-required-reported: a required check that reported green is ready"
+  pass "a red or cancelled check, a failed status context and an unreported required check stop a read; a green, re-run or reported head is read"
+}
+
+test_auto_review_treats_a_failed_runner_exit_as_a_failed_read() {
+  local case_dir
+  # F4, fail case: a runner that exits nonzero after writing a PASS report is a failed read; the next model is asked.
+  case_dir=$(auto_case rc-pass)
+  auto_mode "$case_dir" "$AUTO_SONNET" rc17
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 0 "$(auto_merges "$case_dir")" "rc-pass: a PASS from a runner that failed must not merge"
+  expect_code 0 "$(auto_reviews "$case_dir")" "rc-pass: that PASS must not be recorded"
+  auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code "$AUTO_SONNET,$AUTO_DEEPSEEK" "$(auto_runner_models "$case_dir")" "rc-pass: the failed model is not asked again and the next one is"
+  expect_code 1 "$(auto_merges "$case_dir")" "rc-pass: the next model's clean PASS merges"
+  assert_grep 'exited 17' "$(auto_event_file "$case_dir")" "rc-pass: the failure is not named"
+  auto_dump "$case_dir" "F4 nonzero runner exit after a PASS report"
+  # F4, safe handling of a reported FAIL: the head ends at fail and no later PASS can merge over it.
+  case_dir=$(auto_case rc-fail)
+  auto_mode "$case_dir" "$AUTO_SONNET" rc17-fail
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 0 "$(auto_merges "$case_dir")" "rc-fail: nothing merges over a reported FAIL"
+  expect_code "$AUTO_SONNET" "$(auto_runner_models "$case_dir")" "rc-fail: no later reader is asked after a FAIL"
+  expect_code 1 "$(auto_count '"verdict":"FAIL"' "$case_dir/state/review-records.jsonl")" "rc-fail: the reported FAIL is recorded"
+  assert_grep 'runner exited 17' "$(auto_event_file "$case_dir")" "rc-fail: the exit status is not named"
+  grep -q '^fail ' <<<"$(auto_state "$case_dir")" || fail "rc-fail: current state should read fail: $(auto_state "$case_dir")"
+  pass "a nonzero runner exit is a failed read even with a report: a PASS is not recorded and the next model is asked, a FAIL still ends the head"
+}
+
+test_auto_review_retries_a_wake_that_failed_to_append() {
+  local case_dir
+  # F6: a wake that could not be appended is not delivered, so it is not marked emitted; it is delivered once the queue works.
+  case_dir=$(auto_case wake-retry)
+  rm -f "$case_dir/home/config/review-runner"
+  mkdir "$case_dir/state/.wake-queue"
+  auto_step "$case_dir"
+  expect_code 0 "$(auto_wakes "$case_dir")" "wake-retry: nothing can be appended while the queue is unavailable"
+  expect_code 0 "$(auto_notes "$case_dir" 'review runner unavailable')" "wake-retry: an undelivered hold is not recorded as emitted"
+  rmdir "$case_dir/state/.wake-queue"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_wakes "$case_dir")" "wake-retry: the hold is delivered once the queue recovers"
+  expect_code 1 "$(auto_notes "$case_dir" 'review runner unavailable')" "wake-retry: and recorded once"
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_wakes "$case_dir")" "wake-retry: a repeat pass must not wake again"
+  # F6: a terminal hold (the head has an outcome) still delivers its wake after the queue recovers.
+  case_dir=$(auto_case wake-retry-fail)
+  auto_mode "$case_dir" "$AUTO_SONNET" fail
+  mkdir "$case_dir/state/.wake-queue"
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 0 "$(auto_wakes "$case_dir")" "wake-retry-fail: the FAIL wake cannot be appended yet"
+  rmdir "$case_dir/state/.wake-queue"
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_wakes "$case_dir")" "wake-retry-fail: a terminal head still delivers its pending wake, once"
+  expect_code 0 "$(auto_merges "$case_dir")" "wake-retry-fail: a FAIL never merges"
+  pass "a failed wake append is never marked emitted: it is delivered after recovery, including for a terminal hold, and never repeated"
 }
 
 pr_merge_test_cases=(
@@ -2987,6 +3228,12 @@ test_auto_review_leaves_the_away_record_to_the_merge_script
 test_auto_review_trusts_only_a_structured_served_model
 test_auto_review_waits_on_a_merge_queue_and_keeps_heads_it_needs
 test_auto_review_events_reach_the_fleet_ledger
+test_auto_review_protected_class_counts_every_recorded_review
+test_auto_review_reaches_the_merge_gate_on_a_recorded_routine_pass
+test_auto_review_incomplete_review_pack_is_held_and_never_dispatched
+test_auto_review_judges_each_check_before_spending_a_read
+test_auto_review_treats_a_failed_runner_exit_as_a_failed_read
+test_auto_review_retries_a_wake_that_failed_to_append
 test_auto_review_three_prs_through_the_housekeeping_pass
 test_seeded_homes_cannot_create_a_second_landing_owner
 test_unreadable_landing_routing_refuses

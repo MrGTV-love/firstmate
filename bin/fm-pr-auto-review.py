@@ -17,12 +17,16 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      never counted (bin/fm-review-record.py binds every record to its exact head);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
-     ends the head at fail, and a crashed or unusable read burns that model for the head. A read of an
+     ends the head at fail, and a crashed, unusable or nonzero-exit read burns that model for the head
+     (a runner that exited nonzero is a failed read even when it left a PASS report; a reported FAIL still
+     ends the head). A read of an
      older head never stops the live head from being read; once it ends it is marked returned and is
      never recorded, planned or reported;
-  3. stops unless the PR is open, not a draft, mergeable and reported CLEAN or HAS_HOOKS by the forge
-     with no check pending. This is a fail-closed prefilter for spending a read, never the merge
-     gate: bin/fm-pr-merge.sh re-reads every condition live and stays the only authority;
+  3. stops unless the PR is open, not a draft, mergeable and reported CLEAN or HAS_HOOKS by the forge,
+     every check is green as bin/fm-pr-merge.sh judges one (each check run and each status context on its
+     own, never the aggregate state alone) and every check the base branch requires has reported. This is
+     a fail-closed prefilter for spending a read, never the merge gate: bin/fm-pr-merge.sh re-reads every
+     condition live and stays the only authority;
   4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS goes to
      bin/fm-pr-merge.sh <task> <url> with no other argument, never an override, waiver or captain word,
      and a captain-word basis is left to Main. Otherwise `fm-review-record.py plan` names the author
@@ -63,9 +67,19 @@ unusable. The runner asks the reader for one line exactly `Protected class: yes 
 no lets a covering PASS merge; a `protected=<class>` field in the task's meta also holds it. The model
 that served a read is read only from one runner stdout line exactly `served-model: <model id>`; with
 none the read is never recorded, the head is held as `served model unknown` for Main, and no further
-read is requested for it. Today's runner prints no such line, so until it does every read holds for
-Main. A local-only task never reaches this script's merge path, and an away record is left to
-bin/fm-pr-merge.sh's own away handling. Exit status: 0 for every pass that ran, 2 for a usage error.
+read is requested for it. Main's runner prints that line only when one model served every reply and
+prints nothing otherwise, so a read it cannot vouch for holds for Main.
+Before any reader is dispatched the contract must be complete: a non-empty brief.md, at least one
+non-empty Definition Of Done (dod.md or data/dod/<task>.md) and every `DoD file:` it names under data/;
+otherwise the head is held as `review pack not built: contract source missing: <names>` and nothing runs.
+The protected-class decision reads every review row recorded for the exact head, whoever recorded it:
+any yes, missing or malformed answer, any report that is gone or no longer matches its recorded digest,
+and any unreadable history holds the merge, and a later `no` never clears an earlier answer. A recorded
+routine PASS that verify accepts, with every exact-head report answering `no`, goes to the merge gate
+whether or not this lane requested it. A wake that could not be appended is kept pending in the sidecar,
+is not counted as emitted, and every pass retries it. A local-only task never reaches this script's merge
+path, and an away record is left to bin/fm-pr-merge.sh's own away handling.
+Exit status: 0 for every pass that ran, 2 for a usage error.
 """
 import fcntl
 import hashlib
@@ -78,6 +92,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 
 BIN = Path(__file__).resolve().parent
 RULE_PREFIX = "Isolated independent quality review"
@@ -188,20 +203,35 @@ def emit(home, task, side, sha, key, text, wake=None):
 
     Events live in the sidecar, never in the worker's own status log: a trailing `note:` there would
     replace the worker's `done:` as the latest event and change how bin/fm-crew-state.sh reads a ship
-    whose PR is in review.
+    whose PR is in review. An event whose wake could not be appended is pending, not emitted, until
+    flush_wakes delivers it.
     """
     head = side.head(sha)
     if key in head["emitted"]:
         return
+    pending = side.data.setdefault("pending", [])
     if wake:
         script = '. "$1/fm-wake-lib.sh" && fm_wake_append check "$2" "$3"'
-        run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), f"pr-review:{task}:{sha[:12]}:{key}",
-             f"check: pr-review {task}: {wake}"], home)
+        sent = run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), f"pr-review:{task}:{sha[:12]}:{key}",
+                    f"check: pr-review {task}: {wake}"], home)
+        if sent.returncode != 0:
+            # Not delivered, so not emitted: the event and its key wait in the sidecar and every pass retries them.
+            if not any(item["sha"] == sha and item["key"] == key for item in pending):
+                pending.append({"sha": sha, "key": key, "text": text, "wake": wake})
+            side.save()
+            return
+    side.data["pending"] = [item for item in pending if not (item["sha"] == sha and item["key"] == key)]
     events = side.data.setdefault("events", [])
     events.append({"at": int(time.time()), "head": sha[:12], "text": text})
     del events[:-100]
     head["emitted"].append(key)
     side.save()
+
+
+def flush_wakes(home, task, side):
+    """Retry every wake that could not be appended, before any early return of the pass."""
+    for item in list(side.data.get("pending", [])):
+        emit(home, task, side, item["sha"], item["key"], item["text"], item["wake"])
 
 
 def gh_view(url):
@@ -226,7 +256,88 @@ def still_queued(url):
     return not (result.returncode == 0 and "queued=false" in result.stdout.splitlines())
 
 
-def ready_reason(view):
+def checks_not_green(rollup):
+    """(state, name) for each check that is not green, judged as bin/fm-pr-merge.sh judges it; None when unreadable.
+
+    A status context is green only as SUCCESS. A check run is green as SUCCESS, NEUTRAL or SKIPPED; a
+    non-green run of a name stays red unless every such run is completed, dated to the whole second and
+    started before a green run of the same name.
+    """
+    problems, runs = [], {}
+    for index, entry in enumerate(rollup):
+        if not isinstance(entry, dict):
+            return None
+        if entry.get("__typename") == "CheckRun":
+            name = entry.get("name") or ""
+            started = entry.get("startedAt")
+            runs.setdefault((name, -1) if name else ("", index), []).append({
+                "name": name or "(unnamed check)", "completed": entry.get("status") == "COMPLETED",
+                "ok": entry.get("status") == "COMPLETED" and entry.get("conclusion") in ("SUCCESS", "NEUTRAL", "SKIPPED"),
+                "at": started if isinstance(started, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", started) else None})
+        elif entry.get("state") != "SUCCESS":
+            problems.append(("pending" if entry.get("state") in ("PENDING", "EXPECTED") else "failed",
+                             entry.get("context") or "(unnamed check)"))
+    for group in runs.values():
+        reds = [run_ for run_ in group if not run_["ok"]]
+        greens = [run_["at"] for run_ in group if run_["ok"] and run_["at"]]
+        if reds and (not greens or any(not r["completed"] or r["at"] is None for r in reds) or max(r["at"] for r in reds) >= max(greens)):
+            problems.append(("pending" if any(not r["completed"] for r in reds) else "failed", reds[0]["name"]))
+    return problems
+
+
+def required_contexts(url, base):
+    """(names, why): the contexts the base branch requires, from classic protection and active rulesets; why when unreadable."""
+    owner, repo, _ = PR_URL.fullmatch(url).groups()
+    segment = urllib.parse.quote(base, safe="")
+    names, why = set(), ""
+
+    def add(context):
+        nonlocal why
+        if isinstance(context, str) and context:
+            names.add(context)
+        else:
+            why = "a required check name is unreadable"
+
+    branch = run(["gh", "api", f"repos/{owner}/{repo}/branches/{segment}"])
+    try:
+        payload = json.loads(branch.stdout) if branch.returncode == 0 else None
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict) or not isinstance(payload.get("protected"), bool):
+        why = "the branch protection summary could not be read"
+    elif payload["protected"]:
+        required = (payload.get("protection") or {}).get("required_status_checks")
+        if not isinstance(required, dict):
+            why = "the branch protection summary could not be read"
+        else:
+            for item in required.get("checks") or []:
+                add(item.get("context") if isinstance(item, dict) else None)
+            for context in required.get("contexts") or []:
+                add(context)
+    rules = run(["gh", "api", "--paginate", f"repos/{owner}/{repo}/rules/branches/{segment}"])
+    if rules.returncode != 0:
+        if "Upgrade to GitHub Pro or make this repository public" not in rules.stderr:
+            why = "the branch rules could not be read"
+        return names, why
+    decoder, text, index = json.JSONDecoder(), rules.stdout, 0
+    try:
+        while index < len(text):
+            if text[index].isspace():
+                index += 1
+                continue
+            page, index = decoder.raw_decode(text, index)
+            for rule in page if isinstance(page, list) else [None]:
+                if not isinstance(rule, dict):
+                    raise ValueError("rules payload is unreadable")
+                if rule.get("type") == "required_status_checks":
+                    for item in (rule.get("parameters") or {}).get("required_status_checks") or []:
+                        add(item.get("context") if isinstance(item, dict) else None)
+    except ValueError:
+        why = "the branch rules could not be read"
+    return names, why
+
+
+def ready_reason(url, view):
     """None when the forge reports the head ready to be read, else why not."""
     if str(view.get("state", "")).upper() != "OPEN":
         return "pull request is not open"
@@ -237,16 +348,17 @@ def ready_reason(view):
     if view.get("mergeStateStatus") not in GREEN_STATES:
         return f"forge merge state is {view.get('mergeStateStatus') or 'unreadable'}, not green"
     rollup = view.get("statusCheckRollup")
-    if not isinstance(rollup, list):
+    problems = checks_not_green(rollup) if isinstance(rollup, list) else None
+    if problems is None:
         return "check rollup unreadable"
-    for entry in rollup:
-        if not isinstance(entry, dict):
-            return "check rollup unreadable"
-        if entry.get("__typename") == "StatusContext":
-            if entry.get("state") in ("PENDING", "EXPECTED"):
-                return "a check is still pending"
-        elif entry.get("status") != "COMPLETED":
-            return "a check is still pending"
+    for state, name in problems:
+        return f"a check is still pending: {name}" if state == "pending" else f"check {name} is not green"
+    required, why = required_contexts(url, view.get("baseRefName") or "main")
+    if why:
+        return f"required checks unreadable: {why}"
+    reported = {entry.get("name") or entry.get("context") for entry in rollup if isinstance(entry, dict)}
+    for context in sorted(required - reported):
+        return f"required check {context} has not reported"
     return None
 
 
@@ -418,8 +530,9 @@ def collect(home, task, url, sha, base, side, meta):
         att["state"] = "returned" if why else "recorded"
         head["outcome"] = {"kind": "fail", "detail": report}
         phase(side, sha, "fail", f"report {report}")
-        emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report}" + (f" (not recorded: {why})" if why else ""),
-             f"FAIL at {sha[:12]} read by {actual}; findings are in {report}")
+        ran = f"; the runner exited {att['exited']}" if att.get("exited") else ""
+        emit(home, task, side, sha, "fail", f"fail: {sha[:12]} read by {actual}, report {report}" + (f" (not recorded: {why})" if why else "") + ran,
+             f"FAIL at {sha[:12]} read by {actual}; findings are in {report}{ran}")
 
     for model_id, att in sorted(head["attempts"].items(), key=lambda item: item[1]["at"]):
         if att["state"] != "requested":
@@ -441,8 +554,14 @@ def collect(home, task, url, sha, base, side, meta):
         served = outcome.get("served_model")
         named = served or model_id
         report = outcome.get("report") or ""
-        verdict, facts, protected, problem = parse_report(report, sha) if report else (None, {}, None, "the runner wrote no report")
+        verdict, facts, _, problem = parse_report(report, sha) if report else (None, {}, None, "the runner wrote no report")
         quota = " (usage limit reached)" if "usage_limit_reached" in str(outcome.get("tail", "")) else ""
+        exited = outcome.get("rc", 0)
+        att["exited"] = exited
+        if exited != 0 and verdict != "FAIL":
+            # A failed run is a failed read even when it left a report: burn the model, the next one is asked.
+            burn(att, model_id, f"read of {sha[:12]} by {named} failed: the runner exited {exited}{quota}", f"the runner exited {exited}{quota}")
+            continue
         if problem and verdict == "FAIL":
             stand_failed(att, named, report, problem)
             continue
@@ -457,7 +576,7 @@ def collect(home, task, url, sha, base, side, meta):
                  f"held: served model unknown at {sha[:12]}: the runner printed no 'served-model:' line for the read requested from {model_id}, report {report}",
                  f"served model unknown for the read of {sha[:12]} requested from {model_id}; not recorded, report {report}, the merge is Main's")
             continue
-        att.update(report=report, verdict=verdict, actual_model=served, protected=protected)
+        att.update(report=report, verdict=verdict, actual_model=served, exited=exited)
         if verdict == "INCOMPLETE":
             att["state"] = "returned"
             head["outcome"] = {"kind": "incomplete", "detail": report}
@@ -515,30 +634,42 @@ def collect(home, task, url, sha, base, side, meta):
 
 
 def contract_text(home, task):
-    """The brief, its Definition Of Done and every steering message, which is what the reader judges against."""
+    """(text, absent): the brief, its Definition Of Done and every steering message, which is what the reader judges against.
+
+    absent names each required source that is missing or empty: the brief, at least one Definition Of
+    Done (dod.md or data/dod/<task>.md) and every file the brief or a DoD names on an unfenced
+    `DoD file: <absolute path>` line under data/. Steering messages are optional. A pointer outside data/ is never read.
+    """
     sources = [("brief.md", home.data / task / "brief.md"), ("dod.md", home.data / task / "dod.md"),
                (f"dod/{task}.md", home.data / "dod" / f"{task}.md")]
     data_root = Path(os.path.realpath(home.data))
-    parts, seen, visited = [], set(), set()
+    parts, seen, visited, absent, dod = [], set(), set(), [], False
     for name, path in sources:
-        if not path.is_file() or os.path.realpath(path) in visited:
+        real = os.path.realpath(path)
+        if real in visited:
             continue
-        visited.add(os.path.realpath(path))
-        text = path.read_text(encoding="utf-8", errors="replace")
-        # A brief may point at its finished criteria with an unfenced `DoD file: <absolute path>` line;
-        # only a file under the home's data directory is read.
+        visited.add(real)
+        text = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        if not text.strip():
+            if name == "brief.md" or name.startswith("DoD file "):
+                absent.append(name)
+            continue
+        dod = dod or name != "brief.md"
+        # A brief may point at its finished criteria; only a file under the home's data directory is read.
         for match in re.finditer(r"(?m)^DoD file: (/\S+)\s*$", text):
             target = Path(os.path.realpath(match.group(1)))
-            if target.is_file() and data_root in target.parents:
+            if data_root in target.parents:
                 sources.append((f"DoD file {target.name}", target))
         if text not in seen:
             seen.add(text)
             parts.append(f"<!-- {name} -->\n{text}")
+    if not dod:
+        absent.append("a Definition Of Done (dod.md or dod/<task>.md)")
     for folder in (home.state / f"{task}.inbox" / "handled", home.state / f"{task}.inbox"):
         for message in sorted(folder.glob("*.msg")) if folder.is_dir() else []:
             body = message.read_text(encoding="utf-8", errors="replace").split("\n--\n", 1)[-1]
             parts.append(f"## Main ruling {message.name}\n{body}")
-    return "\n\n".join(parts)
+    return "\n\n".join(parts), absent
 
 
 def ci_text(sha, view):
@@ -550,6 +681,9 @@ def ci_text(sha, view):
 
 
 def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, covers):
+    contract, absent = contract_text(home, task)
+    if absent:
+        return f"contract source missing: {', '.join(absent)}"
     runner, _ = runner_path(home)
     review_dir = home.root / f"{task}.d" / f"{sha[:12]}-{slug(model_id)}"
     review_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -566,7 +700,7 @@ def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, c
     if fetched != sha:
         return f"diff unavailable: the PR head fm-review-diff.sh fetched is {fetched[:12] or 'none'}, not {sha[:12]}"
     (review_dir / "pr.diff").write_text(diff.stdout, encoding="utf-8")
-    (review_dir / "contract.md").write_text(contract_text(home, task), encoding="utf-8")
+    (review_dir / "contract.md").write_text(contract, encoding="utf-8")
     (review_dir / "ci-evidence.md").write_text(ci_text(sha, view), encoding="utf-8")
     again = gh_view(url)
     if not again or again["headRefOid"] != sha:
@@ -628,6 +762,7 @@ def step(home, task):
 
 
 def advance(home, task, url, meta, side):
+    flush_wakes(home, task, side)
     head_sha = side.data.get("phase", {}).get("head")
     prior = side.head(head_sha) if head_sha else None
     if prior and prior.get("outcome") and prior["outcome"]["kind"] == "merged":
@@ -659,7 +794,7 @@ def advance(home, task, url, meta, side):
     ensure_objects(meta, sha, base)
     if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):
         return
-    reason = ready_reason(view)
+    reason = ready_reason(url, view)
     if reason:
         phase(side, sha, "waiting", reason)
         side.save()
@@ -727,20 +862,50 @@ def advance(home, task, url, meta, side):
     side.save()
 
 
+def protected_reasons(url, sha, meta):
+    """Why this head is not a routine merge; empty only when every exact-head recorded review answers `Protected class: no`.
+
+    Every review row recorded for the head counts, whoever wrote it and in whatever order: an answer of yes,
+    a missing or malformed answer, a report that is gone, changed since it was recorded or does not match
+    its row, and a history that cannot be read each hold the merge. A later `no` never clears an earlier answer.
+    """
+    classes = sorted({c for c in meta.get("protected", "").split(",") if c in CLASSES})
+    reasons = [f"protected class {','.join(classes)}"] if classes else []
+    record = load_record_module()
+    try:
+        with record.ledger(False, record.task_home()) as fd:
+            _, rows = record.newest(fd, record.canonical_pr(url))
+    except (record.RecordError, OSError, ValueError) as exc:
+        return reasons + [f"the review record history cannot be read: {str(exc)[:120]}"]
+    rows = [row for row in rows if row["kind"] == "review" and row["head"] == sha]
+    if not rows:
+        reasons.append("no review record for the head answers the protected-class question")
+    for row in rows:
+        who = f"the {row['verdict']} review by {row['reader_model']}"
+        try:
+            intact = record.report_digest(row["report"], row["verdict"], sha) == row.get("report_sha256")
+        except record.RecordError:
+            intact = False
+        if not intact:
+            reasons.append(f"{who} cannot be verified: its report is missing or changed since it was recorded")
+            continue
+        verdict, _, protected, problem = parse_report(row["report"], sha)
+        if problem or verdict != row["verdict"]:
+            reasons.append(f"{who} cannot be verified: {problem or 'its report names another verdict'}")
+        elif protected != "no":
+            reasons.append(f"protected class {protected}" if protected.startswith("yes") else f"protected class line {protected} in a report")
+    return sorted(set(reasons))
+
+
 def merge(home, task, url, sha, side, meta):
     head = side.head(sha)
-    classes = sorted({c for c in (meta.get("protected", "").split(",")) if c in CLASSES})
-    answers = [att.get("protected") for att in head["attempts"].values() if att["state"] == "recorded" and att.get("verdict") == "PASS"]
-    reasons = [f"protected class {','.join(classes)}"] if classes else []
-    reasons += sorted({f"protected class {a}" if str(a).startswith("yes") else f"protected class line {a} in a report"
-                       for a in answers if a != "no"})
-    if not answers:
-        reasons.append("no read this lane recorded for the head answered the protected-class question")
+    reasons = protected_reasons(url, sha, meta)
     if reasons:
+        # Not terminal: the evidence is read again every pass, so a readable report or a repaired history is judged anew.
         reason = "; ".join(reasons)
-        head["outcome"] = {"kind": "protected", "detail": reason}
         phase(side, sha, "held", reason)
-        emit(home, task, side, sha, "protected", f"held: {reason} at {sha[:12]}; the merge is Main's",
+        emit(home, task, side, sha, f"protected:{hashlib.sha256(reason.encode()).hexdigest()[:12]}",
+             f"held: {reason} at {sha[:12]}; the merge is Main's",
              f"{url} held: {reason}; not merged, Main decides it and takes a protected class to the captain")
         return
     attempt = head.get("merge") or {}
