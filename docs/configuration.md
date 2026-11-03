@@ -1109,6 +1109,7 @@ That source was explicitly selected instead of the original GraphQL-query/header
 A `process` row holds a locally sampled caller chain at its first sighting, and a `process_end` row with the same pid and start identity holds the time of the first successful scan that no longer lists that caller, so the two rows connect a long-lived caller to the quota intervals between them.
 No row is written per scan, and a failed scan ends nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
 A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so its `process` row shows when it was first seen and not how long it lived; a new owner records a caller it finds alive as a new `process` row.
+Each row expires on its own age and a running owner writes a caller's `process` row only once, so a caller that lives past the 48-hour retention loses that row and its later `process_end` row can stand alone.
 Temporal coincidence cannot prove that a caller spent the points of a quota interval, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
 Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.
