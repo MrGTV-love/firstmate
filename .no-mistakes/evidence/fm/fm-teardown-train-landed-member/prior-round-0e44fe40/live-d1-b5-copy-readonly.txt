@@ -1,0 +1,21 @@
+copy HEAD: 5714eb0f19016970a2750666f28619d6d71ab5a4
+copy is ancestor of member head: no
+member head is ancestor of copy: no
+merge-base copy/member: 4072273a8cdb65f058ac2a7e5b29145c7333de12
+member head commits not in main squash:       15
+copy commits not in member head nor main squash:
+  5714eb0f1 parents=1 patch-in-member-head :: no-mistakes(ci): Cause (this PR's own code): commit 17b474b5a added ve
+  04d80dfbb parents=1 patch-in-member-head :: no-mistakes(document): Raise B5 persistence CI floor to 13
+  488c997b5 parents=1 patch-in-member-head :: no-mistakes(gate.review.push-checks-review): Extract save-disabled pre
+  9aaae08a7 parents=1 patch-in-member-head :: no-mistakes(review): Show withdrawn org legal name, sort listing, guar
+  58d0b263d parents=1 patch-in-member-head :: no-mistakes(review): Refuse saves on withdrawn orgs, hide their lines,
+  17b474b5a parents=1 patch-in-member-head :: test(db): isolate historical migration replays from current-schema tes
+  6d60163e6 parents=1 patch-in-member-head :: no-mistakes(review): Require portal owner for profile read routes
+  0063d65b7 parents=1 patch-in-member-head :: no-mistakes(review): Rename B5 migration after main's newest, re-recor
+  4e5d0cafc parents=1 patch-in-member-head :: no-mistakes(review): Fail list when no profile is readable
+  7cdfabc43 parents=1 patch-in-member-head :: no-mistakes(document): Document list_profiles integrity-skip behavior
+  07bdf15bb parents=1 patch-in-member-head :: no-mistakes(review): Isolate unreadable profiles in list; drop by-id r
+  593fa889f parents=1 patch-in-member-head :: no-mistakes(review): Reproduce custody run, drop rotation table names
+  afe7dd391 parents=1 patch-in-member-head :: no-mistakes(review): Delete Case snapshots, digest stored bytes, index
+  0bb1ac955 parents=1 NOT-IN-MEMBER-HEAD :: feat(organization-context): add the B5 per-organization profile with f
+uncommitted lines (read-only, no index refresh):        0

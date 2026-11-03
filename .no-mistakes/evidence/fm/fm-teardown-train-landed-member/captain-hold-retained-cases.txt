@@ -1,0 +1,14 @@
+# at 89a6d2ab2be936c996345118d3df00f809ba74a3
+ok - release and scout report retention distinguish deliveries from rejected merge answers
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit: 0 (test_retained_row_artifacts_survive_captain_answers, 198s)
+ok - cleanup replay closes answered work and preserves the report after direct or keyed answers
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit: 0 (test_answer_before_cleanup_replay_preserves_the_retained_report, 239s)
+warning: re-init: ignored --initial-branch=main
+ok - an answer before cleanup replay notes the retained Gerrit change
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit: 0 (test_answer_before_cleanup_replay_notes_a_retained_gerrit_change, 100s)
+ok - ledger on: an answer, a reconcile close, or a repair that closes retained work records one task.closed naming its report, and a repeat records none
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit: 0 (test_captain_close_of_retained_work_records_task_closed, 454s)

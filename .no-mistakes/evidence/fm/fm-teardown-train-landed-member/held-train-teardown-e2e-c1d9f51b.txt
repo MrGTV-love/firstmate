@@ -1,0 +1,53 @@
+=============== variant: treehouse-fails  (head c1d9f51bf45dcaf3d5315330cf74a0de1832a83f)
+member https://github.com/example/repo/pull/7, train https://github.com/example/repo/pull/9
+captain hold set: yes
+--- teardown exit: 1
+--- teardown stderr (banner removed):
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 9d1c881c55d2fbca3a705796c76c9fc95cd13475; https://github.com/example/repo/pull/7 itself is closed, not merged
+error: treehouse return failed for worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Z1Q4tm/held-treehouse-fails/wt; teardown aborted
+--- treehouse calls: return --force /Users/charlesabrooker/tmp/fm-teardown-tests.Z1Q4tm/held-treehouse-fails/wt;
+--- pending close record written by teardown:
+id=task-x1
+data=/Users/charlesabrooker/tmp/fm-teardown-tests.Z1Q4tm/held-treehouse-fails/data
+spawn_gen=teardown-test-task-x1
+cleanup_incomplete=0
+mode=retain
+arg=--pr
+arg=https://github.com/example/repo/pull/9
+arg=--note
+arg=closed by merge train: https://github.com/example/repo/pull/7
+--- row after teardown:
+  state: in_flight
+  held: yes
+  hold_kind: captain
+  links: none
+  body: "Captain hold set: 2026-11-03T10:00:53Z"
+--- captain answer exit: 0
+--- row after the answer:
+  state: done
+  held: no
+  links: "pr:https://github.com/example/repo/pull/9"
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 36b809aaa36006db291041b4656c641e70cc85fa48d819f59d7b00614c4a4561\nResolution mode: answered\nResolves hold set: 2026-11-03T10:00:53Z\nResolved at: 2026-11-03T10:01:39Z\nAnswered by: main\n\nCaptain decision:\nProceed with the landed train.\nclosed by merge train: https://github.com/example/repo/pull/7"
+
+=============== variant: treehouse-ok  (head c1d9f51bf45dcaf3d5315330cf74a0de1832a83f)
+member https://github.com/example/repo/pull/7, train https://github.com/example/repo/pull/9
+captain hold set: yes
+--- teardown exit: 0
+--- teardown stderr (banner removed):
+landed by a merged train: merged train PR https://github.com/example/repo/pull/9 lists https://github.com/example/repo/pull/7 at 3f098520f7003ce15ddcdf64c7103e9f39144f9c; https://github.com/example/repo/pull/7 itself is closed, not merged
+--- treehouse calls: return --force /Users/charlesabrooker/tmp/fm-teardown-tests.Z1Q4tm/held-treehouse-ok/wt;
+--- pending close record written by teardown:
+(none present)
+--- row after teardown:
+  state: queued
+  held: yes
+  hold_kind: captain
+  links: "pr:https://github.com/example/repo/pull/9"
+  body: "Captain hold set: 2026-11-03T10:01:48Z\n\nDeliverable of the finished work: PR https://github.com/example/repo/pull/9; closed by merge train: https://github.com/example/repo/pull/7"
+--- captain answer exit: 0
+--- row after the answer:
+  state: done
+  held: no
+  links: "pr:https://github.com/example/repo/pull/9"
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 36b809aaa36006db291041b4656c641e70cc85fa48d819f59d7b00614c4a4561\nResolution mode: answered\nResolves hold set: 2026-11-03T10:01:48Z\nResolved at: 2026-11-03T10:02:25Z\nAnswered by: main\n\nCaptain decision:\nProceed with the landed train.\n\nDeliverable of the finished work: PR https://github.com/example/repo/pull/9; closed by merge train: https://github.com/example/repo/pull/7"
+

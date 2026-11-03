@@ -1,0 +1,48 @@
+# real forge, d1 B5 r4 replica, at c1d9f51bf45dcaf3d5315330cf74a0de1832a83f, 2026-11-03T09:36:25Z
+copy HEAD 5714eb0f19016970a2750666f28619d6d71ab5a4, clean: yes
+member PR 3528 head is ancestor of copy: no; copy is ancestor of member head: no
+
+=== W1. replica of the d1 B5 r4 copy, member 3528 CLOSED, train 3599 verified, NO run record: expect refused (feature commit 0bb1ac955 has no equal patch in the train)
+exit: 1
+--- stderr (watcher banner removed):
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-teardown-tests.qxGAUD/real-d1b5-replica/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-teardown-tests.qxGAUD/real-d1b5-replica/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+5714eb0f1 no-mistakes(ci): Cause (this PR's own code): commit 17b474b5a added vernant_engine/tests/unit/db/conftest.py::historical_database_url. That fixture gave each historical-replay module a copy of the database made with CREATE DATABASE <clone> TEMPLATE postgres. On the CI Supabase image, 2 other sessions always stay connected to `postgres`. Postgres refuses a template that has other sessions open, so all 14 modules that used the fixture failed at setup (68 errors, ObjectInUse, job 119616094550; the first module failed the same way). The copy approach cannot work on this lane. Original problem that 17b474b5a tried to fix (PR 3505, job 118584453309): unit/db ran before the B5 suite. Old-migration replays redefine public.soft_delete_session_with_review_snapshot without the B5 Case-snapshot delete. Because of that, test_persist_reopen_confirm_reuse_and_withdraw_preserve_old_receipts failed ('assert 1 == 0' at test_organization_context_persistence.py:296). That was the only failure: 569 passed. Invariant: the B5 persistence suite must run against the current migrated schema, and no historical replay may run before it in the same database. Sites that must hold it: (1) the CI pytest invocation in the job 'DB Integration (Live Postgres)', step 'Run live-DB integration tests'; (2) the 14 historical modules' live_database_url fixtures. Site 2 goes back to main's behavior. That behavior is safe once site 1 holds, because main's unit/db suite is green when it runs in sequence. Fix (removal-first): 1. Removed vernant_engine/tests/unit/db/conftest.py. Restored the 14 historical-replay modules to their base-commit content exactly (git diff against 4072273a8 for that directory is now empty). 2. In .github/workflows/ci.yml, the B5 persistence file now comes before vernant_engine/tests/unit/db/ in the 'Run live-DB integration tests' command. This makes it run on the freshly migrated database, before any replay. Added a comment that says why, and why per-module copies do not work there. No other CI value changed. The classname floors (including test_organization_context_persistence:13) are unchanged. Verification run locally (serial, nice -n 20, UV_NO_SYNC=1): - `pytest <persistence file> vernant_engine/tests/unit/db/ -m 'integration and not expensive' --collect-only -q`: exit 0. It collects 577 tests, the same 509+68 as CI. The 14 persistence tests come first and unit/db follows. - `actionlint .github/workflows/ci.yml`: exit 0. - `pytest -q vernant_engine/tests/unit/tools/test_account_erasure_release.py <persistence file>`: exit 0, 165 passed, 14 skipped. The 14 skipped are the persistence tests, which skip because there is no local disposable DB. - I checked that the persistence suite touches none of the tables that unit/db counts globally. Not verified locally: a full live Supabase run. I did not start a Supabase database container, because the user's own local 'vernant' Supabase stack is on this machine and I did not want to touch it. The next CI run of 'DB Integration (Live Postgres)' is the live proof
+04d80dfbb no-mistakes(document): Raise B5 persistence CI floor to 13
+488c997b5 no-mistakes(gate.review.push-checks-review): Extract save-disabled predicate to cut ProfileWorkspace complexity
+9aaae08a7 no-mistakes(review): Show withdrawn org legal name, sort listing, guard submit, refresh custody
+58d0b263d no-mistakes(review): Refuse saves on withdrawn orgs, hide their lines, fail listing visibly
+commits whose change is not proven present in the merged PR head:
+0bb1ac955 feat(organization-context): add the B5 per-organization profile with field provenance
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at /Users/charlesabrooker/tmp/fm-teardown-tests.qxGAUD/real-d1b5-replica/nm/state.sqlite, so no run record ties this copy to https://github.com/MrGTV-love/vernant/pull/3528
+no merge-train proof:
+train PR https://github.com/MrGTV-love/vernant/pull/3599 is a verified train for https://github.com/MrGTV-love/vernant/pull/3528, but this copy's work is not proven present in its head eab72358aa89
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- real gh calls (read-only filter):
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr list --repo MrGTV-love/vernant --state all --search "https://github.com/MrGTV-love/vernant/pull/3528" in:body --json number,url,state,baseRefName,headRefOid,body --limit 30
+/Users/charlesabrooker/.no-mistakes/evidence/01M6G0SSW287C5ENA2421F4C38/drive-real-d1b5-replica.sh: line 41: /Users/charlesabrooker/tmp/fm-teardown-tests.qxGAUD/real-d1b5-replica/treehouse.log: No such file or directory
+--- treehouse calls: 
+--- task record present after: yes
+--- copy present after: yes
+--- backlog state: in_flight
+
+(lab run record written: pr_url=https://github.com/MrGTV-love/vernant/pull/3528 submitted_head_sha=5714eb0f19016970a2750666f28619d6d71ab5a4 last_pushed_sha=0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3)
+=== W2. same replica, with a run record that says this copy was the input of the run that pushed 3528's head: expect accepted, naming 3599
+exit: 0
+--- stderr (watcher banner removed):
+WARNING: watcher still down (same stale episode; last beat: 259s ago, grace 300s) - full banner already printed this episode.
+landed by a merged train: merged train PR https://github.com/MrGTV-love/vernant/pull/3599 lists https://github.com/MrGTV-love/vernant/pull/3528 at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3; https://github.com/MrGTV-love/vernant/pull/3528 itself is closed, not merged
+--- real gh calls (read-only filter):
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr list --repo MrGTV-love/vernant --state all --search "https://github.com/MrGTV-love/vernant/pull/3528" in:body --json number,url,state,baseRefName,headRefOid,body --limit 30
+--- treehouse calls: return --force /Users/charlesabrooker/tmp/fm-teardown-tests.qxGAUD/real-d1b5-replica/wt;
+--- task record present after: no
+--- copy present after: yes
+--- backlog state: done
+

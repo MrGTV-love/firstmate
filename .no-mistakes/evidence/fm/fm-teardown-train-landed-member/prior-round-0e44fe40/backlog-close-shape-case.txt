@@ -1,0 +1,1 @@
+ok - recovery replays only the merge-train close shape and refuses every wider note or argument shape

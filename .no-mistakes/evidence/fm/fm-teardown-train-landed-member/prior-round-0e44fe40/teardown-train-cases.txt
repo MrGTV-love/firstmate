@@ -1,0 +1,28 @@
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - worktree whose content already landed in the default branch is torn down (content fallback)
+ok - a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr and on the backlog close
+ok - a pre-rebase copy whose patches the train head carries is accepted by the patch proof
+ok - a train landed by squash is accepted
+ok - a copy later than the listed head but inside the verified train is accepted
+ok - a closed member no merged PR lists at a 40-hex sha is refused (no list, other member, number prefix, no sha)
+ok - a train listing another sha, or a sha its head does not contain, is refused
+ok - a copy holding a commit the train head never carried is refused with the commit named
+ok - a flattened-rebase train that replays every member commit is accepted although it does not contain the member head
+ok - a flattened train missing one commit of the member head is refused
+ok - a flat train missing a member commit refuses even when a stale remote-tracking ref holds that commit
+ok - a failed re-read of the CLOSED member is unknown, retry
+ok - a dirty copy refuses before any forge read, even when its train is verified
+ok - an open or closed-unmerged train is refused
+ok - the train must be merged into the task's base: the default branch, or its recorded base_branch
+ok - a failed forge search or fetch of the train is unknown, retry, never accepted and never 'not landed'
+ok - a train that lists an OPEN member does not make it landed
+ok - a MERGED member is decided by the existing route, with no train read
+ok - a CLOSED member whose clean content is already in the default branch is still accepted by the content proof
+ok - a closed member with no train and unlanded work keeps the existing refusal
+ok - a removed copy is accepted only on a verified merged train, and every unverified or unread train refuses
+ok - a removed copy's branch in a pool slot is landed by a verified train only
+ok - dirty worktree is refused even when its committed work has landed (dirty always wins)
+ok - gh lookup error with content not in default refuses (fail-safe)
+ok - absent and non-Git ship copies complete only with their recorded merged PR
+ok - ships without Git copies refuse open, closed, unreachable, unrecorded, and unsupported PR proof
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle

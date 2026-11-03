@@ -1,0 +1,128 @@
+# real forge run at c1d9f51bf45dcaf3d5315330cf74a0de1832a83f, 2026-11-03T09:29:11Z
+
+=== R1. real Vernant PR 3528 (CLOSED, unmerged), listed by merged train PR 3599 at its head: expect accepted, naming 3599
+exit: 0
+--- stdout:
+/Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3528/project: STUCK: on branch main with uncommitted changes, 0 commits behind origin/main - needs attention
+teardown task-x1 complete (window none, worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3528/missing-wt, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261103T093007Z-57400)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3528/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 39s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3528/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+landed by a merged train: merged train PR https://github.com/MrGTV-love/vernant/pull/3599 lists https://github.com/MrGTV-love/vernant/pull/3528 at 0b2e8a9f116efe9b9bbfc22b4df108e5a7be88e3; https://github.com/MrGTV-love/vernant/pull/3528 itself is closed, not merged
+--- real gh calls (read-only filter):
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state -q .state
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3528 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr list --repo MrGTV-love/vernant --state all --search "https://github.com/MrGTV-love/vernant/pull/3528" in:body --json number,url,state,baseRefName,headRefOid,body --limit 30
+/Users/charlesabrooker/.no-mistakes/evidence/01M6G0SSW287C5ENA2421F4C38/drive-real-forge.sh: line 45: /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3528/treehouse.log: No such file or directory
+--- treehouse calls: 
+--- task record present after: no
+--- backlog task-x1 after:
+  task:
+    id: task-x1
+    title: "teardown fixture task https://github.com/MrGTV-love/vernant/pull/3599"
+    state: done
+    blocked: no
+    blocked_by: none
+    held: no
+    hold_reason: "-"
+    hold_kind: "-"
+    hold_until: "-"
+    kind: ship
+    repo: "-"
+    priority: "-"
+    created: "-"
+    closed: 2026-11-03
+    deps: none
+    links: "pr:https://github.com/MrGTV-love/vernant/pull/3599"
+    body: "closed by merge train: https://github.com/MrGTV-love/vernant/pull/3528"
+
+=== R2. real Vernant PR 3567 (CLOSED, unmerged), listed by no PR on the forge: expect refused
+exit: 1
+--- stdout:
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 21s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3567/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+no merge-train proof:
+https://github.com/MrGTV-love/vernant/pull/3567 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+--- real gh calls (read-only filter):
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3567 --json state -q .state
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3567 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr list --repo MrGTV-love/vernant --state all --search "https://github.com/MrGTV-love/vernant/pull/3567" in:body --json number,url,state,baseRefName,headRefOid,body --limit 30
+/Users/charlesabrooker/.no-mistakes/evidence/01M6G0SSW287C5ENA2421F4C38/drive-real-forge.sh: line 45: /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3567/treehouse.log: No such file or directory
+--- treehouse calls: 
+--- task record present after: yes
+--- backlog task-x1 after:
+  task:
+    id: task-x1
+    title: teardown fixture task
+    state: in_flight
+    blocked: no
+    blocked_by: none
+    held: no
+    hold_reason: "-"
+    hold_kind: "-"
+    hold_until: "-"
+    kind: ship
+    repo: "-"
+    priority: "-"
+    created: 2026-11-03
+    closed: "-"
+    deps: none
+    links: none
+    body: ""
+
+=== R3. real Vernant PR 3444 (CLOSED, unmerged): merged PR 3451 names its URL and head sha in prose, not as '<url> at <sha>': expect refused
+exit: 1
+--- stdout:
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 23s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3444/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+no merge-train proof:
+https://github.com/MrGTV-love/vernant/pull/3444 is CLOSED and no PR found by the forge lists it at a 40-hex sha
+--- real gh calls (read-only filter):
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3444 --json state -q .state
+  gh pr view https://github.com/MrGTV-love/vernant/pull/3444 --json state,headRefOid,url -q .state + "\t" + .headRefOid + "\t" + .url
+  gh pr list --repo MrGTV-love/vernant --state all --search "https://github.com/MrGTV-love/vernant/pull/3444" in:body --json number,url,state,baseRefName,headRefOid,body --limit 30
+/Users/charlesabrooker/.no-mistakes/evidence/01M6G0SSW287C5ENA2421F4C38/drive-real-forge.sh: line 45: /Users/charlesabrooker/tmp/fm-teardown-tests.Lh9oa4/real-3444/treehouse.log: No such file or directory
+--- treehouse calls: 
+--- task record present after: yes
+--- backlog task-x1 after:
+  task:
+    id: task-x1
+    title: teardown fixture task
+    state: in_flight
+    blocked: no
+    blocked_by: none
+    held: no
+    hold_reason: "-"
+    hold_kind: "-"
+    hold_until: "-"
+    kind: ship
+    repo: "-"
+    priority: "-"
+    created: 2026-11-03
+    closed: "-"
+    deps: none
+    links: none
+    body: ""
+

@@ -1,0 +1,48 @@
+warning: re-init: ignored --initial-branch=main
+# captain-hold train marker sandbox at 89a6d2ab2be936c996345118d3df00f809ba74a3
+teardown exit (treehouse return made to fail): 1
+--- pending record written by teardown:
+id=sample-train-retained-answer
+data=/Users/charlesabrooker/tmp/fm-captain-hold.LBJMPu/train-retained-answer/data
+spawn_gen=fixture-sample-train-retained-answer
+cleanup_incomplete=0
+mode=retain
+arg=--pr
+arg=https://gerrit.example.com/c/project/+/12345
+--- pending record rewritten to the merge-train close shape:
+id=sample-train-retained-answer
+data=/Users/charlesabrooker/tmp/fm-captain-hold.LBJMPu/train-retained-answer/data
+spawn_gen=fixture-sample-train-retained-answer
+cleanup_incomplete=0
+mode=retain
+arg=--pr
+arg=https://github.com/example/repo/pull/9
+arg=--note
+arg=closed by merge train: https://github.com/example/repo/pull/7
+--- captain answer exit: 0
+--- answer stderr:
+--- row after the answer:
+task:
+  id: sample-train-retained-answer
+  title: "Ship the held train member https://github.com/example/repo/pull/9"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "fm-hold-v1:Y2FwdGFpbiBtdXN0IGNob29zZSB0aGUgZm9sbG93LXVw"
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-11-03
+  deps: none
+  links: "pr:https://github.com/example/repo/pull/9"
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 12cda84be0ab441e46e2f8244114418abe6c4fa480b4ba798f8ab598673ac0fa\nResolution mode: answered\nResolves hold set: 2026-11-03T08:23:33Z\nResolved at: 2026-11-03T08:24:21Z\nAnswered by: main\n\nCaptain decision:\nProceed with the landed change."
+--- backlog lines for the row:
+5:- [x] sample-train-retained-answer - Ship the held train member https://github.com/example/repo/pull/9 (repo: sample) (kind: ship) (merged 2026-11-03) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGNob29zZSB0aGUgZm9sbG93LXVw) (hold-kind: captain)
+6-  Resolution recorded by fm-captain-hold.
+7-  Decision digest: 12cda84be0ab441e46e2f8244114418abe6c4fa480b4ba798f8ab598673ac0fa
+8-  Resolution mode: answered
+--- ledger task.closed lines:

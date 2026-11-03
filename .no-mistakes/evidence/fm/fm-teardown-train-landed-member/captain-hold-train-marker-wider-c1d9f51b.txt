@@ -1,0 +1,50 @@
+warning: re-init: ignored --initial-branch=main
+# ADVERSARIAL: wider note shape; captain-hold sandbox at c1d9f51bf45dcaf3d5315330cf74a0de1832a83f
+teardown exit (treehouse return made to fail): 1
+--- pending record written by teardown:
+id=sample-train-retained-answer
+data=/Users/charlesabrooker/tmp/fm-captain-hold.CaKiRu/train-retained-answer/data
+spawn_gen=fixture-sample-train-retained-answer
+cleanup_incomplete=0
+mode=retain
+arg=--pr
+arg=https://gerrit.example.com/c/project/+/12345
+--- pending record rewritten to the merge-train close shape:
+id=sample-train-retained-answer
+data=/Users/charlesabrooker/tmp/fm-captain-hold.CaKiRu/train-retained-answer/data
+spawn_gen=fixture-sample-train-retained-answer
+cleanup_incomplete=0
+mode=retain
+arg=--pr
+arg=https://github.com/example/repo/pull/9
+arg=--note
+arg=closed by merge train: https://github.com/example/repo/pull/7 and also something else
+--- captain answer exit: 1
+--- answer stderr:
+fm-captain-hold: cannot apply the artifact recorded for sample-train-retained-answer in /Users/charlesabrooker/tmp/fm-captain-hold.CaKiRu/train-retained-answer/state/sample-train-retained-answer.backlog-close: invalid pending-close arguments in /Users/charlesabrooker/tmp/fm-captain-hold.CaKiRu/train-retained-answer/state/sample-train-retained-answer.backlog-close
+fm-captain-hold: could not close answered captain-held task sample-train-retained-answer
+--- row after the answer:
+task:
+  id: sample-train-retained-answer
+  title: Ship the held train member
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:Y2FwdGFpbiBtdXN0IGNob29zZSB0aGUgZm9sbG93LXVw"
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: sample
+  priority: "-"
+  created: 2026-11-03
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-11-03T09:40:21Z\n\nResolution recorded by fm-captain-hold.\nDecision digest: 12cda84be0ab441e46e2f8244114418abe6c4fa480b4ba798f8ab598673ac0fa\nResolution mode: answered\nResolves hold set: 2026-11-03T09:40:21Z\nResolved at: 2026-11-03T09:41:13Z\nAnswered by: main\n\nCaptain decision:\nProceed with the landed change."
+--- backlog lines for the row:
+2:- [ ] sample-train-retained-answer - Ship the held train member (repo: sample) (kind: ship) (since 2026-11-03) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGNob29zZSB0aGUgZm9sbG93LXVw) (hold-kind: captain)
+3-  Captain hold set: 2026-11-03T09:40:21Z
+4-
+5-  Resolution recorded by fm-captain-hold.
+--- ledger task.closed lines:

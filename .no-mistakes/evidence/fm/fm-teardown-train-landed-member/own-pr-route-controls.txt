@@ -1,0 +1,63 @@
+# own-PR and content-proof controls, unchanged routes, at 89a6d2ab2be936c996345118d3df00f809ba74a3
+ok - even ancestor archives stay when squash content differs or the merge object is unproven
+ok - archive merge proof includes deleted paths and treats pathspec-like filenames literally
+ok - landing refusal and forced discard never reap recovery archives
+ok - content-only landing with an unreachable forge keeps and names recovery archives
+ok - squash-merged PR accepts a local HEAD that is an ancestor of the final PR head
+ok - teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded
+ok - squash-merged PR accepts replayed unpushed local patches contained in the PR head
+ok - the landed-patch proof ignores an unresolvable git directory in the caller's working directory
+ok - merged PR does not allow teardown after a later local commit
+ok - squash-merged task whose local branch followed the pipeline rebase is torn down
+ok - teardown proves a Forgejo task landed from the merged pull request when the content check is inconclusive
+ok - squash-merged same-path different content still refuses
+ok - squash-merged rebased local still refuses a genuinely unlanded follow-up commit
+ok - squash-merged stale local still refuses when the forge is unreachable
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - squash-pushed-missing subject match ignores a commit ID ending in add and detects a genuine add a
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR still refuses a merge commit that carries a change of its own
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR accepts a pre-rebase copy that merged a later main commit the PR head lacks
+ok - merged PR accepts a diverged earlier iteration that the recorded run started from
+ok - merged PR accepts the local input that the recorded run rewrote and extended
+ok - a slow but working run-record read still proves the copy was the pipeline's input
+ok - a silent run-record read is unknown and retried, while an answered one still refuses
+ok - a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused
+ok - merged PR still refuses a copy that is behind the recorded run's input head
+ok - merged PR is proven by the run that pushed its head, not by an earlier run on the same PR
+ok - merged PR still refuses a copy with a commit made after the recorded run started
+ok - merged PR still refuses a copy that is not part of the recorded run's input
+ok - merged PR still refuses when the only recorded run belongs to another PR
+ok - merged PR still refuses when no recorded run pushed the merged PR head
+ok - merged PR still refuses and names the state database when it is missing
+ok - merged PR still refuses and names the input head when the run did not record it
+ok - merged PR still refuses and names the pushed head when the run did not record it
+ok - merged PR still refuses and names the column when the run table has no input head
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.TvBp0k/pr-check-stale/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-contributions: data directory unavailable
+contributions: observation not armed; coverage is unconfirmed
+WARNING: watcher still down (same stale episode; last beat: 9s ago, grace 300s) - full banner already printed this episode.
+fm-contributions: data directory unavailable
+contributions: observation not armed; coverage is unconfirmed
+ok - fm-pr-check does not refresh PR head after HEAD moves
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.TvBp0k/pr-check-local-lags/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-contributions: data directory unavailable
+contributions: observation not armed; coverage is unconfirmed
+ok - fm-pr-check records the remote PR head when the local worktree lags
+ok - worktree whose content already landed in the default branch is torn down (content fallback)
+bash tests/fm-teardown.test.sh "${ctl[@]}"  66.88s user 116.37s system 31% cpu 9:45.88 total
+exit: 0
