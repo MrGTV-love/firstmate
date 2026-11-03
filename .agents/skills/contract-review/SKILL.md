@@ -190,7 +190,6 @@ No round number, finding count, word count or timer decides any exit.
    A recurrence and a repair-induced failure are not progress.
 5. Take the first test that holds:
    - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
-     The installed skills' closeout rules are governing constraints: a blocked or unverified mandatory item prevents a passing grade, and a safe stop does not establish completion.
      A settlement made after the round does not change that round's exit.
    - `pass`: no substantiated finding remains, and the register supports closure of the earlier ones.
    - `needs-revision`: substantiated findings remain, and the round has progress.
