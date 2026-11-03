@@ -1636,6 +1636,24 @@ teardown_retained_preserve_check() {  # <strict|adopt> <copy> <dir>   (driver-na
   teardown_retained_cover "$mode" "$copy" "$dir" "${named[@]}"
 }
 
+# Does every entry the preserve of <copy> already holds still hold the copy's
+# bytes, wherever the copy still has that entry? An entry adopted by an earlier
+# run that now differs can only refuse after the driver, so it refuses before.
+teardown_retained_preserve_current() {  # <copy>
+  local copy=$1 dir p rel
+  local -a held=()
+  dir=$(teardown_retained_preserve_dir "$copy") || return 1
+  [ -d "$dir" ] || return 0
+  while IFS= read -r -d '' p; do
+    rel=${p#"$dir/"}
+    case "$rel" in copy-path|SHA256SUMS) continue ;; esac
+    [ -e "$copy/$rel" ] || [ -L "$copy/$rel" ] || continue
+    held+=("$rel")
+  done < <(find -P "$dir" ! -type d -print0)
+  [ "${#held[@]}" -gt 0 ] || return 0
+  teardown_retained_cover strict "$copy" "$dir" "${held[@]}"
+}
+
 # Does any own nested copy of the task have a retained record that still applies?
 teardown_retained_own_present() {
   local copy rc
@@ -1658,6 +1676,7 @@ teardown_retained_confirm() {  # <slot> <copy>
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is kept by Vernant's closeout driver (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")), but its ignored files are not held byte for byte in $(fm_refuse_text "$TEARDOWN_RETAINED_PRESERVE"); the task was not closed, and the driver was not asked again." >&2
     return 1
   fi
+  ! teardown_copy_retained "$copy" || return 0
   TEARDOWN_RETAINED+=("$copy")
   echo "teardown: own nested copy $(fm_refuse_text "$copy") is unchanged since the driver kept it (record $(fm_refuse_text "$TEARDOWN_RETAINED_RECORD")); the driver was not asked again" >&2
 }
@@ -1886,6 +1905,10 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
   }
+  if ! teardown_retained_preserve_current "$copy"; then
+    echo "REFUSED: ignored files of own nested copy $(fm_refuse_text "$copy") differ from the bytes already preserved for it in $(fm_refuse_text "$(teardown_retained_preserve_dir "$copy")"); Vernant's closeout driver was not asked, and the task was not closed." >&2
+    return 1
+  fi
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then

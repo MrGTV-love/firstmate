@@ -6484,6 +6484,8 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps() {
     assert_equals ".claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl" "$(retained_field "$record" unique | paste -sd ' ' -)" "retained-close-$shape: the record does not list the driver's unique paths"
     assert_equals "task slot preserve reason closed-at head status-sha256 payload-sha256 unique unique" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
     assert_no_grep 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
+    assert_equals 1 "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr" | grep -c "notice: own nested copy $FOREIGN_COPY was kept")" "retained-close-$shape: the kept copy was not reported exactly once"
+    assert_no_grep 'the driver was not asked again' "$FOREIGN_CASE/stderr" "retained-close-$shape: the run that asked the driver said it did not"
     assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-close-$shape: a close saved a refusal output"
   done
   pass "a landed task whose own copy the driver keeps closes: the copy, the slot and its lease are untouched, the ignored files are verified byte for byte, and one record names the copy"
@@ -6550,6 +6552,34 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     assert_present "$FOREIGN_COPY/.git" "retained-changed-$change: the copy was removed"
   done
   pass "a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call"
+}
+
+# The recorded shape holds unique ignored files only under .claude, which the
+# preservation skips, so an earlier run adopted them into the preserve. When one
+# of them changes, the preserve can never match after the driver, so every
+# retry refuses before the driver and writes no tar and no saved output.
+test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver() {
+  local rc run
+  make_retained_case retained-adopted enclosing
+  rm -f "$FOREIGN_COPY/notes/unique.dat"
+  held_plain_get_slot "$FOREIGN_CASE"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  : > "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 1 "$rc" "retained-adopted: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-adopted: run 1 did not reach the lease check"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-adopted: run 1 should have asked the driver once"
+  printf 'changed\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
+  for run in 2 3; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-adopted: run $run must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "differ from the bytes already preserved" "$FOREIGN_CASE/stderr" "retained-adopted: run $run did not name the cause"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-adopted: run $run asked the driver again"
+    assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-adopted: run $run saved a driver output"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-adopted: run $run removed the task record"
+    assert_present "$FOREIGN_COPY/.git" "retained-adopted: run $run removed the copy"
+  done
+  pass "a kept copy whose adopted ignored bytes changed refuses before the driver on every retry, with no tar and no saved output"
 }
 
 # A kept copy in a slot another live task still works in (the peer route) cannot
@@ -6911,6 +6941,7 @@ test_teardown_retires_the_dsh_launch_state
 test_a_landed_task_closes_around_an_own_copy_the_driver_keeps
 test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing
 test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver_nothing
+test_a_kept_copy_whose_adopted_bytes_changed_refuses_before_the_driver
 test_a_changed_kept_copy_is_assessed_afresh
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
 test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
