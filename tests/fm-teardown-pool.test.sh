@@ -218,7 +218,7 @@ SH
 # verified-train rule as a removed copy, without reading the claimant's copy.
 test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
   local row case_dir slot rc fact kind other=dddddddddddddddddddddddddddddddddddddddd
-  for row in verified wrong-sha open-train search-fails; do
+  for row in verified wrong-sha open-train search-fails no-listing prefix-sha missing-sha wrong-base; do
     train_case "reassigned-train-$row" none head
     case_dir=$TRAIN_CASE
     case "$row" in
@@ -232,6 +232,18 @@ test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
       search-fails)
         : > "$case_dir/gh-fixture/list.fail"
         fact="the forge search for PRs listing"; kind=unknown ;;
+      no-listing)
+        printf '[]\n' > "$case_dir/gh-fixture/list.json"
+        fact="no PR found by the forge lists it at a 40-hex sha"; kind= ;;
+      prefix-sha)
+        train_list "$case_dir" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "${TRAIN_MEMBER_HEAD:0:12}")"
+        fact="no PR found by the forge lists it at a 40-hex sha"; kind= ;;
+      missing-sha)
+        train_list "$case_dir" 9 MERGED main "$TRAIN_HEAD" "Merge train"$'\n\n'"- $TRAIN_MEMBER_URL"
+        fact="no PR found by the forge lists it at a 40-hex sha"; kind= ;;
+      wrong-base)
+        train_list "$case_dir" 9 MERGED release "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+        fact="not this task's base"; kind= ;;
     esac
     mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
     slot="$case_dir/pool/1/project"
@@ -258,6 +270,8 @@ test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
     rc=0
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     assert_absent "$case_dir/treehouse.log" "reassigned-train-$row: the claimant's slot was administered"
+    [ "$(git -C "$slot" symbolic-ref HEAD)" = refs/heads/fm/live-task ] || fail "reassigned-train-$row: claimant branch changed"
+    [ "$(git -C "$slot" log -1 --format=%s)" = 'unlanded claimant work' ] || fail "reassigned-train-$row: claimant HEAD changed"
     cmp -s "$case_dir/claim.before" "$case_dir/pool/1/.fm-slot-owner" || fail "reassigned-train-$row: claimant slot claim changed"
     assert_grep 'claimant untracked work' "$slot/scratch.txt" "reassigned-train-$row: claimant work changed"
     assert_grep "$fact" "$case_dir/stderr" "reassigned-train-$row: stderr did not name the train fact: $(cat "$case_dir/stderr")"

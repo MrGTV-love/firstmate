@@ -67,10 +67,10 @@
 # member PR's recorded head, whose head carries that sha (an ancestor, or every
 # commit of it replayed there by equivalent patch ids, as a flat pipeline rebase
 # leaves it), and whose head carries the copy's work by the same ancestor or
-# rebased-commit proof above, or the copy is the input of the recorded run that
-# pushed that listed head, by the same run-record proof above
-# (teardown_train_landed owns the rule). The record-only routes (copy gone, slot reassigned) apply the same
-# train rule and read no copy. The train is found by searching the forge for the
+# rebased-commit proof above (teardown_train_landed owns the rule). The no-mistakes
+# run record is never a train proof: it shows what a run pushed, not that the copy's
+# own commits survived into the train. The record-only routes (copy gone, slot
+# reassigned) apply the same train rule and read no copy. The train is found by searching the forge for the
 # member URL, never by a title, branch name or comment text, and a forge or fetch
 # read that fails is unknown (retry), never landed. The archive-branch reaper
 # keeps its own MERGED-PR proof, so a train member's archive branches stay.
@@ -2692,11 +2692,8 @@ pr_is_merged() {
 # copy in TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that
 # train head; both tests are teardown_train_carries: an ancestor, or every commit
 # that neither the train head nor the default branch holds proven by the
-# rebased-patch proof pr_is_merged applies to the PR head. A copy the pipeline
-# rewrote is carried instead when pipeline_input_is_local_head, the same proof
-# pr_is_merged applies, ties it to the listed head: the recorded run for this
-# member pushed that head and started from this copy's HEAD. Record mode (copy gone
-# or slot reassigned) reads no copy.
+# rebased-patch proof pr_is_merged applies to the PR head. No run record stands in
+# for that proof. Record mode (copy gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
 # A forge or fetch read that fails sets TEARDOWN_TRAIN_UNASKED (unknown, retry);
@@ -2819,7 +2816,7 @@ for pr in prs:
         TEARDOWN_TRAIN_UNASKED="HEAD of $dir cannot be resolved"
         return 1
       }
-      if ! teardown_train_carries "$current" "$h" && ! pipeline_input_is_local_head "$mhead" "$murl"; then
+      if ! teardown_train_carries "$current" "$h"; then
         why="${why}train PR $u is a verified train for $murl, but this copy's work is not proven present in its head ${h:0:12}"$'\n'
         continue
       fi
