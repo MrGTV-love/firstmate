@@ -1,0 +1,2 @@
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle
+ok - a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does

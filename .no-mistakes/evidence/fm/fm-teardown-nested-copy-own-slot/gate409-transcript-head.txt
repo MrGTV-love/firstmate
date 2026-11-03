@@ -1,0 +1,284 @@
+==================================================================
+[head 5a7bd7478] gate-409 recorded shape, landed, --force --drop-file
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=default:wG:pQ
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/tasktmp
+    backend=herdr
+    herdr_session=default
+    herdr_workspace_id=wG
+    herdr_tab_id=wG:tQ
+    herdr_pane_id=wG:pQ
+leftover teardown-return-pending:
+    spawn_gen=teardown-test-task-x1
+    slot=
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.backlog-close
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+    task-x1.teardown-return-pending
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1 --force --drop-file <captain-words>
+exit=0
+stderr (REFUSED/teardown lines):
+stdout (last 4 lines):
+    /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/project: already current
+    teardown task-x1 complete (window default:wG:pQ; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/pool/1/project/.claude/worktrees/x removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/pool/1/project returned)
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+AFTER:
+  state/:
+    .last-watcher-beat
+    terminal-outcomes
+  nested copy present: no
+  slot claim present:  no
+  tasktmp present:     no
+  treehouse calls:     return --force /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-landed/pool/1/project;
+  herdr pane closed:   yes
+snapshot: CHANGED
+observe: exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+==================================================================
+[head 5a7bd7478] gate-409 recorded shape, slot-unlanded, --force --drop-file
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=default:wG:pQ
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/tasktmp
+    backend=herdr
+    herdr_session=default
+    herdr_workspace_id=wG
+    herdr_tab_id=wG:tQ
+    herdr_pane_id=wG:pQ
+leftover teardown-return-pending:
+    spawn_gen=teardown-test-task-x1
+    slot=
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.backlog-close
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+    task-x1.teardown-return-pending
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1 --force --drop-file <captain-words>
+exit=1
+stderr (REFUSED/teardown lines):
+    ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+    teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/data/task-x1/preservation-bundles.tsv.
+    Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+    REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/pool/1/project would sweep away task task-x1's claimed pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-gate409-slot-unlanded/pool/1/project, whose HEAD 5b2ca720e3aa86a742559fa32f9186705ac5c60e is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor; nothing was changed - not even with --force.
+stdout (last 4 lines):
+AFTER:
+  state/:
+    .guard-watcher-stale-banner
+    .last-watcher-beat
+    task-x1.backlog-close
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+    task-x1.teardown-return-pending
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+snapshot: UNCHANGED (sha256 of record, inbox, status, tasktmp, markers, copy, slot, claim, pool state, endpoint logs)
+observe: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=backlog-close,teardown-return-pending
+==================================================================
+[head 5a7bd7478] claim=other shape=enclosing (enclosing=prior_worktree line, plain=none), landed
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=firstmate:fm-task-x1
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/pool/1/project
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/tasktmp
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1
+exit=0
+stderr (REFUSED/teardown lines):
+    warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/pool/1/project was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/home), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+stdout (last 4 lines):
+    /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/pool/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/pool/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-enclosing/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+AFTER:
+  state/:
+    .last-watcher-beat
+    terminal-outcomes
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     no
+  treehouse calls:     
+  herdr pane closed:   no
+snapshot: CHANGED
+observe: exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+==================================================================
+[head 5a7bd7478] claim=other shape=plain (enclosing=prior_worktree line, plain=none), landed
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=firstmate:fm-task-x1
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/tasktmp
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1
+exit=0
+stderr (REFUSED/teardown lines):
+    warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/pool/1/project was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/home), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+stdout (last 4 lines):
+    /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/pool/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-other-plain/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+AFTER:
+  state/:
+    .last-watcher-beat
+    terminal-outcomes
+  nested copy present: yes
+  slot claim present:  yes
+  tasktmp present:     no
+  treehouse calls:     
+  herdr pane closed:   no
+snapshot: CHANGED
+observe: exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+==================================================================
+[head 5a7bd7478] claim=none shape=enclosing (enclosing=prior_worktree line, plain=none), landed
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=firstmate:fm-task-x1
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    prior_worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/pool/1/project
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/tasktmp
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+  nested copy present: yes
+  slot claim present:  no
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1
+exit=0
+stderr (REFUSED/teardown lines):
+stdout (last 4 lines):
+    /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/pool/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    notice: task-x1's prior copy /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/pool/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-enclosing/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+AFTER:
+  state/:
+    .last-watcher-beat
+    terminal-outcomes
+  nested copy present: yes
+  slot claim present:  no
+  tasktmp present:     no
+  treehouse calls:     
+  herdr pane closed:   no
+snapshot: CHANGED
+observe: exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+==================================================================
+[head 5a7bd7478] claim=none shape=plain (enclosing=prior_worktree line, plain=none), landed
+------------------------------------------------------------------
+record (state/task-x1.meta):
+    window=firstmate:fm-task-x1
+    endpoint_task_id=task-x1
+    worktree=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/pool/1/project/.claude/worktrees/x
+    branch=fm/task-x1-v2
+    project=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/project
+    kind=ship
+    mode=no-mistakes
+    spawn_gen=teardown-test-task-x1
+    tasktmp=/Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/tasktmp
+BEFORE:
+  state/:
+    .last-watcher-beat
+    task-x1.inbox
+    task-x1.meta
+    task-x1.status
+  nested copy present: yes
+  slot claim present:  no
+  tasktmp present:     yes
+  treehouse calls:     
+  herdr pane closed:   no
+$ fm-teardown.sh task-x1
+exit=0
+stderr (REFUSED/teardown lines):
+stdout (last 4 lines):
+    /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/project: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1; reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/pool/1/project/.claude/worktrees/x left in place, since it is not a pool slot)
+    Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.c0Vg5Y/drv-claim-none-plain/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+AFTER:
+  state/:
+    .last-watcher-beat
+    terminal-outcomes
+  nested copy present: yes
+  slot claim present:  no
+  tasktmp present:     no
+  treehouse calls:     
+  herdr pane closed:   no
+snapshot: CHANGED
+observe: exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none

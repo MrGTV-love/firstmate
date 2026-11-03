@@ -1,0 +1,15 @@
+### test_plain_nested_copy_in_own_slot_is_removed_and_slot_returned
+not ok - plain-nested-own-slot-normal: a plain nested copy in its own claimed slot must tear down: ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.UFIT2z/plain-nested-own-slot-normal/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents: expected exit 0, got 1
+rc=
+### test_plain_nested_copy_in_own_slot_is_removed_with_force_and_drop_file
+not ok - plain-nested-own-slot-force: a plain nested copy in its own claimed slot must tear down: ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.YfS7dG/plain-nested-own-slot-force/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents: expected exit 0, got 1
+rc=
+### test_gate_409_recorded_case_tears_down
+not ok - gate-409-landed: the recorded case must tear down: ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.iS8GMM/gate-409-landed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents: expected exit 0, got 1
+rc=
+### test_gate_409_recorded_case_refuses_untouched_when_the_slot_is_unlanded
+not ok - gate-409-slot-unlanded: the refusal did not name its cause
+rc=
