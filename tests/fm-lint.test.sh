@@ -1184,6 +1184,49 @@ PY
   pass "canonical partitions balance measured analysis cost rather than equal direct bytes"
 }
 
+test_canonical_partition_shards_ignore_root_bytes() {
+  local tmp repo fakebin part round name rc grown
+  tmp=$(fm_test_tmproot fm-lint-fixed-shards)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/backends/noop.sh"
+  for name in a b c d e f g h i; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/tests/$name.test.sh"
+  done
+  fakebin=$(fm_fakebin "$tmp/fake")
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+printf 'finding %s\n' "${!#}"
+exit 1
+SH
+  chmod +x "$fakebin/shellcheck"
+  for round in before after; do
+    for part in 1of3 2of3 3of3; do
+      rc=0
+      (cd "$repo" && PATH="$fakebin:$PATH" FM_LINT_CACHE_DIR=off bin/fm-lint.sh --partition "$part") \
+        > "$tmp/$part.$round.out" 2> "$tmp/$part.$round.err" || rc=$?
+      [ "$rc" -eq 1 ] || fail "partition $part ($round) exited $rc: $(cat "$tmp/$part.$round.err")"
+      grep '^fm-lint: begin ' "$tmp/$part.$round.err" | LC_ALL=C sort > "$tmp/$part.$round.shards"
+      [ "$round" = before ] || continue
+      # Outgrow every other root, so byte-weighted packing would put it on shard 0.
+      grown=$(sed -n 's/^fm-lint: begin \(.*\) (shard 1, .*/\1/p' "$tmp/$part.$round.shards" | head -n 1)
+      [ -n "$grown" ] || fail "partition $part has no root on shard 1 to grow"
+      printf '# %0200000d\n' 0 >> "$repo/$grown"
+    done
+  done
+  for part in 1of3 2of3 3of3; do
+    [ "$(cat "$tmp/$part.after.shards")" = "$(cat "$tmp/$part.before.shards")" ] \
+      || fail "a byte edit moved roots between shards in partition $part: $(diff "$tmp/$part.before.shards" "$tmp/$part.after.shards")"
+    cmp -s "$tmp/$part.before.out" "$tmp/$part.after.out" \
+      || fail "a byte edit changed partition $part stdout: $(diff "$tmp/$part.before.out" "$tmp/$part.after.out")"
+  done
+  pass "a byte edit keeps every canonical partition's shards and raw stdout"
+}
+
 fm_lint_test_cases=(
 test_command_words_exclude_inert_source_text
 test_shellcheck_reads_govern_selection_and_cache
@@ -1210,5 +1253,6 @@ test_cache_identity_follows_the_reported_shellcheck_version
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint
 test_canonical_partitions_balance_measured_cost
+test_canonical_partition_shards_ignore_root_bytes
 )
 fm_lint_run "$@"

@@ -116,6 +116,8 @@
 # Partitions are complete, disjoint, and measured-duration balanced; --list-files
 # exposes their actual roots. A root without a measured hint gets 6000 ms,
 # rounded above the observed 5352 ms per-root mean; it is never omitted.
+# Each partition packs its two workers by the same hints, so a byte edit to a
+# root cannot move roots between shards or reorder replayed stdout.
 # Partition mode starts with full source-aware analysis, never changed-only
 # or --fast, and does not accept explicit paths. Each partition also runs
 # workflow lint and backend-purity checks, keeping either invocation
@@ -1099,7 +1101,8 @@ else
   fi
 fi
 # Stable largest-first packing uses measured durations across CI runners and
-# direct bytes across the two local workers. Neither weight is a skip rule.
+# their two workers, and direct bytes across the two local workers. Neither
+# weight is a skip rule.
 TAB=$(printf '\t')
 # Slowest successful per-root duration_ms from three Ubuntu main runs.
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
@@ -1718,12 +1721,19 @@ fm_lint_root_weights() {
   done
 }
 
+fm_lint_root_hint_weights() {
+  (
+    set -o pipefail
+    fm_lint_root_weights | awk -F '\t' '
+      NR == FNR { hint[$1]=$2; next }
+      { printf "%s\t%s\t%s\n", (($3 in hint) ? hint[$3] : 6000), $2, $3 }
+    ' <(fm_lint_partition_weight_hints) -
+  )
+}
+
 if [ -n "$PARTITION" ]; then
   PARTITION_ROOTS=()
-  partition_weights=$(set -o pipefail; fm_lint_root_weights | awk -F '\t' '
-    NR == FNR { hint[$1]=$2; next }
-    { printf "%s\t%s\t%s\n", (($3 in hint) ? hint[$3] : 6000), $2, $3 }
-  ' <(fm_lint_partition_weight_hints) -) || exit $?
+  partition_weights=$(fm_lint_root_hint_weights) || exit $?
   while IFS="$TAB" read -r index path; do
     PARTITION_ROOTS+=("$path")
   done < <(printf '%s\n' "$partition_weights" | LC_ALL=C sort -t "$TAB" -k1,1nr -k2,2n | awk -F '\t' -v want="${PARTITION%%of*}" '
@@ -2002,11 +2012,15 @@ while [ "$worker" -lt "$SHARD_COUNT" ]; do
   worker=$((worker + 1))
 done
 
-fm_lint_root_weights > "$WEIGHTS" || exit $?
+if [ -n "$PARTITION" ]; then
+  fm_lint_root_hint_weights > "$WEIGHTS" || exit $?
+else
+  fm_lint_root_weights > "$WEIGHTS" || exit $?
+fi
 
 # Largest-first deterministic greedy assignment balances the two worker
-# queues without affecting replay order. Direct bytes are a stable portable
-# proxy after the expensive dynamic adapter source fan-out is cut.
+# queues. Outside a partition, direct bytes are a stable portable proxy after
+# the expensive dynamic adapter source fan-out is cut.
 WORKER_LOADS=(0 0)
 LC_ALL=C sort -t "$TAB" -k1,1nr -k2,2n "$WEIGHTS" > "$WEIGHTS.sorted"
 while IFS="$TAB" read -r weight index path; do
@@ -2281,8 +2295,8 @@ EOF
     printf 'source_boundary_directives\t%s\n' "$source_boundaries"
     printf 'source_followed_directives\t%s\n' "$source_followed"
     printf 'source_target_count\t%s\n' "$source_targets"
-    printf 'shard_1_weight_bytes\t%s\n' "${WORKER_LOADS[0]}"
-    printf 'shard_2_weight_bytes\t%s\n' "${WORKER_LOADS[1]:-0}"
+    printf 'shard_1_weight\t%s\n' "${WORKER_LOADS[0]}"
+    printf 'shard_2_weight\t%s\n' "${WORKER_LOADS[1]:-0}"
     printf 'wall_seconds\t%s\n' "$((TELEMETRY_END_EPOCH - TELEMETRY_START_EPOCH))"
     printf 'worker_wall_sum_seconds\t%s\n' "$timing_worker_wall"
     printf 'max_worker_wall_seconds\t%s\n' "$max_worker_wall"
