@@ -12,7 +12,10 @@
 # probe readings; the engine header owns every record's contents and derivation.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
 # cannot prevent supervising existing work. admit, run and sample only record a
-# reading in the invoking home's state.
+# reading in the invoking home's state. After that check, run hands COMMAND to
+# fm-cpu-pass.py pipeline-start --only-fresh: a command that begins a new
+# no-mistakes run (its engine's fresh_pipeline_start) queues there in class
+# other like every other fresh start; any other command runs unchanged.
 # probe is the root local home's periodic host observation; elsewhere it does
 # nothing. It records the host's run and pressure calibration and queues
 # identifying check wakes through fm-wake-lib.sh in the root home's own queue.
@@ -42,7 +45,7 @@ else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
 if [ "$(uname -s)" != Darwin ] && [ -z "${FM_MEMORY_FIXTURE_DIR:-}" ]; then
-  if [ "$mode" = run ]; then exec "$@"; fi
+  if [ "$mode" = run ]; then exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"; fi
   exit 0
 fi
 # shellcheck source=bin/fm-wake-lib.sh
@@ -110,7 +113,7 @@ if [ "$mode" = probe ]; then
 fi
 if [ "$mode" = run ]; then
   if [ "$rc" -ne 0 ]; then printf '%s\n' "$reading" >&2; exit "$rc"; fi
-  exec "$@"
+  exec python3 "$SCRIPT_DIR/fm-cpu-pass.py" pipeline-start --only-fresh -- "$@"
 fi
 printf '%s\n' "$reading"
 exit "$rc"

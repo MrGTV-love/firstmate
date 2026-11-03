@@ -107,14 +107,36 @@ def procs(folder, count=100, limit=10666, error=False):
     write_json(folder / 'procs.json', dict(count=count, limit=limit, error=error))
 
 
-def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None):
-    """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
+def readings(folder, active=GIB, total=128 * GIB, host=None):
+    """The root home's recorded readings: one reading whose two run trees make the active-run term A.
 
-    live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
-    extra maps more runs (repo_id NULL) to their recorded peak in bytes.
+    A is (sum - largest) / (count - 1) over recorded readings with at least two runs, so a
+    reading holding A and 5 x A gives A; an error reading and another host's reading are ignored.
     """
     state = folder / 'fmhome' / 'state'
     state.mkdir(parents=True, exist_ok=True)
+    name = host or socket.gethostname()
+    lines = [dict(host=name, total_bytes=total, errors=[], runs={
+                 'no-mistakes:r/a': dict(rss_bytes=int(active)), 'no-mistakes:r/b': dict(rss_bytes=int(5 * active)),
+                 'task:crewmate': dict(rss_bytes=60 * GIB)}),
+             dict(host=name, total_bytes=total, errors=['memory: unreadable'], runs={
+                 'no-mistakes:r/c': dict(rss_bytes=40 * GIB), 'no-mistakes:r/d': dict(rss_bytes=40 * GIB)}),
+             dict(host='other-host', total_bytes=total, errors=[], runs={
+                 'no-mistakes:r/e': dict(rss_bytes=40 * GIB), 'no-mistakes:r/f': dict(rss_bytes=40 * GIB)})]
+    (state / 'memory-readings.jsonl').write_text(''.join(json.dumps(line) + '\n' for line in lines))
+
+
+def calibrate(folder, peaks=PEAKS, total=128 * GIB, host=None, live=(), extra=None, active=GIB):
+    """The root home's recorded calibration: one no-mistakes run per peak, 2 readings each.
+
+    live names runs (repo_id NULL) whose young, low peak the probe has folded in already;
+    extra maps more runs (repo_id NULL) to their recorded peak in bytes. The readings
+    record beside it sets the active-run term A (active, None for no record).
+    """
+    state = folder / 'fmhome' / 'state'
+    state.mkdir(parents=True, exist_ok=True)
+    if active is not None:
+        readings(folder, active, total, host)
     runs = {'no-mistakes:repo/run-%d' % i: dict(peak_bytes=int(peak * GIB), samples=2, incomplete_samples=0,
                                                  first_seen='x', last_seen='x', max_gap_seconds=0)
             for i, peak in enumerate(peaks)}
@@ -134,7 +156,9 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     folder.mkdir()
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT)')
+        # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
+        connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER)')
         connection.executemany('INSERT INTO runs (id, status) VALUES (?, ?)', [('baseline-' + str(i), 'running') for i in range(running)])
     load_file = folder / 'load.json'
     write_json(load_file, [0, load, 0])
@@ -260,12 +284,14 @@ try:
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     finish(child)
     assert marker.exists()
-    # One qualifying recorded run, a record for another host, and unreadable text all
-    # fall back; none refuses and none reads as an empty host.
+    # One qualifying recorded run, a record for another host, unreadable text and no
+    # readings record of this host for A all fall back; none refuses and none reads as an empty host.
     for name, record in (('one-run', lambda f: calibrate(f, peaks=[3.0])), ('other-host', lambda f: calibrate(f, host='other-host')),
                          ('other-ram', lambda f: calibrate(f, total=64 * GIB)),
                          ('garbage', lambda f: (f / 'fmhome/state').mkdir(parents=True, exist_ok=True) or (f / 'fmhome/state/.memory-calibration.json').write_text('{')),
-                         ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n'))):
+                         ('walk-fails', lambda f: calibrate(f) or (f / 'fmhome/.fm-secondmate-parent').write_text('garbage\n')),
+                         ('no-readings', lambda f: calibrate(f, active=None)),
+                         ('readings-other-host', lambda f: calibrate(f, active=None) or readings(f, host='other-host'))):
         folder, db, env = case('fallback-' + name, running=6)
         record(folder)
         child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'm')], env, folder / 'f')
@@ -283,14 +309,16 @@ try:
     env['FM_HOME'] = str(folder / 'childfm')
     log = folder / 'root.stderr'
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'root.marker')], env, folder / 'root'))
-    assert 'admitted: counted=6 need=' in log.read_text() and 'reservation=%d slack=%d runs_measured=13' % (3 * GIB, 8 * GIB) in log.read_text(), log.read_text()
+    # Six registered runs the reading cannot see yet reserve R each: 6 x 3 + 8 = 26 GiB of 40.
+    assert 'admitted: counted=6 projected=%d ' % (26 * GIB) in log.read_text() and \
+        'reservation=%d active_term=%d slack=%d runs_measured=13 readings_measured=1 ' % (3 * GIB, GIB, 8 * GIB) in log.read_text(), log.read_text()
 
     # A worker has FM_DURATION_HOME and no FM_HOME; it still finds the root home's record.
     folder, db, env = case('worker-env', running=6, measured=True)
     env.pop('FM_HOME')
     env['FM_DURATION_HOME'] = str(folder / 'fmhome')
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'worker.marker')], env, folder / 'worker'))
-    assert 'admitted: counted=6 need=' in (folder / 'worker.stderr').read_text(), (folder / 'worker.stderr').read_text()
+    assert 'admitted: counted=6 projected=' in (folder / 'worker.stderr').read_text(), (folder / 'worker.stderr').read_text()
 
     # A running run's peak so far is not a per-run peak: six young runs at 0.2 GiB would pull
     # the 75th percentile down to 1 GiB, but R stays 3 GiB from the 13 finished runs.
@@ -298,7 +326,7 @@ try:
     calibrate(folder, live=['baseline-%d' % i for i in range(6)])
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'live.marker')], env, folder / 'live'))
     text = (folder / 'live.stderr').read_text()
-    assert 'admitted: counted=6 need=%d ' % (7 * 3 * GIB + 8 * GIB) in text and 'reservation=%d slack=%d runs_measured=13 ' % (3 * GIB, 8 * GIB) in text, text
+    assert 'admitted: counted=6 projected=%d ' % (6 * 3 * GIB + 8 * GIB) in text and 'reservation=%d active_term=%d slack=%d runs_measured=13 ' % (3 * GIB, GIB, 8 * GIB) in text, text
 
     # S takes every qualifying peak: a CI-ready running run holds the largest (20 GiB), and
     # a peak so far can only be too low. R ranks that CI-ready run (14 peaks: 4 GiB) but
@@ -309,27 +337,28 @@ try:
     change(db, "INSERT INTO runs (id, status, awaiting_agent_since) VALUES ('parked', 'running', 1)")
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'ci.marker')], env, folder / 'ci'))
     text = (folder / 'ci.stderr').read_text()
-    assert 'admitted: counted=0 need=%d ' % (24 * GIB) in text and 'reservation=%d slack=%d runs_measured=14 ' % (4 * GIB, 20 * GIB) in text, text
+    # Nothing counted: the new run alone reserves S.
+    assert 'admitted: counted=0 projected=%d ' % (20 * GIB) in text and 'reservation=%d active_term=%d slack=%d runs_measured=14 ' % (4 * GIB, GIB, 20 * GIB) in text, text
 
-    # One-start minimum: with nothing counted, one start is admitted although R + S = 11 GiB
-    # exceeds the 10 GiB budget, unless the backstop reports an overload.
-    folder, db, env = case('floor', measured=True, available=10 * GIB)
-    facts(folder, available=10 * GIB, pressure=2)
+    # One-start minimum: with nothing counted, one start is admitted although S = 8 GiB
+    # exceeds the 7 GiB budget, unless the backstop reports an overload.
+    folder, db, env = case('floor', measured=True, available=7 * GIB)
+    facts(folder, available=7 * GIB, pressure=2)
     marker = folder / 'floor.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'floor')
     pending(folder, 1)
     wait_for(lambda: 'waiting: overload: memory: native memory pressure level 2' in (folder / 'floor.stderr').read_text(), 'floor still pauses on overload')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
-    facts(folder, available=10 * GIB)
+    facts(folder, available=7 * GIB)
     finish(child)
-    assert marker.exists() and 'admitted: counted=0 need=%d budget=%d' % (11 * GIB, 10 * GIB) in (folder / 'floor.stderr').read_text()
+    assert marker.exists() and 'admitted: counted=0 projected=%d budget=%d' % (8 * GIB, 7 * GIB) in (folder / 'floor.stderr').read_text()
 
-    # Measured mode. R = 3 GiB (75th percentile of the 13 recorded peaks) and S = 8 GiB
-    # (the largest); the task:crewmate record is not a no-mistakes run and is ignored.
-    # Budget B = available + resident memory of counted runs; admit while (n+1) R + S <= B.
-    # 40 GiB admits n = 0..9 (3 x 10 + 8 = 38) and refuses n = 10 (41).
-    folder, db, env = case('burst', cores=3, measured=True, available=40 * GIB)
+    # Measured mode. R = 3 GiB (75th percentile of the 13 recorded peaks), S = 8 GiB
+    # (the largest) and A = 1 GiB; the task:crewmate record is not a no-mistakes run and is ignored.
+    # Each registered run the reading cannot see yet reserves R, the new run S; admit while
+    # n x R + S <= available + held. 37 GiB admits n = 0..9 (9 x 3 + 8 = 35) and refuses n = 10 (38).
+    folder, db, env = case('burst', cores=3, measured=True, available=37 * GIB)
     names = ['burst-%d' % i for i in range(11)]
     clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names[:10]}
     for name in names[:10]:
@@ -343,14 +372,14 @@ try:
         waits = [line for line in text.splitlines() if 'waiting' in line]
         assert all('need=' not in line and 'overload' not in line and 'limit=' not in line for line in waits), text
         assert 'admitted: counted=' in text and 'basis=fallback' not in text, text
-    assert any('need=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 40 * GIB) in (folder / (name + '.stderr')).read_text() for name in names[:10])
+    assert any('projected=%d budget=%d' % (3 * GIB * 9 + 8 * GIB, 37 * GIB) in (folder / (name + '.stderr')).read_text() for name in names[:10])
     # No artificial wait: the grants follow each other by the registration handshake alone.
     burst_gaps = assert_no_spacing(folder, names[:10])
-    # The eleventh needs 41 GiB of 40 and waits; releasing one run lets it start.
+    # The eleventh projects 38 GiB of 37 and waits; releasing one run lets it start.
     clients[names[10]] = launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), names[10]], env, folder / names[10])
     pending(folder, 1)
     wait_for(lambda: 'waiting: overload' not in (folder / (names[10] + '.stderr')).read_text() and
-             'waiting: counted=10 need=%d budget=%d' % (3 * GIB * 11 + 8 * GIB, 40 * GIB) in (folder / (names[10] + '.stderr')).read_text(),
+             'waiting: counted=10 projected=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 37 * GIB) in (folder / (names[10] + '.stderr')).read_text(),
              'eleventh start waits for reservations')
     assert not (folder / (names[10] + '.started')).exists()
     (folder / 'burst-0.release').touch()
@@ -363,7 +392,7 @@ try:
     # The check must reject spacing. The same burst shape with a 2-second delay injected before
     # each fake start registers (the admission lock is held across it) passes the earlier
     # assertions but fails assert_no_spacing; the undelayed burst above passed it.
-    folder, db, env = case('spacing-injected', cores=3, measured=True, available=40 * GIB)
+    folder, db, env = case('spacing-injected', cores=3, measured=True, available=37 * GIB)
     env['CASE_LAUNCH_DELAY'] = '2'
     names = ['slow-%d' % i for i in range(4)]
     clients = {name: launch(cli + ['pipeline-start', '--', python, str(worker), str(folder), name], env, folder / name) for name in names}
@@ -388,31 +417,32 @@ try:
 
     # Load5 alone decides nothing: the same full reservations with idle load admit nothing
     # extra, and fitting reservations under a load of 500 are admitted.
-    folder, db, env = case('load-both-ways', cores=18, running=1, measured=True, available=13 * GIB, load=0)
-    # one counted run: need = 2 x 3 + 8 = 14 GiB > 13 GiB
+    folder, db, env = case('load-both-ways', cores=18, running=1, measured=True, available=10 * GIB, load=0)
+    # one counted run the reading cannot see yet: projected = 3 + 8 = 11 GiB > 10 GiB
     marker = folder / 'idle-full.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'idle-full')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: counted=1 need=%d budget=%d' % (14 * GIB, 13 * GIB) in (folder / 'idle-full.stderr').read_text(), 'idle load, full reservations')
+    wait_for(lambda: 'waiting: counted=1 projected=%d budget=%d' % (11 * GIB, 10 * GIB) in (folder / 'idle-full.stderr').read_text(), 'idle load, full reservations')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
-    # The counted run's own resident memory is part of B: 1 GiB held makes 14 of 14.
-    facts(folder, available=13 * GIB, runs=[(None, 'baseline-0', GIB)])
+    # Once visible, the counted run reserves its resident memory or A, whichever is larger,
+    # and what it holds is part of the budget: 1 + 8 = 9 GiB of 10 + 1.
+    facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', GIB)])
     finish(child)
-    assert marker.exists() and 'admitted: counted=1 need=%d budget=%d' % (14 * GIB, 14 * GIB) in (folder / 'idle-full.stderr').read_text()
-    # A counted run holding more than R adds only R to B: its excess is not free memory.
-    # 7 GiB held, 10 GiB available: B = 10 + 3 = 13 GiB < need 14 GiB, so the start waits.
-    folder, db, env = case('over-reservation', cores=18, running=1, measured=True, available=10 * GIB)
-    facts(folder, available=10 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
+    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (9 * GIB, 11 * GIB) in (folder / 'idle-full.stderr').read_text()
+    # A counted run's memory is never capped at R or S: 7 GiB held counts 7 GiB in the projection
+    # and 7 GiB in the budget, so it nets to nothing free. 7 GiB available: 15 > 14 waits; 8 GiB fits.
+    folder, db, env = case('never-capped', cores=18, running=1, measured=True, available=7 * GIB)
+    facts(folder, available=7 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
     marker = folder / 'over.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'over')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: counted=1 need=%d budget=%d' % (14 * GIB, 13 * GIB) in (folder / 'over.stderr').read_text(), 'excess over R is not credited')
+    wait_for(lambda: 'waiting: counted=1 projected=%d budget=%d' % (15 * GIB, 14 * GIB) in (folder / 'over.stderr').read_text(), 'resident memory above R is counted')
     time.sleep(0.6)
     assert not marker.exists() and child.poll() is None
-    facts(folder, available=11 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
+    facts(folder, available=8 * GIB, runs=[(None, 'baseline-0', 7 * GIB)])
     finish(child)
-    assert marker.exists() and 'admitted: counted=1 need=%d budget=%d' % (14 * GIB, 14 * GIB) in (folder / 'over.stderr').read_text()
+    assert marker.exists() and 'admitted: counted=1 projected=%d budget=%d' % (15 * GIB, 15 * GIB) in (folder / 'over.stderr').read_text()
     folder, db, env = case('busy-but-fits', cores=18, running=0, measured=True, available=40 * GIB, load=500)
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'busy.marker')], env, folder / 'busy'))
     assert (folder / 'busy.marker').exists()
@@ -469,22 +499,23 @@ try:
     # A host whose counted runs are not CI-ready yet, so their peak may still rise (little memory left), pauses new starts
     # although a lull in load would allow them. Their resident memory is part of the budget,
     # so the pause comes from what the host really has left.
-    folder, db, env = case('test-peak', measured=True, running=4, available=14 * GIB, load=0)
-    facts(folder, available=14 * GIB, runs=[(None, 'baseline-%d' % i, 2 * GIB) for i in range(4)])
-    # B = 14 + 8 = 22 GiB; need = 5 x 3 + 8 = 23 GiB. A fifth start waits; one run finishing frees 3 GiB.
+    # Startup memory alone is not a run's reservation: four visible runs at 0.5 GiB each reserve A = 1 GiB.
+    folder, db, env = case('test-peak', measured=True, running=4, available=int(9.5 * GIB), load=0)
+    facts(folder, available=int(9.5 * GIB), runs=[(None, 'baseline-%d' % i, GIB // 2) for i in range(4)])
+    # budget = 9.5 + 2 = 11.5 GiB; projected = 4 x 1 + 8 = 12 GiB. A fifth start waits; one run finishing frees 1 GiB.
     marker = folder / 'peak.marker'
     child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], env, folder / 'peak')
     pending(folder, 1)
-    wait_for(lambda: 'waiting: counted=4 need=%d budget=%d' % (23 * GIB, 22 * GIB) in (folder / 'peak.stderr').read_text(), 'test peak pauses')
+    wait_for(lambda: 'waiting: counted=4 projected=%d budget=%d' % (12 * GIB, int(11.5 * GIB)) in (folder / 'peak.stderr').read_text(), 'test peak pauses')
     time.sleep(0.6)
     assert not marker.exists()
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
-    facts(folder, available=14 * GIB, runs=[(None, 'baseline-%d' % i, 2 * GIB) for i in range(1, 4)])
+    facts(folder, available=int(9.5 * GIB), runs=[(None, 'baseline-%d' % i, GIB // 2) for i in range(1, 4)])
     finish(child)
     assert marker.exists()
 
     # Class order still decides who gets scarce capacity (exactly one start fits at a time).
-    folder, db, env = case('measured-priority', cores=3, measured=True, running=1, available=12 * GIB)
+    folder, db, env = case('measured-priority', cores=3, measured=True, running=1, available=10 * GIB)
     classes = ['other', 'vernant-build', 'machinery', 'merge-train']
     clients = {}
     for priority in classes:

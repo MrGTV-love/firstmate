@@ -391,20 +391,69 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
 HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
+INTENT_OPTIONS = ("--intent", "--intent-file")
 
 
-def running_runs() -> dict:
-    """Map each status-running run ID to (repo ID, whether it counts against the start limit, whether it is CI-ready).
+ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
 
-    Reads host execution state without creating or changing its database.
+
+def start_digest(command: List[str]) -> Optional[str]:
+    """A digest of COMMAND from its no-mistakes token on, or None when it names no no-mistakes binary."""
+    import hashlib
+    for index, part in enumerate(command):
+        if os.path.basename(part) == "no-mistakes":
+            return hashlib.sha256("\0".join(command[index + 1:]).encode("utf-8", "replace")).hexdigest()
+    return None
+
+
+def already_admitted(command: List[str], env: dict) -> bool:
+    """Whether an enclosing admission already admitted this same start.
+
+    pipeline-start exports a digest of the start it admitted to COMMAND. A wrapper
+    inside that COMMAND which routes the identical no-mistakes invocation to
+    admission again (for example fm-mem-guard.sh run inside fm-duration.py run)
+    is that one start, not a second, so it runs without queueing again; any other
+    fresh start, nested or not, has another digest and still queues.
     """
+    marker = env.get(ADMITTED_ENV)
+    return marker is not None and marker == start_digest(command)
+
+
+def fresh_pipeline_start(command: List[str]) -> bool:
+    """Whether COMMAND begins a new no-mistakes run, judged by the facts the CLI itself uses.
+
+    `no-mistakes rerun` always creates a new run. `no-mistakes axi run` creates one
+    only with an intent input (--intent TEXT, --intent -, --intent-file PATH or
+    their = forms); without one it reattaches an active run or exits 2. The
+    no-mistakes binary is found at any position and by basename, so a wrapper
+    prefix (env, fm-mem-guard.sh run --, an absolute path) or a shell -c string
+    does not hide it. respond, status and every other subcommand are not starts.
+    """
+    for index, part in enumerate(command):
+        if os.path.basename(part) == "no-mistakes":
+            rest = command[index + 1:]
+            if rest[:1] == ["rerun"]:
+                return True
+            return rest[:2] == ["axi", "run"] and any(
+                option in INTENT_OPTIONS or option.startswith(tuple(name + "=" for name in INTENT_OPTIONS))
+                for option in rest[2:])
+        if " " in part and "no-mistakes" in part:
+            try:
+                import shlex
+                if fresh_pipeline_start(shlex.split(part)):
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
+def read_host_db(sql: str, parameters: tuple = ()) -> list:
+    """Rows of one query on the host's run database, opened read-only; never creates or changes it."""
     path = Path(HOST_STATE_DB).expanduser().resolve()
 
-    def read(query: str) -> dict:
+    def read(query: str) -> list:
         with contextlib.closing(sqlite3.connect(path.as_uri() + query, uri=True)) as connection:
-            return {row[0]: (row[1], bool(row[2]), bool(row[3])) for row in connection.execute(
-                "SELECT id, repo_id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL, ci_ready_at IS NOT NULL"
-                " FROM runs WHERE status = 'running'")}
+            return connection.execute(sql, parameters).fetchall()
 
     try:
         return read("?mode=ro")
@@ -414,6 +463,36 @@ def running_runs() -> dict:
         if str(exc) != "unable to open database file" or os.path.lexists(str(path) + "-wal"):
             raise
     return read("?mode=ro&immutable=1")
+
+
+def running_runs() -> dict:
+    """Map each status-running run ID to (repo ID, whether it counts against the start limit, whether it is CI-ready).
+
+    Reads host execution state without creating or changing its database.
+    """
+    return {row[0]: (row[1], bool(row[2]), bool(row[3])) for row in read_host_db(
+        "SELECT id, repo_id, ci_ready_at IS NULL AND awaiting_agent_since IS NULL, ci_ready_at IS NOT NULL"
+        " FROM runs WHERE status = 'running'")}
+
+
+CI_STEP = "ci"
+OPEN_STEP_STATUSES = ("running", "fixing")
+
+
+def open_steps() -> Optional[dict]:
+    """Each running run's open step as (step name, status, recorded agent pid), or None when unreadable.
+
+    The open step is the highest-ordered step_results row in running or fixing.
+    A run with no such row is absent. None never reads as idle: every run then
+    keeps its full reservation.
+    """
+    try:
+        rows = read_host_db(
+            "SELECT s.run_id, s.step_name, s.status, s.agent_pid FROM step_results s JOIN runs r ON r.id = s.run_id"
+            " WHERE r.status = 'running' AND s.status IN ('running', 'fixing') ORDER BY s.run_id, s.step_order")
+    except (OSError, sqlite3.Error, ValueError):
+        return None
+    return {run: (name, status, pid) for run, name, status, pid in rows}
 
 
 RESERVATION_QUANTILE = 0.75  # policy choice (Main 2473 ruling); the peaks it ranks are measured
@@ -491,6 +570,106 @@ def measured_reservations(report: dict, running: dict) -> Optional[Tuple[int, in
     return rank_quantile(ranked, RESERVATION_QUANTILE), max(peaks.values()), len(ranked)
 
 
+_active_term_cache: dict = {}
+
+
+def active_term_from_readings(lines, host: str, total: int) -> Optional[Tuple[int, int]]:
+    """(A, readings used): the largest per-run concurrent demand the record shows for every run but its largest.
+
+    For each error-free reading of this host and RAM size that saw at least 2
+    no-mistakes run trees, (sum of their resident memory - the largest one) /
+    (count - 1), rounded up; A is the largest such value. With S covering one run
+    at the largest recorded peak, k x A + S is at least the summed run memory of
+    every recorded reading with k runs. None means no qualifying reading.
+    """
+    best, used = None, 0
+    for line in lines:
+        try:
+            reading = json.loads(line)
+            if reading.get("errors") or reading.get("host") != host or reading.get("total_bytes") != total:
+                continue
+            sizes = [run["rss_bytes"] for name, run in reading["runs"].items() if name.startswith("no-mistakes:")]
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+        if len(sizes) < MIN_QUALIFYING_RUNS or any(type(size) is not int or size < 0 for size in sizes):
+            continue
+        value = -(-(sum(sizes) - max(sizes)) // (len(sizes) - 1))
+        best = value if best is None else max(best, value)
+        used += 1
+    return None if best is None else (best, used)
+
+
+def active_term(report: dict) -> Optional[Tuple[int, int]]:
+    """A from the root home's state/memory-readings.jsonl, read-only and cached by size and mtime."""
+    try:
+        path = root_home() / "state" / "memory-readings.jsonl"
+        info = path.stat()
+        key = (str(path), info.st_size, info.st_mtime_ns, report["host"], report["total_bytes"])
+        if _active_term_cache.get("key") != key:
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                value = active_term_from_readings(handle, report["host"], report["total_bytes"])
+            _active_term_cache.clear()
+            _active_term_cache.update(key=key, value=value)
+        return _active_term_cache["value"]
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return None
+
+
+def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
+            reservation: int, slack: int, term: int, self_run: Optional[str] = None) -> dict:
+    """The reservation fit for one more active run; a pure function of its facts.
+
+    counted maps each counted run ID to its repo ID; rss is the reading's run map
+    (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
+    run IDs to their live launch-gate reservations. A run waiting on remote CI
+    (open step ci, status running, no recorded agent pid, no live launch) reserves
+    only the memory it holds. Every other counted or launched run reserves its
+    resident memory or the active-run term A, whichever is larger, once its tree
+    is visible, and its full R while the reading cannot see it yet. The new run
+    reserves S. The waiting launch's own run (self_run) is a waiter: it adds only
+    what it holds. Budget is available memory plus what the counted runs hold.
+    """
+    entries = []
+    runs = dict(counted)
+    for run, entry in launches.items():
+        runs.setdefault(run, entry.get("repo"))
+    held = 0
+    for run in sorted(runs):
+        seen = rss.get("no-mistakes:%s/%s" % (runs[run], run))
+        size = seen["rss_bytes"] if seen and type(seen.get("rss_bytes")) is int else 0
+        visible = bool(seen) and seen.get("processes", 0) > 0
+        step = None if steps is None else steps.get(run)
+        held += size
+        if run == self_run:
+            kind, demand = "waiter", size
+        elif run in launches:
+            kind = "launched"
+            demand = max(size, term) if visible else reservation
+        elif steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running" and step[2] is None:
+            kind, demand = "ci-waiting", size
+        else:
+            kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
+            demand = max(size, term) if visible else reservation
+        entries.append((run, kind, demand, visible))
+    projected = sum(demand for _, _, demand, _ in entries) + slack
+    budget = available + held
+    others = [run for run, _, _, _ in entries if run != self_run]
+    return dict(admit=projected <= budget or not others, projected=projected, budget=budget, held=held,
+                available=available, entries=entries, counted=len(counted))
+
+
+def projection_text(fit: dict, reservation: int, slack: int, term: int, runs_measured: int, readings: int) -> str:
+    def items(selected):
+        return ",".join("%s:%s:%d%s" % (run, kind, demand, "" if visible else ":unseen")
+                        for run, kind, demand, visible in fit["entries"] if selected(kind)) or "none"
+    reserved = items(lambda kind: kind not in ("ci-waiting", "waiter"))
+    unreserved = items(lambda kind: kind in ("ci-waiting", "waiter"))
+    return ("counted=%d projected=%d budget=%d available=%d held=%d reservation=%d active_term=%d slack=%d"
+            " runs_measured=%d readings_measured=%d reserved=[%s] holding_only=[%s]"
+            % (fit["counted"], fit["projected"], fit["budget"], fit["available"], fit["held"], reservation,
+               term, slack, runs_measured, readings, reserved, unreserved))
+
+
 _observed: dict = {}
 
 
@@ -531,24 +710,35 @@ def host_observation(fresh: bool = False) -> dict:
     return _observed
 
 
-def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool = False) -> Tuple[bool, str]:
+def admission(reasons: List[str], report: Optional[dict], running: dict, counted: dict, steps: Optional[dict],
+              launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
+              measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None) -> Tuple[bool, str]:
+    """The complete admission rule over one reading's facts: holds first, then the fit or the count fallback.
+
+    measured, when given, supplies ((R, S, runs measured), (A, readings measured))
+    instead of reading the records; the P4 replay passes the copied records here.
+    """
+    others = len([run for run in set(counted) | set(launches) if run != self_run])
+    if reasons:
+        return False, "overload: %s counted=%d priority=%s" % ("; ".join(reasons), len(counted), priority)
+    if measured is None and report is not None:
+        reserved, term = measured_reservations(report, running), active_term(report)
+        measured = (reserved, term) if reserved is not None and term is not None else None
+    if measured is None:
+        limit = max(1, cores // 3)
+        return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
+    (reservation, slack, qualifying), (term, readings) = measured
+    fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run)
+    return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
+
+
+def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool = False,
+           directory: Optional[str] = None, self_run: Optional[str] = None) -> Tuple[bool, str]:
     """(admit, one-line reason) for the first waiter, from the running and counted runs and the host reading."""
     seen = host_observation(fresh)
-    if seen["reasons"]:
-        return False, "overload: %s counted=%d priority=%s" % ("; ".join(seen["reasons"]), len(counted), priority)
-    report = seen["memory"]
-    reserved = measured_reservations(report, running) if report is not None else None
-    if reserved is None:
-        limit = max(1, cores // 3)
-        return len(counted) < limit, "counted=%d limit=%d basis=fallback priority=%s" % (len(counted), limit, priority)
-    reservation, slack, qualifying = reserved
-    held = sum(min(reservation, report["runs"].get("no-mistakes:%s/%s" % (repo, run), {}).get("rss_bytes", 0))
-               for run, repo in counted.items())
-    budget = report["available_bytes"] + held
-    need = (len(counted) + 1) * reservation + slack
-    return need <= budget or not counted, (
-        "counted=%d need=%d budget=%d reservation=%d slack=%d runs_measured=%d priority=%s"
-        % (len(counted), need, budget, reservation, slack, qualifying, priority))
+    launches = live_launches(directory) if directory else {}
+    steps = open_steps() if seen["memory"] is not None else None
+    return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run)
 
 
 def pipeline_observation() -> Tuple[dict, int]:
@@ -556,6 +746,63 @@ def pipeline_observation() -> Tuple[dict, int]:
     if not isinstance(cores, int) or cores < 1:
         raise ValueError("cannot read a positive native CPU count")
     return running_runs(), cores
+
+
+def live_launches(directory: str) -> dict:
+    """Run ID -> entry for each launch-gate reservation whose gate still holds its lock.
+
+    An unlocked file belongs to a gate that no longer exists: it reserves nothing
+    and is removed. Several live attempts of one run count once.
+    """
+    found: dict = {}
+    for path in Path(directory).glob("launch-*.lock"):
+        try:
+            fd = os.open(str(path), os.O_RDWR | getattr(os, "O_CLOEXEC", 0))
+        except FileNotFoundError:
+            continue
+        try:
+            if try_lock(fd):
+                path.unlink(missing_ok=True)
+                continue
+            entry = json.loads(os.pread(fd, 65536, 0))
+            found.setdefault(entry["run"], entry)
+        except (ValueError, KeyError, TypeError):
+            continue
+        finally:
+            os.close(fd)
+    return found
+
+
+def publish_locked(directory: str, prefix: str, entry: dict) -> Tuple[int, str]:
+    """Write a locked JSON entry and rename it into place, so no reader sees it unlocked or partial."""
+    fd, temporary = tempfile.mkstemp(prefix="." + prefix, dir=directory)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    os.set_inheritable(fd, False)
+    os.write(fd, json.dumps(entry).encode())
+    final = str(Path(directory) / (Path(temporary).name[1:] + ".lock"))
+    os.rename(temporary, final)
+    return fd, final
+
+
+def run_class(directory: str, run: str) -> Optional[str]:
+    """The start class recorded for a run when its fresh start registered, if any."""
+    try:
+        value = json.loads((Path(directory) / ("run-class-%s.json" % run)).read_text())["priority"]
+        return value if value in PIPELINE_PRIORITIES else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def record_run_classes(directory: str, new_runs, priority: str, running) -> None:
+    """Remember the class of newly registered runs; forget classes of runs no longer running."""
+    for run in new_runs:
+        target = Path(directory) / ("run-class-%s.json" % run)
+        temporary = target.with_name("." + target.name + ".%d" % os.getpid())
+        temporary.write_text(json.dumps({"priority": priority}))
+        os.replace(str(temporary), str(target))
+    for path in Path(directory).glob("run-class-*.json"):
+        if path.name[len("run-class-"):-len(".json")] not in running:
+            path.unlink(missing_ok=True)
 
 
 def first_pipeline_waiter(directory: str) -> str:
@@ -577,27 +824,28 @@ def first_pipeline_waiter(directory: str) -> str:
     return min(entries)[2] if entries else ""
 
 
-def cmd_pipeline_start(args: argparse.Namespace) -> int:
-    command = list(args.command)
-    if command[:1] == ["--"]:
-        command = command[1:]
-    if not command:
-        log(2, "pipeline-start needs a command after --")
-        return 125
+class HoldBound(Exception):
+    """A launch reached its hold bound without a fit."""
+
+
+def wait_for_admission(directory: str, priority: str, self_run: Optional[str] = None,
+                       bound: Optional[float] = None, on_wait=None):
+    """Queue one locked waiter entry in class order until admitted; return (start lock fd, before, reason, waited).
+
+    The start lock is held on return. A bound in seconds raises HoldBound with the
+    last reason once that long passed without a grant; None waits without limit.
+    on_wait(reason) is called once, at the first wait that is not the registration handshake.
+    """
     waiter_fd = admission_fd = None
     waiter_path = None
+    started = time.monotonic()
     try:
-        directory = pool_dir()
-        ensure_pool_dir(directory)
         # Publish a fully written, locked entry atomically; no reader sees a
         # partial priority record. These are startup waiters, not CPU passes.
-        waiter_fd, temporary = tempfile.mkstemp(prefix=".pipeline-waiter-", dir=directory)
-        fcntl.flock(waiter_fd, fcntl.LOCK_EX)
-        os.write(waiter_fd, json.dumps({"priority": args.priority, "queued_ns": time.time_ns()}).encode())
-        waiter_path = str(Path(directory) / (Path(temporary).name[1:] + ".lock"))
-        os.rename(temporary, waiter_path)
+        waiter_fd, waiter_path = publish_locked(directory, "pipeline-waiter-", {
+            "priority": priority, "queued_ns": time.time_ns(), "run": self_run})
         admission_fd = open_lock(os.path.join(directory, "pipeline-start.lock"))
-        next_notice = time.monotonic() + FIRST_NOTICE_SECS
+        next_notice = started + FIRST_NOTICE_SECS
         delay = POLL_MIN_SECS
         while True:
             reason = "another start is registering"
@@ -606,48 +854,29 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 counted = {run: repo for run, (repo, is_counted, _) in before.items() if is_counted}
                 first = first_pipeline_waiter(directory)
                 if first == waiter_path:
-                    admit, reason = decide(before, counted, cores, args.priority)
+                    admit, reason = decide(before, counted, cores, priority, directory=directory, self_run=self_run)
                     if admit:
                         # A cached healthy reading may be stale: confirm with a new reading at the grant.
-                        admit, reason = decide(before, counted, cores, args.priority, fresh=True)
+                        admit, reason = decide(before, counted, cores, priority, fresh=True, directory=directory,
+                                               self_run=self_run)
                     if admit:
-                        break
+                        result = (admission_fd, before, reason, time.monotonic() - started)
+                        admission_fd = None
+                        return result
                 else:
-                    reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), args.priority)
+                    reason = "counted=%d priority=%s behind a higher-priority or earlier start" % (len(counted), priority)
                 fcntl.flock(admission_fd, fcntl.LOCK_UN)
+                if on_wait is not None:
+                    on_wait(reason)
+                    on_wait = None
             now = time.monotonic()
+            if bound is not None and now - started >= bound:
+                raise HoldBound(reason)
             if now >= next_notice:
-                log(2, "pipeline-start waiting: " + reason)
+                log(2, "%s waiting: %s" % ("launch-gate" if self_run else "pipeline-start", reason))
                 next_notice = now + NOTICE_EVERY_SECS
             time.sleep(delay)
             delay = min(POLL_MAX_SECS, delay * 2)
-        os.unlink(waiter_path)
-        waiter_path = None
-        log(2, "pipeline-start admitted: " + reason)
-        registration_error = False
-
-        def registered() -> bool:
-            nonlocal registration_error
-            try:
-                if running_runs().keys() - before.keys():
-                    # Serialize only the check-to-registration gap. The daemon
-                    # owns status after this handoff; no lifetime watcher remains.
-                    fcntl.flock(admission_fd, fcntl.LOCK_UN)
-                    return True
-            except (OSError, sqlite3.Error, ValueError) as exc:
-                if not registration_error:
-                    log(2, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
-                    registration_error = True
-            return False
-
-        return run_child(command, dict(os.environ), 2, registered)
-    except KeyboardInterrupt:
-        return 130
-    except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
-        # Unlike a burst's optional throughput pool, an unreadable start source
-        # cannot stand in for proof of headroom under the explicit start policy.
-        log(2, "pipeline-start refused: %s" % exc)
-        return 125
     finally:
         if waiter_path is not None:
             try:
@@ -657,6 +886,284 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         for fd in (waiter_fd, admission_fd):
             if fd is not None:
                 os.close(fd)
+
+
+def cmd_pipeline_start(args: argparse.Namespace) -> int:
+    command = list(args.command)
+    if command[:1] == ["--"]:
+        command = command[1:]
+    if not command:
+        log(2, "pipeline-start needs a command after --")
+        return 125
+    environment = dict(os.environ)
+    if already_admitted(command, environment) or (args.only_fresh and not fresh_pipeline_start(command)):
+        # Already admitted by an enclosing owner, or (with --only-fresh) a
+        # reattachment, response, status read or other command that is no new run.
+        return exec_direct(command, environment, 2)
+    digest = start_digest(command)
+    if digest is not None:
+        environment[ADMITTED_ENV] = digest
+    admission_fd = None
+    try:
+        directory = pool_dir()
+        ensure_pool_dir(directory)
+        admission_fd, before, reason, _ = wait_for_admission(directory, args.priority)
+        log(2, "pipeline-start admitted: " + reason)
+        registration_error = False
+
+        def registered() -> bool:
+            nonlocal registration_error
+            try:
+                running = running_runs()
+                new_runs = running.keys() - before.keys()
+                if new_runs:
+                    # Serialize only the check-to-registration gap. The daemon
+                    # owns status after this handoff; no lifetime watcher remains.
+                    # The class is kept so the run's later fix rounds queue in it.
+                    try:
+                        record_run_classes(directory, new_runs, args.priority, running)
+                    except OSError as exc:
+                        log(2, "cannot record the start class of %s: %s" % (", ".join(sorted(new_runs)), exc))
+                    fcntl.flock(admission_fd, fcntl.LOCK_UN)
+                    return True
+            except (OSError, sqlite3.Error, ValueError) as exc:
+                if not registration_error:
+                    log(2, "cannot confirm startup registration; retaining start lock until command returns: %s" % exc)
+                    registration_error = True
+            return False
+
+        return run_child(command, environment, 2, registered)
+    except KeyboardInterrupt:
+        return 130
+    except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
+        # Unlike a burst's optional throughput pool, an unreadable start source
+        # cannot stand in for proof of headroom under the explicit start policy.
+        log(2, "pipeline-start refused: %s" % exc)
+        return 125
+    finally:
+        if admission_fd is not None:
+            os.close(admission_fd)
+
+
+NO_MISTAKES_CONFIG = "~/.no-mistakes/config.yaml"
+# The daemon's own default when config.yaml sets no agent_timeout: config.DefaultAgentTimeout
+# in the no-mistakes fork (internal/config/config.go:47; internal/pipeline/agent_run.go:23-27).
+DEFAULT_AGENT_TIMEOUT_SECS = 30 * 60
+CI_FIX_QUANTILE = 0.99  # the contract's bound: budget minus the p99 of recorded CI-fix invocations
+
+
+class LaunchRefused(Exception):
+    """The gate cannot start the agent; the message names the cause and the next action."""
+
+    def __init__(self, cause: str, detail: str, action: str):
+        super().__init__(cause)
+        self.cause, self.detail, self.action = cause, detail, action
+
+
+def go_duration_secs(text: str) -> float:
+    """Seconds in a Go duration such as 240m, 1h30m or 90s; ValueError otherwise."""
+    import re
+    units = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 0.001}
+    parts = re.findall(r"(\d+(?:\.\d+)?)(ms|h|m|s)", text)
+    if not parts or "".join(number + unit for number, unit in parts) != text:
+        raise ValueError("not a duration: %r" % text)
+    return sum(float(number) * units[unit] for number, unit in parts)
+
+
+def agent_budget_secs() -> Optional[float]:
+    """The daemon's per-invocation agent budget from config.yaml, its default when unset, None when unreadable."""
+    import re
+    try:
+        text = Path(NO_MISTAKES_CONFIG).expanduser().read_text()
+        match = re.search(r'^agent_timeout:[ \t]*["\']?([^"\'\s#]+)', text, re.MULTILINE)
+        return go_duration_secs(match.group(1)) if match else float(DEFAULT_AGENT_TIMEOUT_SECS)
+    except (OSError, ValueError):
+        return None
+
+
+def ci_fix_p99_secs() -> Optional[float]:
+    """The nearest-rank 99th percentile of recorded CI-step agent invocation durations, or None."""
+    try:
+        values = [row[0] for row in read_host_db(
+            "SELECT duration_ms FROM agent_invocations WHERE step_name = ? AND duration_ms > 0", (CI_STEP,))]
+    except (OSError, sqlite3.Error, ValueError):
+        return None
+    return rank_quantile(values, CI_FIX_QUANTILE) / 1000.0 if values else None
+
+
+def hold_bound() -> Tuple[float, str]:
+    """How long a launch may wait for capacity inside the agent's own budget, and its inputs."""
+    budget, p99 = agent_budget_secs(), ci_fix_p99_secs()
+    if budget is None or p99 is None or budget - p99 <= 0:
+        return 0.0, "hold_bound=0s budget=%s ci_fix_p99=%s" % (
+            "unreadable" if budget is None else "%ds" % budget, "unreadable" if p99 is None else "%ds" % p99)
+    return budget - p99, "hold_bound=%ds budget=%ds ci_fix_p99=%ds" % (budget - p99, budget, p99)
+
+
+def map_worktree(cwd: str) -> Tuple[str, str, str]:
+    """(run ID, repo ID, branch) of the one run whose worktree_dir is this directory, or LaunchRefused."""
+    paths = sorted({cwd, os.path.realpath(cwd)})
+    try:
+        rows = read_host_db("SELECT DISTINCT id, repo_id, branch FROM runs WHERE worktree_dir IN (%s)"
+                            % ",".join("?" * len(paths)), tuple(paths))
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        raise LaunchRefused("run database unreadable", str(exc),
+                            "restore read access to the run database; the next fix round enters the gate again")
+    if not rows:
+        raise LaunchRefused("unmapped worktree", "no run records %s" % cwd,
+                            "launch the agent from a run worktree; a launch outside any run is not gated work")
+    if len(rows) > 1:
+        raise LaunchRefused("ambiguous worktree", "runs %s all record %s" % (",".join(r[0] for r in rows), cwd),
+                            "resolve which run owns this worktree; the next fix round enters the gate again")
+    return rows[0]
+
+
+def durable_line(text: str, key: str) -> None:
+    """Append one check wake to the root home's queue, which supervision drains; never blocks the launch decision."""
+    try:
+        home = root_home()
+        subprocess.run(["bash", "-c", '. "$1" && fm_wake_append check "$2" "$3"', "bash",
+                        str(Path(__file__).with_name("fm-wake-lib.sh")), key, "check: launch-gate: " + text],
+                       env=dict(os.environ, FM_HOME=str(home)), stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        log(2, "launch-gate: durable line not recorded (%s): %s" % (exc, text))
+
+
+def start_watched(command: List[str]) -> Tuple[subprocess.Popen, int]:
+    """Start the agent as this gate's child in its process group, with a watcher that kills it if the gate dies.
+
+    macOS has no parent-death signal: a forked watcher blocks on a pipe only this
+    gate can write. A normal gate exit writes one byte first; end-of-file without
+    it means the gate died, and the watcher kills the agent at once (its whole
+    process group when the gate leads that group, as the daemon's launch does).
+    """
+    gate = os.getpid()
+    read_end, write_end = os.pipe()
+    watcher = os.fork()
+    if watcher == 0:  # pragma: no cover - exercised through the executable
+        try:
+            os.close(write_end)
+            null = os.open(os.devnull, os.O_RDWR)
+            for fd in (0, 1, 2):
+                os.dup2(null, fd)
+            os.closerange(3, read_end)
+            os.closerange(read_end + 1, 65536)
+            for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+                signal.signal(signum, signal.SIG_IGN)
+            agent = int(os.read(read_end, 32).decode() or 0)
+            if os.read(read_end, 1) != b"d" and agent:
+                with contextlib.suppress(OSError):
+                    os.kill(agent, signal.SIGKILL)
+                if os.getpgid(0) == gate:
+                    with contextlib.suppress(OSError):
+                        os.killpg(gate, signal.SIGKILL)
+        finally:
+            os._exit(0)
+    os.close(read_end)
+    child = subprocess.Popen(command, close_fds=True, preexec_fn=_restore_default_signals)
+    os.write(write_end, str(child.pid).encode().ljust(32))
+    return child, write_end
+
+
+def cmd_launch_gate(args: argparse.Namespace) -> int:
+    command = list(args.command)
+    if command[:1] == ["--"]:
+        command = command[1:]
+    if not command:
+        log(2, "launch-gate needs an agent command after --")
+        return 125
+    started = time.monotonic()
+    run = branch = None
+    try:
+        cwd = os.getcwd()
+        run, repo, branch = map_worktree(cwd)
+        steps = open_steps()
+        step = None if steps is None else steps.get(run)
+        log(2, "launch-gate run=%s branch=%s step=%s agent_pid=%s attempt=%d:%d" % (
+            run, branch, step[0] + ":" + step[1] if step else "unreadable" if steps is None else "none",
+            step[2] if step else "none", os.getpid(), time.time_ns()))
+        if step is not None and step[0] != CI_STEP:
+            # Another step of a run already counted as active: unchanged, at once.
+            return exec_direct(command, dict(os.environ), 2)
+        directory = pool_dir()
+        ensure_pool_dir(directory)
+        bound, bound_text = hold_bound()
+        priority = run_class(directory, run) or "other"
+        held = []
+
+        def on_wait(reason: str) -> None:
+            held.append(reason)
+            durable_line("run %s (%s) held for capacity before its CI fix agent starts: %s; %s" % (
+                run, branch, reason, bound_text), "launch-gate-" + run)
+
+        try:
+            admission_fd, _, reason, waited = wait_for_admission(directory, priority, run, bound, on_wait)
+        except HoldBound as reached:
+            raise LaunchRefused("hold bound reached", "%s; held %ds; last reading: %s" % (
+                bound_text, time.monotonic() - started, reached),
+                "this fix attempt ends and the run keeps its CI step; the daemon retries while auto_fix.ci allows, then "
+                "parks the CI findings as an ask-user decision; answer it once capacity has returned")
+        admitted_ns = time.time_ns()
+        reservation_fd = None
+        try:
+            reservation_fd, _ = publish_locked(directory, "launch-", {
+                "run": run, "repo": repo, "pid": os.getpid(), "started_ns": admitted_ns})
+            published_ns = time.time_ns()
+            child, watch_fd = start_watched(command)
+            started_ns = time.time_ns()
+        finally:
+            os.close(admission_fd)
+        unlocked_ns = time.time_ns()
+        log(2, "launch-gate admitted: %s %s admitted_ns=%d published_ns=%d agent_started_ns=%d unlocked_ns=%d" % (
+            reason, bound_text, admitted_ns, published_ns, started_ns, unlocked_ns))
+        if held:
+            durable_line("run %s (%s) admitted after %ds held: %s" % (run, branch, waited, reason), "launch-gate-" + run)
+        return wait_agent(child, watch_fd, reservation_fd)
+    except LaunchRefused as refused:
+        text = "launch-gate refused: %s: run %s; %s; next action: %s" % (
+            refused.cause, run or "unknown", refused.detail, refused.action)
+        log(2, text)
+        durable_line(text, "launch-gate-" + (run or "unmapped"))
+        return 75
+    except KeyboardInterrupt:
+        return 130
+    except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:
+        text = "launch-gate refused: gate error: run %s; %s; next action: repair the gate source named here; the next fix round enters the gate again" % (run or "unknown", exc)
+        log(2, text)
+        durable_line(text, "launch-gate-" + (run or "unmapped"))
+        return 75
+
+
+def wait_agent(child: subprocess.Popen, watch_fd: int, reservation_fd: int) -> int:
+    """Forward signals to the agent, keep its reservation while it lives, and return or re-raise its own ending."""
+    def forward(signum, _frame):
+        with contextlib.suppress(OSError):
+            os.kill(child.pid, signum)
+
+    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(signum, forward)
+    try:
+        while True:
+            try:
+                code = child.wait()
+                break
+            except InterruptedError:  # pragma: no cover - PEP 475 retries
+                continue
+    except BaseException:
+        with contextlib.suppress(OSError):
+            child.kill()
+        child.wait()
+        raise
+    finally:
+        os.close(reservation_fd)
+        with contextlib.suppress(OSError):
+            os.write(watch_fd, b"d")
+        os.close(watch_fd)
+    if code < 0:
+        signal.signal(-code, signal.SIG_DFL)
+        os.kill(os.getpid(), -code)
+    return code
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -706,7 +1213,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
     start = sub.add_parser("pipeline-start", help="queue a fresh pipeline start before its execution clock")
     start.add_argument("--priority", choices=PIPELINE_PRIORITIES, default="other", help="start class in descending priority order")
+    start.add_argument("--only-fresh", action="store_true", help="run COMMAND without admission unless it begins a new no-mistakes run")
     start.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS...]")
+    gate = sub.add_parser("launch-gate", help="secure capacity for a CI fix agent before it starts (the agent launcher's final exec)")
+    gate.add_argument("command", nargs=argparse.REMAINDER, help="-- AGENT [ARGS...]")
     status = sub.add_parser("status", help="report held and free passes")
     status.add_argument("--json", action="store_true", help="print one JSON object")
     sub.add_parser("size", help="print the pool size")
@@ -723,6 +1233,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_run(args)
     if args.action == "pipeline-start":
         return cmd_pipeline_start(args)
+    if args.action == "launch-gate":
+        return cmd_launch_gate(args)
     if args.action == "status":
         return cmd_status(args)
     if args.action == "size":

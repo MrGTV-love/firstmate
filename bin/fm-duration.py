@@ -13,9 +13,10 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS|default [PATH...] [--while-alive]
        fm-duration.py check-literals [--base REF | --report]
 
-Fresh `no-mistakes axi run` calls (with --intent/--intent-file) and `no-mistakes
-rerun` commands automatically enter the existing fm-cpu-pass.py pipeline-start
-owner before any run clock or sample. --pipeline-priority chooses merge-train,
+A command that begins a new no-mistakes run, as fm-cpu-pass.py's
+fresh_pipeline_start judges it (a rerun, or axi run with an intent input, behind
+any wrapper prefix), automatically enters that pipeline-start owner before any
+run clock or sample. --pipeline-priority chooses merge-train,
 machinery, vernant-build or other (default); docs/cpu-pass-pool.md owns policy.
 The admission owner re-executes this runner once with an internal argument that
 this runner consumes, so only that measured child skips requeueing; the wrapped
@@ -211,6 +212,7 @@ try:
 except ImportError:
     fcntl = None  # Native Windows Python cannot use the POSIX timing runner.
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -1503,10 +1505,11 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('run requires -- COMMAND')
-        fresh_pipeline = (Path(command[0]).name == 'no-mistakes' and (
-            command[1:2] == ['rerun'] or (command[1:3] == ['axi', 'run'] and any(
-                part in ('--intent', '--intent-file') or part.startswith(('--intent=', '--intent-file='))
-                for part in command[3:]))))
+        # The admission owner decides what begins a new run, so every route shares one test.
+        engine = importlib.util.spec_from_file_location('fm_cpu_pass', ROOT / 'bin/fm-cpu-pass.py')
+        cpu_pass = importlib.util.module_from_spec(engine)
+        engine.loader.exec_module(cpu_pass)
+        fresh_pipeline = cpu_pass.fresh_pipeline_start(command) and not cpu_pass.already_admitted(command, os.environ)
         if fresh_pipeline and not args.pipeline_admitted:
             # Admission precedes run(), its absolute/progress clocks and samples.
             # The existing pool owns priority, native observations and the short
