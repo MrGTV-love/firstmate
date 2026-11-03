@@ -780,6 +780,10 @@ In a `data/`, `state/`, or `state/extensions/` that the project ignores as a who
 Under a tracked `data/` or `state/`, any other ignored entry outside such a directory is judged like one anywhere else.
 A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
+The one exact file `.claude/commit-intent.json` is also scratch when it is a valid Vernant `CommitIntent` that is spent.
+Valid means a regular file of at most 1 MiB holding a JSON object with `artifacttype` `CommitIntent`, a non-empty `schemaversion`, `branch` and `head_sha`, string lists `owned_paths` and `validators`, and an ISO-8601 `expires_at_iso` with a timezone.
+Spent means `expires_at_iso` is not in the future, or `branch` equals the task's `branch=` as the prune record kept it from the task record, because teardown deletes that record.
+A file that fails a read, a parse or any of these checks keeps the copy, and so does the same file name at any other path.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
 Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 checksums, and the copy is verified, before anything is removed.

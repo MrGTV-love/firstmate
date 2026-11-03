@@ -72,9 +72,15 @@
 # scratch name such as node_modules is not scratch there, and any other file is
 # unique; under a tracked data/ or state/, any other ignored entry outside such a
 # directory is judged like one anywhere else. Under .claude and
-# .opencode only the hook files, a clone (proved on its own) and an entry with a
-# scratch name are scratch; any other ignored entry there is unique, stricter
-# than teardown. The preserve
+# .opencode only the hook files, a clone (proved on its own), an entry with a
+# scratch name and one exact file, .claude/commit-intent.json, are scratch; any
+# other ignored entry there is unique, stricter than teardown. That file is
+# scratch only when it is a valid Vernant CommitIntent that is spent
+# (fm_mp_commit_intent_spent): its expires_at_iso, with a timezone, is not in
+# the future, or its branch equals the task's recorded branch
+# (FM_MP_TASK_BRANCH, set by bin/fm-merge-prune.sh before the proofs run).
+# Anything else about that file, a failed read or parse included, keeps the
+# copy. The preserve
 # list is .claude/bug-evidence (slot-specific closeout records) and
 # .claude/channel-outbox (rate files). Before removal those are copied to the
 # task's data folder with SHA-256 checksums and verified there.
@@ -375,6 +381,67 @@ fm_mp_tooling_path() {  # <real-copy> <relative-path>
   return 1
 }
 
+# The task's recorded ship branch, set by bin/fm-merge-prune.sh before the
+# proofs run. Empty matches no intent.
+FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
+
+# Whether the file at <path> is a Vernant CommitIntent that is spent: a regular
+# file of at most 1 MiB (a real one is under 1 KiB) whose JSON is an object with
+# artifacttype CommitIntent, non-empty string schemaversion, branch and
+# head_sha, string lists owned_paths and validators, and an ISO-8601
+# expires_at_iso with a timezone (the checks of Vernant's own reader), and
+# that has expired (expires_at <= now, UTC) or names FM_MP_TASK_BRANCH exactly.
+# The file is only read, from its path. Any other result, a read or parse
+# failure included, is 1.
+fm_mp_commit_intent_spent() {  # <path>
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<'PY' >/dev/null 2>&1
+import datetime, json, os, re, stat, sys
+path, task_branch = sys.argv[1], sys.argv[2]
+LIMIT = 1048576
+try:
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            sys.exit(1)
+        raw = b""
+        while len(raw) <= LIMIT:
+            chunk = os.read(fd, LIMIT + 1 - len(raw))
+            if not chunk:
+                break
+            raw += chunk
+    finally:
+        os.close(fd)
+    if len(raw) > LIMIT:
+        sys.exit(1)
+    doc = json.loads(raw.decode("utf-8"))
+    if not isinstance(doc, dict) or doc.get("artifacttype") != "CommitIntent":
+        sys.exit(1)
+    for key in ("schemaversion", "branch", "head_sha"):
+        value = doc.get(key)
+        if not isinstance(value, str) or not value.strip():
+            sys.exit(1)
+    for key in ("owned_paths", "validators"):
+        value = doc.get(key)
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            sys.exit(1)
+    stamp = doc.get("expires_at_iso")
+    if not isinstance(stamp, str) or not re.fullmatch(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})", stamp
+    ):
+        sys.exit(1)
+    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if expires.astimezone(datetime.timezone.utc) <= now:
+        sys.exit(0)
+    sys.exit(0 if task_branch and doc["branch"] == task_branch else 1)
+except SystemExit:
+    raise
+except BaseException:
+    sys.exit(1)
+PY
+}
+
 # One ignored entry: scratch (return 0), preserved (recorded, return 0), or
 # unique (keep verdict, return 1). Directories that may hold both kinds are
 # opened one level at a time. The third argument is set for a child reached by
@@ -422,6 +489,13 @@ EOF
     # Firstmate's own hook files, and a clone under .claude/worktrees, which the
     # search for nested copies proves on its own.
     .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;
+    # The one exact path of a spent Vernant CommitIntent; any other shape of
+    # that file falls through to the keep verdict below.
+    .claude/commit-intent.json)
+      if fm_mp_commit_intent_spent "$copy/$rel"; then
+        return 0
+      fi
+      ;;
     .claude/worktrees/*)
       if [ -e "$copy/$rel/.git" ]; then
         return 0
