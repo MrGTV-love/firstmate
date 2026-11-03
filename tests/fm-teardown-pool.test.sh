@@ -894,7 +894,6 @@ test_nested_slot_reproof_refusal_is_rerunnable() {
     expect_code 1 "$rc" "$label: the first teardown must stop at the slot's late work: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "$label: the first teardown had not yet removed the nested copy"
     assert_no_grep "nothing was changed" "$case_dir/stderr" "$label: the post-lock refusal claimed nothing was changed"
-    nested_evidence n4-after "$label run 1 (late work at the post-lock proof): $(nested_observe "$case_dir" "$rc")"
 
     git -C "$NESTED_SLOT" add late.txt
     git -C "$NESTED_SLOT" commit -qm "late slot work"
@@ -906,7 +905,6 @@ test_nested_slot_reproof_refusal_is_rerunnable() {
     assert_present "$case_dir/state/task-x1.meta" "$label: the re-run retired the record with the slot unproved"
     assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the re-run dropped the slot claim"
     assert_absent "$case_dir/treehouse.log" "$label: the re-run returned the unproved slot"
-    nested_evidence n4-after "$label run 2 (late work still unlanded): $(nested_observe "$case_dir" "$rc"); stderr names: $(grep -o "claimed pool slot [^ ]*" "$case_dir/stderr2" | head -1)"
 
     git -C "$NESTED_SLOT" push -q origin HEAD:main
     rc=0
@@ -917,7 +915,6 @@ test_nested_slot_reproof_refusal_is_rerunnable() {
     assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
     assert_absent "$case_dir/state/task-x1.backlog-close" "$label: the backlog-close marker survived"
     assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: the return-pending marker survived"
-    nested_evidence n4-after "$label run 3 (late work landed): $(nested_observe "$case_dir" "$rc")"
   done
   pass "a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record"
 }
@@ -970,7 +967,6 @@ assert_plain_nested_own_slot_closed() {  # <normal|force>
   nested_fixture "$label" plain mine landed
   case_dir=$NESTED_CASE
   if [ "$1" = force ]; then nested_run "$case_dir" --force || rc=$?; else nested_run "$case_dir" || rc=$?; fi
-  nested_evidence n1-after "$label: $(nested_observe "$case_dir" "$rc")"
   expect_code 0 "$rc" "$label: a plain nested copy in its own claimed slot must tear down: $(tail -3 "$case_dir/stderr")"
   assert_nested_closed "$case_dir" "$label"
 }
@@ -1033,9 +1029,6 @@ test_plain_nested_disposition_equals_the_prior_shape() {
       if [ "$mode" = force ]; then nested_run "$case_dir" --force || rc=$?; else nested_run "$case_dir" || rc=$?; fi
       if [ "$shape" = plain ]; then obs_plain=$(nested_observe "$case_dir" "$rc"); else obs_enclosing=$(nested_observe "$case_dir" "$rc"); fi
     done
-    nested_evidence n3-after "fixture $name (claim $claim, $variant, $mode)"
-    nested_evidence n3-after "   prior: $obs_enclosing"
-    nested_evidence n3-after "   plain: $obs_plain"
     [ "$obs_enclosing" = "$obs_plain" ] || mismatches="$mismatches $name"
   done
   [ -z "$mismatches" ] || fail "the plain shape differs from the prior shape in fixture(s):$mismatches"
@@ -1063,7 +1056,6 @@ test_gate_409_recorded_case_tears_down() {
   gate_409_case landed
   case_dir=$NESTED_CASE
   nested_run "$case_dir" --force || rc=$?
-  nested_evidence n5-after "gate-409-landed: $(nested_observe "$case_dir" "$rc"); pane closed: $([ -e "$case_dir/herdr-closed" ] && echo yes || echo no)"
   expect_code 0 "$rc" "gate-409-landed: the recorded case must tear down: $(tail -3 "$case_dir/stderr")"
   assert_nested_closed "$case_dir" gate-409-landed
   assert_present "$case_dir/herdr-closed" "gate-409-landed: the pane was not closed"

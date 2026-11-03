@@ -2752,9 +2752,6 @@ test_plain_nested_bundle_held_commits_match_the_prior_shape() {
       assert_nested_closed "$case_dir" "bundle-pair-$mode-$shape"
       if [ "$shape" = plain ]; then obs_plain=$(nested_observe "$case_dir" "$rc"); else obs_enclosing=$(nested_observe "$case_dir" "$rc"); fi
     done
-    nested_evidence n1-bundle "bundle $mode (nested copy commit held by the bundle${second:+; slot root HEAD $second also held}):"
-    nested_evidence n1-bundle "   prior: $obs_enclosing"
-    nested_evidence n1-bundle "   plain: $obs_plain"
     assert_equals "$obs_enclosing" "$obs_plain" "bundle-pair-$mode: the plain shape must equal the prior shape"
   done
   pass 'a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does'

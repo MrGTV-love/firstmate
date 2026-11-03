@@ -2498,13 +2498,6 @@ SH
   add_lsof_no_holder "$case_dir"
 }
 
-# nested_evidence <name> <line>: keeps one observed line under
-# NESTED_EVIDENCE_DIR when a run asks for it.
-nested_evidence() {
-  [ -z "${NESTED_EVIDENCE_DIR:-}" ] || printf '%s\n' "$2" >> "$NESTED_EVIDENCE_DIR/$1.txt"
-  return 0
-}
-
 # nested_seed_task_files <case-dir>: the files a live task leaves behind that a
 # teardown retires - an inbox with a message, a status file and a tasktmp - and
 # a tmux stand-in that logs only the close calls it receives.
@@ -2663,8 +2656,6 @@ assert_nested_refused_untouched() {
     diff "$case_dir/snapshot.before" "$case_dir/snapshot.after" >&2 || true
     fail "$label: the refusal changed state"
   fi
-  nested_evidence n2-after "== $label: exit nonzero, stderr names '$fragment'; snapshot before == after ($(wc -l < "$case_dir/snapshot.after" | tr -d ' ') entries)"
-  nested_evidence n2-after "$(sed 's/^/   /' "$case_dir/snapshot.after")"
 }
 
 # nested_pipeline_input_case <name>: make_nested_slot_case's enclosing shape
