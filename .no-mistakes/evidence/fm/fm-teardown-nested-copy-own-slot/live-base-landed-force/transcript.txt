@@ -1,0 +1,67 @@
+variant=landed teardown=/Users/charlesabrooker/tmp/fm-base-bin.KJh2e9/bin/fm-teardown.sh args=--force --drop-file DROPFILE
+slot=/Users/charlesabrooker/tmp/fm-lab-work.WpjkuQ/treehouse/.treehouse/demo-07d3e5/1/demo
+copy=/Users/charlesabrooker/tmp/fm-lab-work.WpjkuQ/treehouse/.treehouse/demo-07d3e5/1/demo/.claude/worktrees/task-x1-v2
+---- record
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.WpjkuQ/treehouse/.treehouse/demo-07d3e5/1/demo/.claude/worktrees/task-x1-v2
+branch=fm/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.VomlBC/projects/demo
+kind=ship
+mode=no-mistakes
+spawn_gen=live-lab-task-x1
+tasktmp=/Users/charlesabrooker/tmp/fm-lab-work.WpjkuQ/tasktmp
+---- BEFORE
+== state files
+./task-x1.backlog-close 38d9e32c7da79ebf
+./task-x1.inbox/
+./task-x1.meta 1509dd9aae39597c
+./task-x1.status 9399a0c552b1b4b7
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: present
+== nested copy: present
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.VomlBC 
+== tmux window: fm-task-x1 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.WpjkuQ/treehouse/.treehouse/demo-07d3e5/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight
+---- TEARDOWN exit=1
+-- stdout (tail)
+-- stderr (tail)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-bin.KJh2e9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+---- AFTER
+== state files
+./task-x1.backlog-close 38d9e32c7da79ebf
+./task-x1.meta 1509dd9aae39597c
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: absent
+== nested copy: present
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.VomlBC 
+== tmux window: 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.WpjkuQ/treehouse/.treehouse/demo-07d3e5/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight
+---- before/after diff
+3d2
+< ./task-x1.inbox/
+5d3
+< ./task-x1.status 9399a0c552b1b4b7
+7c5
+< == tasktmp: present
+---
+> == tasktmp: absent
+11c9
+< == tmux window: fm-task-x1 
+---
+> == tmux window: 

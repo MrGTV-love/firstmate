@@ -1,0 +1,15 @@
+== state files
+./task-x1.backlog-close 47b470075d363b47
+./task-x1.inbox/
+./task-x1.meta 7616c802d1732f22
+./task-x1.status 9399a0c552b1b4b7
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: present
+== nested copy: absent
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.5ycw4m 
+== tmux window: fm-task-x1 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.RWfzae/treehouse/.treehouse/demo-22cc4c/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight

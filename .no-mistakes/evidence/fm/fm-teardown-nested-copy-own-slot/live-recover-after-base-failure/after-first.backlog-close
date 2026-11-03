@@ -1,0 +1,6 @@
+id=task-x1
+data=/Users/charlesabrooker/tmp/fm-lab.IaIEC8/data
+spawn_gen=live-lab-task-x1
+cleanup_incomplete=0
+arg=--note
+arg=dropped

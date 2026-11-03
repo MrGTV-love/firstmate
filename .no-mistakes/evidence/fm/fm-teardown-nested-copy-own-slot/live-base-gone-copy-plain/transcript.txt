@@ -1,0 +1,59 @@
+variant=gone-copy teardown=/Users/charlesabrooker/tmp/fm-base-bin.phit4X/bin/fm-teardown.sh args=
+slot=/Users/charlesabrooker/tmp/fm-lab-work.ntlSFB/treehouse/.treehouse/demo-feaa0d/1/demo
+copy=/Users/charlesabrooker/tmp/fm-lab-work.ntlSFB/treehouse/.treehouse/demo-feaa0d/1/demo/.claude/worktrees/task-x1-v2
+---- record
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.ntlSFB/treehouse/.treehouse/demo-feaa0d/1/demo/.claude/worktrees/task-x1-v2
+branch=fm/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.hz4Bf4/projects/demo
+kind=ship
+mode=no-mistakes
+spawn_gen=live-lab-task-x1
+tasktmp=/Users/charlesabrooker/tmp/fm-lab-work.ntlSFB/tasktmp
+---- BEFORE
+== state files
+./task-x1.backlog-close 492b4c603dfbd380
+./task-x1.inbox/
+./task-x1.meta fa7e58519f26f636
+./task-x1.status 9399a0c552b1b4b7
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: present
+== nested copy: absent
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.hz4Bf4 
+== tmux window: fm-task-x1 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.ntlSFB/treehouse/.treehouse/demo-feaa0d/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight
+---- TEARDOWN exit=1
+-- stdout (tail)
+-- stderr (tail)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-bin.phit4X/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-x1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+---- AFTER
+== state files
+./task-x1.backlog-close 492b4c603dfbd380
+./task-x1.inbox/
+./task-x1.meta fa7e58519f26f636
+./task-x1.status 9399a0c552b1b4b7
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: present
+== nested copy: absent
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.hz4Bf4 
+== tmux window: fm-task-x1 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.ntlSFB/treehouse/.treehouse/demo-feaa0d/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight
+---- before/after diff
+(no change)

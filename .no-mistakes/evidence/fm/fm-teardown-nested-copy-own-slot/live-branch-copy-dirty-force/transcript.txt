@@ -1,0 +1,78 @@
+variant=copy-dirty teardown=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6GDEX1JNRK1E4JG7R4C5YC9/bin/fm-teardown.sh args=--force --drop-file DROPFILE
+slot=/Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo
+copy=/Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo/.claude/worktrees/task-x1-v2
+---- record
+window=firstmate:fm-task-x1
+endpoint_task_id=task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo/.claude/worktrees/task-x1-v2
+branch=fm/task-x1-v2
+project=/Users/charlesabrooker/tmp/fm-lab.RqOIxw/projects/demo
+kind=ship
+mode=no-mistakes
+spawn_gen=live-lab-task-x1
+tasktmp=/Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/tasktmp
+---- BEFORE
+== state files
+./task-x1.backlog-close 31075846d46e0372
+./task-x1.inbox/
+./task-x1.meta 62d3a755faea2087
+./task-x1.status 9399a0c552b1b4b7
+./task-x1.teardown-return-pending 0465494e70d5bb2a
+== tasktmp: present
+== nested copy: present
+== slot root: present
+== slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.RqOIxw 
+== tmux window: fm-task-x1 
+== treehouse status:
+   base  main  (repository default)
+   1     leased       ~/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo  (detached)  (held by task-x1)
+== backlog row: in_flight
+---- TEARDOWN exit=0
+-- stdout (tail)
+🌳 Worktree returned to pool.
+demo: synced c3314ce..e94e609
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.RqOIxw/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+-- stderr (tail)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6GDEX1JNRK1E4JG7R4C5YC9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---- AFTER
+== state files
+== tasktmp: absent
+== nested copy: absent
+== slot root: present
+== slot claim: 
+== tmux window: 
+== treehouse status:
+   base  main  (repository default)
+   1     available    ~/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo  (detached)
+== backlog row: done
+---- before/after diff
+2,8c2,3
+< ./task-x1.backlog-close 31075846d46e0372
+< ./task-x1.inbox/
+< ./task-x1.meta 62d3a755faea2087
+< ./task-x1.status 9399a0c552b1b4b7
+< ./task-x1.teardown-return-pending 0465494e70d5bb2a
+< == tasktmp: present
+< == nested copy: present
+---
+> == tasktmp: absent
+> == nested copy: absent
+10,11c5,6
+< == slot claim: task=task-x1 home=/Users/charlesabrooker/tmp/fm-lab.RqOIxw 
+< == tmux window: fm-task-x1 
+---
+> == slot claim: 
+> == tmux window: 
+14,15c9,10
+<    1     leased       ~/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo  (detached)  (held by task-x1)
+< == backlog row: in_flight
+---
+>    1     available    ~/tmp/fm-lab-work.Ef0qVw/treehouse/.treehouse/demo-f2d39c/1/demo  (detached)
+> == backlog row: done
