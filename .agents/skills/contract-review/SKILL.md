@@ -109,13 +109,13 @@ A worker declaration, an author's analysis and a green self-run are context, nev
 
 Report these fields:
 - `Inputs read`: every file you opened, one full path per line, under that heading.
-- Your identity and model.
+- Your identity, model and session ID when known.
 - Each criterion by id with its judgment.
 - Outcome-escape and evidence-escape candidates, each with its disposition.
 - Findings: id, criterion or rule, protected text, concrete witness, whether it is a missing acceptance condition or a check that fails to test an existing condition, and the smallest repair.
 - Notes that are not findings, each with the part of the finding test it fails.
 - Checks not performed, and their limits.
-- One `EXIT:` line.
+- One `EXIT:` line, then its basis: the assertions that hold (coverage, decisions, verification, fallbacks) and the unmet ones.
 <!-- reviewer-block:end -->
 
 ## Author-side procedure
@@ -154,9 +154,11 @@ A contract that accepts one as the verification of a mandatory criterion draws a
 ### Register
 
 Keep a register outside the pack and update it every round.
-Each row has: id, round, target criterion, the counterexample in one line, disposition, reason, repair, repair table, closure.
-Closure is one of: closed by independent verification (the fresh clean review no longer finds the failure case), closed by a recorded withdrawal or owner resolution, or open.
+Each row has: id, round, target criterion, the counterexample in one line, disposition, reason, repair, repair table, state, closure.
+State is the installed skill's: open, fixed, disputed or withdrawn.
+Closure is one of: independent verification (the fresh clean review no longer finds the failure case), a recorded withdrawal or owner resolution, or none yet.
 A repair marked fixed is not closed until the next fresh clean review is read.
+An author's rejection makes a finding disputed, not closed.
 The register holds history, so it is never reviewer input.
 
 ### Repair test
@@ -187,6 +189,8 @@ A round with progress is never `stalled`, whatever else it found.
 The reviewer reports `pass`, `needs-revision` or `conflicting`.
 The author or Main decides `stalled` from the register.
 A round record carries exactly one `EXIT:` value.
+The installed skill's `budget-exhausted` and `NOT RUN` exits apply as it defines them.
+This skill sets no budget or limit of its own.
 
 ### Next action for each exit
 
