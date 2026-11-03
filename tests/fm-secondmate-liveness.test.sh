@@ -371,9 +371,12 @@ test_sweep_respawns_confirmed_dead_secondmate() {
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_GUARD_EVENT_LOG="$w/events.jsonl")
   assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawn failed" \
     "legacy recovery failed before allocating its replacement"
+  jq -se '([.[] | select(.rule == "FM_SPAWN_NO_GUARD")] | length == 0) and ([.[] | select(.task == "sm1")] | length > 0)' \
+    "$w/events.jsonl" >/dev/null \
+    || fail "the liveness relaunch was recorded as an operator escape: $(cat "$w/events.jsonl" 2>/dev/null)"
 
   assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawned" \
     "a successfully respawned secondmate should be handled silently"

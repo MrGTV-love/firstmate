@@ -91,7 +91,7 @@ pass "brief, inbox note/reply/ack, custom-check registration/retirement, and gua
 
 # With no configured home, a copied entry point derives its own code root,
 # not this shell's foreign cwd. Never exercise the fallback against this repo.
-mkdir -p "$TMP_ROOT/code/bin"
+mkdir -p "$TMP_ROOT/code/bin" "$TMP_ROOT/code/state"
 cp "$ROOT/bin/fm-guard-event.sh" "$TMP_ROOT/code/bin/"
 env -u FM_HOME -u FM_ROOT -u FM_ROOT_OVERRIDE \
   bash "$TMP_ROOT/code/bin/fm-guard-event.sh" script-location-proof allow
