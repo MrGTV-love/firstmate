@@ -445,6 +445,48 @@ test_export_root_is_tracked_only_and_the_check_keeps_its_strictness() {
   pass "the export root holds only tracked files at the revision, minus excluded paths, and the check keeps its strictness"
 }
 
+test_leak_check_pinned_rubric_url_and_own_report() {
+  local rep="$TMP_ROOT/report5.md" rev pinned_raw pinned_blob wr
+  make_leak_world
+  git -C "$LEAK_ROOT" remote add origin https://github.com/owner/repo.git
+  rev=$(git -C "$LEAK_ROOT" log -1 --format=%H -- docs/review-rubric.md)
+  pinned_raw="https://raw.githubusercontent.com/owner/repo/$rev/docs/review-rubric.md"
+  pinned_blob="https://github.com/owner/repo/blob/$rev/docs/review-rubric.md"
+  wr="$TMP_ROOT/work/$(basename "$(dirname "$LEAK_PACK")")-$(basename "$LEAK_PACK")"
+  mkdir -p "$wr"
+  printf 'own report\n' >"$wr/review.md"
+  printf 'own log\n' >"$LEAK_PACK/review-run.log"
+  printf 'report\n' >"$LEAK_PACK/review.md"
+  # Compliant: the pinned rubric by either URL form, the run's own report and log, and the work-root report.
+  write_report "$rep" "$LEAK_PACK/contract.md" "$pinned_raw" "$pinned_blob" "$LEAK_PACK/review.md" "$LEAK_PACK/review-run.log" "$wr/review.md"
+  # the report under test is the pack's review.md, so write the list there
+  cp "$rep" "$LEAK_PACK/review.md"
+  CHECK_RC=0
+  CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_WORK_ROOT="$TMP_ROOT/work" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+    "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/review-run.log" 2>&1) || CHECK_RC=$?
+  assert_equals 0 "$CHECK_RC" "the pinned rubric URL or the run's own report was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "INPUT CLEAN" "the compliant list was not reported clean"
+  # Noncompliant: each of these still leaks.
+  leak_one() { # <path-or-url> <why>
+    write_report "$LEAK_PACK/review.md" "$LEAK_PACK/contract.md" "$1"
+    CHECK_RC=0
+    CHECK_OUT=$(REVIEW_FM_ROOT="$LEAK_ROOT" REVIEW_WORK_ROOT="$TMP_ROOT/work" REVIEW_SKILLS_DIR="$LEAK_SKILLS" REVIEW_RUBRIC="$LEAK_ROOT/docs/review-rubric.md" \
+      "$PACK_BIN" check --pack "$LEAK_PACK" --report "$LEAK_PACK/review.md" --log "$LEAK_PACK/review-run.log" 2>&1) || CHECK_RC=$?
+    assert_equals 3 "$CHECK_RC" "$2 was allowed"
+  }
+  leak_one "https://raw.githubusercontent.com/owner/repo/0000000000000000000000000000000000000000/docs/review-rubric.md" "an unpinned rubric revision"
+  leak_one "https://raw.githubusercontent.com/other/repo/$rev/docs/review-rubric.md" "the pinned revision of another repository"
+  leak_one "https://raw.githubusercontent.com/owner/repo/$rev/docs/other.md" "another file at the pinned revision"
+  leak_one "https://example.com/anything" "another URL"
+  # Another review.md beside the pack, and an earlier report in the work root, still leak.
+  printf 'sibling\n' >"$TMP_ROOT/sibling-review.md"
+  leak_one "$TMP_ROOT/sibling-review.md" "a review.md outside the run's own files"
+  mkdir -p "$TMP_ROOT/work/other-pack"
+  printf 'other\n' >"$TMP_ROOT/work/other-pack/review.md"
+  leak_one "$TMP_ROOT/work/other-pack/review.md" "another run's work-root report"
+  pass "the pinned rubric by URL and the run's own report and log are clean, and nothing else is"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -458,4 +500,5 @@ fm_test_run_cases \
   test_leak_check_reads_prose_before_the_list_and_linked_files \
   test_pack_names_only_the_request_it_holds \
   test_export_root_is_tracked_only_and_the_check_keeps_its_strictness \
+  test_leak_check_pinned_rubric_url_and_own_report \
   -- "$@"

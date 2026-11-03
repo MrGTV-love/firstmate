@@ -43,6 +43,11 @@
 #   backups and notes it does not link), the review rubric, or a file the manifest's root tracks (git ls-files, or
 #   <rev>:<path> that git can read). A path in the manifest's excluded set is
 #   refused even when it is tracked. A gitignored file is not tracked.
+#   Two exact exemptions: the pinned rubric read by URL (raw.githubusercontent.com or
+#   github.com blob URL of this repository's origin at exactly the rubric revision the
+#   entrypoint pins; any other URL, repository or revision is a leak), and the run's own
+#   report and log (--report, --log, and the entrypoint's work-root review.md for this
+#   pack; no other review.md).
 #   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric:
 #   $REVIEW_RUBRIC, else $REVIEW_FM_ROOT/docs/review-rubric.md (the entrypoint's
 #   own variables), else this repository's docs/review-rubric.md.
@@ -424,6 +429,14 @@ cmd_check() {
   assess_dir=$(real "$skills/assess-done-and-grade")
   define_dir=$(real "$skills/define-done-and-grading")
 
+  local rubric_rev slug origin report_real log_real work_report
+  rubric_rev=${REVIEW_RUBRIC_REV:-$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$fmroot" log -1 --format=%H -- docs/review-rubric.md 2>/dev/null)}
+  origin=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$fmroot" remote get-url origin 2>/dev/null || true)
+  slug=$(printf '%s' "$origin" | sed -nE 's#^(https?://[^/]*github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\2#p' | sed -E 's#\.git$##')
+  report_real=$(real "$report")
+  log_real=''
+  [ -z "$log" ] || log_real=$(real "$log")
+  work_report=$(real "${REVIEW_WORK_ROOT:-$fmroot/data/review-lane/work}/$(basename "$(dirname "$pack")")-$(basename "$pack")/review.md")
   local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
   local list
   list=$(inputs_read "$report" | grep -e '/' -e '\.' || true)
@@ -442,6 +455,18 @@ cmd_check() {
       prev=$entry
       entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
     done
+    case "$entry" in
+      http://* | https://*)
+        if [ -n "$slug" ] && [ -n "$rubric_rev" ] &&
+          { [ "$entry" = "https://raw.githubusercontent.com/$slug/$rubric_rev/docs/review-rubric.md" ] ||
+            [ "$entry" = "https://github.com/$slug/blob/$rubric_rev/docs/review-rubric.md" ]; }; then
+          continue
+        fi
+        leaks=$((leaks + 1))
+        echo "INPUT LEAK: $entry: a URL other than the pinned rubric revision of this repository"
+        continue
+        ;;
+    esac
     path=$entry
     if printf '%s' "$entry" | grep -Eq '^[0-9A-Za-z_./-]+:[^:]+$' && ! printf '%s' "$entry" | grep -Eq '^(/|~|\./|\.\./)' &&
       printf '%s' "${entry%%:*}" | grep -Eq '^([0-9a-fA-F]{7,40}|HEAD|[A-Za-z][A-Za-z0-9_./-]*)$' && [ ! -e "$entry" ]; then
@@ -468,7 +493,9 @@ cmd_check() {
     done <<EOF
 $(manifest_lines "$manifest" exclude)
 EOF
-    if [ -n "$excluded" ]; then
+    if [ "$path" = "$report_real" ] || { [ -n "$log_real" ] && [ "$path" = "$log_real" ]; } || [ "$path" = "$work_report" ]; then
+      ok=1
+    elif [ -n "$excluded" ]; then
       why="excluded path $excluded"
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
