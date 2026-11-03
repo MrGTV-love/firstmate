@@ -599,6 +599,15 @@
 #   containment test reads local refs only and never fetches, so this gate stays
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
+#   A pooled slot is hard-reset only through fm_slot_guarded_reset, whose header in
+#   bin/fm-slot-provision-lib.sh owns the facts it proves first: HEAD and owner-branch
+#   tips contained in the fetched origin default or the manifest's base_sha, a clean
+#   tree, no ignored work at a path the reset target tracks, no live holder, every
+#   unknown refused, all re-proved right before the reset. A refusal leaves the slot
+#   untouched and names the fact and the slot path. The acquired pane's own shell is
+#   excluded from the cwd check by its pane pid, which tmux and herdr report; a backend
+#   that reports none (zellij, cmux, orca) refuses on holder_cwd while that shell is in
+#   the slot.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
@@ -5006,20 +5015,64 @@ spawn_origin_head_older_than() { # <worktree> <epoch>
   [ -n "$written" ] && [ -n "$2" ] && [ "$written" -lt "$2" ]
 }
 
+# The acquired endpoint's own shell pid, for the backends that report it (tmux,
+# herdr). Nothing for any other backend or an unreadable pane, which exempts no
+# process: the reset guard then counts the pane's shell as a holder and refuses.
+spawn_endpoint_shell_pid() {
+  local pid='' out
+  case "$BACKEND" in
+    tmux)
+      pid=$(tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      ;;
+    herdr)
+      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
+      out=$(fm_run_timed "$(python3 "$SCRIPT_DIR/fm-duration.py" limit spawn.herdr-pane-info --fallback 30 --percentile 99 --margin 3 2>/dev/null || printf 30)" bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$SCRIPT_DIR" "${T%%:*}" "${T#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${T#*:}" \
+        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s' "$pid"
+}
+
+# The context fm-slot-provision-lib.sh's reset guard reads (see its header).
+spawn_reset_guard_context() {
+  FM_SLOT_GUARD_PROJECT=$PROJ_ABS
+  FM_SLOT_GUARD_TASK=$ID
+  FM_SLOT_GUARD_ARCHIVE_ROOT=$DATA
+  FM_SLOT_GUARD_PANE_PID=$(spawn_endpoint_shell_pid)
+}
+
+# The origin default branch's name for a look taken before this spawn fetches:
+# the evidence it already holds, else the copy's recorded origin/HEAD.
+spawn_reset_guard_default() { # <worktree> [<base-branch>]
+  local name=${SPAWN_BASE_DEFAULT:-${2:-}}
+  [ -n "$name" ] || name=$(default_branch "$1" 2>/dev/null) || name=
+  printf '%s' "$name"
+}
+
+# The early look at a slot, before the first change this spawn makes to it (the
+# fetch, a detach, a preservation ref). fm_slot_guarded_reset is the authority.
+spawn_reset_preflight() { # <worktree> [<base-branch>]
+  local name target anchors=()
+  name=$(spawn_reset_guard_default "$1" "${2:-}")
+  [ -z "$name" ] || anchors+=("refs/remotes/origin/$name")
+  [ -z "${SPAWN_BASE_SHA:-}" ] || anchors+=("$SPAWN_BASE_SHA")
+  # The reset target as far as it is known before the fetch: the origin tip this
+  # spawn already fetched into its private ref, else the copy's own origin ref.
+  target=${SPAWN_SELECTED_BASE_SHA:-${SPAWN_BASE_SHA:-}}
+  [ -n "$target" ] || target=${anchors[0]:-HEAD}
+  spawn_reset_guard_context
+  fm_slot_reset_preflight "$1" "$target" ${anchors[@]+"${anchors[@]}"}
+}
+
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
-  local worktree=$1 base=${2:-} default target expected actual status current
-  status=$(git -C "$worktree" -c core.quotePath=false status --porcelain) || {
-    echo "error: could not inspect pooled worktree '$worktree' before refreshing its base" >&2
-    return 1
-  }
-  if [ -n "$status" ]; then
-    if describe_stale_submodule_pins "$worktree" "$status"; then
-      echo "error: pooled worktree '$worktree' has a stale submodule checkout, not uncommitted work; refusing to launch and leaving it untouched" >&2
-    else
-      echo "error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base" >&2
-    fi
-    return 1
-  fi
+  local worktree=$1 base=${2:-} default target expected actual current
+  local -a anchors=()
+  FM_SLOT_GUARD_DIRTY_DESCRIBER=describe_stale_submodule_pins
+  fm_slot_guard_check_clean "$worktree" || return 1
   spawn_validate_local_base "$worktree" || return 1
   if ! spawn_worktree_has_origin_config "$worktree"; then
     if [ -n "$SPAWN_SELECTED_BASE_SHA" ]; then
@@ -5036,6 +5089,7 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     echo "error: $SPAWN_BASE_ERROR for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
   fi
+  spawn_reset_preflight "$worktree" "$base" || return 1
   if [ -n "$SPAWN_BASE_SHA" ] &&
     git -C "$worktree" rev-parse --verify --quiet "$SPAWN_BASE_SHA^{commit}" >/dev/null 2>&1; then
     default=$SPAWN_BASE_DEFAULT
@@ -5086,10 +5140,10 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
       "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
-  if ! git -C "$worktree" reset --hard "$expected" >/dev/null; then
-    echo "error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
-    return 1
-  fi
+  anchors=("refs/remotes/origin/$default")
+  [ -z "$SPAWN_BASE_SHA" ] || anchors+=("$SPAWN_BASE_SHA")
+  spawn_reset_guard_context
+  fm_slot_guarded_reset "$worktree" "$expected" "$target" "${anchors[@]}" || return 1
   actual=$(git -C "$worktree" rev-parse --verify --quiet HEAD 2>/dev/null || true)
   if [ "$actual" != "$expected" ]; then
     echo "error: pooled worktree '$worktree' is at '${actual:-unknown}', not current '$target' ('$expected'); refusing to launch" >&2
@@ -6393,6 +6447,7 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   BRANCH=${BRANCH:-fm/$ID}
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
+    spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
@@ -6407,11 +6462,14 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
         [ "$BACKEND" = orca ] || spawn_fetch_base_evidence
         spawn_validate_local_base "$WT" || spawn_slot_refused
       fi
+      spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
       fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
       if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
         # No worker was admitted and no prepared branch existed. Finish that
         # original immutable local plan, not a newly derived origin baseline.
-        git -C "$WT" reset --hard "$SLOT_SOURCE_SHA" >/dev/null || spawn_slot_refused
+        spawn_reset_guard_context
+        fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
+          "refs/remotes/origin/${SLOT_SOURCE_REF#refs/heads/}" || spawn_slot_refused
         SLOT_FRESH_BASE=0
       fi
     fi
