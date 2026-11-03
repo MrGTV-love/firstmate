@@ -1,0 +1,381 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5Bk5rO (marked lab home); tasks-axi 0.2.6
+
+##### help flags cannot file an item past the checks #####
+
+=== [1] add with an overlapping title and --help
+$ fm-tasks-axi.sh add hx Lock holder crash recovery --objective O7 --help
+    usage: tasks-axi add <id> "<title>" [flags]
+    aliases: create
+    flags:
+      --kind <ship|scout|docs|...>, --repo <name>, --body <text> or --body-file <path>
+      --start (place in In flight) | --queue (place in Queued, default)
+      --blocked-by <id> (repeatable, must exist), --pr <url>, --report <path>, --priority <0-4>
+      --mint [--prefix <p>]   mint a slug-xx id from the title instead of passing one
+      --json   print the resulting task as a JSON object
+    examples:
+      tasks-axi add lavish-foo-q9 "fix summary toggle" --kind ship --repo lavish-axi --start
+      tasks-axi add fm-x "adopt lease" --blocked-by treehouse-lease-t4
+      tasks-axi add "quick note" --mint
+    -> exit 0
+
+=== [2] add with no objective and -h
+$ fm-tasks-axi.sh add hy Unrelated walrus -h
+    error: "Unknown flag: -h"
+    code: VALIDATION_ERROR
+    help[1]: Run the command with --help to see supported flags
+    -> exit 2
+    rows hx|hy in backlog.md: 0; tsv lines: 0
+0
+
+##### a global flag before the command cannot skip the checks #####
+
+=== [3] --backend markdown before add, overlapping title
+$ fm-tasks-axi.sh --backend markdown add gx Lock holder crash recovery --objective O7
+    fm-tasks-axi: unsupported global options; run tasks-axi directly for that invocation
+    -> exit 2
+
+=== [4] --json before add, no objective
+$ fm-tasks-axi.sh --json add gy Granite sloth
+    fm-tasks-axi: unsupported global options; run tasks-axi directly for that invocation
+    -> exit 2
+
+=== [5] -- then add, no objective
+$ fm-tasks-axi.sh -- add gz Granite sloth
+    fm-tasks-axi: unsupported global options; run tasks-axi directly for that invocation
+    -> exit 2
+    rows gx|gy|gz in backlog.md: 0
+
+##### more add-grammar edges #####
+
+=== [6] --objective none with a whitespace-only reason
+$ fm-tasks-axi.sh add ws-a Whitespace reason ocelot --objective none --objective-reason    
+    REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+    completing-command: FM_FRICTION_OPERATION_ID=74dba615-5ce0-433b-931b-2a51aad1af4d FM_FRICTION_EPISODE_ID=74dba615-5ce0-433b-931b-2a51aad1af4d bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+    fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [7] --objective= with an empty value
+$ fm-tasks-axi.sh add ws-b Empty objective ocelot --objective=
+    fm-tasks-axi: --objective requires a value; run tasks-axi directly for other grammar
+    -> exit 2
+
+=== [8] --dup-of with an option-like value
+$ fm-tasks-axi.sh add ws-c Option value ocelot --objective O7 --dup-of --kind
+    fm-tasks-axi: --dup-of requires a value; run tasks-axi directly for other grammar
+    -> exit 2
+
+=== [9] --start on add is refused
+$ fm-tasks-axi.sh add ws-d Started ocelot --objective O7 --start
+    fm-tasks-axi: add --start would place a row In flight with no dispatch record; add it Queued and let bin/fm-spawn.sh start it
+    -> exit 2
+
+=== [10] caller --file is refused
+$ fm-tasks-axi.sh add ws-e File ocelot --objective O7 --file /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/data/backlog.md
+    fm-tasks-axi: this command always addresses this home's backlog at /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/data; drop --file, or run tasks-axi directly for another backlog
+    -> exit 2
+
+=== [11] --body text that holds '--objective O7' is not an objective
+$ fm-tasks-axi.sh add ws-f Body trick ocelot --body --objective O7
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=5943283f-3ec7-4165-862a-833ef2432bc6 FM_FRICTION_EPISODE_ID=5943283f-3ec7-4165-862a-833ef2432bc6 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [12] --dup-of and --not-dup together
+$ fm-tasks-axi.sh add ws-g Lock holder crash recovery --objective O7 --dup-of lock-a --not-dup lock-a
+    fm-tasks-axi: give --dup-of or --not-dup, not both
+    -> exit 2
+
+=== [13] --dup-of this add's own id
+$ fm-tasks-axi.sh add lock-a2 Lock holder crash again --objective O7 --dup-of lock-a2
+    REFUSED: guard=backlog-intake-dup-of rule=kept-is-self missing=a kept item other than this add
+    completing-command: FM_FRICTION_OPERATION_ID=4db4789d-fb84-4f9c-8965-e6b691211e16 FM_FRICTION_EPISODE_ID=4db4789d-fb84-4f9c-8965-e6b691211e16 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>
+    fm-tasks-axi: --dup-of names this add's own id lock-a2; an item cannot be a duplicate of itself, so nothing was filed or appended
+    -> exit 2
+
+=== [14] --not-dup given twice
+$ fm-tasks-axi.sh add ws-h Lock holder crash recovery --objective O7 --not-dup lock-a --not-dup lock-a
+    fm-tasks-axi: --not-dup takes one neighbour id; give it once
+    -> exit 2
+
+=== [15] a title with no searchable word is filed with no prompt
+$ fm-tasks-axi.sh add ws-i a to of --objective O7
+    ok: added ws-i -> Queued
+    task:
+      id: ws-i
+      title: a to of
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+    -> exit 0
+    rows ws-a..ws-h in backlog.md: 0; ws-i: 1
+
+##### threshold boundary (THRESHOLD 0.25) #####
+
+=== [16] 1 shared of 4 distinct words = exactly 0.25 is refused
+$ fm-tasks-axi.sh add th-b alpha charlie delta --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as th-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      th-a (Queued, overlap 0.25) alpha bravo
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to th-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add th-b alpha\ charlie\ delta --objective O7 --dup-of th-a
+      the work is different from th-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add th-b alpha\ charlie\ delta --objective O7 --not-dup th-a
+    -> exit 2
+
+=== [17] 1 shared of 5 distinct words = 0.20 is filed with no prompt
+$ fm-tasks-axi.sh add th-c alpha echo foxtrot golf --objective O7
+    ok: added th-c -> Queued
+    task:
+      id: th-c
+      title: alpha echo foxtrot golf
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+    -> exit 0
+
+##### the newest 50 Done items, and not the 51st #####
+    archive rows: 50
+
+=== [18] overlap with the 50th newest Done item is refused
+$ fm-tasks-axi.sh add old-y Zeppelin mooring audit rerun --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as old-z?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      old-z (Done, archived, overlap 0.75) Zeppelin mooring audit
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      (every neighbour is Done and archived, so --dup-of has no item to append to)
+      the work is different from old-z - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add old-y Zeppelin\ mooring\ audit\ rerun --objective O7 --not-dup old-z
+    -> exit 2
+    archive rows: 51
+
+=== [19] overlap with the 51st newest Done item is filed with no prompt
+$ fm-tasks-axi.sh add old-y Zeppelin mooring audit rerun --objective O7
+    ok: added old-y -> Queued
+    task:
+      id: old-y
+      title: Zeppelin mooring audit rerun
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+    -> exit 0
+
+=== [20] overlap with the newest Done item is refused
+$ fm-tasks-axi.sh add new-y Quokka mooring census rerun --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as new-z?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      new-z (Done, archived, overlap 0.75) Quokka mooring census
+      old-y (Queued, overlap 0.33) Zeppelin mooring audit rerun
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to old-y and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add new-y Quokka\ mooring\ census\ rerun --objective O7 --dup-of old-y
+      the work is different from new-z - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add new-y Quokka\ mooring\ census\ rerun --objective O7 --not-dup new-z
+    -> exit 2
+
+##### eight concurrent --dup-of adds onto one kept item #####
+    cc-1: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-2: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-3: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-4: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-5: exit 0: ok: merged into kept-c (nothing filed)
+    cc-6: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-7: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    cc-8: exit 2: fm-tasks-axi: another command is changing the kept item kept-c; run this again in a moment
+    first pass: 1 exited 0; 1 markers landed (each exit 0 must have a marker; no write is lost)
+    the refused ones run again, one at a time, as their message says:
+    cc-1: ok: merged into kept-c (nothing filed)
+    cc-2: ok: merged into kept-c (nothing filed)
+    cc-3: ok: merged into kept-c (nothing filed)
+    cc-4: ok: merged into kept-c (nothing filed)
+    cc-6: ok: merged into kept-c (nothing filed)
+    cc-7: ok: merged into kept-c (nothing filed)
+    cc-8: ok: merged into kept-c (nothing filed)
+    markers in kept-c body: 8 of 8; rows cc-1..8 filed: 0
+
+##### captain-hold create goes through intake #####
+$ fm-captain-hold.sh hold cap-new --reason 'pick a vendor' --title 'Choose the tapir vendor' --repo firstmate
+    cap-new
+    -> exit 0
+    backlog: 43:- [ ] cap-new - Choose the tapir vendor (repo: firstmate) (kind: captain) (since 2026-11-03) (hold: fm-hold-v1:cGljayBhIHZlbmRvcg==) (hold-kind: captain)
+    tsv: 7:cap-new		none	captain hold record: tracks a captain decision, not a work item
+    ledger file: /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/state/fleet-ledger.jsonl; filed records for cap-new: 1
+    ledger: {"v":1,"ts":1793704724,"at":"2026-11-03T11:18:44Z","event":"task.filed","task":"cap-new","repo":"firstmate","kind":"captain","priority":null}
+$ fm-captain-hold.sh hold cap-dup --reason 'which lock?' --title 'Lock holder crash decision' --repo firstmate
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add cap-dup Lock\ holder\ crash\ decision --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add cap-dup Lock\ holder\ crash\ decision --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup lock-a
+    fm-captain-hold: the duplicate check stopped task cap-dup, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.
+    fm-captain-hold: could not create task cap-dup
+    -> exit 1
+    rows cap-dup: 0; tsv: 0; lock-a hold:   title: Lock holder crash   hold_reason: "-"   hold_kind: "-"   hold_until: "-" 
+
+##### closing-proof edges #####
+
+=== [21] --duplicate-of an In flight kept item closes
+$ fm-tasks-axi.sh done d1 --duplicate-of k1
+    ok: done d1 -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+    49:- [x] d1 - Spare narwhal item (done 2026-11-03)
+      body: duplicate of k1
+      body: "---\nMerged from duplicate d1: Spare narwhal item"
+    ledger: {"v":1,"ts":1793704743,"at":"2026-11-03T11:19:03Z","event":"task.filed","task":"d1","repo":null,"kind":"task","priority":null}
+    ledger: {"v":1,"ts":1793704769,"at":"2026-11-03T11:19:29Z","event":"task.closed","task":"d1","evidence":"none","pr":null}
+
+=== [22] --duplicate-of on an already closed item
+$ fm-tasks-axi.sh done d1 --duplicate-of k1
+    REFUSED: guard=backlog-close-item-eligible rule=item-closed missing=an open item to close
+    completing-command: FM_FRICTION_OPERATION_ID=4e9eef8c-2d46-4e7b-bcee-7280d831f0bc FM_FRICTION_EPISODE_ID=4e9eef8c-2d46-4e7b-bcee-7280d831f0bc bin/fm-tasks-axi.sh show d1
+    fm-tasks-axi: d1 is already closed
+    -> exit 2
+
+=== [23] --duplicate-of itself
+$ fm-tasks-axi.sh done k1 --duplicate-of k1
+    REFUSED: guard=backlog-close-duplicate-of rule=kept-is-self missing=a kept item other than this one
+    completing-command: FM_FRICTION_OPERATION_ID=fcd0eadf-2ff7-49df-8998-733385774d89 FM_FRICTION_EPISODE_ID=fcd0eadf-2ff7-49df-8998-733385774d89 bin/fm-tasks-axi.sh done k1 --duplicate-of <kept-id>
+    fm-tasks-axi: an item cannot be a duplicate of itself
+    -> exit 2
+
+=== [24] --duplicate-of an item that does not exist
+$ fm-tasks-axi.sh done no-such --duplicate-of k1
+    REFUSED: guard=backlog-close-item-eligible rule=item-missing missing=an item in this backlog
+    completing-command: FM_FRICTION_OPERATION_ID=8e12731d-7c78-44a6-99cb-ef10d7fd31b9 FM_FRICTION_EPISODE_ID=8e12731d-7c78-44a6-99cb-ef10d7fd31b9 bin/fm-tasks-axi.sh list
+    fm-tasks-axi: no item no-such in this backlog to close
+    -> exit 2
+
+=== [25] --duplicate-of and --moved-to together
+$ fm-tasks-axi.sh done d2 --duplicate-of k1 --moved-to sm-x k1
+    fm-tasks-axi: give --duplicate-of or --moved-to, not both
+    -> exit 2
+
+=== [26] --moved-to with one value
+$ fm-tasks-axi.sh done d2 --moved-to sm-x
+    fm-tasks-axi: --moved-to takes two values: --moved-to <home> <item-id>
+    -> exit 2
+
+=== [27] --duplicate-of with --note
+$ fm-tasks-axi.sh done d2 --duplicate-of k1 --note hi
+    fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+    -> exit 2
+
+=== [28] owner item (Owner <date>:) refuses --duplicate-of
+$ fm-tasks-axi.sh done own-c --duplicate-of k1
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-c, and in what words?
+    fm-tasks-axi: own-c quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+=== [29] owner item (Captain:) refuses --duplicate-of
+$ fm-tasks-axi.sh done own-d --duplicate-of k1
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-d, and in what words?
+    fm-tasks-axi: own-d quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+=== [30] kind ship owner item refuses the proof
+$ fm-tasks-axi.sh done own-e --duplicate-of k1
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-e, and in what words?
+    fm-tasks-axi: own-e quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+=== [31] kind ship owner item closes with the words the refusal names (--drop-file)
+$ fm-tasks-axi.sh done own-e --drop-file /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/w.txt
+    ok: done own-e -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+    -rw-------  1 charlesabrooker  staff  9 Nov  3 05:20 /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/data/own-e/captain-drop.md
+    default kind of own-d:   kind: task
+
+=== [32] default-kind owner item: the words route the refusal names (--drop-file)
+$ fm-tasks-axi.sh done own-d --drop-file /Users/charlesabrooker/tmp/fm-lab.5Bk5rO/w.txt
+    error: "Unknown flag: --drop-file"
+    code: VALIDATION_ERROR
+    help[1]: Run the command with --help to see supported flags
+    -> exit 2
+    !! UNEXPECTED: expected success
+
+=== [33] default-kind owner item: plain done with a note, no words (closes as before this change?)
+$ fm-tasks-axi.sh done own-d --note plain close
+    ok: done own-d -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+
+##### remote --moved-to paths that need no remote worker #####
+
+=== [34] --moved-to a remote alias of this same backlog (real ssh -G, no connection)
+$ fm-tasks-axi.sh done mv-r --moved-to sm-loop k1
+    REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+    completing-command: FM_FRICTION_OPERATION_ID=8e2f52bd-340e-494a-819d-93a52f4c2ddc FM_FRICTION_EPISODE_ID=8e2f52bd-340e-494a-819d-93a52f4c2ddc bin/fm-tasks-axi.sh done mv-r --moved-to <home> <item-id>
+    fm-tasks-axi: sm-loop reaches this backlog itself (host localhost, home /Users/charlesabrooker/tmp/fm-lab.5Bk5rO); a moved item must live in a different backlog
+    -> exit 2
+
+=== [35] --moved-to a remote home that cannot be reached
+$ fm-tasks-axi.sh done mv-r --moved-to sm-gone some-item
+    fm-tasks-axi: cannot read sm-gone's backlog, so nothing was closed: ssh: Could not resolve hostname fm-lab-nohost.invalid: nodename nor servname provided, or not known
+    -> exit 2
+    51:- [ ] mv-r - Remote move albatross (since 2026-11-03)
+
+--- final backlog-review.tsv:
+    lock-a		O7	
+    ws-i		O7	
+    th-a		O7	
+    th-c		O7	
+    old-y		O7	
+    kept-c		O7	
+    cap-new		none	captain hold record: tracks a captain decision, not a work item
+    k1		O7	
+    d1		O7	
+    d2		O7	
+    own-c		O7	
+    own-d		O7	
+    own-e		O7	
+    mv-r		O7	
+--- guard events (guard, decision, rule):
+       1 backlog-close-duplicate-of	allow	backlog-close-duplicate-of
+       1 backlog-close-duplicate-of	deny	backlog-close-duplicate-of
+       1 backlog-close-item-eligible	allow	backlog-close-item-eligible
+       5 backlog-close-item-eligible	deny	backlog-close-item-eligible
+       2 backlog-close-moved-to	deny	backlog-close-moved-to
+       8 backlog-intake-dup-of	allow	backlog-intake-dup-of
+       1 backlog-intake-dup-of	deny	backlog-intake-dup-of
+      22 backlog-intake-duplicate	allow	backlog-intake-duplicate
+       4 backlog-intake-duplicate	deny	backlog-intake-duplicate
+       1 backlog-intake-not-dup	allow	backlog-intake-not-dup
+      35 backlog-intake-objective	allow	backlog-intake-objective
+       2 backlog-intake-objective	deny	backlog-intake-objective

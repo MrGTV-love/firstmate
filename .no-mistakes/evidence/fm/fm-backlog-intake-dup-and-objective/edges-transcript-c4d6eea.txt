@@ -1,0 +1,215 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xgUhRd (marked lab home); tasks-axi 0.2.6
+
+##### add-grammar spellings cannot skip the checks #####
+
+=== [1] create alias, no objective
+$ fm-tasks-axi.sh create g1 Granite sloth
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=c48296d1-ea05-4d9e-b21e-d88838485c99 FM_FRICTION_EPISODE_ID=c48296d1-ea05-4d9e-b21e-d88838485c99 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [2] task add, no objective
+$ fm-tasks-axi.sh task add g2 Granite sloth
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=5de2af6b-9974-4144-a593-49f65f63dbaf FM_FRICTION_EPISODE_ID=5de2af6b-9974-4144-a593-49f65f63dbaf bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [3] task create, no objective
+$ fm-tasks-axi.sh task create g3 Granite sloth
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=f6ad6e48-ac07-43af-a093-04f562f7cef0 FM_FRICTION_EPISODE_ID=f6ad6e48-ac07-43af-a093-04f562f7cef0 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [4] --title form, no objective
+$ fm-tasks-axi.sh add --title Granite sloth g4
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=4c665415-0e50-443c-b922-6e16c310e51e FM_FRICTION_EPISODE_ID=4c665415-0e50-443c-b922-6e16c310e51e bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [5] --mint form, no objective
+$ fm-tasks-axi.sh add Granite sloth --mint
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=082c38aa-f9e2-4d41-94a8-a20e51a5f17d FM_FRICTION_EPISODE_ID=082c38aa-f9e2-4d41-94a8-a20e51a5f17d bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [6] create alias, overlapping title
+$ fm-tasks-axi.sh create g5 Lock holder crash recovery --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh create g5 Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh create g5 Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [7] task add, overlapping title
+$ fm-tasks-axi.sh task add g6 Lock holder crash recovery --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh task add g6 Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh task add g6 Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [8] --title form, overlapping title
+$ fm-tasks-axi.sh add --title Lock holder crash recovery g7 --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --title Lock\ holder\ crash\ recovery g7 --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --title Lock\ holder\ crash\ recovery g7 --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [9] --mint form, overlapping title
+$ fm-tasks-axi.sh add Lock holder crash recovery --mint --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add Lock\ holder\ crash\ recovery --mint --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add Lock\ holder\ crash\ recovery --mint --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [10] --objective= form, overlapping title
+$ fm-tasks-axi.sh add g8 Lock holder crash recovery --objective=O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add g8 Lock\ holder\ crash\ recovery --objective=O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add g8 Lock\ holder\ crash\ recovery --objective=O7 --not-dup lock-a
+    -> exit 2
+    (no g1..g8 row filed)
+
+##### unwritable sidecar stops the add, nothing filed #####
+
+=== [11] add with read-only backlog-review.tsv is refused
+$ fm-tasks-axi.sh add side-a Sidecar lynx probe --objective O7
+    fm-tasks-axi: cannot record the objective: /Users/charlesabrooker/tmp/fm-lab.xgUhRd/data/backlog-review.tsv is not a writable regular file; fix it, then file the item again (nothing was filed)
+    -> exit 2
+    (no side-a row in backlog.md)
+
+##### --json add still records the objective row #####
+
+=== [12] add --json files and records the row
+$ fm-tasks-axi.sh add json-a Jsonified marmot feed --objective O5 --json
+    {
+      "ok": true,
+      "action": "add",
+      "task": {
+        "id": "json-a",
+        "title": "Jsonified marmot feed",
+        "state": "queued",
+        "kind": null,
+        "repo": null,
+        "priority": null,
+        "created": "2026-11-03",
+        "closed": null,
+        "deps": [],
+        "hold": null,
+        "links": [],
+        "body": null,
+        "blocked": false,
+        "blocked_by": [],
+        "held": false
+      }
+    }
+    -> exit 0
+    tsv: 2:json-a		O5	
+    backlog: 6:- [ ] json-a - Jsonified marmot feed (since 2026-11-03)
+
+##### archive tails written by real tasks-axi #####
+    archive: - [x] h1 - Quill holder crash (done 2026-11-03)
+
+=== [13] add 'Quill timeout' is refused at 0.25 beside an archived held row
+$ fm-tasks-axi.sh add h2 Quill timeout --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as h1?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      h1 (Done, archived, overlap 0.25) Quill holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      (every neighbour is Done and archived, so --dup-of has no item to append to)
+      the work is different from h1 - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add h2 Quill\ timeout --objective O7 --not-dup h1
+    -> exit 2
+    archive: - [x] pc1 - Fix the zinc gear (process cleanup) (repo: firstmate) (kind: ship) (done 2026-11-03)
+
+=== [14] add 'Process cleanup' is refused at 0.40 beside archived '(process cleanup)' row
+$ fm-tasks-axi.sh add pc2 Process cleanup --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as pc1?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      pc1 (Done, archived, overlap 0.40) Fix the zinc gear (process cleanup)
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      (every neighbour is Done and archived, so --dup-of has no item to append to)
+      the work is different from pc1 - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add pc2 Process\ cleanup --objective O7 --not-dup pc1
+    -> exit 2
+
+##### owner shapes from the round-4 rulings #####
+    body of ow-1: Captain's ask 2026-09-22 on /bearings lavish: show the board
+
+=== [15] owner shape 1 refuses --duplicate-of
+$ fm-tasks-axi.sh done ow-1 --duplicate-of keep-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close ow-1, and in what words?
+    fm-tasks-axi: ow-1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done ow-1 --note "<the owner's words>"
+    -> exit 2
+    body of ow-2: Captain chose this on the Lavish page
+
+=== [16] owner shape 2 refuses --duplicate-of
+$ fm-tasks-axi.sh done ow-2 --duplicate-of keep-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close ow-2, and in what words?
+    fm-tasks-axi: ow-2 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done ow-2 --note "<the owner's words>"
+    -> exit 2
+    body of ow-3: Captain direction 2026-10-22, verbatim in data/x.md
+
+=== [17] owner shape 3 refuses --duplicate-of
+$ fm-tasks-axi.sh done ow-3 --duplicate-of keep-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close ow-3, and in what words?
+    fm-tasks-axi: ow-3 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done ow-3 --note "<the owner's words>"
+    -> exit 2
+    body of ow-4: Captain's words, 2026-10-20 (via /kun): yes
+
+=== [18] owner shape 4 refuses --duplicate-of
+$ fm-tasks-axi.sh done ow-4 --duplicate-of keep-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close ow-4, and in what words?
+    fm-tasks-axi: ow-4 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done ow-4 --note "<the owner's words>"
+    -> exit 2
+
+=== [19] lower-case 'owner decision' is not an owner item and closes on proof
+$ fm-tasks-axi.sh done low-a --duplicate-of keep-k
+    ok: done low-a -> Done
+    -> exit 0
+
+##### timeout recurrence after the item closed #####
+$ fm-duration.py timeout lab.again 1200000 --event-id r1
+    -> exit 0
+$ fm-duration.py timeout lab.again 1200000 --event-id r2
+/Users/charlesabrooker/.no-mistakes/evidence/01M6FV6QMEQ95B71GQTT0XSFER/drive-edges.sh: line 83: 56200 Terminated: 15          ( cd "$REPO" && python3 "$WT/bin/fm-duration.py" timeout "$1" 1200000 --event-id "$2" 2>&1 )
+     56205                       | sed 's/^/    /'
