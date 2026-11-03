@@ -335,6 +335,9 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return. A lock in any
 # other format, a driver refusal, or a copy still registered afterwards refuses.
+# A copy that data/supersedence-records.tsv names at its tip is released through
+# the driver's own --pr route instead; bin/fm-teardown-nested-lib.sh's header owns
+# the record format, the merged-PR conditions and the answer it reads.
 # A driver refusal saves its complete combined output unchanged in a private
 # data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
 # directory it could not save into), and prints the last 20 lines with control
@@ -1977,6 +1980,8 @@ fi
 MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 [ -n "$MODE" ] || MODE=no-mistakes
 BASE_BRANCH=$(grep '^base_branch=' "$META" | cut -d= -f2- || true)
+TEARDOWN_ROUTE_DATA=$DATA
+TEARDOWN_ROUTE_BASE=$BASE_BRANCH
 
 teardown_preserves_reassociated_copy() {
   local meta=$1 kind=$2 backend=$3 project=$4 worktree=$5 line
