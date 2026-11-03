@@ -2431,6 +2431,25 @@ scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot() { scn_spent_
 scn_intent_naming_the_task_branch_is_removed_by_the_fallback() { scn_spent_intent_is_removed branch-fallback; }
 scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone() { scn_spent_intent_is_removed branch-resume; }
 
+# The interpreter of the first python3 of 3.11 or later on PATH: python3
+# itself, else a versioned name. The owner reader runs on Python 3.12 or later,
+# and the prune reads the expiry only on 3.11 or later. Fails when there is none.
+python311() {
+  local p
+  for p in python3 python3.14 python3.13 python3.12 python3.11; do
+    command -v "$p" >/dev/null || continue
+    "$p" -I -c 'import sys; sys.exit(sys.version_info < (3, 11) or print(sys.executable))' 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Puts that python3 first on PATH for the prune, as $W/bin/python3.
+use_python311() {
+  local py
+  py=$(python311) || why "no python3 of 3.11 or later on PATH" || return 1
+  ln -sf "$py" "$W/bin/python3"
+}
+
 # Every valid spelling of a timezone-aware time that Vernant's reader accepts
 # is judged on its merits, end to end through a returned slot: expired ones are
 # spent by expiry, and a far-future one is spent only by naming the task's
@@ -2439,6 +2458,7 @@ scn_spent_intent_alternate_date_forms_are_removed() {
   local form
   for form in 2000-01-01T00:00+00:00 2000-01-01T00:00:00+0000 '2000-01-01 00:00:00Z' 2000-01-01T00:00:00Z 2000-01-01T00:00:00.5+00:00 2000-01-01T00:00:00-05:00; do
     intent_world
+    use_python311 || return 1
     put_intent "$COPY" "$form" other/branch
     printf 'ok\n' > "$W/stub.mode"
     go
@@ -2446,16 +2466,19 @@ scn_spent_intent_alternate_date_forms_are_removed() {
   done
   for form in 2999-01-01T00:00+00:00 2999-01-01T00:00:00+0000 '2999-01-01 00:00:00Z' 2999-01-01T00:00:00Z; do
     intent_world
+    use_python311 || return 1
     put_intent "$COPY" "$form" fm/t1
     printf 'ok\n' > "$W/stub.mode"
     go
     intent_removed "unexpired intent naming the task branch with expiry '$form'" || return 1
   done
   intent_world
+  use_python311 || return 1
   put_intent "$COPY" 2000-01-01T00:00+00:00 other/branch
   go
   intent_removed "fallback with expiry '2000-01-01T00:00+00:00'" || return 1
   intent_world
+  use_python311 || return 1
   put_intent "$COPY" '2999-01-01 00:00:00Z' fm/t1
   go
   intent_removed "fallback naming the task branch with expiry '2999-01-01 00:00:00Z'" || return 1
@@ -2465,11 +2488,13 @@ scn_spent_intent_alternate_date_forms_are_removed() {
 # The prune and Vernant's own reader (_parse_expiry: a non-blank string through
 # datetime.fromisoformat after Z becomes +00:00, with a timezone) must agree in
 # both directions on whether an intent is spent, for each expiry below with the
-# intent naming another branch and with it naming the task's branch.
+# intent naming another branch and with it naming the task's branch. Both run
+# on a python3 of 3.11 or later, as the owner's required Python is.
 # prune=spent reader=refused would delete a copy on a file the owner rejects;
 # prune=keep reader=valid would keep a copy forever that the owner calls spent.
 scn_commit_intent_expiry_parity_with_the_owner_reader() {
   make_world
+  use_python311 || return 1
   cat > "$W/parity.py" <<'PY'
 import datetime, json, os, subprocess, sys
 bindir, work = sys.argv[1], sys.argv[2]
@@ -2530,7 +2555,30 @@ if both_spent < 12 or both_kept < 12:
     print("the cases do not cover both verdicts (%d spent, %d kept)" % (both_spent, both_kept))
     sys.exit(1)
 PY
-  out=$(python3 "$W/parity.py" "$BIN_DIR" "$W/parity-expiry" 2>&1) || why "$out" || return 1
+  out=$(PATH="$W/bin:$PATH" python3 "$W/parity.py" "$BIN_DIR" "$W/parity-expiry" 2>&1) || why "$out" || return 1
+  return 0
+}
+
+# A prune whose python3 is older than 3.11 does not judge the expiry: an
+# expired, valid intent keeps the copy with one wake that says why. The stub
+# python3 answers the version probe as 3.10 and runs the real one otherwise.
+scn_older_python_keeps_an_expired_intent() {
+  local real
+  intent_world
+  real=$(command -v python3)
+  cat > "$W/bin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 3 ] && [ "\$1" = -I ] && [ "\$2" = -c ] && case "\$3" in *version_info*) true ;; *) false ;; esac; then
+  exec "$real" -I -c 'import sys; sys.version_info = (3, 10, 0, "final", 0); exec(sys.argv[1])' "\$3"
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$W/bin/python3"
+  put_intent "$COPY" "$INTENT_EXPIRED" other/branch
+  printf 'ok\n' > "$W/stub.mode"
+  go
+  intent_kept "expired intent under python3 3.10" "python3 is older than 3.11, so it does not judge the expiry" || return 1
+  intent_kept "expired intent under python3 3.10" .claude/commit-intent.json || return 1
   return 0
 }
 
@@ -3111,8 +3159,21 @@ test_fallback_keeps_an_unreadable_commit_intent() {
 test_fallback_keeps_lookalike_commit_intent_paths() { assert_scenario scn_lookalike_intent_paths_are_kept "a spent payload at .bak, .old.json, .claude/sub and the copy root keeps the copy with one wake"; }
 test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file() { assert_scenario scn_spent_intent_does_not_cover_another_ignored_file "a spent intent beside .env.local or .claude/private/x keeps the copy for the other file"; }
 test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch() { assert_scenario scn_symlinked_intent_path_stays_scratch "a symlink at .claude/commit-intent.json stays reclaimable as before"; }
-test_returned_slot_removes_a_commit_intent_in_any_valid_date_form() { assert_scenario scn_spent_intent_alternate_date_forms_are_removed "expired intents and branch-matched unexpired intents are spent in every timezone-aware spelling Vernant's reader accepts (no seconds, +HHMM, a space for T, Z, fractions, other offsets), end to end"; }
-test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways() { assert_scenario scn_commit_intent_expiry_parity_with_the_owner_reader "the prune calls an intent spent exactly when Vernant's reader would, and fails on prune=keep reader=valid as well as prune=spent reader=refused"; }
+test_returned_slot_removes_a_commit_intent_in_any_valid_date_form() {
+  if ! python311 >/dev/null; then
+    printf 'skip: no python3 of 3.11 or later on PATH; the date-form removal scenario not run\n'
+    return 0
+  fi
+  assert_scenario scn_spent_intent_alternate_date_forms_are_removed "on python3 3.11 or later, expired intents and branch-matched unexpired intents are spent in every timezone-aware spelling Vernant's reader accepts (no seconds, +HHMM, a space for T, Z, fractions, other offsets), end to end"
+}
+test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways() {
+  if ! python311 >/dev/null; then
+    printf 'skip: no python3 of 3.11 or later on PATH; the owner-reader parity scenario not run\n'
+    return 0
+  fi
+  assert_scenario scn_commit_intent_expiry_parity_with_the_owner_reader "on python3 3.11 or later, the prune calls an intent spent exactly when Vernant's reader would, and fails on prune=keep reader=valid as well as prune=spent reader=refused"
+}
+test_older_python_keeps_an_expired_commit_intent() { assert_scenario scn_older_python_keeps_an_expired_intent "a prune whose python3 is older than 3.11 keeps an expired, valid intent with one wake that names the interpreter reason"; }
 test_commit_intent_predicate_refuses_a_symlink() { assert_scenario scn_symlinked_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a symlink at the path to that file"; }
 test_commit_intent_predicate_refuses_a_fifo_without_hanging() { assert_scenario scn_fifo_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a FIFO holding the same bytes without hanging"; }
 test_fallback_judges_a_nested_clones_commit_intent_on_its_own() { assert_scenario scn_nested_copy_intent_is_judged_on_its_own "a nested clone with a spent intent goes with the slot and one with an unspent intent naming another branch keeps the whole copy"; }
@@ -3324,6 +3385,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught intent-allowance-for-any-claude-name $lib '    .claude/commit-intent.json)
       if fm_mp_commit_intent_spent "$copy/$rel"; then' '    .claude/commit-intent.json|.claude/commit-intent.json.bak)
       if true; then' scn_lookalike_intent_paths_are_kept "exact-path rule of the CommitIntent allowance"
+  expect_caught intent-python-version-not-checked $lib "  python3 -I -c 'import sys; sys.exit(3 if sys.version_info < (3, 11) else 0)' >/dev/null 2>&1 || rc=\$?" '  :' scn_older_python_keeps_an_expired_intent "python3 version check before the CommitIntent expiry is judged"
   expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
 }
@@ -3331,8 +3393,12 @@ test_unsafe_mutations_are_caught() {
 # shellcheck disable=SC2016 # Every mutation old/new text is literal shell source, never expanded here.
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
-  expect_caught intent-date-form-restricted $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_spent_intent_alternate_date_forms_are_removed "reader-parity date parsing of a CommitIntent expiry"
-  expect_caught intent-date-form-restricted-parity $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_commit_intent_expiry_parity_with_the_owner_reader "two-way parity with the owner reader"
+  if python311 >/dev/null; then
+    expect_caught intent-date-form-restricted $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_spent_intent_alternate_date_forms_are_removed "reader-parity date parsing of a CommitIntent expiry"
+    expect_caught intent-date-form-restricted-parity $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_commit_intent_expiry_parity_with_the_owner_reader "two-way parity with the owner reader"
+  else
+    printf 'skip: no python3 of 3.11 or later on PATH; the intent-date-form-restricted mutation rows not run\n'
+  fi
   expect_caught intent-allowance-removed $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_by_the_fallback "spent-intent allowance"
   expect_caught intent-allowance-removed-for-a-returned-slot $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_with_a_returned_slot "spent-intent allowance for a returned slot"
   expect_caught intent-branch-rule-removed $lib '    sys.exit(0 if task_branch and doc["branch"] == task_branch else 1)' '    sys.exit(1)' scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "naming-the-task-branch rule"
@@ -3867,6 +3933,7 @@ ALL_TESTS=(
   test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch
   test_returned_slot_removes_a_commit_intent_in_any_valid_date_form
   test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways
+  test_older_python_keeps_an_expired_commit_intent
   test_commit_intent_predicate_refuses_a_symlink
   test_commit_intent_predicate_refuses_a_fifo_without_hanging
   test_fallback_judges_a_nested_clones_commit_intent_on_its_own

@@ -392,15 +392,23 @@ FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
 # (not absolute, no .. part, not empty or .), and an ISO-8601 expires_at_iso
 # with a timezone (the checks of Vernant's own reader,
 # scripts/hooks/commit_intent.py), and that has expired (expires_at <= now, UTC)
-# or names FM_MP_TASK_BRANCH exactly. The expiry is read exactly as that
-# reader's _parse_expiry reads it: a non-blank string through
-# datetime.fromisoformat (after "Z" becomes "+00:00"), which must carry a
-# timezone. So the prune calls an intent spent when the reader would, for every
-# form it accepts (a space for T, no seconds, a +HHMM offset), and keeps the
-# copy for every form it refuses (a malformed string, no timezone).
+# or names FM_MP_TASK_BRANCH exactly. The expiry is read as that reader's
+# _parse_expiry reads it on its required Python (3.12 or later): a non-blank
+# string through datetime.fromisoformat (after "Z" becomes "+00:00"), which
+# must carry a timezone. That function accepts fewer forms before Python 3.11,
+# so when the prune's own python3 is older than 3.11 it does not judge the
+# expiry: it returns 1 and sets FM_MP_INTENT_WHY to say why.
 # The file is only read, from its path. Any other result, a read or parse
 # failure included, is 1.
+FM_MP_INTENT_WHY=
 fm_mp_commit_intent_spent() {  # <path>
+  local rc=0
+  FM_MP_INTENT_WHY=
+  python3 -I -c 'import sys; sys.exit(3 if sys.version_info < (3, 11) else 0)' >/dev/null 2>&1 || rc=$?
+  if [ "$rc" = 3 ]; then
+    FM_MP_INTENT_WHY="the prune's python3 is older than 3.11, so it does not judge the expiry"
+  fi
+  [ "$rc" = 0 ] || return 1
   python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<'PY' >/dev/null 2>&1
 import datetime, json, os, pathlib, stat, sys
 path, task_branch = sys.argv[1], sys.argv[2]
@@ -504,6 +512,10 @@ EOF
     .claude/commit-intent.json)
       if fm_mp_commit_intent_spent "$copy/$rel"; then
         return 0
+      fi
+      if [ -n "$FM_MP_INTENT_WHY" ]; then
+        fm_mp_verdict keep "$copy holds $rel and $FM_MP_INTENT_WHY"
+        return 1
       fi
       ;;
     .claude/worktrees/*)
