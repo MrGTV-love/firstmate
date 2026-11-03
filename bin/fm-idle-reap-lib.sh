@@ -60,6 +60,14 @@ fm_idle_reap_refusal_stands() {
 # it. Only the printed refusal decides the class (fm_closeout_retained_class),
 # never the token elsewhere in the output. A copy that cannot be read as a git
 # repository gives no record, so its retry stays as it was.
+# Both sweeps take the task's closeout lock (fm_closeout_lock_take, never
+# waited for) around the whole of one attempt: the record check, the teardown,
+# the record write and the wake. A sweep that finds the lock busy skips the task
+# this round, so no second teardown starts before the first refusal is on
+# record, and the wake_sent decision, the queue append and the record update
+# cannot interleave between the two processes. A record that no longer reads the
+# same (fm_closeout_retained_check says "changed") lifts the hold at once; it
+# does not wait for the older refusal memo to age out.
 FM_CLOSEOUT_RETAINED_CLASS=cleanup_ignored_payload_archived_tree_retained
 CLOSEOUT_RETAINED_PATHS=()
 CLOSEOUT_RETAINED_ENTRIES=()
@@ -181,21 +189,44 @@ fm_closeout_retained_record() {  # <state> <id> <worktree> <teardown-output>
   fm_closeout_retained_write "$1" "$2" 0
 }
 
-# Succeeds when the record exists, its first line is for the task copy
-# <worktree>, and every copy it names still reads the same. Sets
-# CLOSEOUT_RETAINED_WAKE.
-fm_closeout_retained_stands() {  # <state> <id> <worktree>
+# Reads the record against the copy as it is now. Succeeds, with
+# CLOSEOUT_RETAINED_STATE=stands, when the record exists, its first line is for
+# the task copy <worktree>, and every copy it names still reads the same; the
+# record's wake flag is then in CLOSEOUT_RETAINED_WAKE. It fails with "changed"
+# when a copy reads differently (HEAD, tracked changes or untracked files) or
+# the task copy moved, and with "none" when there is no valid record or a copy
+# cannot be read now (that copy's hold then stays as it was).
+CLOSEOUT_RETAINED_STATE=none
+fm_closeout_retained_check() {  # <state> <id> <worktree>
   local e p first=1 now
+  CLOSEOUT_RETAINED_STATE=none
   fm_closeout_retained_read "$1" "$2" || return 1
   for e in "${CLOSEOUT_RETAINED_ENTRIES[@]}"; do
     p=${e#* * }
     if [ "$first" = 1 ]; then
-      [ "$p" = "$3" ] || return 1
+      [ "$p" = "$3" ] || { CLOSEOUT_RETAINED_STATE=changed; return 1; }
       first=0
     fi
     now=$(fm_closeout_retained_entry "$p") || return 1
-    [ "$now" = "$e" ] || return 1
+    [ "$now" = "$e" ] || { CLOSEOUT_RETAINED_STATE=changed; return 1; }
   done
+  CLOSEOUT_RETAINED_STATE=stands
+}
+
+fm_closeout_retained_stands() {  # <state> <id> <worktree>
+  fm_closeout_retained_check "$@"
+}
+
+# The task's closeout lock: one holder at a time across both sweeps, taken
+# without waiting and recovered by the shared lock library when its owner is
+# gone. Release it with fm_closeout_lock_drop.
+fm_closeout_lock_take() {  # <state> <id>
+  mkdir -p "$1/.closeout-lock" 2>/dev/null || return 1
+  fm_lock_try_acquire "$1/.closeout-lock/$2"
+}
+
+fm_closeout_lock_drop() {  # <state> <id>
+  fm_lock_release "$1/.closeout-lock/$2" || true
 }
 
 # Marks the wake as sent. Call it only after the queue took the wake.
@@ -205,7 +236,9 @@ fm_closeout_retained_mark_wake() {  # <state> <id>
 }
 
 # The one wake of a record: appended only while wake_sent is 0 and marked only
-# after the append succeeded, so a failed append is raised again next time.
+# after the append succeeded, so a failed append is raised again next time. The
+# caller holds the task's closeout lock, so the read, the append and the mark
+# are one step across both sweeps.
 fm_closeout_retained_wake() {  # <state> <id> <wake-key> <wake-text>
   fm_closeout_retained_read "$1" "$2" || return 1
   [ "$CLOSEOUT_RETAINED_WAKE" = 0 ] || return 0
@@ -222,11 +255,15 @@ fm_closeout_retained_clear() {  # <state> <id>
 fm_idle_reap_refusal_holds() {  # <state> <id> <status-line> <now>
   local wt
   wt=$(fm_meta_get "$1/$2.meta" worktree)
-  if [ -n "$wt" ] && fm_closeout_retained_stands "$1" "$2" "$wt"; then
-    # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    IDLE_REAP_HELD=closeout
-    IDLE_REAP_DETAIL=$(fm_closeout_retained_reason)
-    return 0
+  if [ -n "$wt" ]; then
+    if fm_closeout_retained_check "$1" "$2" "$wt"; then
+      # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+      IDLE_REAP_HELD=closeout
+      IDLE_REAP_DETAIL=$(fm_closeout_retained_reason)
+      return 0
+    fi
+    # The older refusal memo describes the earlier fingerprint of the copy.
+    [ "$CLOSEOUT_RETAINED_STATE" != changed ] || return 1
   fi
   fm_idle_reap_refusal_stands "$1/.idle-reap/$2.refused" "$3" "$4"
 }

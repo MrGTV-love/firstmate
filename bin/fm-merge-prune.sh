@@ -138,7 +138,7 @@
 # hours in case the cause cleared, except a copy that Vernant's closeout driver
 # retained after archiving its ignored files: each try would write another
 # archive, so teardown does not run again while the copy is unchanged
-# (bin/fm-idle-reap-lib.sh, fm_closeout_retained_stands, owns the record that
+# (bin/fm-idle-reap-lib.sh, fm_closeout_retained_check, owns the record that
 # bin/fm-idle-session-reap.sh shares, and the one wake). The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
@@ -841,7 +841,19 @@ remove_returned_locked() {  # <real-copy> <detail>
   return 0
 }
 
+# One attempt under the task's closeout lock, shared with idle-reap: a sweep that
+# finds the lock busy leaves the task for its next due time instead of calling
+# teardown while the other sweep's refusal is not yet on record.
 attempt() {
+  if ! fm_closeout_lock_take "$STATE" "$ID"; then
+    log_line "another cleanup sweep is working on the task's copy; the next due attempt looks again"
+    return 0
+  fi
+  attempt_locked
+  fm_closeout_lock_drop "$STATE" "$ID"
+}
+
+attempt_locked() {
   local reason wt project branch
   wt=$(fm_meta_get "$META" worktree)
   project=$(fm_meta_get "$META" project)
@@ -859,6 +871,8 @@ attempt() {
     retain_closeout "$wt" "$CLOSEOUT_RETAINED_WAKE"
     return 0
   fi
+  # A record that no longer stands describes an earlier fingerprint of the copy.
+  fm_closeout_retained_clear "$STATE" "$ID"
   run_teardown
   if [ "$TD_RC" -eq 0 ]; then
     settle_copy "$wt" "$project" "teardown completed"
