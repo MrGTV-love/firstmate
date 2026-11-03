@@ -175,6 +175,7 @@ The interrupted close/retention marker's publication and replay safety gates are
 
 If a direct answer closes the row before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
 A retained Gerrit change URL is instead recorded as a `Gerrit change <url>` note on that close.
+A retained merge-train close copies the train pull request into the row and records its `closed by merge train: <member PR url>` note on that close.
 Replay then retires the record.
 
 ### Known retained-delivery gaps
