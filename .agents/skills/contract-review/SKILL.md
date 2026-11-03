@@ -138,6 +138,7 @@ Add `covered-by: <criterion>` when an existing criterion already keeps the prote
 A finding that matches a recorded withdrawal or owner resolution, with no new counterexample against the current text, is closed by that record.
 It is neither a new finding nor a trigger for `stalled`.
 The same protection raised with a new counterexample is a new material finding.
+A finding that mixes a withdrawn or resolved demand with a new counterexample is split: the withdrawn part is closed by the record, and the new counterexample is a new material finding.
 A reviewer note that meets the finding test is a finding, whatever the reviewer called it.
 A report that says `EXIT: pass` while it holds such a note is reconciled to `needs-revision`.
 
@@ -189,6 +190,7 @@ No round number, finding count, word count or timer decides any exit.
    A recurrence and a repair-induced failure are not progress.
 5. Take the first test that holds:
    - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
+     The installed skills' closeout rules are governing constraints: a blocked or unverified mandatory item prevents a passing grade, and a safe stop does not establish completion.
      A settlement made after the round does not change that round's exit.
    - `pass`: no substantiated finding remains, and the register supports closure of the earlier ones.
    - `needs-revision`: substantiated findings remain, and the round has progress.
