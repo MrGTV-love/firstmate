@@ -1224,6 +1224,38 @@ test_fm_send_marked_secondmate_creates_pending_and_embeds_corr() {
   pass "fm-send marked secondmate path creates pending and embeds corr"
 }
 
+# The recovery request answers no decision (fm-send header, "Decision closure"),
+# so it states --answers-none and still lands when the mate has an open keyed
+# decision. This drives the real fm-send (no send hook). The sandbox that runs
+# this suite may deny ps, so a stub ps supplies the sender-identity read.
+test_recovery_send_is_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local dir fb log home state corr before got
+  dir="$TMP_ROOT/recovery-open-key"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  printf '#!/usr/bin/env bash\nprintf "fixture-sender-identity\\n"\n' > "$fb/ps"
+  chmod +x "$fb/ps"
+  home=$(setup_parent recovery-open-key)
+  state="$home/state"
+  fm_write_secondmate_meta "$state/hibit.meta" "$home/sm" "sess:fm-hibit"
+  printf 'needs-decision [key=audit-scope]: whole repo or one package\n' > "$state/hibit.status"
+  before=$(cat "$state/hibit.status")
+  unset FM_PENDING_REPLY_SEND_HOOK
+  export FM_PENDING_REPLY_NOW=2500
+  corr=$(fm_pending_reply_create "$home" "$state" "hibit" "status of phase 7")
+  fm_pending_reply_mark_delivered "$state" "$corr"
+  fm_pending_reply_mark_turn_completed "$state" "$corr" request
+  : > "$log"
+  PATH="$fb:$PATH" FM_SEND_LOG="$log" FM_ROOT_OVERRIDE="$home" \
+    fm_pending_reply_send_recovery "$state" "$corr" \
+    || fail "the recovery send was refused or failed against a mate with an open keyed decision"
+  got=$(latest_record_body "$home" hibit)
+  assert_contains "$got" "$corr" "the recovery request did not reach the mate's steering record"
+  assert_equals "$before" "$(cat "$state/hibit.status")" "the recovery send closed or appended something in the mate's status log"
+  assert_contains "$(FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" 2>/dev/null)" "[key=audit-scope]" \
+    "the open decision no longer lists as open after the recovery send"
+  pass "the pending-reply recovery send is delivered to a mate with an open keyed decision and leaves it open"
+}
+
 test_document_pointer_resolves() {
   local home state corr
   home=$(setup_parent doc-pointer)
@@ -2465,6 +2497,7 @@ test_restart_preserves_expectation_and_parent_destination
 test_wrong_home_detected_not_acknowledged
 test_unmarked_captain_input_creates_no_expectation
 test_fm_send_marked_secondmate_creates_pending_and_embeds_corr
+test_recovery_send_is_delivered_to_a_mate_with_an_open_keyed_decision
 test_document_pointer_resolves
 test_helper_report_resolves
 test_busy_idle_observation_via_backend_abstraction

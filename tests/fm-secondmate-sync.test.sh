@@ -576,6 +576,49 @@ test_bootstrap_nudge_retry_is_idempotent() {
   pass "T8d bootstrap nudge retry is idempotent after success"
 }
 
+# The bootstrap nudge (first send and marker retry) answers no decision, so it
+# states --answers-none (fm-send header, "Decision closure") and still lands when
+# the secondmate has an open keyed decision.
+test_bootstrap_nudge_is_delivered_to_a_secondmate_with_an_open_keyed_decision() {
+  local w c1 fakebin out marker before
+  w=$(new_world nudge-open-key)
+  c1=$(head_of "$w/main")
+  add_sm_worktree "$w" sm-instr "$c1"
+  bump_primary "$w" instr
+  fakebin=$(make_fake_toolchain "$w")
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$w/home/state/sm-instr.status"
+  before=$(cat "$w/home/state/sm-instr.status")
+  : > "$w/home/state/sm-instr.inbox"   # first send fails for a real local reason and leaves a retry marker
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" "precondition: first nudge should fail"
+  assert_not_contains "$out" "has open keyed decisions" "the first nudge was refused by the open keyed decision, not by the blocked inbox"
+  marker="$w/home/state/.secondmate-nudge-pending/sm-instr.pending"
+  assert_present "$marker" "precondition: failed nudge should leave marker"
+
+  rm -f "$w/home/state/sm-instr.inbox"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "BOOTSTRAP_INFO: nudged fm-sm-instr with" "the retry nudge was refused by the open keyed decision"
+  assert_absent "$marker" "the delivered retry should clear the marker"
+  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "re-read your AGENTS.md" "the nudge did not reach the record"
+  assert_equals "$before" "$(cat "$w/home/state/sm-instr.status")" "the nudge closed or appended something in the secondmate's status log"
+
+  # The first-send path (no marker) is covered the same way.
+  w=$(new_world nudge-open-key-first)
+  c1=$(head_of "$w/main")
+  add_sm_worktree "$w" sm-instr "$c1"
+  bump_primary "$w" instr
+  fakebin=$(make_fake_toolchain "$w")
+  printf 'blocked [key=staging-token]: need the staging token\n' > "$w/home/state/sm-instr.status"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_SEND_SETTLE=0 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "BOOTSTRAP_INFO: nudged fm-sm-instr with" "the first nudge was refused by the open keyed blocker"
+  assert_not_contains "$out" "NUDGE_SECONDMATES:" "a delivered nudge leaves no action item"
+  pass "T8e bootstrap nudges reach a secondmate that has an open keyed decision and leave it open"
+}
+
 test_bootstrap_nudge_retry_refuses_changed_home() {
   local w c1 fakebin marker out other
   w=$(new_world nudge-retry-home-change)
@@ -1298,6 +1341,103 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   pass "R8 session start converges a remote home on the primary's default-branch commit"
 }
 
+# The remote bootstrap nudge answers no decision, so it states --answers-none
+# (fm-send header, "Decision closure"); this is R8 with an open keyed decision.
+test_bootstrap_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local w c1 c2 home fakebin out coderoot_before
+  w=$(new_remote_world remote-bootstrap-open-key)
+  # fm-on.sh only routes commands this primary checkout genuinely tracks, so the
+  # fixture primary carries the real tooling the parent legs invoke.
+  cp "$ROOT"/bin/fm-remote-*.sh "$w/main/bin/"
+  git -C "$w/main" add -A
+  git -C "$w/main" commit -qm "primary tooling"
+  git -C "$w/main" push -q origin main
+  c1=$(head_of "$w/main")
+  add_remote_home "$w" sm "$w/forge.git" "$c1"
+  bump_primary "$w" instr
+  c2=$(head_of "$w/main")
+  git -C "$w/main" push -q origin main
+  coderoot_before=$(head_of "$w/coderoot")
+  home="$w/home"
+  mkdir -p "$home/config" "$home/projects"
+  printf -- '- sm - remote fixture (host: host-sm; root: %s; home: %s; scope: remote work; projects: alpha; added 2026-08-02)\n' \
+    "$w/coderoot" "$w/sm" > "$home/data/secondmates.md"
+  fm_write_secondmate_meta "$home/state/sm.meta" "$w/sm"
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$home/state/sm.status"
+  printf 'remote_host=host-sm\n' >> "$home/state/sm.meta"
+  mkdir -p "$w/sm/state/parent-route"
+  fm_write_meta "$w/sm/state/parent-route/sm.meta" \
+    'window=fm-remote:p1' 'endpoint_task_id=sm' 'worktree=-' 'project=-' \
+    'backend=herdr' 'harness=codex' 'herdr_session=fm-remote' \
+    'herdr_workspace_id=w1' 'herdr_tab_id=t1' 'herdr_pane_id=p1'
+
+  fakebin=$(make_remote_leg_ssh_stub "$w")
+  fm_fake_exit0 "$fakebin" gh treehouse tmux node
+  out=$(PATH="$fakebin:$BASE_PATH" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_BOOTSTRAP_NETWORK=only \
+    FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
+    FM_TEST_REPO_ROOT="$ROOT" \
+    FM_INHERITABLE_CONFIG='' FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 FM_BOOTSTRAP_VERBOSE_FACTS=1 \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+
+  [ "$(head_of "$w/sm")" = "$c2" ] \
+    || fail "session start left the remote home off the primary's commit (out: $out)"
+  assert_contains "$out" "BOOTSTRAP_INFO: nudged remote fm-sm after convergence" \
+    "the remote re-read nudge was refused by the open keyed decision (out: $out)"
+  assert_not_contains "$out" "NUDGE_SECONDMATES:" "a delivered remote nudge leaves no action item"
+  assert_equals "needs-decision [key=shard-plan]: shard by team or by repo" "$(cat "$home/state/sm.status")" \
+    "the remote nudge closed or appended something in the mate's status log"
+  pass "R8b the remote re-read nudge reaches a mate that has an open keyed decision and leaves it open"
+}
+
+# fm-config-push.sh's remote re-read nudge answers no decision, so it states
+# --answers-none; this is R8b driven through the push entry point.
+test_config_push_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local w c1 home fakebin out
+  w=$(new_remote_world remote-push-open-key)
+  # fm-on.sh only routes commands this primary checkout genuinely tracks, so the
+  # fixture primary carries the real tooling the parent legs invoke.
+  cp "$ROOT"/bin/fm-remote-*.sh "$w/main/bin/"
+  git -C "$w/main" add -A
+  git -C "$w/main" commit -qm "primary tooling"
+  git -C "$w/main" push -q origin main
+  c1=$(head_of "$w/main")
+  add_remote_home "$w" sm "$w/forge.git" "$c1"
+  bump_primary "$w" instr
+  git -C "$w/main" push -q origin main
+  home="$w/home"
+  mkdir -p "$home/config" "$home/projects"
+  printf -- '- sm - remote fixture (host: host-sm; root: %s; home: %s; scope: remote work; projects: alpha; added 2026-08-02)\n' \
+    "$w/coderoot" "$w/sm" > "$home/data/secondmates.md"
+  fm_write_secondmate_meta "$home/state/sm.meta" "$w/sm"
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$home/state/sm.status"
+  printf 'remote_host=host-sm\n' >> "$home/state/sm.meta"
+  mkdir -p "$w/sm/state/parent-route"
+  fm_write_meta "$w/sm/state/parent-route/sm.meta" \
+    'window=fm-remote:p1' 'endpoint_task_id=sm' 'worktree=-' 'project=-' \
+    'backend=herdr' 'harness=codex' 'herdr_session=fm-remote' \
+    'herdr_workspace_id=w1' 'herdr_tab_id=t1' 'herdr_pane_id=p1'
+
+  bash -c '. "$1"; fm_secondmate_nudge_write "$2" sm "$3" "" remote "$4" 1' _ "$ROOT/bin/fm-secondmate-nudge-lib.sh" \
+    "$home/state" "$w/sm" "re-read your AGENTS.md" || fail "could not seed the retry marker"
+  fakebin=$(make_remote_leg_ssh_stub "$w")
+  fm_fake_exit0 "$fakebin" gh treehouse tmux node
+  out=$(PATH="$fakebin:$BASE_PATH" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
+    FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
+    FM_TEST_REPO_ROOT="$ROOT" \
+    FM_INHERITABLE_CONFIG='' FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 FM_BOOTSTRAP_VERBOSE_FACTS=1 \
+    "$ROOT/bin/fm-config-push.sh" 2>&1)
+
+  assert_contains "$out" "config-reread: sent" \
+    "the remote re-read nudge was refused by the open keyed decision (out: $out)"
+  assert_not_contains "$out" "send failed" "a delivered remote nudge leaves no failure line"
+  assert_equals "needs-decision [key=shard-plan]: shard by team or by repo" "$(cat "$home/state/sm.status")" \
+    "the remote nudge closed or appended something in the mate's status log"
+  pass "R8c the config-push remote re-read nudge reaches a mate that has an open keyed decision and leaves it open"
+}
+
 # --- R10: an outdated host refuses, and the report says how to fix it ----------
 # A host still running an older Firstmate copy rejects a command shape it does
 # not know, which for this leg can only mean it predates the parent-targeted
@@ -1404,6 +1544,7 @@ test_bootstrap_nudge_send_uses_state_override
 test_bootstrap_nudge_retry_rejects_malformed_marker_id
 test_bootstrap_nudge_failure_records_retry_marker
 test_bootstrap_nudge_retry_is_idempotent
+test_bootstrap_nudge_is_delivered_to_a_secondmate_with_an_open_keyed_decision
 test_bootstrap_nudge_retry_refuses_changed_home
 test_nudge_retry_uses_fresh_herdr_endpoint_after_respawn
 test_bootstrap_sweep_surfaces_skipped_home
@@ -1421,6 +1562,8 @@ test_remote_sync_skips_unimportable_target
 test_remote_sync_skips_dirty_diverged_and_feature_branch
 test_remote_sync_without_target_follows_host_copy
 test_bootstrap_syncs_remote_home_to_primary_commit
+test_bootstrap_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision
+test_config_push_remote_nudge_is_delivered_to_a_mate_with_an_open_keyed_decision
 test_bootstrap_reports_outdated_host_actionably
 test_remote_launch_does_not_retarget_host_copy
 

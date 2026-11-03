@@ -149,7 +149,8 @@
     "backlog-transition",
     "compact-adviser",
     "secondmate-inherit",
-    "secondmate-sync"
+    "secondmate-sync",
+    "send-states-its-choice"
   ],
   "guards": [
     {
@@ -1235,6 +1236,44 @@
         {
           "file": "bin/fm-send.sh",
           "match": "echo \"error: --resolve-key cannot close a decision key of length ${#k}: its ${#probe_line}-character close record exceeds the $FM_LINE_CAP_DEFAULT-character status-line cap, and truncation would remove the structural key delimiter. Refusing rather than writing an ineffective close; nothing was sent.\" >&2"
+        }
+      ]
+    },
+    {
+      "id": "send-states-its-choice",
+      "version": "1",
+      "owner": "bin/fm-send.sh",
+      "invariant": "A text send to a task with open keyed decisions states whether it answers one or answers none.",
+      "layer": "runtime-block",
+      "source": "the target task's status log folded by status_open_decisions (bin/fm-status-decision-lib.sh), the --resolve-key keys and the --answers-none flag on the command line",
+      "trigger": "a text send to a task selector whose open decision set is nonempty or unreadable, carrying neither --resolve-key nor --answers-none / --answers-none together with --resolve-key",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Resend with FM_HOME=<home> bash bin/fm-send.sh <task> --resolve-key <key> <message> to answer and close a listed key, or with FM_HOME=<home> bash bin/fm-send.sh <task> --answers-none <message> to answer none of them.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before the sender chooses a flag; no per-family cross-invocation counter is implemented, so repeated bare invocations refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; the refusal diagnostic names every open key and both flags on stderr. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-send-resolve-key.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent.\" >&2"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: cannot tell whether $CHOICE_TASK_ID has open decisions: $CHOICE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so a send that states no choice would be a guess. Re"
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: $CHOICE_TASK_ID has open keyed decisions in $CHOICE_STATUS_FILE, and this send states no choice. Refusing it; nothing was sent. Open keys:\""
         }
       ]
     },

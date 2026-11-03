@@ -480,6 +480,7 @@ FM_HOME=<primary-home> bin/fm-send.sh fm-<id> '<request>'
 ```
 
 The [`fm-send.sh` header](../bin/fm-send.sh) owns the exact delivery-status contract.
+A routed request to a secondmate with open keyed decisions must also pass `--resolve-key <key>` or `--answers-none` (rule: the same header).
 Routed requests use the [steering-inbox contract](../bin/fm-task-inbox-lib.sh) in the remote home.
 The payload is never delivered by typing it into the pane.
 Exit 0 means the record durably exists.

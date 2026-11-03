@@ -782,7 +782,7 @@ test_local_secondmate_unknown_draft_preserves_delivery() {
   env PATH="$fb:$PATH" FM_FAKE_TMUX_UNKNOWN_DRAFT=1 FM_FAKE_TMUX_COMMAND=omp \
     FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
-    "$SEND" lsm "/audit the ledger" >"$dir/retry.out" 2>"$dir/retry.err" || rc=$?
+    "$SEND" lsm --resolve-key ledger "/audit the ledger" >"$dir/retry.out" 2>"$dir/retry.err" || rc=$?
   expect_code 1 "$rc" "an unresolved draft-risk delivery must refuse a blind resend"
   assert_contains "$(cat "$dir/retry.err")" "refusing to resend correlation $corr" \
     "the preserved delivery marker must prevent duplicate typing"

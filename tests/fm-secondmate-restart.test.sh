@@ -390,6 +390,33 @@ test_unprovable_runtime_falls_back() {
   pass "T3 a runtime that cannot prove a restart falls back to the re-read message"
 }
 
+# --- T3b: both restart sends state --answers-none, so an open keyed decision
+# on the mate never refuses them (fm-send header, "Decision closure") -----------
+test_restart_sends_are_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local dir out rc before
+  dir=$(new_case open-key-nudge)
+  add_local_mate "$dir" sm1 claude zellij
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$dir/home/state/sm1.status"
+  before=$(cat "$dir/home/state/sm1.status")
+  out=$(run_restart "$dir" sm1); rc=$?
+  expect_code 3 "$rc" "the nudge fallback is still the outcome"$'\n'"$out"
+  assert_contains "$out" "nudged: sm1:" "the re-read nudge was refused by an open keyed decision"$'\n'"$out"
+  assert_grep 're-read your AGENTS.md' "$dir/home/state/sm1.inbox/001.msg" \
+    "the re-read message did not reach the mate"
+  assert_equals "$before" "$(cat "$dir/home/state/sm1.status")" "the nudge closed or appended something in the mate's status log"
+
+  dir=$(new_case open-key-persist)
+  add_local_mate "$dir" sm1
+  printf 'blocked [key=staging-token]: need the staging token\n' > "$dir/home/state/sm1.status"
+  before=$(cat "$dir/home/state/sm1.status")
+  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" fm-sm1); rc=$?
+  expect_code 3 "$rc" "an unconfirmed persist is still a fallback"$'\n'"$out"
+  assert_grep 'Open-record persistence' "$dir/home/state/sm1.inbox/001.msg" \
+    "the persist request was refused by an open keyed blocker"
+  assert_equals "$before" "$(cat "$dir/home/state/sm1.status")" "the persist request closed or appended something in the mate's status log"
+  pass "T3b restart sends reach a mate that has an open keyed decision and leave it open"
+}
+
 # --- T4: a mate with no durable record in this home --------------------------
 test_unknown_mate_is_accounted_for() {
   local dir out rc
@@ -979,6 +1006,7 @@ test_persist_precedes_restart
 test_arrived_answer_precedes_deadline_check
 test_answer_between_resolution_and_timeout_wins
 test_unprovable_runtime_falls_back
+test_restart_sends_are_delivered_to_a_mate_with_an_open_keyed_decision
 test_unknown_mate_is_accounted_for
 test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran

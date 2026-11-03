@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
-# Usage: fm-send.sh <target> [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
+# Usage: fm-send.sh <target> [--resolve-key <key>]... | --answers-none [--fire-and-forget <delivery-id>] <text...>
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved
 #   through this home's state/<id>.meta, or an explicit well-formed backend
 #   target. fm-send refuses unresolved guesses rather than falling back to a
@@ -148,9 +148,21 @@
 # during the final locked remote-route validation; unset or empty guards do not
 # change ordinary sends.
 #
-# Decision closure (answerer-closes): pass --resolve-key <key> (repeatable,
-# before the message) when this send answers an open keyed needs-decision: or
-# blocked: record in the target task's state/<id>.status. fm-send itself
+# Decision closure (answerer-closes): a text send to a task selector whose
+# state/<id>.status holds open keyed decisions (every key status_open_decisions
+# returns, reserved keys included) must state its choice, because a send that
+# states none is delivered yet leaves its decision open and the drain keeps
+# listing answered work as waiting. State it with --resolve-key <key>
+# (repeatable, before the message) when this send answers an open keyed
+# needs-decision: or blocked: record, or with --answers-none when this send
+# answers none of them (a routine steer, nudge, or reminder; accepted on a task
+# with no open decision, so a caller may pass it unconditionally). A send with
+# neither refuses with exit 1, before anything is marked, locked, recorded, or
+# typed, and lists each open key with its verb and both flags; the two flags
+# together are refused as contradictory. A --key send and a send to an explicit
+# backend target cannot answer a decision, so the rule does not apply to them.
+# This is the one statement of the rule; every other file points here.
+# With --resolve-key, fm-send itself
 # appends the closing resolved line to that status file, so the captain-facing
 # OPEN DECISIONS record closes at answer time and never depends on the busy
 # worker writing a matching resolved line. For ordinary keys the payload is
@@ -471,6 +483,7 @@ fi
 # message exactly as before, so ordinary sends are byte-identical.
 RESOLVE_KEYS=
 FIRE_AND_FORGET_ID=
+ANSWERS_NONE=0
 fm_send_add_resolve_key() { # <key>
   local k=$1
   case "$k" in
@@ -501,6 +514,14 @@ while :; do
     fm_send_add_resolve_key "${1#--resolve-key=}" || exit 1
     shift
     ;;
+  --answers-none)
+    [ "$ANSWERS_NONE" = 0 ] || {
+      echo "error: duplicate --answers-none" >&2
+      exit 1
+    }
+    ANSWERS_NONE=1
+    shift
+    ;;
   --fire-and-forget)
     [ $# -ge 2 ] || {
       echo "error: --fire-and-forget requires a delivery id" >&2
@@ -524,6 +545,11 @@ while :; do
   *) break ;;
   esac
 done
+
+if [ "$ANSWERS_NONE" = 1 ] && [ -n "$RESOLVE_KEYS" ]; then
+  echo "error: --answers-none and --resolve-key contradict each other: a send either answers the named key(s) or answers none of the open decisions. Refusing the pair; nothing was sent." >&2
+  exit 1
+fi
 
 if [ "$TARGET_BACKEND" != remote ]; then
   fm_backend_validate "$TARGET_BACKEND" || exit 1
@@ -693,6 +719,33 @@ if [ -n "$RESOLVE_KEYS" ]; then
       exit 1
     fi
   done
+fi
+
+# A text send to a task selector must state its choice when that task has open
+# keyed decisions (header: "Decision closure"). The open set is the same one
+# fold the --resolve-key check above reads. This check runs in the same
+# validation phase, before the target is marked, locked, recorded, or typed to.
+if [ -z "$RESOLVE_KEYS" ] && [ "$ANSWERS_NONE" = 0 ] && [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "${1:-}" != "--key" ]; then
+  CHOICE_TASK_ID=$(fm_send_id_from_meta "$TARGET_META")
+  CHOICE_STATUS_FILE="$STATE/$CHOICE_TASK_ID.status"
+  choice_open_set=$(status_open_decisions "$CHOICE_STATUS_FILE") || {
+    echo "error: cannot tell whether $CHOICE_TASK_ID has open decisions: $CHOICE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so a send that states no choice would be a guess. Refusing it; resend with --resolve-key <key> or --answers-none; nothing was sent." >&2
+    exit 1
+  }
+  if [ -n "$choice_open_set" ]; then
+    {
+      echo "error: $CHOICE_TASK_ID has open keyed decisions in $CHOICE_STATUS_FILE, and this send states no choice. Refusing it; nothing was sent. Open keys:"
+      while IFS= read -r choice_line; do
+        [ -n "$choice_line" ] || continue
+        choice_key=${choice_line%%$'\t'*}
+        echo "  [key=$choice_key] $(_fm_open_set_verb "$choice_open_set" "$choice_key")"
+      done <<CHOICE_OPEN_SET
+$choice_open_set
+CHOICE_OPEN_SET
+      echo "Resend with --resolve-key <key> (repeatable; this send answers that key and closes it), or with --answers-none (this send answers none of them and every key stays open). Rule: the bin/fm-send.sh header, \"Decision closure\"."
+    } >&2
+    exit 1
+  fi
 fi
 
 # Close each answered decision in this home's ledger, only after the answer is

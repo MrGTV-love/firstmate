@@ -520,7 +520,9 @@ test_promotion_delivers_the_real_definition_of_done() {
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
 # Capture the message a promoted worker would receive, instead of steering one.
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+# The printed command must state its choice for an open keyed decision: arg 2 is --answers-none.
+[ "$2" = "--answers-none" ] || exit 64
+printf '%s' "$3" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
 
@@ -626,7 +628,8 @@ test_promotion_teaches_the_closes_line_only_where_a_pr_body_exists() {
   mkdir -p "$home/state" "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+[ "$2" = "--answers-none" ] || exit 64
+printf '%s' "$3" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
   for mode in no-mistakes direct-PR local-only; do
@@ -1921,7 +1924,8 @@ test_promotion_carries_the_forge_binding() {
   printf '%s\n' '- proj [no-mistakes forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+[ "$2" = "--answers-none" ] || exit 64
+printf '%s' "$3" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
 
@@ -1995,7 +1999,8 @@ EOF
   mkdir -p "$sendroot/bin"
   cat > "$sendroot/bin/fm-send.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+[ "$2" = "--answers-none" ] || exit 64
+printf '%s' "$3" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
   id="forge-forgejo-p1"

@@ -1934,6 +1934,17 @@ assert rows()['scout']['overdue']
 refused = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', 'worker'],
                          env=dict(env, FM_HOME=''), text=True, capture_output=True, timeout=120)
 assert refused.returncode == 1 and 'FM_HOME is required' in refused.stdout
+# A reserved key a supervisor raised (a pending-reply expectation) is not the report's own wait, so the silent
+# report stays eligible and its check-in reaches a task that fm-send sees as holding an open keyed decision.
+# The check-in answers none of them and states --answers-none (fm-send header, "Decision closure"), so fm-send
+# delivers it and the key stays open.
+status('scout', f'blocked [at={now - 901}] [key=pending-reply-abcdef0123456789]: pending-reply-missed: task=scout pending-reply-id=abcdef0123456789 request=ship it\n', now - 901)
+assert rows()['scout']['overdue']
+scout_status_before = (home / 'state/scout.status').read_text()
+call('--check-in', 'scout')
+scout_messages = list((home / 'state/scout.inbox').glob('*.msg')); assert len(scout_messages) == 1, scout_messages
+assert 'report progress' in scout_messages[0].read_text()
+assert (home / 'state/scout.status').read_text() == scout_status_before
 print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
 PY
 

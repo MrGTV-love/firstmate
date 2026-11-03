@@ -417,6 +417,27 @@ test_a_failed_send_is_retried_on_the_next_run() {
   pass "a failed ask starts no cooldown, so the next run retries it"
 }
 
+# The reconcile ask answers no decision (fm-send header, "Decision closure"), so it
+# states --answers-none and still lands when the mate has an open keyed decision.
+test_the_ask_is_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local home mate fakebin snap out before
+  { read -r home; read -r mate; read -r fakebin; } < <(make_main_home open-key mate)
+  snap="$home/snapshot.json"
+  write_snapshot "$snap" mate '{"kind":"orphan_in_flight","ids":["ghost"]}'
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$home/state/mate.status"
+  before=$(cat "$home/state/mate.status")
+  out=$(run_notify "$home" "$fakebin" open-key "$snap") || fail "the ask failed against a mate with an open decision: $out"
+  assert_contains "$out" "sent: mate orphan_in_flight" "the ask was not sent: $out"
+  [ "$(inbox_records "$home/state" mate)" -eq 1 ] \
+    || fail "the ask did not land as one durable steering record"
+  assert_contains "$(inbox_text "$home/state" mate)" "check your current books" \
+    "the instruction did not reach the mate"
+  assert_equals "$before" "$(cat "$home/state/mate.status")" "the ask closed or appended something in the mate's status log"
+  assert_contains "$(FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-wake-drain.sh" 2>/dev/null)" "[key=shard-plan]" \
+    "the open decision no longer lists as open after the reconcile ask"
+  pass "the reconcile ask is delivered to a mate with an open keyed decision and leaves it open"
+}
+
 test_busy_lifecycle_locks_never_hold_up_the_digest() {
   local label home mate fakebin snap lock ready release holder notify out i
   for label in reconcile control meta; do
@@ -998,6 +1019,7 @@ test_the_ask_never_arms_a_reply_expectation_or_a_re_ring
 test_a_readable_home_without_a_mismatch_is_never_asked
 test_the_parent_never_changes_the_mates_own_files
 test_a_failed_send_is_retried_on_the_next_run
+test_the_ask_is_delivered_to_a_mate_with_an_open_keyed_decision
 test_busy_lifecycle_locks_never_hold_up_the_digest
 test_concurrent_recaps_send_one_instruction
 test_a_delayed_snapshot_never_prescribes_a_stale_repair

@@ -1124,13 +1124,13 @@ cp -R "$ROOT/bin" "$NOJQ/code/bin"
 cat > "$NOJQ/code/bin/fm-send.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-[ "$#" = 2 ] && [ "$1" = fm-no-jq ] || exit 90
-case "$2" in
-  "CONFIG_REREAD: $NOJQ_SEND_HOME/state/"*) instruction=${2#CONFIG_REREAD: } ;;
+[ "$#" = 3 ] && [ "$1" = fm-no-jq ] && [ "$2" = --answers-none ] || exit 90
+case "$3" in
+  "CONFIG_REREAD: $NOJQ_SEND_HOME/state/"*) instruction=${3#CONFIG_REREAD: } ;;
   *) exit 91 ;;
 esac
 [ -f "$instruction" ] || exit 92
-printf '%s\t%s\n' "$1" "$2" >> "$NOJQ_SEND_LOG"
+printf '%s\t%s\n' "$1" "$3" >> "$NOJQ_SEND_LOG"
 SH
 chmod +x "$NOJQ/code/bin/fm-send.sh"
 for presence in absent index-only dispatch-only; do
