@@ -251,6 +251,9 @@ cmd_build() {
     if [ -n "$request" ]; then
       # shellcheck disable=SC2016 # literal backticks in generated Markdown
       printf 'The request is `request.md`.\n'
+    elif grep -qi '^#\{1,3\} request' "$pack/target.md"; then
+      # shellcheck disable=SC2016 # literal backticks in generated Markdown
+      printf 'There is no separate request file: the request is the REQUEST section of `target.md`.\n'
     fi
     if [ -n "$names" ]; then
       printf 'Context in this folder: %s.\n' "${names#, }"

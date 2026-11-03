@@ -359,6 +359,26 @@ test_leak_check_reads_prose_before_the_list_and_linked_files() {
   pass "the leak check reads a list that follows a prose line and authorizes only files the skill links"
 }
 
+test_pack_names_only_the_request_it_holds() {
+  local src="$TMP_ROOT/rq.md" ctx="$TMP_ROOT/rq-request.md" with without none
+  write_fixture_contract "$src"
+  printf 'The owner wants a thing.\n' >"$ctx"
+  build_pack with --contract "$src" --request "$ctx" || fail "build with a request failed"
+  build_pack without --contract "$src" || fail "build without a request failed"
+  assert_present "$with/request.md" "the request file is missing from the pack"
+  assert_absent "$without/request.md" "a request file appeared though none was given"
+  # shellcheck disable=SC2016 # literal backticks in generated Markdown
+  assert_grep 'The request is `request.md`.' "$with/contract.md" "the pack with a request does not name it"
+  # shellcheck disable=SC2016 # literal backticks in generated Markdown
+  assert_no_grep 'The request is `request.md`.' "$without/contract.md" "the pack without a request names a file it does not hold"
+  # shellcheck disable=SC2016 # literal backticks in generated Markdown
+  assert_grep 'the request is the REQUEST section of `target.md`' "$without/contract.md" "the pack without a request does not point at the REQUEST section"
+  printf '# Fixture\n\n## Definition Of Done\n\n- A1 (mandatory): x\n' >"$TMP_ROOT/rq-none.md"
+  build_pack none --contract "$TMP_ROOT/rq-none.md" || fail "build of a contract with no request section failed"
+  assert_no_grep 'The request is' "$none/contract.md" "a contract with no request is said to have one"
+  pass "the pack names a request only where the pack or the contract holds one"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -370,4 +390,5 @@ fm_test_run_cases \
   test_leak_check_revision_paths_and_excluded_directories \
   test_leak_check_reads_common_report_shapes \
   test_leak_check_reads_prose_before_the_list_and_linked_files \
+  test_pack_names_only_the_request_it_holds \
   -- "$@"

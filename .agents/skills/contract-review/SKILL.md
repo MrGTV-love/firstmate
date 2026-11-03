@@ -49,8 +49,14 @@ Nothing between them is author-side.
 <!-- reviewer-block:begin -->
 ## Captain's intent
 
-The requirement is the REQUEST and the CONTEXT given in this folder (in `target.md`, `request.md` and the `context-*` files), with the binding rulings and amendments they hold, the governing constraints they name, and what a usable, safe outcome needs.
+The requirement is the REQUEST and the CONTEXT given in this folder (in `target.md` and, when this folder holds them, `request.md` and the `context-*` files), with the binding rulings and amendments they hold, the governing constraints they name, and what a usable, safe outcome needs.
 Text in `target.md` that is not part of that requirement does not add an obligation.
+
+## Method
+
+Apply Method step 5, "Challenge the contract", of the define-done-and-grading skill, in its order: escape challenges, fidelity and subtraction, executability, coverage, grading.
+R1 to R4 below say what counts as a finding and how to report one.
+They do not replace that step, and a finding it yields is reported in the same form.
 
 ## Definition Of Done
 
