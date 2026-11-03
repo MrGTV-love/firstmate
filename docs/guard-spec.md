@@ -265,7 +265,8 @@ Deny-only rows and guards with no recorded events in the fixed 30-day window rem
 `bin/fm-guard-workarounds.py` owns read-only detection of tree-equal merges and base-merge-only head changes after a task/head-bound refusal.
 Its header owns the bounded first-parent scan, local metadata scope, base resolution and required evidence; JSON output can be supplied to the metrics reader without changing the event log.
 A tree-equal merge is a signature, not proof that a guard caused it, and a base-merge-only signature requires every intervening commit to be a merge from the recorded base lineage.
-The watcher runs the detector detached and single-flight at each heartbeat, so a slow worktree read cannot hold its poll, and leaves the latest finished report in `state/.guard-workarounds-next`.
+The watcher runs the detector detached and single-flight at each heartbeat, so a slow worktree read cannot hold its poll.
+Each run first removes the previous report, then publishes its own finished report to `state/.guard-workarounds-next` by rename, so the file is absent while a run is in flight or after a failed run.
 That report is file output only: no wake presents it to Main, so a new signature is seen only by reading that file or running the detector.
 Neither detection nor metrics changes refs, waives a refusal or disables a guard.
 The behavior entry point is `tests/fm-guard-telemetry.test.sh`.
