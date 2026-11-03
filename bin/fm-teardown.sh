@@ -64,9 +64,10 @@
 # A member PR that a merge train carried ends CLOSED, not merged, when the train
 # lands by squash. It has landed when the forge shows a train PR MERGED into the
 # task's base whose body lists exactly this member's URL "at <40-hex sha>" with the
-# member PR's recorded head, whose head contains that sha, and whose head carries
-# the copy's work by the ancestor or patch proofs above (teardown_train_landed owns
-# the rule). The record-only routes (copy gone, slot reassigned) apply the same
+# member PR's recorded head, whose head carries that sha (an ancestor, or every
+# commit of it replayed there by equivalent patch ids, as a flat pipeline rebase
+# leaves it), and whose head carries the copy's work by the same ancestor or patch
+# proofs above (teardown_train_landed owns the rule). The record-only routes (copy gone, slot reassigned) apply the same
 # train rule and read no copy. The train is found by searching the forge for the
 # member URL, never by a title, branch name or comment text, and a forge or fetch
 # read that fails is unknown (retry), never landed. The archive-branch reaper
@@ -2678,10 +2679,13 @@ pr_is_merged() {
 # when the forge shows a train PR that is MERGED into the task's base (base_branch=
 # when recorded, else the default branch), whose body lists "<member PR URL> at
 # <40-hex sha>" for exactly this member, whose sha is the member PR's recorded head
-# (the forge's headRefOid), and whose head contains that sha. Work mode (a copy in
-# TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that train
-# head, by the same ancestor, replayed-patch and rebased-patch proofs pr_is_merged
-# applies to the PR head; record mode (copy gone or slot reassigned) reads no copy.
+# (the forge's headRefOid), and whose head carries that sha: an ancestor of the train
+# head, or every commit of it replayed there with an equivalent patch id (a train
+# the pipeline rebased flat does not contain the member head itself). Work mode (a
+# copy in TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that
+# train head; both tests are teardown_train_carries, the ancestor, replayed-patch
+# and rebased-patch proofs pr_is_merged applies to the PR head. Record mode (copy
+# gone or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
 # A forge or fetch read that fails sets TEARDOWN_TRAIN_UNASKED (unknown, retry);
@@ -2689,6 +2693,15 @@ pr_is_merged() {
 TEARDOWN_TRAIN_UNASKED=
 TEARDOWN_TRAIN_WHY=
 TEARDOWN_TRAIN_ANNOUNCED=0
+# Is <ref> carried by <train head>: an ancestor of it, or its commits replayed there?
+teardown_train_carries() {  # <ref> <train head>
+  local TEARDOWN_LANDED_REF=$1
+  TEARDOWN_UNPROVEN_COMMITS=
+  git -C "${TEARDOWN_LANDED_DIR:-$WT}" merge-base --is-ancestor "$1" "$2" 2>/dev/null \
+    || unpushed_patches_are_in_pr_head "$2" \
+    || rebased_commits_are_in_pr_head "$2"
+}
+
 teardown_train_landed() {  # work <member pr url or number> | record <member pr url>
   local mode=$1 target=$2 view state remainder mhead murl base found list candidates
   local n u s b h shas why='' current
@@ -2780,8 +2793,9 @@ for pr in prs:
       TEARDOWN_TRAIN_UNASKED="the head ${mhead:0:12} of $murl could not be fetched"
       return 1
     }
-    if ! git -C "$dir" merge-base --is-ancestor "$mhead" "$h" 2>/dev/null; then
-      why="${why}train PR $u lists $murl at ${mhead:0:12}, but the train head ${h:0:12} does not contain it"$'\n'
+    if ! teardown_train_carries "$mhead" "$h"; then
+      TEARDOWN_UNPROVEN_COMMITS=
+      why="${why}train PR $u lists $murl at ${mhead:0:12}, but the train head ${h:0:12} neither contains it nor carries every commit of it"$'\n'
       continue
     fi
     if [ "$mode" = work ]; then
@@ -2789,11 +2803,7 @@ for pr in prs:
         TEARDOWN_TRAIN_UNASKED="HEAD of $dir cannot be resolved"
         return 1
       }
-      if git -C "$dir" merge-base --is-ancestor "$current" "$h" 2>/dev/null \
-         || unpushed_patches_are_in_pr_head "$h" \
-         || rebased_commits_are_in_pr_head "$h"; then
-        :
-      else
+      if ! teardown_train_carries "$current" "$h"; then
         why="${why}train PR $u is a verified train for $murl, but this copy's work is not proven present in its head ${h:0:12}"$'\n'
         continue
       fi

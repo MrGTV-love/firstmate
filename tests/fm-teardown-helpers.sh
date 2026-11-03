@@ -3305,18 +3305,22 @@ TRAIN_MEMBER_HEAD=
 TRAIN_HEAD=
 TRAIN_COPY_HEAD=
 
-# setup_train_history <case-dir> <landing: none|squash> <copy: head|prerebase|inside|extra>
-# Builds the member PR head H (feature.txt on top of a moved main), the train head
-# (a merge of H plus a second member's commit), and then moves the default branch
+# setup_train_history <case-dir> <landing: none|squash> <copy: head|prerebase|inside|extra> [train: merge|flat|flat-missing]
+# Builds the member PR head H (two commits on top of a moved main: feature.txt, then
+# feature2.txt), the train head (a merge of H plus a second member's commit), and
+# then moves the default branch
 # on by editing feature.txt, so the content-in-default proof can never match.
 #   landing squash: the default branch also holds the train's squash commit.
+#   train flat: the pipeline rebased the train flat, so it replays the member's two
+#     commits as new commits and does not contain H. flat-missing: it replays only
+#     the second, so one of the member's commits never reached the train.
 #   copy head: the copy sits at H. prerebase: at a commit with H's patch on the old
 #     main. inside: at the train's merge of H, later than H. extra: at H plus a
 #     commit the train never merged.
 # TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
 # Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
 setup_train_history() {
-  local case_dir=$1 landing=$2 copy=$3 tmp="$1/_train" prerebase= merge_commit
+  local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase= merge_commit
   if [ "$copy" = prerebase ]; then
     wt_commit_file "$case_dir" feature.txt hello "add feature"
     prerebase=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -3332,10 +3336,18 @@ setup_train_history() {
   printf '%s\n' hello > "$tmp/feature.txt"
   git -C "$tmp" add -- feature.txt
   git -C "$tmp" commit -q -m "add feature"
+  printf '%s\n' hello2 > "$tmp/feature2.txt"
+  git -C "$tmp" add -- feature2.txt
+  git -C "$tmp" commit -q -m "add feature two"
   TRAIN_MEMBER_HEAD=$(git -C "$tmp" rev-parse HEAD)
   git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
   git -C "$tmp" checkout -q -b train main
-  git -C "$tmp" merge -q --no-ff --no-edit member
+  case "$shape" in
+    merge) git -C "$tmp" merge -q --no-ff --no-edit member ;;
+    flat) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member~1 member >/dev/null ;;
+    flat-missing) GIT_COMMITTER_DATE="2030-01-01T00:00:00Z" git -C "$tmp" cherry-pick member >/dev/null ;;
+    *) fail "setup_train_history: unknown train shape $shape" ;;
+  esac
   merge_commit=$(git -C "$tmp" rev-parse HEAD)
   printf '%s\n' second > "$tmp/second.txt"
   git -C "$tmp" add -- second.txt
@@ -3429,7 +3441,7 @@ SH
   chmod +x "$1/fakebin/treehouse"
 }
 
-# train_case <name> <landing> <copy> [<base-branch recorded in meta>]: a task whose
+# train_case <name> <landing> <copy> [<base-branch recorded in meta>] [<train shape>]: a task whose
 # member PR is CLOSED and whose train is listed and merged, ready to run teardown.
 # Sets TRAIN_CASE.
 train_case() {
@@ -3437,7 +3449,7 @@ train_case() {
   write_meta "$TRAIN_CASE" no-mistakes ship
   append_pr_meta_url "$TRAIN_CASE"
   [ -z "${4:-}" ] || printf 'base_branch=%s\n' "$4" >> "$TRAIN_CASE/state/task-x1.meta"
-  setup_train_history "$TRAIN_CASE" "$2" "$3"
+  setup_train_history "$TRAIN_CASE" "$2" "$3" "${5:-merge}"
   add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
   train_default_list "$TRAIN_CASE"
   add_logging_treehouse "$TRAIN_CASE"

@@ -3922,7 +3922,7 @@ test_train_refuses_a_listing_that_is_not_the_members_head() {
   printf '%s\n' "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)" > "$TRAIN_CASE/gh-fixture/member-head"
   train_list "$TRAIN_CASE" 9 MERGED main "$TRAIN_HEAD" \
     "$(train_body "$TRAIN_MEMBER_URL" "$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)")"
-  assert_train_refused "$TRAIN_CASE" "train-not-contained" "does not contain it"
+  assert_train_refused "$TRAIN_CASE" "train-not-contained" "neither contains it nor carries every commit of it"
   pass "a train listing another sha, or a sha its head does not contain, is refused"
 }
 
@@ -4127,6 +4127,28 @@ test_train_member_removed_copy_in_pool_slot() {
   pass "a removed copy's branch in a pool slot is landed by a verified train only"
 }
 
+# A train the pipeline rebased flat (Vernant's squash-only history) does not contain
+# the member head: it replays the member's commits as new commits. The listed head
+# is then carried when every one of its commits has an equivalent patch in the train.
+test_train_flattened_rebase_carries_the_listed_head() {
+  local copy
+  for copy in head prerebase; do
+    train_case "train-flat-$copy" squash "$copy" "" flat
+    if git -C "$TRAIN_CASE/wt" merge-base --is-ancestor "$TRAIN_MEMBER_HEAD" "$TRAIN_HEAD"; then
+      fail "train-flat-$copy: the flat train contains the member head"
+    fi
+    assert_train_allowed "$TRAIN_CASE" "train-flat-$copy"
+  done
+  pass "a flattened-rebase train that replays every member commit is accepted although it does not contain the member head"
+}
+
+test_train_flattened_rebase_missing_a_member_commit_refuses() {
+  train_case train-flat-missing squash head "" flat-missing
+  assert_train_refused "$TRAIN_CASE" "train-flat-missing" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-flat-missing: the train was accepted"
+  pass "a flattened train missing one commit of the member head is refused"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -4192,6 +4214,8 @@ test_train_member_copy_inside_train_allows
 test_train_refuses_when_no_merged_pr_lists_the_member
 test_train_refuses_a_listing_that_is_not_the_members_head
 test_train_refuses_copy_work_the_train_does_not_carry
+test_train_flattened_rebase_carries_the_listed_head
+test_train_flattened_rebase_missing_a_member_commit_refuses
 test_train_dirty_copy_refuses_before_the_train_is_read
 test_train_refuses_a_train_that_is_not_merged
 test_train_refuses_a_train_merged_into_another_branch
