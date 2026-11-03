@@ -1,0 +1,33 @@
+## state files for task-held2 (sha256)
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.backlog-close 41489c1eb9d78c3cfe60b168cb328f3a8d17b548b15b7d0d44c11fb25fabf79c
+dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.inbox
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.meta d02681acbf259e0f025616a8c66deee80cdee3b6cd8febb25efaf090116ab70f
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.teardown-return-pending 449a8db9796016495ba67ab52ccdd11a95484916ae4f4fe802e8fb0c1e6ddf90
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held2.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+## tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held2/tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held2/tasktmp/scratch.txt
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/task-held2-v2 present
+copy-head 892b5fa8d82ba882745fda05579e154b1c8f9f46
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project present
+slot-head 892b5fa8d82ba882745fda05579e154b1c8f9f46
+ref refs/heads/fm/other-lane 5cc0a24f9a131fd2036d301154f0569fe780a168
+ref refs/heads/fm/task-held2-v2 892b5fa8d82ba882745fda05579e154b1c8f9f46
+ref refs/heads/main 892b5fa8d82ba882745fda05579e154b1c8f9f46
+## slot claim
+claim task=task-held2
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project","leased":null,"lease_holder":"","status":"dirty"}]
+## tmux windows (lab socket)
+firstmate:fm-task-held2
+## backlog row
+task:
+  id: task-held2
+  title: lab nested fixture held2
+  state: in_flight
+  blocked: no
+  blocked_by: none

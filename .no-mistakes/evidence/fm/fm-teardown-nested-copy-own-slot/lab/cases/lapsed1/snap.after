@@ -1,0 +1,24 @@
+## state files for task-lapsed1 (sha256)
+## tasktmp
+tasktmp absent
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project/.claude/worktrees/task-lapsed1-v2 absent
+copy-head absent
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project present
+slot-head d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+ref refs/heads/fm/task-lapsed1-v2 d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+ref refs/heads/main d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+## slot claim
+claim absent
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project","leased":null,"lease_holder":"","status":"available"}]
+## tmux windows (lab socket)
+window fm-task-lapsed1 absent
+## backlog row
+task:
+  id: task-lapsed1
+  title: lab nested fixture lapsed1
+  state: done
+  blocked: no
+  blocked_by: none

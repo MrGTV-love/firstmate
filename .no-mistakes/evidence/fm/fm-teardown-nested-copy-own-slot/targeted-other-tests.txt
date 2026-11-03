@@ -1,0 +1,7 @@
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record
+rc=0
+ok - a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record
+ok - a held close whose slot leases finishes and retires the pending-close record an earlier run left
+rc=0
+ok - a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does
+rc=0

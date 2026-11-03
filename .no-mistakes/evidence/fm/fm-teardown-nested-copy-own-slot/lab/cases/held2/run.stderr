@@ -1,0 +1,3 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.dcd379
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: the held-copy record /Users/charlesabrooker/tmp/fm-lab.dcd379/data/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed.

@@ -1,0 +1,7 @@
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned under --force --drop-file
+ok - an entry refusal for the slot root's unlanded commit or the nested copy's dirt changes nothing, for a prior and a plain record
+ok - a plain nested record gets the prior shape's result for every claim state and fixture
+ok - a scout with a plain nested copy in its claimed slot is left as before: refused, copy, claim and record kept, no slot returned
+ok - the recorded gate-409 case tears down, returns the slot and clears both leftover files
+ok - the recorded gate-409 case refuses naming the slot root and its HEAD, with every file left as it was

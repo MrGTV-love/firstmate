@@ -1,0 +1,50 @@
+===== held2 (ordinary close, foreign unlanded copy held, held-copy record path is a directory) rc=1
+REFUSED: the held-copy record /Users/charlesabrooker/tmp/fm-lab.dcd379/data/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed.
+--- diff before/after (incl. treehouse lease state, tmux window, both leftover markers)
+NO DIFFERENCE
+FOREIGN COPY UNCHANGED
+--- treehouse status now:
+[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project","status":"dirty","branch":"","detached":true,"flavor":"git","lease_id":"","lease_holder":"","leased_at":null,"processes":[]}]
+===== held2 rerun with the held-copy record writable rc=0
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two stays in pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project: its HEAD 5cc0a24f9a13 is not proved landed.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two: list the commits only it holds with git -C /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two log --oneline HEAD --not --remotes, land them, remove the copy with git -C /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project worktree remove /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held2/project && treehouse return /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project --if-lease-holder task-held2 </dev/null).
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/held-foreign-copies.log.
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held2/project: already current
+teardown task-held2 complete (window firstmate:fm-task-held2; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-held2 is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+🌳 Leased worktree 1 at ~/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project. Run 'treehouse return ~/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project' to release it.
+--- after2
+## state files for task-held2 (sha256)
+## tasktmp
+tasktmp absent
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/task-held2-v2 absent
+copy-head absent
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project present
+slot-head 892b5fa8d82ba882745fda05579e154b1c8f9f46
+ref refs/heads/fm/other-lane 5cc0a24f9a131fd2036d301154f0569fe780a168
+ref refs/heads/fm/task-held2-v2 892b5fa8d82ba882745fda05579e154b1c8f9f46
+ref refs/heads/main 892b5fa8d82ba882745fda05579e154b1c8f9f46
+## slot claim
+claim task=task-held2
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project","leased":null,"lease_holder":"task-held2","status":"leased"}]
+## tmux windows (lab socket)
+window fm-task-held2 absent
+## backlog row
+task:
+  id: task-held2
+  title: lab nested fixture held2
+  state: done
+  blocked: no
+  blocked_by: none
+FOREIGN COPY UNCHANGED AFTER HELD CLOSE
+--- treehouse status json:
+[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project","status":"leased","branch":"","detached":true,"flavor":"git","lease_id":"fe42262e3ab97e5626ab7dd027d09165","lease_holder":"task-held2","leased_at":"2026-11-03T10:32:26.416424-06:00","processes":[]}]
+--- held record:
+2026-11-03T16:32:28Z	task-held2	/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project	/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b823ff/1/project/.claude/worktrees/fc-two	its HEAD 5cc0a24f9a13 is not proved landed

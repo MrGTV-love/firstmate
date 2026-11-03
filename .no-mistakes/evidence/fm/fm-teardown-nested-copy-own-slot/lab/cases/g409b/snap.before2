@@ -1,0 +1,32 @@
+## state files for task-g409b (sha256)
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.backlog-close a7417ac6a082c9627f1a791af025820b39831004116822d38549eaacfd4ab61b
+dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.inbox
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.meta f9691375623d57f968d03eb9ac96e31b60cf62fdcab70fda8691562cf16a5ab5
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.teardown-return-pending 14b1f72068a1b7ee1ce30714d6c0cc060cd6f25cef1536a10d3c25f3fa80914f
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-g409b.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+## tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/g409b/tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/g409b/tasktmp/scratch.txt
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-ee3f7d/1/project/.claude/worktrees/task-g409b-v2 present
+copy-head d838f97db197ff11952b5d1d5fd183b5a87d4455
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-ee3f7d/1/project present
+slot-head ce130b60d0cc2b8f4e5718f12fd4d42dd130e45e
+ref refs/heads/fm/task-g409b-v2 d838f97db197ff11952b5d1d5fd183b5a87d4455
+ref refs/heads/main ce130b60d0cc2b8f4e5718f12fd4d42dd130e45e
+## slot claim
+claim task=task-g409b
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-ee3f7d/1/project","leased":null,"lease_holder":"task-g409b","status":"leased"}]
+## tmux windows (lab socket)
+firstmate:fm-task-g409b
+## backlog row
+task:
+  id: task-g409b
+  title: lab nested fixture g409b
+  state: in_flight
+  blocked: no
+  blocked_by: none

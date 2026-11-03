@@ -1,0 +1,90 @@
+===== lapsed1 rc=0
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/lapsed1/project: already current
+teardown task-lapsed1 complete (window firstmate:fm-task-lapsed1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project/.claude/worktrees/task-lapsed1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project returned)
+Backlog: task-lapsed1 is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+🌳 Leased worktree 1 at ~/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project. Run 'treehouse return ~/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project' to release it.
+--- before
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project","leased":null,"lease_holder":"","status":"dirty"}]
+## tmux windows (lab socket)
+--- after
+## state files for task-lapsed1 (sha256)
+## tasktmp
+tasktmp absent
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project/.claude/worktrees/task-lapsed1-v2 absent
+copy-head absent
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project present
+slot-head d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+ref refs/heads/fm/task-lapsed1-v2 d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+ref refs/heads/main d5d5aa3e3ca4caa1c90617d29aafecb6704852a6
+## slot claim
+claim absent
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project","leased":null,"lease_holder":"","status":"available"}]
+## tmux windows (lab socket)
+window fm-task-lapsed1 absent
+## backlog row
+task:
+  id: task-lapsed1
+  title: lab nested fixture lapsed1
+  state: done
+  blocked: no
+  blocked_by: none
+===== held1 (held-copy record is a directory) rc=1
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.dcd379/data/task-held1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/task-held1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two stays in pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project: its HEAD 72578df511d9 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two (its HEAD 72578df511d9 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project contains registered copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two that is not one of task task-held1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- diff before/after
+NO DIFFERENCE
+FOREIGN COPY UNCHANGED
+===== held1 rerun with the record writable rc=1
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.dcd379/data/task-held1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/task-held1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two stays in pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project: its HEAD 72578df511d9 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two (its HEAD 72578df511d9 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project contains registered copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/fc-two that is not one of task task-held1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- after2
+## state files for task-held1 (sha256)
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.backlog-close 0e6673a430c567d6560540af44f2f6b79fa1d26b70d6a120ca02092bcae08147
+dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.inbox
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.meta c3344a97a950033efa1391f6b07559f4ab08a40aa7e37a105edaff2c6a6f2578
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.teardown-return-pending 504a9612cfe483bd63f4034781486ddccf55b78d1f78df7d3dbb5f527f9060bd
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-held1.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+## tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held1/tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/held1/tasktmp/scratch.txt
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project/.claude/worktrees/task-held1-v2 present
+copy-head 893128bd889ca72d08414586f41d34b1a9d6085e
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project present
+slot-head 893128bd889ca72d08414586f41d34b1a9d6085e
+ref refs/heads/fm/other-lane 72578df511d928ce68bcca9c4a2a59c03202385b
+ref refs/heads/fm/task-held1-v2 893128bd889ca72d08414586f41d34b1a9d6085e
+ref refs/heads/main 893128bd889ca72d08414586f41d34b1a9d6085e
+## slot claim
+claim task=task-held1
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-d0e58f/1/project","leased":null,"lease_holder":"","status":"dirty"}]
+## tmux windows (lab socket)
+firstmate:fm-task-held1
+## backlog row
+task:
+  id: task-held1
+  title: lab nested fixture held1
+  state: in_flight
+  blocked: no
+  blocked_by: none
+--- foreign copy: present head=72578df511d928ce68bcca9c4a2a59c03202385b
+--- held record:
+cat: /Users/charlesabrooker/tmp/fm-lab.dcd379/data/held-foreign-copies.log: No such file or directory

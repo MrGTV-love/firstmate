@@ -1,0 +1,100 @@
+===== case plain1 claim=mine variant=landed prior_line=0 args= -> rc=0
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/plain1/project: already current
+teardown task-plain1 complete (window firstmate:fm-task-plain1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project/.claude/worktrees/task-plain1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project returned)
+Backlog: task-plain1 is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- diff before/after:
+2,5d1
+< dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-plain1.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-plain1.meta 4a282b62911347008c6d46687b60f3d15ec19a0ef780a9b089b5ba7060147b8c
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-plain1.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-plain1.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+7,8c3
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/plain1/tasktmp
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/plain1/tasktmp/scratch.txt
+---
+> tasktmp absent
+10,11c5,6
+< copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project/.claude/worktrees/task-plain1-v2 present
+< copy-head 31e655ff927765551aa03f5fdaacd5b0ada47f32
+---
+> copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project/.claude/worktrees/task-plain1-v2 absent
+> copy-head absent
+18,19c13
+< claim task=task-plain1
+< claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+---
+> claim absent
+21c15
+< [{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project","leased":null,"lease_holder":"task-plain1","status":"leased"}]
+---
+> [{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-b6a3a0/1/project","leased":null,"lease_holder":"","status":"available"}]
+23c17
+< firstmate:fm-task-plain1
+---
+> window fm-task-plain1 absent
+28c22
+<   state: in_flight
+---
+>   state: done
+===== case other1 claim=other variant=landed prior_line=0 args= -> rc=0
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1/project: already current
+teardown task-other1 complete (window firstmate:fm-task-other1; reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-434bc2/1/project/.claude/worktrees/task-other1-v2 left in place, since it is not a pool slot)
+Backlog: task-other1 is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+warning: task task-other1's recorded worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-434bc2/1/project was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-lab.dcd379), which claimed that pool slot after this record was written; that slot is no longer task-other1's, so its processes, copy, and claim are left untouched and only task-other1's own cleanup runs.
+--- diff before/after:
+2,5d1
+< dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1.meta 047c98f56439574ce5dc2b39fbd79545e6116cfc721340d3b28bb21f29c8672c
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+7,8c3
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1/tasktmp
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1/tasktmp/scratch.txt
+---
+> tasktmp absent
+23c18
+< firstmate:fm-task-other1
+---
+> window fm-task-other1 absent
+28c23
+<   state: in_flight
+---
+>   state: done
+===== case other1p claim=other variant=landed prior_line=1 args= -> rc=0
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1p/project: already current
+teardown task-other1p complete (window firstmate:fm-task-other1p; reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project/.claude/worktrees/task-other1p-v2 left in place, since it is not a pool slot)
+notice: task-other1p's prior copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+Backlog: task-other1p is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+warning: task task-other1p's recorded worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project was reassigned to task other-task (home /Users/charlesabrooker/tmp/fm-lab.dcd379), which claimed that pool slot after this record was written; that slot is no longer task-other1p's, so its processes, copy, and claim are left untouched and only task-other1p's own cleanup runs.
+--- diff before/after:
+2,5d1
+< dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.inbox
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.meta 546ec7653f452c4e3934b53482d4bbb331e638325e42ba5d0ef22e8d367c4130
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+< file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+7,8c3
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1p/tasktmp
+< /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1p/tasktmp/scratch.txt
+---
+> tasktmp absent
+23c18
+< firstmate:fm-task-other1p
+---
+> window fm-task-other1p absent
+28c23
+<   state: in_flight
+---
+>   state: done
+===== case dirty1 claim=mine variant=copy-dirty prior_line=0 args= -> rc=1
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-3e0b02/1/project/.claude/worktrees/task-dirty1-v2 has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+--- diff before/after:
+NO DIFFERENCE
+===== case dirty1p claim=mine variant=copy-dirty prior_line=1 args= -> rc=1
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-f89305/1/project/.claude/worktrees/task-dirty1p-v2 has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+--- diff before/after:
+NO DIFFERENCE

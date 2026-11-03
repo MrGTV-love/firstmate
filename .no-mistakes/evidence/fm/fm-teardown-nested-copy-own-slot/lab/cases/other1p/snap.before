@@ -1,0 +1,30 @@
+## state files for task-other1p (sha256)
+dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.inbox
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.meta 546ec7653f452c4e3934b53482d4bbb331e638325e42ba5d0ef22e8d367c4130
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-other1p.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+## tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1p/tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/other1p/tasktmp/scratch.txt
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project/.claude/worktrees/task-other1p-v2 present
+copy-head e5a0c8b667e1186f5a25380b0c96116c7fce3a85
+copy-status 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project present
+slot-head e5a0c8b667e1186f5a25380b0c96116c7fce3a85
+ref refs/heads/fm/task-other1p-v2 e5a0c8b667e1186f5a25380b0c96116c7fce3a85
+ref refs/heads/main e5a0c8b667e1186f5a25380b0c96116c7fce3a85
+## slot claim
+claim task=other-task
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-fab5f1/1/project","leased":null,"lease_holder":"task-other1p","status":"leased"}]
+## tmux windows (lab socket)
+firstmate:fm-task-other1p
+## backlog row
+task:
+  id: task-other1p
+  title: lab nested fixture other1p
+  state: in_flight
+  blocked: no
+  blocked_by: none

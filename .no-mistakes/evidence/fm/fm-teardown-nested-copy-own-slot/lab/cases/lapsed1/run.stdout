@@ -1,0 +1,5 @@
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/lapsed1/project: already current
+teardown task-lapsed1 complete (window firstmate:fm-task-lapsed1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project/.claude/worktrees/task-lapsed1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-e57410/1/project returned)
+Backlog: task-lapsed1 is closed in /Users/charlesabrooker/tmp/fm-lab.dcd379/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.

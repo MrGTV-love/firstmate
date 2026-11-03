@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.dcd379
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-f89305/1/project/.claude/worktrees/task-dirty1p-v2 has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).

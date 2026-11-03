@@ -1,0 +1,30 @@
+## state files for task-dirty1 (sha256)
+dir /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-dirty1.inbox
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-dirty1.meta dd350a49682b8512593f28b3748184c681508f603ab7b20bec91849f61a7fc92
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-dirty1.status d8ef2667158108d72727a5224b68a9c87b9b6fa95a69db1631e02fef9c78a500
+file /Users/charlesabrooker/tmp/fm-lab.dcd379/state/task-dirty1.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+## tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/dirty1/tasktmp
+/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/dirty1/tasktmp/scratch.txt
+## copy and slot
+copy /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-3e0b02/1/project/.claude/worktrees/task-dirty1-v2 present
+copy-head abf49f04229b448f91fc7f7743d62a57e3790e86
+copy-status A  dirty.txt 
+slot /Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-3e0b02/1/project present
+slot-head abf49f04229b448f91fc7f7743d62a57e3790e86
+ref refs/heads/fm/task-dirty1-v2 abf49f04229b448f91fc7f7743d62a57e3790e86
+ref refs/heads/main abf49f04229b448f91fc7f7743d62a57e3790e86
+## slot claim
+claim task=task-dirty1
+claim home=/Users/charlesabrooker/tmp/fm-lab.dcd379
+## treehouse status (real, temp root)
+[{"path":"/Users/charlesabrooker/tmp/fm-lab-work.qADKuX/th/.treehouse/project-3e0b02/1/project","leased":null,"lease_holder":"task-dirty1","status":"leased"}]
+## tmux windows (lab socket)
+firstmate:fm-task-dirty1
+## backlog row
+task:
+  id: task-dirty1
+  title: lab nested fixture dirty1
+  state: in_flight
+  blocked: no
+  blocked_by: none
