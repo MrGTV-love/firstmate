@@ -214,9 +214,26 @@ def assert_no_spacing(folder, names):
     return gaps
 
 
+def live_entries(folder, pattern='pipeline-waiter-*.lock'):
+    """Entries whose owner still holds its lock; a dead owner's inert file does not count."""
+    import fcntl
+    live = 0
+    for path in (folder / 'pool').glob(pattern):
+        try:
+            fd = os.open(str(path), os.O_RDONLY)
+        except FileNotFoundError:
+            continue
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            live += 1
+        finally:
+            os.close(fd)
+    return live
+
+
 def pending(folder, count):
-    wait_for(lambda: len(list((folder / 'pool').glob('pipeline-waiter-*.lock'))) == count,
-             str(count) + ' registered waiters')
+    wait_for(lambda: live_entries(folder) == count, str(count) + ' registered waiters')
 
 
 def held(env):
@@ -446,6 +463,89 @@ try:
     folder, db, env = case('busy-but-fits', cores=18, running=0, measured=True, available=40 * GIB, load=500)
     finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'busy.marker')], env, folder / 'busy'))
     assert (folder / 'busy.marker').exists()
+
+    # The fleet's recorded healthy states are admitted at the first poll, and a fit that fails still waits.
+    # Inputs: R 5.77 GiB and S 13.39 GiB (Main's live diagnosis), A = 1953340270 bytes (the largest
+    # per-run concurrent demand of every run but the largest in the copied readings record).
+    diag_peaks = [1.0, 2.0, 5.77, 13.39]
+    diag_active = 1953340270
+
+    def steps(db, rows):
+        for run, name, status, pid in rows:
+            change(db, 'INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES (?, ?, ?, ?, ?, ?)',
+                   (run + '-' + name, run, name, 1, status, pid))
+
+    def counted_case(name, available, active, waiting_ci=(), invisible=()):
+        """Counted runs: active is (id, rss) at an agent step; waiting_ci and invisible list runs the reading cannot see."""
+        folder, db, env = case(name, measured=True, available=available)
+        calibrate(folder, peaks=diag_peaks, active=diag_active)
+        for run, _ in active:
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES (?, 'running', 'repo')", (run,))
+        for run in list(waiting_ci) + list(invisible):
+            change(db, "INSERT INTO runs (id, status, repo_id) VALUES (?, 'running', 'repo')", (run,))
+        steps(db, [(run, 'review', 'fixing', 4000 + i) for i, (run, _) in enumerate(active)] +
+              [(run, 'ci', 'running', None) for run in waiting_ci])
+        facts(folder, available=available, runs=[('repo', run, rss) for run, rss in active])
+        return folder, db, env
+
+    # (a) Main's live case: 11 counted, 4 waiting on remote CI with no agent and no memory.
+    live = [('test-fixing', int(0.70 * GIB)), ('review-a', int(0.43 * GIB)), ('lint', int(2.22 * GIB)),
+            ('review-b', int(0.13 * GIB)), ('pr', int(0.13 * GIB)), ('test', int(0.43 * GIB)), ('review-c', int(0.73 * GIB))]
+    folder, db, env = counted_case('p1-live', 32.82 * GIB // 16384 * 16384, live, waiting_ci=['ci-361', 'ci-367', 'ci-369', 'ci-3609'])
+    finish(launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'sh', '-c', 'exit 3'], env, folder / 'p1a'), 3)
+    text = (folder / 'p1a.stderr').read_text()
+    assert 'admitted: counted=11 ' in text and 'start waiting' not in text and 'ci-361:ci-waiting:0:unseen' in text \
+        and 'lint:active:%d' % int(2.22 * GIB) in text and 'review-b:active:%d' % diag_active in text, text
+    # (b) the 2026-11-03 14:14Z record: 12 runs holding 20.1 GiB together, 25.27 GiB available.
+    recorded = [21299200, 118226944, 491290624, 545144832, 574226432, 652591104, 673792000, 1083260928,
+                1926561792, 3074097152, 5121441792, 7301611520]
+    shape = [('run-%02d' % i, rss) for i, rss in enumerate(recorded)]
+    folder, db, env = counted_case('p1-recorded', 27132805120, shape)
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'p1b')], env, folder / 'p1b'))
+    text = (folder / 'p1b.stderr').read_text()
+    assert 'admitted: counted=12 ' in text and 'start waiting' not in text, text
+    projected = 9 * diag_active + 3074097152 + 5121441792 + 7301611520 + int(13.39 * GIB)
+    threshold = projected - sum(recorded)
+    assert 'projected=%d budget=%d' % (projected, 27132805120 + sum(recorded)) in text, (projected, text)
+    # (c) control: the same state with available memory one page below the fit waits and names its inputs.
+    folder, db, env = counted_case('p1-control', threshold // 16384 * 16384 - 16384, shape)
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'p1c')], env, folder / 'p1c')
+    pending(folder, 1)
+    wait_for(lambda: 'waiting: counted=12 projected=%d ' % projected in (folder / 'p1c.stderr').read_text(), 'fit fails at healthy pressure')
+    assert not (folder / 'p1c').exists() and 'reserved=[run-00:active:' in (folder / 'p1c.stderr').read_text()
+    os.killpg(child.pid, signal.SIGTERM)
+    finish(child, -signal.SIGTERM)
+
+    # Which counted runs reserve: with R = 3, S = 8 and 10 GiB available, a counted run that reserves
+    # R makes 11 GiB and waits, while one that holds only its resident memory admits.
+    for label, rows, visible, admitted in (
+            ('ci-waiting', [('x', 'ci', 'running', None)], [], True),
+            ('ci-waiting-raised', [('x', 'ci', 'running', None)], [('repo', 'x', 4 * GIB)], True),
+            ('ci-agent-resumed', [('x', 'ci', 'fixing', 4321)], [], False),
+            ('ci-agent-pid', [('x', 'ci', 'running', 4321)], [], False),
+            ('just-registered', [], [], False),
+            ('step-unreadable', None, [], False),
+            ('other-step', [('x', 'review', 'running', None)], [], False)):
+        folder, db, env = case('p2-' + label, measured=True, available=10 * GIB)
+        change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
+        if rows is None:
+            change(db, 'DROP TABLE step_results')
+        else:
+            steps(db, rows)
+        facts(folder, available=10 * GIB, runs=visible)
+        log = folder / 'p2.stderr'
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'p2')], env, folder / 'p2')
+        if admitted:
+            finish(child)
+            held_now = visible[0][2] if visible else 0
+            assert 'admitted: counted=1 projected=%d ' % (held_now + 8 * GIB) in log.read_text() and \
+                'holding_only=[x:ci-waiting:%d' % held_now in log.read_text(), (label, log.read_text())
+        else:
+            pending(folder, 1)
+            wait_for(lambda: 'waiting: counted=1 projected=%d ' % (11 * GIB) in log.read_text(), label + ' keeps its reservation')
+            assert not (folder / 'p2').exists() and 'reserved=[x:' in log.read_text(), (label, log.read_text())
+            os.killpg(child.pid, signal.SIGTERM)
+            finish(child, -signal.SIGTERM)
 
     # Pause-only backstop (M3). Fitting reservations never override it, it stops nothing
     # that runs, and an unreadable observation never reads as an empty host.
@@ -739,6 +839,88 @@ if name == 'outer':
     child = launch(duration + ['axi', 'run'], env, folder / 'reattach')
     finish(child)
     assert (folder / 'reattach.started').exists()
+    # Every genuinely new run joins the one queue, whatever its command formatting; reattachment,
+    # responses and status reads never queue. The fake client follows the real CLI's facts: a
+    # rerun or an axi run with an intent input starts a run; axi run without one reattaches an
+    # active run or exits 2 when none is active (internal/cli/axi_drive.go).
+    nm_bin = root / 'nmbin'
+    nm_bin.mkdir()
+    fake = nm_bin / 'no-mistakes'
+    fake.write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys
+folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
+fresh = args[:1] == ['rerun'] or (args[:2] == ['axi', 'run'] and any(
+    a in ('--intent', '--intent-file') or a.startswith(('--intent=', '--intent-file=')) for a in args[2:]))
+with sqlite3.connect(folder / 'state.sqlite') as db:
+    active = db.execute("SELECT count(*) FROM runs WHERE status = 'running'").fetchone()[0]
+    if fresh:
+        db.execute("INSERT INTO runs (id, status) VALUES (?, 'running')", (os.environ['CASE_NAME'],))
+if args[:2] == ['axi', 'run'] and not fresh and not active:
+    print('error: --intent or --intent-file is required to start a run'); sys.exit(2)
+with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\\n')
+""")
+    fake.chmod(0o700)
+    intent = root / 'intent.txt'
+    intent.write_text('goal\n')
+    measured_run = [str(proxy), str(repo / 'bin/fm-duration.py'), 'run', '--pipeline-priority', 'machinery', 'no-mistakes.p6', '--']
+    mem_guard = ['bash', str(repo / 'bin/fm-mem-guard.sh'), 'run', '--']
+    fresh_shapes = {
+        'intent': ['no-mistakes', 'axi', 'run', '--intent', 'goal'],
+        'intent-equals': ['no-mistakes', 'axi', 'run', '--intent=goal'],
+        'intent-file': ['no-mistakes', 'axi', 'run', '--intent-file', str(intent)],
+        'intent-file-equals': ['no-mistakes', 'axi', 'run', '--intent-file=' + str(intent)],
+        'intent-stdin': ['no-mistakes', 'axi', 'run', '--intent', '-'],
+        'reordered': ['no-mistakes', 'axi', 'run', '--verification-plan', str(intent), '--intent', 'goal'],
+        'absolute': [str(fake), 'axi', 'run', '--intent', 'goal'],
+        'env-wrapped': ['env', 'A=B', 'no-mistakes', 'axi', 'run', '--intent', 'goal'],
+        'shell-string': ['sh', '-c', 'no-mistakes axi run --intent goal'],
+        'rerun': ['no-mistakes', 'rerun'],
+        # PR 366's recorded fresh start (nm-r2-1.log): fm-duration around env around fm-mem-guard.sh run.
+        'pr-366': ['env', 'FM_HOME=HOME_PLACEHOLDER'] + mem_guard[1:] + ['no-mistakes', 'axi', 'run', '--intent-file', str(intent),
+                                                                     '--verification-plan', str(intent)],
+    }
+    not_starts = {
+        'reattach': (['no-mistakes', 'axi', 'run'], 0, True),
+        'reattach-wait': (['no-mistakes', 'axi', 'run', '--wait', '1m'], 0, True),
+        'respond': (['no-mistakes', 'axi', 'respond', '--action', 'approve'], 0, True),
+        'status': (['no-mistakes', 'axi', 'status'], 0, True),
+        'no-intent-no-run': (['no-mistakes', 'axi', 'run'], 2, False),
+        'other-command': (['true'], 0, True),
+    }
+    for route_name, route in (('measured', measured_run), ('mem-guard', mem_guard)):
+        for name, shape in list(fresh_shapes.items()) + [(n, v[0]) for n, v in not_starts.items()]:
+            folder, db, env = case('p6-%s-%s' % (route_name, name), cores=3)
+            env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], CASE_NAME=name, FM_DURATION_FILE='off')
+            shape = [part.replace('HOME_PLACEHOLDER', str(folder / 'fmhome')) for part in shape]
+            code, active = (0, False) if name in fresh_shapes else not_starts[name][1:]
+            if active:
+                change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
+                change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
+            child = launch(route + shape, dict(env, CASE_STDIN='goal'), folder / 'p6')
+            finish(child, code)
+            text = (folder / 'p6.stderr').read_text() + (folder / 'p6.stdout').read_text()
+            admitted = text.count('pipeline-start admitted')
+            assert admitted == (1 if name in fresh_shapes else 0), (route_name, name, admitted, text)
+            if name == 'no-intent-no-run':
+                assert '--intent or --intent-file is required to start a run' in text, text
+            with sqlite3.connect(db) as connection:
+                new_rows = connection.execute("SELECT count(*) FROM runs WHERE id = ?", (name,)).fetchone()[0]
+            assert new_rows == (1 if name in fresh_shapes else 0), (route_name, name)
+            assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), (route_name, name)
+    # One queue in class order across routes: a fresh start through fm-mem-guard.sh run (class other)
+    # queued first still follows a machinery start through fm-duration.py run.
+    folder, db, env = case('p6-order', cores=3, running=1)
+    env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
+    first = launch(mem_guard + fresh_shapes['intent'], dict(env, CASE_NAME='mem-guard-other'), folder / 'first')
+    pending(folder, 1)
+    second = launch(measured_run + fresh_shapes['intent'], dict(env, CASE_NAME='measured-machinery'), folder / 'second')
+    pending(folder, 2)
+    change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
+    finish(second)
+    assert (folder / 'order').read_text().splitlines() == ['measured-machinery'] and first.poll() is None
+    change(db, "UPDATE runs SET status='completed' WHERE id='measured-machinery'")
+    finish(first)
+    assert (folder / 'order').read_text().splitlines() == ['measured-machinery', 'mem-guard-other']
+
     print(json.dumps(dict(result='pass', spacing=dict(limit=SPACING_LIMIT, burst_gaps=[round(g, 3) for g in burst_gaps], burst_median=round(statistics.median(burst_gaps), 3), injected_gaps=[round(g, 3) for g in injected_gaps], injected_median=round(statistics.median(injected_gaps), 3), injected_rejection=injected_rejection), artifacts=str(root), native_cpu_count=os.cpu_count(), invocations=records)), flush=True)
 finally:
     for file in root.glob('*/release-children'):
