@@ -2336,7 +2336,9 @@ scn_unique_data_under_claude_or_opencode_is_kept() {
 # Merged Vernant copies were kept for the one ignored file the trusted commit
 # helper leaves behind. The file is scratch only when it is a valid CommitIntent
 # that is spent: expired, or naming the task's recorded branch. Every other
-# shape, and every other path, keeps the copy. Fixtures use fixed timestamps.
+# shape of the file at that exact path keeps the copy; a file of that name
+# elsewhere gets no new treatment and the existing scratch, preserve and symlink
+# rules decide it. Fixtures use fixed timestamps.
 INTENT_EXPIRED=2000-01-01T00:00:00+00:00
 INTENT_FUTURE=2999-01-01T00:00:00+00:00
 
@@ -2661,8 +2663,10 @@ scn_unreadable_intent_is_kept() {
   return 0
 }
 
-# Only the exact path counts: lookalike names and places hold a spent payload
-# and still keep the copy.
+# Only the exact path counts: the lookalike names and places below hold a spent
+# payload and still keep the copy under the existing rules (none is scratch).
+# A file of that name under an existing scratch directory, such as .tac/tmp or
+# node_modules, is scratch by those rules and is not covered here.
 scn_lookalike_intent_paths_are_kept() {
   local v rel named
   for v in bak old sub root; do

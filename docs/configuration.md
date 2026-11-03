@@ -785,7 +785,11 @@ The one exact file `.claude/commit-intent.json` is also scratch when it is a val
 Valid means a regular file holding a JSON object with `artifacttype` `CommitIntent`, a non-blank string `schemaversion`, `branch` and `head_sha`, `owned_paths` and `validators` that are each a non-empty list of non-blank strings, every `owned_paths` item repo-relative (not absolute, with no `..` part, not empty or `.`), and an `expires_at_iso` that Vernant's own reader accepts on its required Python (3.12 or later): a non-blank string that Python's `datetime.fromisoformat` parses once `Z` becomes `+00:00`, and that carries a timezone; a string with no timezone or no valid date is not valid.
 The prune reads the expiry as that reader does, and when its own `python3` is older than 3.11, where `datetime.fromisoformat` accepts fewer forms, it does not judge the expiry and keeps the copy.
 Spent means `expires_at_iso` is not in the future, or `branch` equals the task's `branch=` as the prune record kept it from the task record, because teardown deletes that record.
-A file that fails a read, a parse or any of these checks keeps the copy, and so does the same file name at any other path within a copy; a nested clone is judged by this rule at its own `.claude/commit-intent.json`.
+A file that fails a read, a parse or any of these checks keeps the copy.
+This is the one allowance: a spent intent at the exact copy-relative path `.claude/commit-intent.json`.
+A file with that name anywhere else gets no new treatment, and the existing scratch, preserve and symlink rules decide it as before.
+So under an existing scratch directory (for example `.tac/tmp` or `node_modules`) it is scratch, and elsewhere it keeps the copy only when those existing rules keep it.
+A nested clone is judged by this rule at its own `.claude/commit-intent.json`.
 A symlink at that path is never read and stays scratch, like any other ignored symlink.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
