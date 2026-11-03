@@ -1,0 +1,39 @@
+=== real teardown, intent expires=2000-01-01T00:00:00+00:00 branch=other/branch (want removed), bin=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FXTE3XBQNN738ZB78RYY9A/bin
+$ fm-merge-prune.sh arm t1 --run
+  log: 2026-11-03T07:06:10Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:06:29Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.NvUCLi/w1/th/pool1/1/repo (head 55a752d); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.NvUCLi/w1/home/data/t1/merge-prune-preserved/1793689570
+  log: 2026-11-03T07:06:29Z reaped: teardown completed; removed the returned copy
+  treehouse calls:
+    pool-dir
+    status --json
+    return --force /Users/charlesabrooker/tmp/fm-merge-prune.NvUCLi/w1/th/pool1/1/repo
+    destroy /Users/charlesabrooker/tmp/fm-merge-prune.NvUCLi/w1/th/pool1/1/repo --include-leased --yes
+  task meta exists: no
+  copy: removed | destroy calls: 1 | wakes: 0
+RESULT removed: PASS
+=== real teardown, intent expires=2000-01-01T00:00:00+00:00 branch=other/branch (want kept), bin=/tmp/fm-mp-base.EOCtEB/bin
+$ fm-merge-prune.sh arm t1 --run
+  log: 2026-11-03T07:06:40Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:06:49Z retained /Users/charlesabrooker/tmp/fm-merge-prune.YpXLZQ/w1/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.YpXLZQ/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse calls:
+    pool-dir
+    status --json
+    return --force /Users/charlesabrooker/tmp/fm-merge-prune.YpXLZQ/w1/th/pool1/1/repo
+  task meta exists: no
+  copy HEAD: HEAD status: [] ignored: !! .claude/ 
+  copy: kept | destroy calls: 0 | wakes: 1
+  wake: 1793689609	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.YpXLZQ/w1/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.YpXLZQ/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT kept: PASS
+=== real teardown, intent expires=2999-01-01T00:00:00+00:00 branch=other/branch (want kept), bin=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FXTE3XBQNN738ZB78RYY9A/bin
+$ fm-merge-prune.sh arm t1 --run
+  log: 2026-11-03T07:07:06Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:07:22Z retained /Users/charlesabrooker/tmp/fm-merge-prune.qzScXt/w1/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.qzScXt/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse calls:
+    pool-dir
+    status --json
+    return --force /Users/charlesabrooker/tmp/fm-merge-prune.qzScXt/w1/th/pool1/1/repo
+  task meta exists: no
+  copy HEAD: HEAD status: [] ignored: !! .claude/ 
+  copy: kept | destroy calls: 0 | wakes: 1
+  wake: 1793689642	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.qzScXt/w1/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.qzScXt/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT kept: PASS

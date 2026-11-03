@@ -1,0 +1,28 @@
+# head 9378e3eb0aa99f21c4df0283be1879d8cb3ebcc1; base 9ed98a152 at /tmp/fm-mp-base.UGVCY1/bin
+=== U1 old retained record, expired intent, head retry (want removed)
+$ [base code] fm-merge-prune.sh arm t1; run t1 --now
+  after base: copy exists=yes task meta exists=no wakes=1
+  base record: version=fm-merge-prune-v1 pr=https://github.com/acme/widget/pull/7 attempts=1 next_at=1793711089 state=retained reason=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json wake_sent=1 copy=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/th/pool1/1/repo armed_at=1793689488 project=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/project returned=1 
+$ [head code] fm-merge-prune.sh run t1   (due retry of the retained record)
+/Users/charlesabrooker/.no-mistakes/evidence/01M6FXTE3XBQNN738ZB78RYY9A/driver/drive2.sh: line 18: /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/home/state/t1.merge-prune: No such file or directory
+  copy: removed | destroy calls: 1 | wakes: 1 | record: 
+  wake: 1793689492	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT U1 old retained record, expired intent, head retry: PASS (removed)
+=== U2 old retained record (no branch=), unexpired intent naming fm/t1, head retry (want kept)
+$ [base code] fm-merge-prune.sh arm t1; run t1 --now
+  after base: copy exists=yes task meta exists=no wakes=1
+  base record: version=fm-merge-prune-v1 pr=https://github.com/acme/widget/pull/7 attempts=1 next_at=1793711097 state=retained reason=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json wake_sent=1 copy=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo armed_at=1793689497 project=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/project returned=1 
+$ [head code] fm-merge-prune.sh run t1   (due retry of the retained record)
+  copy: kept | destroy calls: 0 | wakes: 1 | record: version=fm-merge-prune-v1 pr=https://github.com/acme/widget/pull/7 attempts=2 next_at=1793711100 state=retained reason=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json wake_sent=1 copy=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo armed_at=1793689497 project=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/project returned=1 branch= 
+  wake: 1793689500	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT U2 old retained record (no branch=), unexpired intent naming fm/t1, head retry: PASS (kept)
+=== X1 FM_MP_TASK_BRANCH=other/branch in the caller env, record says fm/t1, intent unexpired names other/branch (want kept)
+  copy: kept | destroy calls: 0 | wakes: 1 | record: version=fm-merge-prune-v1 pr=https://github.com/acme/widget/pull/7 attempts=1 next_at=1793711104 state=retained reason=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json wake_sent=1 copy=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w3/th/pool1/1/repo armed_at=1793689503 project=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w3/project returned=1 branch=fm/t1 
+  wake: 1793689511	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w3/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT X1 caller env cannot widen the branch rule: PASS (kept)
+=== X2 FIFO at .claude/commit-intent.json, full flow under a 120 s bound (want kept, no hang)
+  run exit=0 elapsed=5s
+  copy: kept | destroy calls: 0 | wakes: 1 | record: version=fm-merge-prune-v1 pr=https://github.com/acme/widget/pull/7 attempts=1 next_at=1793711121 state=retained reason=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json wake_sent=1 copy=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w4/th/pool1/1/repo armed_at=1793689521 project=/Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w4/project returned=1 branch=fm/t1 
+  wake: 1793689525	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w4/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.6onsT0/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT X2 FIFO keeps the copy without hanging: PASS (kept)
+# note U1: the one wake line is the one the base run raised (its timestamp precedes the head retry); the head retry removed the copy, called destroy once, added no wake and dropped the record (the "No such file" line is the driver reading the removed record).

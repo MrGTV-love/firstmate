@@ -1,0 +1,71 @@
+# read-only replay of fm_mp_commit_intent_spent on real Vernant intent files, 2026-11-03T06:54:48Z, head 9378e3eb0aa99f21c4df0283be1879d8cb3ebcc1
+# FM_MP_TASK_BRANCH empty: spent only by expiry
+102/vernant/.claude/commit-intent.json sha256:5164d895f344 expires=2026-11-01T23:53:38+00:00 branch=fm/vernant-d2-corpus-ingestion-inflight-marker -> spent
+103/vernant/.claude/commit-intent.json sha256:555023dba2ee expires=2026-10-15T13:38:13+00:00 branch=fm/vernant-reflect-back-failure-state -> spent
+109/vernant/.claude/commit-intent.json sha256:51dfc8560613 expires=2026-10-11T02:21:43+00:00 branch=fm/vernant-d1-gre2046-docx-extra-field-bound -> spent
+110/vernant/.claude/commit-intent.json sha256:32588aed51cd expires=2026-10-07T20:37:37+00:00 branch=fm/vernant-canon-r20 -> spent
+115/vernant/.claude/commit-intent.json sha256:177333c7f0d0 expires=2026-10-19T06:57:12+00:00 branch=fm/vernant-a5-doc-followups-e69-canon02-v2-r3 -> spent
+116/vernant/.claude/commit-intent.json sha256:247047e2a3ee expires=2026-10-08T00:26:05+00:00 branch=fm/vernant-dry-well-followups -> spent
+120/vernant/.claude/commit-intent.json sha256:159ed1c76c76 expires=2026-10-07T20:42:23+00:00 branch=fm/vernant-d2-gate-409-code -> spent
+121/vernant/.claude/commit-intent.json sha256:e86054800f79 expires=2026-10-19T08:39:17+00:00 branch=fm/vernant-a5-doc-followups-e69-canon02-v4s -> spent
+123/vernant/.claude/commit-intent.json sha256:95fc93201423 expires=2026-10-07T20:43:41+00:00 branch=fm/vernant-run-start-dsn-scope -> spent
+124/vernant/.claude/commit-intent.json sha256:b0024fd7a61e expires=2026-10-19T19:46:42+00:00 branch=fm/vernant-grp-u1-r2 -> spent
+126/vernant/.claude/commit-intent.json sha256:c4b98d6905d7 expires=2026-10-14T21:44:00+00:00 branch=fm/vernant-d1-pr3023-review-followups -> spent
+128/vernant/.claude/commit-intent.json sha256:5247b8088155 expires=2026-11-01T23:17:52+00:00 branch=fm/vernant-judge-model-runtime-resolution-s2 -> spent
+140/vernant/.claude/commit-intent.json sha256:c28a5f985a2e expires=2026-10-22T17:49:21+00:00 branch=fm/vernant-r0-scope-map-20261021 -> spent
+141/vernant/.claude/commit-intent.json sha256:6323eaa6497f expires=2026-10-19T17:25:45+00:00 branch=fm/vernant-plan-05-row-research-report-decisions-20261011 -> spent
+156/vernant/.claude/commit-intent.json sha256:40d5e34f7737 expires=2026-10-12T18:37:56+00:00 branch=fm/vernant-d1-corpus-xlsx-upload-v6 -> spent
+160/vernant/.claude/commit-intent.json sha256:3ea1a222b48a expires=2026-11-01T23:29:22+00:00 branch=fm/vernant-h1-heredoc-abstention-gap-s2 -> spent
+161/vernant/.claude/commit-intent.json sha256:a6267e3ff46a expires=2026-10-11T04:33:19+00:00 branch=fm/vernant-phase-a-gre-2030 -> spent
+162/vernant/.claude/commit-intent.json sha256:fcf9a3e11354 expires=2026-10-18T03:31:16+00:00 branch=chore/guard-wire-closeout -> spent
+168/vernant/.claude/commit-intent.json sha256:64e5770baf0b expires=2026-11-02T00:33:54+00:00 branch=fm/vernant-custody-pin-case-analytics-graph -> spent
+172/vernant/.claude/commit-intent.json sha256:064fb852dd09 expires=2026-10-14T22:27:41+00:00 branch=fm/vernant-d3-ael-u9-csv-robustness -> spent
+181/vernant/.claude/commit-intent.json sha256:4279ac97ab00 expires=2026-11-03T19:15:37+00:00 branch=fm/vernant-no-nested-slot-trees-s2 -> kept
+182/vernant/.claude/commit-intent.json sha256:a8eb691a3b86 expires=2026-11-02T10:51:48+00:00 branch=fm/vernant-provisioner-retire-stale-manifest -> spent
+185/vernant/.claude/commit-intent.json sha256:22bed199a070 expires=2026-10-14T16:49:53+00:00 branch=fm/gre2036-preservation-push-refused -> spent
+190/vernant/.claude/commit-intent.json sha256:c1c8d6653b73 expires=2026-10-19T15:35:20+00:00 branch=fm/vernant-claude-guard-policy-probe-scope -> spent
+194/vernant/.claude/commit-intent.json sha256:9c0ad1432108 expires=2026-11-04T01:13:22+00:00 branch=fm/vernant-successor-record-verb -> kept
+195/vernant/.claude/commit-intent.json sha256:a58acc360763 expires=2026-10-21T01:22:39+00:00 branch=fm/vernant-ref-history-guard-equivalents -> spent
+200/vernant/.claude/commit-intent.json sha256:ef3a1ecc14f1 expires=2026-10-22T22:00:08+00:00 branch=fm/vernant-h1-heredoc-abstention-gap -> spent
+201/vernant/.claude/commit-intent.json sha256:14a24855243c expires=2026-10-19T19:31:20+00:00 branch=fm/vernant-rule7-start-here-refresh -> spent
+202/vernant/.claude/commit-intent.json sha256:1ebea4004986 expires=2026-10-22T14:11:23+00:00 branch=fm/vernant-b11-spend-ceiling -> spent
+203/vernant/.claude/commit-intent.json sha256:e156a03e50aa expires=2026-10-23T18:49:38+00:00 branch=fm/vernant-judge-model-runtime-resolution -> spent
+204/vernant/.claude/commit-intent.json sha256:ac8b4488e9db expires=2026-11-02T10:31:39+00:00 branch=fm/vernant-custody-pin-citation-rendering -> spent
+205/vernant/.claude/commit-intent.json sha256:6810d04b83e4 expires=2026-11-03T20:12:42+00:00 branch=fm/vernant-ref-history-guard-equivalents-s2 -> kept
+215/vernant/.claude/commit-intent.json sha256:306b938d94e7 expires=2026-11-01T23:22:18+00:00 branch=fm/vernant-no-nested-slot-trees -> spent
+218/vernant/.claude/commit-intent.json sha256:c3a8ba0e29dc expires=2026-11-02T00:07:53+00:00 branch=fm/vernant-classifier-echo-ls-argument-carveout -> spent
+219/vernant/.claude/commit-intent.json sha256:b703a411cdcd expires=2026-10-22T13:07:45+00:00 branch=fm/vernant-ended-case-activity-touch-r2 -> spent
+223/vernant/.claude/commit-intent.json sha256:7000e667c3fb expires=2026-10-23T02:12:24+00:00 branch=fm/vernant-d1-intake-limits-estimate -> spent
+251/vernant/.claude/commit-intent.json sha256:15952008e817 expires=2026-11-02T01:58:13+00:00 branch=fm/vernant-d3-mcp-upload-near-timeout-failed-record -> spent
+263/vernant/.claude/commit-intent.json sha256:daeb39f83a41 expires=2026-11-02T05:56:40+00:00 branch=fm/vernant-d3-ael-provenance-v3 -> spent
+264/vernant/.claude/commit-intent.json sha256:9e6a11846293 expires=2026-11-04T06:22:37+00:00 branch=fm/vernant-d3-ael-g2-cleaning-build -> kept
+265/vernant/.claude/commit-intent.json sha256:39bd1c6335df expires=2026-11-01T23:10:39+00:00 branch=fm/vernant-d3-admissions-register-rows-main2011 -> spent
+266/vernant/.claude/commit-intent.json sha256:64b5e7c395cf expires=2026-11-02T02:33:23+00:00 branch=fm/vernant-d3-cap-edge-clean-fail -> spent
+267/vernant/.claude/commit-intent.json sha256:f780118225a1 expires=2026-11-02T02:16:22+00:00 branch=fm/vernant-d3-ael-case-analytics-graph -> spent
+268/vernant/.claude/commit-intent.json sha256:87ba10744a6f expires=2026-11-02T05:43:24+00:00 branch=fm/vernant-d3-b6-slice2-customer-screens -> spent
+270/vernant/.claude/commit-intent.json sha256:d404124f1fbc expires=2026-11-02T00:07:53+00:00 branch=fm/vernant-d3-csv-headerless-decimal-comma-residual -> spent
+271/vernant/.claude/commit-intent.json sha256:cc6472e22c28 expires=2026-11-01T23:31:57+00:00 branch=fm/vernant-d3-ael-csv-20-checks-rescore -> spent
+272/vernant/.claude/commit-intent.json sha256:88ff460a5149 expires=2026-11-04T00:02:04+00:00 branch=fm/vernant-d3-ael-u9-csv-shapes-followup -> kept
+273/vernant/.claude/commit-intent.json sha256:fd010044d63f expires=2026-11-02T02:50:53+00:00 branch=fm/b8-stage2b-measurement-refinements -> spent
+40/vernant/.claude/commit-intent.json sha256:a67ddd6eec2e expires=2026-09-26T14:12:17+00:00 branch=fm/vernant-octagon-retirement -> spent
+41/vernant/.claude/commit-intent.json sha256:18a5066f6e05 expires=2026-10-09T01:29:54+00:00 branch=fm/vernant-d1-casemode-review-notes -> spent
+42/vernant/.claude/commit-intent.json sha256:f77cb0f686ab expires=2026-10-01T11:39:44+00:00 branch=fm/vernant-gate-push-first-narrow -> spent
+43/vernant/.claude/commit-intent.json sha256:09c8728f1684 expires=2026-09-26T15:21:37+00:00 branch=fm/vernant-dry-well-persistent-failure -> spent
+47/vernant/.claude/commit-intent.json sha256:2f43eb23e3d7 expires=2026-10-22T13:50:42+00:00 branch=fm/vernant-admission-register-gaps-20261021 -> spent
+55/vernant/.claude/commit-intent.json sha256:d3e7011d4544 expires=2026-10-14T21:22:05+00:00 branch=fm/gre2036-test-strength-m3-m4-m7 -> spent
+56/vernant/.claude/commit-intent.json sha256:960f9eb999b4 expires=2026-10-18T22:06:56+00:00 branch=fm/vernant-d1-docx-pptx-internal-figures-copy -> spent
+67/vernant/.claude/commit-intent.json sha256:bba45066419f expires=2026-09-30T10:32:19+00:00 branch=fm/vernant-cwd-fold-guard-bypass -> spent
+76/vernant/.claude/commit-intent.json sha256:ca3c474eeebd expires=2026-10-11T01:21:18+00:00 branch=fm/vernant-d3-xlsx-extra-field-bound -> spent
+78/vernant/.claude/commit-intent.json sha256:a391c3a8b8fb expires=2026-10-23T15:02:20+00:00 branch=fm/b8-stage2b-read-labels -> spent
+79/vernant/.claude/commit-intent.json sha256:2c685ebe3a22 expires=2026-10-18T19:39:54+00:00 branch=fm/vernant-d2-closeout-coverage-false-uncovered -> spent
+83/vernant/.claude/commit-intent.json sha256:a1aa5783aa76 expires=2026-10-16T07:14:55+00:00 branch=fm/vernant-d3-a8-sm04-contract-pair -> spent
+85/vernant/.claude/commit-intent.json sha256:78903f52abc1 expires=2026-10-18T16:03:59+00:00 branch=fm/vernant-successor-provisioning-command -> spent
+93/vernant/.claude/commit-intent.json sha256:88b995c52af3 expires=2026-10-22T10:02:42+00:00 branch=fm/vernant-program-acceptance-record-20261021 -> spent
+95/vernant/.claude/commit-intent.json sha256:72f5e847abd1 expires=2026-10-18T18:47:23+00:00 branch=fm/vernant-sm13-b2-seam-contract -> spent
+# files=62 spent=57
+# now 2026-11-03T06:55:40Z; unexpired real intents judged with a task branch
+181 same-branch=spent prefix-branch=kept upper-case-branch=kept
+194 same-branch=spent prefix-branch=kept upper-case-branch=kept
+205 same-branch=spent prefix-branch=kept upper-case-branch=kept
+264 same-branch=spent prefix-branch=kept upper-case-branch=kept
+272 same-branch=spent prefix-branch=kept upper-case-branch=kept

@@ -1,0 +1,97 @@
+# head 9378e3eb0aa99f21c4df0283be1879d8cb3ebcc1, bin=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FXTE3XBQNN738ZB78RYY9A/bin
+=== A expired valid intent is the only leftover (want removed)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: removed | destroy calls: 1 | wakes: 0 | record state: 
+  reason: 
+  log: 2026-11-03T06:59:31Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T06:59:41Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w1/th/pool1/1/repo (head 3e1b6c4); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w1/home/data/t1/merge-prune-preserved/1793689171
+  log: 2026-11-03T06:59:41Z reaped: teardown completed; removed the returned copy
+RESULT A expired valid intent is the only leftover: PASS (removed)
+=== B unexpired intent naming the task branch (want removed)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: removed | destroy calls: 1 | wakes: 0 | record state: 
+  reason: 
+  log: 2026-11-03T06:59:48Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T06:59:58Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w2/th/pool1/1/repo (head ff9eb47); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w2/home/data/t1/merge-prune-preserved/1793689188
+  log: 2026-11-03T06:59:58Z reaped: teardown completed; removed the returned copy
+RESULT B unexpired intent naming the task branch: PASS (removed)
+=== C unexpired intent naming another branch (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake: 1793689204	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w3/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  log: 2026-11-03T07:00:00Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:04Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w3/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT C unexpired intent naming another branch: PASS (kept)
+=== D spent intent plus another .claude file (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/notes.md
+  wake: 1793689209	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w4/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/notes.md
+  log: 2026-11-03T07:00:06Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:09Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w4/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/notes.md
+RESULT D spent intent plus another .claude file: PASS (kept)
+=== E expired intent with absolute owned path (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w5/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake: 1793689224	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w5/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w5/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  log: 2026-11-03T07:00:12Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:29Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w5/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w5/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT E expired intent with absolute owned path: PASS (kept)
+=== F expired intent with no timezone (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w6/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake: 1793689240	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w6/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w6/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  log: 2026-11-03T07:00:35Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:40Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w6/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w6/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+RESULT F expired intent with no timezone: PASS (kept)
+=== G spent payload at .claude/commit-intent.json.bak (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w7/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+  wake: 1793689245	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w7/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w7/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+  log: 2026-11-03T07:00:42Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:46Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w7/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w7/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+RESULT G spent payload at .claude/commit-intent.json.bak: PASS (kept)
+=== H spent payload at .claude/commit-intent.old.json (want kept)
+$ git -C <copy> status --porcelain --ignored
+  !! .claude/
+$ fm-merge-prune.sh arm t1
+  record branch= fm/t1
+$ fm-merge-prune.sh run t1 --now
+  copy: kept | destroy calls: 0 | wakes: 1 | record state: retained
+  reason: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w8/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.old.json
+  wake: 1793689250	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w8/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w8/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.old.json
+  log: 2026-11-03T07:00:47Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-11-03T07:00:50Z retained /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w8/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.PpkOWo/w8/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.old.json
+RESULT H spent payload at .claude/commit-intent.old.json: PASS (kept)

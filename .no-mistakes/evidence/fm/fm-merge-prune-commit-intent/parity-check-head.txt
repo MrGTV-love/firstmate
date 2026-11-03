@@ -1,0 +1,3 @@
+narrower prune=keep reader=valid expires_at_iso="2000-01-01T00:00+00:00"
+narrower prune=keep reader=valid expires_at_iso="2000-01-01T00:00:00+0000"
+cases=215 agree=213 prune-narrower=2 violations=0

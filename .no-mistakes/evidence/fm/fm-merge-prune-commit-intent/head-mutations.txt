@@ -1,0 +1,5 @@
+# head 9378e3eb0aa99f21c4df0283be1879d8cb3ebcc1
+ok - mutation proof (unsafe direction): breaking any safety proof makes its keep case fail
+ok - mutation proof (over-strict direction): tightening any permission makes its removal case fail
+bash tests/fm-merge-prune.test.sh test_unsafe_mutations_are_caught   244.25s user 396.60s system 29% cpu 36:45.87 total
+rc=0
