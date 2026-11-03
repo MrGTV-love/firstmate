@@ -190,7 +190,10 @@
 # copy, except as below for a refusal the driver names temporary. A receipt whose path is gone, whose path now holds a different copy, whose
 # copy now has a different lock, or that records no hash or identity is stale:
 # classification ignores it, report mode leaves it, and --apply removes it and
-# lists RECEIPT-CLEARED.
+# lists RECEIPT-CLEARED. bin/fm-teardown.sh writes the same receipt, in a complete
+# form with more lines after the first four, when it closes a task around an own
+# nested copy the driver kept (bin/fm-teardown-nested-lib.sh owns the fields); the
+# sweep holds that copy the same way and shows only the fourth line as its reason.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
@@ -376,19 +379,6 @@ file_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
-}
-
-# The inode and birth time of the copy's own .git file, "<inode>:<birth>", or
-# failure when either cannot be read.
-copy_identity() {  # <copy>
-  local identity
-  if [ "$(uname)" = Darwin ]; then
-    identity=$(/usr/bin/stat -f %i:%B "$1/.git" 2>/dev/null) || return 1
-  else
-    identity=$(stat -c %i:%W "$1/.git" 2>/dev/null) || return 1
-  fi
-  [[ $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
-  printf '%s\n' "$identity"
 }
 
 gib_to_kib() {  # <GiB, may be decimal>
@@ -726,9 +716,7 @@ sweep_vernant_lock_pid() {  # <lock-file>
 # records the SHA-256 of the creation lock the driver was asked to release, the
 # copy's path and the copy's identity (see copy_identity).
 retained_receipt() {  # <copy>
-  local hash
-  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
-  printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+  teardown_retained_receipt "$DATA_DIR" "$1"
 }
 
 record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
@@ -962,7 +950,7 @@ classify() {  # <copy> <clone> <pool> <container>
   }
   if { [ -e "$pending" ] || [ -L "$pending" ]; } && ! receipt_is_stale "$pending"; then
     CLASS=HELD-LOCKED
-    REASON="driver retained this copy: $(sed -n '4,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    REASON="driver retained this copy: $(sed -n '4p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
     return 0
   fi
   rc=0

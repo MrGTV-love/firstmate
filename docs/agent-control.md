@@ -358,6 +358,28 @@ For each held copy the output also prints the next step for that copy's owner, w
 For a copy held for commits on no remote: list the commits only it holds with `git -C <copy> log --oneline HEAD --not --remotes`, land them, then remove the copy and return the slot with the commands the output prints.
 For a copy held for unique ignored files: review them with `git -C <copy> status --ignored` and save the ones needed, with any commits only the copy holds, before the copy is removed in any way; the output names no removal command for it, because `git worktree remove` deletes ignored files without asking.
 The output shows every copy path, slot path and reason with control characters replaced by `?`, and quotes each path in a printed command with `printf %q`; the record carries the same cleaned text.
+
+**Kept own copies.**
+A task whose own nested copy Vernant's closeout driver keeps (exit 3, `cleanup_ignored_payload_archived_tree_retained`) closes instead of refusing on every retry.
+Asking the driver again can only add archives: each `--execute-cleanup` call writes one more timestamped tar of the same ignored files under the slot's `.claude/bug-evidence/worktree-preservation/` and keeps the tree.
+So teardown judges the harm itself, and the driver's refusal alone is no longer read as unique work.
+The driver's answer must be one JSON document that refuses with that reason, names no uncovered path of any kind, and says it kept this copy.
+The copy must pass the ordinary clean and landed proof again, and must hold no other Git repository.
+Every ignored file the driver names unique, and every ignored file teardown's preservation selects, must be held with the same SHA-256 in `data/<task>/nested-copy-preserved/<sha256 of the copy path>/`; teardown compares the bytes and never takes the driver's JSON as proof.
+A driver-named path that preservation skips by design, such as one under `.claude`, is copied into that preserve when it is absent there and never over a different preserved byte.
+The copy must also be unchanged while that is checked.
+Then the task closes as under the held-copy rule: the backlog item goes to Done, the task's record and runtime state go, the copy and its slot are left exactly as they were, and the slot stays under a durable lease and claim.
+A close that cannot prove that lease refuses, and so does its retry, before anything is removed.
+The one record is the nested-copy sweep's driver-retention receipt, `data/copy-sweep/retained/<sha256 of the copy path>`, in its complete form: its first four lines keep the sweep's form (lock hash, copy, identity, one sentence), and `key=value` lines add `task`, `slot`, `preserve`, `reason`, `closed-at`, `head`, `status-sha256`, `payload-sha256`, the driver's `driver-archive` and `driver-archive-sha256` when it gave them, and one `unique` line per driver-named path.
+The nested-copy sweep reads the same receipt and neither preserves, executes nor removes the copy while it holds, and clears it once the copy is gone, as the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) describes; the idle-reap and merge-prune sweeps reach the copy only through `bin/fm-teardown.sh`, which reads the receipt first.
+A retry makes no driver call and so writes no further archive while the copy's path, identity, creation lock, HEAD, complete status and ignored-payload fingerprint (the SHA-256 over the path, type and bytes of every ignored file except the regenerable class) still match the receipt and its task.
+A receipt that no longer matches is ignored, never trusted: the copy is proved again through the ordinary proofs first, refuses with its cause before any driver call when it now fails one, and goes to the driver again, and is recorded again, only when it still passes them.
+`--force` waives none of this: the proofs above run the same with it, and the driver's other refusals (`cleanup_lease_conflict`, `cleanup_skipped_live_or_unknown`, `cleanup_policy_not_allowed`, another exit code, an answer that is not one JSON document) refuse exactly as before.
+Teardown adds no way to remove a kept copy.
+No command in this repository removes a creation-locked kept copy: plain `git worktree remove` refuses it, and the driver's `--execute-cleanup` keeps the tree and writes another archive, so do not run it for that copy.
+Its release depends on Vernant's closeout driver, which lives outside this repository; the owner is the Vernant lane, through Main.
+Until a person decides the removal, the copy, its slot, its lease and the receipt stay.
+Archives and saved driver output that earlier retries wrote are not touched by this rule.
 Once every proof has passed and before it removes anything, teardown appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
 A line already there for the same task, slot, copy and reason is not written again, and teardown never edits or clears the file.
 A record that cannot be written refuses the close with nothing removed, so a close that happened never lacks its inventory.

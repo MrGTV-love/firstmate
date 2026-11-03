@@ -1603,6 +1603,52 @@ test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
   pass "a driver-retention receipt that cannot be written before execute stops the release, discards that run's preserve while the copy still holds its lock and originals, so repeated refusals add no preserve, and the next run that can write it preserves once and releases the copy"
 }
 
+# The record bin/fm-teardown.sh writes when it closes a task around an own copy
+# the driver kept is this sweep's receipt in its complete form: the same first
+# four lines plus key=value lines. The sweep neither executes, preserves nor
+# removes that copy while the record matches, and clears the record once the copy
+# is gone.
+test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it() {
+  local copy admin hash record identity lock before line calls
+  make_locked_copy_case teardown-record dead
+  install_driver "$SLOT" "$W"
+  copy=$(copy_path locked)
+  admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+  lock=$(shasum -a 256 "$admin/locked" | awk '{print $1}')
+  if [ "$(uname)" = Darwin ]; then identity=$(/usr/bin/stat -f %i:%B "$copy/.git"); else identity=$(stat -c %i:%W "$copy/.git"); fi
+  hash=$(printf '%s' "$copy" | shasum -a 256 | awk '{print $1}')
+  record="$HOMED/data/copy-sweep/retained/$hash"
+  mkdir -p "${record%/*}"
+  {
+    printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n' "$lock" "$copy" "$identity"
+    printf 'the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained); task t verified its ignored payload byte for byte\n'
+    printf 'task=t\nslot=%s\npreserve=/p\nreason=cleanup_ignored_payload_archived_tree_retained\nclosed-at=2026-11-03T00:00:00Z\nhead=h\nstatus-sha256=s\npayload-sha256=p\nunique=.claude/channel-outbox/a.jsonl\n' "$SLOT"
+  } > "$record"
+  before=$(shasum -a 256 "$record")
+  snap "$copy" > "$W/copy.before"
+  for mode in report apply apply; do
+    if [ "$mode" = report ]; then run_sweep; else FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply; fi
+    [ "$RC" = 0 ] || fail "$mode: the run failed ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    line=$(printf '%s\n' "$OUT" | grep -F "$copy" | head -n 1)
+    assert_contains "$line" "driver retained this copy: the closeout driver kept this copy (exit 3, cleanup_ignored_payload_archived_tree_retained)" "$mode: the held reason did not show the record's sentence"
+    assert_not_contains "$line" "payload-sha256" "$mode: the held reason leaked the record's key lines"
+    calls=0
+    [ ! -e "$W/closeout.log" ] || calls=$(wc -l < "$W/closeout.log" | tr -d ' ')
+    assert_equals 0 "$calls" "$mode: the sweep asked the driver about a copy the record keeps"
+    assert_equals "$before" "$(shasum -a 256 "$record")" "$mode: the sweep rewrote the teardown record"
+    snap "$copy" | cmp -s - "$W/copy.before" || fail "$mode: the sweep changed the kept copy"
+    registered locked || fail "$mode: the kept copy is no longer registered"
+  done
+  git -C "$SLOT" worktree unlock "$copy"
+  git -C "$SLOT" worktree remove --force "$copy"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the run after the copy was removed failed ($RC): $OUT"
+  assert_contains "$OUT" "RECEIPT-CLEARED" "a record for a copy that is gone was not cleared"
+  [ ! -e "$record" ] || fail "a record for a copy that is gone survived"
+  pass "a teardown-written retained record keeps the sweep from executing, preserving or removing the copy, shows one line as the hold reason, and is cleared with the copy"
+}
+
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
   local shape reason long line retained
   for shape in kept failed; do
@@ -3098,6 +3144,7 @@ test_a_new_ignored_file_after_preservation_waits_then_releases_once
 test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
 test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
+test_a_teardown_retained_record_protects_the_copy_and_is_cleared_with_it
 test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 test_a_failed_preservation_leaves_no_staging_directory
 test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released

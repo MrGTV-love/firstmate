@@ -2598,6 +2598,9 @@ fi
 if [ -n "\${FM_STUB_CLOSEOUT_OUTPUT:-}" ]; then
   cat "\$FM_STUB_CLOSEOUT_OUTPUT" >&2
 fi
+if [ "\${FM_STUB_CLOSEOUT:-ok}" = retained ]; then
+  exec bash "$case_dir/retained-driver.sh" "\$@"
+fi
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'
   exit 3
@@ -2607,6 +2610,44 @@ git worktree unlock "\$2" && git worktree remove "\$2"
 SH
   printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$case_dir/vernant-python"
   chmod +x "$case_dir/vernant-python"
+  # FM_STUB_CLOSEOUT=retained: the recorded behavior of Vernant's driver for a
+  # tree with unique ignored files (read from the saved outputs of
+  # vernant-claude-guard-policy-probe-scope): every --execute-cleanup call writes
+  # one more timestamped tar under <slot>/.claude/bug-evidence/worktree-preservation/,
+  # keeps the tree and exits 3 with one JSON document. The call count is
+  # closeout.log's line count and the tar count is retained_tar_count. The unique
+  # paths are FM_STUB_UNIQUE (space separated); FM_STUB_AFTER runs a shell command
+  # in the slot after the tar is written, to change the copy or the preserve.
+  {
+    printf 'SLOT=%q\n' "$NESTED_SLOT"
+    cat <<'SH'
+tardir=$SLOT/.claude/bug-evidence/worktree-preservation
+mkdir -p "$tardir"
+n=$(find "$tardir" -name '*.tar' | wc -l | tr -d ' ')
+printf 'archive %s\n' "$n" > "$tardir/stub-ordinary_cleanup-$((n + 1)).tar"
+[ -z "${FM_STUB_AFTER:-}" ] || eval "$FM_STUB_AFTER"
+unique=$(printf '%s\n' ${FM_STUB_UNIQUE-.claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl} | jq -R . | jq -s -c .)
+reason=${FM_STUB_REASON:-cleanup_ignored_payload_archived_tree_retained}
+case "${FM_STUB_JSON:-one}" in
+  broken) printf '{"allowed": false, "reason": "%s"\n' "$reason" ;;
+  two) printf '{"allowed": false}\n{"allowed": false, "reason": "%s"}\n' "$reason" ;;
+  *)
+    jq -n -c --arg copy "$2" --arg reason "$reason" --argjson unique "$unique" '{allowed: false, ignored_payload_disposition: "archive_then_retain_tree", ignored_payload_preservation: [{archive_path: "stub.tar", archive_sha256: ("ab" * 32), path_count: ($unique | length), restore_verified: true, stage: "ordinary_cleanup"}], reason: $reason, retained_worktree_path: $copy, target: $copy, tracked_uncovered_paths: [], uncovered_paths: [], untracked_uncovered_paths: [], unique_ignored_paths: $unique}'
+    ;;
+esac
+exit "${FM_STUB_EXIT:-3}"
+SH
+  } > "$case_dir/retained-driver.sh"
+}
+
+# The tars the stand-in driver wrote into the slot.
+retained_tar_count() {
+  find "$FOREIGN_SLOT/.claude/bug-evidence/worktree-preservation" -name '*.tar' 2>/dev/null | wc -l | tr -d ' '
+}
+
+# The stand-in driver's --execute-cleanup calls so far.
+retained_call_count() {
+  if [ -f "$FOREIGN_CASE/closeout.log" ]; then wc -l < "$FOREIGN_CASE/closeout.log" | tr -d ' '; else echo 0; fi
 }
 
 # A pid that exited, so a creation lock naming it has no live launcher.
@@ -2972,6 +3013,56 @@ make_own_locked_copy_case() {
   fi
   cp "$FOREIGN_CASE/pool/treehouse-state.json" "$FOREIGN_CASE/treehouse-state.before"
   cp "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$FOREIGN_CASE/slot-owner.before"
+}
+
+# make_retained_case <name> [enclosing|reverse]: an own Vernant-locked copy of a
+# landed task with a merged PR and an in-flight backlog item, holding unique
+# ignored files the driver stand-in names (two under .claude/channel-outbox, the
+# class the recorded cases hold, and notes/unique.dat, the class teardown's own
+# preservation selects). Snapshots the copy, the slot claim and the lease record.
+make_retained_case() {
+  local exclude
+  dead_launcher_pid
+  make_own_locked_copy_case "$1" "${2:-enclosing}" "$FOREIGN_DEAD_PID"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' '.claude/channel-outbox/' 'notes/unique.dat' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/.claude/channel-outbox" "$FOREIGN_COPY/notes"
+  printf 'one\n' > "$FOREIGN_COPY/.claude/channel-outbox/a.jsonl"
+  printf 'two\n' > "$FOREIGN_COPY/.claude/channel-outbox/b.jsonl"
+  printf 'only here\n' > "$FOREIGN_COPY/notes/unique.dat"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+}
+
+# retained_assert_closed <label>: the task closed around the kept copy: backlog
+# Done, record and runtime state gone, the copy byte-identical and still locked and
+# registered, the slot unreturned with its claim and lease record unchanged, one
+# retained record naming the copy, and the output saying where it is.
+retained_assert_closed() {
+  local label=$1 case_dir=$FOREIGN_CASE record
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record survived"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: a pending-return marker survived"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "$label: the backlog item is not done: $(backlog_row_state "$case_dir")"
+  held_fingerprint "$FOREIGN_COPY" | cmp -s - "$case_dir/held-before.$(basename "$FOREIGN_COPY")" || fail "$label: the kept copy changed"
+  cmp -s "$case_dir/claim-before" "$case_dir/pool/1/.fm-slot-owner" || fail "$label: the slot's claim changed"
+  cmp -s "$case_dir/lease-before" "$case_dir/pool/treehouse-state.json" || fail "$label: the slot's lease record changed"
+  git -C "$case_dir/project" worktree list --porcelain | cmp -s - "$case_dir/registrations-before" || fail "$label: copy registrations changed"
+  assert_absent "$case_dir/treehouse.log" "$label: the pool slot was returned"
+  git -C "$case_dir/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail "$label: the copy is no longer locked"
+  record=$(retained_record_path)
+  assert_present "$record" "$label: no retained record was written"
+  assert_equals 1 "$(find "$case_dir/data/copy-sweep/retained" -type f | wc -l | tr -d ' ')" "$label: more than one record"
+  assert_equals "copy=$FOREIGN_COPY" "$(sed -n 2p "$record")" "$label: the record does not name the copy"
+  assert_grep "retained record: $record" "$case_dir/stdout" "$label: the output does not say where the record is"
+}
+
+retained_record_path() {
+  local hash
+  hash=$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  printf '%s/data/copy-sweep/retained/%s\n' "$FOREIGN_CASE" "$hash"
 }
 
 # A refused teardown of an own copy changed nothing: the copy is still locked and
