@@ -3128,6 +3128,109 @@ scn_closeout_completed_teardown_clears_the_record() {
   return 0
 }
 
+# --- the two sweeps overlap ------------------------------------------------------
+#
+# Neither sweep may start a second teardown against a copy whose first refusal is
+# not yet on record, and the one wake is raised once even when both sweeps hold
+# the same unsent wake. The parser stand-in pauses the first sweep after its
+# teardown has returned and before the refusal is recorded.
+
+mk_parser_gate() {
+  local real_py
+  real_py=$(command -v python3)
+  cat > "$W/bin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"did not release"*)
+    if [ -n "\${PARSER_GATE:-}" ]; then
+      : > "\$PARSER_GATE.reached"
+      n=0
+      while [ ! -e "\$PARSER_GATE.release" ] && [ "\$n" -lt 600 ]; do sleep 0.1; n=\$((n + 1)); done
+    fi ;;
+esac
+exec "$real_py" "\$@"
+SH
+  chmod +x "$W/bin/python3"
+}
+
+wait_for_file() {  # <file>: up to 30 s
+  local n=0
+  while [ ! -e "$1" ] && [ "$n" -lt 300 ]; do sleep 0.1; n=$((n + 1)); done
+  [ -e "$1" ]
+}
+
+scn_closeout_overlapping_sweeps_make_one_attempt() {  # <idle|prune>: the sweep that is paused first
+  local gate pid
+  make_world
+  gate="$W/gate"
+  mk_nested; mk_closeout_out own "$NESTED"; mk_parser_gate
+  [ -e "$STATE/t1.merge-prune" ] || prune arm t1 >/dev/null 2>&1
+  if [ "$1" = idle ]; then
+    PARSER_GATE=$gate idle_reap &
+  else
+    PARSER_GATE=$gate prune run t1 --now >/dev/null 2>&1 &
+  fi
+  pid=$!
+  if ! wait_for_file "$gate.reached"; then
+    : > "$gate.release"; wait "$pid"
+    why "the first sweep never reached the refusal parser" || return 1
+  fi
+  [ "$(stub_calls)" = 1 ] || { : > "$gate.release"; wait "$pid"; why "the first sweep called teardown $(stub_calls) times" || return 1; }
+  if [ "$1" = idle ]; then
+    prune run t1 --now >/dev/null 2>&1
+  else
+    idle_reap
+  fi
+  : > "$gate.release"
+  wait "$pid"
+  [ "$(stub_calls)" = 1 ] || why "a sweep started while the first refusal was unrecorded called teardown again (calls=$(stub_calls))" || return 1
+  [ "$(copy_wakes)" = 1 ] || why "want one wake for the copy, got $(copy_wakes): $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  [ -f "$(closeout_file)" ] || why "no closeout record was written" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the sent wake is not recorded: $(cat "$(closeout_file)")" || return 1
+  return 0
+}
+scn_closeout_overlap_idle_reap_first() { scn_closeout_overlapping_sweeps_make_one_attempt idle; }
+scn_closeout_overlap_prune_first() { scn_closeout_overlapping_sweeps_make_one_attempt prune; }
+
+# An unsent wake (the first append failed) that both sweeps try to raise at the
+# same moment: the queue lock serializes the appends, so only the decision to
+# append can tell them apart.
+scn_closeout_unsent_wake_is_raised_once_by_two_sweeps() {
+  local ticks i pids=0 idle_pid prune_pid
+  make_world
+  ticks="$W/ticks"
+  mk_nested; mk_closeout_out own "$NESTED"
+  mkdir "$STATE/.wake-queue"
+  go
+  grep -q '^wake_sent=0$' "$(closeout_file)" || why "the failed append was recorded as sent" || return 1
+  rmdir "$STATE/.wake-queue"
+  cat > "$W/tick" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$PPID" >> "$ticks"
+SH
+  chmod +x "$W/tick"
+  mkdir "$STATE/.wake-queue.lock"
+  printf '%s\n' "$$" > "$STATE/.wake-queue.lock/pid"
+  make_retries_due
+  FM_LOCK_WAIT_TICK="$W/tick" idle_reap &
+  idle_pid=$!
+  FM_LOCK_WAIT_TICK="$W/tick" prune run t1 --now >/dev/null 2>&1 &
+  prune_pid=$!
+  i=0
+  while [ "$i" -lt 300 ]; do
+    pids=$(sort -u "$ticks" 2>/dev/null | wc -l | tr -d ' ')
+    [ "$pids" -lt 2 ] || break
+    if [ "$pids" -ge 1 ] && { ! kill -0 "$idle_pid" 2>/dev/null || ! kill -0 "$prune_pid" 2>/dev/null; }; then break; fi
+    sleep 0.1; i=$((i + 1))
+  done
+  rm -rf "$STATE/.wake-queue.lock"
+  wait "$idle_pid"; wait "$prune_pid"
+  [ "$(stub_calls)" = 1 ] || why "teardown ran $(stub_calls) times, want 1" || return 1
+  [ "$(copy_wakes)" = 1 ] || why "two sweeps raised $(copy_wakes) wakes for one refusal: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+  grep -q '^wake_sent=1$' "$(closeout_file)" || why "the sent wake is not recorded: $(cat "$(closeout_file)")" || return 1
+  return 0
+}
+
 test_closeout_retained_own_copy_is_not_retried() { assert_scenario scn_closeout_own_is_not_retried "an unchanged own nested copy the closeout driver retained is not offered to teardown again by run, run --now or sweep, and raises one wake"; }
 test_closeout_retained_foreign_copy_is_not_retried() { assert_scenario scn_closeout_foreign_is_not_retried "the same holds for a foreign copy refusal"; }
 test_closeout_retained_unsaved_output_is_not_retried() { assert_scenario scn_closeout_unsaved_is_not_retried "the same holds when the driver output could not be saved"; }
@@ -3147,6 +3250,10 @@ test_closeout_mixed_refusal_keeps_its_retry() { assert_scenario scn_closeout_ret
 test_closeout_unreadable_nested_copy_keeps_its_retry() { assert_scenario scn_closeout_retry_unreadable_nested "a named copy that cannot be fingerprinted makes no record"; }
 test_closeout_missing_task_copy_keeps_its_retry() { assert_scenario scn_closeout_retry_missing_copy "a task copy that cannot be fingerprinted makes no record"; }
 test_closeout_completed_teardown_clears_the_record() { assert_scenario scn_closeout_completed_teardown_clears_the_record "a teardown that completes clears the closeout record"; }
+
+test_closeout_overlap_idle_reap_first_makes_one_attempt() { assert_scenario scn_closeout_overlap_idle_reap_first "a merge-prune attempt that starts while idle-reap's first refusal is not yet recorded calls no second teardown and raises one wake"; }
+test_closeout_overlap_prune_first_makes_one_attempt() { assert_scenario scn_closeout_overlap_prune_first "an idle-reap sweep that starts while merge-prune's first refusal is not yet recorded calls no second teardown and raises one wake"; }
+test_closeout_unsent_wake_is_raised_once_by_two_sweeps() { assert_scenario scn_closeout_unsent_wake_is_raised_once_by_two_sweeps "two sweeps that both hold the same unsent wake raise it once"; }
 
 # --- 1. arming ----------------------------------------------------------------
 
@@ -4169,6 +4276,9 @@ ALL_TESTS=(
   test_closeout_unreadable_nested_copy_keeps_its_retry
   test_closeout_missing_task_copy_keeps_its_retry
   test_closeout_completed_teardown_clears_the_record
+  test_closeout_overlap_idle_reap_first_makes_one_attempt
+  test_closeout_overlap_prune_first_makes_one_attempt
+  test_closeout_unsent_wake_is_raised_once_by_two_sweeps
   test_fallback_ends_the_tasks_idle_pane_shell_on_tmux
   test_fallback_ends_the_tasks_idle_pane_shell_on_herdr
   test_fallback_keeps_a_non_shell_process_in_the_pane

@@ -1244,7 +1244,6 @@ test_closeout_changed_copy_is_retried() {
       untracked) printf 'new\n' > "$COPY_C/new.txt" ;;
       modified) printf 'edit\n' >> "$COPY_C/README.md" ;;
     esac
-    age_refusal_memo "$HOME_C" cl 100000
     run_reap "$HOME_C" reap >/dev/null || fail "$change: second reap failed"
     [ "$(calls)" = 2 ] || fail "$change: a changed copy is offered to teardown again (calls=$(calls))"
     [ "$(wake_rows "$HOME_C" "$COPY_C")" = 2 ] || fail "$change: the refusal of the changed copy raises one new wake (rows=$(wake_rows "$HOME_C" "$COPY_C"))"
@@ -1252,7 +1251,7 @@ test_closeout_changed_copy_is_retried() {
     run_reap "$HOME_C" reap >/dev/null || fail "$change: third reap failed"
     [ "$(calls)" = 2 ] || fail "$change: the new fingerprint is held too (calls=$(calls))"
   done
-  pass "a copy whose HEAD or status changed is retried once more, and its new refusal raises a new wake"
+  pass "a copy whose HEAD or status changed is retried by the next sweep, and its new refusal raises a new wake"
 }
 
 test_closeout_other_refusals_keep_their_retry() {
@@ -1322,6 +1321,19 @@ test_closeout_record_is_cleared_and_pruned() {
   assert_present "$rec" "a record for a task that still exists is kept"
   pass "a completed teardown clears the closeout record, and a stale record is pruned"
 }
+test_closeout_orphan_record_is_pruned_on_the_first_reap() {
+  local rec
+  closeout_home closeout-orphan-first own
+  run_reap "$HOME_C" reap >/dev/null || fail "reap failed"
+  rec=$(closeout_record "$HOME_C" cl)
+  cp "$rec" "$(closeout_record "$HOME_C" gone)"
+  rm -rf "$HOME_C/state/.idle-reap"
+  run_reap "$HOME_C" reap >/dev/null || fail "second reap failed"
+  assert_absent "$(closeout_record "$HOME_C" gone)" "a record for a task with no record is dropped even when no refusal memo directory exists yet"
+  assert_present "$rec" "a record for a task that still exists is kept"
+  pass "a stale closeout record is pruned by the first reap, with or without the refusal memo directory"
+}
+test_closeout_orphan_record_is_pruned_on_the_first_reap
 test_closeout_retained_copy_is_not_retried_while_unchanged
 test_closeout_wake_survives_a_drained_queue_and_a_failed_append
 test_closeout_changed_copy_is_retried
