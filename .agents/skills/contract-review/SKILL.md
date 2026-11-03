@@ -88,10 +88,12 @@ The meaning of each exit is in the define-done-and-grading skill, section "Revie
 
 Allowed inputs, and only these:
 - Every file in this folder.
-- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill, which this review names as references to read.
+- The assess-done-and-grade skill, the pinned rubric and the define-done-and-grading skill, which this review names as references to read, and the files those two skills link to by a relative link.
 - A file that the repository root named in your instructions tracks, read only to check that a criterion can run.
 
 Open nothing else.
+Do not search or list a skill folder: backups, hidden files and notes in it are not inputs.
+Any helper or subagent you start is bound by this list, and what it opens belongs in your `Inputs read`.
 A report, review, register, history, earlier folder, sibling folder, transcript or copy of the contract from elsewhere is not an input.
 If a task needs a file that is not allowed, say so in the report as a check not performed.
 A gitignored file under the root is not an allowed input.

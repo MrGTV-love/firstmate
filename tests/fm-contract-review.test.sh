@@ -200,6 +200,9 @@ make_leak_world() { # builds LEAK_* variables
   printf 'assess\n' >"$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
   printf 'define\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
   printf 'old copy\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md.backup-20261101-x"
+  printf 'boundaries\n' >"$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md"
+  printf 'notes\n' >"$LEAK_SKILLS/define-done-and-grading/MAINTAINER-NOTES.md"
+  printf 'define\n\nApply [Operational boundaries](OPERATIONAL-BOUNDARIES.md).\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
   ln -s "$LEAK_SKILLS" "$TMP_ROOT/leak-skills-link"
   fm_git_init_commit "$LEAK_ROOT"
   git -C "$LEAK_ROOT" add bin docs sources .gitignore
@@ -326,6 +329,36 @@ test_leak_check_reads_common_report_shapes() {
   pass "the leak check reads numbered headings and line references without voiding a clean round"
 }
 
+test_leak_check_reads_prose_before_the_list_and_linked_files() {
+  local rep="$TMP_ROOT/report4.md"
+  make_leak_world
+  # Prose between the heading and the first path, blank lines between paths, prose after the list.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nEach path is listed separately; none is cited as evidence.\n\n'
+    printf '%s\n\n' "$LEAK_PACK/contract.md"
+    printf '%s\n' "$LEAK_PACK/target.md"
+    printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/SKILL.md"
+    printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/OPERATIONAL-BOUNDARIES.md"
+    printf '\nThat is the whole list.\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a list after a prose line, or a file the skill links, was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "4 listed input(s)" "the list after the prose line was not read in full"
+  # A file in the skill folder that its SKILL.md does not link is still a leak.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nPaths follow.\n\n'
+    printf '%s\n' "$LEAK_PACK/contract.md"
+    printf '%s\n' "$LEAK_SKILLS/define-done-and-grading/MAINTAINER-NOTES.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "an unlinked note in the skill folder was authorized"
+  # Prose before the list and nothing after it is a missing list, not a clean one.
+  printf 'VERDICT: FAIL head=abc\n\n# Inputs read\n\nNone recorded.\n\nEXIT: needs-revision\n' >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a heading with no paths was accepted"
+  pass "the leak check reads a list that follows a prose line and authorizes only files the skill links"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -336,4 +369,5 @@ fm_test_run_cases \
   test_leak_check_judges_what_a_path_is \
   test_leak_check_revision_paths_and_excluded_directories \
   test_leak_check_reads_common_report_shapes \
+  test_leak_check_reads_prose_before_the_list_and_linked_files \
   -- "$@"

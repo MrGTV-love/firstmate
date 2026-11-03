@@ -32,8 +32,9 @@
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
 #   An authorized input is judged by what it is: a file inside the pack, the
-#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (not
-#   the backups and notes beside them), the review rubric, or a file the manifest's root tracks (git ls-files, or
+#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill and a
+#   top-level file that SKILL.md links by a relative markdown link (not the
+#   backups and notes it does not link), the review rubric, or a file the manifest's root tracks (git ls-files, or
 #   <rev>:<path> that git can read). A path in the manifest's excluded set is
 #   refused even when it is tracked. A gitignored file is not tracked.
 #   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric:
@@ -303,12 +304,20 @@ inputs_read() { # <report>
       state = 2
       next
     }
+    # Inside the list: blank lines and prose before the first item are skipped; the
+    # list ends at a heading or at a prose line after its first item.
     state == 1 {
-      if ($0 ~ /^[ \t]*$/) { if (items) state = 2; next }
-      if ($0 ~ /^#/ || (items && $0 !~ /^[ \t]*([-*+]|[0-9]+[.)]|`|\/|~)/)) { state = 2; next }
-      items = 1
-      t = entry($0)
-      if (t != "") print t
+      if ($0 ~ /^[ \t]*$/) next
+      if ($0 ~ /^#/) { state = 2; next }
+      line = $0
+      sub(/^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/, "", line)
+      if (line ~ /^`?[^ \t`]*[\/]/ || line ~ /^`?~/ || line ~ /^`?[A-Za-z0-9_.-]+\.[A-Za-z0-9]+(`|[ \t]|$)/) {
+        items = 1
+        t = entry($0)
+        if (t != "") print t
+        next
+      }
+      if (items) state = 2
     }
   ' "$1"
 }
@@ -320,6 +329,25 @@ manifest_lines() { # <manifest> <kind>
 path_under() { # <path> <dir>: true when path equals dir or lies below it
   [ "$1" = "$2" ] && return 0
   case "$1" in "$2"/*) return 0 ;; esac
+  return 1
+}
+
+# True when <path> is a top-level file of a named skill directory that the skill's own
+# SKILL.md links by a relative markdown link (for example the operational-boundaries
+# note the define-done-and-grading skill tells its reader to apply). Backups, dotfiles
+# and anything the SKILL.md does not link stay refused.
+skill_linked() { # <path> <dir>...
+  local path=$1 dir name
+  shift
+  for dir in "$@"; do
+    [ -f "$dir/SKILL.md" ] || continue
+    [ "$(dirname "$path")" = "$dir" ] || continue
+    name=$(basename "$path")
+    case "$name" in .* | SKILL.md) continue ;; esac
+    if grep -oE '\]\(([A-Za-z0-9_.-]+)\)' "$dir/SKILL.md" | sed -E 's/^\]\((.*)\)$/\1/' | grep -qxF -- "$name"; then
+      return 0
+    fi
+  done
   return 1
 }
 
@@ -402,6 +430,8 @@ EOF
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
     elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
+      ok=1
+    elif [ -z "$rev" ] && skill_linked "$path" "$assess_dir" "$define_dir"; then
       ok=1
     elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       ok=1
