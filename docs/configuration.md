@@ -103,6 +103,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
+- The heartbeat guard-workaround report `state/.guard-workarounds-next`, written by `bin/fm-watch.sh` as file output only; no wake presents it.
 - The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
 - The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
@@ -706,7 +707,15 @@ Role is never inferred from GitHub identity, forge permissions, remotes, reposit
 `bin/fm-role.sh report` prints the resolved role with no network call, and the session-start digest shows it in the HOME ROLE subsection.
 
 `bin/fm-role-lib.sh` owns the fail-closed parser, self-repository detection, and the gate that `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh` apply.
-The publication target is selected from the first configured remote in the order `upstream`, `github`, `origin`; see `bin/fm-role-lib.sh` for URL and local-path normalization.
+The publication target is the repository the task's delivery mode publishes to, and each caller passes that mode.
+A `no-mistakes` task is checked against `origin` alone, because the no-mistakes pipeline opens its pull request against the repository's origin remote whatever other remotes exist.
+The gate also reads, never writes, the no-mistakes registration for the project (`<NM_HOME>/state.sqlite`, default `~/.no-mistakes`), because the pipeline publishes to its registered destination and keeps the prior registration when its run-start refresh from origin fails.
+A registration that names another repository is refused: the denial names origin and the registered destination, and the owner must reconcile the no-mistakes registration.
+A registry that exists but cannot be read is refused too.
+A project with no registration, or a home with no registry database, is checked against `origin` alone.
+A `direct-PR` task, and a caller that names no mode (`bin/fm-role.sh check` without `mode`), publishes through `gh` and is checked against the first configured remote in the order `upstream`, `github`, `origin`.
+A `local-only` task publishes nothing and never reaches the gate.
+A missing `origin` on a `no-mistakes` task is an undeterminable target and is refused; see `bin/fm-role-lib.sh` for URL and local-path normalization.
 A task's project counts as the firstmate repository when it shares the code root's lineage - the same git common dir, or a root commit of the code root's history, which every fork, the parent, and any clone of either share - computed offline; undeterminable lineage (for example a shallow clone sharing no root commit) and an undeterminable publication target are refused, even under task consent.
 Secondmate homes inherit the primary's resolved role, never its raw file: a primary file that resolves to user for any reason propagates as revocation.
 In a secondmate home the file is honored only while the inheritance receipt `config/.fm-inherit-firstmate-role.generation` proves the exact bytes the primary last published (`bin/fm-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
@@ -762,9 +771,15 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
 Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
-These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
-When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except two named shapes.
+First, when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
+Second, the prune counts these exact paths under `data/` and `state/` as scratch, although teardown preserves them: `data/command-durations.jsonl`, `data/command-durations.jsonl.lock`, `state/.omp-live-model`, `state/.omp-turnend-extension-loaded`, `state/.omp-watch-extension-loaded`, `state/extensions/omp-primary-watch` (a directory, with every child at any depth), and `state/guard-events.jsonl`.
+Firstmate's own tooling writes these during ordinary runs.
+The match is by exact path, never by name.
+In a `data/`, `state/`, or `state/extensions/` that the project ignores as a whole, a scratch name such as `node_modules` is not scratch there, and any other file is unique work, so the copy stays.
+Under a tracked `data/` or `state/`, any other ignored entry outside such a directory is judged like one anywhere else.
+A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
@@ -796,7 +811,7 @@ The ordinary finished-session sweep keeps its classification unchanged.
 No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
 A proof read that fails never counts as finding nothing.
-That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude`, `.tac`, `data`, or `state` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
 A process table (`ps`) or open-file listing (`lsof`) that fails also counts as a failed read when it printed rows or process ids first, because the process it did not list may be the one that is alive: the copy stays and the prune retries.
 
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails, including the removal of a copy that teardown returned.
@@ -1041,7 +1056,7 @@ Age limits are non-negative integer seconds for the categories above.
 The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
 For a configured repository, the ledger asks `bin/fm-review-record.py verify --task <owning task> --base <live base sha> --review-only --json` once for an owned PR's exact live head and consumes that single atomic owner output; a PR no task owns is not checked.
 That owner is the only authority: it applies the merge gate's exact-head, derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
-A missing, stale-head, FAIL, same-family, unknown-family, or yes-trigger record is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
+A missing, stale-head, FAIL, unknown-reader-family, or yes-trigger record, or any author family that the recorded reads leave uncovered under `bin/fm-review-record.py`'s coverage rule, is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
@@ -1083,6 +1098,15 @@ Ship and scout completion requires delivery evidence or the captain's own words,
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+A pull request that finishes a queued item names it with a `Closes: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge.
+A merge train closes its members' items too, with the train as the proof: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
+[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the exact `Closes:` line syntax and of which URLs in a train body are members; a line inside a fenced code block is an example, not a directive, and a pull request the body only mentions is not a member.
+The merged pull request's own task is closed by its own teardown, so the merge only reports it.
+Any other task that still has a live record stays open, and the merge reports it as an `actionable:` line.
+[`bin/fm-pr-close-items.sh`](../bin/fm-pr-close-items.sh)'s header owns what it closes and the reason it reports for each item it leaves open, an unknown id, a finished item and an open captain call among them.
+A close that fails never undoes or fails the merge, and a repeat run changes nothing.
+An item that moves to Done through `bin/fm-tasks-axi.sh` (`done`, `close`, or a typed `public-followup` completion), a backlog transition such as teardown's, or a captain-hold `answer` or `withdraw` also leaves every other active item's blocked-by list, and the cleared items are reported; an item with another unfinished blocker keeps waiting on it, and [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns that clear.
+A raw `tasks-axi done` skips this clear, and so does teardown in a home where the backlog transition gate does not apply.
 [`orca-backend.md`](orca-backend.md#current-lifecycle-and-safety) owns Orca's record-only cleanup limit when the recorded copy is missing.
 Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
@@ -1446,6 +1470,8 @@ The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-gui
 
 It also sets `rebase: strategy: merge`, so the rebase step merges newer main instead of rewriting the submitted commits; no-mistakes honors that setting only from the default-branch copy, and [`tests/fm-nm-test-contract.test.sh`](../tests/fm-nm-test-contract.test.sh) pins it.
 [Event-driven supervision](architecture.md#event-driven-supervision) owns its effect on run binding and the CI conflict-repair path it does not cover.
+
+The tracked `.no-mistakes.yaml` also lists `.gitignore` and `.ignore` under `protected_paths`, so a pipeline agent's edit to either file is refused instead of committed automatically, and the run waits for an explicit operator response; the [no-mistakes protected-path reference](https://kunchenguid.github.io/no-mistakes/reference/repo-config/#protected_paths) owns the matching and refusal rules.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test policy and entry points.
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
@@ -1579,7 +1605,7 @@ Cursor typed-submit confirmation is verified on tmux and Herdr only.
 On Zellij, cmux, and Orca a typed-plane Cursor send (a harness-native invocation or an explicit backend target; ordinary text steers ride the durable inbox and exit 0 at enqueue) lands, but `fm-send` reports delivery unconfirmed and exits non-zero because their shared submit core does not consult the busy footer; [runtime backend verification](verification/runtime-backends.md#cursor-agent-cli) owns the evidence and transcript-state boundary.
 
 muse is verified for crewmate and scout launches ONLY, and `fm-spawn.sh` refuses it for a secondmate, because muse ships no usable hook surface for a primary session's turn-end supervision; [`docs/verification/muse.md`](verification/muse.md) owns that evidence.
-muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`, because a caller-only `META_API_KEY` does not cross a long-lived backend daemon.
+muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`; [its adapter reference](../.agents/skills/harness-adapters/references/harness/muse.md#credential-preflight) owns when a `META_API_KEY` is accepted instead.
 
 gemini is likewise refused for secondmates because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
 rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns the live launch, OAuth refresh, and pane-liveness evidence, while [Herdr's process-backed liveness contract](herdr-backend.md#stale-agent-registrations) owns current recovery classification.
@@ -1807,7 +1833,7 @@ The launcher refuses again in the pane, rather than start Claude unproxied, if T
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
 Firstmate requires any nonempty override to be an absolute path.
-The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked; Claude and the rest of the worker get only the [launch environment](#worker-launch-environment-configlaunch-env-allowlist), which does not keep `TEAMCLAUDE_CONFIG` by default.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
 A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs through the launcher's `--exec`, so it receives the same proxy environment; ancestor-memory settings enforcement is owned by [`bin/fm-claude-memory-lib.sh`](../bin/fm-claude-memory-lib.sh), not bypassed by raw commands.
@@ -1890,7 +1916,7 @@ The check runs with only `HOME`, `PATH`, `TMPDIR`, `USER`, `LOGNAME`, and the pi
 A pinned Claude launch also unsets the environment credentials Claude ranks above a stored login, such as `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and the Bedrock and Vertex switches ([authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence)).
 Pi ranks a root's stored logins above environment variables, so a pinned Pi launch unsets nothing.
 
-A home that authenticates Claude through environment credentials on purpose should leave the pin absent and opt in through the [Claude API key guard](#claude-api-key-guard).
+A home that authenticates Claude through environment credentials on purpose should leave the pin absent, keep `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` through the [Claude API key guard](#claude-api-key-guard) opt-in, and list any other credential, such as `CLAUDE_CODE_OAUTH_TOKEN`, in the [launch environment allowlist](#worker-launch-environment-configlaunch-env-allowlist).
 
 ### Failures, reporting, and inheritance
 
@@ -1908,7 +1934,7 @@ The optional local, gitignored `config/lavish-axi-host` contains one non-empty a
 `fm-spawn.sh` exports that address into every new worker and relaunch for opening boards, and the file is inherited into secondmate homes through the primary-authoritative configuration contract.
 
 Once a board exists, the process-event adapter derives the polling address from that board's own saved Lavish session instead; its header owns the lookup contract.
-When the file is absent, worker launches do not add a board address and retain the existing ambient-environment behavior.
+When the file is absent, worker launches do not add a board address; a `LAVISH_AXI_HOST` the pane sets still reaches the worker through the [launch environment](#worker-launch-environment-configlaunch-env-allowlist)'s operational floor.
 
 Malformed or unreadable values refuse the launch before the worker starts.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
@@ -1955,8 +1981,27 @@ The text is static and never executed or expanded; secondmate charters never tak
 
 ## Worker launch environment (config/launch-env-allowlist)
 
-The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
-With no file, ambient inheritance remains unfiltered except for harness-specific shedding, including the [Claude API key guard](#claude-api-key-guard); the provider, long-lived terminal daemon, and shell initialization determine the remaining inherited variables.
+Every newly launched worker, scout, and secondmate, including relaunches, starts from a clean environment rather than the pane's ambient one, so an operator credential exported in the pane does not reach the worker's tools.
+With no `config/launch-env-allowlist` file, the launch keeps the operational floor, non-secret plumbing (`SSH_AUTH_SOCK`, `SSH_ASKPASS`, `GIT_SSH_COMMAND`, `GIT_CONFIG_GLOBAL`, `NM_HOME`, the `XDG_*` base directories, the proxy names `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, the certificate paths `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and the pane's numbered `GIT_CONFIG_*` entries), the non-secret toolchain home paths (`JAVA_HOME`, `GOROOT`, `GOPATH`, `CARGO_HOME`, `RUSTUP_HOME`, `PNPM_HOME`, `BUN_INSTALL`, `NVM_DIR`) and the selected harness's non-secret store selectors.
+Each retained name is passed only when the pane sets it.
+The launch uses `/usr/bin/env -i` with names-only retained entries, so unlisted readonly exports and non-identifier environment names are absent from the new process.
+The default starts the pane's own shell without user startup loading (`zsh -f`, or noninteractive Bash/sh without BASH_ENV/ENV), preserving its raw-command syntax.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the `HARNESS_ROUTES` store selectors, the `TOOLCHAIN` home paths and the `WORK` plumbing, including the non-secret `DISABLE_AUTOUPDATER` and `TRACEPARENT` carriers.
+[`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns Claude's provider selectors (`FM_WORKER_ACCOUNT_CLAUDE_SELECTORS`) and their non-secret companions (`FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS`: `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_FOUNDRY_RESOURCE`, `ANTHROPIC_BASE_URL`).
+Claude keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` only with `--allow-api-key`; without it the default launch drops both, and the [Claude API key guard](#claude-api-key-guard) refuses only an allowlist that lists one.
+
+DSH keeps the one credential its launch patch names, `DEEPSEEK_API_KEY` (`bin/fm-dsh.py api-key-env` owns the name).
+That key reaches the dsh-tui process, so it is a retained credential, not an isolated one.
+The installed DSH subprocess owner removes `KEY`, `PASSWORD`, `SECRET` and `TOKEN` names, this one included, from the base environment of the commands it starts, but an explicit per-command environment can restore an entry, and no live DSH tool run has proved this yet.
+
+The default keeps no other secret-valued name, so these routes that used to inherit from the pane stop working until you act: `GH_TOKEN` and `GITHUB_TOKEN`; AWS secret keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`; `CLAUDE_CODE_OAUTH_TOKEN`; and provider API keys such as `GEMINI_API_KEY`, `META_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
+Other names outside the default set stop reaching the worker the same way.
+That includes `VIRTUAL_ENV`, `PYTHONPATH` and `NODE_OPTIONS`, which the default deliberately omits because they are pane-specific or can inject code.
+A Git identity set only in `GIT_AUTHOR_*` or `GIT_COMMITTER_*` pane variables stops reaching the worker too; set it in Git config, which the kept `HOME`, `XDG_CONFIG_HOME` and `GIT_CONFIG_GLOBAL` still locate.
+A raw launch command runs inside this boundary, so a pane variable it expands is empty unless it is kept.
+The remedy is the optional local, gitignored `config/launch-env-allowlist`.
+That file **replaces the whole default set** with exactly the floor and its listed names, so it must list the full set the launch needs, including any plumbing and selectors above; listing only `GH_TOKEN` also drops `SSH_AUTH_SOCK`.
+A credential kept this way still reaches that harness's tools; only the harness's own child-environment policy, where one exists, removes it there.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -1969,7 +2014,7 @@ Create the file with one environment variable **name** per line, never credentia
 Blank lines and lines beginning with `#` are allowed.
 
 Invalid names, an unreadable or nonregular file, or a path inspection error (including an inaccessible configuration directory) stop the launch.
-An empty file enables filtering with only Firstmate's operational floor.
+An empty file keeps only Firstmate's operational floor.
 
 For example, a provider using `OPENAI_API_KEY` and Git using an SSH agent could use:
 
@@ -1983,9 +2028,11 @@ SSH_AUTH_SOCK
 ### Variables retained and where values come from
 
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
+[`bin/fm-worker-env.py`](../bin/fm-worker-env.py) owns the retained environment floor and destination-side execution; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns allowlist selection and parsing.
+Main-run readers can invoke the same helper directly without fm-spawn, using its default clean environment and its `--startup` option on Darwin.
+An explicit `--keep` retains a named existing authentication route; it does not isolate that credential from the harness's tools.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
+In an allowlist file, every other ambient name must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -2007,11 +2054,14 @@ Choose the minimum additions for the authentication method actually in use:
 
 ### Validation and security limits
 
-Verify the selected provider login and Git transport after opting in; Firstmate does not infer credentials from model names or install a secret manager.
-Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when this option is enabled, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
+Verify the selected provider login and Git transport after you change the file; Firstmate does not infer credentials from model names or install a secret manager.
+Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when an allowlist file is present, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
-This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
+Herdr's native restore is outside this boundary: a restored pane resumes the agent from its recorded session without the clean-environment prefix or the Seatbelt profile, so that agent's tools can see what the pane shell loaded ([Herdr restart behavior](herdr-backend.md#husks-after-a-server-restart)).
+The environment filter alone is not a sandbox: it cannot revoke same-user access to credential files, prevent later credential imports, or isolate processes from the same user's other processes.
+The separate [worker OS confinement](#worker-os-write-confinement) adds named startup-read rules for Darwin omp/Claude tasks; kept harness credentials, dotenv reads or imports, a child login or interactive shell outside that confinement (other harnesses, secondmates, Linux), alternate credential loaders and unconfined platforms remain outside that boundary.
+A prose rule against dumping environment variables is only operator guidance on those uncovered surfaces, not enforcement.
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
 
@@ -2031,7 +2081,7 @@ It applies to fresh launches, relaunches, raw launch commands with an identifiab
 For an unidentifiable raw command, the adviser stays off.
 
 Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
-Compaction key delivery for compact-adviser is pending (follow-up fm-compact-adviser-key-source); until then compact-adviser works only where `TYPESAFE_API_KEY` is in the process environment or `./.env`.
+compact-adviser has no key route on fm-spawn launches until a home-`.env` key route like the guard hook's lands (follow-up fm-compact-adviser-key-source).
 Use the plugin's supported settings to select `mode: auto` and acknowledge experimental automatic mode.
 For omp's Pi plugin, these fields are `mode` and `autoAcknowledged` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
 Claude stores mode in its plugin options and acknowledgement in the plugin's own preferences store.
@@ -2090,7 +2140,8 @@ Per-machine Cursor `cli-config.json` attribution-off is not this contract: it do
 
 ### Claude API key guard
 
-Every claude worker Firstmate launches is refused before creation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through ambient environment inheritance or an explicit allowlist entry.
+Every claude worker Firstmate launches is refused before creation when `config/launch-env-allowlist` lists `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` and that variable is set where the worker would inherit it.
+Without an allowlist file the default [launch environment](#worker-launch-environment-configlaunch-env-allowlist) keeps neither variable unless `--allow-api-key` is passed, so an ambient, tmux session or tmux global value is dropped from the launch and does not refuse it.
 Claude Code prefers an API key over a claude.ai subscription login and silently bills the API, so this guard prevents accidental API charges when the captain intends subscription billing.
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
@@ -2102,7 +2153,7 @@ A direct `fm-spawn.sh --relaunch` without the flag drops the line.
 
 When `config/launch-env-allowlist` is active, a variable name the allowlist does not list is filtered out of the worker environment; the guard does not refuse for a filtered-out variable, because it cannot reach the worker.
 
-On the tmux backend the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
+On the tmux backend, for a variable the allowlist lists, the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
 The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
@@ -2286,7 +2337,8 @@ No budget gates it, so it still fires when both budgets are `off`.
 The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
 It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, the live-copy fact and its record, and how `check` stays inside the watcher's timeout.
 `bin/fm-copy-sweep.sh --help` prints that header.
-The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
+The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it removes nothing, moves no ref, touches no worktree, and lists every copy with its class and reason.
+Its content proof is the one `--apply` uses, and that proof can add Git objects to the object store.
 
 ### Hourly command and watcher check
 
@@ -2332,7 +2384,7 @@ The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only ver
 Review the first batch's records before unattended operation.
 The header also owns the closeout-script liveness dependency and the proposed Vernant follow-ups that would replace this fallback, `vernant-lock-lease` and `vernant-commits-remote-before-lock`; neither is built yet, so the sweep keeps its own proofs.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
-[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the main regression entry point; [`tests/fm-copy-sweep-orphan.test.sh`](../tests/fm-copy-sweep-orphan.test.sh) covers locked squash-content eligibility, report and `--apply` agreement on content proofs, hash-preserved disposable classes, the unpreserved regenerable class, no added preserve on a refused removal or an activity-only write, and diagnostic-preserving launcher observation.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
@@ -2843,6 +2895,13 @@ Dispatch is separate from this tool-call guard: its [typed resolution contract](
 On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
 The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
 It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+Both profiles include read-denial rules for standard user/system Bash and Zsh startup files, their canonical symlink targets and the resolved `ZDOTDIR`, `BASH_ENV` and `ENV` selectors, intended to stop child login and interactive shells from re-running those credential loaders.
+A selector present only in a stale destination pane, an arbitrary alternate loader and a selector changed after launch are outside this named-path boundary.
+The launch already supplies PATH; if additional operational initialization is needed, ask Main to separate it from credential-loading startup rather than sourcing a different secret-bearing file.
+Neither profile provides dotenv read isolation; project and foreign-home dotenv files remain readable where ordinary filesystem permissions permit it.
+The executable acceptance test must run from an unconfined Darwin process; `sandbox_apply: Operation not permitted` from an already-confined worker does not prove the new rules enforce or that native authentication remains compatible.
+The named startup rules do not protect renamed copies, hard-link aliases, arbitrary alternate loaders or same-user process inspection.
+Guard events record one launch admission, not each kernel read denial; [`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) exercises the actual profiles with fake-only files.
 Writes are allowed by default; the profile denies writes to these named protected assets:
 
 - the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;
@@ -2950,10 +3009,10 @@ That includes any temp entry with no owner marker: a `/private/tmp/claude-<uid>/
 It also includes the home's shared `state/` files, the shared Git directory's config and hooks, credentials outside the listed harness homes, and Claude's shared `history.jsonl` prompt history, which loads no code.
 Protected lists are read at launch, so a task, home, gate or session directory created later is not covered until the worker is relaunched; only a later task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, a later `data/<other>/` directory and the contents of a later Claude session directory are still covered, by their name patterns or the protected data root.
 Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
-The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
+Apart from the shell startup read rules above, the profile does not restrict reads, network access or system calls unrelated to filesystem writes.
 In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
 macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
-`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
+`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample, the nested copy sweep's lock launcher check and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
 The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects the task audit ledger and enables the separate write-guard confinement probe, still reaches the helper.
 `bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`, and its macOS resident-memory watch reads each root's process-group tree through a long-lived helper `mem-tree` reader started at the root's first tick, falling back to `ps` for a tick the reader does not answer in time, and for the rest of the root once the reader is given up.
 The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
@@ -3003,7 +3062,7 @@ Native outbound devices have a separate `DEVICE_EGRESS` table in the same egress
 | `xd://report_issue` | `provider`; refused because native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so the worker prompt never offers it. The refusal says Auto QA is off for firstmate workers. No grant admits it. |
 | `xd://github` | `remote-storage`; refused because native results return as unscreened `write` output. Only `repo_view` and `file_read` name `gh-axi` through the shell as a read alternative; write and unknown ops name none. A top-level `github` call instead follows its tool row below. No grant admits the device. |
 
-These device writes record `branch=egress`, their destination class and a `jev-egress-grant` deny event keyed to session `<task>:<device>` with the canonical routed device, such as `<task>:xd://github` for `XD://github` or `xd://github ` too, before any filesystem check or confinement deferral; no destination-class allow shares that subject, so a granted call never counts as clearing a device refusal. Device edits and non-omp invocations remain refused as invocation mismatches.
+These device writes record `branch=egress`, their destination class and a `jev-egress-grant` deny event for the task whose rule is the canonical routed device, such as `xd://github` for `XD://github` or `xd://github ` too, before any filesystem check or confinement deferral; no destination-class allow shares that rule, so a granted call never counts as clearing a device refusal. Device edits and non-omp invocations remain refused as invocation mismatches.
 Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
 omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
@@ -3048,7 +3107,7 @@ The `xd://github` device write stays refused by the separate device-egress table
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
 The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` and `xd://github` device writes are owned by `jev-egress-grant` and remain refused under every grant.
-Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), `dispatch-grant` or `dispatch-find` (for the `jev-egress-grant` spawn decision that resolves the task grant or the native find capability; a refusal there has `source_ok` false), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing, the task id with the `worker` actor, and a rule of the decided tool name (for `jev-tool-coverage`), destination class (for a grant-based `jev-egress-grant` decision), `dispatch-grant` or `dispatch-find` (for the `jev-egress-grant` spawn decision that resolves the task grant or the native find capability; a refusal there has `source_ok` false), canonical routed device URI (for an unconditional device-egress refusal) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
 For grant-based decisions, the egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
 An unconditional device-egress refusal uses the compiled device row as its source, so `source_ok=true` does not imply that task metadata was read or any grant was accepted.
 The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
@@ -3539,7 +3598,7 @@ Arming refuses an unbound source, establishes the DM and proves it readable, the
 The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
 Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
 `bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which first reads every tracked old-DM thread once and, only when that read is complete and finds nothing new, stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
-`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, or when its own read of an old thread stages one, and with the read's own error name when an old thread cannot be read or the request budget runs out.
+`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, or when its own read of an old thread stages one, and with the read's own error name when an old thread cannot be read.
 A refused retarget changes nothing except the rows its read staged; those rows are delivered by the old owner's poll, and an empty journal alone never proves the old threads were read.
 The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until the pending journal is empty, set the new value, then run `disarm`, `retarget`, and `arm`.
 A poll can print nothing while work is still pending, so silence is not the signal.
@@ -3574,10 +3633,10 @@ Only replies inside the card's thread map to that decision; messages typed in th
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
 Persisted posted-text and attempted-update digests avoid repeated edits across polls and restarts; pre-digest cards are refreshed once in place.
-A Slack-returned update failure is reported once for that text change without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt. Local `request_budget_exhausted` and `unreachable` failures propagate without recording an attempted digest, so the next pass can try again.
+A Slack-returned update failure is reported once for that text change without stopping later candidates; its unchanged text is not retried, so a new text change or hold lifecycle is needed for another attempt. Local `unreachable` failures propagate without recording an attempted digest, so the next pass can try again.
 Refreshed answer instructions also respect the thread's recorded reaction capability: granting scopes and re-arming clears the missing-scope warning but leaves a previously typed-only card typed-only; a new hold lifecycle is needed to enable taps for that call.
 A changed option set is never applied to an existing card and requires a new hold lifecycle.
-Card posts and edits are not limited by `FM_SLACK_POLL_MAX_ANSWERS`; the open cards and existing request deadline bound each mirror pass.
+Card posts and edits are not limited by `FM_SLACK_POLL_MAX_ANSWERS`; the open cards, each request's socket timeout, and the watcher's check bounds limit each mirror pass.
 Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
 Every value posted to Slack (card fields, option text, task ids, and conflict candidates) has `&`, `<`, and `>` escaped as `&amp;`, `&lt;`, and `&gt;`, so a placeholder such as `<source-id>` shows as written instead of being read as Slack markup; the card budget and the post cut count the escaped length and never split an escape, and the wake line keeps the plain text.
 Beyond the labeled parts above and evidence pointers, the mirror reads only explicit `Option N:` fields from the task body and never infers options from arbitrary prose.
@@ -3620,7 +3679,8 @@ Ordinary Slack outages, revoked tokens, and rate limits are reported once per fa
 Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post, edit, or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
 No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
-The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
+Each Slack API request keeps its own 10-second socket timeout, and no budget is shared across the requests of one run; `bin/fm-watch.sh` owns the standing check's no-progress and absolute bounds.
+The standing check writes one `slack: request finished` line to stderr after each JSON reply, because a check that waits on slow replies uses almost no CPU and the watcher counts check stderr as progress; a hung or trickling request writes nothing, so the no-progress bound still stops it.
 
 `tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.

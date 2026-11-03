@@ -1341,11 +1341,6 @@
       "text": "[ \"${#CANDIDATES[@]}\" -gt 0 ] || die \"candidate set is empty; refusing isolation proof\""
     },
     {
-      "id": "site:bin/fm-turnend-guard.sh:0f9ac132f3",
-      "rule": "S1",
-      "text": "\"$SCRIPT_DIR/fm-guard-event.sh\" turnend-supervision-block \"$@\" 2>/dev/null || true"
-    },
-    {
       "id": "site:bin/fm-voice-client.py:7df92e99a6",
       "rule": "S1",
       "text": "\"runs; open-mic is accepted and refuses until \""

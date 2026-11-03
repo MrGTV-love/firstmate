@@ -7,12 +7,16 @@
 #   - bin/fm-spawn.sh checks before creating a worker.
 #   - bin/fm-control.sh checks before stopping the current worker for relaunch.
 #
-# It reads the invoking environment and, on tmux, the effective session/global
+# Without config/launch-env-allowlist the launch's names-only env -i boundary
+# keeps neither credential unless --allow-api-key is passed, so only an
+# allowlist that lists one can let it reach the worker. For a listed name it
+# reads the invoking environment and, on tmux, the effective session/global
 # environment. Existing panes can hold older values; the launch command sheds
 # both credential variables when billing has not been opted into.
-# An ambient refusal prints the exact `env -u` relaunch that clears it plus the
-# `--allow-api-key` opt-in; a tmux refusal prints the tmux unset command,
-# because `env -u` cannot clear a value the new window inherits from the server.
+# A refusal for the invoking environment prints the exact `env -u` relaunch
+# that clears it plus the `--allow-api-key` opt-in; a tmux refusal prints the
+# tmux unset command, because `env -u` cannot clear a value the new window
+# inherits from the server.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
 
@@ -156,6 +160,11 @@ fm_api_key_guard_launch_env_config() {
   fi
 }
 
+fm_api_key_guard_event() {
+  [ -z "${fm_api_key_guard_quiet:-}" ] || return 0
+  "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" claude-api-billing "$1" --rule inherited-credential --task "${ID:-${FM_TASK_ID:-}}" "${@:2}" 2>/dev/null || true
+}
+
 # fm_api_key_guard <harness> <allow_api_key> <worker_account> <launch_env_enabled> <launch_env_names> [backend]
 # Returns:
 #   0 - guard passes, no refusal needed
@@ -164,34 +173,54 @@ fm_api_key_guard_launch_env_config() {
 fm_api_key_guard() {
   local harness=$1 allow_api_key=$2 worker_account=$3
   local launch_env_enabled=$4 launch_env_names=$5 backend=${6:-}
-  local route_text check_var would_reach tmux_session tmux_env_entry tmux_env_scope
+  local check_var listed tmux_session tmux_env_entry tmux_env_scope opt_in_names
 
   # Only claude workers are affected.
-  [ "$harness" = claude ] && [ "$allow_api_key" -eq 0 ] || return 0
+  [ "$harness" = claude ] || return 0
+  if [ "$allow_api_key" -ne 0 ]; then
+    # The opt-in is a used waiver only when it carries a set credential. At the
+    # default launch boundary it keeps both names, so judge it as if both were
+    # listed; an allowlist launch keeps only the names the allowlist lists.
+    opt_in_names=$launch_env_names
+    [ "$launch_env_enabled" = 1 ] || opt_in_names=$'ANTHROPIC_API_KEY\nANTHROPIC_AUTH_TOKEN'
+    if fm_api_key_guard_quiet=1 fm_api_key_guard "$harness" 0 "$worker_account" 1 "$opt_in_names" "$backend" 2>/dev/null; then
+      fm_api_key_guard_event allow
+    else
+      fm_api_key_guard_event allow --override --cleared-by allow-api-key
+    fi
+    return 0
+  fi
 
   # A worker-account pin shed strips both ANTHROPIC_API_KEY and
   # ANTHROPIC_AUTH_TOKEN from the launch (fm_worker_account_claude_shed).
-  [ -z "$worker_account" ] || return 0
-
-  # Determine route text for the error message.
-  if [ "$launch_env_enabled" = 1 ]; then
-    route_text=' through config/launch-env-allowlist'
-  else
-    route_text=' through ambient environment inheritance'
+  if [ -n "$worker_account" ]; then
+    fm_api_key_guard_event allow
+    return 0
   fi
 
-  # Check each variable in the spawning environment.
+  # The default launch boundary keeps neither credential without the opt-in.
+  if [ "$launch_env_enabled" != 1 ]; then
+    fm_api_key_guard_event allow
+    return 0
+  fi
+
+  # Only a name the allowlist lists can reach the worker.
+  listed=
   for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-    would_reach=1
-    if [ "$launch_env_enabled" = 1 ]; then
-      case $'\n'"$launch_env_names"$'\n' in
-      *$'\n'"$check_var"$'\n'*) ;;
-      *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
-      esac
-    fi
-    if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-      echo "error: $check_var is set and would reach the claude worker$route_text; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API" >&2
-      "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/fm-guard-event.sh" claude-api-billing deny --source-ok true 2>/dev/null || true
+    case $'\n'"$launch_env_names"$'\n' in
+    *$'\n'"$check_var"$'\n'*) listed="$listed $check_var" ;;
+    esac
+  done
+  if [ -z "$listed" ]; then
+    fm_api_key_guard_event allow
+    return 0
+  fi
+
+  # Check each listed variable in the spawning environment.
+  for check_var in $listed; do
+    if [ -n "${!check_var:-}" ]; then
+      echo "error: $check_var is set and would reach the claude worker through config/launch-env-allowlist; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API" >&2
+      fm_api_key_guard_event deny
       return 1
     fi
   done
@@ -205,13 +234,7 @@ fm_api_key_guard() {
     elif tmux has-session -t firstmate 2>/dev/null; then
       tmux_session=firstmate
     fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      if [ "$launch_env_enabled" = 1 ]; then
-        case $'\n'"$launch_env_names"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) continue ;;
-        esac
-      fi
+    for check_var in $listed; do
       tmux_env_scope=
       if [ -n "$tmux_session" ] \
          && tmux_env_entry=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null); then
@@ -226,15 +249,18 @@ fm_api_key_guard() {
       case "$tmux_env_scope" in
       session)
         echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        fm_api_key_guard_event deny
         return 1
         ;;
       global)
         echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        fm_api_key_guard_event deny
         return 1
         ;;
       esac
     done
   fi
 
+  fm_api_key_guard_event allow
   return 0
 }

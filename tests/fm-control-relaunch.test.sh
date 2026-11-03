@@ -889,8 +889,8 @@ test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop() {
   expect_code 0 "$rc" "native Ultra relaunch failed: $out"
   [ "$(meta_field "$dir" "$id" effort)" = ultra ] || fail "relaunch lost Ultra metadata"
   [ "$(meta_field "$dir" "$id" model)" = codex-native/gpt-6-astra ] || fail "relaunch lost native model"
-  assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "relaunch lost native flag"
-  assert_not_contains "$(cat "$dir/fake/literal")" "--thinking 'ultra'" "relaunch used an invalid Pi level"
+  assert_launch_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "relaunch lost native flag"
+  assert_launch_not_contains "$(cat "$dir/fake/literal")" "--thinking 'ultra'" "relaunch used an invalid Pi level"
   pass "native Ultra relaunch preserves its profile and rejects an unsupported model before stopping"
 }
 
@@ -917,7 +917,7 @@ test_model_index_resolves_and_refuses_before_stop() {
   out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --model role:native --note "move to the indexed role"); rc=$?
   expect_code 0 "$rc" "a role relaunch with native Ultra should resolve before its effort check: $out"
   [ "$(meta_field "$dir" "$id" model)" = codex-native/gpt-6-astra ] || fail "the relaunch should record the resolved id"
-  assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "the resolved native model should keep its Ultra flag"
+  assert_launch_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "the resolved native model should keep its Ultra flag"
   assert_not_contains "$(cat "$dir/fake/literal")" "role:native" "a role reference must not reach the harness"
   printf '%s\n' '{"models":[{"id":"codex-native/gpt-7"}]}' > "$dir/catalogs/pi.json"
   cp "$dir/fake/literal" "$dir/literal-before"
@@ -986,7 +986,7 @@ SH
       else
         expect_code 0 "$rc" "the selected available generation must survive auth mutation and replacement: $out"
         [ "$(meta_field "$dir" "$id" model)" = "$selected" ] || fail "replacement switched model generations"
-        assert_contains "$(cat "$dir/fake/literal")" "--model '$selected'" "replacement lost the frozen model"
+        assert_launch_contains "$(cat "$dir/fake/literal")" "--model '$selected'" "replacement lost the frozen model"
         [ "$(wc -l < "$dir/catalog-roots" | tr -d ' ')" = 2 ] || fail "both pre-stop and replacement must check the selected entry"
       fi
     done
@@ -1071,7 +1071,7 @@ test_worker_account_pin_follows_the_relaunch() {
   out=$(run_control "$dir" "$id" relaunch --note "pin removed"); rc=$?
   expect_code 0 "$rc" "a relaunch after the pin is removed should succeed"$'\n'"$out"
   assert_no_grep "account=" "$dir/home/state/$id.meta" "a relaunch without a pin must drop the previous account from the record"
-  assert_not_contains "$(cat "$dir/fake/literal")" "CLAUDE_CONFIG_DIR=" \
+  assert_launch_not_contains "$(cat "$dir/fake/literal")" "CLAUDE_CONFIG_DIR='" \
     "an unpinned replacement must launch exactly as before"
   pass "fm-control relaunch: the replacement follows the home's current worker account pin"
 }
@@ -1081,9 +1081,12 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   dir=$(new_case apikey "$id")
   add_ship_task "$dir" "$id" claude
   printf 'api_key=allow\n' >> "$dir/home/state/$id.meta"
-  out=$(ANTHROPIC_API_KEY=sk-ant-relaunch-test \
+  out=$(ANTHROPIC_API_KEY=sk-ant-relaunch-test FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl" \
     run_control "$dir" "$id" relaunch --note "deliberate API billing"); rc=$?
   expect_code 0 "$rc" "a relaunch of a task that opted in to API billing should carry the opt-in"$'\n'"$out"
+  jq -se --arg id "$id" '[.[] | select(.guard == "claude-api-billing")] | length == 1
+    and .[0].override == true and .[0].cleared_by == "allow-api-key" and .[0].task == $id' "$dir/guard-events.jsonl" >/dev/null \
+    || fail "one guarded relaunch must write one billing decision: $(cat "$dir/guard-events.jsonl" 2>/dev/null)"
   assert_not_contains "$out" "would reach the claude worker" \
     "the recorded opt-in must keep the guard from refusing the replacement"
   [ "$(grep -c '^api_key=' "$dir/home/state/$id.meta")" = 1 ] \
@@ -1095,12 +1098,32 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   pass "fm-control relaunch: a recorded api_key=allow opt-in is carried to the replacement launch"
 }
 
+test_manual_backlog_relaunch_records_one_skip() {
+  local dir out rc id=rl-manual-backlog
+  dir=$(new_case manual-backlog "$id")
+  add_ship_task "$dir" "$id" codex
+  mkdir -p "$dir/home/config"
+  printf 'manual\n' > "$dir/home/config/backlog-backend"
+  out=$(FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl" run_control "$dir" "$id" relaunch --note "manual backlog"); rc=$?
+  expect_code 0 "$rc" "a relaunch on a manual-backlog home should succeed"$'\n'"$out"
+  jq -se --arg id "$id" '[.[] | select(.guard == "backlog-transition")] | length == 1
+    and .[0].decision == "bypass" and .[0].rule == "manual-backend" and .[0].task == $id' "$dir/guard-events.jsonl" >/dev/null \
+    || fail "one manual-backlog relaunch must record one skip: $(cat "$dir/guard-events.jsonl" 2>/dev/null)"
+  pass "fm-control relaunch: a manual-backlog home records one backlog skip per relaunch"
+}
+
 test_api_key_guard_refuses_before_stop() {
   local dir out rc id=rl-key-refuse
   dir=$(new_case key-refuse "$id")
   add_ship_task "$dir" "$id" claude
+  out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-test-token run_control "$dir" "$id" relaunch --note "unlisted"); rc=$?
+  expect_code 0 "$rc" "the default launch boundary drops an ambient key, so relaunch must proceed"$'\n'"$out"
+  dir=$(new_case key-refuse-listed "$id")
+  add_ship_task "$dir" "$id" claude
+  mkdir -p "$dir/home/config"
+  printf '%s\n' HOME PATH ANTHROPIC_AUTH_TOKEN > "$dir/home/config/launch-env-allowlist"
   out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-test-token run_control "$dir" "$id" relaunch --note "guarded"); rc=$?
-  expect_code 1 "$rc" "a key must refuse the replacement before stopping the worker"
+  expect_code 1 "$rc" "an allowlisted key must refuse the replacement before stopping the worker"
   assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" "the refusal names the credential variable"
   [ "$(cat "$dir/fake/command")" = claude ] || fail "a guard refusal must leave the original worker running"
   [ ! -s "$dir/fake/literal" ] || fail "a guard refusal must not send lifecycle input"
@@ -1121,6 +1144,7 @@ test_api_key_guard_uses_replacement_profile() {
   mkdir -p "$dir/home/config" "$dir/work"
   : > "$dir/work/.credentials.json"
   printf '%s\n' "$dir/work" > "$dir/home/config/claude-account"
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$dir/home/config/launch-env-allowlist"
   out=$(ANTHROPIC_API_KEY=sk-ant-test-key run_control "$dir" rl-key-pin relaunch --note "pinned"); rc=$?
   expect_code 0 "$rc" "a pin that sheds the key must permit relaunch"$'\n'"$out"
   pass "fm-control honors the replacement account pin's credential shed"
@@ -1138,6 +1162,8 @@ test_api_key_guard_refuses_tmux_key_before_stop() {
   local dir out rc id=rl-key-tmux
   dir=$(new_case key-tmux "$id")
   add_ship_task "$dir" "$id" claude
+  mkdir -p "$dir/home/config"
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$dir/home/config/launch-env-allowlist"
   out=$(FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-server-key \
     run_control "$dir" "$id" relaunch --note "guarded"); rc=$?
   expect_code 1 "$rc" "a tmux-only key must refuse before stopping the worker"
@@ -1172,7 +1198,7 @@ test_pi_exclude_tools_follow_the_relaunch() {
   printf '%s\n' '# hide writes' 'mcp__srv__writeTool' 'mcp__srv__adminTool' > "$dir/home/config/crew-exclude-tools"
   out=$(run_control "$dir" "$id" relaunch --note "keep exclusions"); rc=$?
   expect_code 0 "$rc" "a Pi relaunch with exclusions should succeed"$'\n'"$out"
-  assert_contains "$(cat "$dir/fake/literal")" "--exclude-tools 'mcp__srv__writeTool,mcp__srv__adminTool'" \
+  assert_launch_contains "$(cat "$dir/fake/literal")" "--exclude-tools 'mcp__srv__writeTool,mcp__srv__adminTool'" \
     "the relaunched Pi worker must keep the home's tool exclusions"
   rm "$dir/home/config/crew-exclude-tools"
   : > "$dir/fake/literal"
@@ -2311,6 +2337,7 @@ test_owned_path_relaunch_refuses_before_stop() {
 }
 
 control_relaunch_test_cases=(
+test_manual_backlog_relaunch_records_one_skip
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
 test_relaunch_refuses_contradictory_dsh_route_before_stopping

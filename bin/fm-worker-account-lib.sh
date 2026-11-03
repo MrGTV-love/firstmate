@@ -63,8 +63,14 @@ FM_WORKER_ACCOUNT_CHECK_SECONDS=${FM_WORKER_ACCOUNT_CHECK_SECONDS:-30}
 # Credentials Claude Code ranks above the /login stored in its config root
 # (code.claude.com/docs/en/authentication, "Authentication precedence"; the
 # Claude Platform on AWS and Bedrock Mantle switches from
-# code.claude.com/docs/en/env-vars).
-FM_WORKER_ACCOUNT_CLAUDE_SHED="CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID"
+# code.claude.com/docs/en/env-vars). The selector names carry no secret value,
+# so an unpinned launch's default clean environment keeps them (bin/fm-spawn.sh).
+FM_WORKER_ACCOUNT_CLAUDE_SELECTORS="CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID"
+FM_WORKER_ACCOUNT_CLAUDE_SHED="$FM_WORKER_ACCOUNT_CLAUDE_SELECTORS ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN"
+# Non-secret region, profile, project and endpoint names those provider modes
+# read; a pin does not shed them, and the default clean environment keeps them.
+# shellcheck disable=SC2034 # read by bin/fm-spawn.sh
+FM_WORKER_ACCOUNT_CLAUDE_COMPANIONS="AWS_PROFILE AWS_REGION AWS_DEFAULT_REGION CLOUD_ML_REGION ANTHROPIC_VERTEX_PROJECT_ID ANTHROPIC_FOUNDRY_RESOURCE ANTHROPIC_BASE_URL"
 
 # fm_worker_account_file <harness>
 # Prints the pin file name for a pinnable runner; returns 1 for any other.
