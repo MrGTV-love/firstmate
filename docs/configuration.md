@@ -3598,7 +3598,7 @@ Arming refuses an unbound source, establishes the DM and proves it readable, the
 The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
 Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
 `bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which first reads every tracked old-DM thread once and, only when that read is complete and finds nothing new, stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
-`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, or when its own read of an old thread stages one, and with the read's own error name when an old thread cannot be read.
+`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer, notice, or request for the old DM, or when its own read of an old thread stages an answer or notice, and with the read's own error name when an old thread cannot be read.
 A refused retarget changes nothing except the rows its read staged; those rows are delivered by the old owner's poll, and an empty journal alone never proves the old threads were read.
 The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until the pending journal is empty, set the new value, then run `disarm`, `retarget`, and `arm`.
 A poll can print nothing while work is still pending, so silence is not the signal.
@@ -3610,7 +3610,7 @@ The same last resort covers an old thread that `retarget` can never read or judg
 First read that thread in Slack by hand and record any answer it holds with `bin/fm-captain-hold.sh answer`; only then run `bin/fm-slack-check.sh disarm` and remove `state/slack-watch/`.
 The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
-When there are neither open calls nor tracked threads needing resolution, an armed plane's poll makes one history read of the owner DM for new requests, and more than one when new messages span more than one page, plus the owner-DM proof, the reply lookup, and the post for each request it takes in; a bound plane that was never armed has no stored owner DM and makes none.
+When there are neither open calls nor tracked threads needing resolution, an armed plane's poll makes one history read of the owner DM for new requests, and more than one when new messages span more than one page, plus the owner-DM proof, the reply lookup, and the post for each request it takes in; a plane whose owner DM was never opened (by `arm`, or by a mirror or poll with an open call) has no stored owner DM and makes none.
 
 Each card carries its task id once and reads explicit decision-card fields; arbitrary task-body prose is never posted, and labeled task-body fields stay single-line.
 Write a concise multiline hold reason with these four parts; only hold-reason parts continue until the next label or numbered option, and the mirror renders them in this order even when the input order differs:
@@ -3635,7 +3635,7 @@ A thread reply, including one also sent to the main window, a bot-marked message
 The text is carried as labeled unverified data on one line, with controls and semicolons replaced, Slack's escaping undone as for typed answers, and the line cut to the wake limit, saying so and naming the thread when it cuts.
 A request reaches no record: it writes nothing outside `state/slack-watch/`, runs no repository script, and gives the captain-hold intake nothing.
 Firstmate handles the wake under `check-result-handling`.
-The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed.
+The starting point is the newest message in the DM when the DM is opened (by `arm`, or by a mirror or poll with an open call), or at the first poll of a plane armed before requests existed.
 Each `arm` starts again from the newest message, so a message typed before an arm is never taken in.
 A new install first needs one app setting that the code cannot change: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it (while it is off, Slack itself refuses a message with "Sending messages to this app has been turned off.").
 Requests need no new scope or Slack method.
