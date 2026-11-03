@@ -6,7 +6,8 @@
 #
 # usage:
 #   fm-contract-review-pack.sh [build] --contract <file> [--request <file>]
-#       [--context <file>]... [--root <repo-root>] [--exclude <path>]...
+#       [--context <file>]... [--root <repo-root> | --export-root <repo> [--rev <rev>]]
+#       [--exclude <path>]...
 #       [--register <path>] [--history <path>] [--policy <file>]
 #       [--out-root <dir>] [--label <text>]
 #   fm-contract-review-pack.sh check --pack <dir> --report <file>
@@ -23,6 +24,11 @@
 #   which is the layout data/review-lane/run-review.sh takes (pass diff.patch).
 #   The author's sections are dropped by heading. A heading the builder does not
 #   recognise stops the build with exit 3 naming it, and nothing is written.
+#   --export-root builds the repository root as a tracked-only snapshot: `git archive
+#   <rev>` (default HEAD) of <repo> is extracted into <out-root>.root, outside the pack,
+#   and every path the caller excluded is removed from it. Pass that directory (printed
+#   on stderr as root=...) as the entrypoint's repository-root argument. Gitignored files
+#   do not exist under it. The manifest records it as tracked by construction.
 #   The manifest of excluded paths is <out-root>.excluded-paths, outside the pack.
 #   It always holds the real path of every input file (the contract, the request,
 #   each context file), the register and history paths when given, and every
@@ -154,7 +160,7 @@ policy_block() { # <policy> -> block with marker lines on stdout, nonzero unless
 }
 
 cmd_build() {
-  local contract='' request='' root='' policy='' out_root='' label=''
+  local contract='' request='' root='' policy='' out_root='' label='' export_repo='' export_rev=HEAD export_dir='' export_sha=''
   local -a contexts=() excludes=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -162,6 +168,8 @@ cmd_build() {
       --request) [ $# -ge 2 ] || die "--request needs a file"; request=$2; shift 2 ;;
       --context) [ $# -ge 2 ] || die "--context needs a file"; contexts+=("$2"); shift 2 ;;
       --root) [ $# -ge 2 ] || die "--root needs a directory"; root=$2; shift 2 ;;
+      --export-root) [ $# -ge 2 ] || die "--export-root needs a repository"; export_repo=$2; shift 2 ;;
+      --rev) [ $# -ge 2 ] || die "--rev needs a revision"; export_rev=$2; shift 2 ;;
       --exclude | --register | --history)
         [ $# -ge 2 ] || die "$1 needs a path"; excludes+=("$2"); shift 2 ;;
       --policy) [ $# -ge 2 ] || die "--policy needs a file"; policy=$2; shift 2 ;;
@@ -179,6 +187,11 @@ cmd_build() {
     [ -f "$f" ] && [ -r "$f" ] || die "context file not readable: $f"
   done
   [ -z "$root" ] || [ -d "$root" ] || die "root is not a directory: $root"
+  [ -z "$export_repo" ] || [ -z "$root" ] || die "use --root or --export-root, not both"
+  if [ -n "$export_repo" ]; then
+    [ -d "$export_repo" ] || die "export-root is not a directory: $export_repo"
+    export_sha=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$export_repo" rev-parse --verify "$export_rev^{commit}" 2>/dev/null) || die "not a commit in $export_repo: $export_rev"
+  fi
   [ -n "$policy" ] || policy=${FM_CONTRACT_REVIEW_POLICY:-$FM_ROOT/.agents/skills/contract-review/SKILL.md}
   [ -f "$policy" ] && [ -r "$policy" ] || die "policy file not readable: $policy"
 
@@ -229,6 +242,16 @@ cmd_build() {
   # shellcheck disable=SC2064
   trap "rm -rf '$scratch'; rm -f '$manifest'; if [ $created_root = 1 ]; then rm -rf '$out_root'; else rm -rf '$pack'; fi" EXIT
   mkdir "$pack" || die "cannot create pack directory: $pack"
+  if [ -n "$export_repo" ]; then
+    export_dir="$out_root.root"
+    [ ! -e "$export_dir" ] || die "export directory already exists: $export_dir"
+    # shellcheck disable=SC2064
+    trap "rm -rf '$scratch' '$export_dir'; rm -f '$manifest'; if [ $created_root = 1 ]; then rm -rf '$out_root'; else rm -rf '$pack'; fi" EXIT
+    mkdir "$export_dir" || die "cannot create export directory: $export_dir"
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$export_repo" archive "$export_sha" | tar -x -C "$export_dir" || die "cannot export $export_rev of $export_repo"
+    export_dir=$(cd "$export_dir" && pwd -P)
+    root=$export_dir
+  fi
 
   cp "$scratch/keep" "$pack/target.md"
   [ -z "$request" ] || cp "$request" "$pack/request.md"
@@ -266,6 +289,11 @@ cmd_build() {
     echo "# fm-contract-review-pack manifest: paths the reviewer must never read"
     printf 'pack\t%s\n' "$(real "$pack")"
     [ -z "$root" ] || printf 'root\t%s\n' "$(real "$root")"
+    if [ -n "$export_repo" ]; then
+      printf 'tree\t%s\n' "$(real "$export_dir")"
+      printf 'source\t%s\n' "$(real "$export_repo")"
+      printf 'sourcerev\t%s\n' "$export_sha"
+    fi
     printf 'exclude\t%s\n' "$(real "$contract")"
     [ -z "$request" ] || printf 'exclude\t%s\n' "$(real "$request")"
     for f in ${contexts[@]+"${contexts[@]}"} ${excludes[@]+"${excludes[@]}"}; do
@@ -275,10 +303,20 @@ cmd_build() {
       printf 'dropped\t%s\n' "$f"
     done <"$scratch/dropped"
   } >"$manifest"
+  if [ -n "$export_repo" ]; then
+    local src_real x rel
+    src_real=$(real "$export_repo")
+    while IFS= read -r x; do
+      [ -n "$x" ] || continue
+      case "$x" in "$src_real"/*) rel=${x#"$src_real"/}; rm -rf "${export_dir:?}/$rel" ;; esac
+    done <<EXCL
+$(manifest_lines "$manifest" exclude)
+EXCL
+  fi
 
   # shellcheck disable=SC2064
   trap "rm -rf '$scratch'" EXIT
-  echo "fm-contract-review-pack: pack=$pack head=$head diff=diff.patch manifest=$manifest" >&2
+  echo "fm-contract-review-pack: pack=$pack head=$head diff=diff.patch manifest=$manifest${export_dir:+ root=$export_dir}" >&2
   printf '%s\n' "$pack"
 }
 
@@ -374,8 +412,10 @@ cmd_check() {
   [ -f "$manifest" ] && [ -r "$manifest" ] || die "manifest not readable: $manifest"
   [ "$(manifest_lines "$manifest" pack | head -1)" = "$pack" ] || die "manifest does not belong to this pack: $manifest"
 
-  local root skills fmroot rubric rubric_real
+  local root tree source_repo skills fmroot rubric rubric_real
   root=$(manifest_lines "$manifest" root | head -1)
+  tree=$(manifest_lines "$manifest" tree | head -1)
+  source_repo=$(manifest_lines "$manifest" source | head -1)
   skills=${REVIEW_SKILLS_DIR:-$HOME/.agents/skills}
   fmroot=${REVIEW_FM_ROOT:-$FM_ROOT}
   rubric=${REVIEW_RUBRIC:-$fmroot/docs/review-rubric.md}
@@ -438,6 +478,14 @@ EOF
       ok=1
     elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       ok=1
+    elif [ -n "$tree" ]; then
+      if [ -n "$rev" ]; then
+        if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$source_repo" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi
+      elif path_under "$path" "$tree"; then
+        ok=1
+      else
+        why="outside the tracked-only export (and not a pack file or named reference)"
+      fi
     elif [ -n "$root" ]; then
       if [ -n "$rev" ]; then
         if env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR git -C "$root" cat-file -e "$rev:$revpath" 2>/dev/null; then ok=1; fi

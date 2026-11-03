@@ -379,6 +379,72 @@ test_pack_names_only_the_request_it_holds() {
   pass "the pack names a request only where the pack or the contract holds one"
 }
 
+test_export_root_is_tracked_only_and_the_check_keeps_its_strictness() {
+  local repo="$TMP_ROOT/exp-repo" src pack xroot rep="$TMP_ROOT/exp-report.md" rev
+  rm -rf "$repo"
+  mkdir -p "$repo/bin" "$repo/data" "$repo/config" "$repo/docs"
+  printf '#!/bin/sh\n' >"$repo/bin/tool.sh"
+  printf 'rubric\n' >"$repo/docs/review-rubric.md"
+  printf 'private config\n' >"$repo/config/private.json"
+  printf 'earlier report\n' >"$repo/data/earlier-review.md"
+  printf 'tracked notes\n' >"$repo/docs/notes.md"
+  printf 'config/\ndata/\n' >"$repo/.gitignore"
+  write_fixture_contract "$repo/docs/contract-src.md"
+  fm_git_init_commit "$repo"
+  git -C "$repo" add .gitignore bin docs
+  git -C "$repo" -c user.name=t -c user.email=t@example.invalid commit -qm files
+  rev=$(git -C "$repo" rev-parse HEAD)
+  # A tracked file changed after the revision must not appear in the export of that revision.
+  printf 'later\n' >"$repo/bin/later.sh"
+  git -C "$repo" add bin/later.sh
+  git -C "$repo" -c user.name=t -c user.email=t@example.invalid commit -qm later
+  src="$repo/docs/contract-src.md"
+  build_pack pack --contract "$src" --export-root "$repo" --rev "$rev" --exclude "$repo/docs/notes.md" \
+    || fail "export build failed: $(cat "$TMP_ROOT/build.err")"
+  xroot="$(dirname "$pack").root"
+  assert_present "$xroot/bin/tool.sh" "a tracked file is missing from the export"
+  assert_absent "$xroot/bin/later.sh" "a file from a later revision is in the export"
+  assert_absent "$xroot/config/private.json" "a gitignored config file is in the export"
+  assert_absent "$xroot/data/earlier-review.md" "a gitignored report is in the export"
+  assert_absent "$xroot/docs/notes.md" "a tracked file the caller excluded is in the export"
+  assert_absent "$xroot/docs/contract-src.md" "the contract source is in the export"
+  assert_equals "pack" "$(ls -A "$(dirname "$pack")")" "the export sits inside the pack's parent"
+  assert_grep "root=$xroot" "$TMP_ROOT/build.err" "the export root is not announced"
+  # Clean: pack file and an exported tracked file.
+  write_report "$rep" "$pack/contract.md" "$xroot/bin/tool.sh"
+  CHECK_RC=0
+  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 0 "$CHECK_RC" "an exported tracked file was flagged: $CHECK_OUT"
+  # Leaks: the original gitignored path, the original excluded path, and an unexported path in the export directory.
+  write_report "$rep" "$pack/contract.md" "$repo/config/private.json"
+  CHECK_RC=0
+  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 3 "$CHECK_RC" "a read of the original gitignored file was allowed"
+  write_report "$rep" "$pack/contract.md" "$repo/docs/notes.md"
+  CHECK_RC=0
+  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 3 "$CHECK_RC" "a read of the original excluded file was allowed"
+  write_report "$rep" "$pack/contract.md" "$repo/bin/tool.sh"
+  CHECK_RC=0
+  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 3 "$CHECK_RC" "a read in the original checkout was allowed beside the export"
+  # A revision path is judged against the source repository.
+  write_report "$rep" "$pack/contract.md" "${rev}:bin/tool.sh"
+  CHECK_RC=0
+  CHECK_OUT=$("$PACK_BIN" check --pack "$pack" --report "$rep" 2>&1) || CHECK_RC=$?
+  assert_equals 0 "$CHECK_RC" "a revision path tracked at that revision was flagged: $CHECK_OUT"
+  # Refusals.
+  CHECK_RC=0
+  "$PACK_BIN" --contract "$src" --export-root "$repo" --root "$repo" --out-root "$TMP_ROOT/exp-bad1" >/dev/null 2>&1 || CHECK_RC=$?
+  assert_equals 2 "$CHECK_RC" "--root and --export-root together were accepted"
+  CHECK_RC=0
+  "$PACK_BIN" --contract "$src" --export-root "$repo" --rev no-such-rev --out-root "$TMP_ROOT/exp-bad2" >/dev/null 2>&1 || CHECK_RC=$?
+  assert_equals 2 "$CHECK_RC" "an unknown revision was accepted"
+  assert_absent "$TMP_ROOT/exp-bad2" "a refused export left an output directory"
+  assert_absent "$TMP_ROOT/exp-bad2.root" "a refused export left an export directory"
+  pass "the export root holds only tracked files at the revision, minus excluded paths, and the check keeps its strictness"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -391,4 +457,5 @@ fm_test_run_cases \
   test_leak_check_reads_common_report_shapes \
   test_leak_check_reads_prose_before_the_list_and_linked_files \
   test_pack_names_only_the_request_it_holds \
+  test_export_root_is_tracked_only_and_the_check_keeps_its_strictness \
   -- "$@"
