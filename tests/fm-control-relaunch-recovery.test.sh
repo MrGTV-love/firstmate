@@ -1475,6 +1475,18 @@ SH
     "automatic replacement did not inherit the recovery-only instruction contract"
   assert_grep 'not resuming implementation' "$dir/home/data/$id/launch-brief.md" \
     "automatic replacement instructions incorrectly authorize implementation"
+  awk -v cue='use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification' '
+    /^# Current worker role contract$/ { role = NR }
+    index($0, cue) { cues++; routed = NR }
+    /^# Current reconciliation-only recovery contract$/ { recovery = NR }
+    END { exit !(role > 0 && cues == 1 && role < routed && routed < recovery) }
+  ' "$dir/home/data/$id/launch-brief.md" \
+    || fail 'existing-criteria routing did not precede the stricter reconciliation-only recovery contract'
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf '# evidence begin: reconciliation-only replacement launch brief\n'
+    cat "$dir/home/data/$id/launch-brief.md"
+    printf '# evidence end: reconciliation-only replacement launch brief\n'
+  fi
   cmp -s "$dir/backlog-before-auto" "$dir/home/data/backlog.md" \
     || fail "automatic replacement changed task/dependency state"
   # Direct launch callers must inherit the same restriction, not only control.

@@ -445,11 +445,11 @@ SH
     -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR="$dir/trace-probe-config" \
-    FM_FAKE_TRACE_PROBE="$dir/trace-probe" \
+    FM_FAKE_TRACE_PROBE="$dir/wt/trace-probe" \
     TRACEPARENT=00-cccccccccccccccccccccccccccccccc-dddddddddddddddd-01); rc=$?
   expect_code 0 "$rc" "staged relaunch should reach the fake worker"$'\n'"$out"
-  [ -f "$dir/trace-probe" ] || fail "staged relaunch did not execute the fake worker"
-  [ "$(cat "$dir/trace-probe")" = "$expected" ] \
+  [ -f "$dir/wt/trace-probe" ] || fail "staged relaunch did not execute the fake worker"
+  [ "$(cat "$dir/wt/trace-probe")" = "$expected" ] \
     || fail "replacement worker trace carrier did not match '$expected'"
 }
 

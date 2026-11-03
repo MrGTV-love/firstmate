@@ -468,12 +468,12 @@ fm_test_teamclaude_launch_env() {
     /bin/sh -c "$launch" </dev/null >/dev/null 2>&1
 }
 
-# fm_test_assert_teamclaude_launch <fakebin> <launch-command> <label>
+# fm_test_assert_teamclaude_launch <fakebin> <launch-command> <label> [<env-out>]
 # Asserts the launch starts Firstmate's TeamClaude launcher and that running it
 # hands claude the proxy and CA variables `teamclaude env` exported.
 fm_test_assert_teamclaude_launch() {
   local fakebin=$1 launch=$2 label=$3 out
-  out="$(dirname "$fakebin")/claude-env.$RANDOM"
+  out="${4:-$(dirname "$fakebin")/claude-env.$RANDOM}"
   fm_test_teamclaude_launch_env "$fakebin" "$launch" "$out" \
     || fail "$label: the recorded launch command failed: $launch"
   grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$out" \

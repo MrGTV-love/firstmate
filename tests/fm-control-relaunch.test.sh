@@ -520,8 +520,61 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
   done
 }
 
+# Each fixture stage needs its actual marker and a still-running owned producer.
+# A failed/exited producer reports its real wait status and actionable output.
+await_relaunch_fixture_marker() {  # <marker> <producer-pid> <producer-output> <stage>
+  local marker=$1 producer_pid=$2 output=$3 stage=$4 rc running_pid owned_running
+  while :; do
+    owned_running=0
+    for running_pid in $(jobs -pr); do
+      [ "$running_pid" != "$producer_pid" ] || owned_running=1
+    done
+    if [ "$owned_running" -ne 1 ]; then
+      wait "$producer_pid"; rc=$?
+      printf '%s: producer %s is not a running owned job (wait status %s)\n' "$stage" "$producer_pid" "$rc" >&2
+      [ ! -s "$output" ] || cat "$output" >&2
+      return 1
+    fi
+    [ ! -e "$marker" ] || return 0
+    /bin/sleep 0.01
+  done
+}
+
+test_relaunch_trace_prepare_rejects_failed_setup() {
+  local dir="$TMP_ROOT/failed-prepare" setup_pid rc
+  mkdir -p "$dir"
+  (printf 'fixture setup refused\n' > "$dir/setup.out"; exit 7) &
+  setup_pid=$!
+  await_relaunch_fixture_marker "$dir/prepare" "$setup_pid" "$dir/setup.out" 'relaunch trace preparation' > "$dir/wait.out" 2>&1; rc=$?
+  expect_code 1 "$rc" 'an exited setup without the preparation marker must refuse readiness'
+  assert_grep "relaunch trace preparation: producer $setup_pid is not a running owned job (wait status 7)" "$dir/wait.out" 'setup failure lost its actual stage, producer or wait status'
+  assert_grep 'fixture setup refused' "$dir/wait.out" 'setup failure lost its actionable output'
+  assert_absent "$dir/prepare" 'a failed setup invented readiness'
+  (
+    mkfifo "$dir/unrelated-pid" "$dir/unrelated-release" || fail 'could not create the process-identity fixture'
+    (
+      bash -c 'read -r release < "$1"' _ "$dir/unrelated-release" &
+      unrelated_child=$!
+      printf '%s\n' "$unrelated_child" > "$dir/unrelated-pid"
+      wait "$unrelated_child"
+    ) &
+    holder=$!
+    read -r unrelated < "$dir/unrelated-pid"
+    : > "$dir/unrelated-prepare" || fail 'could not supply the process-identity readiness marker'
+    await_relaunch_fixture_marker "$dir/unrelated-prepare" "$unrelated" "$dir/setup.out" 'relaunch trace preparation' > "$dir/unrelated-wait.out" 2>&1; status=$?
+    numeric_live=0
+    builtin kill -0 "$unrelated" 2>/dev/null && numeric_live=1
+    printf 'process-identity probe: live=%s supplied_marker=1 helper_exit=%s wrapper=%s unrelated=%s\n' "$numeric_live" "$status" "$holder" "$unrelated"
+    printf 'release\n' > "$dir/unrelated-release"
+    wait "$holder" || fail 'could not release the fixture-owned unrelated process'
+    expect_code 1 "$numeric_live" 'the process-identity negative must use a genuinely live PID'
+    expect_code 1 "$status" 'a live PID outside the running owned jobs must not establish setup readiness'
+  ) || fail 'setup readiness lost its owned-child identity'
+  pass 'fm-control relaunch: an exited setup cannot satisfy the actual preparation marker'
+}
+
 test_relaunch_serializes_concurrent_durable_metadata_publication() {
-  local dir control_pid link_pid rc i=0 traceparent prepare launch_release waiting ready release
+  local dir control_pid link_pid rc traceparent prepare launch_release waiting ready release
   dir=$(new_case metadata-race rl28)
   add_ship_task "$dir" rl28 claude
   printf '%s\n' "$$" > "$dir/home/state/.lock"
@@ -537,15 +590,8 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     FM_FAKE_TRACE_RELEASE="$launch_release" \
     run_control "$dir" rl28 relaunch --note "continue after publication" > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$prepare" ] && [ "$i" -lt 500 ]; do
-    /bin/sleep 0.01
-    i=$((i + 1))
-  done
-  [ -e "$prepare" ] || {
-    kill "$control_pid" 2>/dev/null || true
-    wait "$control_pid" 2>/dev/null || true
-    fail "relaunch did not reach trace delivery"
-  }
+  await_relaunch_fixture_marker "$prepare" "$control_pid" "$dir/control.out" 'relaunch trace preparation' \
+    || fail 'relaunch did not reach trace delivery'
   # shellcheck disable=SC2031 # A fixture subshell's PATH change does not reach this parent.
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     FM_REAL_MV="$(command -v mv)" \
@@ -556,12 +602,8 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     "$X_LINK" rl28 request-28 --carry-count 1 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &
   link_pid=$!
-  i=0
-  while [ ! -e "$waiting" ] && [ "$i" -lt 500 ]; do
-    /bin/sleep 0.01
-    i=$((i + 1))
-  done
-  [ -e "$waiting" ] && [ ! -e "$ready" ] || {
+  await_relaunch_fixture_marker "$waiting" "$link_pid" "$dir/link.out" 'X-link lock contention' \
+    && [ -e "$waiting" ] && [ ! -e "$ready" ] || {
     : > "$launch_release"
     : > "$release"
     wait "$link_pid" 2>/dev/null || true
@@ -569,16 +611,12 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     fail "a durable metadata writer was not blocked during relaunch delivery"
   }
   : > "$launch_release"
-  i=0
-  while [ ! -e "$ready" ] && [ "$i" -lt 500 ]; do
-    /bin/sleep 0.01
-    i=$((i + 1))
-  done
-  [ -e "$ready" ] || {
-    kill "$link_pid" "$control_pid" 2>/dev/null || true
+  await_relaunch_fixture_marker "$ready" "$link_pid" "$dir/link.out" 'X-link metadata publication' || {
+    : > "$launch_release"
+    : > "$release"
     wait "$link_pid" 2>/dev/null || true
     wait "$control_pid" 2>/dev/null || true
-    fail "durable metadata writer did not resume after relaunch delivery committed"
+    fail "durable metadata writer did not reach publication readiness after first delivery release"
   }
   : > "$release"
   wait "$link_pid"; rc=$?
@@ -637,6 +675,8 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
     "the Firstmate-worktree relaunch omitted the worker's exact steering inbox"
   assert_grep 'do not reject it as another home' "$launch_brief" \
     "the Firstmate-worktree relaunch did not distinguish its inbox from cross-home state"
+  [ "$(grep -cF 'use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification' "$launch_brief")" -eq 1 ] \
+    || fail 'relaunch did not deliver the existing-criteria implementation/verification route exactly once'
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
@@ -2348,6 +2388,7 @@ test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree
 test_relaunch_preserves_durable_task_metadata
 test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring
+test_relaunch_trace_prepare_rejects_failed_setup
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
