@@ -130,6 +130,7 @@ Give every finding and every note one disposition, with its reason.
 - **outside the DoD:** the finding is real but belongs to work the contract does not cover, or it is wording, polish or an optional clarification whose absence changes no result that a criterion decides; record it as a follow-up.
 
 Add `recurrence-of: <id>` when the finding has the same requirement and the same failing result as a recorded one.
+A finding whose witness rests on a fact that the reviewer says it could not check has no concrete witness; its protection stays, and it is recorded as a follow-up to verify at implementation.
 A finding on the same theme with a different failing result is not a recurrence.
 For example, a compliant result that the current text would reject is a different result from a missing protection that an earlier finding asked for.
 Add `covered-by: <criterion>` when an existing criterion already keeps the protection.
@@ -142,10 +143,11 @@ A report that says `EXIT: pass` while it holds such a note is reconciled to `nee
 ### Cutting a criterion
 
 Cut a criterion only after naming the criterion that keeps the same protection.
-Then show that the keeper, as it is written now, rejects the failure the cut criterion rejected.
+Then take a concrete failing case that the cut criterion rejects, and read the keeper on that case as it is written now: the keeper must reject it too.
+If the keeper would accept the case, there is no keeper.
 A keeper that needs an edit before it rejects that failure is not a keeper.
 Also check what else the cut item does: any other text that refers to it by name, and any duty it carries under the installed skill, such as an assumption that Verification Complete must close.
-A cut that leaves a reference with no target, or drops such a duty, is not a cut of a duplicate.
+A cut that leaves a reference with no target, needs another text edited to keep working, or drops such a duty, is not a cut of a duplicate.
 A criterion with no keeper stays, whatever its wording.
 A repair that demands an artifact the task's stage cannot produce is excess whatever protection it points at.
 Keep the protection, and change the evidence form to what the stage can produce.
@@ -186,7 +188,6 @@ No round number, finding count, word count or timer decides any exit.
    A recurrence and a repair-induced failure are not progress.
 5. Take the first test that holds:
    - `conflicting`: two binding requirements, each from the request, a ruling, the brief or a governing constraint, call for incompatible results, repairing a finding would break one of them, and nothing in the record as it stood at the end of the round says which governs.
-     Two readings of one text are a dispute for Main, not a conflict.
      A settlement made after the round does not change that round's exit.
    - `pass`: no substantiated finding remains, and the register supports closure of the earlier ones.
    - `needs-revision`: substantiated findings remain, and the round has progress.
