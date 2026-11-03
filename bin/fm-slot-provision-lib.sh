@@ -8,6 +8,9 @@
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
 # is rederived from origin/main, and legacy callers send no new project flag.
 # Firstmate never deletes/replaces its manifests or creates another worktree.
+# A declared successor passes the resolved predecessor copy to that provisioner
+# as --supersedes through FM_SLOT_SUPERSEDES; the provisioner alone records it.
+# fm_slot_resolve_successor needs fm-pr-lib.sh (fm_task_id_path_safe) and fm_meta_get.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
 # Requires fm-task-copy-lib.sh for isolation and preservation predicates.
@@ -19,6 +22,9 @@ FM_SLOT_BASE_REF=
 FM_SLOT_PREPARED_HEAD=
 FM_SLOT_PREVIOUS_BRANCH=
 FM_SLOT_PREVIOUS_HEAD=
+# Input to fm_slot_provision, reset here so an inherited value never reaches it.
+FM_SLOT_SUPERSEDES=
+FM_SLOT_SUCCESSOR_WT=
 
 fm_slot_required() { # <project> <copy>
   [ -f "$1/scripts/git-stability/provision_existing_slot.py" ] ||
@@ -50,6 +56,52 @@ fm_slot_check_copy() { # <project> <copy>
     git_path=$(git -C "$copy" rev-parse --path-format=absolute --git-path "$marker") || return 1
     [ ! -e "$git_path" ] || { echo 'error: slot provisioning refused: operation_in_progress' >&2; return 1; }
   done
+}
+
+fm_slot_realdir() { # <dir>; the physical path, or failure for an empty or missing one
+  [ -n "$1" ] && [ -d "$1" ] && (cd -P -- "$1" 2>/dev/null && pwd -P)
+}
+
+fm_slot_advertises_supersedes() { # <project>
+  local script=$1/scripts/git-stability/provision_existing_slot.py help
+  [ -f "$script" ] || return 1
+  help=$(cd "$1" && PATH="$1/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 "$script" --help 2>/dev/null) || return 1
+  printf '%s\n' "$help" | grep -Eq -- '(^|[^[:alnum:]_-])--supersedes([^[:alnum:]_-]|$)'
+}
+
+# Resolve a declared predecessor to its live copy, or refuse with one error line
+# before any resource exists. Sets FM_SLOT_SUCCESSOR_WT to the resolved path.
+fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
+  local project=$1 state=$2 id=$3 pred=$4 meta kind wt branch head real top pcommon scommon
+  FM_SLOT_SUCCESSOR_WT=
+  fm_task_id_path_safe "$pred" || { echo 'error: --successor-of needs a safe predecessor task id' >&2; return 1; }
+  [ "$pred" != "$id" ] || { echo "error: --successor-of $pred names the task itself" >&2; return 1; }
+  meta=$state/$pred.meta
+  { [ -f "$meta" ] && [ ! -L "$meta" ]; } || { echo "error: --successor-of $pred has no task record in $state" >&2; return 1; }
+  kind=$(fm_meta_get "$meta" kind)
+  wt=$(fm_meta_get "$meta" worktree)
+  branch=$(fm_meta_get "$meta" branch)
+  if [ "$kind" = secondmate ] || [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
+    echo "error: --successor-of $pred is a secondmate or remote record with no local task copy" >&2
+    return 1
+  fi
+  { [ -n "$wt" ] && [ -n "$branch" ]; } || { echo "error: --successor-of $pred records no worktree or branch" >&2; return 1; }
+  git check-ref-format --branch "$branch" >/dev/null 2>&1 || { echo "error: --successor-of $pred records an invalid branch" >&2; return 1; }
+  real=$(fm_slot_realdir "$wt") || { echo "error: --successor-of $pred copy $wt is gone; a successor record needs the live predecessor" >&2; return 1; }
+  top=$(fm_slot_realdir "$(git -C "$real" rev-parse --show-toplevel 2>/dev/null)") || top=
+  [ "$top" = "$real" ] || { echo "error: --successor-of $pred copy $wt is not a git worktree root" >&2; return 1; }
+  pcommon=$(fm_slot_realdir "$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)") || pcommon=
+  scommon=$(fm_slot_realdir "$(git -C "$real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)") || scommon=
+  [ "$real" != "$(fm_slot_realdir "$project")" ] || { echo "error: --successor-of $pred copy $wt is the project's primary checkout, not a task copy" >&2; return 1; }
+  { [ -n "$pcommon" ] && [ "$pcommon" = "$scommon" ]; } || { echo "error: --successor-of $pred copy $wt belongs to a different repository than $project" >&2; return 1; }
+  head=$(git -C "$real" symbolic-ref -q HEAD) || head=
+  [ -n "$head" ] || { echo "error: --successor-of $pred copy $wt has a detached HEAD, not its recorded branch $branch" >&2; return 1; }
+  [ "$head" = "refs/heads/$branch" ] || { echo "error: --successor-of $pred copy $wt is on ${head#refs/heads/}, not its recorded branch $branch" >&2; return 1; }
+  fm_slot_advertises_supersedes "$project" || {
+    echo "error: --successor-of needs project $(basename "$project") to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; the successor record needs the Vernant verb" >&2
+    return 1
+  }
+  FM_SLOT_SUCCESSOR_WT=$real
 }
 
 fm_slot_prepare_base() { # <project> <copy> <task-id>
@@ -167,6 +219,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   local args=() path
   [ -z "$local_ref" ] || args+=(--base-source local-default)
   for path in "$@"; do args+=(--owned-path "$path"); done
+  [ -z "$FM_SLOT_SUPERSEDES" ] || args+=(--supersedes "$FM_SLOT_SUPERSEDES")
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
