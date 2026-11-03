@@ -1,0 +1,209 @@
+[base 012b72f34] === expired-intent-only
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/merged-elsewhere","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2026-11-02T04:52:45+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733304
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project
+    armed_at=1793711702
+    project=/Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:15:03Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:15:10Z retained /Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project: /Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711709	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.HIHnLZ/th/.treehouse/project-ab161e/1/project  (detached) 
+[base 012b72f34] === task-branch-unexpired
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/t1","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2999-01-01T00:00:00+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733314
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project
+    armed_at=1793711713
+    project=/Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:15:14Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:15:28Z retained /Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project: /Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711727	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.FbkdHY/th/.treehouse/project-393756/1/project  (detached) 
+[base 012b72f34] === other-branch-unexpired
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/t1-other","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2999-01-01T00:00:00+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733332
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project
+    armed_at=1793711732
+    project=/Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:15:32Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:15:36Z retained /Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project: /Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711736	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.JGQ5Af/th/.treehouse/project-c26939/1/project  (detached) 
+[base 012b72f34] === expiry-without-timezone
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/t1","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2000-01-01T00:00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733340
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project
+    armed_at=1793711740
+    project=/Users/charlesabrooker/tmp/fm-intent-live.juXpPq/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:15:40Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:15:44Z retained /Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project: /Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711744	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.juXpPq/th/.treehouse/project-550c42/1/project  (detached) 
+[base 012b72f34] === wrong-artifacttype
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitPlan","schemaversion":"1","branch":"fm/t1","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2000-01-01T00:00:00+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733348
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project
+    armed_at=1793711747
+    project=/Users/charlesabrooker/tmp/fm-intent-live.0nRu34/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:15:47Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:16:08Z retained /Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project: /Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711768	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.0nRu34/th/.treehouse/project-871306/1/project  (detached) 
+[base 012b72f34] === empty-owned_paths
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/t1","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":[],"validators":["pytest -q"],"expires_at_iso":"2000-01-01T00:00:00+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733373
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project
+    armed_at=1793711772
+    project=/Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:16:13Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:16:21Z retained /Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project: /Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711780	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.Y6ZvBx/th/.treehouse/project-883f3e/1/project  (detached) 
+[base 012b72f34] === spent-intent-beside-claude-private-x
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/merged-elsewhere","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2026-11-02T04:52:45+00:00"}
+  file .claude/private/x: secret
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project (0 status lines; ignored: .claude/commit-intent.json .claude/private/x )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733388
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project
+    armed_at=1793711787
+    project=/Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:16:27Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:16:35Z retained /Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project: /Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711795	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.puoDlQ/th/.treehouse/project-4f47f7/1/project  (detached) 
+[base 012b72f34] === lookalike-commit-intent.json.bak
+  python3 the prune sees: /Users/charlesabrooker/.pyenv/shims/python3 -> Python 3.13.6
+  file .claude/commit-intent.json.bak: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/t1","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2000-01-01T00:00:00+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project (0 status lines; ignored: .claude/commit-intent.json.bak )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733402
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project
+    armed_at=1793711801
+    project=/Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:16:42Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:16:49Z retained /Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project: /Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+  wake queue:
+    1793711808	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.JhrIHN/th/.treehouse/project-81a2c5/1/project  (detached) 
+[base 012b72f34] === expired-intent-under-real-python-3.9
+  python3 the prune sees: /Users/charlesabrooker/tmp/fm-oldpy.OsX0qu/python3 -> Python 3.9.6
+  file .claude/commit-intent.json: {"artifacttype":"CommitIntent","schemaversion":"1","branch":"fm/merged-elsewhere","head_sha":"0123456789abcdef0123456789abcdef01234567","owned_paths":["scripts/hooks/commit_intent.py"],"validators":["pytest -q"],"expires_at_iso":"2026-11-02T04:52:45+00:00"}
+  slot=/Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project (0 status lines; ignored: .claude/commit-intent.json )
+  exit=0 copy=present treehouse_destroy_calls=0 wakes=1
+  prune record:
+    version=fm-merge-prune-v1
+    pr=https://github.com/acme/widget/pull/7
+    attempts=1
+    next_at=1793733412
+    state=retained
+    reason=/Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+    wake_sent=1
+    copy=/Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project
+    armed_at=1793711812
+    project=/Users/charlesabrooker/tmp/fm-intent-live.36z7ov/project
+    returned=1
+  merge-prune.log:
+    2026-11-03T13:16:52Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T13:17:06Z retained /Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project: /Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  wake queue:
+    1793711826	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project for t1: /Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+  treehouse status after: base  main  (repository default) 1     available    /Users/charlesabrooker/tmp/fm-intent-live.36z7ov/th/.treehouse/project-a5144e/1/project  (detached) 
+done-base rc=0
