@@ -669,7 +669,8 @@ def advance(home, task, url, meta, side):
     if outcome.get("ok") is True:
         if outcome.get("basis") != "independent-review":
             phase(side, sha, "held", "a captain merge word is recorded for this head")
-            emit(home, task, side, sha, "captain-word", f"held: a captain merge word is recorded at {sha[:12]}; the merge is Main's")
+            emit(home, task, side, sha, "captain-word", f"held: a captain merge word is recorded at {sha[:12]}; the merge is Main's",
+                 f"a captain merge word is recorded at {sha[:12]}; the merge is Main's")
             return
         merge(home, task, url, sha, side, meta)
         return

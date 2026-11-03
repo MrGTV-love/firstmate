@@ -2490,7 +2490,7 @@ test_auto_review_green_uncovered_pr_is_read_recorded_and_merged() {
 }
 
 test_auto_review_makes_no_request_when_the_pr_is_not_ready() {
-  local scenario case_dir
+  local scenario case_dir sha
   for scenario in draft red pending unreported conflicting unregistered local-only closed covered-by-captain-word stale-diff; do
     case_dir=$(auto_case "none-$scenario")
     case $scenario in
@@ -2512,6 +2512,13 @@ test_auto_review_makes_no_request_when_the_pr_is_not_ready() {
       assert_grep 'review pack not built for 333333333333: diff unavailable: the PR head fm-review-diff.sh fetched is' "$(auto_event_file "$case_dir")" \
         "stale-diff: a diff of another head must not be sent to a reader"
       grep -q 'pr-review:task-x1:333333333333:pack:' "$case_dir/state/.wake-queue" || fail "stale-diff: the unbuilt pack did not wake Main"
+    fi
+    if [ "$scenario" = covered-by-captain-word ]; then
+      sha=$(auto_sha "$case_dir" h1)
+      assert_grep "held: a captain merge word is recorded at ${sha:0:12}" "$(auto_event_file "$case_dir")" \
+        "covered-by-captain-word: the captain-word head is not held"
+      expect_code 1 "$(auto_count "pr-review:task-x1:${sha:0:12}:captain-word" "$case_dir/state/.wake-queue")" \
+        "covered-by-captain-word: two passes must wake Main exactly once for the head and reason"
     fi
     expect_code 0 "$(auto_calls "$case_dir")" "none-$scenario: a read was requested for a PR that is not ready or not the machinery's"
     expect_code 0 "$(auto_merges "$case_dir")" "none-$scenario: a merge command ran"
