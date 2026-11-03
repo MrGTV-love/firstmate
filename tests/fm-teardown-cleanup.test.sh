@@ -6629,6 +6629,28 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
   pass "a teardown keeps a foreign copy whose record names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes"
 }
 
+# Both of teardown's call sites: the driver would switch a primary checkout that is
+# on the PR's head branch, so a teardown keeps the copy without asking the driver.
+test_a_teardown_never_asks_the_driver_while_the_primary_checkout_is_on_the_prs_head_branch() {
+  local rc shape head
+  for shape in foreign enclosing reverse; do
+    route_teardown_world "route-head-branch-$shape" "$shape"
+    head=$(git -C "$FOREIGN_CASE/project" branch --show-current)
+    [ -n "$head" ] || fail "route-head-branch-$shape: the fixture's primary checkout is detached, so this row proves nothing"
+    route_set_pr "$FOREIGN_CASE/forge" 7 MERGED "$ROUTE_MERGE" "$head"
+    route_script_row "$FOREIGN_CASE" "${FOREIGN_COPY##*/}" allowed success 7
+    route_teardown_record "$FOREIGN_COPY" 7
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "route-head-branch-$shape: the copy must be kept: $(cat "$FOREIGN_CASE/stderr")"
+    assert_present "$FOREIGN_COPY/.git" "route-head-branch-$shape: the copy was removed"
+    assert_grep "head branch $head" "$FOREIGN_CASE/stderr" "route-head-branch-$shape: the refusal does not name the head branch"
+    assert_equals "" "$(route_teardown_calls "$FOREIGN_COPY")" "route-head-branch-$shape: the copy reached the driver"
+    assert_equals "$head" "$(git -C "$FOREIGN_CASE/project" branch --show-current)" "route-head-branch-$shape: the primary checkout moved"
+    assert_absent "$FOREIGN_CASE/treehouse.log" "route-head-branch-$shape: the pool slot was returned beside a kept copy"
+  done
+  pass "a teardown's foreign and own nested release keep the copy, with no driver call, while the primary checkout is on the PR's head branch"
+}
+
 # R3 for the teardown: the execute is judged by its real shape.
 test_a_route_execute_releases_only_on_the_success_envelope_and_a_removed_copy() {
   local rc kind
@@ -7009,6 +7031,7 @@ test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 test_teardown_retires_the_dsh_launch_state
 test_a_record_makes_teardown_ask_the_driver_by_its_pr_route_for_foreign_and_own_copies
 test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_the_driver
+test_a_teardown_never_asks_the_driver_while_the_primary_checkout_is_on_the_prs_head_branch
 test_a_route_execute_releases_only_on_the_success_envelope_and_a_removed_copy
 test_a_valid_record_releases_no_foreign_copy_when_the_driver_or_the_copy_is_not_ready
 test_a_valid_record_releases_no_foreign_copy_with_a_process_or_a_live_launcher

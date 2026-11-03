@@ -122,10 +122,10 @@ route_write_profile() {
 }
 
 # route_install_gh <fakebin> <table-dir>: a `gh` that answers only the route's
-# read, `gh pr view <n> --repo acme/widgets --json state,mergeCommit -q ...`, from
-# <table-dir>/pr-<n> (state TAB merge-commit; FAIL; HANG; GARBAGE) and logs each
-# such call to <table-dir>/gh.log. Anything else goes to the fixture's own gh
-# (kept as gh.base) or fails.
+# read, `gh pr view <n> --repo acme/widgets --json <fields> -q ...`, from
+# <table-dir>/pr-<n> (state TAB merge-commit TAB head-branch; FAIL; HANG; GARBAGE)
+# and logs each such call to <table-dir>/gh.log.
+# Anything else goes to the fixture's own gh (kept as gh.base) or fails.
 route_install_gh() {
   local fakebin=$1 dir=$2
   mkdir -p "$dir"
@@ -140,7 +140,7 @@ case " \$* " in
 esac
 printf '%s\n' "\$*" >> "$dir/gh.log"
 [ "\${1:-}" = pr ] && [ "\${2:-}" = view ] && [ "\${4:-}" = --repo ] && [ "\${5:-}" = $ROUTE_REPO ] \\
-  && [ "\${6:-}" = --json ] && [ "\${7:-}" = state,mergeCommit ] || { echo "unexpected gh call: \$*" >&2; exit 2; }
+  && [ "\${6:-}" = --json ] && [ "\${7:-}" = state,mergeCommit,headRefName ] || { echo "unexpected gh call: \$*" >&2; exit 2; }
 file="$dir/pr-\$3"
 [ -f "\$file" ] || { echo "no such pull request" >&2; exit 1; }
 case "\$(head -n 1 "\$file")" in
@@ -153,12 +153,13 @@ SH
   chmod +x "$fakebin/gh"
 }
 
-# route_set_pr <table-dir> <pr> <state> [<merge-commit>]: the forge's answer for a PR.
+# route_set_pr <table-dir> <pr> <state> [<merge-commit> [<head-branch>]]: the
+# forge's answer for a PR. No fixture's checkout is on the default head branch.
 route_set_pr() {
   mkdir -p "$1"
   case "$3" in
     FAIL | HANG | GARBAGE) printf '%s\n' "$3" > "$1/pr-$2" ;;
-    *) printf '%s\t%s\n' "$3" "${4:-}" > "$1/pr-$2" ;;
+    *) printf '%s\t%s\t%s\n' "$3" "${4:-}" "${5:-fm/pr-$2-head}" > "$1/pr-$2" ;;
   esac
 }
 

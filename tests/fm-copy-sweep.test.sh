@@ -3247,7 +3247,7 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
       pr-closes-after-plan)
         # The record holds at the plan; the forge shows the PR closed by the execute.
         route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
-        printf '#!/usr/bin/env bash\nprintf "CLOSED\\t\\n" > "%s"\n' "$W/forge/pr-$((100 + n))" > "$W/ans/bad-$row/plan.hook"
+        printf '#!/usr/bin/env bash\nprintf "CLOSED\\t\\t%%s\\n" "%s" > "%s"\n' "fm/pr-$((100 + n))-head" "$W/forge/pr-$((100 + n))" > "$W/ans/bad-$row/plan.hook"
         phrase="PR $((100 + n)) as CLOSED, not MERGED"
         expect=1
         ;;
@@ -3287,6 +3287,40 @@ test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driv
     n=$((n + 1))
   done
   pass "a record that names another tip or a prefix, moves the tip after the plan, has a bad PR field, profile or forge answer, or names a merge commit that is missing or off origin/main keeps the copy, with no driver call, while a valid record in the same run is released (${#rows[@]} conditions)"
+}
+
+# A plan is a dry run, and the driver's DONE-state finish switches a primary
+# checkout that is on the PR's head branch and writes its closeout-state marker
+# before Firstmate reads the answer. The twin's scripted driver does what the real
+# one does in that state, so only Firstmate's own check can keep the slot as it was.
+test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_branch() {
+  local head before line
+  route_world route-head-branch
+  head=fm/pr-7-head
+  git -C "$SLOT" checkout -q -b "$head"
+  before=$(git -C "$SLOT" rev-parse HEAD)
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE" "$head"
+  route_set_pr "$W/forge" 8 MERGED "$ROUTE_MERGE"
+  route_copy twin 7
+  route_copy control 8
+  cat > "$W/ans/twin/plan.hook" <<SH
+#!/usr/bin/env bash
+[ "\$(git -C "$SLOT" branch --show-current)" = "$head" ] || exit 0
+git -C "$SLOT" checkout -q main
+: > "$SLOT/.git/closeout-state-marker"
+SH
+  route_sweep --apply
+  [ "$RC" = 0 ] || fail "route-head-branch: the run failed ($RC): $OUT"
+  assert_equals "$head" "$(git -C "$SLOT" branch --show-current)" "route-head-branch: the plan switched the slot's branch"
+  assert_equals "$before" "$(git -C "$SLOT" rev-parse HEAD)" "route-head-branch: the plan moved the slot's HEAD"
+  assert_absent "$SLOT/.git/closeout-state-marker" "route-head-branch: the plan wrote the closeout-state marker"
+  route_assert_kept twin route-head-branch
+  assert_equals "" "$(route_calls_for twin)" "route-head-branch: the copy reached the driver"
+  line=$(route_line_of twin)
+  assert_contains "$line" "is on PR 7's head branch $head" "route-head-branch: the reason does not name the head branch"
+  route_assert_released control route-head-branch
+  route_assert_calls control 8 route-head-branch
+  pass "a plan never asks the driver while the slot's checkout is on the PR's head branch, so the slot's branch, HEAD and marker stay as they were, and a PR with another head branch still routes from that slot"
 }
 
 # R3: the driver's answer is the only authority and is read in its real shape.
@@ -3628,6 +3662,7 @@ test_help_and_bad_calls
 test_the_route_comparator_accepts_both_orders_and_rejects_every_wrong_call
 test_a_record_makes_the_sweep_ask_the_driver_by_its_pr_route_and_no_record_changes_nothing
 test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driver
+test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_branch
 test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers

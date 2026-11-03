@@ -84,8 +84,10 @@
 # and whose superseded_tip_sha is the record's tip; and gh, naming the repository
 # from the clone's origin URL (GitHub only), shows that PR MERGED with a merge
 # commit that the clone has and that is an ancestor of origin/<landing branch>,
-# read with git and no fetch. The landing branch is the task's base_branch=
-# (TEARDOWN_ROUTE_BASE) or else the clone's default branch. A forge read that
+# read with git and no fetch; and the clone's primary checkout is not on that
+# PR's head branch (forge headRefName), where the driver's DONE-state finish would
+# switch it to the base branch even on a plan. The landing branch is the task's
+# base_branch= (TEARDOWN_ROUTE_BASE) or else the clone's default branch. A forge read that
 # fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default) or cannot be
 # parsed is unknown, never merged. A record that names the copy and fails any of
 # these keeps the copy with no driver call and the failed condition named.
@@ -101,10 +103,14 @@
 # with the driver's words and the route and PR named. The driver stays the only
 # authority and is not widened. The lane's side effects are the driver's own
 # (closeout_pr.py at Vernant origin/main 1cf0e36): git fetch --prune origin in
-# the clone, for a plan too; the closeout-state marker; the evidence files, which
-# --no-evidence-files suppresses; a repair of the clone's primary checkout when
-# it is on the PR's head branch, for a plan too (--repair-primary-base is never
-# passed); and deletion of the PR's local branch after an executed cleanup.
+# the clone, for a plan too; the evidence files, which
+# --no-evidence-files suppresses; the closeout-state marker, which the driver
+# writes on any call, a plan too, whose state reaches DONE (its --verify-only mode
+# refuses --cleanup-worktree and still writes the marker, so no quieter plan
+# exists); a repair of the clone's primary checkout, which never runs because the
+# route is refused while that checkout is on the PR's head branch
+# (--repair-primary-base is never passed); and deletion of the PR's local branch
+# after an executed cleanup.
 #
 # Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh, bin/fm-refuse-lib.sh,
 # bin/fm-pr-lib.sh and bin/fm-timeout-lib.sh first,
@@ -1379,11 +1385,12 @@ teardown_route_profile_ok() {  # <profile> <pr> <tip>
 # True when the forge shows PR <pr> MERGED with a merge commit that the clone has
 # and that is an ancestor of origin/<landing branch>, read with git and no fetch.
 # The landing branch is the task's base_branch= (TEARDOWN_ROUTE_BASE) or the
-# clone's default branch. The forge is read with gh and the repository named
-# from the clone's origin URL; a read that fails, times out or cannot be parsed
-# is unknown, never merged.
+# clone's default branch. False too while the clone's primary checkout is on the
+# PR's head branch. The forge is read with gh and the repository named from the
+# clone's origin URL; a read that fails, times out or cannot be parsed is
+# unknown, never merged.
 teardown_route_pr_landed() {  # <slot> <pr>
-  local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge branch ref
+  local slot=$1 pr=$2 url path owner repo out limit rc=0 forge_state merge head current branch ref
   # fm_pr_url_parse writes these globals; keep them out of the calling script.
   local FM_PR_PROVIDER FM_PR_URL FM_PR_HOST FM_PR_PATH FM_PR_OWNER FM_PR_REPO FM_PR_NUMBER
   url=$(git -C "$slot" config --get-all remote.origin.url 2>/dev/null) || url=
@@ -1408,8 +1415,8 @@ teardown_route_pr_landed() {  # <slot> <pr>
     TEARDOWN_CLOSEOUT_ROUTE_WHY="gh is not available, so PR $pr cannot be read on the forge (unknown, not merged)"
     return 1
   fi
-  out=$(fm_run_timed "$limit" gh pr view "$pr" --repo "$FM_PR_OWNER/$FM_PR_REPO" --json state,mergeCommit \
-    -q '[.state, (.mergeCommit.oid // "")] | join("\t")' 2>/dev/null </dev/null) || rc=$?
+  out=$(fm_run_timed "$limit" gh pr view "$pr" --repo "$FM_PR_OWNER/$FM_PR_REPO" --json state,mergeCommit,headRefName \
+    -q '[.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")' 2>/dev/null </dev/null) || rc=$?
   if [ "$rc" != 0 ]; then
     if fm_timed_out "$rc"; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr timed out after ${limit}s (unknown, not merged)"
@@ -1418,18 +1425,28 @@ teardown_route_pr_landed() {  # <slot> <pr>
     fi
     return 1
   fi
-  if [[ ! $out =~ ^(MERGED|OPEN|CLOSED)$'\t'([0-9a-f]*)$ ]]; then
+  if [[ ! $out =~ ^(MERGED|OPEN|CLOSED)$'\t'([0-9a-f]*)$'\t'([^[:space:]]+)$ ]]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge answer for PR $pr cannot be parsed (unknown, not merged)"
     return 1
   fi
   forge_state=${BASH_REMATCH[1]}
   merge=${BASH_REMATCH[2]}
+  head=${BASH_REMATCH[3]}
   if [ "$forge_state" != MERGED ]; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge shows PR $pr as $forge_state, not MERGED"
     return 1
   fi
   if ! fm_pr_head_valid "$merge"; then
     TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge shows PR $pr MERGED but reports no merge commit"
+    return 1
+  fi
+  if ! current=$(git -C "$slot" worktree list --porcelain 2>/dev/null); then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's primary checkout cannot be read, so the driver might switch it off PR $pr's head branch"
+    return 1
+  fi
+  current=$(printf '%s\n' "$current" | awk 'NF == 0 { exit } $1 == "branch" { sub(/^refs\/heads\//, "", $2); print $2 }')
+  if [ "$current" = "$head" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the clone's primary checkout is on PR $pr's head branch $head, which the driver would switch to the base branch even on a plan"
     return 1
   fi
   branch=${TEARDOWN_ROUTE_BASE:-}
