@@ -171,7 +171,9 @@ def emit(home, task, side, sha, key, text, wake=None):
     stamp = int(time.time())
     status = home.state / f"{task}.status"
     rc = run([str(BIN / "fm-status-append.sh"), str(status), f"note [at={stamp}]: review-lane {text}"], home).returncode
-    if rc == 0 and (home.config / "fleet-ledger").exists():
+    if rc != 0:
+        return  # not emitted: a later pass tries again, so the event is never lost
+    if (home.config / "fleet-ledger").exists():
         run([str(BIN / "fm-fleet-ledger.sh"), "appended", str(home.config), str(status)], home)
     if wake:
         script = '. "$1/fm-wake-lib.sh" && fm_wake_append check "$2" "$3"'
@@ -513,6 +515,13 @@ def step(home, task):
     if (meta is None or meta.get("kind") != "ship" or meta.get("mode") not in ("no-mistakes", "direct-PR")
             or not PR_URL.fullmatch(url)):
         return
+    home.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    guard = open(home.root / f"{task}.lock", "a+")
+    try:
+        fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        guard.close()
+        return  # another pass for this task is running
     side = Sidecar(home, task, url)
     try:
         advance(home, task, url, meta, side)
@@ -525,6 +534,7 @@ def step(home, task):
             marker.unlink(missing_ok=True)
         else:
             write_atomic(marker, f"{side.data.get('next_at', 0)}\n")
+        guard.close()
 
 
 def advance(home, task, url, meta, side):
@@ -667,6 +677,8 @@ def sweep(home):
     for path in home.root.glob("*.json"):
         if not (home.state / f"{path.stem}.meta").exists():
             path.unlink(missing_ok=True)
+            for leftover in ("next", "lock"):
+                (home.root / f"{path.stem}.{leftover}").unlink(missing_ok=True)
             shutil.rmtree(home.root / f"{path.stem}.d", ignore_errors=True)
 
 

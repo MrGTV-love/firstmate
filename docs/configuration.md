@@ -2632,6 +2632,8 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 - A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
 - Outcomes are status lines `note: review-lane ...` (reading, verdict recorded, merged with the full PR URL, fail, held with its reason), which the fleet ledger captures, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `merged`, `fail`, `held: <reason>` or `idle`.
 - The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes.
+- While an away-posture record exists (quiet mode is a present captain and holds nothing) the merge step holds with `held: away posture` and the verdict is still recorded, so the supervision session keeps reading the captain's away words; a captain-word recorded for the head is likewise left to Main.
+- `state/.pr-auto-review/<task>.next` names the next due time, and the housekeeping pass starts nothing for a task before it; a task is swept with its meta.
 - `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
