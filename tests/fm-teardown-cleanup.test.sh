@@ -5469,6 +5469,54 @@ test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
   pass "a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
 }
 
+# The entry check of the held-copy record never strands a retry that needs no
+# write: when a stuck endpoint refused the first close after it recorded every
+# held copy, a read-only record still lets the rerun close, byte-identical, like
+# a writable one. An entry the record does not hold yet, in a read-only record,
+# still refuses before the slot is reserved: no lease, no return-pending record
+# and the earlier markers as they were.
+test_a_held_close_rerun_needs_no_writable_record_when_every_copy_is_recorded() {
+  local rc shape access label
+  for shape in plain enclosing; do
+    for access in read-only writable; do
+      label="held-recorded-$shape-$access"
+      held_marker_case "$label" "$shape"
+      stuck_endpoint_tmux "$FOREIGN_CASE"
+      : > "$FOREIGN_CASE/endpoint-stuck"
+      run_foreign_teardown rc
+      expect_code 1 "$rc" "$label: a stuck endpoint must refuse the first close: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "$label: the first close did not record its one held copy"
+      cp "$FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
+      [ "$access" = writable ] || chmod a-w "$FOREIGN_CASE/data/held-foreign-copies.log"
+      rm -f "$FOREIGN_CASE/endpoint-stuck"
+      run_foreign_teardown rc
+      expect_code 0 "$rc" "$label: the rerun must close, since every held copy is already recorded: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      cmp -s "$FOREIGN_CASE/record.before" "$FOREIGN_CASE/data/held-foreign-copies.log" || fail "$label: the rerun changed the record"
+      chmod u+w "$FOREIGN_CASE/data/held-foreign-copies.log"
+    done
+    label="held-unrecorded-read-only-$shape"
+    held_marker_case "$label" "$shape"
+    mkdir -p "$FOREIGN_CASE/data"
+    printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$FOREIGN_CASE/data/held-foreign-copies.log"
+    chmod a-w "$FOREIGN_CASE/data/held-foreign-copies.log"
+    # A user who can write a read-only file (root) cannot show this refusal.
+    if [ -w "$FOREIGN_CASE/data/held-foreign-copies.log" ]; then continue; fi
+    cp "$FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "$label: a needed entry that cannot be recorded must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "REFUSED: the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log could not be written" "$FOREIGN_CASE/stderr" \
+      "$label: the refusal did not name the record"
+    cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" || fail "$label: the refusal changed the pending-close record"
+    cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
+    cmp -s "$FOREIGN_CASE/record.before" "$FOREIGN_CASE/data/held-foreign-copies.log" || fail "$label: the refusal changed the record"
+    jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
+    assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+    chmod u+w "$FOREIGN_CASE/data/held-foreign-copies.log"
+  done
+  pass "a held close rerun needs no writable record when every held copy is recorded, and still refuses at entry when a needed entry cannot be recorded"
+}
+
 test_a_held_close_that_leases_retires_an_earlier_pending_close_record() {
   local rc shape label
   for shape in plain enclosing; do
@@ -6629,6 +6677,7 @@ test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
 test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was
+test_a_held_close_rerun_needs_no_writable_record_when_every_copy_is_recorded
 test_a_held_close_that_leases_retires_an_earlier_pending_close_record
 test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
 test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path

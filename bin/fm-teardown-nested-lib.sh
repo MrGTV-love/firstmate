@@ -1176,6 +1176,14 @@ teardown_own_nested_other_repos() {
 # again, so a rerun after a later refusal adds nothing. The record is only ever
 # appended to here; nothing returns the slot or removes a held copy on its own,
 # and a held copy goes only on the owner's word naming it.
+# Whether the record already holds a line for this task, the slot, <copy> and
+# <reason> (both as fm_refuse_text renders them): the one test that decides a
+# held copy needs no append, shared by the write and by the entry check.
+teardown_held_copy_recorded() {  # <slot> <copy> <reason>
+  [ -f "$DATA/held-foreign-copies.log" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$1 FM_HELD_COPY=$2 FM_HELD_WHY=$3 awk -F'\t' \
+    '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$DATA/held-foreign-copies.log" 2>/dev/null
+}
+
 teardown_held_copies_record() {
   local record="$DATA/held-foreign-copies.log" entry copy why slot stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
@@ -1186,8 +1194,7 @@ teardown_held_copies_record() {
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=$(fm_refuse_text "${entry%%$'\t'*}")
     why=$(fm_refuse_text "${entry#*$'\t'}")
-    if [ -f "$record" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$slot FM_HELD_COPY=$copy FM_HELD_WHY=$why awk -F'\t' \
-        '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
+    if teardown_held_copy_recorded "$slot" "$copy" "$why"; then
       continue
     fi
     { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1

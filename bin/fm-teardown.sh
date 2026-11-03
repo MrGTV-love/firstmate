@@ -4696,12 +4696,19 @@ teardown_held_copies_report() {
   echo "notice: each held copy is also listed in $record."
 }
 
-# Succeeds when the held-copy record can be written: it is a regular file that
-# is not a symlink and is writable, or it does not exist yet and the nearest
-# existing directory above it is writable. It writes nothing.
+# Succeeds when no held-copy record write is needed that could not be made: every
+# held copy already has its identical line in the record (the write skips it, so
+# a retry needs no append and a read-only record does not stop it), or the record
+# is a regular file that is not a symlink and is writable, or it does not exist
+# yet and the nearest existing directory above it is writable. It writes nothing.
 teardown_held_copies_record_writable() {
-  local record="$DATA/held-foreign-copies.log" dir=$DATA
+  local record="$DATA/held-foreign-copies.log" dir=$DATA entry missing=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
+  for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
+    teardown_held_copy_recorded "$(fm_refuse_text "$TEARDOWN_HELD_SLOT")" \
+      "$(fm_refuse_text "${entry%%$'\t'*}")" "$(fm_refuse_text "${entry#*$'\t'}")" || missing=1
+  done
+  [ "$missing" = 1 ] || return 0
   if [ -e "$record" ] || [ -L "$record" ]; then
     [ -f "$record" ] && [ ! -L "$record" ] && [ -w "$record" ]
     return
