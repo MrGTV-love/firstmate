@@ -11,6 +11,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fm-supersedence-route-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-supersedence-route-helpers.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-copy-sweep)
 SWEEP=${FM_COPY_SWEEP_BIN:-$ROOT/bin/fm-copy-sweep.sh}
@@ -3053,6 +3055,484 @@ test_help_and_bad_calls() {
   pass "help carries the hourly command and bad calls are refused"
 }
 
+# --- supersedence route ------------------------------------------------------
+# bin/fm-teardown-nested-lib.sh owns the route and its header the record format
+# and conditions. The forge is a fake `gh` and the driver a scripted stand-in per
+# copy (tests/fm-supersedence-route-helpers.sh); both are reduced evidence, and
+# the real driver is never called.
+
+# A world whose clone names a GitHub origin (rewritten to the local bare one),
+# with one merge commit on origin/main, a fake forge and the scripted driver.
+# ROUTE_MERGE is that merge commit. Make copies after this call.
+route_world() {  # <name>
+  make_world "$1"
+  git -C "$SLOT" config "url.file://$(cd "$W/origin.git" && pwd).insteadOf" "$ROUTE_REMOTE_URL"
+  git -C "$SLOT" remote set-url origin "$ROUTE_REMOTE_URL"
+  git -C "$SLOT" commit --allow-empty -qm "merge of the superseding pull request"
+  git -C "$SLOT" push -q origin main
+  git -C "$SLOT" fetch -q origin
+  ROUTE_MERGE=$(git -C "$SLOT" rev-parse HEAD)
+  route_install_gh "$FAKEBIN" "$W/forge"
+  install_driver "$SLOT" "$W"
+  route_install_row_driver "$SLOT" "$W"
+  mkdir -p "$HOMED/data" "$W/profiles"
+}
+
+# Vernant's creation lock naming a launcher that has finished.
+route_lock_dead() {  # <name>
+  local pid
+  sleep 0.1 &
+  pid=$!
+  wait "$pid" 2>/dev/null || true
+  git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$(copy_path "$1")"
+}
+
+route_record() {  # <name> <pr> <tip> <profile>
+  printf '%s\t%s\t%s\t%s\n' "$(copy_path "$1")" "$3" "$2" "$4" >> "$HOMED/data/supersedence-records.tsv"
+}
+
+route_tip() { git -C "$(copy_path "$1")" rev-parse HEAD; }
+
+# A locked, pushed copy with a valid record, a profile for its tip and scripted
+# --pr answers (default: the plan allows and the execute succeeds).
+route_copy() {  # <name> <pr> [<plan-kind> [<execute-kind>]]
+  local name=$1 pr=${2:-7}
+  add_copy "$name"
+  route_lock_dead "$name"
+  route_write_profile "$W/profiles/$name.json" "$pr" "$(route_tip "$name")"
+  route_record "$name" "$pr" "$(route_tip "$name")" "$W/profiles/$name.json"
+  route_script_row "$W" "$name" "${3:-allowed}" "${4:-success}" "$pr"
+}
+
+route_sweep() { FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep "$@"; }
+
+# The driver's argv lines for one copy, without the "<cwd>|" prefix.
+route_calls_for() {  # <name>
+  [ -f "$W/closeout.log" ] || return 0
+  COPY="--cleanup-worktree $(copy_path "$1")" awk '
+    { i = index($0, ENVIRON["COPY"]); if (i == 0) next
+      rest = substr($0, i + length(ENVIRON["COPY"]))
+      if (rest == "" || substr(rest, 1, 1) == " ") { sub(/^[^|]*\|/, ""); print } }' "$W/closeout.log"
+}
+
+# The report line of one copy.
+route_line_of() {
+  printf '%s\n' "$OUT" | P=$(copy_path "$1") awk -F '\t' '$3 == ENVIRON["P"] || $2 == ENVIRON["P"] { print }'
+}
+
+# Exactly one plan and one execute for <name>, run from the slot, each holding
+# exactly the route's option bindings.
+route_assert_calls() {  # <name> <pr> <label>
+  local name=$1 pr=$2 label=$3 lines plan execute
+  lines=$(route_calls_for "$name")
+  [ "$(printf '%s\n' "$lines" | wc -l | tr -d ' ')" = 2 ] || fail "$label: wanted one plan and one execute for $name, got: $lines"
+  plan=$(printf '%s\n' "$lines" | sed -n 1p)
+  execute=$(printf '%s\n' "$lines" | sed -n 2p)
+  # shellcheck disable=SC2086 # the argv words hold no spaces
+  route_argv_check plan "$pr" "$W/profiles/$name.json" "$(copy_path "$name")" $plan || fail "$label: the plan's argv is wrong: $ROUTE_ARGV_WHY ($plan)"
+  # shellcheck disable=SC2086
+  route_argv_check execute "$pr" "$W/profiles/$name.json" "$(copy_path "$name")" $execute || fail "$label: the execute's argv is wrong: $ROUTE_ARGV_WHY ($execute)"
+  [ "$(grep -cF "$SLOT|$plan" "$W/closeout.log")" = 1 ] && [ "$(grep -cF "$SLOT|$execute" "$W/closeout.log")" = 1 ] \
+    || fail "$label: the driver did not run from the slot clone for $name"
+  printf 'argv: %s: plan: %s\nargv: %s: execute: %s\n' "$label" "${plan//$W/<world>}" "$label" "${execute//$W/<world>}"
+}
+
+route_assert_released() {  # <name> <label>
+  [ ! -e "$(copy_path "$1")" ] || fail "$2: $1 was not removed"
+  ! registered "$1" || fail "$2: $1 is still registered"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path "$1")"$'\t' "$2: $1 was not reported removed"
+}
+
+route_assert_kept() {  # <name> <label>
+  [ -e "$(copy_path "$1")" ] || fail "$2: $1 was removed"
+  registered "$1" || fail "$2: $1 is no longer registered"
+  assert_not_contains "$OUT" "REMOVED"$'\t'"$(copy_path "$1")"$'\t' "$2: $1 was reported removed"
+}
+
+test_the_route_comparator_accepts_both_orders_and_rejects_every_wrong_call() {
+  route_argv_selftest
+  pass "the argv comparator accepts the canonical and the plain call's prefix order and rejects an added option, a missing or wrong binding and a duplicate"
+}
+
+test_a_record_makes_the_sweep_ask_the_driver_by_its_pr_route_and_no_record_changes_nothing() {
+  local plain_line
+  route_world route-argv
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy twin 7
+  add_copy plain
+  route_lock_dead plain
+  route_sweep --apply
+  [ "$RC" = 0 ] || fail "route-argv: the run failed ($RC): $OUT"
+  route_assert_released twin route-argv
+  route_assert_calls twin 7 route-argv
+  assert_equals "--cleanup-worktree $(copy_path plain)" "$(route_calls_for plain)" \
+    "route-argv: the copy with no record was not asked exactly as before, once, as a plan"
+  route_assert_kept plain route-argv
+  plain_line=$(route_line_of plain)
+  assert_contains "$plain_line" "verification_stale_or_uncovered_paths" "route-argv: the plain refusal lost the driver's reason"
+  assert_not_contains "$plain_line" "supersedence route" "route-argv: a copy with no record reads as a route refusal"
+  pass "a record makes the sweep's plan and execute ask the driver with exactly the --pr route's options from the slot clone, and a copy with no record is asked exactly as before"
+}
+
+# One world, one run: a good copy and one bad copy per condition. The good copy
+# is released and every bad copy stays, with no driver call for it, and the reason
+# names what failed. The scripted driver would allow every route call, so only
+# Firstmate's own check can keep a bad copy.
+test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driver() {
+  local row phrase tip other n=0 line expect
+  local -a rows=(tip-differs tip-prefix tip-moves pr-not-integer profile-relative profile-missing profile-symlink profile-not-json
+    profile-pr-mismatch profile-tip-mismatch profile-tip-absent pr-closed pr-open forge-fails forge-hangs forge-garbage
+    no-merge-commit merge-commit-absent merge-commit-off-main short-record conflicting-records other-copy pr-closes-after-plan)
+  local -a phrases=() expects=()
+  other=$(printf '%040d' 0 | tr 0 b)
+  route_world route-conditions
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy ok 7
+  for row in "${rows[@]}"; do
+    n=$((n + 1))
+    add_copy "bad-$row"
+    route_lock_dead "bad-$row"
+    route_script_row "$W" "bad-$row" allowed success "$((100 + n))"
+    tip=$(route_tip "bad-$row")
+    route_set_pr "$W/forge" "$((100 + n))" MERGED "$ROUTE_MERGE"
+    route_write_profile "$W/profiles/bad-$row.json" "$((100 + n))" "$tip"
+    phrase=
+    expect=0
+    case "$row" in
+      tip-differs) route_record "bad-$row" "$((100 + n))" "$other" "$W/profiles/bad-$row.json"; phrase="names tip $other" ;;
+      tip-prefix) route_record "bad-$row" "$((100 + n))" "${tip:0:39}" "$W/profiles/bad-$row.json"; phrase="names tip ${tip:0:39}" ;;
+      tip-moves)
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        # shellcheck disable=SC2016 # the hook expands its own $1 when it runs
+        printf '#!/usr/bin/env bash\ngit -C "$1" -c user.name=t -c user.email=t@example.invalid commit --allow-empty -qm moved\n' > "$W/ans/bad-$row/plan.hook"
+        phrase="no longer proven after its plan"
+        expect=1
+        ;;
+      pr-not-integer) route_record "bad-$row" 8a "$tip" "$W/profiles/bad-$row.json"; phrase="'8a' is not a decimal integer" ;;
+      profile-relative) route_record "bad-$row" "$((100 + n))" "$tip" "profiles/bad-$row.json"; phrase="'profiles/bad-$row.json' is not absolute" ;;
+      profile-missing) rm -f "$W/profiles/bad-$row.json"; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="is not a regular file" ;;
+      profile-symlink)
+        mv "$W/profiles/bad-$row.json" "$W/profiles/bad-$row.real.json"
+        ln -s "$W/profiles/bad-$row.real.json" "$W/profiles/bad-$row.json"
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        phrase="is not a regular file"
+        ;;
+      profile-not-json) printf 'name only, not json\n' > "$W/profiles/bad-$row.json"; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="cannot be read as a JSON object" ;;
+      profile-pr-mismatch) route_write_profile "$W/profiles/bad-$row.json" 99 "$tip"; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="names PR 99, not PR $((100 + n))" ;;
+      profile-tip-mismatch) route_write_profile "$W/profiles/bad-$row.json" "$((100 + n))" "$other"; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="binds superseded_tip_sha $other" ;;
+      profile-tip-absent) route_write_profile "$W/profiles/bad-$row.json" "$((100 + n))" -; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="binds superseded_tip_sha none" ;;
+      pr-closed) route_set_pr "$W/forge" "$((100 + n))" CLOSED; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="PR $((100 + n)) as CLOSED, not MERGED" ;;
+      pr-open) route_set_pr "$W/forge" "$((100 + n))" OPEN; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="PR $((100 + n)) as OPEN, not MERGED" ;;
+      forge-fails) route_set_pr "$W/forge" "$((100 + n))" FAIL; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="forge read of PR $((100 + n)) failed" ;;
+      forge-hangs) route_set_pr "$W/forge" "$((100 + n))" HANG; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="forge read of PR $((100 + n)) timed out" ;;
+      forge-garbage) route_set_pr "$W/forge" "$((100 + n))" GARBAGE; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="forge answer for PR $((100 + n)) cannot be parsed" ;;
+      no-merge-commit) route_set_pr "$W/forge" "$((100 + n))" MERGED ""; route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"; phrase="reports no merge commit" ;;
+      merge-commit-absent)
+        route_set_pr "$W/forge" "$((100 + n))" MERGED "$other"
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        phrase="merge commit $other of PR $((100 + n)) is not in the clone"
+        ;;
+      merge-commit-off-main)
+        route_set_pr "$W/forge" "$((100 + n))" MERGED "$(git -C "$SLOT" commit-tree 'HEAD^{tree}' -p HEAD -m side-branch)"
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        phrase="is not on origin/main (not landed)"
+        ;;
+      short-record) printf '%s\t%s\t%s\n' "$(copy_path "bad-$row")" "$tip" "$((100 + n))" >> "$HOMED/data/supersedence-records.tsv"; phrase="has 3 tab-separated fields, not four" ;;
+      conflicting-records)
+        route_write_profile "$W/profiles/bad-$row.2.json" "$((100 + n))" "$tip"
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.2.json"
+        phrase="two records bind this copy at its tip to different PRs or profiles"
+        ;;
+      pr-closes-after-plan)
+        # The record holds at the plan; the forge shows the PR closed by the execute.
+        route_record "bad-$row" "$((100 + n))" "$tip" "$W/profiles/bad-$row.json"
+        printf '#!/usr/bin/env bash\nprintf "CLOSED\\t\\n" > "%s"\n' "$W/forge/pr-$((100 + n))" > "$W/ans/bad-$row/plan.hook"
+        phrase="PR $((100 + n)) as CLOSED, not MERGED"
+        expect=1
+        ;;
+      other-copy)
+        # A record for another copy, carrying this copy's tip and profile, binds nothing here.
+        printf '%s\t%s\t%s\t%s\n' "$(copy_path ok)" "$tip" "$((100 + n))" "$W/profiles/bad-$row.json" >> "$HOMED/data/supersedence-records.tsv"
+        phrase="verification_stale_or_uncovered_paths"
+        expect=1
+        ;;
+    esac
+    phrases+=("$phrase")
+    expects+=("$expect")
+  done
+  FM_TEARDOWN_FORGE_TIMEOUT=2 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  route_assert_released ok conditions
+  route_assert_calls ok 7 conditions
+  n=0
+  for row in "${rows[@]}"; do
+    route_assert_kept "bad-$row" "$row"
+    line=$(route_line_of "bad-$row")
+    assert_contains "$line" "${phrases[$n]}" "$row: the reason does not name the failed condition"
+    assert_equals "${expects[$n]}" "$(route_calls_for "bad-$row" | grep -c .)" "$row: wrong number of driver calls for the bad copy: $(route_calls_for "bad-$row")"
+    printf 'condition %s: kept; driver calls for it: %s; reason: %s\n' "$row" "${expects[$n]}" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 220) }')"
+    case "$row" in
+      pr-closes-after-plan)
+        assert_not_contains "$(route_calls_for "bad-$row")" "--execute-cleanup" "$row: the closed PR reached the driver's execute"
+        assert_contains "$line" "was not released: its supersedence record cannot be used" "$row: the stopped execute is not named"
+        assert_absent "$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path "bad-$row")" | shasum -a 256 | awk '{print $1}')" "$row: a receipt was kept for an execute that never reached the driver"
+        ;;
+      tip-moves) assert_not_contains "$(route_calls_for "bad-$row")" "--execute-cleanup" "$row: the moved tip reached the driver's execute" ;;
+      other-copy) assert_equals "--cleanup-worktree $(copy_path "bad-$row")" "$(route_calls_for "bad-$row")" "$row: a copy with no record of its own was not asked the plain plan" ;;
+    esac
+    case "$row" in
+      tip-moves | other-copy | pr-closes-after-plan) ;;
+      *) assert_not_contains "$(route_calls_for "bad-$row")" "--pr" "$row: the bad copy reached the driver by the route" ;;
+    esac
+    n=$((n + 1))
+  done
+  pass "a record that names another tip or a prefix, moves the tip after the plan, has a bad PR field, profile or forge answer, or names a merge commit that is missing or off origin/main keeps the copy, with no driver call, while a valid record in the same run is released (${#rows[@]} conditions)"
+}
+
+# R3: the driver's answer is the only authority and is read in its real shape.
+# One world per stage keeps the run short: a control copy that is released and one
+# copy per scripted answer.
+test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed() {
+  local kind phrase line receipt
+  local -a plan_kinds=(refuse two 'done' error unbound allowed-doc silent hang retain)
+  local -a exec_kinds=(success-done blocked retained lie allowed-doc temporary)
+  route_world route-plan-answers
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy ok 7
+  for kind in "${plan_kinds[@]}"; do
+    route_copy "plan-$kind" 7 "$kind"
+  done
+  FM_COPY_SWEEP_PLAN_TIMEOUT=2 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  [ "$RC" = 0 ] || fail "plan answers: a held plan must not fail the run ($RC): $OUT"
+  route_assert_released ok "plan answers"
+  for kind in "${plan_kinds[@]}"; do
+    case "$kind" in
+      refuse) phrase="verification_stale_or_uncovered_paths" ;;
+      error) phrase="PR state != MERGED" ;;
+      unbound) phrase="cleanup_tip_unbound" ;;
+      hang) phrase="did not answer within 2s" ;;
+      retain) phrase="unique ignored files" ;;
+      *) phrase="the plan did not answer with exit 3 and the dry-run envelope" ;;
+    esac
+    route_assert_kept "plan-$kind" "plan $kind"
+    line=$(route_line_of "plan-$kind")
+    assert_contains "$line" "$phrase" "plan $kind: the driver's words or the failed shape are missing"
+    assert_equals 1 "$(route_calls_for "plan-$kind" | wc -l | tr -d ' ')" "plan $kind: the driver was asked for more than the plan"
+    assert_not_contains "$(route_calls_for "plan-$kind")" "--execute-cleanup" "plan $kind: the execute ran after a plan that did not allow"
+    receipt="$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path "plan-$kind")" | shasum -a 256 | awk '{print $1}')"
+    assert_absent "$receipt" "plan $kind: a receipt was written for a refused plan"
+    case "$kind" in
+      hang) ;;
+      *) assert_contains "$line" "supersedence route (--pr 7)" "plan $kind: the refusal does not say the route was used" ;;
+    esac
+    printf 'plan answer %s: kept (HELD-LOCKED); driver calls: 1 (the plan); reason: %s\n' "$kind" "$(printf '%s' "$line" | awk -F '\t' '{ print substr($NF, 1, 200) }')"
+  done
+  printf 'plan answer allowed (the dry-run envelope, exit 3): proceeds; the control copy was released\n'
+  route_world route-execute-answers
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  for kind in "${exec_kinds[@]}"; do
+    route_copy "x-$kind" 7 allowed "$kind"
+  done
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  [ "$RC" = 1 ] || fail "execute answers: a refused execute must exit 1, got $RC: $OUT"
+  for kind in "${exec_kinds[@]}"; do
+    receipt="$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path "x-$kind")" | shasum -a 256 | awk '{print $1}')"
+    assert_equals 2 "$(route_calls_for "x-$kind" | wc -l | tr -d ' ')" "execute $kind: the driver was not asked once to plan and once to execute"
+    line=$(route_line_of "x-$kind")
+    case "$kind" in
+      success-done)
+        route_assert_released "x-$kind" "execute $kind"
+        assert_absent "$receipt" "execute $kind: a receipt survived a full release"
+        ;;
+      blocked | allowed-doc | lie)
+        route_assert_kept "x-$kind" "execute $kind"
+        assert_contains "$line" "FAILED" "execute $kind: not reported FAILED"
+        assert_present "$receipt" "execute $kind: no receipt was kept for the copy"
+        ;;
+      retained)
+        route_assert_kept "x-$kind" "execute $kind"
+        assert_contains "$line" "KEPT" "execute $kind: a retained tree is KEPT"
+        assert_not_contains "$line" "FAILED" "execute $kind: a retained tree is not a failure"
+        assert_present "$receipt" "execute $kind: no receipt was kept for the retained tree"
+        ;;
+      temporary)
+        route_assert_kept "x-$kind" "execute $kind"
+        assert_contains "$OUT" "names this refusal temporary" "execute $kind: the temporary refusal was not recognised in the route's shape"
+        assert_absent "$receipt" "execute $kind: a receipt was kept after a temporary refusal"
+        ;;
+    esac
+    printf 'execute answer %s: %s\n' "$kind" "$(printf '%s' "$line" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 200) }')"
+    case "$kind" in
+      success-done | lie) ;;
+      *) printf '    route words: %s\n' "$(printf '%s' "$line" | grep -o 'supersedence route (--pr [0-9]*): .\{0,140\}' | head -1)" ;;
+    esac
+    case "$kind" in
+      success-done | lie) ;;
+      blocked) assert_contains "$line" "cleanup_tip_unbound" "execute $kind: the driver's reason is missing" ;;
+      *) assert_contains "$(printf '%s\n' "$OUT" | grep -F "$(copy_path "x-$kind")" | head -n 3)" "supersedence route (--pr 7)" "execute $kind: the refusal does not say the route was used" ;;
+    esac
+  done
+  # A route execute that leaves the copy present uses its release slot, as a plain
+  # execute does; a temporary refusal that released nothing does not.
+  for kind in lie temporary; do
+    route_world "route-slot-$kind"
+    route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+    route_copy ok 7
+    route_copy "zrow" 7 allowed "$kind"
+    FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 route_sweep --apply
+    if [ "$kind" = lie ]; then
+      assert_contains "$(route_line_of ok)" "DEFERRED" "slot $kind: an execute that left the copy present did not use its release slot"
+    else
+      route_assert_released ok "slot $kind"
+    fi
+  done
+  pass "a route plan proceeds only on exit 3 with the dry-run envelope and a route execute releases only on exit 0 with the success envelope and a removed copy; every other answer keeps the copy with the driver's words and the route named, with the receipt and release slot as for a plain execute and the retained-tree and temporary-refusal rules unchanged"
+}
+
+# R4: every hold before the driver is asked still holds with a valid record.
+test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
+  local class with without state_dir
+  for class in dirty unpushed live orphan live-launcher no-interpreter retained-receipt; do
+    route_world "route-hold-$class"
+    route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+    route_copy held 7
+    state_dir=$HOMED/state
+    case "$class" in
+      dirty) printf 'scratch\n' > "$(copy_path held)/untracked.txt" ;;
+      unpushed)
+        printf 'y\n' > "$(copy_path held)/local.txt"
+        git -C "$(copy_path held)" add local.txt
+        git -C "$(copy_path held)" commit -qm local-only
+        ;;
+      live) fm_write_meta "$state_dir/live-task.meta" "worktree=$(copy_path held)" "kind=ship" ;;
+      orphan) printf 'garbage\n' > "$(copy_path held)/.git" ;;
+      live-launcher)
+        git -C "$SLOT" worktree unlock "$(copy_path held)"
+        (cd "$W" && exec sleep 600) &
+        LIVE_PID=$!
+        disown "$LIVE_PID" 2>/dev/null || true
+        git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$LIVE_PID launcher=$LIVE_PID" "$(copy_path held)"
+        ;;
+      retained-receipt)
+        route_script_row "$W" held allowed blocked 7
+        route_sweep --apply
+        rm -f "$W/closeout.log"
+        ;;
+    esac
+    if [ "$class" = no-interpreter ]; then
+      FM_TEARDOWN_VERNANT_PYTHON="$W/no-such-python" run_sweep --apply
+    else
+      route_sweep --apply
+    fi
+    with=$(route_line_of held)
+    mv "$HOMED/data/supersedence-records.tsv" "$HOMED/data/supersedence-records.off"
+    if [ "$class" = no-interpreter ]; then
+      FM_TEARDOWN_VERNANT_PYTHON="$W/no-such-python" run_sweep --apply
+    else
+      route_sweep --apply
+    fi
+    without=$(route_line_of held)
+    [ -n "$with" ] || fail "hold $class: the copy is missing from the report"
+    assert_equals "$without" "$with" "hold $class: a valid record changed how the copy is held"
+    printf 'hold %s: with a record: %s\n' "$class" "$(printf '%s' "$with" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 160) }')"
+    printf 'hold %s: without a record: %s\n' "$class" "$(printf '%s' "$without" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 160) }')"
+    route_assert_kept held "hold $class"
+    if [ -f "$W/closeout.log" ]; then
+      assert_not_contains "$(cat "$W/closeout.log")" "--pr" "hold $class: the route reached the driver for a held copy"
+    fi
+    [ -z "${LIVE_PID:-}" ] || { kill "$LIVE_PID" 2>/dev/null || true; LIVE_PID=; }
+  done
+  pass "a dirty, unpushed, live-task, orphaned, live-launcher, no-interpreter or retained-receipt copy is held exactly as it is with no record, and the route never reaches the driver for it"
+}
+
+# R5: the recorded cases. The staged d7 table is private Vernant data and is read
+# in place, never copied into this repository, so CI (which does not have it)
+# skips the case and says so. Every driver answer here is scripted: reduced
+# evidence about Firstmate's routing and pass-through, not about the driver, and
+# the sandbox commits are generated, not the original historical ones.
+test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers() {
+  local cases rows counts num tip cls pr state kind own name line label expect_released=0 expect_never=0 merged_kept=0
+  cases=${FM_SUPERSEDENCE_CASES:-}
+  if [ ! -f "$cases/d7-supersedence-table.md" ] || [ ! -f "$cases/d7-closeout-driver-report.md" ]; then
+    pass "SKIPPED (not run): the staged d7 cases are not available; set FM_SUPERSEDENCE_CASES to the staged cases directory to decide the 26 rows and the PR 3446 twin"
+    return 0
+  fi
+  rows=$(route_table_rows "$cases")
+  counts=$(route_table_counts "$rows")
+  assert_equals "5/4/16/1" "$counts" "table: the staged table's class counts are not 5 twins, 4 ancestors, 16 closed-unmerged and 1 open"
+  assert_equals 27 "$(printf '%s\n' "$rows" | grep -c .)" "table: the rows are not the 26 table rows and the PR 3446 twin"
+  route_world route-table
+  : > "$HOMED/data/supersedence-records.tsv"
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    name="row-$num"
+    add_copy "$name"
+    route_lock_dead "$name"
+    route_write_profile "$W/profiles/$name.json" "$pr" "$(route_tip "$name")"
+    case "$state" in
+      MERGED) route_set_pr "$W/forge" "$pr" MERGED "$ROUTE_MERGE" ;;
+      *) route_set_pr "$W/forge" "$pr" "$state" "" ;;
+    esac
+    if [ "$kind" = accept ]; then
+      route_script_row "$W" "$name" allowed success "$pr"
+    elif [ "$state" = MERGED ]; then
+      route_script_row "$W" "$name" refuse refuse "$pr"
+    else
+      route_script_row "$W" "$name" allowed success "$pr"
+    fi
+  done <<< "$rows"
+  # (i) with no record: every row is asked as before and refused with the base reason.
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    name="row-$num"
+    label="row $num (tip $tip, class $cls, PR $pr $state, $kind)"
+    route_assert_kept "$name" "$label without a record"
+    assert_equals "--cleanup-worktree $(copy_path "$name")" "$(route_calls_for "$name")" "$label: the call with no record is not the base call"
+    assert_contains "$(route_line_of "$name")" "verification_stale_or_uncovered_paths" "$label: the base reason is missing"
+    printf 'table: %s: no record -> kept, plain call, base reason\n' "$label"
+  done <<< "$rows"
+  # (ii) with a record naming the row's PR.
+  rm -f "$W/closeout.log"
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    name="row-$num"
+    route_record "$name" "$pr" "$(route_tip "$name")" "$W/profiles/$name.json"
+  done <<< "$rows"
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  while IFS=$'\t' read -r num tip cls pr state kind own; do
+    name="row-$num"
+    label="row $num (tip $tip, class $cls, PR $pr $state, $kind)"
+    if [ "$kind" = accept ]; then
+      route_assert_released "$name" "$label with a record"
+      route_assert_calls "$name" "$pr" "$label"
+      expect_released=$((expect_released + 1))
+      printf 'table: %s: record -> released by the route (scripted allowing envelopes)\n' "$label"
+    elif [ "$state" = MERGED ]; then
+      route_assert_kept "$name" "$label with a record"
+      line=$(route_calls_for "$name")
+      assert_equals 1 "$(printf '%s\n' "$line" | wc -l | tr -d ' ')" "$label: the refused plan was followed by another call"
+      # shellcheck disable=SC2086
+      route_argv_check plan "$pr" "$W/profiles/$name.json" "$(copy_path "$name")" $line || fail "$label: argv: $ROUTE_ARGV_WHY"
+      assert_contains "$(route_line_of "$name")" "supersedence route (--pr $pr)" "$label: the refusal does not name the route"
+      assert_contains "$(route_line_of "$name")" "verification_stale_or_uncovered_paths" "$label: the driver's reason is missing"
+      merged_kept=$((merged_kept + 1))
+      if [ "$own" = no ]; then
+        printf 'table: %s: record naming the nearest merged PR (misattributed-record negative) -> route used, driver refused, kept\n' "$label"
+      else
+        printf 'table: %s: record -> route used, driver refused, kept\n' "$label"
+      fi
+    else
+      route_assert_kept "$name" "$label with a record"
+      assert_equals "" "$(route_calls_for "$name")" "$label: a $state PR reached the driver"
+      assert_contains "$(route_line_of "$name")" "as $state, not MERGED" "$label: the forge state is not named"
+      expect_never=$((expect_never + 1))
+      printf 'table: %s: record -> kept by the forge check, driver never called\n' "$label"
+    fi
+  done <<< "$rows"
+  assert_equals 10 "$expect_released" "table: not every twin and ancestor row was released"
+  assert_equals 9 "$merged_kept" "table: not every merged-nearest reject row reached the driver and was refused"
+  assert_equals 8 "$expect_never" "table: not every closed or open reject row was kept before the driver"
+  pass "the staged cases: 5 twins, 4 ancestors and the PR 3446 twin are released through the route and 17 reject rows are kept with or without a record (reduced evidence: scripted driver answers, generated sandbox commits)"
+}
+
 # FM_TEST_ONLY=<function> runs one case, which keeps a mutation proof quick.
 fm_test_only
 
@@ -3145,4 +3625,10 @@ test_bad_config_is_refused
 test_real_lsof_sees_a_process_inside_a_copy
 test_arm_and_disarm_bind_the_check
 test_help_and_bad_calls
+test_the_route_comparator_accepts_both_orders_and_rejects_every_wrong_call
+test_a_record_makes_the_sweep_ask_the_driver_by_its_pr_route_and_no_record_changes_nothing
+test_a_record_that_fails_any_condition_keeps_the_copy_and_never_reaches_the_driver
+test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed
+test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
+test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers
 pass "fm-copy-sweep"
