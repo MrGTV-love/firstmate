@@ -1,0 +1,15 @@
+--- this home now has a secondmate marker with no parent binding, so the outcome cannot be placed
+PR body: Closes: nr-1
+$ bin/fm-pr-merge.sh task-s5b https://localhost/fixture/fixture-repo/pulls/10
+--- stdout
+armed: state/task-s5b.check.sh
+close-at-merge: 0 closed, 1 left open
+--- stderr
+actionable: PR https://localhost/fixture/fixture-repo/pulls/10 is registered but its ready line did not reach the parent channel (rc=2)
+verified: https://localhost/fixture/fixture-repo/pulls/10 is open and mergeable, with a successful combined status at head 186afc2265b3439d3f0340bd3c2ad6761abfde4e
+review: PASS
+actionable: merged https://localhost/fixture/fixture-repo/pulls/10 but could not report it upward: this home has no readable secondmate identity or parent binding (.fm-secondmate-home, .fm-secondmate-parent)
+actionable: close-at-merge: not closed nr-1: the merge of https://localhost/fixture/fixture-repo/pulls/10 was not recorded, so nothing was closed (named by the body of https://localhost/fixture/fixture-repo/pulls/10); retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F9X7FJAKHMR14WR8N0VN8C/bin/fm-pr-close-items.sh task-s5b https://localhost/fixture/fixture-repo/pulls/10
+--- exit=0
+forge after: {"state":"closed","merged":true}
+nr-1: state: queued deps: none 

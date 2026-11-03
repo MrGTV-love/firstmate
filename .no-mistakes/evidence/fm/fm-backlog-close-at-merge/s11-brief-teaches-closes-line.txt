@@ -1,0 +1,10 @@
+=== bin/fm-brief.sh b-nm alpha --mode no-mistakes: 2 line(s) name Closes: b-nm
+141:Name the backlog items your change finishes: put `Closes: b-nm` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. A merge that bin/fm-pr
+194:Before that done, check the PR body for the lines that close backlog items (at least `Closes: b-nm`), because the pipeline wrote the body after your commit. Read the PR body back with `gh-axi pr view <number> --full`; if any `Closes:` line is missing, writ
+=== bin/fm-brief.sh b-dp alpha --mode direct-PR: 1 line(s) name Closes: b-dp
+139:Name the backlog items your change finishes: put `Closes: b-dp` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. A m
+=== bin/fm-brief.sh b-fj alpha --mode direct-PR --forge forgejo: 1 line(s) name Closes: b-fj
+139:Name the backlog items your change finishes: put `Closes: b-fj` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. A m
+=== bin/fm-brief.sh b-ger alpha --mode direct-PR --forge gerrit: 0 line(s) name Closes: b-ger
+=== bin/fm-brief.sh b-lo alpha --mode local-only: 0 line(s) name Closes: b-lo
+=== bin/fm-brief.sh b-sc alpha --scout: 0 line(s) name Closes: b-sc

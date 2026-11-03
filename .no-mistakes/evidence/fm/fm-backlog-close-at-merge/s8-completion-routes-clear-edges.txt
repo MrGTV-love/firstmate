@@ -1,0 +1,100 @@
+$ bin/fm-tasks-axi.sh done n-done --note finished
+--- stdout
+ok: done n-done -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: w-n-done no longer waits on n-done; no stored blocked-by edge remains
+--- exit=0
+$ bin/fm-tasks-axi.sh close n-close --note finished
+--- stdout
+ok: done n-close -> Done; pruned 1
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: w-n-close no longer waits on n-close; no stored blocked-by edge remains
+--- exit=0
+$ bin/fm-tasks-axi.sh task done n-task-done --note finished
+--- stdout
+ok: done n-task-done -> Done; pruned 1
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: w-n-task-done no longer waits on n-task-done; no stored blocked-by edge remains
+--- exit=0
+$ bin/fm-tasks-axi.sh task close n-task-close --note finished
+--- stdout
+ok: done n-task-close -> Done; pruned 1
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: w-n-task-close no longer waits on n-task-close; no stored blocked-by edge remains
+--- exit=0
+w-n-done: state: queued deps: none 
+w-n-close: state: queued deps: none 
+w-n-task-done: state: queued deps: none 
+w-n-task-close: state: queued deps: none 
+--- quoted-id: an id tasks-axi prints in quotes
+$ bin/fm-tasks-axi.sh done 123 --note finished
+--- stdout
+ok: done 123 -> Done; pruned 1
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: 456 no longer waits on 123; no stored blocked-by edge remains
+--- exit=0
+456: state: queued deps: none 
+--- raw tasks-axi done does not clear (documented exception)
+$ tasks done rawb --note x
+--- stderr
+timeout: failed to run command ‘tasks’: No such file or directory
+--- exit=127
+w-raw: state: queued deps: "blocked-by:rawb" 
+--- captain call answered
+$ bin/fm-captain-hold.sh answer call-a --decision-file /Users/charlesabrooker/tmp/fm-cam.9iEqeA/d.md
+--- stdout
+answered: call-a
+--- stderr
+unblocked: w-a no longer waits on call-a; no stored blocked-by edge remains
+--- exit=0
+call-a: state: done deps: none 
+w-a: state: queued deps: none 
+--- captain call withdrawn
+$ bin/fm-captain-hold.sh withdraw call-w --evidence-file /Users/charlesabrooker/tmp/fm-cam.9iEqeA/ev.md --ruling rul
+--- stderr
+fm-captain-hold: ruling rul does not name call-w in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw call-w
+--- exit=1
+call-w: state: queued deps: none 
+w-w: state: queued deps: "blocked-by:call-w" 
+--- typed completion: public-followup waive, and a help call
+$ bin/fm-tasks-axi.sh public-followup waive --help  (stderr shown)
+$ bin/fm-tasks-axi.sh public-followup waive pf-1 --reason not needed --approved-by captain
+--- stdout
+ok: public-followup waive pf-1 -> waived (revision 2); pruned 1
+public_followup:
+  id: pf-1
+  state: done
+  delivery_state: waived
+  revision: 2
+  relations: 0
+--- stderr
+unblocked: w-pf no longer waits on pf-1; no stored blocked-by edge remains
+--- exit=0
+w-pf: state: queued deps: none 
+--- (driver fix) raw tasks-axi done, run from the lab home
+$ tasks-axi done rawb --note x
+--- stdout
+ok: done rawb -> Done; pruned 1
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- exit=0
+w-raw: state: queued deps: "blocked-by:rawb" 
+--- (driver fix) captain call withdrawn, ruling that names the call
+$ bin/fm-captain-hold.sh withdraw call-w --evidence-file /Users/charlesabrooker/tmp/fm-cam.9iEqeA/ev.md --ruling rul2
+--- stdout
+withdrawn: call-w
+--- stderr
+unblocked: w-w no longer waits on call-w; no stored blocked-by edge remains
+--- exit=0
+call-w: state: done deps: none 
+w-w: state: queued deps: none 

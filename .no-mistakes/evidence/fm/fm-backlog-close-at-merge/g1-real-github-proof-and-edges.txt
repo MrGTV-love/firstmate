@@ -1,0 +1,24 @@
+forge: 353 MERGED, 363 OPEN
+$ bin/fm-tasks-axi.sh done ship-open --pr https://github.com/MrGTV-love/firstmate/pull/363
+--- stderr
+fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/363
+--- exit=2
+ship-open: state: queued deps: none 
+$ bin/fm-tasks-axi.sh done ship-none
+--- stderr
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+--- exit=2
+ship-none: state: queued deps: none 
+$ bin/fm-tasks-axi.sh done ship-g1 --pr https://github.com/MrGTV-love/firstmate/pull/353
+--- stdout
+ok: done ship-g1 -> Done (pr https://github.com/MrGTV-love/firstmate/pull/353)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+--- stderr
+unblocked: waits-g1 no longer waits on ship-g1; no stored blocked-by edge remains
+unblocked: waits-both no longer waits on ship-g1; it still waits on second-blocker
+--- exit=0
+ship-g1: state: done deps: none 
+waits-g1: state: queued deps: none 
+waits-both: state: queued deps: "blocked-by:second-blocker" 
+second-blocker: state: queued deps: none 

@@ -1,0 +1,31 @@
+ok - a merge closes each named eligible item with the merged PR URL and reports the one it left open
+ok - a merge that names its own task reports the live-record refusal and still succeeds
+ok - a body with no Closes line, even one that links another PR, changes no item
+ok - a merge whose outcome cannot be recorded runs no close and lists the named items
+ok - a merge the watcher already recorded still closes its items and sends no second notice
+ok - an unreadable merged body leaves the merge unchanged and names the URL and the error
+ok - each failure kind is reported with its reason, none stops the next item, and holds win
+ok - a hold placed after the close step's last look is caught inside the completion lock
+ok - a repeat of the close step changes nothing, with the task record present and after it is gone
+ok - a rerun after a partial close only reports the closed item and closes the rest
+ok - a hand run with a pull request that is not merged closes nothing and reports each named item
+ok - a train closes its members' items from bodies and from pr=, in every layout, a Component table under a Component heading or lead-in included, never an excluded PR's
+ok - a train body without its own Closes line still closes the members' items
+ok - an unreadable member is reported by URL while the item behind its pr= still closes
+ok - members match by the full URL, never by number
+ok - a train names a linked PR outside its member list, reads none of its items, and counts nothing for it
+ok - a GitLab merge reports the completion path's actual result per item and still succeeds
+ok - a Forgejo merge reports the completion path's actual result per item and still succeeds
+ok - the parser takes real ids, ignores fenced examples and non-directive lines
+ok - only a table's header row names the Component column; a data row that mentions it does not
+ok - a table does not end a Component heading's list, and it does end a lead-in's list
+ok - a dependent whose id the list prints in quotes still loses the finished edge
+ok - completing a blocker clears its edge on every wrapper route, keeps other blockers and holds, and reports the dependents
+ok - the task noun forms and a typed public-followup completion clear the finished edge
+ok - a typed completion clears the edge when the row is archived at once and reports a failed read back
+ok - a help call on a typed completion asks nobody to act
+ok - a merge reports a cleared edge on stdout and a failed clear behind actionable: on stderr
+ok - answering a captain call clears the call's edge from its dependents
+ok - withdrawing a captain call clears the call's edge from its dependents
+ok - an explicit data root gets the same blocker clear
+exit=0

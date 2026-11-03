@@ -1,0 +1,9 @@
+real merged, no Closes line: https://github.com/MrGTV-love/firstmate/pull/345
+$ bin/fm-pr-close-items.sh plain https://github.com/MrGTV-love/firstmate/pull/345
+--- exit=0
+backlog unchanged
+--- a bad URL
+$ bin/fm-pr-close-items.sh plain https://example.com/not-a-pr
+--- stderr
+usage: fm-pr-close-items.sh [--not-recorded] <task-id> <merged-pr-url>
+--- exit=2

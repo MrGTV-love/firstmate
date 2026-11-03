@@ -1,0 +1,10 @@
+real train: https://github.com/MrGTV-love/firstmate/pull/362 is OPEN
+members: 
+$ bin/fm-pr-close-items.sh train-open https://github.com/MrGTV-love/firstmate/pull/362
+--- exit=0
+g-open-train: state: queued deps: none 
+--- reading of this result
+Real train PR 362 lists 7 PRs in its title. Its live body (updated 2026-11-03T00:38:40Z, rewritten by the pipeline) has no Component table, bullet or lead-in.
+fm_pr_closes_train_members returns nothing for it, so no member body is read, no pr= task is looked up, no "not read" line prints, and the exit is 0.
+The cause is the body parse, so merge state does not change it: the same body on a merged PR gives the same silence.
+Component mentions in the body: 4; member URLs the reader returned: 0.

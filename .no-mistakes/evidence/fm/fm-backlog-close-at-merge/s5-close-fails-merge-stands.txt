@@ -1,0 +1,22 @@
+forge before: {"state":"open","merged":false}; PR body names: Closes: f1
+--- fault: a watcher makes data/backlog.md unreadable the moment the forge reports merged
+$ bin/fm-pr-merge.sh task-s5 https://localhost/fixture/fixture-repo/pulls/9
+--- stdout
+armed: state/task-s5.check.sh
+close-at-merge: 0 closed, 1 left open
+--- stderr
+verified: https://localhost/fixture/fixture-repo/pulls/9 is open and mergeable, with a successful combined status at head 5ddd4938241fa233b7021296483193d91167a2cd
+review: PASS
+actionable: close-at-merge: not closed f1: the item could not be read (error: "EACCES: permission denied, open '/Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab/data/backlog.md'"); it stays open; retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F9X7FJAKHMR14WR8N0VN8C/bin/fm-pr-close-items.sh task-s5 https://localhost/fixture/fixture-repo/pulls/9
+--- exit=0
+fault fired: fired
+forge after: {"state":"closed","merged":true}
+f1: state: queued deps: none 
+--- backlog readable again; run the printed retry
+$ bin/fm-pr-close-items.sh task-s5 https://localhost/fixture/fixture-repo/pulls/9
+close-at-merge: closed f1 with https://localhost/fixture/fixture-repo/pulls/9 (named by the body of https://localhost/fixture/fixture-repo/pulls/9)
+close-at-merge: unblocked: waits-f1 no longer waits on f1; no stored blocked-by edge remains
+close-at-merge: 1 closed, 0 left open
+--- exit=0
+f1: state: done deps: none 
+waits-f1: state: queued deps: none 

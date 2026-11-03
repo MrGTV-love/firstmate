@@ -1,0 +1,6 @@
+forge: {"state":"open","merged":false}
+$ bin/fm-pr-close-items.sh task-s4 https://localhost/fixture/fixture-repo/pulls/8
+actionable: close-at-merge: not closed open-1: https://localhost/fixture/fixture-repo/pulls/8 is not merged, so nothing was closed (named by the body of https://localhost/fixture/fixture-repo/pulls/8); retry once it has merged: bin/fm-pr-close-items.sh task-s4 https://localhost/fixture/fixture-repo/pulls/8
+close-at-merge: 0 closed, 1 left open
+--- exit=3
+open-1: state: queued deps: none 

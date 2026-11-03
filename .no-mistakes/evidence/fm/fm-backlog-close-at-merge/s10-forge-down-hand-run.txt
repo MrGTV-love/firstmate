@@ -1,0 +1,13 @@
+--- forge stopped
+$ bin/fm-pr-close-items.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- stderr
+actionable: close-at-merge could not read the body of https://localhost/fixture/fixture-repo/pulls/13 (Error: request failed: Get "http://localhost:3987/api/v1/repos/fixture/fixture-repo/pulls/13": dial tcp [::1]:3987: connect: connection refused), so it closed nothing and the merge result is unchanged; retry: bin/fm-pr-close-items.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- exit=1
+--- forge back
+$ bin/fm-pr-close-items.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- stdout
+close-at-merge: 0 closed, 2 left open
+--- stderr
+actionable: close-at-merge: not closed crlf-a: https://localhost/fixture/fixture-repo/pulls/13 is not merged, so nothing was closed (named by the body of https://localhost/fixture/fixture-repo/pulls/13); retry once it has merged: bin/fm-pr-close-items.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+actionable: close-at-merge: not closed lead-a: https://localhost/fixture/fixture-repo/pulls/13 is not merged, so nothing was closed (named by the body of train member https://localhost/fixture/fixture-repo/pulls/12); retry once it has merged: bin/fm-pr-close-items.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- exit=3

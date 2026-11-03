@@ -1,0 +1,32 @@
+body (CRLF), real on forge:
+Components:^M
+^M
+| # | Component PR | Head |^M
+| --- | --- | --- |^M
+| 1 | https://localhost/fixture/fixture-repo/pulls/12 | a |^M
+^M
+Closes: crlf-a^M
+
+$ bin/fm-pr-merge.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- stdout
+armed: state/task-s9.check.sh
+--- stderr
+verified: https://localhost/fixture/fixture-repo/pulls/13 is open and mergeable, with a successful combined status at head 246f8b0a66bed4072a91d63a6f1e2c691b72bfde
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown needs exact-head PASS reads of this group from two different known reader families; obtain reads until both families count, set each read's actual trigger answers and local report, then record each with: FM_HOME=/Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F9X7FJAKHMR14WR8N0VN8C/bin/fm-review-record.py review --pr https://localhost/fixture/fixture-repo/pulls/13 --head 246f8b0a66bed4072a91d63a6f1e2c691b72bfde --verdict PASS --reader-model SECOND_KNOWN_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' --covered-groups '["no-mistakes:unknown"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F9X7FJAKHMR14WR8N0VN8C/bin/fm-review-record.py captain-word --pr https://localhost/fixture/fixture-repo/pulls/13 --head 246f8b0a66bed4072a91d63a6f1e2c691b72bfde --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+--- exit=1
+crlf-a: state: queued deps: none 
+lead-a: state: queued deps: none 
+--- (driver fix) a lab no-mistakes database appeared during the s6 runs, and the first merge attempt was refused by the review guard; removing that lab database cleared the refusal
+$ bin/fm-pr-merge.sh task-s9 https://localhost/fixture/fixture-repo/pulls/13
+--- stdout
+armed: state/task-s9.check.sh
+close-at-merge: closed crlf-a with https://localhost/fixture/fixture-repo/pulls/13 (named by the body of https://localhost/fixture/fixture-repo/pulls/13)
+close-at-merge: closed lead-a with https://localhost/fixture/fixture-repo/pulls/13 (named by the body of train member https://localhost/fixture/fixture-repo/pulls/12)
+close-at-merge: 2 closed, 0 left open
+--- stderr
+verified: https://localhost/fixture/fixture-repo/pulls/13 is open and mergeable, with a successful combined status at head 246f8b0a66bed4072a91d63a6f1e2c691b72bfde
+review: PASS
+--- exit=0
+forge after: {"state":"closed","merged":true}
+crlf-a: state: done deps: none 
+lead-a: state: done deps: none 

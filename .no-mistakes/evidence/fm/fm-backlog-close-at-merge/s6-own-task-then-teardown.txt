@@ -1,0 +1,76 @@
+READ THIS FIRST. Two separate things are shown below.
+1. The merge part is a real Forgejo merge of PR 11. It reports the merged task's own live record on stdout, and the dependent keeps waiting.
+2. The teardown part is a separate proof that the teardown route clears the edge. It is NOT a teardown of that Forgejo merge.
+The passing teardown used a hand-made legacy record, the copy was removed, and pr= was pointed at unrelated real merged GitHub PR 353, because missing-copy teardown admits only a GitHub proof.
+The REFUSED attempts below were setup errors in this hand-made record (no spawn_gen, malformed endpoint, shared worktree, not a treehouse copy, no GitHub proof). They are not product defects.
+---
+$ bin/fm-pr-merge.sh own-1 https://localhost/fixture/fixture-repo/pulls/11
+--- stdout
+armed: state/own-1.check.sh
+close-at-merge: not closed own-1: bin/fm-tasks-axi.sh done did not close it: own-1 has a live task record; complete it with bin/fm-teardown.sh own-1, which owns the landing proof
+close-at-merge: 0 closed, 1 left open
+--- stderr
+verified: https://localhost/fixture/fixture-repo/pulls/11 is open and mergeable, with a successful combined status at head d6d7709e3dad93eef0f4e5b4e1c1f12c9abb4801
+review: PASS
+--- exit=0
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+$ bin/fm-teardown.sh own-1
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+error: task own-1's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab/state/own-1.meta has 0 spawn generation fields; exactly one is required); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less
+--- exit=1
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+own-1.meta present: yes
+$ bin/fm-teardown.sh own-1 --legacy-record   (this hand-made record has no spawn_gen; no endpoint ever ran)
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+REFUSED: tmux endpoint 'fm-own-1' is malformed or does not belong to task own-1; preserving task state.
+--- exit=1
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+own-1.meta present: yes
+$ bin/fm-teardown.sh own-1 --legacy-record   (this hand-made record has no spawn_gen; no endpoint ever ran)
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+REFUSED: task own-1's cleanup target /Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone is also task task-s1's recorded worktree (/Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone); preserved worktree custody overlaps it, so nothing was changed - not even with --force.
+--- exit=1
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+own-1.meta present: yes
+$ bin/fm-teardown.sh own-1 --legacy-record   (this hand-made record has no spawn_gen; no endpoint ever ran)
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+worktree /Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone-own is not managed by treehouse
+error: treehouse return failed for worktree /Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone-own; teardown aborted
+--- exit=1
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+own-1.meta present: yes
+$ bin/fm-teardown.sh own-1 --legacy-record   (this hand-made record has no spawn_gen; no endpoint ever ran)
+--- stdout
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+REFUSED: task own-1 has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge.
+Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- exit=1
+own-1: state: in_flight deps: none 
+waits-own: state: queued deps: "blocked-by:own-1" 
+own-1.meta present: yes
+--- lab record now points pr= at real merged https://github.com/MrGTV-love/firstmate/pull/353, because missing-copy teardown only admits a GitHub proof; the copy was removed
+$ timeout 150 bin/fm-teardown.sh own-1 --legacy-record
+--- stdout
+/Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone-project: already current
+teardown own-1 complete (window firstmate:fm-own-1, worktree /Users/charlesabrooker/tmp/fm-cam.9iEqeA/clone-own, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261103T004737Z-99269)
+Backlog: own-1 is closed in /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-cam.9iEqeA/lab
+unblocked: waits-own no longer waits on own-1; no stored blocked-by edge remains
+--- exit=0
+own-1: state: done deps: none 
+waits-own: state: queued deps: none 

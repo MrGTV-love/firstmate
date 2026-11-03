@@ -1,0 +1,46 @@
+$ train https://localhost/fixture/fixture-repo/pulls/6 body:
+    ## Train components
+    
+    This train landed the table below. PR https://localhost/fixture/fixture-repo/pulls/5 was dropped, it did not land.
+    
+    | Component | Head | Result |
+    | --- | --- | --- |
+    | https://localhost/fixture/fixture-repo/pulls/2 | `a` | merged |
+    | https://localhost/fixture/fixture-repo/pulls/3 | `b` | merged |
+    | https://localhost/fixture/fixture-repo/pulls/4 | `c` | merged |
+    | https://localhost/fixture/fixture-repo/pulls/999 | `d` | merged |
+    
+    Also landed: https://github.com/MrGTV-love/firstmate/pull/353 and a mention of https://localhost/fixture/fixture-repo/pulls/5.
+    
+    ```
+    https://github.com/MrGTV-love/firstmate/pull/352
+    ```
+--- member PRs: M1=#2 (Closes tm-a, tm-b) M2=#3 (names nothing) M3=#4 (tm-meta, tm-meta-ship records hold it) X1=#5 excluded (Closes excl-id)
+$ bin/fm-pr-merge.sh task-train https://localhost/fixture/fixture-repo/pulls/6
+--- stdout
+armed: state/task-train.check.sh
+close-at-merge: closed tm-a with https://localhost/fixture/fixture-repo/pulls/6 (named by the body of train member https://localhost/fixture/fixture-repo/pulls/2)
+close-at-merge: unblocked: waits-tm no longer waits on tm-a; no stored blocked-by edge remains
+close-at-merge: closed tm-b with https://localhost/fixture/fixture-repo/pulls/6 (named by the body of train member https://localhost/fixture/fixture-repo/pulls/2)
+close-at-merge: closed tm-meta with https://localhost/fixture/fixture-repo/pulls/6 (named by the task record that holds train member https://localhost/fixture/fixture-repo/pulls/4)
+close-at-merge: 3 closed, 2 left open
+--- stderr
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+verified: https://localhost/fixture/fixture-repo/pulls/6 is open and mergeable, with a successful combined status at head 4d450d35d44119ec818cb0524a106525d14854ef
+review: PASS
+actionable: close-at-merge: not closed tm-meta-ship: bin/fm-tasks-axi.sh done did not close it: tm-meta-ship has a live task record; complete it with bin/fm-teardown.sh tm-meta-ship, which owns the landing proof
+actionable: close-at-merge: could not read the body of train member https://localhost/fixture/fixture-repo/pulls/999 (jq: error (at <stdin>:0): the forge answered: The target couldn't be found.); retry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F9X7FJAKHMR14WR8N0VN8C/bin/fm-pr-close-items.sh task-train https://localhost/fixture/fixture-repo/pulls/6
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/353: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=0
+--- forge after: train {"state":"closed","merged":true}
+--- backlog after
+tm-a: state: done deps: none 
+tm-b: state: done deps: none 
+tm-meta: state: done deps: none 
+tm-meta-ship: state: queued deps: none 
+tm-other-repo: state: queued deps: none 
+excl-id: state: queued deps: none 
+tm-empty: state: queued deps: none 
+waits-tm: state: queued deps: none 
+--- proof links stored for tm-a: 22:- [x] tm-a - item tm-a https://localhost/fixture/fixture-repo/pulls/6 (kind: docs) (merged 2026-11-02)

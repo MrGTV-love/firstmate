@@ -1,0 +1,32 @@
+real train: https://github.com/MrGTV-love/firstmate/pull/353 is MERGED; its Component list:
+https://github.com/MrGTV-love/firstmate/pull/335
+https://github.com/MrGTV-love/firstmate/pull/336
+https://github.com/MrGTV-love/firstmate/pull/343
+https://github.com/MrGTV-love/firstmate/pull/344
+https://github.com/MrGTV-love/firstmate/pull/346
+$ bin/fm-pr-close-items.sh train-g https://github.com/MrGTV-love/firstmate/pull/353
+--- stdout
+close-at-merge: closed g-docs with https://github.com/MrGTV-love/firstmate/pull/353 (named by the task record that holds train member https://github.com/MrGTV-love/firstmate/pull/343)
+close-at-merge: unblocked: waits-g-docs no longer waits on g-docs; no stored blocked-by edge remains
+close-at-merge: 1 closed, 1 left open
+--- stderr
+actionable: close-at-merge: not closed g-ship: bin/fm-tasks-axi.sh done did not close it: g-ship has a live task record; complete it with bin/fm-teardown.sh g-ship, which owns the landing proof
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/337: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/351: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=3
+g-docs: state: done deps: none 
+g-ship: state: queued deps: none 
+g-other: state: queued deps: none 
+g-norec: state: queued deps: none 
+waits-g-docs: state: queued deps: none 
+--- rerun
+$ bin/fm-pr-close-items.sh train-g https://github.com/MrGTV-love/firstmate/pull/353
+--- stdout
+close-at-merge: g-docs is already done
+close-at-merge: 0 closed, 1 left open
+--- stderr
+actionable: close-at-merge: not closed g-ship: bin/fm-tasks-axi.sh done did not close it: g-ship has a live task record; complete it with bin/fm-teardown.sh g-ship, which owns the landing proof
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/337: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+actionable: close-at-merge: not read https://github.com/MrGTV-love/firstmate/pull/351: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed
+--- exit=3
+g-docs row: 14:- [x] g-docs - item https://github.com/MrGTV-love/firstmate/pull/353 (kind: docs) (merged 2026-11-02)

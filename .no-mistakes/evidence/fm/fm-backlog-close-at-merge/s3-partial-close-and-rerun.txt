@@ -1,0 +1,28 @@
+$ bin/fm-pr-merge.sh task-s3 https://localhost/fixture/fixture-repo/pulls/7   (r2 has an open owner call)
+--- stdout
+armed: state/task-s3.check.sh
+close-at-merge: closed r1 with https://localhost/fixture/fixture-repo/pulls/7 (named by the body of https://localhost/fixture/fixture-repo/pulls/7)
+close-at-merge: 1 closed, 1 left open
+--- stderr
+verified: https://localhost/fixture/fixture-repo/pulls/7 is open and mergeable, with a successful combined status at head 72ba6a2eabeff5cde2100ea1b397a2cf5592571d
+review: PASS
+actionable: close-at-merge: not closed r2: it is an open owner call: r2 is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+--- exit=0
+r1: state: done deps: none 
+r2: state: queued deps: none 
+waits-r2: state: queued deps: "blocked-by:r2" 
+--- owner releases the hold: tasks-axi unhold r2
+$ bin/fm-pr-close-items.sh task-s3 https://localhost/fixture/fixture-repo/pulls/7   (rerun 1, by hand)
+close-at-merge: r1 is already done
+close-at-merge: closed r2 with https://localhost/fixture/fixture-repo/pulls/7 (named by the body of https://localhost/fixture/fixture-repo/pulls/7)
+close-at-merge: unblocked: waits-r2 no longer waits on r2; no stored blocked-by edge remains
+close-at-merge: 1 closed, 0 left open
+--- exit=0
+$ bin/fm-pr-close-items.sh task-s3 https://localhost/fixture/fixture-repo/pulls/7   (rerun 2, by hand)
+close-at-merge: r1 is already done
+close-at-merge: r2 is already done
+--- exit=0
+r1 row before reruns: 23:- [x] r1 - item r1 https://localhost/fixture/fixture-repo/pulls/7 (kind: docs) (merged 2026-11-02)
+r1 row after reruns:  23:- [x] r1 - item r1 https://localhost/fixture/fixture-repo/pulls/7 (kind: docs) (merged 2026-11-02)
+r2: state: done deps: none 
+waits-r2: state: queued deps: none 
