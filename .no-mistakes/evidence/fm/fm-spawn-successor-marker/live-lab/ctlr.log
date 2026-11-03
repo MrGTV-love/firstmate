@@ -1,0 +1,12 @@
+
+===== CONTROL for F3: relaunch the plain (non-successor) admitted task ctl the same way =====
+ctl successor_of lines: 0
+$ spawn ctl --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/ctl/launch-brief.md records no ship branch; defaulting to legacy branch fm/ctl
+warning: $FM_HOME/data/ctl/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: ctl ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/2/proj and endpoint firstmate:fm-ctl retained; no worker admitted
+[exit 1]
+ctl relaunch exit=1

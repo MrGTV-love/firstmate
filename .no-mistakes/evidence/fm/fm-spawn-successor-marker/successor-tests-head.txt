@@ -1,0 +1,5 @@
+ok - --successor-of hands one resolved --supersedes to the provisioner and records successor_of; no flag changes nothing
+ok - --successor-of refuses every untrustworthy predecessor before any resource is used
+ok - --successor-of refuses scouts, secondmates, relaunches and a second predecessor, changing nothing
+ok - a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily
+ok - removing the predecessor-branch check or the advertise check makes its refusal row stop refusing

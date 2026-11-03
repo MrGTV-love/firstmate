@@ -1,0 +1,450 @@
+
+===== Setup: Vernant PR #3604 head c28a44a6 scripts committed in sandbox project; real tmux, real treehouse, real fm-spawn =====
+$ lg -C $SB/proj log --oneline -1
+5076120 seed: vernant subset at c28a44a668
+[exit 0]
+
+===== Spawn predecessor (no flag) =====
+$ spawn pred $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400
+warning: task pred: $FM_HOME/data/pred/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: $FM_HOME/data/pred/launch-brief.md records no ship branch; defaulting to legacy branch fm/pred
+warning: $FM_HOME/data/pred/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pred ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@50761208e1aa5af286eb126a71416a1f383736ea origin=main@50761208e1aa5af286eb126a71416a1f383736ea selected=origin/main@50761208e1aa5af286eb126a71416a1f383736ea
+{
+  "base_sha": "50761208e1aa5af286eb126a71416a1f383736ea",
+  "branch": "fm/pred",
+  "manifest_path": "$SB/durable/39706e8fed4db76e.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "pred",
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/1/proj"
+}
+skill selection for pred: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned pred harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-pred worktree=$SB/treehouse/.treehouse/proj-f2ff61/1/proj
+[exit 0]
+window=firstmate:fm-pred
+endpoint_task_id=pred
+worktree=$SB/treehouse/.treehouse/proj-f2ff61/1/proj
+project=$SB/proj
+harness=sleep
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/pred
+tasktmp=/tmp/fm-pred
+write_confinement=unconfined-macos-sleep
+slot_manifest=$SB/durable/39706e8fed4db76e.json
+slot_base_sha=50761208e1aa5af286eb126a71416a1f383736ea
+slot_owned_path=README.md
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=[]
+skill_selection=undelivered
+skill_selection_reason=raw launch command has no supported brief transport
+spawn_gen=s1793707880.9622.5702
+lab bash $SB
+fm-pred bash $SB/treehouse/.treehouse/proj-f2ff61/1/proj
+$SB/durable:
+total 8
+drwxr-xr-x   3 charlesabrooker  staff   96 Nov  3 06:10 .
+drwx------  15 charlesabrooker  staff  480 Nov  3 06:06 ..
+-rw-------   1 charlesabrooker  staff  503 Nov  3 06:10 39706e8fed4db76e.json
+
+$SB/state:
+total 0
+drwxr-xr-x   3 charlesabrooker  staff   96 Nov  3 06:10 .
+drwx------  15 charlesabrooker  staff  480 Nov  3 06:06 ..
+drwx------   3 charlesabrooker  staff   96 Nov  3 06:10 worktree-lifecycle
+
+===== Predecessor work: two commits on fm/pred, pushed to the temp origin =====
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/1/proj push -q origin fm/pred
+[exit 0]
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/1/proj log --oneline -3
+865caae predecessor 1
+59930ad predecessor 0
+5076120 seed: vernant subset at c28a44a668
+[exit 0]
+
+===== CONTROL: spawn ctl with NO flag, carry predecessor commits, real push through real R-13 =====
+$ spawn ctl $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/2/proj"
+}
+skill selection for ctl: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned ctl harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-ctl worktree=$SB/treehouse/.treehouse/proj-f2ff61/2/proj
+[exit 0]
+successor_of lines in ctl.meta: 0
+marker dir: ls: /Users/charlesabrooker/tmp/fm-succ-sb.v3ms4s/state/worktree-supersedence: No such file or directory
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/2/proj push origin fm/ctl
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+
+error: failed to push some refs to '$SB/origin.git'
+[exit 1]
+
+===== CONTROL cleanup: drop carried commits from ctl so it cannot taint the successor row =====
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/2/proj log --oneline -1
+5076120 seed: vernant subset at c28a44a668
+[exit 0]
+
+===== SUCCESSOR: spawn succ --successor-of pred against the REAL verb =====
+$ spawn succ $SB/proj --mode local-only --yolo off --owned-path README.md --successor-of pred --harness sleep 86400
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task succ: $FM_HOME/data/succ/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: $FM_HOME/data/succ/launch-brief.md records no ship branch; defaulting to legacy branch fm/succ
+warning: $FM_HOME/data/succ/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: succ ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@50761208e1aa5af286eb126a71416a1f383736ea origin=main@50761208e1aa5af286eb126a71416a1f383736ea selected=origin/main@50761208e1aa5af286eb126a71416a1f383736ea
+{
+  "base_sha": "50761208e1aa5af286eb126a71416a1f383736ea",
+  "branch": "fm/succ",
+  "manifest_path": "$SB/durable/b8b07ecde6d9a617.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "succ",
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/3/proj"
+}
+skill selection for succ: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned succ harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-succ worktree=$SB/treehouse/.treehouse/proj-f2ff61/3/proj
+[exit 0]
+
+===== Task record =====
+worktree=$SB/treehouse/.treehouse/proj-f2ff61/3/proj
+branch=fm/succ
+slot_manifest=$SB/durable/b8b07ecde6d9a617.json
+successor_of=pred
+
+===== Marker written by the Vernant verb in the temp state dir =====
+total 8
+drwx------  3 charlesabrooker  staff    96 Nov  3 06:25 .
+drwxr-xr-x  4 charlesabrooker  staff   128 Nov  3 06:25 ..
+-rw-------  1 charlesabrooker  staff  1351 Nov  3 06:25 39706e8fed4db76e.json
+39706e8fed4db76e.json
+{
+ "schema_version": "1.1.0",
+ "carry_status": "resolved",
+ "predecessor_branch": "fm/pred",
+ "superseded_by_branch": "fm/succ",
+ "superseded_worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/1/proj",
+ "superseded_by_worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/3/proj",
+ "predecessor_unmerged_count": 2
+}
+
+===== Carry predecessor commits onto fm/succ, add own commit, real push through real R-13 =====
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/3/proj log --oneline -4
+b7d58f1 succ own commit
+865caae predecessor 1
+59930ad predecessor 0
+5076120 seed: vernant subset at c28a44a668
+[exit 0]
+$ lg -C $SB/treehouse/.treehouse/proj-f2ff61/3/proj push origin fm/succ
+R-13: main is not proven against the remote (origin does not resolve to the canonical github.com/MrGTV-love/vernant URL (git ls-remote --get-url origin)); judging against the local origin/main 50761208e1aa with the strict base-equality check.
+To $SB/origin.git
+ * [new branch]      fm/succ -> fm/succ
+[exit 0]
+origin fm/succ = b7d58f1; succ HEAD = b7d58f1
+
+===== NARROWNESS: ctl (no flag) carries the same commits while the marker exists: still BLOCK =====
+[exit 1]
+**R-13 BLOCK** — branch `refs/heads/fm/ctl` (local_sha 36a3a792) carries commits that are not its own.
+  2 commit(s) in this branch's ancestry are not on the local `origin/main`
+    865caae predecessor 1
+    59930ad predecessor 0
+error: failed to push some refs to '$SB/origin.git'
+
+===== REFUSAL ROW: predecessor detached HEAD =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+[exit 1]
+row=predecessor detached HEAD nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: predecessor on another branch =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj is on fm/pred-elsewhere, not its recorded branch fm/pred
+[exit 1]
+row=predecessor on another branch nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+predecessor restored to: refs/heads/fm/pred
+
+===== REFUSAL ROW: predecessor copy gone =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of ghost
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of ghost copy $SB/gone-copy is gone; a successor record needs the live predecessor
+[exit 1]
+row=predecessor copy gone nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: no predecessor record =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of nosuchtask
+
+===== REFUSAL ROW: no predecessor record =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of nosuchtask
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of nosuchtask has no task record in $FM_HOME/state
+[exit 1]
+17,19d16
+< state/.control-adv.lock
+< state/.control-adv.lock.owner.eWWxrO
+< state/.control-adv.lock.owner.eWWxrO/pid
+row=no predecessor record nonzero=yes message_ok=yes state+windows+pool_unchanged=no RESULT=no
+
+===== REFUSAL ROW: with --scout =====
+$ spawn adv $SB/proj --scout --owned-path README.md --harness sleep 86400 --successor-of pred
+error: --successor-of applies only to a fresh ship spawn, not a scout
+[exit 1]
+row=with --scout nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: with --relaunch on admitted succ =====
+$ spawn succ --relaunch --successor-of pred
+error: --successor-of applies only to a fresh ship spawn; a retained refusal keeps its declaration and --relaunch re-resolves it
+[exit 1]
+row=with --relaunch on admitted succ nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: with --secondmate =====
+$ spawn mate2 --secondmate --successor-of pred
+error: --successor-of applies only to a fresh ship spawn, not a secondmate
+[exit 1]
+row=with --secondmate nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== F4: the REAL verb refuses (marker store blocked by a plain file, PR #3604 S4 recipe) =====
+$ spawn retry $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@50761208e1aa5af286eb126a71416a1f383736ea origin=main@50761208e1aa5af286eb126a71416a1f383736ea selected=origin/main@50761208e1aa5af286eb126a71416a1f383736ea
+{
+  "blocked_reasons": [
+    "supersedes_marker_write_failed"
+  ],
+  "error": "[Errno 17] File exists: '$SB/state/worktree-supersedence'",
+  "reason": "supersedes_marker_write_failed",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task retry (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/retry/slot-provision-spawn.24296.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-retry retained; no worker admitted
+[exit 1]
+worktree=$SB/treehouse/.treehouse/proj-f2ff61/4/proj
+recovery=slot-provision-refused
+branch=fm/retry
+successor_of=pred
+slot_owned_path=README.md
+durable manifests for retry: 0
+lab bash
+fm-pred bash
+fm-ctl bash
+fm-succ bash
+fm-retry bash
+
+===== F4 retry while the predecessor is not live (detached): refuses, record unchanged =====
+$ spawn retry --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: unknown harness 'sleep'; pass a raw launch command to use an unverified adapter
+[exit 1]
+record unchanged: yes
+
+===== F4 supported retry: clear the blocker, fm-spawn retry --relaunch (no flag) =====
+$ spawn retry --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: unknown harness 'sleep'; pass a raw launch command to use an unverified adapter
+[exit 1]
+recovery=slot-provision-refused
+branch=fm/retry
+successor_of=pred
+39706e8fed4db76e.json fm/pred -> fm/succ resolved
+
+===== LATER RELAUNCH of the admitted successor succ with the predecessor NOT live: ordinary attestation, no --supersedes =====
+$ spawn succ --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task succ's recorded endpoint firstmate:fm-succ reads 'missing', but the processes holding the recorded worktree could not be read. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+[exit 1]
+successor_of lines in succ.meta: 1
+
+===== Real default Vernant hook store and ~/.treehouse untouched =====
+real store listing unchanged: yes
+~/.treehouse listing unchanged: yes
+
+===== F4 retry (named harness) while the predecessor is not live (detached): refuses naming pred, record unchanged =====
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+error: --relaunch of retry keeps its unfulfilled successor declaration of pred and cannot continue without it
+[exit 1]
+record unchanged: yes
+
+===== F4 supported retry: blocker already cleared; fm-spawn retry --relaunch --harness claude (no --successor-of) =====
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+{
+  "base_sha": "50761208e1aa5af286eb126a71416a1f383736ea",
+  "branch": "fm/retry",
+  "manifest_path": "$SB/durable/dc32247870cb59cc.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "retry",
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/4/proj"
+}
+skill selection for retry: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned retry harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-retry worktree=$SB/treehouse/.treehouse/proj-f2ff61/4/proj
+[exit 0]
+harness=claude
+branch=fm/retry
+slot_manifest=$SB/durable/dc32247870cb59cc.json
+successor_of=pred
+durable manifests for retry: 1
+marker 39706e8fed4db76e.json fm/pred -> fm/retry resolved $SB/treehouse/.treehouse/proj-f2ff61/4/proj
+
+===== LATER RELAUNCH of admitted succ (named harness) with the predecessor NOT live: ordinary attestation, no --supersedes =====
+$ spawn succ --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task succ's proven-gone tmux endpoint
+[exit 1]
+harness=sleep
+slot_manifest=$SB/durable/b8b07ecde6d9a617.json
+successor_of=pred
+
+===== F3 setup: admitted successor succ3 --successor-of pred (raw sleep worker) =====
+$ spawn succ3 $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task succ3 (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/succ3/slot-provision-spawn.11011.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-succ3 retained; no worker admitted
+[exit 1]
+succ3 successor_of: pred
+marker fm/pred -> fm/retry
+
+===== F3: stop the succ3 worker process, keep its endpoint; detach the predecessor; relaunch succ3 --harness claude =====
+fm-succ3 bash
+$ spawn succ3 --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+error: --relaunch of succ3 keeps its unfulfilled successor declaration of pred and cannot continue without it
+[exit 1]
+succ3 relaunch exit=1; successor_of lines: 1; recovery lines: 1
+marker byte-identical after relaunch (no --supersedes re-record): yes
+
+===== NOT ADVERTISED: project proj2 runs Vernant main 1cf0e36bbb provisioner (no --supersedes). Predecessor pred2 spawned with no flag =====
+$ spawn pred2 $SB/proj2 --mode local-only --yolo off --owned-path README.md --harness sleep 86400
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj2-04a3a4/1/proj2"
+}
+skill selection for pred2: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned pred2 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-pred2 worktree=$SB/treehouse/.treehouse/proj2-04a3a4/1/proj2
+[exit 0]
+pred2 branch in record: fm/pred2; copy HEAD: refs/heads/fm/pred2
+$ spawn adv2 $SB/proj2 --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred2
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of needs project proj2 to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; the successor record needs the Vernant verb
+[exit 1]
+34,40d33
+< state/.home-summary-error.nUNzAx
+< state/.home-summary-refresh.lock
+< state/.home-summary-refresh.lock.owner.4Dhkr0
+< state/.home-summary-refresh.lock.owner.4Dhkr0/monitor-record
+< state/.home-summary-refresh.lock.owner.4Dhkr0/pid
+< state/.home-summary.json.g2N96s
+< state/.lock-monitor.hold.MbYhnh
+row=not advertised nonzero=yes names_project_and_verb=yes state+windows+pool_unchanged=no adv2_meta_absent=yes
+
+===== F3: later relaunch of the ADMITTED successor retry; endpoint window recreated empty (agent exited); predecessor detached (not live) =====
+marker before: fm/pred -> fm/retry 
+retry meta before: recovery lines=0; successor_of=pred
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/dc32247870cb59cc.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task retry (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/retry/slot-provision-spawn.81564.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-retry retained; no worker admitted
+[exit 1]
+retry relaunch exit=1; successor_of lines: 1; recovery lines: 0
+marker byte-identical after relaunch (provisioner did not re-record with --supersedes): yes
+
+===== F3 clean: spawn succ4 --successor-of pred (used slots held so the pool hands out a fresh one) =====
+$ spawn succ4 $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+}
+skill selection for succ4: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned succ4 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-succ4 worktree=$SB/treehouse/.treehouse/proj-f2ff61/5/proj
+[exit 0]
+succ4 worktree: $SB/treehouse/.treehouse/proj-f2ff61/5/proj; successor_of=pred; recovery lines=0
+marker: fm/pred -> fm/succ4
+
+===== F3 clean: stop succ4's worker, keep its window; detach the predecessor; relaunch succ4 --harness claude =====
+$ spawn succ4 --relaunch --harness claude
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/3c9984025f1b8c36.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task succ4 (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/succ4/slot-provision-spawn.72249.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/5/proj and endpoint firstmate:fm-succ4 retained; no worker admitted
+[exit 1]
+succ4 relaunch exit=1; successor_of lines: 1; recovery lines: 0
+marker byte-identical after relaunch (no --supersedes re-record): yes
+
+===== CONTROL for F3: relaunch the plain (non-successor) admitted task ctl the same way =====
+ctl successor_of lines: 0
+$ spawn ctl --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/ctl/launch-brief.md records no ship branch; defaulting to legacy branch fm/ctl
+warning: $FM_HOME/data/ctl/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: ctl ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/2/proj and endpoint firstmate:fm-ctl retained; no worker admitted
+[exit 1]
+ctl relaunch exit=1
+
+===== CONTROL for F3: relaunch the plain (non-successor) admitted task ctl the same way =====
+ctl successor_of lines: 0
+$ spawn ctl --relaunch --harness claude
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/20797db08471c785.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task ctl (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/ctl/slot-provision-spawn.78995.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/2/proj and endpoint firstmate:fm-ctl retained; no worker admitted
+[exit 1]
+ctl relaunch exit=1
+real hook store unchanged: yes
+~/.treehouse unchanged: yes

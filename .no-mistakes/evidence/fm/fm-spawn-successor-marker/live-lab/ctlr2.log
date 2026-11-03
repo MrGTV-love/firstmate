@@ -1,0 +1,16 @@
+
+===== CONTROL for F3: relaunch the plain (non-successor) admitted task ctl the same way =====
+ctl successor_of lines: 0
+$ spawn ctl --relaunch --harness claude
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/20797db08471c785.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task ctl (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/ctl/slot-provision-spawn.78995.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/2/proj and endpoint firstmate:fm-ctl retained; no worker admitted
+[exit 1]
+ctl relaunch exit=1

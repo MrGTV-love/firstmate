@@ -1,0 +1,27 @@
+
+===== REFUSAL ROW: predecessor detached HEAD =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+[exit 1]
+row=predecessor detached HEAD nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: predecessor on another branch =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj is on fm/pred-elsewhere, not its recorded branch fm/pred
+[exit 1]
+row=predecessor on another branch nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+predecessor restored to: refs/heads/fm/pred
+
+===== REFUSAL ROW: predecessor copy gone =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of ghost
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of ghost copy $SB/gone-copy is gone; a successor record needs the live predecessor
+[exit 1]
+row=predecessor copy gone nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: no predecessor record =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of nosuchtask
+
+[killed]

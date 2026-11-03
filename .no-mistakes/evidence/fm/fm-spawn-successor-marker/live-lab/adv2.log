@@ -1,0 +1,24 @@
+
+===== NOT ADVERTISED: project proj2 runs Vernant main 1cf0e36bbb provisioner (no --supersedes). Predecessor pred2 spawned with no flag =====
+$ spawn pred2 $SB/proj2 --mode local-only --yolo off --owned-path README.md --harness sleep 86400
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj2-04a3a4/1/proj2"
+}
+skill selection for pred2: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned pred2 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-pred2 worktree=$SB/treehouse/.treehouse/proj2-04a3a4/1/proj2
+[exit 0]
+pred2 branch in record: fm/pred2; copy HEAD: refs/heads/fm/pred2
+$ spawn adv2 $SB/proj2 --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred2
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of needs project proj2 to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; the successor record needs the Vernant verb
+[exit 1]
+34,40d33
+< state/.home-summary-error.nUNzAx
+< state/.home-summary-refresh.lock
+< state/.home-summary-refresh.lock.owner.4Dhkr0
+< state/.home-summary-refresh.lock.owner.4Dhkr0/monitor-record
+< state/.home-summary-refresh.lock.owner.4Dhkr0/pid
+< state/.home-summary.json.g2N96s
+< state/.lock-monitor.hold.MbYhnh
+row=not advertised nonzero=yes names_project_and_verb=yes state+windows+pool_unchanged=no adv2_meta_absent=yes

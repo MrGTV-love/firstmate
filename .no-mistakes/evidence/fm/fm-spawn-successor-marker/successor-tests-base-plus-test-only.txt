@@ -1,0 +1,1 @@
+not ok - a declared successor of a live predecessor failed: error: unknown harness '--successor-of'; pass a raw launch command to use an unverified adapter: expected exit 0, got 1

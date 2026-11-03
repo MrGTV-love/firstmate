@@ -1,0 +1,2 @@
+bin/fm-slot-manifest-retire.py:228:    parser.add_argument("--state-dir", type=Path, default=Path(os.environ.get("CODEX_HOOK_STATE_DIR", f"/tmp/vernant-codex-hooks-{os.getuid()}")))
+bin/fm-teardown.sh:2777:    --owner-branch "$branch" --state-dir "${CODEX_HOOK_STATE_DIR:-/tmp/vernant-codex-hooks-$(id -u)}" \

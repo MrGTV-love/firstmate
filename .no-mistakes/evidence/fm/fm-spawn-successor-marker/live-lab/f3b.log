@@ -1,0 +1,22 @@
+
+===== F3: later relaunch of the ADMITTED successor retry; endpoint window recreated empty (agent exited); predecessor detached (not live) =====
+marker before: fm/pred -> fm/retry 
+retry meta before: recovery lines=0; successor_of=pred
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/dc32247870cb59cc.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task retry (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/retry/slot-provision-spawn.81564.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-retry retained; no worker admitted
+[exit 1]
+retry relaunch exit=1; successor_of lines: 1; recovery lines: 0
+marker byte-identical after relaunch (provisioner did not re-record with --supersedes): yes

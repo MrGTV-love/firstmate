@@ -1,0 +1,26 @@
+
+===== F3 clean: spawn succ4 --successor-of pred (used slots held so the pool hands out a fresh one) =====
+$ spawn succ4 $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+}
+skill selection for succ4: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned succ4 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-succ4 worktree=$SB/treehouse/.treehouse/proj-f2ff61/5/proj
+[exit 0]
+succ4 worktree: $SB/treehouse/.treehouse/proj-f2ff61/5/proj; successor_of=pred; recovery lines=0
+marker: fm/pred -> fm/succ4
+
+===== F3 clean: stop succ4's worker, keep its window; detach the predecessor; relaunch succ4 --harness claude =====
+$ spawn succ4 --relaunch --harness claude
+{
+  "blocked_reasons": [
+    "manifest_exists"
+  ],
+  "manifest_path": "$SB/durable/3c9984025f1b8c36.json",
+  "reason": "manifest_exists",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task succ4 (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/succ4/slot-provision-spawn.72249.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/5/proj and endpoint firstmate:fm-succ4 retained; no worker admitted
+[exit 1]
+succ4 relaunch exit=1; successor_of lines: 1; recovery lines: 0
+marker byte-identical after relaunch (no --supersedes re-record): yes

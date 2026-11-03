@@ -1,0 +1,47 @@
+
+===== F4 retry (named harness) while the predecessor is not live (detached): refuses naming pred, record unchanged =====
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+error: --relaunch of retry keeps its unfulfilled successor declaration of pred and cannot continue without it
+[exit 1]
+record unchanged: yes
+
+===== F4 supported retry: blocker already cleared; fm-spawn retry --relaunch --harness claude (no --successor-of) =====
+$ spawn retry --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+{
+  "base_sha": "50761208e1aa5af286eb126a71416a1f383736ea",
+  "branch": "fm/retry",
+  "manifest_path": "$SB/durable/dc32247870cb59cc.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "retry",
+  "state": "PASS",
+  "worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/4/proj"
+}
+skill selection for retry: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned retry harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-retry worktree=$SB/treehouse/.treehouse/proj-f2ff61/4/proj
+[exit 0]
+harness=claude
+branch=fm/retry
+slot_manifest=$SB/durable/dc32247870cb59cc.json
+successor_of=pred
+durable manifests for retry: 1
+marker 39706e8fed4db76e.json fm/pred -> fm/retry resolved $SB/treehouse/.treehouse/proj-f2ff61/4/proj
+
+===== LATER RELAUNCH of admitted succ (named harness) with the predecessor NOT live: ordinary attestation, no --supersedes =====
+$ spawn succ --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task succ's proven-gone tmux endpoint
+[exit 1]
+harness=sleep
+slot_manifest=$SB/durable/b8b07ecde6d9a617.json
+successor_of=pred

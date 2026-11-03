@@ -1,0 +1,33 @@
+{
+  "already_landed_via_squash": false,
+  "carry_command": "git -C $SB/treehouse/.treehouse/proj-f2ff61/5/proj cherry-pick --allow-empty --empty=keep 50761208e1aa5af286eb126a71416a1f383736ea..865caae3cd1dc54313090d93b91a204adcca8fed",
+  "carry_note": null,
+  "carry_status": "resolved",
+  "manual_carry_reason": null,
+  "manual_carry_required": false,
+  "net_delta_empty": false,
+  "owner_id": "succ4",
+  "predecessor_already_landed_count": 0,
+  "predecessor_branch": "fm/pred",
+  "predecessor_dirty": false,
+  "predecessor_dirty_paths": [],
+  "predecessor_dirty_total": 0,
+  "predecessor_head": "865caae3cd1dc54313090d93b91a204adcca8fed",
+  "predecessor_merge_commit_count": 0,
+  "predecessor_unmerged_commits": [
+    {
+      "sha": "59930adab129a2b9f76a2ee545a5586cb451d247",
+      "subject": "predecessor 0"
+    },
+    {
+      "sha": "865caae3cd1dc54313090d93b91a204adcca8fed",
+      "subject": "predecessor 1"
+    }
+  ],
+  "predecessor_unmerged_count": 2,
+  "recorded_at_iso": "2026-11-03T12:55:37Z",
+  "schema_version": "1.1.0",
+  "superseded_by_branch": "fm/succ4",
+  "superseded_by_worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/5/proj",
+  "superseded_worktree_path": "$SB/treehouse/.treehouse/proj-f2ff61/1/proj"
+}

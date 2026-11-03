@@ -1,0 +1,57 @@
+
+===== F4: the REAL verb refuses (marker store blocked by a plain file, PR #3604 S4 recipe) =====
+$ spawn retry $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+warning: $FM_HOME/data/retry/launch-brief.md records no ship branch; defaulting to legacy branch fm/retry
+warning: $FM_HOME/data/retry/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: retry ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@50761208e1aa5af286eb126a71416a1f383736ea origin=main@50761208e1aa5af286eb126a71416a1f383736ea selected=origin/main@50761208e1aa5af286eb126a71416a1f383736ea
+{
+  "blocked_reasons": [
+    "supersedes_marker_write_failed"
+  ],
+  "error": "[Errno 17] File exists: '$SB/state/worktree-supersedence'",
+  "reason": "supersedes_marker_write_failed",
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task retry (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/retry/slot-provision-spawn.24296.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-retry retained; no worker admitted
+[exit 1]
+worktree=$SB/treehouse/.treehouse/proj-f2ff61/4/proj
+recovery=slot-provision-refused
+branch=fm/retry
+successor_of=pred
+slot_owned_path=README.md
+durable manifests for retry: 0
+lab bash
+fm-pred bash
+fm-ctl bash
+fm-succ bash
+fm-retry bash
+
+===== F4 retry while the predecessor is not live (detached): refuses, record unchanged =====
+$ spawn retry --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: unknown harness 'sleep'; pass a raw launch command to use an unverified adapter
+[exit 1]
+record unchanged: yes
+
+===== F4 supported retry: clear the blocker, fm-spawn retry --relaunch (no flag) =====
+$ spawn retry --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: unknown harness 'sleep'; pass a raw launch command to use an unverified adapter
+[exit 1]
+recovery=slot-provision-refused
+branch=fm/retry
+successor_of=pred
+39706e8fed4db76e.json fm/pred -> fm/succ resolved
+
+===== LATER RELAUNCH of the admitted successor succ with the predecessor NOT live: ordinary attestation, no --supersedes =====
+$ spawn succ --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task succ's recorded endpoint firstmate:fm-succ reads 'missing', but the processes holding the recorded worktree could not be read. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+[exit 1]
+successor_of lines in succ.meta: 1
+
+===== Real default Vernant hook store and ~/.treehouse untouched =====
+real store listing unchanged: yes
+~/.treehouse listing unchanged: yes

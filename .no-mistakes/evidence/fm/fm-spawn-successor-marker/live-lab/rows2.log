@@ -1,0 +1,29 @@
+
+===== REFUSAL ROW: no predecessor record =====
+$ spawn adv $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of nosuchtask
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of nosuchtask has no task record in $FM_HOME/state
+[exit 1]
+17,19d16
+< state/.control-adv.lock
+< state/.control-adv.lock.owner.eWWxrO
+< state/.control-adv.lock.owner.eWWxrO/pid
+row=no predecessor record nonzero=yes message_ok=yes state+windows+pool_unchanged=no RESULT=no
+
+===== REFUSAL ROW: with --scout =====
+$ spawn adv $SB/proj --scout --owned-path README.md --harness sleep 86400 --successor-of pred
+error: --successor-of applies only to a fresh ship spawn, not a scout
+[exit 1]
+row=with --scout nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: with --relaunch on admitted succ =====
+$ spawn succ --relaunch --successor-of pred
+error: --successor-of applies only to a fresh ship spawn; a retained refusal keeps its declaration and --relaunch re-resolves it
+[exit 1]
+row=with --relaunch on admitted succ nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes
+
+===== REFUSAL ROW: with --secondmate =====
+$ spawn mate2 --secondmate --successor-of pred
+error: --successor-of applies only to a fresh ship spawn, not a secondmate
+[exit 1]
+row=with --secondmate nonzero=yes message_ok=yes state+windows+pool_unchanged=yes RESULT=yes

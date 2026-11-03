@@ -1,0 +1,20 @@
+
+===== F3 setup: admitted successor succ3 --successor-of pred (raw sleep worker) =====
+$ spawn succ3 $SB/proj --mode local-only --yolo off --owned-path README.md --harness sleep 86400 --successor-of pred
+  "state": "BLOCKED"
+}
+error: slot provisioner refused task succ3 (exit 2); no agent or ship transition admitted; report: $FM_HOME/data/succ3/slot-provision-spawn.11011.json
+error: assigned copy $SB/treehouse/.treehouse/proj-f2ff61/4/proj and endpoint firstmate:fm-succ3 retained; no worker admitted
+[exit 1]
+succ3 successor_of: pred
+marker fm/pred -> fm/retry
+
+===== F3: stop the succ3 worker process, keep its endpoint; detach the predecessor; relaunch succ3 --harness claude =====
+fm-succ3 bash
+$ spawn succ3 --relaunch --harness claude
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --successor-of pred copy $SB/treehouse/.treehouse/proj-f2ff61/1/proj has a detached HEAD, not its recorded branch fm/pred
+error: --relaunch of succ3 keeps its unfulfilled successor declaration of pred and cannot continue without it
+[exit 1]
+succ3 relaunch exit=1; successor_of lines: 1; recovery lines: 1
+marker byte-identical after relaunch (no --supersedes re-record): yes
