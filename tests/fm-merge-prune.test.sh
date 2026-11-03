@@ -2431,6 +2431,109 @@ scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot() { scn_spent_
 scn_intent_naming_the_task_branch_is_removed_by_the_fallback() { scn_spent_intent_is_removed branch-fallback; }
 scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone() { scn_spent_intent_is_removed branch-resume; }
 
+# Every valid spelling of a timezone-aware time that Vernant's reader accepts
+# is judged on its merits, end to end through a returned slot: expired ones are
+# spent by expiry, and a far-future one is spent only by naming the task's
+# recorded branch (the fallback is covered for one form of each).
+scn_spent_intent_alternate_date_forms_are_removed() {
+  local form
+  for form in 2000-01-01T00:00+00:00 2000-01-01T00:00:00+0000 '2000-01-01 00:00:00Z' 2000-01-01T00:00:00Z 2000-01-01T00:00:00.5+00:00 2000-01-01T00:00:00-05:00; do
+    intent_world
+    put_intent "$COPY" "$form" other/branch
+    printf 'ok\n' > "$W/stub.mode"
+    go
+    intent_removed "expired intent with expiry '$form'" || return 1
+  done
+  for form in 2999-01-01T00:00+00:00 2999-01-01T00:00:00+0000 '2999-01-01 00:00:00Z' 2999-01-01T00:00:00Z; do
+    intent_world
+    put_intent "$COPY" "$form" fm/t1
+    printf 'ok\n' > "$W/stub.mode"
+    go
+    intent_removed "unexpired intent naming the task branch with expiry '$form'" || return 1
+  done
+  intent_world
+  put_intent "$COPY" 2000-01-01T00:00+00:00 other/branch
+  go
+  intent_removed "fallback with expiry '2000-01-01T00:00+00:00'" || return 1
+  intent_world
+  put_intent "$COPY" '2999-01-01 00:00:00Z' fm/t1
+  go
+  intent_removed "fallback naming the task branch with expiry '2999-01-01 00:00:00Z'" || return 1
+  return 0
+}
+
+# The prune and Vernant's own reader (_parse_expiry: a non-blank string through
+# datetime.fromisoformat after Z becomes +00:00, with a timezone) must agree in
+# both directions on whether an intent is spent, for each expiry below with the
+# intent naming another branch and with it naming the task's branch.
+# prune=spent reader=refused would delete a copy on a file the owner rejects;
+# prune=keep reader=valid would keep a copy forever that the owner calls spent.
+scn_commit_intent_expiry_parity_with_the_owner_reader() {
+  make_world
+  cat > "$W/parity.py" <<'PY'
+import datetime, json, os, subprocess, sys
+bindir, work = sys.argv[1], sys.argv[2]
+os.makedirs(work, exist_ok=True)
+UTC = datetime.timezone.utc
+now = datetime.datetime.now(UTC)
+STAMPS = [
+    "2000-01-01T00:00:00+00:00", "2000-01-01T00:00+00:00", "2000-01-01T00:00:00+0000", "2000-01-01 00:00:00Z",
+    "2000-01-01T00:00:00Z", "2000-01-01T00:00:00.123456+00:00", "2000-01-01T00:00:00-05:00", "20000101T000000Z",
+    "2000-01-01T00Z", "2999-01-01T00:00:00+00:00", "2999-01-01T00:00+00:00", "2999-01-01 00:00:00Z",
+    "2999-01-01T00:00:00-05:00", "2000-01-01T00:00:00", "2000-01-01", "yesterday", "", "  ",
+    "2000-13-01T00:00:00Z", "2000-01-01T00:00:00+25:00", "2000-01-01T00:00:00 +00:00", 5, None, ["2000-01-01T00:00:00Z"],
+]
+
+def reader_expiry(value):
+    """Vernant scripts/hooks/commit_intent.py _parse_expiry: None when it refuses the value."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
+
+both_spent = both_kept = 0
+problems = []
+for i, stamp in enumerate(STAMPS):
+    for names_task_branch in (False, True):
+        branch = "fm/t1" if names_task_branch else "other/branch"
+        payload = {
+            "artifacttype": "CommitIntent", "schemaversion": "1.0.0", "branch": branch,
+            "head_sha": "cd916701e5388f24c741a905c7be6a1348cf4e03", "owned_paths": ["docs/a.md"],
+            "validators": ["ruff-check"], "expires_at_iso": stamp,
+        }
+        path = os.path.join(work, "i%d-%d.json" % (i, names_task_branch))
+        with open(path, "w") as fh:
+            json.dump(payload, fh)
+        got = subprocess.run(
+            ["bash", "-c", 'set -u; . "$1/fm-merge-prune-lib.sh"; FM_MP_TASK_BRANCH=fm/t1; fm_mp_commit_intent_spent "$2"', "_", bindir, path],
+            capture_output=True,
+        ).returncode == 0
+        expires = reader_expiry(stamp)
+        want = expires is not None and (expires <= now or names_task_branch)
+        if got and not want:
+            problems.append("prune=spent reader=refused-or-unspent for expiry %r naming the task branch %s" % (stamp, names_task_branch))
+        elif want and not got:
+            problems.append("prune=keep reader=valid-and-spent for expiry %r naming the task branch %s" % (stamp, names_task_branch))
+        elif got:
+            both_spent += 1
+        else:
+            both_kept += 1
+if problems:
+    print("\n".join(problems))
+    sys.exit(1)
+if both_spent < 12 or both_kept < 12:
+    print("the cases do not cover both verdicts (%d spent, %d kept)" % (both_spent, both_kept))
+    sys.exit(1)
+PY
+  out=$(python3 "$W/parity.py" "$BIN_DIR" "$W/parity-expiry" 2>&1) || why "$out" || return 1
+  return 0
+}
+
 # An intent that is not provably spent keeps the copy: unexpired and naming
 # another branch (a prefix of the task's, longer than it, different case), or
 # the task record names no branch.
@@ -2460,7 +2563,7 @@ scn_unspent_intent_is_kept() {
 scn_invalid_intent_is_kept() {
   local v
   for v in malformed array scalar empty type-missing type-wrong type-case \
-    expiry-missing expiry-number expiry-text expiry-no-timezone \
+    expiry-missing expiry-number expiry-text expiry-blank expiry-date-only expiry-no-timezone \
     schema-missing branch-missing head-missing owned-not-a-list validators-not-strings \
     owned-empty validators-empty owned-blank validators-blank owned-absolute owned-parent \
     directory; do
@@ -2476,6 +2579,8 @@ scn_invalid_intent_is_kept() {
       expiry-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.expires_at_iso)' ;;
       expiry-number) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = 5' ;;
       expiry-text) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = "yesterday"' ;;
+      expiry-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.expires_at_iso = "  "' ;;
+      expiry-date-only) put_intent "$COPY" 2000-01-01 fm/t1 ;;
       expiry-no-timezone) put_intent "$COPY" 2000-01-01T00:00:00 fm/t1 ;;
       schema-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.schemaversion)' ;;
       branch-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 'del(.branch)' ;;
@@ -3006,6 +3111,8 @@ test_fallback_keeps_an_unreadable_commit_intent() {
 test_fallback_keeps_lookalike_commit_intent_paths() { assert_scenario scn_lookalike_intent_paths_are_kept "a spent payload at .bak, .old.json, .claude/sub and the copy root keeps the copy with one wake"; }
 test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file() { assert_scenario scn_spent_intent_does_not_cover_another_ignored_file "a spent intent beside .env.local or .claude/private/x keeps the copy for the other file"; }
 test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch() { assert_scenario scn_symlinked_intent_path_stays_scratch "a symlink at .claude/commit-intent.json stays reclaimable as before"; }
+test_returned_slot_removes_a_commit_intent_in_any_valid_date_form() { assert_scenario scn_spent_intent_alternate_date_forms_are_removed "expired intents and branch-matched unexpired intents are spent in every timezone-aware spelling Vernant's reader accepts (no seconds, +HHMM, a space for T, Z, fractions, other offsets), end to end"; }
+test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways() { assert_scenario scn_commit_intent_expiry_parity_with_the_owner_reader "the prune calls an intent spent exactly when Vernant's reader would, and fails on prune=keep reader=valid as well as prune=spent reader=refused"; }
 test_commit_intent_predicate_refuses_a_symlink() { assert_scenario scn_symlinked_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a symlink at the path to that file"; }
 test_commit_intent_predicate_refuses_a_fifo_without_hanging() { assert_scenario scn_fifo_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a FIFO holding the same bytes without hanging"; }
 test_fallback_judges_a_nested_clones_commit_intent_on_its_own() { assert_scenario scn_nested_copy_intent_is_judged_on_its_own "a nested clone with a spent intent goes with the slot and one with an unspent intent naming another branch keeps the whole copy"; }
@@ -3196,7 +3303,8 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-project-lock-for-the-returned-copy $orch '  if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then' '  if false; then' scn_project_lock_busy_backs_off_for_the_returned_copy "project lock for the returned copy"
   expect_caught intent-expiry-not-checked $lib '    if expires.astimezone(datetime.timezone.utc) <= now:' '    if True:' scn_unspent_intent_is_kept "expiry check of a CommitIntent"
   expect_caught intent-artifact-type-not-checked $lib '    if not isinstance(doc, dict) or doc.get("artifacttype") != "CommitIntent":' '    if not isinstance(doc, dict):' scn_invalid_intent_is_kept "artifact-type check of a CommitIntent"
-  expect_caught intent-timezone-not-required $lib '(Z|[+-][0-9]{2}:[0-9]{2})", stamp' '(Z|[+-][0-9]{2}:[0-9]{2})?", stamp' scn_invalid_intent_is_kept "timezone requirement of a CommitIntent expiry"
+  expect_caught intent-timezone-not-required $lib '    if expires.tzinfo is None:
+        sys.exit(1)' '    pass' scn_invalid_intent_is_kept "timezone requirement of a CommitIntent expiry"
   expect_caught intent-symlink-followed $lib 'os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)' 'os.O_RDONLY | os.O_NONBLOCK' scn_symlinked_intent_is_refused_by_the_predicate "no-follow open of a CommitIntent"
   expect_caught intent-non-regular-file-read $lib '        if not stat.S_ISREG(os.fstat(fd).st_mode):' '        if False:' scn_fifo_intent_is_refused_by_the_predicate "regular-file check of a CommitIntent"
   expect_caught intent-branch-compared-by-prefix $lib 'doc["branch"] == task_branch' 'doc["branch"].startswith(task_branch)' scn_unspent_intent_is_kept "exact branch comparison of a CommitIntent"
@@ -3223,6 +3331,8 @@ test_unsafe_mutations_are_caught() {
 # shellcheck disable=SC2016 # Every mutation old/new text is literal shell source, never expanded here.
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
+  expect_caught intent-date-form-restricted $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_spent_intent_alternate_date_forms_are_removed "reader-parity date parsing of a CommitIntent expiry"
+  expect_caught intent-date-form-restricted-parity $lib '    expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))' '    expires = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")' scn_commit_intent_expiry_parity_with_the_owner_reader "two-way parity with the owner reader"
   expect_caught intent-allowance-removed $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_by_the_fallback "spent-intent allowance"
   expect_caught intent-allowance-removed-for-a-returned-slot $lib '      if fm_mp_commit_intent_spent "$copy/$rel"; then' '      if false; then' scn_spent_intent_is_removed_with_a_returned_slot "spent-intent allowance for a returned slot"
   expect_caught intent-branch-rule-removed $lib '    sys.exit(0 if task_branch and doc["branch"] == task_branch else 1)' '    sys.exit(1)' scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "naming-the-task-branch rule"
@@ -3755,6 +3865,8 @@ ALL_TESTS=(
   test_fallback_keeps_lookalike_commit_intent_paths
   test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file
   test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch
+  test_returned_slot_removes_a_commit_intent_in_any_valid_date_form
+  test_commit_intent_expiry_agrees_with_the_owner_reader_both_ways
   test_commit_intent_predicate_refuses_a_symlink
   test_commit_intent_predicate_refuses_a_fifo_without_hanging
   test_fallback_judges_a_nested_clones_commit_intent_on_its_own

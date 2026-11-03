@@ -392,16 +392,17 @@ FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
 # (not absolute, no .. part, not empty or .), and an ISO-8601 expires_at_iso
 # with a timezone (the checks of Vernant's own reader,
 # scripts/hooks/commit_intent.py), and that has expired (expires_at <= now, UTC)
-# or names FM_MP_TASK_BRANCH exactly. The expiry may put a space or T between
-# date and time, because that reader's _parse_expiry uses
-# datetime.fromisoformat, which accepts a space. The prune never calls an intent
-# spent when the reader refuses it; its date pattern is narrower than the
-# reader's, so it may keep a copy whose intent the reader would call valid.
+# or names FM_MP_TASK_BRANCH exactly. The expiry is read exactly as that
+# reader's _parse_expiry reads it: a non-blank string through
+# datetime.fromisoformat (after "Z" becomes "+00:00"), which must carry a
+# timezone. So the prune calls an intent spent when the reader would, for every
+# form it accepts (a space for T, no seconds, a +HHMM offset), and keeps the
+# copy for every form it refuses (a malformed string, no timezone).
 # The file is only read, from its path. Any other result, a read or parse
 # failure included, is 1.
 fm_mp_commit_intent_spent() {  # <path>
   python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<'PY' >/dev/null 2>&1
-import datetime, json, os, pathlib, re, stat, sys
+import datetime, json, os, pathlib, stat, sys
 path, task_branch = sys.argv[1], sys.argv[2]
 try:
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
@@ -435,11 +436,11 @@ try:
         if pure.is_absolute() or ".." in pure.parts or pure.as_posix() in ("", "."):
             sys.exit(1)
     stamp = doc.get("expires_at_iso")
-    if not isinstance(stamp, str) or not re.fullmatch(
-        r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})", stamp
-    ):
+    if not isinstance(stamp, str) or not stamp.strip():
         sys.exit(1)
     expires = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    if expires.tzinfo is None:
+        sys.exit(1)
     now = datetime.datetime.now(datetime.timezone.utc)
     if expires.astimezone(datetime.timezone.utc) <= now:
         sys.exit(0)
