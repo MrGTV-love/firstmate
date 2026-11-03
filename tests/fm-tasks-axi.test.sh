@@ -1433,11 +1433,15 @@ test_add_keeps_its_row_when_the_answer_cannot_be_read() {
   id=$ids
   assert_grep "$id" "$dir/home/data/backlog.md" "the minted row names an id that is not in the backlog"
   assert_contains "$rows" "$(printf '%s\t\tO4\t' "$id")" "the minted add recorded the wrong objective"
-  # A repeat add of an existing id is proved already present and adds no row.
-  PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 >/dev/null 2>&1 \
-    || fail "a repeat add of an existing id failed"
+  # A repeat add of an existing id leaves no new item to tie the objective to: it
+  # fails, names what to check, adds no row, and removes nothing.
+  out=$(PATH="$fakebin:$PATH" wrapper_from_code "$dir" add cap-plain "$(ftitle cap-plain)" --objective O2 2>&1) \
+    && fail "a repeat add with an unreadable answer succeeded: $out"
+  assert_contains "$out" "0 new items (none)" "the failure did not say no new item appeared"
+  assert_contains "$out" "of cap-plain" "the failure did not name the item to check"
   assert_equals 3 "$(wc -l < "$dir/home/data/backlog-review.tsv" | tr -d ' ')" "a repeat add of an existing id added a row"
-  pass "an add whose answer cannot be read still gets its objective row, a repeat add adds none"
+  assert_grep "cap-plain" "$dir/home/data/backlog.md" "the failed repeat add removed the existing item"
+  pass "an add whose answer cannot be read still gets its objective row, and an add tied to no new item fails and removes nothing"
 }
 
 # A title with no searchable word has nothing to compare, but a malformed or
@@ -1633,6 +1637,25 @@ test_add_judges_near_duplicate_titles() {
     || fail "a title matching only the stale Markdown decoy was refused through the adapter: $out"
   assert_grep "add ad-new" "$dir/home/.stubdata/calls" "the adapter did not receive the add"
   pass "fm-tasks-axi.sh refuses near-duplicate titles with the three best neighbours and both overrides, in every spelling, over the addressed backlog and a non-Markdown adapter"
+}
+
+# --backend takes a value, so it never shifts the id or the title the duplicate
+# check reads; a body file is read only for --dup-of, so a pipe reaches tasks-axi.
+test_add_backend_value_and_piped_body_file() {
+  local dir out before
+  dir=$(make_split intake-backend)
+  wrapper_from_code "$dir" add bk-base "$PAIR_BASE" --objective O7 >/dev/null || fail "could not file the base item"
+  before=$(cat "$dir/home/data/backlog.md")
+  out=$(refusal_of "$dir" "--backend before the id" add --backend markdown bid2 "$PAIR_ABOVE" --objective O1)
+  assert_contains "$out" "bk-base (Queued, overlap 0.75) $PAIR_BASE" "--backend before the id skipped the duplicate check"
+  out=$(refusal_of "$dir" "--backend before a minted title" add --backend markdown "$PAIR_ABOVE" --mint --objective O1)
+  assert_contains "$out" "bk-base (Queued, overlap 0.75) $PAIR_BASE" "--backend before a minted title skipped the duplicate check"
+  assert_equals "$before" "$(cat "$dir/home/data/backlog.md")" "a --backend add beside its duplicate changed the backlog"
+  out=$(wrapper_from_code "$dir" add bk-pipe "$(ftitle bk-pipe)" --objective O7 --body-file <(printf 'PIPED-BODY-LINE') 2>&1) \
+    || fail "an add with a piped body file failed: $out"
+  assert_grep "PIPED-BODY-LINE" "$dir/home/data/backlog.md" "the piped body did not reach the filed item"
+  assert_contains "$(cat "$dir/home/data/backlog-review.tsv")" "$(printf 'bk-pipe\t\tO7\t')" "the piped-body add lost its objective row"
+  pass "--backend never takes the place of the id or the title, and a piped body file reaches tasks-axi"
 }
 
 test_duplicate_check_boundaries_and_unreadable_sources() {
@@ -2497,6 +2520,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_add_keeps_its_row_when_the_answer_cannot_be_read
   test_empty_search_words_still_check_the_sources
   test_add_judges_near_duplicate_titles
+  test_add_backend_value_and_piped_body_file
   test_duplicate_check_boundaries_and_unreadable_sources
   test_dup_of_and_not_dup_do_what_the_refusal_says
   test_dup_of_repeat_needs_the_whole_block

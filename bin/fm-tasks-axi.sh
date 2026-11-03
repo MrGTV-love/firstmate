@@ -630,7 +630,7 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
       --help|-h) ADD_HELP=1; kept+=("$token") ;;
       --objective|--objective-reason|--dup-of|--not-dup) expect=$token ;;
       --objective=*|--objective-reason=*|--dup-of=*|--not-dup=*) set_intake_flag "${token%%=*}" "${token#*=}" ;;
-      --kind|--repo|--body|--body-file|--title|--blocked-by|--pr|--report|--priority|--prefix)
+      --kind|--repo|--body|--body-file|--title|--blocked-by|--pr|--report|--priority|--prefix|--backend)
         kept+=("$token"); expect=$token ;;
       --body=*) ADD_BODY=${token#*=}; kept+=("$token") ;;
       --body-file=*) body_file=${token#*=}; kept+=("$token") ;;
@@ -648,7 +648,7 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
     ADD_TITLE=${positionals[1]:-}
   fi
   [ -z "$flag_title" ] || ADD_TITLE=$flag_title
-  if [ -z "$ADD_BODY" ] && [ -n "$body_file" ]; then
+  if [ -n "$ADD_DUP_OF" ] && [ -z "$ADD_BODY" ] && [ -n "$body_file" ]; then
     ADD_BODY=$(cat -- "$body_file" 2>/dev/null) || fail "cannot read --body-file $body_file"
   fi
   ARGS=("${kept[@]}")
@@ -802,45 +802,39 @@ list_ids() {
 
 # The add's own output could not be read. Find the item it filed by comparing the
 # backlog now with the ids the duplicate check saw before the add. Sets ADDED_ID
-# to the one new id, or leaves it empty when nothing new appeared; returns 1 when
-# the add cannot be tied to one item, after removing what it can.
+# to the one new id; returns 1, naming the candidate items and removing nothing,
+# when the add cannot be tied to exactly one new item.
 recover_added_id() {
   local after new count
   ADDED_ID=
   if after=$(fm_backlog_row_list "$DATA") && [ -n "${ADD_PRE_IDS+x}" ]; then
     new=$(printf '%s\n' "$after" | list_ids | grep -Fxv -f <(printf '%s\n' "$ADD_PRE_IDS") || true)
     count=$(printf '%s' "$new" | grep -c . || true)
-    if [ "$count" -eq 0 ]; then
-      return 0
-    elif [ "$count" -eq 1 ]; then
+    if [ "$count" -eq 1 ]; then
       ADDED_ID=$new
       return 0
     fi
-    printf 'fm-tasks-axi: tasks-axi added an item but its answer could not be read, and %s new items now exist, so the objective could not be tied to one of them; check data/backlog-review.tsv against tasks-axi list\n' "$count" >&2
+    new=$(printf '%s' "$new" | tr '\n' ' ' | sed 's/ $//')
+    printf 'fm-tasks-axi: the answer of the add%s could not be read, and the backlog now holds %s new items (%s), so no objective was recorded; check them with tasks-axi list and data/backlog-review.tsv\n' \
+      "${ADD_ID:+ of $ADD_ID}" "$count" "${new:-none}" >&2
     return 1
   fi
-  if [ -n "$ADD_ID" ] && fm_backlog_mutate "$DATA" rm "$ADD_ID" 2>/dev/null; then
-    printf 'fm-tasks-axi: tasks-axi added %s but its answer could not be read and the backlog could not be listed, so the item was removed again; nothing is filed\n' "$ADD_ID" >&2
-  else
-    printf 'fm-tasks-axi: tasks-axi added an item but its answer could not be read and the backlog could not be listed, so its objective was not recorded; run tasks-axi list, remove the item, and file it again\n' >&2
-  fi
+  printf 'fm-tasks-axi: the answer of the add%s could not be read and the backlog could not be listed, so no objective was recorded; check %s with tasks-axi list and data/backlog-review.tsv\n' \
+    "${ADD_ID:+ of $ADD_ID}" "${ADD_ID:-the new item}" >&2
   return 1
 }
 
 # One line per filed item in data/backlog-review.tsv: id, review-by (empty),
-# objective, and reason. An item never stays filed without its row: a row that
-# cannot be written removes the item again, an add whose answer cannot be read is
-# matched to the new item by id, and an add that cannot be matched fails.
+# objective, and reason. A row that cannot be written removes the item again, an
+# add whose answer cannot be read is matched to the one new item by id, and an add
+# that cannot be matched fails, naming the items to check, and removes nothing.
 intake_record() {  # <captured-add-stdout-file>
   local reason row status=0
   added_fields "$1" || status=$?
   case "$status" in
     0) ;;
     3) return 0 ;;
-    *)
-      recover_added_id || return 1
-      [ -n "$ADDED_ID" ] || return 0
-      ;;
+    *) recover_added_id || return 1 ;;
   esac
   reason=$(printf '%s' "$ADD_REASON" | tr '\t\n' '  ')
   row=$(printf '%s\t\t%s\t%s' "$ADDED_ID" "$ADD_OBJECTIVE" "$reason")

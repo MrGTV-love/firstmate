@@ -719,15 +719,15 @@ if shutil.which('tasks-axi'):
     assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2', first + '-3']
     review = [line.split('\t') for line in (owner / 'data/backlog-review.tsv').read_text().splitlines()]
     assert (first + '-3', 'O7') == (review[-1][0], review[-1][2]), review
-    # Three fm-timeout neighbours fill the refusal's list, so a hand-filed item for the same work that ranks
-    # fourth is never shown; the refusal goes to the operator and nothing is filed.
+    # Three fm-timeout neighbours fill the refusal's list, so a hand-filed item for the same work ranks fourth
+    # and is not shown; the filer reads it from the backlog, names it to the operator, and files nothing.
     hidden_key = 'worker.lintfix'
     hidden_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + hidden_key).encode()).hexdigest()[:16]
     subprocess.run(['tasks-axi', 'add', 'hand-raise-lintfix', 'Raise the worker lintfix timeout', '--kind', 'ship'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
     worker('timeout', hidden_key, 1200000, '--event-id', 'x1')
     result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', hidden_key, '1200000', '--event-id', 'x2'], env=worker_env, cwd=workrepo, capture_output=True, text=True)
     out = result.stdout + result.stderr
-    assert result.returncode != 0 and 'overlaps' in out and out.count(first) >= 3 and 'hand-raise-lintfix' not in out, (result.returncode, out)
+    assert result.returncode != 0 and out.count(first) >= 3 and 'hand-raise-lintfix may be the same work filed by hand' in out, (result.returncode, out)
     assert hidden_task not in (owner / 'data/backlog.md').read_text()
     owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
     assert not any(r.get('event') == 'filed' and r.get('key') == hidden_key for r in owner_rows)
@@ -741,7 +741,50 @@ if shutil.which('tasks-axi'):
     assert hand_task not in (owner / 'data/backlog.md').read_text()
     owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
     assert not any(r.get('event') == 'filed' and r.get('key') == hand_key for r in owner_rows)
-    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item, a hand-filed or possibly hidden neighbour goes to the operator, and an unrecorded filing is never called filed')
+    print('ok - worker timings and repeated-timeout work reach the owning home, every recurrence files new work linked to the previous item, a hand-filed neighbour goes to the operator even when the refusal hides it, and an unrecorded filing is never called filed')
+
+    # Seven open timeout items for other keys fill every refusal's list, as in the live home. Filing keeps
+    # working: a new key is filed past the refusal, a recurrence after its item closed files the next item,
+    # and an open timeout item under the same title (filed from another host) takes the occurrence.
+    seven = tmp / 'owner-seven'
+    (seven / 'data').mkdir(parents=True)
+    (seven / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+    (seven / 'bin').symlink_to(root / 'bin')
+    seven_env = dict(worker_env, FM_DURATION_HOME=str(seven))
+    seven_raw = dict(seven_env, TASKS_AXI_FILE=str(seven / 'data/backlog.md'))
+
+    def seven_timeout(timeout_key, event_id):
+        result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', timeout_key, '1200000', '--event-id', event_id], env=seven_env, cwd=workrepo, capture_output=True, text=True)
+        assert result.returncode == 0, (timeout_key, event_id, result.stdout, result.stderr)
+
+    def seven_filed(timeout_key):
+        ledger_rows = [json.loads(line) for line in (seven / 'data/command-durations.jsonl').read_text().splitlines()]
+        return [r['task'] for r in ledger_rows if r.get('event') == 'filed' and r.get('key') == timeout_key]
+
+    for i in range(7):
+        subprocess.run(['tasks-axi', 'add', f'fm-timeout-other{i}', f'Measure and repair repeated timeout: {REPO} other.key{i}', '--kind', 'ship'], cwd=seven, env=seven_raw, check=True, capture_output=True)
+    fresh = 'seven.fresh'
+    fresh_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + fresh).encode()).hexdigest()[:16]
+    seven_timeout(fresh, 'f1')
+    seven_timeout(fresh, 'f2')
+    assert seven_filed(fresh) == [fresh_task]
+    assert f'- [ ] {fresh_task} ' in (seven / 'data/backlog.md').read_text()
+    subprocess.run(['tasks-axi', 'done', fresh_task, '--note', 'limit repaired', '--keep', '5'], cwd=seven, env=seven_raw, check=True, capture_output=True)
+    seven_timeout(fresh, 'f3')
+    assert seven_filed(fresh) == [fresh_task, fresh_task + '-2']
+    shown = subprocess.run([str(seven / 'bin/fm-tasks-axi.sh'), 'show', fresh_task + '-2', '--full'], env=dict(seven_env, FM_HOME=str(seven)), capture_output=True, text=True, check=True)
+    assert 'state: queued' in shown.stdout and fresh_task in shown.stdout
+    review = [line.split('\t') for line in (seven / 'data/backlog-review.tsv').read_text().splitlines()]
+    assert [(r[0], r[2]) for r in review] == [(fresh_task, 'O7'), (fresh_task + '-2', 'O7')], review
+    shared = 'seven.shared'
+    shared_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + shared).encode()).hexdigest()[:16]
+    subprocess.run(['tasks-axi', 'add', 'fm-timeout-otherhost', f'Measure and repair repeated timeout: {REPO} {shared}', '--kind', 'ship'], cwd=seven, env=seven_raw, check=True, capture_output=True)
+    seven_timeout(shared, 's1')
+    seven_timeout(shared, 's2')
+    assert seven_filed(shared) == ['fm-timeout-otherhost']
+    assert shared_task not in (seven / 'data/backlog.md').read_text()
+    assert len((seven / 'data/backlog-review.tsv').read_text().splitlines()) == 2
+    print('ok - with seven open timeout items, a new key is filed, a recurrence files the next item, and an open item under the same title takes the occurrence')
 
 # Repeated-timeout work goes to the project registered under the repository's name in
 # the owning home's data/projects.md, and to firstmate when there is no such project.
