@@ -1683,6 +1683,7 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not the copy the driver was asked about any more; the task was not closed." >&2
     return 1
   fi
+  teardown_own_nested_other_repos || return 1
   teardown_own_copy_disposable "$copy" || return 1
   dir=$(teardown_retained_preserve_dir "$copy") || return 1
   if ! teardown_retained_snapshot "$copy"; then
@@ -1878,9 +1879,6 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     teardown_retained_confirm "$slot" "$copy"
     return
   fi
-  # The driver can keep the tree and then the task closes around it, so a copy
-  # that holds another repository is refused before the driver is asked.
-  teardown_own_nested_other_repos || return 1
   lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || lock_hash=
   identity=$(copy_identity "$copy") || identity=
   teardown_preserve_ignored "$copy" || {

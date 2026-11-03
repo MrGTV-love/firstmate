@@ -6622,7 +6622,6 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
     case "$variant" in
       c1-input|same-repo-worktree|driver-path-directory) want="exit=0 task-record=removed backlog=done copy=kept slot-returned=no record=written driver-calls=1 tars=1" ;;
       unlanded|dirty) want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=0 tars=0" ;;
-      other-repo) want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=0 tars=0" ;;
       *) want="exit=nonzero task-record=kept backlog=in_flight copy=kept slot-returned=no record=none driver-calls=1 tars=1" ;;
     esac
     assert_equals "$want" "$plain" "$variant: wrong disposition: $plain"
