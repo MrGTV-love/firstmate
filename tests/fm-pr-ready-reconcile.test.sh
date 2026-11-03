@@ -484,7 +484,11 @@ for rejection in draft unreachable unreadable-forge; do
     git -C "$CASE/project" commit -q --allow-empty -m unpublished
     HEAD=$(git -C "$CASE/project" rev-parse HEAD)
   fi
-  [ "$rejection" != unreadable-forge ] || : > "$CASE/unreadable-forge"
+  if [ "$rejection" = unreadable-forge ]; then
+    # The no-mistakes pipeline pushed this head to the forge, which no local ref names.
+    printf '%s\n' "$HEAD" > "$CASE/forge-head"
+    : > "$CASE/unreadable-forge"
+  fi
   before=$(shasum -a 256 "$CASE/home/state/ready.meta")
   out=$(run_pass)
   [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail "$rejection refusal not printed exactly once"
