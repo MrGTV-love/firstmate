@@ -80,7 +80,8 @@
 # the future, or its branch equals the task's recorded branch
 # (FM_MP_TASK_BRANCH, set by bin/fm-merge-prune.sh before the proofs run).
 # Anything else about that file, a failed read or parse included, keeps the
-# copy. The preserve
+# copy, except that a symlink at that path stays scratch like any ignored
+# symlink. The preserve
 # list is .claude/bug-evidence (slot-specific closeout records) and
 # .claude/channel-outbox (rate files). Before removal those are copied to the
 # task's data folder with SHA-256 checksums and verified there.
@@ -386,7 +387,7 @@ fm_mp_tooling_path() {  # <real-copy> <relative-path>
 FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
 
 # Whether the file at <path> is a Vernant CommitIntent that is spent: a regular
-# file whose JSON is an object with artifacttype CommitIntent, non-empty string
+# file whose JSON is an object with artifacttype CommitIntent, non-blank string
 # schemaversion, branch and head_sha, owned_paths and validators that are each
 # a non-empty list of non-blank strings, every owned_paths item repo-relative
 # (not absolute, no .. part, not empty or .), and an ISO-8601 expires_at_iso
@@ -507,8 +508,9 @@ EOF
     # Firstmate's own hook files, and a clone under .claude/worktrees, which the
     # search for nested copies proves on its own.
     .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;
-    # The one exact path of a spent Vernant CommitIntent; any other shape of
-    # that file falls through to the keep verdict below.
+    # The one exact path of a spent Vernant CommitIntent; a symlink there returned
+    # above, and any other shape of that file falls through to the keep verdict
+    # below.
     .claude/commit-intent.json)
       if fm_mp_commit_intent_spent "$copy/$rel"; then
         return 0
