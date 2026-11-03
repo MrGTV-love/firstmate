@@ -29,6 +29,8 @@ DEFAULT_AGES = {
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
+# Finished or unaccepted work with an open record adds rows, never a timer: each borrows an existing age class.
+AGE_CLASS = {"pending_cleanup": "interrupted_teardown", "pending_acceptance": "open_pr"}
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
                  "secondmates must preserve the request correlation in their parent-channel reply. "
@@ -299,7 +301,7 @@ class Collector:
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
-        limit = self.ages[category]
+        limit = self.ages[AGE_CLASS.get(category, category)]
         row = dict(id=identity, category=category, subject=str(subject), owner=owner,
                    next_action=action, age_seconds=age, limit_seconds=limit,
                    overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
@@ -1077,6 +1079,82 @@ class Collector:
                 value = line[len("spawn_gen="):]
         return value
 
+    def home_label(self):
+        """The home that owns this ledger's records: a secondmate's id in its own home, else the primary."""
+        if self.lane:
+            first = (self.home / ".fm-secondmate-home").read_text().splitlines()[:1]
+            return re.sub(r"\s", "", first[0]) if first else "secondmate"
+        return "firstmate"
+
+    def merge_prune_refusal(self, task_id):
+        """The last refusal bin/fm-merge-prune.sh kept for this task's plain teardown, or empty."""
+        try:
+            lines = (self.state / (task_id + ".merge-prune")).read_text().splitlines()
+        except OSError:
+            return ""
+        fields = dict(line.split("=", 1) for line in lines if "=" in line)
+        return fields.get("reason", "") if fields.get("state") == "retained" else ""
+
+    def finished_class(self, task):
+        """Why a task whose deliverable is landed counts as finished, in words for the row's evidence."""
+        if self.captain_dropped(task):
+            return "a recorded ruling drops or supersedes it", None
+        if task["kind"] == "scout":
+            return "its scout report is delivered", None
+        pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
+        if pr and pr.get("merged_at"):
+            return "its PR merged: " + task["pr"]["url"], epoch(pr.get("merged_at"))
+        return "its work is already on the default branch", None
+
+    def completion_rows(self):
+        """Every open record whose work was reported done has a row until its record is gone.
+
+        A deliverable that is landed, delivered or ruled moot leaves the record awaiting plain teardown
+        (pending_cleanup); a done report with no accepted deliverable and no other row for the task awaits
+        acceptance (pending_acceptance). Both are derived from the records alone, so a restart finds the same
+        rows. A declared wait, an unanswered decision and a worker that is still running (a no-mistakes pipeline
+        runs after the handoff `done`) own the task's next move and add neither; a persistent secondmate is not in
+        self.tasks.
+        """
+        owner = "home:" + self.home_label()
+        for task in self.tasks:
+            ident = task["id"]
+            _, verb, open_decision, pause_limit, _, _ = self.report_status(ident)
+            state = task["current_state"].get("state")
+            closed = any(r["id"] == ident and r.get("state") == "done" for r in self.backlog) \
+                or self.captain_dropped(task)
+            if not (closed or verb == "done" or state == "done") or open_decision or pause_limit:
+                continue
+            if state in ("working", "paused", "blocked", "parked") and not closed:
+                continue
+            since = mtime(self.state / (ident + ".status")) or mtime(self.state / (ident + ".meta"))
+            landed = self.source("finished deliverable " + ident, self.deliverable_landed, task)
+            if landed:
+                why, merged_at = self.finished_class(task)
+                refusal = self.merge_prune_refusal(ident)
+                action = f"run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+                if task["kind"] == "scout":
+                    action = f"accept the delivered report, then run plain bin/fm-teardown.sh {ident}; the record stays open until it succeeds"
+                if refusal:
+                    action = (f"plain bin/fm-teardown.sh {ident} was refused: {refusal}; the owning home clears that "
+                              "cause and runs it again (dropping the work needs the captain's own words)")
+                self.add("pending_cleanup", ident, action, merged_at or since, owner,
+                         evidence=f"finished: {why}; the record is still open")
+                continue
+            pr_url = task["pr"].get("url")
+            covered = any(r["category"] not in ("silent_report", "coverage")
+                          and (r["subject"] == ident or r["subject"].startswith(ident + ":") or r["subject"] == pr_url)
+                          for r in self.rows.values())
+            if covered:
+                continue
+            gone = task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing")
+            action = (f"review and accept the delivered work of {ident}, or relaunch its worker with "
+                      f"bin/fm-control.sh {ident} relaunch if it is incomplete" if gone else
+                      f"review and accept the delivered work of {ident}; its worker is still live")
+            self.add("pending_acceptance", ident, action, since, owner,
+                     evidence="the last report was done and no accepted or landed deliverable is on record"
+                              + ("; landing could not be read" if landed is None else ""))
+
     def interrupted_teardown_rows(self):
         """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
         for marker in self.state_files:
@@ -1120,6 +1198,7 @@ class Collector:
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
         self.source("interrupted teardowns", self.interrupted_teardown_rows)
+        self.source("completion", self.completion_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))

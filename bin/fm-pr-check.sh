@@ -3,7 +3,10 @@
 # exact pr_head=<sha> when available, then atomically arm a static merge poll.
 # Refuses when bin/fm-dod-lib.sh will not accept the named head as reachable
 # outside the worker's disposable copy; in no-mistakes mode a forge-reported
-# head is that named head and is already stored on the forge.
+# head is that named head and is already stored on the forge. In any mode a
+# forge-reported PR head that is exactly this copy's HEAD is held by the forge
+# too, so it passes even after the forge deleted the PR branch at merge and a
+# fetch pruned its remote-tracking ref; a differing HEAD still takes the gate.
 # A merge call (FM_PR_CHECK_MERGE=1) on a GitHub task that owns several pull
 # requests (bin/fm-dod-lib.sh fm_dod_task_owns_several_prs) is judged on the
 # forge's head for the PR it names instead, because the worker copy's HEAD
@@ -200,7 +203,18 @@ case "$PROVIDER:$MODE" in
   *:no-mistakes|*:) DONE_LINE="done: PR $URL checks green" ;;
   *) DONE_LINE="done: PR $URL" ;;
 esac
-if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
+# A forge that reports this copy's exact HEAD as the PR's head holds the named
+# head, so it is stored outside the disposable copy even when no remote-tracking
+# ref names it: the forge deleted the PR branch at a squash merge and a later
+# fetch pruned the ref. Only an exact match counts. A later unpushed commit makes
+# the copy's HEAD differ from the forge's head, and the gate below then runs.
+COPY_HEAD=
+if [ -n "$PR_HEAD" ] && [ -n "$WT" ] && [ -d "$WT" ]; then
+  COPY_HEAD=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null || true)
+fi
+if [ -n "$COPY_HEAD" ] && [ "$COPY_HEAD" = "$PR_HEAD" ]; then
+  :
+elif { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
   # A merge call on a task that owns several PRs names one PR, and the forge
   # holds that PR's head: the worker copy's HEAD may rest on another PR, on a
   # local tip carrying several PRs' content, or on a PR that already merged and

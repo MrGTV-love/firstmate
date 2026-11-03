@@ -1370,15 +1370,24 @@ fm_dod_should_gate_ship_done() {  # <kind> <mode> <line>
   esac
 }
 
-# The PR/MR URL from a `done: PR <url>...` note, or empty.
+# The PR/MR URL a `done:` note names, or empty: the word after `PR `, or the
+# note's first word when that word is itself a pull request, merge request or
+# change URL (a close-evidence note leads with it). A URL later in the note, an
+# issue URL and a note with no URL name no PR. The bare form is judged by
+# fm_pr_url_parse in a subshell, so the caller's FM_PR_* values stay as they were.
 fm_dod_pr_url_from_done_note() {  # <note>
   local note=$1 url
   case "$note" in
-    PR\ https://*|PR\ http://*) ;;
+    PR\ https://*|PR\ http://*)
+      url=${note#PR }
+      url=${url%% *}
+      ;;
+    https://*)
+      url=${note%% *}
+      ( fm_pr_url_parse "$url" ) || return 1
+      ;;
     *) return 1 ;;
   esac
-  url=${note#PR }
-  url=${url%% *}
   printf '%s\n' "$url"
 }
 

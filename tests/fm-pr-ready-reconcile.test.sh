@@ -213,6 +213,8 @@ pass 'refusal queues one check wake per reason, skips the forge for ten minutes,
 # changes from pass to pass; only the registrar's own refusal is the reason.
 make_case guard-banner
 write_ship ready ship direct-PR
+# The forge holds the head the worker published; the copy has moved on past it.
+printf '%s\n' "$HEAD" > "$CASE/forge-head"
 git -C "$CASE/project" commit -q --allow-empty -m unpublished
 cat > "$CASE/root/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
@@ -479,6 +481,8 @@ for rejection in draft unreachable unreadable-forge; do
   write_ship ready ship "$mode"
   [ "$rejection" != draft ] || : > "$CASE/draft"
   if [ "$rejection" != draft ]; then
+    # The forge holds only the head the worker published; the copy moves past it.
+    [ "$rejection" != unreachable ] || printf '%s\n' "$HEAD" > "$CASE/forge-head"
     git -C "$CASE/project" commit -q --allow-empty -m unpublished
     HEAD=$(git -C "$CASE/project" rev-parse HEAD)
   fi
@@ -494,7 +498,7 @@ for rejection in draft unreachable unreadable-forge; do
   case "$rejection" in
     draft) rm "$CASE/draft" ;;
     unreadable-forge) rm "$CASE/unreadable-forge" ;;
-    unreachable) git -C "$CASE/project" update-ref refs/remotes/origin/main "$HEAD" ;;
+    unreachable) rm -f "$CASE/forge-head"; git -C "$CASE/project" update-ref refs/remotes/origin/main "$HEAD" ;;
   esac
   age_refusal ready 540
   [ -z "$(run_pass)" ] || fail "$rejection healed cause retried inside the interval"

@@ -2014,6 +2014,8 @@ v4_task('wait-held', copy=wait_held, verb='captain-held', note='awaiting captain
 unfin = v4_copy('unfin-dirty', dirty=True)
 v4_task('unfin-dirty', copy=unfin, verb='working', note='building', state='working', live=True, age=2000)
 v4_task('pend-ship', copy=world / 'v4-nowhere', note='delivered, branch pushed')
+pend_run = v4_copy('pend-run', work=False)
+v4_task('pend-run', copy=pend_run, note='handoff: pipeline starting', state='working', live=True)
 v4_task('pend-scout', kind='scout', copy=None, note='delivered, report pending review')
 mate_home = world / 'v4-mate'
 for name in ('state', 'data', 'config', 'projects'):
@@ -2064,12 +2066,14 @@ for name in ('fin-merged', 'fin-content', 'fin-scout', 'fin-moot'):
     assert row['owner'] == 'home:firstmate', row
     assert f'bin/fm-teardown.sh {name}' in row['next_action'] and '--force' not in row['next_action'] and '--drop-file' not in row['next_action'], row
     assert row['overdue'] and not row.get('informational'), ('done must not suppress a finished task past its age class', row)
-    assert row['limit_seconds'] in set(DEFAULT_AGES_FOR_TEST.values()), ('a new timer was introduced', row)
+    assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['interrupted_teardown'], ('cleanup must follow the existing teardown age class', row)
+assert 'pending_cleanup' not in DEFAULT_AGES_FOR_TEST and 'pending_acceptance' not in DEFAULT_AGES_FOR_TEST, 'a new age class was added'
+assert 'accept' in cleanup['fin-scout']['next_action'], cleanup['fin-scout']
 refused = cleanup['fin-refused']
 assert refused['owner'] == 'home:firstmate' and refusal in refused['next_action'], ('the refusal text must stay on the row', refused)
 assert 'bin/fm-teardown.sh fin-refused' in refused['next_action'], refused
 # A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
-for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate'):
+for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate', 'pend-run'):
     assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))
 for name in ('wait-paused', 'wait-held', 'v4-mate'):
     assert not any(r['overdue'] for r in mine(name)), ('a waiting task or idle mate reported overdue because it is quiet', name, mine(name))
@@ -2081,6 +2085,7 @@ assert {'pend-ship', 'pend-scout'} <= set(acceptance), ('done with no accepted d
 for name in ('pend-ship', 'pend-scout'):
     row = acceptance[name]
     assert row['owner'] == 'home:firstmate' and name in row['next_action'] and row['overdue'], row
+    assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['open_pr'], ('acceptance must follow the existing review age class', row)
     assert 'accept' in row['next_action'] or 'review' in row['next_action'], row
 # The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
 again = ledger4()

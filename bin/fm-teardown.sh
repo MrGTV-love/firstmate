@@ -160,9 +160,11 @@
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
-# up a merged PR whose head branch matches the worktree's branch, fetching its head
-# via refs/pull/<n>/head when the branch itself was deleted. So a missing pr= never
-# by itself causes a false refusal of landed work.
+# up a merged PR whose head branch matches the worktree's branch (a detached copy
+# uses the record's own branch=, else fm/<id>), fetching its head via
+# refs/pull/<n>/head when the branch itself was deleted. The lookup only finds the
+# PR; the containment proofs still decide whether this copy's work is in its head.
+# So a missing pr= never by itself causes a false refusal of landed work.
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
 # Uncommitted changes are never landed; dirty refusals distinguish untracked-only
@@ -3379,6 +3381,10 @@ validate_worktree_teardown_safety() {
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
     if [ -z "$branch" ]; then
       branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      # A detached copy (a direct-PR slot copy has no local branch) names no
+      # branch in HEAD, so the PR lookup uses the record's own: branch=, else
+      # fm/<id>. Only the lookup changes; the same containment proof decides.
+      [ "$branch" != HEAD ] || branch=$(teardown_record_branch)
       TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=$branch
     fi
     if ! work_is_landed "$branch"; then
