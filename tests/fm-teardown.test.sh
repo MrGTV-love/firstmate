@@ -4197,6 +4197,81 @@ test_train_member_reread_failure_is_unknown() {
   pass "a failed re-read of the CLOSED member is unknown, retry"
 }
 
+# train_pipeline_input_case <name>: the live d1 B5 r4 shape. The copy is the input
+# of a run that rewrote it and pushed the member head, so no patch of "add a" is in
+# the train, the member is CLOSED, and a merged train lists that pushed head.
+train_pipeline_input_case() {
+  local tmp
+  TRAIN_CASE=$(make_case "$1")
+  write_meta "$TRAIN_CASE" no-mistakes ship
+  append_pr_meta_url "$TRAIN_CASE"
+  TRAIN_MEMBER_HEAD=$(setup_pipeline_rewritten_history "$TRAIN_CASE" rewritten-input)
+  add_gh_train_fake "$TRAIN_CASE" CLOSED "$TRAIN_MEMBER_HEAD"
+  tmp="$TRAIN_CASE/_train"
+  git clone -q "$TRAIN_CASE/origin.git" "$tmp"
+  git -C "$tmp" fetch -q origin refs/pull/7/head
+  git -C "$tmp" checkout -q -b train origin/main~1
+  git -C "$tmp" -c user.email=t@t -c user.name=t merge -q --no-ff --no-edit "$TRAIN_MEMBER_HEAD"
+  TRAIN_HEAD=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin HEAD:refs/pull/9/head
+  rm -rf "$tmp"
+  git -C "$TRAIN_CASE/wt" fetch -q origin refs/pull/7/head refs/pull/9/head
+  train_default_list "$TRAIN_CASE"
+  add_logging_treehouse "$TRAIN_CASE"
+}
+
+test_train_pipeline_input_copy_allows_only_with_the_run_record() {
+  local copy_head
+  train_pipeline_input_case train-pipeline-input
+  seed_backlog_in_flight "$TRAIN_CASE"
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  assert_train_refused "$TRAIN_CASE" "train-pipeline-input-no-record" "copy's work is not proven present"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-pipeline-input-no-record: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-pipeline-input-no-record: refusal closed the backlog"
+
+  write_nm_run_record "$TRAIN_CASE" 01RUNTRAIN "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  assert_train_allowed "$TRAIN_CASE" "train-pipeline-input"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = "done" ] || fail "train-pipeline-input: backlog item stayed open"
+  assert_train_backlog_close "$TRAIN_CASE" train-pipeline-input
+  pass "a copy the pipeline rewrote is carried by a verified train only with the run record for the listed head"
+}
+
+# The record must tie this copy to the listed head, and the train must still be verified.
+test_train_pipeline_input_copy_refuses_without_the_exact_record() {
+  local copy_head
+  train_pipeline_input_case train-input-other-pushed
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNOTHERPUSH "$TRAIN_MEMBER_URL" "$copy_head" "$copy_head"
+  assert_train_refused "$TRAIN_CASE" "train-input-other-pushed" "not the merged PR head"
+
+  train_pipeline_input_case train-input-other-copy
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNOTHERINPUT "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD" "$TRAIN_MEMBER_HEAD"
+  assert_train_refused "$TRAIN_CASE" "train-input-other-copy" "is not that head"
+
+  train_pipeline_input_case train-input-unverified
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNTRAIN "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  train_list "$TRAIN_CASE" 9 OPEN main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+  assert_train_refused "$TRAIN_CASE" "train-input-unverified" "is OPEN, not merged"
+  pass "the run record proves a copy only for its own listed head and only on a verified train"
+}
+
+# A silent run-record read on the train route is unknown and retried, as on the own-PR route.
+test_train_pipeline_input_silent_record_read_is_unknown() {
+  local copy_head rc
+  train_pipeline_input_case train-input-silent
+  copy_head=$(git -C "$TRAIN_CASE/wt" rev-parse HEAD)
+  write_nm_run_record "$TRAIN_CASE" 01RUNTRAIN "$TRAIN_MEMBER_URL" "$copy_head" "$TRAIN_MEMBER_HEAD"
+  install_quiet_record_reader "$TRAIN_CASE" hang
+  rc=$(FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$TRAIN_CASE")
+  expect_code 75 "$rc" "train-input-silent: a silent record read should exit for a retry"$'\n'"$(cat "$TRAIN_CASE/stderr")"
+  assert_no_grep "REFUSED" "$TRAIN_CASE/stderr" "train-input-silent: a silent read was reported as a refusal"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-input-silent: a silent read accepted the train"
+  assert_refusal_retained_task_state "$TRAIN_CASE" train-input-silent "$copy_head"
+  pass "a silent run-record read on the train route is unknown and retried"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -4266,6 +4341,9 @@ test_train_flattened_rebase_carries_the_listed_head
 test_train_flattened_rebase_missing_a_member_commit_refuses
 test_train_flat_missing_with_a_stale_remote_ref_refuses
 test_train_member_reread_failure_is_unknown
+test_train_pipeline_input_copy_allows_only_with_the_run_record
+test_train_pipeline_input_copy_refuses_without_the_exact_record
+test_train_pipeline_input_silent_record_read_is_unknown
 test_train_dirty_copy_refuses_before_the_train_is_read
 test_train_refuses_a_train_that_is_not_merged
 test_train_refuses_a_train_merged_into_another_branch
