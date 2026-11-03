@@ -2,8 +2,10 @@
 # tests/fm-spawn-claude-api-key-guard.test.sh - every claude worker this fleet
 # launches must be refused when ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would
 # reach it, unless --allow-api-key opts in or the worker-account pin shed strips
-# the variable from the launch environment. On the tmux backend the check also
-# covers the tmux session and global environment a new worker window inherits.
+# the variable from the launch environment. Without config/launch-env-allowlist
+# the launch boundary drops both, so only an allowlist that lists one refuses.
+# On the tmux backend the check also covers the tmux session and global
+# environment a new worker window inherits.
 #
 # The assertions never read bin/fm-spawn.sh's source. They drive the real spawn
 # against a fake pane and a real isolated git worktree, then check the exit
@@ -68,32 +70,43 @@ run_case_spawn() {
 
 # --- tests ------------------------------------------------------------------
 
-# Test 1: claude spawn refuses when ANTHROPIC_API_KEY is set and no allowlist.
-test_refuse_api_key_no_allowlist() {
-  local rec out status
-  rec=$(make_case refuse-api-key claude refuse-api-key-a1)
-  read_case "$rec"
-  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
-    run_case_spawn refuse-api-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
-  status=$?
-  [ "$status" -ne 0 ] || fail "claude spawn should refuse when ANTHROPIC_API_KEY is set"$'\n'"$out"
-  assert_contains "$out" "ANTHROPIC_API_KEY" \
-    "the refusal message should name the variable"
-  pass "claude spawn refuses when ANTHROPIC_API_KEY is set and no allowlist"
+# Test 1: with no allowlist an ambient key spawns, because the default launch
+# boundary drops it, and the worker never receives it.
+test_ambient_key_without_allowlist_is_dropped() {
+  local rec out status var
+  for var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    rec=$(make_case "ambient-$var" claude ambient-key-a1)
+    read_case "$rec"
+    out=$(export "$var=sk-ant-ambient-fake"
+      run_case_spawn ambient-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+    status=$?
+    [ "$status" -eq 0 ] || fail "claude spawn should succeed when the launch drops an ambient $var"$'\n'"$out"
+    assert_not_contains "$(cat "$LAUNCH_LOG")" sk-ant-ambient-fake "the launch text must not carry the ambient $var"
+    observe_launch
+    assert_grep 'API_KEY=unset' "$CASE_DIR/observed" "an ambient API key must not reach Claude"
+    assert_grep 'AUTH_TOKEN=unset' "$CASE_DIR/observed" "an ambient auth token must not reach Claude"
+  done
+  pass "claude spawn without an allowlist drops an ambient key instead of refusing"
 }
 
-# Test 2: claude spawn refuses when ANTHROPIC_AUTH_TOKEN is set and no allowlist.
-test_refuse_auth_token_no_allowlist() {
-  local rec out status
-  rec=$(make_case refuse-auth-token claude refuse-auth-token-a1)
-  read_case "$rec"
-  out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-test-token \
-    run_case_spawn refuse-auth-token-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
-  status=$?
-  [ "$status" -ne 0 ] || fail "claude spawn should refuse when ANTHROPIC_AUTH_TOKEN is set"$'\n'"$out"
-  assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" \
-    "the refusal message should name the variable"
-  pass "claude spawn refuses when ANTHROPIC_AUTH_TOKEN is set and no allowlist"
+# Test 2: an allowlist that lists a set key carries it past the boundary, so
+# the spawn refuses before launching anything.
+test_refuse_allowlisted_key() {
+  local rec out status var
+  for var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    rec=$(make_case "listed-$var" claude listed-key-a1)
+    read_case "$rec"
+    printf '%s\n' HOME PATH "$var" > "$HOME_DIR/config/launch-env-allowlist"
+    out=$(export "$var=sk-ant-listed-fake"
+      run_case_spawn listed-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "claude spawn should refuse when the allowlist lists a set $var"$'\n'"$out"
+    assert_contains "$out" "$var is set and would reach the claude worker through config/launch-env-allowlist" \
+      "the refusal message should name the variable and its route"
+    assert_not_contains "$out" sk-ant-listed-fake "the refusal must not print the credential"
+    [ ! -s "$LAUNCH_LOG" ] || fail "a refused spawn must not launch anything"
+  done
+  pass "claude spawn refuses a set key that config/launch-env-allowlist lists"
 }
 
 # Test 3: claude spawn succeeds when neither variable is set.
@@ -155,6 +168,7 @@ test_succeed_with_pin_shed() {
   rec=$(make_case succeed-pin-shed claude succeed-pin-shed-a1)
   read_case "$rec"
   install_signed_in_pin
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
   out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
     run_case_spawn succeed-pin-shed-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -178,12 +192,19 @@ test_allow_api_key_recorded_in_meta() {
   pass "task meta records api_key=allow when --allow-api-key is used"
 }
 
-# Test 9: a key only in the tmux session environment is refused, because a new
-# window in that session inherits it even though fm-spawn's own env is clean.
+# Test 9: a key only in the tmux session environment is dropped by the default
+# boundary. With an allowlist that lists it, it is refused, because a new window
+# in that session inherits it even though fm-spawn's own env is clean.
 test_refuse_tmux_session_env() {
   local rec out status
-  rec=$(make_case refuse-tmux-session claude refuse-tmux-session-a1)
+  rec=$(make_case refuse-tmux-session claude refuse-tmux-session-a0 refuse-tmux-session-a1)
   read_case "$rec"
+  out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=sk-ant-session-key \
+    run_case_spawn refuse-tmux-session-a0 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn without an allowlist should drop a tmux session key"$'\n'"$out"
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=sk-ant-session-key \
     run_case_spawn refuse-tmux-session-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
@@ -195,13 +216,19 @@ test_refuse_tmux_session_env() {
   pass "claude spawn refuses a key set only in the tmux session environment"
 }
 
-# Test 10: a key only in the tmux global environment is refused. A session
-# lookup alone reports "unknown variable" here, yet a new window inherits the
-# global value.
+# Test 10: a listed key only in the tmux global environment is refused. A
+# session lookup alone reports "unknown variable" here, yet a new window
+# inherits the global value. Without an allowlist the boundary drops it.
 test_refuse_tmux_global_env() {
   local rec out status
-  rec=$(make_case refuse-tmux-global claude refuse-tmux-global-a1)
+  rec=$(make_case refuse-tmux-global claude refuse-tmux-global-a0 refuse-tmux-global-a1)
   read_case "$rec"
+  out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_AUTH_TOKEN=sk-ant-global-token \
+    run_case_spawn refuse-tmux-global-a0 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn without an allowlist should drop a tmux global token"$'\n'"$out"
+  printf '%s\n' HOME PATH ANTHROPIC_AUTH_TOKEN > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_AUTH_TOKEN=sk-ant-global-token \
     run_case_spawn refuse-tmux-global-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
@@ -219,6 +246,7 @@ test_succeed_tmux_session_removal_marker() {
   local rec out status
   rec=$(make_case succeed-tmux-removed claude succeed-tmux-removed-a1)
   read_case "$rec"
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=- \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-global-key \
@@ -235,6 +263,7 @@ test_succeed_tmux_env_with_pin_shed() {
   rec=$(make_case succeed-tmux-pin claude succeed-tmux-pin-a1)
   read_case "$rec"
   install_signed_in_pin
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=sk-ant-session-key \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_AUTH_TOKEN=sk-ant-global-token \
@@ -270,8 +299,11 @@ test_tmux_env_follows_the_allowlist() {
 # Execute the generated launch in a synthetic pane, which may have a captured
 # credential that is absent from the spawning process and tmux server.
 observe_launch() {
-  cat > "$FAKEBIN_DIR/claude" <<'SH'
-#!/usr/bin/env bash
+  # The recorder names its own output path: the launch boundary keeps no
+  # test-only pane variable.
+  {
+    printf '#!/usr/bin/env bash\nFM_OBSERVED=%q\n' "$CASE_DIR/observed"
+    cat <<'SH'
 observed="$FM_OBSERVED"
 session=none
 if [ "${1:-}" = --session-id ]; then
@@ -286,9 +318,11 @@ printf 'API_KEY=%s\nAUTH_TOKEN=%s\nCONFIG_DIR=%s\n' \
   "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" \
   "${CLAUDE_CONFIG_DIR-unset}" > "$observed"
 printf '%s\n' "$session" > "$observed.session"
+printf 'AWS_REGION=%s\n' "${AWS_REGION-unset}" > "$observed.companion"
 SH
+  } > "$FAKEBIN_DIR/claude"
   chmod +x "$FAKEBIN_DIR/claude"
-  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
+  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" AWS_REGION=us-fake-1 \
     FM_OBSERVED="$CASE_DIR/observed" ANTHROPIC_API_KEY=sk-ant-pane-only \
     ANTHROPIC_AUTH_TOKEN=sk-ant-pane-token CLAUDE_CONFIG_DIR="$CASE_DIR/stale-claude" \
     bash -c "$(cat "$LAUNCH_LOG")" \
@@ -306,7 +340,8 @@ test_launch_sheds_captured_credentials() {
   observe_launch
   assert_grep 'API_KEY=unset' "$CASE_DIR/observed" "the pane's API key must not reach Claude"
   assert_grep 'AUTH_TOKEN=unset' "$CASE_DIR/observed" "the pane's auth token must not reach Claude"
-  pass "a non-opt-in launch sheds credentials captured by the pane"
+  assert_grep 'AWS_REGION=us-fake-1' "$CASE_DIR/observed.companion" "the pane's non-secret provider companion must reach Claude"
+  pass "a non-opt-in launch sheds credentials captured by the pane and keeps its provider companion"
 }
 
 # An explicit billing opt-in must allow the pane's credentials through.
@@ -408,20 +443,23 @@ test_non_tmux_guard() {
   # shellcheck source=bin/fm-api-key-guard-lib.sh
   . "$ROOT/bin/fm-api-key-guard-lib.sh"
   out=$(ANTHROPIC_API_KEY=sk-ant-herdr-test \
-    fm_api_key_guard claude 0 '' 0 '' herdr 2>&1)
+    fm_api_key_guard claude 0 '' 1 ANTHROPIC_API_KEY herdr 2>&1)
   status=$?
-  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an inherited API key"
+  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an allowlisted API key"
   assert_contains "$out" "ANTHROPIC_API_KEY" "the refusal should identify the API key"
   out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-herdr-test \
-    fm_api_key_guard claude 0 '' 0 '' herdr 2>&1)
+    fm_api_key_guard claude 0 '' 1 ANTHROPIC_AUTH_TOKEN herdr 2>&1)
   status=$?
-  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an inherited auth token"
+  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an allowlisted auth token"
   assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" "the refusal should identify the auth token"
-  ANTHROPIC_API_KEY=sk-ant-herdr-test fm_api_key_guard claude 1 '' 0 '' herdr \
+  ANTHROPIC_API_KEY=sk-ant-herdr-test ANTHROPIC_AUTH_TOKEN=sk-ant-herdr-test \
+    fm_api_key_guard claude 0 '' 0 '' herdr \
+    || fail "the default launch boundary drops an ambient key, so it must not refuse"
+  ANTHROPIC_API_KEY=sk-ant-herdr-test fm_api_key_guard claude 1 '' 1 ANTHROPIC_API_KEY herdr \
     || fail "an explicit API billing opt-in must permit the Herdr launch"
   ANTHROPIC_API_KEY=sk-ant-herdr-test fm_api_key_guard claude 0 '' 1 'HOME' herdr \
     || fail "a filtered-out key must not refuse the Herdr launch"
-  pass "the shared guard enforces non-tmux Claude keys and respects opt-in and filtering"
+  pass "the shared guard refuses only allowlisted non-tmux Claude keys and respects opt-in and filtering"
 }
 
 # --- run --------------------------------------------------------------------
@@ -434,6 +472,7 @@ test_teamclaude_launcher_keeps_the_api_key_guard() {
   read_case "$rec"
   fm_test_fake_teamclaude "$FAKEBIN_DIR"
   printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+  printf '%s\n' HOME PATH ANTHROPIC_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
   out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
     run_case_spawn teamclaude-api-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -453,8 +492,8 @@ test_teamclaude_launcher_keeps_the_api_key_guard() {
   pass "config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in"
 }
 
-test_refuse_api_key_no_allowlist
-test_refuse_auth_token_no_allowlist
+test_ambient_key_without_allowlist_is_dropped
+test_refuse_allowlisted_key
 test_succeed_unset
 test_succeed_api_key_filtered_by_allowlist
 test_succeed_with_allow_api_key_flag

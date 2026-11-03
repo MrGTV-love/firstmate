@@ -433,7 +433,8 @@ assert_relaunch_worker_trace() {  # <case-dir> <expected-carrier>
   mkdir -p "$dir/trace-probe-bin" "$dir/user-home" "$dir/trace-probe-config"
   cat > "$dir/trace-probe-bin/claude" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${TRACEPARENT-unset}" > "$FM_TRACE_PROBE"
+[ ! -f "${0%/*}/.fm-fake-config" ] || . "${0%/*}/.fm-fake-config"
+printf '%s\n' "${TRACEPARENT-unset}" > "$FM_FAKE_TRACE_PROBE"
 SH
   chmod +x "$dir/trace-probe-bin/claude"
   [ -s "$dir/fake/launch" ] || fail "relaunch did not stage a replacement command"
@@ -444,7 +445,7 @@ SH
     -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR="$dir/trace-probe-config" \
-    FM_TRACE_PROBE="$dir/trace-probe" \
+    FM_FAKE_TRACE_PROBE="$dir/trace-probe" \
     TRACEPARENT=00-cccccccccccccccccccccccccccccccc-dddddddddddddddd-01); rc=$?
   expect_code 0 "$rc" "staged relaunch should reach the fake worker"$'\n'"$out"
   [ -f "$dir/trace-probe" ] || fail "staged relaunch did not execute the fake worker"
@@ -1194,15 +1195,6 @@ assert_launch_word() {
     esac
   done
   grep -Eq -e "$2[\\\\']*'$value'" "$1" || fail "$4 (missing: $2'$3' in $(cat "$1"))"
-}
-
-# teamclaude_launch_line <log>: the newest launch the pane received. A confined
-# launch spans several lines inside its sandbox-exec wrapper and is kept whole.
-teamclaude_launch_line() {
-  awk '/\/usr\/bin\/sandbox-exec /{buf=""; open=1}
-    open{buf=buf $0 "\n"}
-    /Firstmate operational input waiting: read/{last=open ? buf : $0 "\n"; open=0}
-    END{printf "%s", last}' "$1"
 }
 
 # arm_session_end <case-dir> <id>: record that the task's Claude session ended.

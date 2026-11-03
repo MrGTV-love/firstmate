@@ -785,9 +785,12 @@ scn_unignored_nested_clone_with_unpushed_work_is_kept() {
 # entry is the only ignored thing of its own throwaway repo; a trailing slash is
 # a directory holding one file. Other entries under .claude and .opencode are
 # left out on purpose: the prune is stricter there
-# (scn_unique_data_under_claude_or_opencode_is_kept). A wholly ignored .tac/ is
-# the one shape where the prune is looser
-# (scn_wholly_ignored_tac_caches_are_the_named_exception).
+# (scn_unique_data_under_claude_or_opencode_is_kept). Two shapes are looser in
+# the prune, each its own named exception: a wholly ignored .tac/
+# (scn_wholly_ignored_tac_caches_are_the_named_exception) and the exact tooling
+# paths under data/ and state/
+# (scn_tooling_paths_under_data_and_state_are_the_second_named_exception); those
+# paths never go in the pass list below, because teardown preserves them.
 IGNORED_ENTRIES_BOTH_PASS=(
   .venv/ venv/ node_modules/ __pycache__/ .pytest_cache/ .ruff_cache/ .mypy_cache/
   .next/ graphify-out/ .import_linter_cache/ pkg/__pycache__/ a/b/node_modules/
@@ -795,11 +798,13 @@ IGNORED_ENTRIES_BOTH_PASS=(
   .tac/tmp/ .tac/uv-cache/
   .claude/settings.local.json .opencode/plugins/fm-busy-state.js
   scripts/hooks/_conformance_manifest.json graft/
+  data/__pycache__/ data/.DS_Store state/node_modules/ data/pkg/__pycache__/
 )
 IGNORED_ENTRIES_BOTH_BLOCK=(
   build/ data/unique.bin precious.local .tac/state.json .ignore sub/graft/
   scripts/hooks/other.json scripts/hooks/_conformance_manifest.json.bak
   scripts/_conformance_manifest.json sub/scripts/hooks/_conformance_manifest.json
+  data/report.md state/other.log
 )
 
 make_ignored_entry_repo() {  # <dir> <entry>
@@ -853,7 +858,7 @@ scn_ignored_entries_get_teardowns_verdict() {
   return 0
 }
 
-# The one named shape where the prune and teardown differ on purpose. A project
+# The first named shape where the prune and teardown differ on purpose. A project
 # that ignores the whole .tac/ directory lists it as one entry. Teardown
 # preserves every child except tmp and uv-cache; the prune opens .tac and counts
 # a rebuildable cache child (.venv, node_modules) as scratch. Any other child
@@ -875,6 +880,356 @@ scn_wholly_ignored_tac_caches_are_the_named_exception() {
   : > "$d/.tac/state.json"
   [ "$(teardown_ignored_verdict "$real")" = blocks ] || why "teardown passes a wholly ignored .tac/ that holds state.json" || return 1
   [ "$(prune_ignored_verdict "$real")" = blocks ] || why "the exception hides .tac/state.json beside the caches" || return 1
+  return 0
+}
+
+# The second named shape where the prune and teardown differ on purpose. A copy's
+# ignored data/ and state/ hold files that Firstmate's own tooling writes during
+# ordinary runs. Teardown preserves the whole directories; the prune opens each
+# one level at a time and counts exactly these paths as scratch, by exact
+# relative path and never by basename.
+TOOLING_PATHS=(
+  data/command-durations.jsonl data/command-durations.jsonl.lock
+  state/.omp-live-model state/.omp-turnend-extension-loaded state/.omp-watch-extension-loaded
+  state/extensions/omp-primary-watch/ state/guard-events.jsonl
+)
+
+# plant_tooling_paths <dir>: the seven tooling paths, with a child at two depths
+# below the omp-primary-watch directory.
+plant_tooling_paths() {
+  local d=$1 p
+  mkdir -p "$d/data" "$d/state/extensions/omp-primary-watch/sub/deeper"
+  for p in "${TOOLING_PATHS[@]}"; do
+    case "$p" in */) ;; *) printf 'x\n' > "$d/$p" ;; esac
+  done
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch/index.js"
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch/sub/deeper/x.js"
+}
+
+# make_data_state_repo <dir> [<extra exclude line>...]: a throwaway repo that
+# ignores data/ and state/ through its own exclude file.
+make_data_state_repo() {
+  local d=$1
+  shift
+  mkdir -p "$d"
+  git init -q "$d"
+  : > "$d/top.keep"
+  git -C "$d" add -f -A
+  git -C "$d" commit -q -m seed
+  printf '%s\n' '/data/' '/state/' "$@" > "$d/.git/info/exclude"
+}
+
+scn_tooling_paths_under_data_and_state_are_the_second_named_exception() {
+  local d real
+  make_world
+  d="$W/parity/tooling"
+  make_data_state_repo "$d"
+  plant_tooling_paths "$d"
+  real=$(cd "$d" && pwd -P)
+  [ "$(git -C "$real" ls-files -o -i --exclude-standard --directory | tr '\n' ' ')" = 'data/ state/ ' ] || why "the fixture does not list data/ and state/ as two ignored entries" || return 1
+  [ "$(teardown_ignored_verdict "$real")" = blocks ] || why "teardown no longer preserves the tooling files under data/ and state/; retire this named exception" || return 1
+  [ "$(prune_ignored_verdict "$real")" = passes ] || why "the prune does not count the exact tooling paths under data/ and state/ as scratch" || return 1
+  printf 'x\n' > "$d/data/report.md"
+  [ "$(teardown_ignored_verdict "$real")" = blocks ] || why "teardown passes a data/ that holds report.md" || return 1
+  [ "$(prune_ignored_verdict "$real")" = blocks ] || why "the exception hides data/report.md beside the tooling files" || return 1
+  rm -f "$d/data/report.md"
+  printf 'x\n' > "$d/state/other.log"
+  [ "$(prune_ignored_verdict "$real")" = blocks ] || why "the exception hides state/other.log beside the tooling files" || return 1
+  return 0
+}
+
+# A pool copy that holds only the tooling files under an ignored data/ and
+# state/ is removed. The project ignores them through its own exclude file (the
+# project clone's .git/info/exclude, which a linked worktree shares), so no other
+# scenario's baseline changes.
+scn_copy_with_only_tooling_files_is_removed() {
+  make_world
+  printf '%s\n' '/data/' '/state/' >> "$W/project/.git/info/exclude"
+  plant_tooling_paths "$COPY"
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a copy holding only the tooling files was kept: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "a reaped copy raised a wake" || return 1
+  return 0
+}
+
+# Everything else under a wholly ignored data/ and state/ keeps the copy with
+# one wake that names the first blocking entry (git lists a wholly ignored
+# directory as one entry, and the classifier opens data and state one level at
+# a time).
+scn_other_data_or_state_file_keeps_the_copy() {
+  make_world
+  printf '%s\n' '/data/' '/state/' >> "$W/project/.git/info/exclude"
+  plant_tooling_paths "$COPY"
+  printf 'a worker wrote this\n' > "$COPY/data/report.md"
+  go
+  [ -e "$COPY/data/report.md" ] && [ "$(destroy_calls)" = 0 ] || why "a copy holding data/report.md was removed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'data/report.md' || why "the wake does not name data/report.md" || return 1
+  return 0
+}
+
+# P3: each planted path is the only ignored thing of its own throwaway repo.
+# prune_keep_reason prints the reason when the prune keeps the copy and nothing
+# when it passes it.
+prune_keep_reason() {  # <real-copy>
+  bash -c 'set -u; . "$1/fm-merge-prune-lib.sh"; if fm_mp_prove_ignored "$2" >/dev/null 2>&1; then :; else printf "%s" "$FM_MP_REASON"; fi' _ "$BIN_DIR" "$1" 2>/dev/null
+}
+
+# plant_and_judge <planted-path>: builds the throwaway repo, plants the path
+# (a trailing slash makes it a directory that holds one real file) and fails
+# unless the prune keeps the copy naming a prefix of the planted path.
+plant_and_judge() {  # <planted-path>
+  local planted=$1 file d real reason got
+  PLANT_N=$((${PLANT_N:-0} + 1))
+  d="$W/plant/p$PLANT_N"
+  make_data_state_repo "$d" /notes/ /sub/ /.review/ /eval/ /.backpass/
+  file=${planted%/}
+  mkdir -p "$d/$(dirname "$file")"
+  if [ "$file" != "$planted" ]; then
+    mkdir -p "$d/$file"
+    : > "$d/$file/real"
+  else
+    : > "$d/$file"
+  fi
+  real=$(cd "$d" && pwd -P)
+  reason=$(prune_keep_reason "$real")
+  [ -n "$reason" ] || why "the prune passed the planted path $planted" || return 1
+  got=${reason##*: }
+  case "$file" in
+    "$got"|"$got"/*) ;;
+    *) why "for the planted path $planted the reason names $got: $reason" || return 1 ;;
+  esac
+  return 0
+}
+
+scn_nothing_outside_the_tooling_list_is_scratch() {
+  local p
+  make_world
+  for p in \
+    data/command-durations.jsonl.bak data/command-durations.jsonl.lock.bak \
+    state/.omp-live-model.old state/.omp-turnend-extension-loaded.old state/.omp-watch-extension-loaded.old \
+    state/extensions/omp-primary-watch.old state/guard-events.jsonl.old \
+    data/node_modules/x state/__pycache__/x state/.venv/x data/.DS_Store \
+    .backpass/x .review/x eval/x \
+    data/guard-events.jsonl state/command-durations.jsonl \
+    data/sub/command-durations.jsonl state/sub/guard-events.jsonl state/.omp-other \
+    data/command-durations.jsonl/ data/command-durations.jsonl.lock/ \
+    state/.omp-live-model/ state/.omp-turnend-extension-loaded/ state/.omp-watch-extension-loaded/ \
+    state/guard-events.jsonl/ \
+    state/extensions/other/x \
+    data/report.md data/unique.bin data/t1/notes.md state/other.log \
+    notes/command-durations.jsonl sub/data/command-durations.jsonl; do
+    plant_and_judge "$p" || return 1
+  done
+  return 0
+}
+
+# The omp-primary-watch directory is scratch, with children at any depth; a
+# regular file of that name is not, and neither is a sibling under extensions/.
+scn_omp_watch_extension_must_be_a_directory() {
+  local d real
+  make_world
+  d="$W/plant/omp"
+  make_data_state_repo "$d"
+  mkdir -p "$d/state/extensions"
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch"
+  real=$(cd "$d" && pwd -P)
+  [ -n "$(prune_keep_reason "$real")" ] || why "a regular file at state/extensions/omp-primary-watch passed" || return 1
+  rm -f "$d/state/extensions/omp-primary-watch"
+  mkdir -p "$d/state/extensions/omp-primary-watch/a/b/c"
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch/a/b/c/x"
+  [ -z "$(prune_keep_reason "$real")" ] || why "children of omp-primary-watch at depth three were kept: $(prune_keep_reason "$real")" || return 1
+  mkdir -p "$d/state/extensions/other"
+  printf 'x\n' > "$d/state/extensions/other/x"
+  [ -n "$(prune_keep_reason "$real")" ] || why "a sibling directory under state/extensions passed" || return 1
+  # A project that ignores the children one by one lists each of them as its own
+  # entry, so the classifier meets a child without having opened its parent.
+  d="$W/plant/omp-children"
+  make_data_state_repo "$d"
+  sed -i.bak '/^\/state\/$/d' "$d/.git/info/exclude"
+  rm -f "$d/.git/info/exclude.bak"
+  printf '%s\n' '/state/extensions/omp-primary-watch/*' '/state/extensions/other/*' >> "$d/.git/info/exclude"
+  mkdir -p "$d/state/extensions/omp-primary-watch/sub" "$d/state/extensions/other"
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch/index.js"
+  printf 'x\n' > "$d/state/extensions/omp-primary-watch/sub/x.js"
+  real=$(cd "$d" && pwd -P)
+  git -C "$real" ls-files -o -i --exclude-standard --directory | grep -qx 'state/extensions/omp-primary-watch/index.js' || why "the fixture does not list a child of omp-primary-watch as its own ignored entry" || return 1
+  [ -z "$(prune_keep_reason "$real")" ] || why "children of omp-primary-watch listed one by one were kept: $(prune_keep_reason "$real")" || return 1
+  printf 'x\n' > "$d/state/extensions/other/x"
+  [ -n "$(prune_keep_reason "$real")" ] || why "a child of a sibling extension, listed one by one, passed" || return 1
+  return 0
+}
+
+# A project that tracks data/ and state/ lists each ignored child as its own
+# entry, so the classifier never opens either directory. A scratch name there
+# gets teardown's verdict, and a tooling path is still scratch.
+scn_tracked_data_and_state_children_get_the_base_rules() {
+  local entry d real n=0
+  make_world
+  for entry in data/__pycache__/ data/.DS_Store state/node_modules/ data/pkg/__pycache__/ \
+    data/command-durations.jsonl state/guard-events.jsonl state/extensions/omp-primary-watch/; do
+    n=$((n + 1))
+    d="$W/plant/tracked$n"
+    mkdir -p "$d"
+    make_ignored_entry_repo "$d" "$entry"
+    real=$(cd "$d" && pwd -P)
+    [ "$(git -C "$real" ls-files -o -i --exclude-standard --directory)" = "$entry" ] || why "the fixture does not list $entry as its own ignored entry under a tracked directory" || return 1
+    case "$entry" in
+      data/command-durations.jsonl|state/*/omp-primary-watch/|state/guard-events.jsonl) ;;
+      *) [ "$(teardown_ignored_verdict "$real")" = passes ] || why "teardown blocks $entry under a tracked directory" || return 1 ;;
+    esac
+    [ "$(prune_ignored_verdict "$real")" = passes ] || why "the prune keeps $entry under a tracked directory: $(prune_keep_reason "$real")" || return 1
+  done
+  return 0
+}
+
+# A data/ or state/ that cannot be listed keeps the copy. A root user can read
+# a mode-000 directory, so the scenario cannot show that and is skipped there.
+scn_unreadable_data_directory_keeps_the_copy() {
+  local d real reason
+  make_world
+  [ "$(id -u)" != 0 ] || { printf 'skipped: running as root, a mode-000 directory is still readable\n'; return 0; }
+  d="$W/plant/unreadable"
+  make_data_state_repo "$d"
+  mkdir -p "$d/data"
+  : > "$d/data/command-durations.jsonl"
+  chmod 000 "$d/data"
+  real=$(cd "$d" && pwd -P)
+  reason=$(prune_keep_reason "$real")
+  chmod 755 "$d/data"
+  [ -n "$reason" ] || why "an unreadable data/ passed" || return 1
+  return 0
+}
+
+# --- an empty nested repository ----------------------------------------------
+
+# prune_git_verdict <copy> <pr-number-or-empty> <own|all>: runs the git proof
+# alone, as `verdict|reason`.
+prune_git_verdict() {
+  bash -c 'set -u; . "$1/fm-timeout-lib.sh"; . "$1/fm-backend.sh"; . "$1/fm-task-copy-lib.sh"; . "$1/fm-merge-prune-lib.sh"; fm_mp_prove_git "$2" "$3" nofetch "$4" >/dev/null 2>&1; printf "%s|%s" "$FM_MP_VERDICT" "$FM_MP_REASON"' _ "$BIN_DIR" "$1" "$2" "$3" 2>/dev/null
+}
+
+# An empty nested `git init` has no commit to compare and so carries nothing.
+scn_empty_nested_repo_goes_with_the_slot() {
+  make_world
+  git init -q "$COPY/.claude/worktrees/n1"
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "an empty nested repository kept the slot: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "an empty nested repository raised a wake" || return 1
+  return 0
+}
+
+# (e3) The project does not ignore .claude/: the empty repository shows as one
+# untracked directory, which is removed before the destroy.
+scn_unignored_empty_nested_repo_goes_with_the_slot() {
+  IGNORE_CLAUDE=0 make_world
+  git init -q "$COPY/.claude/worktrees/n1"
+  [ "$(git -C "$COPY" status --porcelain --untracked-files=all)" = '?? .claude/worktrees/n1/' ] || why "the fixture does not show the empty repository as one untracked directory: $(git -C "$COPY" status --porcelain --untracked-files=all)" || return 1
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "an unignored empty nested repository kept the slot: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# kept_with <needle>: the copy stays, with one wake that names the nested copy
+# and the needle.
+nested_kept_with() {  # <nested-dir> <needle>
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the slot was removed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$1" "$STATE/.wake-queue" | grep -q -- "$2" || why "the wake does not name $1 and '$2': $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+# (a)
+scn_empty_nested_repo_with_an_untracked_file_is_kept() {
+  local n
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  git init -q "$n"
+  printf 'mine\n' > "$n/new.txt"
+  go
+  nested_kept_with "$n" 'changed or untracked files'
+}
+
+# (b) The HEAD is unborn but another branch holds a commit that is on no remote.
+scn_nested_repo_with_an_unborn_head_and_a_branch_commit_is_kept() {
+  local n
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  git init -q "$n"
+  git -C "$n" commit -q --allow-empty -m "only here"
+  git -C "$n" symbolic-ref HEAD refs/heads/unborn
+  go
+  nested_kept_with "$n" 'commit(s) on no remote'
+}
+
+# (c) A nested independent clone with a detached HEAD at a commit on no remote.
+scn_nested_clone_with_a_detached_head_commit_is_kept() {
+  local n
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  make_nested .claude/worktrees/n1
+  git -C "$n" checkout -q --detach
+  git -C "$n" commit -q --allow-empty -m "only on the detached head"
+  go
+  nested_kept_with "$n" 'commit(s) on no remote'
+}
+
+# (d) The same for a nested linked worktree of the project.
+scn_nested_worktree_with_a_detached_head_commit_is_kept() {
+  local n
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  git -C "$W/project" worktree add -q --detach "$n" origin/main
+  git -C "$n" commit -q --allow-empty -m "only on the detached head"
+  go
+  nested_kept_with "$n" 'commit(s) on no remote'
+}
+
+# (e) The task's own copy with an unborn HEAD is not proved landed.
+scn_own_copy_with_an_unborn_head_is_kept() {
+  local o v
+  make_world
+  o="$W/orphan"
+  git -C "$W/project" worktree add -q --orphan -b orphan1 "$o" 2>/dev/null || why "the fixture could not be built" || return 1
+  o=$(cd "$o" && pwd -P)
+  [ -z "$(git -C "$o" status --porcelain --untracked-files=all)" ] || why "the fixture is not clean" || return 1
+  v=$(prune_git_verdict "$o" 7 own)
+  case "$v" in
+    keep\|*'cannot read the HEAD'*) ;;
+    *) why "an own copy with an unborn HEAD was judged: $v" || return 1 ;;
+  esac
+  return 0
+}
+
+# (e2) A nested linked worktree whose HEAD is a sha of a missing object is kept.
+scn_nested_worktree_with_a_missing_head_object_is_kept() {
+  local n gitdir
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  git -C "$W/project" worktree add -q --detach "$n" origin/main
+  gitdir=$(git -C "$n" rev-parse --absolute-git-dir)
+  printf '0123456789abcdef0123456789abcdef01234567\n' > "$gitdir/HEAD"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a nested worktree at a missing object did not keep the slot" || return 1
+  return 0
+}
+
+# The same where HEAD names a branch whose ref points at a missing object: that
+# branch exists, so HEAD is still compared and the proof never reads it as unborn.
+scn_nested_worktree_on_a_branch_at_a_missing_object_is_kept() {
+  local n common v
+  make_world
+  n="$COPY/.claude/worktrees/n1"
+  git -C "$W/project" worktree add -q -b fm/n1 "$n" origin/main
+  common=$(git -C "$W/project" rev-parse --absolute-git-dir)
+  printf '0123456789abcdef0123456789abcdef01234567\n' > "$common/refs/heads/fm/n1"
+  v=$(prune_git_verdict "$n" "" own)
+  case "$v" in
+    keep\|*|transient\|*) ;;
+    *) why "a branch at a missing object was judged: $v" || return 1 ;;
+  esac
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a nested worktree on a branch at a missing object did not keep the slot" || return 1
   return 0
 }
 
@@ -2269,6 +2624,22 @@ test_fallback_keeps_an_untracked_file_beside_an_unignored_nested_clone() { asser
 test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work() { assert_scenario scn_unignored_nested_clone_with_unpushed_work_is_kept "a nested clone that the project's .gitignore does not cover, with an unpushed commit, keeps the slot with one wake naming the clone"; }
 test_fallback_judges_ignored_entries_like_teardown() { assert_scenario scn_ignored_entries_get_teardowns_verdict "the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal"; }
 test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch() { assert_scenario scn_wholly_ignored_tac_caches_are_the_named_exception "the one named difference from teardown: a wholly ignored .tac/ holding .venv and node_modules passes the prune and blocks teardown, and state.json beside them still blocks both"; }
+test_fallback_counts_the_tooling_files_under_data_and_state_as_scratch() { assert_scenario scn_tooling_paths_under_data_and_state_are_the_second_named_exception "the second named difference from teardown: the exact tooling paths under an ignored data/ and state/ pass the prune and block teardown, and data/report.md or state/other.log beside them still blocks both"; }
+test_fallback_removes_a_copy_holding_only_tooling_files() { assert_scenario scn_copy_with_only_tooling_files_is_removed "a pool copy whose only ignored files are the exact tooling files under data/ and state/ is removed with no wake"; }
+test_fallback_keeps_a_copy_with_another_data_file() { assert_scenario scn_other_data_or_state_file_keeps_the_copy "data/report.md beside the tooling files keeps the copy with one wake naming it"; }
+test_fallback_keeps_every_path_outside_the_tooling_list() { assert_scenario scn_nothing_outside_the_tooling_list_is_scratch "lookalike suffixes, scratch names under a wholly ignored data/ and state/, wrong or deeper directories, directories in place of files, and other ignored trees all keep the copy"; }
+test_fallback_needs_the_omp_watch_extension_to_be_a_directory() { assert_scenario scn_omp_watch_extension_must_be_a_directory "state/extensions/omp-primary-watch is scratch with children at any depth only as a directory; a file there and a sibling extension directory keep the copy"; }
+test_fallback_judges_tracked_data_and_state_children_by_the_base_rules() { assert_scenario scn_tracked_data_and_state_children_get_the_base_rules "under a tracked data/ or state/, a scratch-named ignored child passes like teardown and a tooling path is still scratch"; }
+test_fallback_keeps_a_copy_whose_data_directory_cannot_be_listed() { assert_scenario scn_unreadable_data_directory_keeps_the_copy "a data/ that cannot be listed keeps the copy"; }
+test_fallback_removes_an_empty_nested_repo_with_the_slot() { assert_scenario scn_empty_nested_repo_goes_with_the_slot "an empty nested git init, which has no commit to compare, goes with the slot with no wake"; }
+test_fallback_removes_an_unignored_empty_nested_repo_with_the_slot() { assert_scenario scn_unignored_empty_nested_repo_goes_with_the_slot "an empty nested git init that the project does not ignore is removed before the destroy and goes with the slot"; }
+test_fallback_keeps_an_empty_nested_repo_with_an_untracked_file() { assert_scenario scn_empty_nested_repo_with_an_untracked_file_is_kept "an untracked file in an otherwise empty nested repo keeps the slot"; }
+test_fallback_keeps_a_nested_repo_with_an_unborn_head_and_a_branch_commit() { assert_scenario scn_nested_repo_with_an_unborn_head_and_a_branch_commit_is_kept "a nested repo whose HEAD is unborn but whose other branch holds a commit on no remote keeps the slot"; }
+test_fallback_keeps_a_nested_clone_with_a_detached_head_commit() { assert_scenario scn_nested_clone_with_a_detached_head_commit_is_kept "a nested clone with a commit only on its detached HEAD keeps the slot"; }
+test_fallback_keeps_a_nested_worktree_with_a_detached_head_commit() { assert_scenario scn_nested_worktree_with_a_detached_head_commit_is_kept "a nested linked worktree with a commit only on its detached HEAD keeps the slot"; }
+test_fallback_keeps_a_nested_worktree_on_a_branch_at_a_missing_object() { assert_scenario scn_nested_worktree_on_a_branch_at_a_missing_object_is_kept "a nested linked worktree whose branch ref names a missing object is not read as an unborn HEAD and keeps the slot"; }
+test_fallback_keeps_an_own_copy_with_an_unborn_head() { assert_scenario scn_own_copy_with_an_unborn_head_is_kept "the task's own copy with an unborn HEAD is not proved landed"; }
+test_fallback_keeps_a_nested_worktree_whose_head_object_is_missing() { assert_scenario scn_nested_worktree_with_a_missing_head_object_is_kept "a nested linked worktree whose HEAD names a missing object keeps the slot"; }
 test_fallback_keeps_unique_ignored_files() { assert_scenario scn_unique_ignored_file_is_kept "a unique ignored file outside the preserve list and the scratch patterns keeps the copy"; }
 test_fallback_keeps_a_non_pool_copy() { assert_scenario scn_non_pool_copy_is_kept "a copy outside the pool is never destroyed"; }
 test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot() { assert_scenario scn_plain_git_tree_is_not_a_pool_copy "a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed"; }
@@ -2402,7 +2773,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-nested-proof-before-teardown $orch '  prove_nested_first || return 0' '  :' scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "nested-copy proof before teardown"
   expect_caught no-pane-job-proof-before-teardown $orch '  fm_mp_prove_pane_idle "$real" "$(fm_mp_pane_pid "$META")" || { record_verdict "$real"; return 1; }' '  :' scn_pane_job_keeps_the_copy_before_teardown "pane-job proof before teardown"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
-  expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
+  expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
   expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
   expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1' '    :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
   expect_caught conformance-manifest-by-path-suffix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    *scripts/hooks/_conformance_manifest.json) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact path of the conformance manifest"
@@ -2416,6 +2787,12 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-second-classification-busy $orch '  if ! reapable; then
     fm_project_lock_release "$plock" || true' '  if false; then
     fm_project_lock_release "$plock" || true' scn_worker_busy_after_the_first_verdict "second idle classification under the project lock (busy)"
+  expect_caught empty-head-dropped-for-any-branch $lib '    && ! git -C "$copy" rev-parse -q --verify "$headref" >/dev/null 2>&1; then' '    && true; then' scn_unpushed_commit_is_kept "HEAD dropped only when its branch is unborn"
+  expect_caught tooling-path-check-always-passes $lib '      if fm_mp_tooling_path "$copy" "$rel"; then' '      if true; then' scn_nothing_outside_the_tooling_list_is_scratch "exact-path check under data and state"
+  expect_caught tooling-scratch-name-bypass-removed $lib '      if [ -n "$opened" ]; then' '      if false; then' scn_nothing_outside_the_tooling_list_is_scratch "bypass of the scratch-name rule under an opened data and state"
+  expect_caught opened-flag-never-set $lib '        case "$rel" in data|state|state/extensions) sub=opened ;; esac' '        :' scn_nothing_outside_the_tooling_list_is_scratch "flag for children of an opened data and state"
+  expect_caught omp-watch-file-passes $lib '      [ -d "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 0' scn_omp_watch_extension_must_be_a_directory "directory check of the omp-primary-watch extension"
+  expect_caught tooling-file-type-unchecked $lib '      [ -f "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 0' scn_nothing_outside_the_tooling_list_is_scratch "regular-file check of the tooling files"
   expect_caught ignored-listing-status-is-tr $lib 'listing=$(set -o pipefail; git -C "$copy" ls-files -o -i' 'listing=$(git -C "$copy" ls-files -o -i' scn_failing_ignored_listing_keeps_the_copy "checked ignored-file listing"
   expect_caught tracked-listing-status-is-sed $lib 'gitlinks=$(set -o pipefail; git -C' 'gitlinks=$(git -C' scn_failing_tracked_listing_keeps_the_copy "checked tracked-file listing"
   expect_caught stash-listing-failure-is-nothing $lib 'listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || return 1' 'listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || true' scn_failing_stash_listing_is_retried "checked stash listing"
@@ -2496,7 +2873,12 @@ test_over_strict_mutations_are_caught() {
   expect_caught unignored-nested-worktree-left-for-the-destroy $lib '      git --git-dir="$common" worktree remove "$n" >/dev/null 2>&1' '      :' scn_unignored_nested_worktree_goes_with_the_slot "removing an unignored nested linked worktree before the destroy"
   expect_caught no-conformance-manifest-scratch $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/NEVER) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "conformance manifest rule"
   expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
-  expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
+  expect_caught empty-head-always-compared $lib '    refs=()' '    :' scn_empty_nested_repo_goes_with_the_slot "dropping an unborn HEAD from the compared refs"
+  expect_caught data-and-state-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac|data|state|state/extensions)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' scn_copy_with_only_tooling_files_is_removed "opening data and state one level at a time"
+  expect_caught tracked-data-children-always-unique $lib '      if [ -n "$opened" ]; then' '      if true; then' scn_tracked_data_and_state_children_get_the_base_rules "base rules for entries listed one by one under a tracked data and state"
+  expect_caught tooling-paths-never-scratch $lib '      [ -f "$1/$2" ] && [ ! -L "$1/$2" ]' '      return 1' scn_copy_with_only_tooling_files_is_removed "the exact tooling file paths"
+  expect_caught omp-watch-children-never-scratch $lib '      [ -d "$1/state/extensions/omp-primary-watch" ] && [ ! -L "$1/state/extensions/omp-primary-watch" ]' '      return 1' scn_omp_watch_extension_must_be_a_directory "children of the omp-primary-watch extension"
+  expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac|data|state|state/extensions)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins|data|state|state/extensions)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-agent-not-exempt $lib '    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" = agent ] || continue' '    continue' scn_pane_agent_does_not_block_teardown "worker-agent exemption before teardown"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
@@ -2921,6 +3303,22 @@ ALL_TESTS=(
   test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work
   test_fallback_judges_ignored_entries_like_teardown
   test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch
+  test_fallback_counts_the_tooling_files_under_data_and_state_as_scratch
+  test_fallback_removes_a_copy_holding_only_tooling_files
+  test_fallback_keeps_a_copy_with_another_data_file
+  test_fallback_keeps_every_path_outside_the_tooling_list
+  test_fallback_needs_the_omp_watch_extension_to_be_a_directory
+  test_fallback_judges_tracked_data_and_state_children_by_the_base_rules
+  test_fallback_keeps_a_copy_whose_data_directory_cannot_be_listed
+  test_fallback_removes_an_empty_nested_repo_with_the_slot
+  test_fallback_removes_an_unignored_empty_nested_repo_with_the_slot
+  test_fallback_keeps_an_empty_nested_repo_with_an_untracked_file
+  test_fallback_keeps_a_nested_repo_with_an_unborn_head_and_a_branch_commit
+  test_fallback_keeps_a_nested_clone_with_a_detached_head_commit
+  test_fallback_keeps_a_nested_worktree_with_a_detached_head_commit
+  test_fallback_keeps_an_own_copy_with_an_unborn_head
+  test_fallback_keeps_a_nested_worktree_whose_head_object_is_missing
+  test_fallback_keeps_a_nested_worktree_on_a_branch_at_a_missing_object
   test_fallback_removes_only_generated_graft_output
   test_fallback_keeps_non_graft_ignore
   test_fallback_removes_every_graft_output_shape

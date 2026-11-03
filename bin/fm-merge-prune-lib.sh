@@ -11,8 +11,8 @@
 # treehouse-reap-clean reaper and proves, read live, that the copy holds nothing
 # worth keeping. It never forces, discards or hides anything: any proof it
 # cannot make keeps the copy. A read that fails (the ignored-file listing, the
-# stash listing, the search for nested copies, the listing of a .claude or .tac
-# directory) never counts as finding nothing: it keeps the copy, except that a
+# stash listing, the search for nested copies, the listing of a .claude, .tac,
+# data or state directory) never counts as finding nothing: it keeps the copy, except that a
 # failed stash listing is retried later.
 #
 # A copy passes only when ALL of these hold, for the task's own copy AND for
@@ -57,10 +57,21 @@
 # generated output (teardown_graft_generated), and
 # scripts/hooks/_conformance_manifest.json: the disposable entries of
 # teardown_preservable_ignored in bin/fm-teardown-nested-lib.sh, which
-# tests/fm-merge-prune.test.sh holds to the same verdict, except one named
-# shape: when a project ignores the whole .tac/ directory, teardown preserves
-# its children other than tmp and uv-cache, and the prune counts rebuildable
-# cache children (.venv, node_modules) as scratch. Under .claude and
+# tests/fm-merge-prune.test.sh holds to the same verdict, except two named
+# shapes. First: when a project ignores the whole .tac/ directory, teardown
+# preserves its children other than tmp and uv-cache, and the prune counts
+# rebuildable cache children (.venv, node_modules) as scratch. Second: the prune
+# treats these exact paths under data/ and state/ as scratch, which Firstmate's
+# own tooling writes during ordinary runs, although teardown preserves them:
+# data/command-durations.jsonl,
+# data/command-durations.jsonl.lock, state/.omp-live-model,
+# state/.omp-turnend-extension-loaded, state/.omp-watch-extension-loaded,
+# state/extensions/omp-primary-watch (a directory, and every child of it at any
+# depth) and state/guard-events.jsonl. They match by exact path, never by name.
+# In a data/, state/ or state/extensions/ that the project ignores as a whole, a
+# scratch name such as node_modules is not scratch there, and any other file is
+# unique; under a tracked data/ or state/, any other ignored entry outside such a
+# directory is judged like one anywhere else. Under .claude and
 # .opencode only the hook files, a clone (proved on its own) and an entry with a
 # scratch name are scratch; any other ignored entry there is unique, stricter
 # than teardown. The preserve
@@ -201,7 +212,7 @@ EOF
 # directory, "?? <path>/". That line alone is not counted: the clone is proved on
 # its own. Every other untracked file still is.
 fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
-  local copy=$1 prn=${2:-} mode=${3:-fetch} scope=${4:-all} top dirty stashes unpushed prsha='' extra=() refs=(HEAD) nested
+  local copy=$1 prn=${2:-} mode=${3:-fetch} scope=${4:-all} top dirty stashes unpushed prsha='' extra=() refs=(HEAD) nested headref
   if ! top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) || [ "$(fm_mp_real "$top")" != "$copy" ]; then
     fm_mp_verdict keep "$copy is not a git work tree root"
     return 1
@@ -240,8 +251,17 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
     fi
   fi
   [ -z "$prsha" ] || extra=("$prsha")
+  # A repository whose HEAD names a branch that does not exist yet (an empty
+  # `git init`) has no commit to compare, and rev-list exits 128 on such a HEAD.
+  # Only that case leaves HEAD out. A detached HEAD, a HEAD at a missing object
+  # and every repository with a commit are judged as before; the branches of the
+  # all scope are still compared.
+  if headref=$(git -C "$copy" symbolic-ref -q HEAD 2>/dev/null) \
+    && ! git -C "$copy" rev-parse -q --verify "$headref" >/dev/null 2>&1; then
+    refs=()
+  fi
   [ "$scope" != all ] || refs+=(--branches)
-  if ! unpushed=$(git -C "$copy" rev-list --count "${refs[@]}" --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
+  if ! unpushed=$(git -C "$copy" rev-list --count ${refs[@]+"${refs[@]}"} --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
     fm_mp_verdict keep "cannot compare $copy with its remotes"
     return 1
   fi
@@ -330,11 +350,37 @@ EOF
   return 0
 }
 
+# The exact paths under data/ or state/ that Firstmate's own tooling
+# writes during ordinary runs. A file-valued path must be a regular file; the
+# omp-primary-watch extension directory and everything below it, at any depth,
+# are scratch only when that path is a directory. Matched by exact relative path,
+# never by basename.
+fm_mp_tooling_path() {  # <real-copy> <relative-path>
+  case "$2" in
+    data/command-durations.jsonl|data/command-durations.jsonl.lock \
+      |state/.omp-live-model|state/.omp-turnend-extension-loaded|state/.omp-watch-extension-loaded \
+      |state/guard-events.jsonl)
+      [ -f "$1/$2" ] && [ ! -L "$1/$2" ]
+      return
+      ;;
+    state/extensions/omp-primary-watch)
+      [ -d "$1/$2" ] && [ ! -L "$1/$2" ]
+      return
+      ;;
+    state/extensions/omp-primary-watch/*)
+      [ -d "$1/state/extensions/omp-primary-watch" ] && [ ! -L "$1/state/extensions/omp-primary-watch" ]
+      return
+      ;;
+  esac
+  return 1
+}
+
 # One ignored entry: scratch (return 0), preserved (recorded, return 0), or
 # unique (keep verdict, return 1). Directories that may hold both kinds are
-# opened one level at a time.
-fm_mp_classify_entry() {  # <real-copy> <relative-path>
-  local copy=$1 rel=$2 name child n children
+# opened one level at a time. The third argument is set for a child reached by
+# opening an ignored data, state or state/extensions directory.
+fm_mp_classify_entry() {  # <real-copy> <relative-path> [opened]
+  local copy=$1 rel=$2 opened=${3:-} name child n children sub=
   name=${rel##*/}
   if [ -L "$copy/$rel" ] || teardown_graft_generated "$copy" "$rel"; then
     return 0
@@ -355,15 +401,16 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
       esac
       return 0
       ;;
-    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)
+    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac|data|state|state/extensions)
       if [ -d "$copy/$rel" ]; then
         if ! children=$(ls -A "$copy/$rel" 2>/dev/null); then
           fm_mp_verdict keep "cannot list $rel in $copy"
           return 1
         fi
+        case "$rel" in data|state|state/extensions) sub=opened ;; esac
         while IFS= read -r child; do
           [ -n "$child" ] || continue
-          fm_mp_classify_entry "$copy" "$rel/$child" || return 1
+          fm_mp_classify_entry "$copy" "$rel/$child" "$sub" || return 1
         done <<EOF
 $children
 EOF
@@ -378,6 +425,18 @@ EOF
     .claude/worktrees/*)
       if [ -e "$copy/$rel/.git" ]; then
         return 0
+      fi
+      ;;
+    # The exact tooling paths are scratch however they were reached. Inside an
+    # ignored data or state that was opened, nothing else is: the generic
+    # scratch-name rule below applies only to entries git lists one by one.
+    data/*|state/*)
+      if fm_mp_tooling_path "$copy" "$rel"; then
+        return 0
+      fi
+      if [ -n "$opened" ]; then
+        fm_mp_verdict keep "$copy holds an ignored file that is neither scratch nor on the preserve list: $rel"
+        return 1
       fi
       ;;
   esac

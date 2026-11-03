@@ -37,30 +37,40 @@
 # of the code root's history covers any fork, the parent, and any clone of
 # either. Lineage that cannot be determined (no code root history, or a shallow
 # side sharing no root) refuses rather than permits. The publication target is
-# compared only against a maintainer scope or task consent: the first remote
-# named upstream, github, or origin (the order gh prefers when resolving a
-# default repository), reduced to lowercase host/owner/repo; a local-path remote
-# is resolved one hop through that repository's own origin, and left as
-# path:<abs> when unreadable. An unknown target never permits.
+# compared only against a maintainer scope or task consent, and it is the
+# repository the task's delivery mode really publishes to, reduced to lowercase
+# host/owner/repo. A no-mistakes task publishes through the no-mistakes
+# pipeline, which opens its pull request against the destination registered for
+# the repository, normally the origin remote whatever other remotes exist, so
+# the gate checks origin and, before it authorizes, refuses when a registration
+# names another repository or the registry cannot be read; an unregistered
+# project publishes to origin (fm_role_nm_registration_check). Every other
+# publishing mode, and a caller that names no mode, publishes through gh, so the
+# gate keeps the first remote named upstream, github, or origin (the order gh
+# prefers when resolving a default repository). A local-path remote is resolved
+# one hop through that repository's own origin, and left as path:<abs> when
+# unreadable. An unknown target never permits.
 #
 # Public functions:
 #   fm_role_file <config-dir>            - the role file path
 #   fm_role_scope_valid <scope>          - host/owner/repo[/subgroup] shape check
 #   fm_role_scope_norm <scope>           - canonical comparison form
 #   fm_role_remote_identity <url> [<dir>]- host/owner/repo or path:<abs> or empty
-#   fm_role_publication_target <git-dir> - identity a default publication reaches
+#   fm_role_publication_target <git-dir> [<mode>]
+#                                        - identity the task's delivery publishes to
 #   fm_role_self_repo <project> <root>   - 0 firstmate lineage, 1 not, 2 unknown
 #   fm_role_parse_file <file>            - sets FM_ROLE/FM_ROLE_SCOPE/FM_ROLE_DIAG
 #   fm_role_resolve <home> <config-dir>  - effective role; adds FM_ROLE_SOURCE
 #   fm_role_inherit_payload <home> <config-dir> <out-file>
 #                                        - stage the resolved role a parent publishes
-#   fm_role_gate_self_publish <home> <config> <project> <root> [consent]
+#   fm_role_gate_self_publish <home> <config> <project> <root> [consent] [mode]
 #                                        - 0 authorized, 1 refused, 2 not self-repo
 #
 # Global outputs: FM_ROLE (user|maintainer), FM_ROLE_SCOPE (maintainer scope),
 # FM_ROLE_SOURCE (absent|local|inherited), FM_ROLE_DIAG (narrow refusal or
 # malformed-input reason), FM_ROLE_PUB_TARGET, FM_ROLE_PUB_AUTHORITY,
-# FM_ROLE_PUB_DENIAL.
+# FM_ROLE_PUB_DENIAL, FM_ROLE_PUB_NEEDS_GRANT (1 when a grant would clear the
+# refusal, else empty).
 
 # fm_role_file <config-dir>
 fm_role_file() {
@@ -221,13 +231,23 @@ fm_role_git_common_dir() {
   (CDPATH='' cd -- "$common" 2>/dev/null && pwd -P) || printf '%s\n' "$common"
 }
 
-# fm_role_publication_target <git-dir> - the repository a default publication
-# (gh pr/issue, a no-mistakes PR) would reach: the first of upstream, github,
-# origin that is configured, in the order gh prefers, normalized to
-# host/owner/repo or path:<abs>. Empty when the repo has no such remote.
+# fm_role_publication_target <git-dir> [<mode>] - the repository the task's
+# delivery names as its publication target, normalized to host/owner/repo or
+# path:<abs>. Mode no-mistakes publishes through the no-mistakes pipeline,
+# whose pull request destination is the origin remote alone (its init help says
+# it opens pull requests against origin, and its init refuses a fork whose
+# parent an upstream remote names rather than resolve the parent), so only
+# origin counts here; fm_role_nm_registration_check then refuses when the
+# pipeline's own registration names another repository. Any other mode, or none,
+# publishes through gh and keeps the first of upstream, github, origin that is
+# configured, in the order gh prefers. Empty when the repo has no such remote.
 fm_role_publication_target() {
-  local dir=$1 remote url=
-  for remote in upstream github origin; do
+  local dir=$1 mode=${2:-} remote url="" remotes
+  case $mode in
+  no-mistakes) remotes=origin ;;
+  *) remotes='upstream github origin' ;;
+  esac
+  for remote in $remotes; do
     if url=$(git -C "$dir" remote get-url "$remote" 2>/dev/null) && [ -n "$url" ]; then
       break
     fi
@@ -235,6 +255,74 @@ fm_role_publication_target() {
   done
   [ -n "$url" ] || return 0
   fm_role_remote_identity "$url" "$dir"
+}
+
+# fm_role_nm_registered_urls <project-dir> <db> - read-only: print the
+# upstream_url of every registration whose working path is the project's
+# checkout or the checkout holding its git common dir, one per line. rc 0 read
+# (zero lines = not registered, including no database at all); rc 1 the registry
+# could not be read or a matching row names no destination.
+fm_role_nm_registered_urls() {
+  local proj=$1 db=$2 top common cands=
+  [ -e "$db" ] || [ -L "$db" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 1
+  top=$(git -C "$proj" rev-parse --show-toplevel 2>/dev/null) || top=
+  common=$(fm_role_git_common_dir "$proj")
+  [ -z "$top" ] || cands=$top
+  case $common in
+  */.git) cands=$cands${cands:+$'\n'}${common%/.git} ;;
+  esac
+  python3 -I - "$db" "$cands" 2>/dev/null <<'PY'
+import os, sqlite3, sys
+from contextlib import closing
+from pathlib import Path
+db, cands = sys.argv[1], {os.path.realpath(c) for c in sys.argv[2].split("\n") if c}
+try:
+    with closing(sqlite3.connect(Path(db).as_uri() + "?mode=ro", uri=True)) as con:
+        rows = con.execute("SELECT working_path, upstream_url FROM repos").fetchall()
+except sqlite3.Error:
+    sys.exit(1)
+for path, url in rows:
+    if isinstance(path, str) and os.path.realpath(path) in cands:
+        if not isinstance(url, str) or not url.strip():
+            sys.exit(1)
+        print(url)
+PY
+}
+
+# fm_role_nm_registration_check <project-dir> <target> - for a no-mistakes
+# task: 0 when no registration exists for the project (no row, or no database at
+# all), so origin stands, or when every registration names <target>, the
+# destination the gate is about to authorize; otherwise 1 with
+# FM_ROLE_PUB_DENIAL. The pipeline opens its pull request against the registered
+# destination, and when its run-start refresh from origin fails (unreadable,
+# ambiguous or invalid remote, or a database write failure) it keeps the prior
+# registration, so a registration that disagrees with origin, or a registry that
+# cannot be read, refuses. The registry is only read, never written. The library
+# holding the registry path loads here, so only this check pays for it.
+fm_role_nm_registration_check() {
+  local proj=$1 target=$2 db='' urls url ident
+  if ! declare -F fm_nm_state_db >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-nm-run-lib.sh
+    . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-nm-run-lib.sh"
+  fi
+  if ! db=$(fm_nm_state_db "$proj") || ! urls=$(fm_role_nm_registered_urls "$proj" "$db"); then
+    # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+    FM_ROLE_PUB_DENIAL="cannot read the no-mistakes registration for $proj (registry ${db:-state.sqlite} needs python3 and a readable state.sqlite), so the repository a no-mistakes run would publish to cannot be established; run 'no-mistakes doctor', or set NM_HOME to the registry in use, then dispatch again"
+    return 1
+  fi
+  [ -n "$urls" ] || return 0
+  while IFS= read -r url; do
+    ident=$(fm_role_remote_identity "$url" "$proj")
+    if [ "$ident" != "$target" ]; then
+      # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+      FM_ROLE_PUB_DENIAL="origin names $target but the no-mistakes registration for $proj publishes to ${ident:-an unreadable destination}; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open its pull request against ${ident:-that destination} instead; the owner must reconcile the no-mistakes registration with origin, then dispatch again"
+      return 1
+    fi
+  done <<EOF
+$urls
+EOF
+  return 0
 }
 
 # fm_role_shallow <dir> - 0 when <dir> is a shallow git repository.
@@ -488,25 +576,35 @@ fm_role_pub_deny_event() {
   "$dir/fm-guard-event.sh" upstream-publish-role deny --source-ok true 2>/dev/null || true
 }
 
-# fm_role_gate_self_publish <home> <config-dir> <project-dir> <code-root> [consent]
+# fm_role_gate_registration <project-dir> <mode> - the registration check, for
+# no-mistakes only; every other mode publishes through gh and has none.
+fm_role_gate_registration() {
+  [ "$2" = no-mistakes ] || return 0
+  fm_role_nm_registration_check "$1" "$FM_ROLE_PUB_TARGET"
+}
+
+# fm_role_gate_self_publish <home> <config-dir> <project-dir> <code-root> [consent] [mode]
 # Evaluate whether this home may run a publication contract for a task on
 # firstmate's own repository. rc 0 authorized (FM_ROLE_PUB_AUTHORITY names the
 # source: maintainer scope or task consent); rc 1 refused (FM_ROLE_PUB_DENIAL
 # names the narrow reason); rc 2 the task is not on this firstmate repository
 # and the boundary does not apply. FM_ROLE_PUB_TARGET is the normalized
-# publication target when determinable.
+# publication target when determinable. <mode> is the task's delivery mode: it
+# selects which remote names the destination (fm_role_publication_target).
 fm_role_gate_self_publish() {
-  local home=$1 config=$2 proj=$3 root=$4 consent=${5:-} lineage=0
+  local home=$1 config=$2 proj=$3 root=$4 consent=${5:-} mode=${6:-} lineage=0 remotes_word
   FM_ROLE_PUB_TARGET=
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_ROLE_PUB_AUTHORITY=
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_ROLE_PUB_DENIAL=
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_ROLE_PUB_NEEDS_GRANT=
   fm_role_self_repo "$proj" "$root" || lineage=$?
   if [ "$lineage" -eq 1 ]; then
     return 2
   fi
-  FM_ROLE_PUB_TARGET=$(fm_role_publication_target "$proj")
+  FM_ROLE_PUB_TARGET=$(fm_role_publication_target "$proj" "$mode")
   if [ "$lineage" -eq 2 ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_DENIAL="cannot determine whether $proj shares firstmate's history (the code root $root has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work"
@@ -522,22 +620,28 @@ fm_role_gate_self_publish() {
     fi
   fi
   if [ -z "$FM_ROLE_PUB_TARGET" ]; then
+    remotes_word='upstream, github, or origin remote'
+    [ "$mode" != no-mistakes ] || remotes_word='origin remote, which a no-mistakes pull request targets'
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    FM_ROLE_PUB_DENIAL="this task targets firstmate's own repository but no publication target can be determined (no upstream, github, or origin remote on $proj)"
+    FM_ROLE_PUB_DENIAL="this task targets firstmate's own repository but no publication target can be determined (no $remotes_word on $proj)"
     return 1
   fi
   if [ -n "$consent" ] && [ "$consent" = "$FM_ROLE_PUB_TARGET" ]; then
+    fm_role_gate_registration "$proj" "$mode" || return 1
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_AUTHORITY="task consent for $consent"
     return 0
   fi
   if [ "$FM_ROLE" = maintainer ] && [ "$FM_ROLE_SCOPE" = "$FM_ROLE_PUB_TARGET" ]; then
+    fm_role_gate_registration "$proj" "$mode" || return 1
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
     FM_ROLE_PUB_AUTHORITY="maintainer scope $FM_ROLE_PUB_TARGET"
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_ROLE_PUB_DENIAL="this home runs as firstmate user/operator and holds no publication authority for $FM_ROLE_PUB_TARGET; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in $config/firstmate-role, or one-task consent recorded at dispatch as --upstream-consent <host>/<owner>/<repo>"
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_ROLE_PUB_NEEDS_GRANT=1
   fm_role_pub_deny_event
   return 1
 }

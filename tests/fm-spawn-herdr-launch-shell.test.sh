@@ -31,6 +31,14 @@ make_case() {
     fail "refusing preexisting or unavailable task temp namespace $task_tmp"
   fi
   FAKEBIN=$(fm_test_make_spawn_fakebin "$CASE_DIR/fake" gh gh-axi)
+  # These model-free shell fixtures exercise staged delivery, not native
+  # Seatbelt. The separate confinement suite owns Darwin kernel acceptance.
+  cat > "$FAKEBIN/uname" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != -s ] || { printf 'Linux\n'; exit 0; }
+exec /usr/bin/uname "$@"
+SH
+  chmod +x "$FAKEBIN/uname"
   fm_test_spawn_home "$HOME_DIR" codex
   home_root=$(cd "$HOME_DIR" && pwd -P)
   home_hash=$(printf '%s' "$home_root" | shasum -a 256)
@@ -152,20 +160,17 @@ SH
     TMPDIR="${TMPDIR:-$TMP_ROOT}" PANE_AMBIENT=ambient PANE_LISTED=listed \
     "$shell" "${shell_args[@]}" -c '
       unset FM_SPAWN_GEN
-      BOUNDARY_SHELL=${ZSH_VERSION:+zsh}
-      BOUNDARY_SHELL=${BOUNDARY_SHELL:-bash}
-      export BOUNDARY_SHELL
       . "$1"
       . "$2"
     ' pane "$CASE_DIR/pane-input.sh" "$CASE_DIR/after-launch.sh" \
     > "$CASE_DIR/probe-output" 2> "$CASE_DIR/probe-error" \
     || fail "destination shell failed: $(cat "$CASE_DIR/probe-error")"
-  "$PYTHON_BIN" - "$CASE_DIR/probe-output" "$gen" "$filtered" "$expected_config" "$compound" <<'PY'
+  "$PYTHON_BIN" - "$CASE_DIR/probe-output" "$gen" "$filtered" "$expected_config" "$compound" "${shell##*/}" <<'PY'
 import json, pathlib, sys
-path, gen, filtered, config, compound = sys.argv[1:]
+path, gen, filtered, config, compound, pane_shell = sys.argv[1:]
 lines = pathlib.Path(path).read_text().splitlines()
 children = [json.loads(line) for line in lines if line.startswith('{')]
-assert len(children) == 2, lines
+assert len(children) == 2, (lines, pathlib.Path(path).with_name('probe-error').read_text())
 child, resume = children
 assert child['gen'] == gen, child
 assert 'shell-gen=unset' in lines, lines
@@ -174,12 +179,16 @@ assert 'shell-compound=unset' in lines, lines
 assert resume['argv'] == ['--resume=bare-session'], resume
 assert child['argv'] == ['--config', config], child
 assert child['compound'] == (compound or None), child
-assert child['ambient'] == (None if filtered == 'yes' else 'ambient'), child
-assert child['listed'] == 'listed', child
+# Every launch drops the pane's ambient names; only an allowlist keeps one.
+assert child['ambient'] is None, child
+assert child['listed'] == ('listed' if filtered == 'yes' else None), child
+# The launch text itself records the shell that parsed it: the pane's own shell
+# by default, never a POSIX-mode or other wrapper shell under the allowlist.
+name, _, options = child['shell'].partition(':')
 if filtered == 'yes':
-    assert child['shell'] is None, child
+    assert name != pane_shell or 'posix' in options.split(':'), child
 else:
-    assert child['shell'] in ('zsh', 'bash'), child
+    assert name == pane_shell and 'posix' not in options.split(':'), (pane_shell, child)
 PY
   pass "$harness destination-shell launch matches record without contaminating shell or bare resume"
 }
@@ -191,28 +200,22 @@ test_claude_staged_native_hook_suppression() {
     [ "$mode" != secondmate ] || kind=secondmate
     make_case "claude-$mode" "$kind"
     fm_test_fake_teamclaude "$FAKEBIN"
-    # This portable environment regression does not exercise nested macOS
-    # Seatbelt; its separate live guard owns OS-confinement evidence.
-    cat > "$FAKEBIN/uname" <<'SH'
-#!/usr/bin/env bash
-[ "$*" != -s ] || { printf 'Linux\n'; exit 0; }
-exec /usr/bin/uname "$@"
-SH
-    chmod +x "$FAKEBIN/uname"
     printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
-    cat > "$FAKEBIN/claude" <<'SH'
+    # The recorders name their output paths themselves: the launch boundary
+    # keeps no test-only pane variable.
+    cat > "$FAKEBIN/claude" <<SH
 #!/usr/bin/env bash
 set -eu
-env > "$FM_TEST_RUNTIME_RESULT"
-. "$FM_TEST_RUNTIME_ROOT/bin/fm-backend.sh"
-. "$FM_TEST_RUNTIME_ROOT/bin/fm-supervisor-target-lib.sh"
-fm_backend_name > "$FM_TEST_RUNTIME_RESULT.backend"
-discover_supervisor_backend > "$FM_TEST_RUNTIME_RESULT.supervisor"
-discover_supervisor_target > "$FM_TEST_RUNTIME_RESULT.target"
+env > '$CASE_DIR/runtime-result'
+. '$ROOT/bin/fm-backend.sh'
+. '$ROOT/bin/fm-supervisor-target-lib.sh'
+fm_backend_name > '$CASE_DIR/runtime-result.backend'
+discover_supervisor_backend > '$CASE_DIR/runtime-result.supervisor'
+discover_supervisor_target > '$CASE_DIR/runtime-result.target'
 SH
-    cat > "$FAKEBIN/codex" <<'SH'
+    cat > "$FAKEBIN/codex" <<SH
 #!/usr/bin/env bash
-env > "$FM_TEST_RUNTIME_RESULT.unrelated"
+env > '$CASE_DIR/runtime-result.unrelated'
 SH
     chmod +x "$FAKEBIN/claude" "$FAKEBIN/codex"
     command=claude
@@ -226,8 +229,7 @@ SH
     # shellcheck disable=SC2016 # The destination shell must expand this code.
     env -i HOME="$CASE_DIR/pane-home" FM_HOME="$WT_DIR" \
       PATH="$FAKEBIN:$PATH" TERM=xterm HERDR_ENV=1 HERDR_PANE_ID=%9 \
-      HERDR_SESSION=fm-shell-test FM_TEST_RUNTIME_ROOT="$ROOT" \
-      FM_TEST_RUNTIME_RESULT="$CASE_DIR/runtime-result" \
+      HERDR_SESSION=fm-shell-test \
       "$BASH_BIN" --noprofile --norc -c '
         . "$1"
         [ "$HERDR_ENV" = 1 ] && [ "${FM_HERDR_RUNTIME-unset}" = unset ] || exit 97
@@ -258,12 +260,12 @@ test_claude_staged_native_hook_suppression
 if [ -n "$ZSH_BIN" ]; then
   make_case zsh-ship ship
   # shellcheck disable=SC2016 # The destination zsh must expand this launch command.
-  run_spawn ship 'omp --config "${${HOME}:A}/worker.yml"'
+  run_spawn ship 'BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} omp --config "${${HOME}:A}/worker.yml"'
   execute_pane "$ZSH_BIN" no omp "$CASE_DIR/pane-home/worker.yml" ''
 
   make_case zsh-scout scout
   # shellcheck disable=SC2016 # The destination zsh must expand this launch command.
-  run_spawn scout 'omp --config "${${HOME}:A}/worker.yml"; export COMPOUND_VALUE=compound'
+  run_spawn scout 'BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} omp --config "${${HOME}:A}/worker.yml"; export COMPOUND_VALUE=compound'
   execute_pane "$ZSH_BIN" no omp "$CASE_DIR/pane-home/worker.yml" ''
   [ ! -s "$CASE_DIR/probe-error" ] || fail 'compound zsh launch must not emit errors'
 else
@@ -272,21 +274,21 @@ fi
 
 make_case bash-generic ship
 # shellcheck disable=SC2016 # The destination shell must expand this launch command.
-run_spawn ship 'codex --config "${HOME}/worker.yml"'
+run_spawn ship 'BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} codex --config "${HOME}/worker.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/worker.yml" ''
 
 : > "$CASE_DIR/pane-input.sh"
 : > "$CASE_DIR/source-lines"
 old_gen=$(grep '^spawn_gen=' "$HOME_DIR/state/$ID.meta" | cut -d= -f2-)
 # shellcheck disable=SC2016 # The destination shell must expand this launch command.
-run_spawn relaunch 'codex --config "${HOME}/replacement.yml"'
+run_spawn relaunch 'BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} codex --config "${HOME}/replacement.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/replacement.yml" ''
 new_gen=$(grep '^spawn_gen=' "$HOME_DIR/state/$ID.meta" | cut -d= -f2-)
 [ "$old_gen" != "$new_gen" ] || fail 'relaunch must record a new incarnation'
 
 make_case bash-secondmate secondmate
 # shellcheck disable=SC2016 # The destination shell must expand this launch command.
-run_spawn secondmate 'codex --config "${HOME}/supervisor.yml"'
+run_spawn secondmate 'BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} codex --config "${HOME}/supervisor.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/supervisor.yml" ''
 
 for shell in "$BASH_BIN" ${ZSH_BIN:+"$ZSH_BIN"}; do
@@ -295,6 +297,6 @@ for shell in "$BASH_BIN" ${ZSH_BIN:+"$ZSH_BIN"}; do
   make_case "$name-filtered" scout
   printf 'PANE_LISTED\n' > "$HOME_DIR/config/launch-env-allowlist"
   # shellcheck disable=SC2016 # The destination shell must expand this launch command.
-  run_spawn scout 'COMPOUND_VALUE=posix; export COMPOUND_VALUE; omp --config "${ZSH_VERSION-posix}/worker.yml"'
+  run_spawn scout 'COMPOUND_VALUE=posix; export COMPOUND_VALUE; BOUNDARY_SHELL=${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}:${SHELLOPTS-} omp --config "${ZSH_VERSION-posix}/worker.yml"'
   execute_pane "$shell" yes omp 'posix/worker.yml' posix
 done
