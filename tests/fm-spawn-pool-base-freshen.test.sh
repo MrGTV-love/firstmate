@@ -1575,6 +1575,16 @@ if "--help" in sys.argv[1:]:
             probes = len(log.read().splitlines())
         if probes == int(at):
             subprocess.run(["git", "-C", repo, "checkout", "-q", "-b", moved], check=True)
+    # FM_TEST_HELP_META=<n>::<meta file>::<branch>: another actor rewrites the
+    # recorded branch of a task during the n-th probe.
+    rewrite = os.environ.get("FM_TEST_HELP_META")
+    if rewrite:
+        at, meta_file, moved = rewrite.split("::")
+        with open(calls + ".help", encoding="utf-8") as log:
+            probes = len(log.read().splitlines())
+        if probes == int(at):
+            lines = Path(meta_file).read_text(encoding="utf-8").splitlines()
+            Path(meta_file).write_text("\n".join("branch=" + moved if l.startswith("branch=") else l for l in lines) + "\n", encoding="utf-8")
     ap.parse_args()
 with open(calls, "a", encoding="utf-8") as log:
     log.write(json.dumps(sys.argv[1:]) + "\n")
@@ -1648,7 +1658,7 @@ successor_real() { (cd -P -- "$1" && pwd -P); }
 
 run_successor_spawn() { # <arg>...: a fresh ship spawn of $SUCC_ID
   FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE="${OWNER_MODE:-pass}" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
-    FM_TEST_HELP_SWITCH="${HELP_SWITCH:-}" \
+    FM_TEST_HELP_SWITCH="${HELP_SWITCH:-}" FM_TEST_HELP_META="${HELP_META:-}" \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" run_spawn "$SUCC_ID" --mode local-only --yolo off --owned-path README.md "$@"
 }
 
@@ -1957,6 +1967,26 @@ test_successor_of_branch_is_rechecked_at_handover() {
   pass 'a predecessor that leaves its recorded branch after preflight is refused before the provisioner and mints nothing'
 }
 
+# Review finding 1, task half: the predecessor's task record is part of the proof.
+test_successor_of_task_record_is_rechecked_at_handover() {
+  local out rc=0 head branch
+  make_successor_case recordmoved advertise
+  successor_pred pred-live
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  # The task record names another branch during the second help probe.
+  out=$(HELP_META="2::$HOME_DIR/state/pred-live.meta::fm/other-task" run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a predecessor whose task record changed after preflight was admitted'
+  assert_contains "$out" 'changed its task record after it was checked' 'the changed task record refusal is not named'
+  assert_grep 'branch=fm/other-task' "$HOME_DIR/state/pred-live.meta" 'the probe did not change the record, so the row is vacuous'
+  [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
+  [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor whose record changed'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
+    || fail 'the refusal did not restore the assigned checkout'
+  pass 'a predecessor whose task record changes after preflight is refused before the provisioner'
+}
+
 # Review finding 2: an id=repo batch never drops the declaration silently.
 test_successor_of_batch_is_refused() {
   local before out rc=0 pred
@@ -2003,7 +2033,7 @@ test_successor_of_refuses_before_any_lock() {
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -2024,6 +2054,7 @@ test_successor_of_scope
 test_successor_of_retained_retry
 test_successor_of_checks_are_load_bearing
 test_successor_of_branch_is_rechecked_at_handover
+test_successor_of_task_record_is_rechecked_at_handover
 test_successor_of_batch_is_refused
 test_successor_of_refuses_before_any_lock
 test_local_only_origin_early
