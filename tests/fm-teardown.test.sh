@@ -511,6 +511,102 @@ test_squash_merged_branch_deleted_allows() {
   pass "squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)"
 }
 
+# A detached copy has no branch name in HEAD, so the merged PR is looked up
+# through the record's own branch (branch=, else fm/<id>). The same containment
+# proof decides landed: a copy holding a commit the merged PR head lacks is refused.
+add_gh_axi_pr_for_branch() {  # <case_dir> <branch>: PR 7 is merged only for that exact head branch
+  local case_dir=$1 branch=$2
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$case_dir/gh-axi.calls"
+case "\${1:-} \${2:-}" in
+  "pr list")
+    case " \$* " in
+      *" --head $branch "*) printf '%s\\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,merged" ;;
+      *) printf '%s\\n' "count: 0 (showing first 0)" "pull_requests[]: []" ;;
+    esac
+    exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/gh-axi"
+}
+
+detached_copy_case() {  # <name> <recorded-branch|-> <extra-commit yes|no> <pr-head own|base>
+  local name=$1 branch=$2 extra=$3 prhead=$4 case_dir pr_head lookup=fm/task-x1
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" direct-PR ship
+  [ "$branch" = - ] || { printf 'branch=%s\n' "$branch" >> "$case_dir/state/task-x1.meta"; lookup=$branch; }
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  [ "$prhead" = own ] || pr_head=$(git -C "$case_dir/project" rev-parse main)
+  if [ "$extra" = yes ]; then
+    wt_commit_file "$case_dir" extra.txt different "add extra work the PR never carried"
+  fi
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  add_gh_axi_pr_for_branch "$case_dir" "$lookup"
+  git -C "$case_dir/wt" checkout -q --detach
+  git -C "$case_dir/project" branch -q -D fm/task-x1
+  printf '%s\n' "$case_dir"
+}
+
+test_detached_copy_is_judged_through_the_record_branch() {
+  local variant case_dir rc recorded
+  for variant in default-branch recorded-branch; do
+    recorded=-
+    [ "$variant" = default-branch ] || recorded=fm/recorded-x
+    case_dir=$(detached_copy_case "detached-landed-$variant" "$recorded" no own)
+    [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD)" = HEAD ] || fail "$variant: the copy is not detached"
+    ! grep -q '^pr=' "$case_dir/state/task-x1.meta" || fail "$variant: the fixture recorded a pr="
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$variant: a detached copy whose merged PR holds its work was refused: $(cat "$case_dir/stderr")"
+    ! grep -q REFUSED "$case_dir/stderr" || fail "$variant: teardown printed a REFUSED line"
+    assert_absent "$case_dir/state/task-x1.meta" "$variant: the record stayed open"
+    grep -q -- "--head ${recorded/#-/fm/task-x1}" "$case_dir/gh-axi.calls" \
+      || fail "$variant: the PR was not looked up by the record's branch: $(cat "$case_dir/gh-axi.calls")"
+  done
+  pass "a detached copy with no pr= is judged landed through the record's branch (branch= or fm/<id>) and torn down"
+}
+
+test_detached_copy_unlanded_work_is_still_refused() {
+  local variant case_dir rc
+  for variant in extra-commit pr-lacks-the-work; do
+    case "$variant" in
+      extra-commit) case_dir=$(detached_copy_case "detached-$variant" - yes own) ;;
+      pr-lacks-the-work) case_dir=$(detached_copy_case "detached-$variant" fm/recorded-x no base) ;;
+    esac
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$variant: a detached copy the merged PR does not carry was torn down"
+    assert_grep 'the ship deliverable is not landed' "$case_dir/stderr" "$variant: the refusal does not say not landed"
+    assert_present "$case_dir/state/task-x1.meta" "$variant: the record was closed over unlanded work"
+    [ -d "$case_dir/wt" ] || fail "$variant: the copy was removed"
+    git -C "$case_dir/wt" log -1 --format=%s | grep -q . || fail "$variant: the copy lost its commits"
+  done
+  assert_grep 'add extra work the PR never carried' "$TMP_ROOT/detached-extra-commit/stderr" \
+    "the refusal does not name the commit the merged PR does not contain"
+  pass "a detached copy holding a commit the merged PR lacks, or whose record branch matches a PR that lacks its work, is still refused and kept"
+}
+
+test_named_branch_copy_without_pr_meta_behaves_as_before() {
+  local case_dir rc
+  case_dir=$(make_case named-branch-no-pr)
+  write_meta "$case_dir" direct-PR ship
+  seed_backlog_in_flight "$case_dir" ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  add_gh_axi_pr_for_branch "$case_dir" fm/task-x1
+  [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD)" = fm/task-x1 ] || fail "the copy is not on its branch"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a named-branch copy with a merged PR was refused: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "the record stayed open"
+  pass "a copy on a named branch is judged landed through that branch as before"
+}
+
 test_task_archives_reap_only_carried_refs() {
   local case_dir base submitted replayed pipeline rc=0 name
   case_dir=$(make_case archive-carried)
@@ -3813,6 +3909,9 @@ SH
 
 
 teardown_test_cases=(
+test_detached_copy_is_judged_through_the_record_branch
+test_detached_copy_unlanded_work_is_still_refused
+test_named_branch_copy_without_pr_meta_behaves_as_before
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself

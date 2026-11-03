@@ -1620,6 +1620,39 @@ test_external_forge_direct_pr_is_refused
 test_external_forge_brief_is_not_published
 test_worker_role_names_skill_and_fallback_file
 
+# A done note names its PR either as `PR <url> ...` or as a note whose first
+# word is the URL (the 2026-10-18 close-evidence note began with the merged
+# URL). Only a pull or merge request URL in one of those two places is taken.
+test_pr_url_from_done_note() {
+  local note want got rc
+  while IFS='|' read -r want note; do
+    got=$(fm_dod_pr_url_from_done_note "$note") && rc=0 || rc=$?
+    if [ "$want" = - ]; then
+      [ "$rc" -ne 0 ] && [ -z "$got" ] || fail "taken from a note that names no PR in the first place: $note -> $got"
+    else
+      [ "$rc" -eq 0 ] && [ "$got" = "$want" ] || fail "PR URL not taken from: $note (got '$got', rc=$rc)"
+    fi
+  done <<'ROWS'
+https://github.com/o/r/pull/9|PR https://github.com/o/r/pull/9 head abc
+https://github.com/o/r/pull/9|https://github.com/o/r/pull/9 merged
+https://github.com/o/r/pull/9|https://github.com/o/r/pull/9
+https://gitlab.com/o/r/-/merge_requests/5|https://gitlab.com/o/r/-/merge_requests/5 merged by another lane
+-|https://github.com/o/r/issues/9
+-|https://github.com/o/r/issues/9 merged
+-|see https://github.com/o/r/pull/9
+-|merged https://github.com/o/r/pull/9
+-|https://github.com/o/r/tree/main merged
+-|http://github.com/o/r/pull/9 merged
+-|
+-|PR checks green
+ROWS
+  # The bare form is judged inside the function: the caller's PR globals stay.
+  FM_PR_URL=sentinel
+  fm_dod_pr_url_from_done_note 'https://github.com/o/r/pull/9 merged' >/dev/null
+  [ "$FM_PR_URL" = sentinel ] || fail "parsing a bare URL clobbered the caller's FM_PR_URL"
+  pass "a done note names its PR as 'PR <url>' or as its first word, and nothing else"
+}
+
 # Independent review readers may not hold a read grant for the rubric owner, so
 # the emitted launch role must carry its full text and refuse without it.
 test_worker_role_renders_shared_rubric() {
@@ -1646,5 +1679,7 @@ test_worker_role_renders_shared_rubric() {
 }
 
 test_worker_role_renders_shared_rubric
+
+test_pr_url_from_done_note
 
 echo "all fm-dod-lib tests passed"

@@ -23,8 +23,8 @@
 #   5. the merge path end to end through bin/fm-pr-merge.sh and the real teardown
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fm-pr-merge-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 unset FM_HOME
 fm_git_identity fmtest fmtest@example.invalid
 # tests/lib.sh turns arming off for every other suite; this one tests it.
@@ -90,7 +90,7 @@ make_world() {
   git -C "$COPY" add work.txt
   git -C "$COPY" commit -q -m "task work"
   git -C "$COPY" push -q origin fm/t1
-  squash_merge_into_main "$COPY"
+  [ -n "${NO_SQUASH:-}" ] || squash_merge_into_main "$COPY"
   install_stubs
   mk_task t1 "$COPY"
 }
@@ -3267,6 +3267,511 @@ test_e2e_unsafe_copies_are_never_removed() {
   pass "end to end: a changed file, an unpushed commit and an unpushed NESTED commit each keep the copy, force nothing, and raise exactly one wake"
 }
 
+
+# --- 6. a PR merged by another lane --------------------------------------------
+#
+# Lane O (this world's home) owns the implementation task t1: a direct-PR ship
+# whose pool copy is detached and whose record has no pr=. Lane M (a second home
+# built by the merge suite's fixtures) owns a review task and merges t1's PR through
+# its own bin/fm-pr-merge.sh, so no merge event is written in O's home. O's real
+# watcher housekeeping, merge poll, ledger and teardown must carry t1 to a safe
+# close. The forge is one shared file both lanes' gh doubles read.
+
+XL_PR=https://github.com/acme/widget/pull/7
+
+# xl_env: the environment O's real scripts run in (as prune_real gives them).
+xl_env() {
+  env HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE="$W/code-root" NM_HOME="$W/nm" \
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" TH_FAIL="$W/th.fail" \
+    FM_MERGE_PRUNE_EXIT_WAIT=0 FM_TEARDOWN_GUARD_DONE=1 ROOT="$ROOT" STUB_LOG="$W/stub.log" \
+    FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-real" REFUSE_FLAG="$W/refuse" \
+    FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log" \
+    WORKER_PID_FILE="$W/worker.pid" PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" \
+    SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" STOP_FAIL_FILE="$W/stop-fail" \
+    BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" "$@"
+}
+
+# make_xlane_world: lane O's world, then a second home for lane M.
+make_xlane_world() {
+  local head
+  NO_SQUASH=1 make_e2e_world
+  head=$(git -C "$COPY" rev-parse HEAD)
+  XL_HEAD=$head
+  XL_MHOME_CASE=
+  printf 'OPEN\n' > "$W/forge.state"
+  # A direct-PR slot copy is detached and has no local task branch; the pushed
+  # branch is still on the remote, as when the forge keeps the head branch.
+  git -C "$COPY" checkout -q --detach
+  git -C "$W/project" branch -q -D fm/t1
+  rm -f "$STATE/t1.pr-poll-merge-notified"
+  fm_write_meta "$STATE/t1.meta" "window=firstmate:fm-t1" "endpoint_task_id=t1" "worktree=$COPY" \
+    "project=$W/project" "kind=ship" "mode=direct-PR" "spawn_gen=xl-t1" "harness=claude" "backend=tmux" "model=gpt-5.1-codex"
+  printf 'working [at=%s]: building\n' "$OLD" > "$STATE/t1.status"
+  : > "$HOME_DIR/config/fleet-ledger"
+  # The forge both lanes see: one state file, read by every gh double.
+  cat > "$W/bin/gh" <<SH
+#!/usr/bin/env bash
+state=\$(cat "$W/forge.state")
+case "\${1:-} \${2:-}" in
+  "pr view")
+    case " \$* " in
+      *"--json isDraft"*) printf '{"isDraft":false}\n'; exit 0 ;;
+      *"state,headRefOid,mergeCommit"*) printf '%s\t%s\t%s\n' "\$state" '$head' ''; exit 0 ;;
+      *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' "\$state" '$head' '$XL_PR'; exit 0 ;;
+      *"--json state "*) printf '%s\n' "\$state"; exit 0 ;;
+      *"headRefOid"*) printf '%s\n' '$head'; exit 0 ;;
+    esac ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  cat > "$W/bin/gh-axi" <<SH
+#!/usr/bin/env bash
+state=\$(tr 'A-Z' 'a-z' < "$W/forge.state")
+case "\${1:-} \${2:-}" in
+  "pr list") printf '%s\\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,\$state"; exit 0 ;;
+  "pr view") printf '%s\\n' "pull_request:" "  number: 7" "  state: \$state"; exit 0 ;;
+esac
+exit 0
+SH
+  chmod +x "$W/bin/gh" "$W/bin/gh-axi"
+}
+
+# xl_merge_case <label>: a merge fixture whose gh double flips the shared forge
+# when (and only when) a real merge call succeeds.
+xl_merge_case() {
+  local mc
+  mc=$(make_case "$1-$WN")
+  XL_MC=$mc
+  mkdir -p "$mc/wt"
+  add_gh_mocks "$mc" "$XL_HEAD"
+  mv "$mc/fakebin/gh" "$mc/fakebin/gh.real"
+  cat > "$mc/fakebin/gh" <<SH
+#!/usr/bin/env bash
+"$mc/fakebin/gh.real" "\$@"
+rc=\$?
+case "\${1:-} \${2:-}" in
+  "pr merge") case " \$* " in *" --disable-auto "*) ;; *) [ "\$rc" -ne 0 ] || printf 'MERGED\n' > "$W/forge.state" ;; esac ;;
+esac
+exit \$rc
+SH
+  chmod +x "$mc/fakebin/gh"
+  : > "$mc/gh-axi.log"
+}
+
+# xl_merge_in_lane_m: lane M merges t1's PR through M's own real fm-pr-merge.sh.
+xl_merge_in_lane_m() {
+  local rc=0
+  xl_merge_case xlane-m
+  XL_O_BEFORE=$(xl_digest_o)
+  run_pr_merge "$XL_MC" task-x1 "$XL_PR" > "$XL_MC/stdout" 2> "$XL_MC/stderr" || rc=$?
+  [ "$rc" -eq 0 ] || fail "lane M's fm-pr-merge.sh did not merge: $(cat "$XL_MC/stderr")"
+  [ "$(cat "$W/forge.state")" = MERGED ] || fail "lane M's merge did not reach the forge"
+  grep -qx "pr=$XL_PR" "$XL_MC/state/task-x1.meta" || fail "lane M's own record does not name the PR it merged"
+  [ "$XL_O_BEFORE" = "$(xl_digest_o)" ] || fail "lane M's merge wrote into lane O's home"
+}
+
+# A digest of every file in lane O's state directory (names and bytes), so a
+# write by another lane shows as a different digest.
+xl_digest_o() {
+  (cd "$STATE" && find . -type f ! -name '.wake-queue.lock' -print0 2>/dev/null | sort -z | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')
+}
+
+# done note leading with the PR URL, as the 2026-10-18 close-evidence note did
+xl_write_done_note() {
+  printf 'done [at=%s] [key=close-evidence]: %s merged by lane M review task\n' "$NOW" "$XL_PR" >> "$STATE/t1.status"
+}
+
+xl_start_watcher() {
+  xl_env FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=999999 FM_CHECK_INTERVAL=1 \
+    FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=1 FM_IDLE_REAP_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
+    FM_LAVISH_AUTO_RETIRE_INTERVAL=0 FM_CHECK_TIMEOUT=20 \
+    bash "$ROOT/bin/fm-watch.sh" > "$W/watch.out" 2>&1 &
+  XL_WATCH_PID=$!
+  WORKER_PIDS+=("$XL_WATCH_PID")
+  fm_test_track_watcher_state "$STATE"
+}
+
+xl_stop_watcher() {
+  [ -z "${XL_WATCH_PID:-}" ] || { kill -TERM "$XL_WATCH_PID" 2>/dev/null || true; wait "$XL_WATCH_PID" 2>/dev/null || true; }
+  XL_WATCH_PID=
+}
+
+# xl_supervise_until <condition...>: run O's real watcher, re-arming it each time
+# it exits on a wake (the supervision cycle), until the condition holds; bounded.
+xl_supervise_until() {
+  local deadline=$((SECONDS + ${XL_BOUND:-75}))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if "$@"; then xl_stop_watcher; return 0; fi
+    if [ -z "${XL_WATCH_PID:-}" ] || ! kill -0 "$XL_WATCH_PID" 2>/dev/null; then
+      [ -z "${XL_WATCH_PID:-}" ] || wait "$XL_WATCH_PID" 2>/dev/null || true
+      xl_start_watcher
+    fi
+    sleep 0.1
+  done
+  xl_stop_watcher
+  return 1
+}
+
+xl_record_gone() { [ ! -e "$STATE/t1.meta" ]; }
+# closed: the record, the pool copy and the prune record are all gone
+xl_closed() { [ ! -e "$STATE/t1.meta" ] && [ ! -e "$COPY" ] && [ ! -e "$STATE/t1.merge-prune" ]; }
+
+# The observed result, read from files only (never from a log of what was sent).
+xl_ledger_events() {  # t1's ledger event types in order
+  { grep -h '"task":"t1"' "$STATE"/fleet-ledger.jsonl 2>/dev/null || true; } | sed -n 's/.*"event":"\([^"]*\)".*/\1/p' | tr '\n' ' '
+}
+
+xl_print_state() {  # <label>
+  printf '%s: record=%s pr=%s poll=%s prune-record=%s copy=%s ledger=[%s]\n' "$1" \
+    "$([ -e "$STATE/t1.meta" ] && echo open || echo gone)" \
+    "$(sed -n 's/^pr=//p' "$STATE/t1.meta" 2>/dev/null | tail -1 | grep . || echo none)" \
+    "$([ -e "$STATE/t1.check.sh" ] && echo armed || echo none)" \
+    "$([ -e "$STATE/t1.merge-prune" ] && echo armed || echo none)" \
+    "$([ -e "$COPY" ] && echo present || echo gone)" "$(xl_ledger_events)"
+}
+
+# O's plain teardown, exactly as the closeout runs it (never forced).
+xl_plain_teardown() {  # <stderr file>
+  local rc=0
+  xl_env "$W/bin/teardown-real" t1 > "$W/teardown.out" 2> "$1" || rc=$?
+  return "$rc"
+}
+
+test_xlane_merge_by_another_lane_reaches_safe_closeout() {
+  local variant
+  for variant in unregistered poll-never-published; do
+    make_xlane_world
+    xl_merge_in_lane_m
+    xl_write_done_note
+    if [ "$variant" = poll-never-published ]; then
+      # The registrar committed pr= and was interrupted before it published the poll.
+      printf 'pr=%s\npr_head=%s\n' "$XL_PR" "$XL_HEAD" >> "$STATE/t1.meta"
+    fi
+    xl_print_state "$variant before housekeeping"
+    [ ! -e "$STATE/t1.check.sh" ] || fail "$variant: a poll existed before housekeeping"
+    [ ! -e "$STATE/t1.merge-prune" ] || fail "$variant: a prune record existed before housekeeping"
+    xl_supervise_until xl_closed \
+      || { xl_print_state "$variant after supervision"; fail "$variant: t1 stayed open after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
+    xl_print_state "$variant after supervision"
+    [ ! -e "$COPY" ] || fail "$variant: the copy is still on disk"
+    [ ! -e "$STATE/t1.check.sh" ] && [ ! -e "$STATE/t1.pr-poll" ] || fail "$variant: the poll file outlived the record"
+    case " $(xl_ledger_events)" in *' task.merged '*) ;; *) fail "$variant: no task.merged for t1 in O's ledger: $(xl_ledger_events)" ;; esac
+    case " $(xl_ledger_events)" in *' task.cleaned_up '*) ;; *) fail "$variant: no task.cleaned_up for t1 in O's ledger: $(xl_ledger_events)" ;; esac
+    assert_nothing_forced "xlane $variant"
+    [ ! -e "$XL_MC/state/t1.meta" ] || fail "$variant: lane M holds a record for t1"
+    cleanup_workers
+  done
+  pass "a PR merged by another lane reaches its owning record: pr= from the done note (or the lost poll re-armed), the merge found at the forge, plain teardown, record, copy and poll gone, ledger shows merged and cleaned_up"
+}
+
+
+# A PR that is still open, or was closed unmerged, never closes the record: the
+# copy and the record stay, and nothing is torn down.
+test_xlane_open_or_closed_pr_keeps_the_record() {
+  local state
+  for state in OPEN CLOSED; do
+    make_xlane_world
+    printf '%s\n' "$state" > "$W/forge.state"
+    xl_write_done_note
+    XL_BOUND=12
+    xl_supervise_until xl_closed && fail "$state: the record was closed with the PR $state"
+    unset XL_BOUND
+    xl_print_state "$state PR after supervision"
+    [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "$state: the copy or the record was removed"
+    case " $(xl_ledger_events)" in *' task.merged '*|*' task.cleaned_up '*) fail "$state: the ledger claims a merge or a cleanup: $(xl_ledger_events)" ;; esac
+    assert_nothing_forced "xlane $state"
+    cleanup_workers
+  done
+  pass "a PR that is open, or closed unmerged, leaves the record, the copy and the ledger as they were"
+}
+
+# The path that worked before: the task runs fm-pr-check.sh itself and its own
+# home merges the PR through fm-pr-merge.sh; the ledger shows pr_ready, merged
+# and cleaned_up in that order. It is the same on every revision.
+test_xlane_same_lane_path_completes_as_before() {
+  local rc=0 events
+  make_xlane_world
+  printf 'done [at=%s]: PR %s head %s\n' "$NOW" "$XL_PR" "$XL_HEAD" >> "$STATE/t1.status"
+  xl_env "$BIN_DIR/fm-pr-check.sh" t1 "$XL_PR" > "$W/pr-check.out" 2>&1 || fail "the worker's fm-pr-check.sh was refused: $(cat "$W/pr-check.out")"
+  grep -qx "pr=$XL_PR" "$STATE/t1.meta" || fail "fm-pr-check.sh recorded no pr="
+  [ -e "$STATE/t1.check.sh" ] || fail "fm-pr-check.sh armed no merge poll"
+  xl_merge_case samelane
+  ( export FM_TEST_HOME="$HOME_DIR" FM_TEST_STATE="$STATE" FM_MERGE_PRUNE=0
+    run_pr_merge "$XL_MC" t1 "$XL_PR" > "$XL_MC/stdout" 2> "$XL_MC/stderr" ) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the task's own home could not merge its PR: $(cat "$XL_MC/stderr")"
+  [ "$(cat "$W/forge.state")" = MERGED ] || fail "the merge did not reach the forge"
+  xl_env FM_MERGE_PRUNE=1 "$BIN_DIR/fm-merge-prune.sh" arm t1 --run || fail "the merge did not arm the prune"
+  fm_test_wait_until --progress-file "$DATA/t1/merge-prune.log" -- xl_closed || { xl_print_state "same lane"; fail "the same-lane task was not closed"; }
+  xl_print_state "same lane"
+  events=$(xl_ledger_events)
+  case "$events" in *task.pr_ready*task.merged*task.cleaned_up*) ;; *) fail "the same-lane ledger order is wrong: $events" ;; esac
+  [ ! -e "$COPY" ] || fail "the same-lane copy is still on disk"
+  assert_nothing_forced "xlane same lane"
+  pass "the same-lane path (fm-pr-check.sh, own-home fm-pr-merge.sh, prune) still ends pr_ready, merged, cleaned_up with the copy and record gone"
+}
+
+# The protections still refuse when the cross-lane PR is merged and its branch
+# name, its link and a registered pr= all resolve.
+xl_protection_case() {  # <dirty|unlanded-commit|conflicting-owner>
+  make_xlane_world
+  xl_merge_in_lane_m
+  printf 'branch=fm/t1\npr=%s\npr_head=%s\n' "$XL_PR" "$XL_HEAD" >> "$STATE/t1.meta"
+  xl_write_done_note
+  case "$1" in
+    dirty) printf 'edit\n' >> "$COPY/README.md" ;;
+    unlanded-commit)
+      printf 'new\n' > "$COPY/new.txt"; git -C "$COPY" add new.txt
+      git -C "$COPY" commit -q -m "work the merged PR never carried" ;;
+    conflicting-owner)
+      fm_write_meta "$STATE/other-live.meta" "window=firstmate:fm-other-live" "endpoint_task_id=other-live" \
+        "worktree=$COPY" "project=$W/project" "kind=ship" "mode=direct-PR" "spawn_gen=xl-other"
+      printf 'working [at=%s]: building\n' "$NOW" > "$STATE/other-live.status"
+      printf 'task=other-live\nhome=%s\n' "$HOME_DIR" > "$POOL/pool1/1/.fm-slot-owner" ;;
+  esac
+}
+
+test_xlane_protections_still_refuse() {
+  local what rc
+  for what in dirty unlanded-commit conflicting-owner-pr-open; do
+    case "$what" in
+      conflicting-owner-pr-open) xl_protection_case conflicting-owner; printf 'OPEN\n' > "$W/forge.state" ;;
+      *) xl_protection_case "$what" ;;
+    esac
+    rc=0
+    xl_plain_teardown "$W/refusal.txt" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$what: plain teardown succeeded over unsafe work"
+    [ -e "$COPY" ] && [ -e "$STATE/t1.meta" ] || fail "$what: the copy or the record was removed"
+    printf '%s: plain teardown exit %s; first refusal line: %s\n' "$what" "$rc" "$(grep -m1 -E 'REFUSED|refused|error' "$W/refusal.txt")"
+    grep -qE 'REFUSED|refused|error' "$W/refusal.txt" || fail "$what: the refusal does not name a cause: $(cat "$W/refusal.txt")"
+    [ "$what" != dirty ] || grep -q 'uncommitted changes' "$W/refusal.txt" || fail "dirty: the refusal does not name the uncommitted change"
+    [ "$what" != unlanded-commit ] || grep -q 'not landed' "$W/refusal.txt" || fail "unlanded-commit: the refusal does not say not landed"
+    [ "$what" != conflicting-owner-pr-open ] || grep -q 'reassigned to task other-live' "$W/refusal.txt" || fail "conflicting owner: the refusal does not name the claimant"
+    assert_nothing_forced "xlane $what"
+    cleanup_workers
+  done
+  # With the PR confirmed merged, a conflicting slot owner still never loses its copy:
+  # only the finished task's own record retires and the claimant's slot stays as it is.
+  xl_protection_case conflicting-owner
+  rc=0
+  xl_plain_teardown "$W/refusal.txt" || rc=$?
+  printf 'conflicting-owner-pr-merged: plain teardown exit %s; claimant copy=%s claimant record=%s\n' "$rc" \
+    "$([ -e "$COPY" ] && echo present || echo gone)" "$([ -e "$STATE/other-live.meta" ] && echo present || echo gone)"
+  [ -e "$COPY" ] && [ -e "$STATE/other-live.meta" ] || fail "conflicting owner: the claimant's copy or record was removed"
+  assert_nothing_forced "xlane conflicting owner merged"
+  cleanup_workers
+  pass "a merged cross-lane PR with a resolving branch, link and pr= never turns a changed file, an unlanded commit or a conflicting slot owner into a removal"
+}
+
+# --- the owner's representative scenario (V5) ---------------------------------------
+#
+# One home holds five records at once: A (t1) a finished task whose PR another
+# actor merges; B an unfinished task with an unlanded commit and an uncommitted
+# change whose worker never reports; C a task with a declared wait on a named
+# captain decision; D an idle persistent secondmate silent for a day; E a task
+# whose independent review recorded PASS for its exact head while its PR is open.
+# Time passes with no worker update, every supervision and ledger process is
+# stopped and started again from disk, then E's PASS is on record and A's PR is
+# merged at the forge. The table is read from records, the copies, the ledger
+# and the forge double, never from a log of what was sent.
+
+# The forge double for REST reads (fm-gh-rest.sh): PR 7 is A's, PR 9 is E's.
+xl_install_rest_double() {
+  cat > "$W/bin/gh-rest.py" <<PYD
+#!/usr/bin/env python3
+import hashlib, json, os, sys, time
+args = sys.argv[1:]
+assert args[:2] == ['api', '-i'], args
+state = open('$W/forge.state').read().strip()
+double = json.load(open('$W/rest.json'))
+path = '/' + args[-1].lstrip('/')
+if '/check-runs' in path:
+    value = {'check_runs': double['checks'].get(path.split('/commits/')[1].split('/')[0], [])}
+elif '/statuses' in path:
+    value = []
+elif '/pulls?' in path:
+    value = [p for p in double['pulls'] if not (p['number'] == 7 and state != 'OPEN')]
+elif '/rules/branches/' in path:
+    value = []
+elif '/branches/' in path:
+    value = {'protected': False}
+else:
+    number = path.rsplit('/', 1)[1]
+    value = dict(double['single'][number])
+    if number == '7':
+        value['merged_at'] = '2026-11-03T00:00:00Z' if state == 'MERGED' else None
+        value['state'] = 'closed' if state in ('MERGED', 'CLOSED') else 'open'
+body = json.dumps(value)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: "%s"\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4000\r\n'
+                 'X-Ratelimit-Reset: %d\r\nX-Ratelimit-Resource: core\r\n\r\n%s' % (hashlib.sha1(body.encode()).hexdigest()[:8], int(time.time()) + 3600, body))
+PYD
+  chmod +x "$W/bin/gh-rest.py"
+  mv "$W/bin/gh" "$W/bin/gh.base"
+  cat > "$W/bin/gh" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" != api ] || exec "$W/bin/gh-rest.py" "\$@"
+exec "$W/bin/gh.base" "\$@"
+SH
+  chmod +x "$W/bin/gh"
+}
+
+make_v5_world() {
+  local head base e_head mate_home reader_report
+  make_xlane_world
+  xl_install_rest_double
+  head=$XL_HEAD
+  base=$(git -C "$W/project" rev-parse origin/main)
+  V5_NOW=$(date +%s)
+  # The project's origin reads as GitHub; every git command maps it to the local bare repository.
+  git -C "$W/project" remote set-url origin https://github.com/acme/widget.git
+  V5_GIT_ENV=(GIT_CONFIG_COUNT=1 "GIT_CONFIG_KEY_0=url.$ORIGIN.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/acme/widget.git)
+  mkdir -p "$DATA"
+  # B: an unfinished task whose worker never reports: one unlanded commit and one uncommitted file.
+  git -C "$W/project" worktree add -q -b fm/t-b "$W/b-copy" origin/main
+  printf 'work\n' > "$W/b-copy/b-work.txt"; git -C "$W/b-copy" add b-work.txt; git -C "$W/b-copy" commit -q -m "b unlanded work"
+  printf 'uncommitted\n' > "$W/b-copy/b-dirty.txt"
+  # E: its PR 9 is open and a review is recorded for its exact head later.
+  git -C "$W/project" worktree add -q -b fm/t-e "$W/e-copy" origin/main
+  printf 'e\n' > "$W/e-copy/e-work.txt"; git -C "$W/e-copy" add e-work.txt; git -C "$W/e-copy" commit -q -m "e work"
+  e_head=$(git -C "$W/e-copy" rev-parse HEAD)
+  V5_E_HEAD=$e_head
+  V5_E_PR=https://github.com/acme/widget/pull/9
+  mate_home="$W/mate-home"
+  mkdir -p "$mate_home/state" "$mate_home/data" "$mate_home/config" "$mate_home/projects"
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$mate_home/data/backlog.md"
+  {
+    printf '## In flight\n'
+    for id in t1 t-b t-c t-e; do printf -- '- [ ] %s - task %s (repo: firstmate) (kind: ship) (since 2026-11-02)\n' "$id" "$id"; done
+    printf '\n## Queued\n\n## Done\n'
+  } > "$DATA/backlog.md"
+  fm_write_meta "$STATE/t-b.meta" "window=firstmate:fm-t-b" "endpoint_task_id=t-b" "worktree=$W/b-copy" "project=$W/project" \
+    "kind=ship" "mode=direct-PR" "spawn_gen=v5-b" "harness=claude" "backend=tmux" "model=gpt-5.1-codex" "branch=fm/t-b"
+  fm_write_meta "$STATE/t-c.meta" "window=firstmate:fm-t-c" "endpoint_task_id=t-c" "worktree=$W/project" "project=$W/project" \
+    "kind=ship" "mode=direct-PR" "spawn_gen=v5-c" "harness=claude" "backend=tmux" "model=gpt-5.1-codex"
+  fm_write_meta "$STATE/t-e.meta" "window=firstmate:fm-t-e" "endpoint_task_id=t-e" "worktree=$W/e-copy" "project=$W/project" \
+    "kind=ship" "mode=direct-PR" "spawn_gen=s$((V5_NOW - 7200)).1.1" "harness=claude" "backend=tmux" "model=anthropic/claude-sonnet-5" \
+    "branch=fm/t-e" "pr=$V5_E_PR" "pr_head=$e_head"
+  fm_write_meta "$STATE/mate1.meta" "window=firstmate:fm-mate1" "kind=secondmate" "mode=secondmate" "backend=tmux" "harness=claude" "home=$mate_home"
+  printf 'working [at=%s]: building\n' "$((V5_NOW - 21600))" > "$STATE/t-b.status"
+  printf 'paused [at=%s]: waiting on Main decision d9 until %s\n' "$((V5_NOW - 21600))" \
+    "$(date -u -r "$((V5_NOW + 172800))" +%Y-%m-%dT%H:%MZ)" > "$STATE/t-c.status"
+  printf 'done [at=%s]: PR %s checks green\n' "$((V5_NOW - 7200))" "$V5_E_PR" > "$STATE/t-e.status"
+  printf 'working [at=%s]: idle\n' "$((V5_NOW - 90000))" > "$STATE/mate1.status"
+  for id in t-b t-c t-e mate1; do
+    fm_touch_epoch "$(sed -n 's/^[a-z]* \[at=\([0-9]*\)\].*/\1/p' "$STATE/$id.status")" "$STATE/$id.status"
+  done
+  printf '{"review_lanes":{"acme/widget":["review-lane"]},"age_limits_seconds":{"review_pass_not_merged":600}}\n' > "$HOME_DIR/config/open-loops.json"
+  python3 - "$W" "$head" "$base" "$e_head" "$XL_PR" "$V5_E_PR" <<'PYJ'
+import json, sys
+w, head, base, e_head, pr7, pr9 = sys.argv[1:]
+def pull(number, url, sha, ref):
+    return dict(number=number, html_url=url, state='open', draft=False, merged_at=None, updated_at='2026-11-03T00:00:00Z',
+                head=dict(sha=sha, ref=ref), base=dict(sha=base, ref='main'))
+double = dict(pulls=[pull(7, pr7, head, 'fm/t1'), pull(9, pr9, e_head, 'fm/t-e')],
+              checks={head: [dict(id=1, name='ci', app=dict(id=3), status='completed', conclusion='success', completed_at='2026-11-03T00:00:00Z')],
+                      e_head: [dict(id=2, name='ci', app=dict(id=3), status='completed', conclusion='success', completed_at='2026-11-03T00:00:00Z')]},
+              single={'7': pull(7, pr7, head, 'fm/t1'), '9': pull(9, pr9, e_head, 'fm/t-e')})
+json.dump(double, open(w + '/rest.json', 'w'))
+PYJ
+}
+
+v5_ledger() {  # <epoch> [--heartbeat]: the ledger process, run fresh from disk at that time
+  local at=$1
+  shift
+  xl_env "${V5_GIT_ENV[@]}" FM_OPEN_LOOPS_NOW="$at" "$ROOT/bin/fm-open-loops.sh" --json "$@" 2> "$W/ledger.err"
+}
+
+v5_record_review() {
+  printf 'VERDICT: PASS head=%s\nIndependent reader evidence.\n' "$V5_E_HEAD" > "$W/review-e.md"
+  xl_env "${V5_GIT_ENV[@]}" "$ROOT/bin/fm-review-record.py" review --pr "$V5_E_PR" --head "$V5_E_HEAD" --verdict PASS \
+    --reader-model openai-codex/gpt-6.1-sol --author-groups '{"all":["anthropic/claude-sonnet-5"]}' \
+    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$W/review-e.md" > "$W/review-record.out" 2>&1 \
+    || fail "the review PASS could not be recorded: $(cat "$W/review-record.out")"
+}
+
+# v5_rows <ledger-json-file> <subject-prefix-regex>: tab-separated category, subject, owner, overdue, informational, action
+v5_rows() {
+  jq -r --arg s "$2" '.rows[] | select(.subject | test($s)) | [.category, .subject, .owner, (.overdue|tostring), ((.informational // false)|tostring), .next_action] | @tsv' "$1"
+}
+
+v5_table() {  # <ledger-json>: acceptance and cleanup per task, read from the records, copies, ledger and forge double
+  local ledger=$1 forge a_events review
+  forge=$(cat "$W/forge.state")
+  a_events=$(xl_ledger_events)
+  review=$(jq -r --arg h "$V5_E_HEAD" 'select(.kind == "review" and .head == $h) | "PASS by \(.reader_model)"' "$STATE/review-records.jsonl" 2>/dev/null | tail -1)
+  printf '%-4s %-46s %-46s %s\n' task acceptance cleanup 'ledger row (category | owner | next action)'
+  printf '%-4s %-46s %-46s %s\n' 'A t1' \
+    "PR 7 $forge at the forge; ledger: $(case " $a_events" in *' task.merged '*) echo merged ;; *) echo no-merge-event ;; esac)" \
+    "record $([ -e "$STATE/t1.meta" ] && echo open || echo gone), copy $([ -e "$COPY" ] && echo present || echo gone); ledger: $(case " $a_events" in *' task.cleaned_up '*) echo cleaned_up ;; *) echo not-cleaned ;; esac)" \
+    "$(v5_rows "$ledger" '^t1$' | tr '\t' '|' | head -1 | sed 's/^$/none (record gone)/')"
+  printf '%-4s %-46s %-46s %s\n' 'B t-b' \
+    "unaccepted: $(git -C "$W/b-copy" log --oneline origin/main..HEAD 2>/dev/null | wc -l | tr -d ' ') unlanded commit, $(git -C "$W/b-copy" status --porcelain | wc -l | tr -d ' ') uncommitted file" \
+    "none: record $([ -e "$STATE/t-b.meta" ] && echo kept || echo gone), copy $([ -e "$W/b-copy" ] && echo kept || echo gone)" \
+    "$(v5_rows "$ledger" '^t-b$' | tr '\t' '|' | paste -sd ';' -)"
+  printf '%-4s %-46s %-46s %s\n' 'C t-c' \
+    "wait intact: $(head -c 60 "$STATE/t-c.status")" "none: record $([ -e "$STATE/t-c.meta" ] && echo kept || echo gone)" \
+    "$(v5_rows "$ledger" '^t-c' | tr '\t' '|' | paste -sd ';' - | sed 's/^$/none (declared wait, not stranded)/')"
+  printf '%-4s %-46s %-46s %s\n' 'D mate1' \
+    "idle secondmate, silent $(( (V5_NOW + 21600 - $(sed -n 's/.*\[at=\([0-9]*\)\].*/\1/p' "$STATE/mate1.status")) / 3600 ))h" "none: record $([ -e "$STATE/mate1.meta" ] && echo kept || echo gone)" \
+    "$(v5_rows "$ledger" '^mate1$' | tr '\t' '|' | paste -sd ';' - | sed 's/^$/none/')"
+  printf '%-4s %-46s %-46s %s\n' 'E t-e' \
+    "review ${review:-none} at head ${V5_E_HEAD:0:8}; PR 9 open at the forge" "none: record $([ -e "$STATE/t-e.meta" ] && echo kept || echo gone), pending merge" \
+    "$(v5_rows "$ledger" "pull/9" | tr '\t' '|' | paste -sd ';' -)"
+}
+
+test_v5_missing_updates_restart_and_completed_review_cannot_strand_work() {
+  local frozen_before frozen_after l0 l1 l2 key0 key1 wake_before wake_after t6
+  make_v5_world
+  xl_write_done_note
+  t6=$((V5_NOW + 21600))
+  frozen_before=$(cd "$STATE" && cat t-b.status t-c.status t-e.status mate1.status | shasum | awk '{print $1}')
+  # (1) six hours pass and no worker reports.
+  v5_ledger "$V5_NOW" > "$W/l0.json"; l0="$W/l0.json"
+  v5_ledger "$t6" > "$W/l1.json"; l1="$W/l1.json"
+  frozen_after=$(cd "$STATE" && cat t-b.status t-c.status t-e.status mate1.status | shasum | awk '{print $1}')
+  [ "$frozen_before" = "$frozen_after" ] || fail "a worker status changed during the silent period"
+  [ "$(jq -r '.complete' "$l1")" = true ] || fail "the ledger was blind during the silent period: $(jq -c '[.rows[] | select(.category == "coverage")]' "$l1")"
+  # (2) the supervisor and the ledger restart from disk with a wake still unacknowledged.
+  ( . "$ROOT/bin/fm-wake-lib.sh"; FM_STATE_OVERRIDE="$STATE" fm_wake_append check v5-unacknowledged "check: v5 unacknowledged wake" ) || fail "could not queue the wake"
+  wake_before=$(grep -c 'v5 unacknowledged wake' "$STATE/.wake-queue")
+  xl_start_watcher; sleep 3; xl_stop_watcher
+  rm -f "$STATE/open-loops.json"
+  v5_ledger "$t6" --heartbeat > "$W/l2.json"; l2="$W/l2.json"
+  wake_after=$(grep -c 'v5 unacknowledged wake' "$STATE/.wake-queue")
+  [ "$wake_before" = 1 ] && [ "$wake_after" = 1 ] || fail "the unacknowledged wake was lost or duplicated by the restart ($wake_before -> $wake_after)"
+  key0=$(jq -c '[.rows[] | select(.category != "coverage") | [.category, .subject, .owner, .next_action]] | sort' "$l1")
+  key1=$(jq -c '[.rows[] | select(.category != "coverage") | [.category, .subject, .owner, .next_action]] | sort' "$l2")
+  [ "$key0" = "$key1" ] || fail "the restart lost or duplicated a ledger row: $key0 vs $key1"
+  [ -s "$STATE/open-loops.json" ] || fail "the restarted ledger published nothing"
+  # (3) E's review PASS is recorded and A's PR is merged by the other lane, through the forge double.
+  v5_record_review
+  xl_merge_in_lane_m
+  xl_supervise_until xl_closed || { xl_print_state "A after supervision"; fail "A (the finished task) was not closed after the other lane merged its PR: $(tail -5 "$W/watch.out")"; }
+  v5_ledger "$t6" > "$W/l3.json"
+  v5_table "$W/l3.json" | tee "$W/v5-table.txt"
+  # A is closed: record, copy, poll and prune record are gone and the ledger shows merged and cleaned_up.
+  case " $(xl_ledger_events)" in *' task.merged '*' task.cleaned_up '*) ;; *) fail "A: ledger events are $(xl_ledger_events)" ;; esac
+  [ -z "$(v5_rows "$W/l3.json" '^t1$')" ] || fail "A: a ledger row outlived its record"
+  # B is untouched, with its commit, its uncommitted file and a row naming an owner and a next action.
+  [ -e "$STATE/t-b.meta" ] && [ -e "$W/b-copy/b-dirty.txt" ] || fail "B: record or uncommitted change was removed"
+  git -C "$W/b-copy" log -1 --format=%s | grep -q 'b unlanded work' || fail "B: its commit is gone"
+  [ -n "$(v5_rows "$W/l3.json" '^t-b$' | awk -F'\t' '$3 != "" && $6 != ""')" ] || fail "B: no ledger row with an owner and a next action"
+  # C keeps its wait and is not stranded.
+  [ -e "$STATE/t-c.meta" ] && grep -q 'waiting on Main decision d9' "$STATE/t-c.status" || fail "C: record or wait was changed"
+  ! v5_rows "$W/l3.json" '^t-c' | awk -F'\t' '$4 == "true" || $1 ~ /^pending_/ {bad=1} END {exit !bad}' || fail "C: reported as stranded or overdue: $(v5_rows "$W/l3.json" '^t-c')"
+  # D is untouched and never stranded, actionable or overdue because it is quiet.
+  [ -e "$STATE/mate1.meta" ] || fail "D: the secondmate record was removed"
+  ! v5_rows "$W/l3.json" '^mate1$' | awk -F'\t' '$4 == "true" || $1 ~ /^(pending_|missing_worker|unlanded)/ {bad=1} END {exit !bad}' || fail "D: reported as stranded: $(v5_rows "$W/l3.json" '^mate1$')"
+  # E shows its review result, is pending its merge with an owner and a next action, and is not closed.
+  [ -e "$STATE/t-e.meta" ] || fail "E: the record was closed with its PR still open"
+  v5_rows "$W/l3.json" 'pull/9' | awk -F'\t' '$1 == "review_pass_not_merged" && $3 != "" && $6 != "" {ok=1} END {exit !ok}' \
+    || fail "E: no review_pass_not_merged row with an owner and a next action: $(v5_rows "$W/l3.json" 'pull/9')"
+  [ "$(jq -r '.rows[] | select(.subject | test("pull/9")) | .category' "$l1" | head -1)" = open_pr ] || fail "E: before its review the PR row was not the ordinary open_pr row"
+  assert_nothing_forced "v5"
+  pass "five records survive silence, a restart and a completed review: A closed from the other lane's merge, B/C/D untouched and not stranded, E pending its merge with the review on record"
+}
+
 # --- run ----------------------------------------------------------------------
 #
 # Usage: bash tests/fm-merge-prune.test.sh [test_function_name ...]
@@ -3404,6 +3909,11 @@ ALL_TESTS=(
   test_e2e_unsafe_copies_are_never_removed
   test_unsafe_mutations_are_caught
   test_over_strict_mutations_are_caught
+  test_xlane_merge_by_another_lane_reaches_safe_closeout
+  test_xlane_open_or_closed_pr_keeps_the_record
+  test_xlane_same_lane_path_completes_as_before
+  test_xlane_protections_still_refuse
+  test_v5_missing_updates_restart_and_completed_review_cannot_strand_work
 )
 if [ "$#" -gt 0 ]; then
   fm_test_run_cases -- "$@"

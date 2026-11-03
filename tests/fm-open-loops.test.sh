@@ -1759,7 +1759,7 @@ PY
 
 # Report silence through the real snapshot, ledger, inbox send and pending-reply store.
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-import datetime as dt, json, os, shutil, subprocess, sys, time
+import datetime as dt, json, os, runpy, shutil, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
 code, home, fake = (world / name for name in ('silence-code', 'silence-home', 'silence-fake'))
@@ -1768,6 +1768,7 @@ for name in ('state', 'data', 'config', 'projects'):
     (home / name).mkdir(parents=True)
 fake.mkdir()
 now = int(time.time())
+iso = lambda t: dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 def script(path, text):
     path.write_text(text); path.chmod(0o755)
 script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: %s · %s\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}" "${FM_SILENCE_TEST_CREW_SOURCE:-pane}" "${FM_SILENCE_TEST_CREW_DETAIL:-building}"\n')
@@ -1935,6 +1936,163 @@ refused = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', 'wor
                          env=dict(env, FM_HOME=''), text=True, capture_output=True, timeout=120)
 assert refused.returncode == 1 and 'FM_HOME is required' in refused.stdout
 print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
+
+# ---- Finished and unaccepted work with an open record ------------------------------------------------
+# Every open record is either a finished task awaiting plain teardown (pending_cleanup) or a task whose
+# deliverable is not accepted or landed and whose only report was `done` (pending_acceptance); each row names
+# its owning home and a concrete next action and lives exactly as long as the record. Waits, holds, unfinished
+# work and an idle persistent secondmate are never turned into either row. Real records, the real snapshot.
+DEFAULT_AGES_FOR_TEST = runpy.run_path(str(code / 'bin/fm_open_loops.py'))['DEFAULT_AGES']
+v4 = world / 'v4-home'
+for name in ('state', 'data', 'config', 'projects'):
+    (v4 / name).mkdir(parents=True)
+(v4 / 'data/backlog.md').write_text(
+    '## In flight\n\n## Queued\n\n## Done\n'
+    '- [x] fin-moot - Ruled moot (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n')
+v4_origin = world / 'v4-origin.git'
+git_ = lambda *a, **k: subprocess.run(['git', *map(str, a)], check=True, capture_output=True, text=True, **k).stdout.strip()
+git_('init', '-q', '--bare', v4_origin)
+git_('-C', v4_origin, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+v4_seed = world / 'v4-seed'
+git_('init', '-q', '-b', 'main', v4_seed)
+(v4_seed / 'base').write_text('base\n')
+git_('-C', v4_seed, 'add', 'base'); git_('-C', v4_seed, 'commit', '-q', '-m', 'baseline')
+git_('-C', v4_seed, 'remote', 'add', 'origin', v4_origin)
+git_('-C', v4_seed, 'push', '-q', 'origin', 'main')
+git_('clone', '-q', v4_origin, v4 / 'projects/project')
+git_('-C', v4 / 'projects/project', 'remote', 'set-url', 'origin', 'https://github.com/test/project.git')
+def v4_copy(name, work=True, dirty=False):
+    path = world / ('v4-copy-' + name)
+    git_('clone', '-q', v4_origin, path)
+    if work:
+        (path / (name + '.txt')).write_text(name + '\n')
+        git_('-C', path, 'add', '.'); git_('-C', path, 'commit', '-q', '-m', 'work ' + name)
+    if dirty:
+        (path / 'scratch.txt').write_text('uncommitted\n')
+    return path
+V4_PR = 'https://github.com/test/project/pull/'
+v4_states, v4_live, v4_prs = {}, [], {}
+def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None, state='done', live=False, age=2 * 3600):
+    lines = [f'kind={kind}', 'backend=tmux', f'window=sess:fm-{name}', 'harness=claude', 'mode=direct-PR']
+    if copy is not None:
+        lines.append(f'worktree={copy}')
+    if pr:
+        lines.append(f'pr={V4_PR}{pr}')
+    (v4 / f'state/{name}.meta').write_text('\n'.join(lines) + '\n')
+    (v4 / f'state/{name}.status').write_text(f'{verb} [at={now - age}]: {note}\n')
+    os.utime(v4 / f'state/{name}.status', (now - age, now - age))
+    v4_states[name] = state
+    if live:
+        v4_live.append(name)
+def v4_merged_pr(number, copy):
+    v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
+                               head=dict(sha=git_('-C', copy, 'rev-parse', 'HEAD')))
+fin_merged = v4_copy('fin-merged'); v4_merged_pr(11, fin_merged)
+v4_task('fin-merged', copy=fin_merged, pr=11, note=f'{V4_PR}11 merged by another lane')
+fin_content = v4_copy('fin-content')
+land = world / 'v4-land'
+git_('clone', '-q', v4_origin, land)
+(land / 'fin-content.txt').write_text('fin-content\n')
+git_('-C', land, 'add', '.'); git_('-C', land, 'commit', '-q', '-m', 'squash fin-content'); git_('-C', land, 'push', '-q', 'origin', 'main')
+git_('-C', fin_content, 'fetch', '-q', 'origin')
+v4_task('fin-content', copy=fin_content, note='landed on main by squash')
+(v4 / 'data/fin-scout').mkdir()
+(v4 / 'data/fin-scout/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout', kind='scout', copy=None, note='report delivered')
+fin_moot = v4_copy('fin-moot')
+v4_task('fin-moot', copy=fin_moot, note='ruled moot by Main')
+fin_refused = v4_copy('fin-refused'); v4_merged_pr(12, fin_refused)
+v4_task('fin-refused', copy=fin_refused, pr=12, note=f'{V4_PR}12 merged')
+refusal = 'REFUSED: worktree /pool/9 has uncommitted changes.'
+(v4 / 'state/fin-refused.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}12\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={refusal}\n'
+    f'wake_sent=1\ncopy={fin_refused}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+wait_paused = v4_copy('wait-paused', work=False)
+v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
+wait_held = v4_copy('wait-held', work=False)
+v4_task('wait-held', copy=wait_held, verb='captain-held', note='awaiting captain approval', state='paused', live=True, age=3000)
+unfin = v4_copy('unfin-dirty', dirty=True)
+v4_task('unfin-dirty', copy=unfin, verb='working', note='building', state='working', live=True, age=2000)
+v4_task('pend-ship', copy=world / 'v4-nowhere', note='delivered, branch pushed')
+v4_task('pend-scout', kind='scout', copy=None, note='delivered, report pending review')
+mate_home = world / 'v4-mate'
+for name in ('state', 'data', 'config', 'projects'):
+    (mate_home / name).mkdir(parents=True)
+(mate_home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+(v4 / 'state/v4-mate.meta').write_text(f'kind=secondmate\nbackend=tmux\nwindow=sess:fm-v4-mate\nharness=claude\nhome={mate_home}\n')
+(v4 / 'state/v4-mate.status').write_text(f'working [at={now - 90000}]: idle\n')
+os.utime(v4 / 'state/v4-mate.status', (now - 90000, now - 90000))
+v4_states['v4-mate'] = 'working'; v4_live.append('v4-mate')
+(world / 'v4-gh.json').write_text(json.dumps(dict(pulls=[], single=v4_prs)))
+script(fake / 'gh', r"""#!/usr/bin/env python3
+import hashlib, json, os, sys, time
+args = sys.argv[1:]
+assert args[:2] == ['api', '-i'], args
+double = json.load(open(os.environ['V4_GH']))
+path = '/' + args[-1].lstrip('/')
+value = double['pulls'] if '/pulls?' in path else double['single'][path.rsplit('/', 1)[1]]
+body = json.dumps(value)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: "%s"\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4000\r\n'
+                 'X-Ratelimit-Reset: %d\r\nX-Ratelimit-Resource: core\r\n\r\n%s' % (hashlib.sha1(body.encode()).hexdigest()[:8], int(time.time()) + 3600, body))
+""")
+(world / 'v4-live.txt').write_text(''.join(f'fm-{n}\n' for n in v4_live))
+script(fake / 'tmux', '#!/usr/bin/env bash\ncase "$1" in\n'
+       "  capture-pane) printf '╭────╮\\n│    │\\n╰────╯\\n' ;;\n"
+       '  list-windows) cat "$V4_LIVE" ;;\n'
+       "  display-message) printf 'fakepane\\n' ;;\n"
+       '  send-keys) printf \'%s\\n\' "$*" >> "$FM_SEND_LOG" ;;\nesac\n')
+script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\ns=$(sed -n "s/^$1=//p" "$V4_STATES" | head -1)\n'
+       'printf "state: %s · source: pane · recorded\\n" "${s:-working}"\n')
+(world / 'v4-states.txt').write_text(''.join(f'{n}={st}\n' for n, st in v4_states.items()))
+env4 = dict(env, FM_HOME=str(v4), V4_GH=str(world / 'v4-gh.json'), V4_LIVE=str(world / 'v4-live.txt'),
+            V4_STATES=str(world / 'v4-states.txt'), FM_SILENCE_TEST_LIVENESS='alive',
+            GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0=f'url.{v4_origin}.insteadOf', GIT_CONFIG_VALUE_0='https://github.com/test/project.git')
+def ledger4():
+    done = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--json'], env=env4, text=True, capture_output=True, timeout=180)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    return json.loads(done.stdout)
+report4 = ledger4()
+by_cat = lambda c: {r['subject']: r for r in report4['rows'] if r['category'] == c}
+mine = lambda sub: [r for r in report4['rows'] if r['subject'] == sub]
+print('V4 ledger rows (category, subject, owner, overdue, next action):')
+for r in sorted(report4['rows'], key=lambda r: (r['category'], r['subject'])):
+    print('  ', r['category'], r['subject'], r['owner'], 'overdue' if r['overdue'] else '-', '|', r['next_action'][:110])
+cleanup = by_cat('pending_cleanup')
+assert {'fin-merged', 'fin-content', 'fin-scout', 'fin-moot', 'fin-refused'} <= set(cleanup), ('finished classes need a row', sorted(cleanup))
+for name in ('fin-merged', 'fin-content', 'fin-scout', 'fin-moot'):
+    row = cleanup[name]
+    assert row['owner'] == 'home:firstmate', row
+    assert f'bin/fm-teardown.sh {name}' in row['next_action'] and '--force' not in row['next_action'] and '--drop-file' not in row['next_action'], row
+    assert row['overdue'] and not row.get('informational'), ('done must not suppress a finished task past its age class', row)
+    assert row['limit_seconds'] in set(DEFAULT_AGES_FOR_TEST.values()), ('a new timer was introduced', row)
+refused = cleanup['fin-refused']
+assert refused['owner'] == 'home:firstmate' and refusal in refused['next_action'], ('the refusal text must stay on the row', refused)
+assert 'bin/fm-teardown.sh fin-refused' in refused['next_action'], refused
+# A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
+for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate'):
+    assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))
+for name in ('wait-paused', 'wait-held', 'v4-mate'):
+    assert not any(r['overdue'] for r in mine(name)), ('a waiting task or idle mate reported overdue because it is quiet', name, mine(name))
+assert 'unfin-dirty' in by_cat('unlanded_commit'), 'unfinished changes keep their existing row'
+assert not any(r['category'] in ('missing_worker', 'unlanded_commit') for r in mine('v4-mate'))
+# A record whose last report was done with no accepted deliverable and no live worker is never left with no row.
+acceptance = by_cat('pending_acceptance')
+assert {'pend-ship', 'pend-scout'} <= set(acceptance), ('done with no accepted deliverable needs a row', sorted(acceptance))
+for name in ('pend-ship', 'pend-scout'):
+    row = acceptance[name]
+    assert row['owner'] == 'home:firstmate' and name in row['next_action'] and row['overdue'], row
+    assert 'accept' in row['next_action'] or 'review' in row['next_action'], row
+# The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
+again = ledger4()
+key = lambda rep: sorted((r['category'], r['subject'], r['owner'], r['next_action']) for r in rep['rows']
+                         if r['category'] in ('pending_cleanup', 'pending_acceptance'))
+assert key(report4) == key(again) and key(again), 'a restart changed or lost a pending row'
+# The row lives until the record is gone: removing a record removes only its own row.
+(v4 / 'state/fin-merged.meta').unlink()
+after = ledger4()
+assert not [r for r in after['rows'] if r['subject'] == 'fin-merged' and r['category'] in ('pending_cleanup', 'pending_acceptance')]
+assert 'fin-content' in {r['subject'] for r in after['rows'] if r['category'] == 'pending_cleanup'}
+print('PASS: finished and unaccepted work with an open record keeps an owned ledger row; waits, unfinished work and an idle secondmate do not', flush=True)
 PY
 
 # The real snapshot's home-input contract: large inventories travel by file, direct secondmates

@@ -592,3 +592,25 @@ done
 stop_watcher
 assert_registered ready
 pass 'hung forge call is killed at the pass limit and the next watcher tick registers the ready ship'
+
+# The 2026-10-18 shape: the worker's done note leads with the PR's URL instead of
+# `PR <url>`. It names the same PR, so the pass registers it exactly as for the
+# `PR ` form, and a note that does not start with a PR or MR URL registers nothing.
+make_case done-note-forms
+write_ship pr-form ship direct-PR
+write_ship bare-url ship direct-PR
+write_ship prose-url ship direct-PR
+write_ship issue-url ship direct-PR
+write_ship no-url ship direct-PR
+printf 'done [at=1792479210]: PR %s head %s\n' "$URL" "$HEAD" > "$CASE/home/state/pr-form.status"
+printf 'done [at=1792479210] [key=close-evidence]: %s merged by another lane\n' "$URL" > "$CASE/home/state/bare-url.status"
+printf 'done [at=1792479210]: closed, see %s\n' "$URL" > "$CASE/home/state/prose-url.status"
+printf 'done [at=1792479210]: https://github.com/example/project/issues/42 closed\n' > "$CASE/home/state/issue-url.status"
+printf 'done [at=1792479210]: closed with no link\n' > "$CASE/home/state/no-url.status"
+out=$(run_pass)
+assert_registered pr-form
+assert_registered bare-url
+assert_unregistered prose-url
+assert_unregistered issue-url
+assert_unregistered no-url
+pass 'a done note leading with the PR URL registers like the PR form; a URL later in the note, an issue URL and no URL do not'
