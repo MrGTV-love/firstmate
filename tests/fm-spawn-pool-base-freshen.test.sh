@@ -1586,7 +1586,8 @@ PY
 # logging wrappers so each row can prove which resources it touched.
 make_successor_case() {
   local rec
-  SUCC_ID="succ-$1-$(date +%s)-$$"
+  SUCC_SEQ=$((${SUCC_SEQ:-0} + 1))
+  SUCC_ID="succ-$1-$SUCC_SEQ-$$"
   rec=$(make_case "$SUCC_ID" "$SUCC_ID")
   read_case_record "$rec"
   fm_test_fake_no_mistakes "$FAKEBIN_DIR"
