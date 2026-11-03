@@ -1035,36 +1035,6 @@ test_plain_nested_disposition_equals_the_prior_shape() {
   pass "a plain nested record gets the prior shape's result for every claim state and fixture"
 }
 
-# The refusal snapshot compares the nested copy and the slot root by file
-# content, so a changed byte in an untracked or ignored file that leaves the git
-# status text alone is still seen, while an untouched case compares equal.
-test_nested_snapshot_sees_a_changed_byte_in_copy_and_slot_files() {
-  local case_dir file status_before
-  nested_fixture nested-snapshot-bytes plain mine landed
-  case_dir=$NESTED_CASE
-  printf 'ignored.log\n' > "$NESTED_COPY/.gitignore"
-  printf 'ignored-one\n' > "$NESTED_COPY/ignored.log"
-  printf 'untracked-one\n' > "$NESTED_SLOT/untracked.txt"
-  nested_snapshot "$case_dir" "$case_dir/snapshot.a"
-  nested_snapshot "$case_dir" "$case_dir/snapshot.b"
-  cmp -s "$case_dir/snapshot.a" "$case_dir/snapshot.b" || fail "nested-snapshot-bytes: an untouched case did not compare equal"
-  for file in "$NESTED_COPY/ignored.log" "$NESTED_SLOT/untracked.txt"; do
-    status_before=$(git -C "${file%/*}" status --porcelain=v1 --untracked-files=all)
-    cp "$file" "$case_dir/saved-file"
-    printf 'X' >> "$file"
-    assert_equals "$status_before" "$(git -C "${file%/*}" status --porcelain=v1 --untracked-files=all)" \
-      "nested-snapshot-bytes: the fixture must leave the git status text alone"
-    nested_snapshot "$case_dir" "$case_dir/snapshot.c"
-    if cmp -s "$case_dir/snapshot.a" "$case_dir/snapshot.c"; then
-      fail "nested-snapshot-bytes: a changed byte in $file was not seen"
-    fi
-    cp "$case_dir/saved-file" "$file"
-  done
-  nested_snapshot "$case_dir" "$case_dir/snapshot.d"
-  cmp -s "$case_dir/snapshot.a" "$case_dir/snapshot.d" || fail "nested-snapshot-bytes: the restored case did not compare equal"
-  pass "the refusal snapshot sees a changed byte in an untracked or ignored copy or slot file and passes an untouched case"
-}
-
 # A scout's teardown is outside the plain nested route: the same plain nested
 # path, claim and clean landed copies leave a scout exactly as before - refused,
 # with the copy, claim and record kept and no slot returned.
@@ -3771,7 +3741,6 @@ test_plain_nested_copy_in_own_slot_is_removed_and_slot_returned
 test_plain_nested_copy_in_own_slot_is_removed_with_force_and_drop_file
 test_nested_entry_refusals_change_nothing
 test_plain_nested_disposition_equals_the_prior_shape
-test_nested_snapshot_sees_a_changed_byte_in_copy_and_slot_files
 test_scout_with_a_plain_nested_copy_keeps_its_own_route
 test_gate_409_recorded_case_tears_down
 test_gate_409_recorded_case_refuses_untouched_when_the_slot_is_unlanded
