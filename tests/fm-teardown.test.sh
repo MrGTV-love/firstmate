@@ -3830,6 +3830,22 @@ assert_train_allowed() {  # <case-dir> <label>
   assert_grep "$TRAIN_MEMBER_HEAD" "$case_dir/stderr" "$label: stderr did not name the listed sha"
 }
 
+# The closed row records the merged train as its PR and the member as closed by it,
+# and the ledger's merged_pr evidence names the train, never the closed member.
+assert_train_backlog_close() {  # <case-dir> <label>
+  local case_dir=$1 label=$2 row
+  row=$(grep -F -- '- [x] task-x1 ' "$case_dir/data/backlog.md") \
+    || fail "$label: the backlog has no closed task-x1 row"$'\n'"$(cat "$case_dir/data/backlog.md")"
+  case "$row" in *" $TRAIN_URL "*) ;; *) fail "$label: the closed row does not record the train PR: $row" ;; esac
+  case "$row" in *"$TRAIN_MEMBER_URL"*) fail "$label: the closed row records the closed member as its PR: $row" ;; esac
+  grep -qxF "  closed by merge train: $TRAIN_MEMBER_URL" "$case_dir/data/backlog.md" \
+    || fail "$label: the close did not name the member as closed by the train"$'\n'"$(cat "$case_dir/data/backlog.md")"
+  if [ -e "$case_dir/config/fleet-ledger" ]; then
+    assert_equals "[\"task-x1\",\"merged_pr\",\"$TRAIN_URL\",true]" \
+      "$(ledger_closed_rows "$case_dir")" "$label: task.closed record"
+  fi
+}
+
 # A refused teardown names the failed fact, keeps the copy and every record, and
 # never asks the pool to return the slot.
 assert_train_refused() {  # <case-dir> <label> <fact> [unknown]
@@ -3853,10 +3869,11 @@ assert_train_refused() {  # <case-dir> <label> <fact> [unknown]
 test_train_member_closed_landed_by_merged_train_allows() {
   train_case train-merge-landed none head
   seed_backlog_in_flight "$TRAIN_CASE"
+  : > "$TRAIN_CASE/config/fleet-ledger"
   assert_train_allowed "$TRAIN_CASE" "train-merge-landed"
-  [ "$(backlog_row_state "$TRAIN_CASE")" = done ] || fail "train-merge-landed: backlog item stayed open"
-  assert_grep "$TRAIN_MEMBER_URL" "$TRAIN_CASE/data/backlog.md" "train-merge-landed: the close did not record the member PR"
-  pass "a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = "done" ] || fail "train-merge-landed: backlog item stayed open"
+  assert_train_backlog_close "$TRAIN_CASE" train-merge-landed
+  pass "a CLOSED member whose merged train lists its head and contains it is accepted, naming the train on stderr and on the backlog close"
 }
 
 test_train_member_prerebase_copy_allows() {
@@ -4042,8 +4059,8 @@ test_train_other_refusals_stay() {
 
 # The record-only route (the copy is gone) applies the same verified-train rule and
 # reads no copy: the recorded PR is CLOSED, so only the forge's train proof counts.
-train_absent_case() {  # <name>
-  train_case "$1" none head
+train_absent_case() {  # <name> [<train shape>]
+  train_case "$1" none head "" "${2:-merge}"
   write_windowless_legacy_meta "$TRAIN_CASE" no-mistakes ship "$TRAIN_CASE/missing-wt"
   append_pr_meta_url "$TRAIN_CASE"
   seed_backlog_in_flight "$TRAIN_CASE"
@@ -4057,7 +4074,8 @@ test_train_record_only_route_without_a_copy() {
   assert_grep "$TRAIN_URL" "$TRAIN_CASE/stderr" "train-absent-ok: stderr did not name the train PR"
   assert_grep "$TRAIN_MEMBER_HEAD" "$TRAIN_CASE/stderr" "train-absent-ok: stderr did not name the listed sha"
   assert_absent "$TRAIN_CASE/state/task-x1.meta" "train-absent-ok: accepted teardown left the task record"
-  [ "$(backlog_row_state "$TRAIN_CASE")" = done ] || fail "train-absent-ok: backlog item stayed open"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = "done" ] || fail "train-absent-ok: backlog item stayed open"
+  assert_train_backlog_close "$TRAIN_CASE" train-absent-ok
 
   for row in empty other-member wrong-sha open-train other-base search-fails fetch-fails; do
     case "$row" in
@@ -4149,6 +4167,36 @@ test_train_flattened_rebase_missing_a_member_commit_refuses() {
   pass "a flattened train missing one commit of the member head is refused"
 }
 
+# A remote-tracking ref left at the member head's parent must not hide that parent
+# from the proof: the flat train dropped it, so neither the member head nor the
+# copy is carried, in work mode or record mode.
+test_train_flat_missing_with_a_stale_remote_ref_refuses() {
+  train_case train-flat-stale squash head "" flat-missing
+  git -C "$TRAIN_CASE/wt" update-ref refs/remotes/origin/fm/task-x1 "$TRAIN_MEMBER_HEAD~1"
+  assert_train_refused "$TRAIN_CASE" "train-flat-stale" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-flat-stale: the train was accepted"
+
+  train_absent_case train-absent-flat-stale flat-missing
+  git -C "$TRAIN_CASE/project" fetch -q origin refs/pull/7/head
+  git -C "$TRAIN_CASE/project" update-ref refs/remotes/origin/fm/task-x1 "$TRAIN_MEMBER_HEAD~1"
+  assert_train_refused "$TRAIN_CASE" "train-absent-flat-stale" "neither contains it nor carries every commit of it"
+  assert_no_grep "landed by a merged train" "$TRAIN_CASE/stderr" "train-absent-flat-stale: the train was accepted"
+  [ "$(backlog_row_state "$TRAIN_CASE")" = in_flight ] || fail "train-absent-flat-stale: refusal closed the backlog"
+  pass "a flat train missing a member commit refuses even when a stale remote-tracking ref holds that commit"
+}
+
+# The train route reads the member again after pr_is_merged saw it CLOSED; a re-read
+# that fails is unknown, retry, never 'not landed' and never accepted.
+test_train_member_reread_failure_is_unknown() {
+  train_case train-reread-fails none head
+  : > "$TRAIN_CASE/gh-fixture/member-view.once"
+  assert_train_refused "$TRAIN_CASE" "train-reread-fails" "could not be read again" unknown
+  assert_grep "REFUSED: not known whether the ship deliverable is landed" "$TRAIN_CASE/stderr" \
+    "train-reread-fails: the refusal did not say the landing is unknown"
+  assert_no_grep "pr list" "$TRAIN_CASE/gh-fixture/calls.log" "train-reread-fails: the train was searched after the member read failed"
+  pass "a failed re-read of the CLOSED member is unknown, retry"
+}
+
 teardown_test_cases=(
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
@@ -4216,6 +4264,8 @@ test_train_refuses_a_listing_that_is_not_the_members_head
 test_train_refuses_copy_work_the_train_does_not_carry
 test_train_flattened_rebase_carries_the_listed_head
 test_train_flattened_rebase_missing_a_member_commit_refuses
+test_train_flat_missing_with_a_stale_remote_ref_refuses
+test_train_member_reread_failure_is_unknown
 test_train_dirty_copy_refuses_before_the_train_is_read
 test_train_refuses_a_train_that_is_not_merged
 test_train_refuses_a_train_merged_into_another_branch

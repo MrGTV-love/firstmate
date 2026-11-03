@@ -1286,9 +1286,14 @@ fm_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
     FM_BACKLOG_TRANSITION_ERROR="foreign data directory in pending-close record $marker"
     return 1
   fi
+  if [ "${#args[@]}" -eq 4 ] && ! { [ "${args[0]}" = --pr ] && [ "${args[2]}" = --note ] \
+       && [[ "${args[3]}" =~ ^closed\ by\ merge\ train:\ https://github[.]com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[0-9]+$ ]]; }; then
+    FM_BACKLOG_TRANSITION_ERROR="invalid pending-close arguments in $marker"
+    return 1
+  fi
   case "${#args[@]}" in
     0) ;;
-    2)
+    2|4)
       case "${args[0]}" in
         --note)
           [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] \

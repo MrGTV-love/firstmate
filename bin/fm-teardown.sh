@@ -66,8 +66,8 @@
 # task's base whose body lists exactly this member's URL "at <40-hex sha>" with the
 # member PR's recorded head, whose head carries that sha (an ancestor, or every
 # commit of it replayed there by equivalent patch ids, as a flat pipeline rebase
-# leaves it), and whose head carries the copy's work by the same ancestor or patch
-# proofs above (teardown_train_landed owns the rule). The record-only routes (copy gone, slot reassigned) apply the same
+# leaves it), and whose head carries the copy's work by the same ancestor or
+# rebased-commit proof above (teardown_train_landed owns the rule). The record-only routes (copy gone, slot reassigned) apply the same
 # train rule and read no copy. The train is found by searching the forge for the
 # member URL, never by a title, branch name or comment text, and a forge or fetch
 # read that fails is unknown (retry), never landed. The archive-branch reaper
@@ -2615,10 +2615,13 @@ EOF
 # tea (fm_pr_forgejo_read_record), and everything else through GitHub. Returns
 # non-zero when the PR is not merged, the current work is not contained in the
 # PR head, no PR is found, or any forge read error occurs - the caller then
-# falls back to the content check.
+# falls back to the content check. TEARDOWN_PR_SEEN_STATE is the GitHub state
+# this call read, empty when no GitHub view answered.
+TEARDOWN_PR_SEEN_STATE=
 pr_is_merged() {
   local branch=$1 target view state remainder head resolved_url current landed=0
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
+  TEARDOWN_PR_SEEN_STATE=
   [ -d "$dir" ] || return 1
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
@@ -2646,6 +2649,7 @@ pr_is_merged() {
     head=${remainder%%$'\t'*}
     resolved_url=${remainder#*$'\t'}
     [ "$head" != "$remainder" ] || return 1
+    TEARDOWN_PR_SEEN_STATE=$state
     case "$state" in
       MERGED|merged) ;;
       *) return 1 ;;
@@ -2684,9 +2688,10 @@ pr_is_merged() {
 # head, or every commit of it replayed there with an equivalent patch id (a train
 # the pipeline rebased flat does not contain the member head itself). Work mode (a
 # copy in TEARDOWN_LANDED_DIR at TEARDOWN_LANDED_REF) must also be carried by that
-# train head; both tests are teardown_train_carries, the ancestor, replayed-patch
-# and rebased-patch proofs pr_is_merged applies to the PR head. Record mode (copy
-# gone or slot reassigned) reads no copy.
+# train head; both tests are teardown_train_carries: an ancestor, or every commit
+# that neither the train head nor the default branch holds proven by the
+# rebased-patch proof pr_is_merged applies to the PR head. Record mode (copy gone
+# or slot reassigned) reads no copy.
 # A train is found by searching the forge for the member URL, never by a title,
 # branch name or comment text, and every candidate is verified from its own fields.
 # A forge or fetch read that fails sets TEARDOWN_TRAIN_UNASKED (unknown, retry);
@@ -2694,12 +2699,14 @@ pr_is_merged() {
 TEARDOWN_TRAIN_UNASKED=
 TEARDOWN_TRAIN_WHY=
 TEARDOWN_TRAIN_ANNOUNCED=0
+# The first accepted train and its member, recorded on the backlog close.
+TEARDOWN_TRAIN_PR_URL=
+TEARDOWN_TRAIN_MEMBER_URL=
 # Is <ref> carried by <train head>: an ancestor of it, or its commits replayed there?
 teardown_train_carries() {  # <ref> <train head>
   local TEARDOWN_LANDED_REF=$1
   TEARDOWN_UNPROVEN_COMMITS=
   git -C "${TEARDOWN_LANDED_DIR:-$WT}" merge-base --is-ancestor "$1" "$2" 2>/dev/null \
-    || unpushed_patches_are_in_pr_head "$2" \
     || rebased_commits_are_in_pr_head "$2"
 }
 
@@ -2712,9 +2719,12 @@ teardown_train_landed() {  # work <member pr url or number> | record <member pr 
   TEARDOWN_TRAIN_UNASKED=
   TEARDOWN_TRAIN_WHY=
   [ -d "$dir" ] && [ -n "$target" ] || return 1
-  # The member's own state is read by pr_is_merged, or by the record-only caller,
-  # first; a read that fails there is already answered, so it is not asked again.
-  view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || return 1
+  # Every caller has already seen the member CLOSED (pr_is_merged, or the
+  # record-only caller), so a re-read that fails now is unknown, never unlanded.
+  view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || {
+    TEARDOWN_TRAIN_UNASKED="the member PR $target could not be read again"
+    return 1
+  }
   state=${view%%$'\t'*}
   remainder=${view#*$'\t'}
   [ "$state" = CLOSED ] || return 1
@@ -2811,6 +2821,8 @@ for pr in prs:
     fi
     if [ "$TEARDOWN_TRAIN_ANNOUNCED" = 0 ]; then
       TEARDOWN_TRAIN_ANNOUNCED=1
+      TEARDOWN_TRAIN_PR_URL=$u
+      TEARDOWN_TRAIN_MEMBER_URL=$murl
       echo "landed by a merged train: merged train PR $u lists $murl at $mhead; $murl itself is closed, not merged" >&2
     fi
     TEARDOWN_TRAIN_WHY=
@@ -2934,7 +2946,8 @@ work_is_landed_proof() {
   # when nothing else proves the work.
   local train_target=$PR_URL
   [ -n "$train_target" ] || train_target=$(pr_number_from_branch "$branch") || train_target=
-  if [ -n "$train_target" ] && teardown_train_landed work "$train_target"; then
+  if [ "$TEARDOWN_PR_SEEN_STATE" = CLOSED ] && [ -n "$train_target" ] \
+     && teardown_train_landed work "$train_target"; then
     return 0
   fi
   [ -z "$TEARDOWN_TRAIN_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$TEARDOWN_TRAIN_UNASKED}
@@ -3110,8 +3123,9 @@ teardown_is_dropping() {
 
 # The completion links this teardown already holds locally. A scout's
 # deliverable is its report, a ship whose commits only a recorded bundle holds
-# names that bundle and says it is not landed, a local-only ship lands on local
-# main, and every other ship carries the PR recorded on its own record.
+# names that bundle and says it is not landed, a ship a merged train landed names
+# that train PR and its closed member, a local-only ship lands on local main, and
+# every other ship carries the PR recorded on its own record.
 BACKLOG_DONE_ARGS=()
 TEARDOWN_RECORDED_PR_ONLY=0
 backlog_done_args() {
@@ -3129,6 +3143,8 @@ backlog_done_args() {
     *)
       if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
         BACKLOG_DONE_ARGS=(--note "preserved in bundle $TEARDOWN_BUNDLE_PROOF, not landed")
+      elif [ -n "$TEARDOWN_TRAIN_PR_URL" ]; then
+        BACKLOG_DONE_ARGS=(--pr "$TEARDOWN_TRAIN_PR_URL" --note "closed by merge train: $TEARDOWN_TRAIN_MEMBER_URL")
       elif [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
       elif [ -n "$PR_URL" ]; then

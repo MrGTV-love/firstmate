@@ -3320,7 +3320,7 @@ TRAIN_COPY_HEAD=
 # TRAIN_PREFETCH_TRAIN=0 leaves the train head out of the copy's object store.
 # Sets TRAIN_MEMBER_HEAD, TRAIN_HEAD and TRAIN_COPY_HEAD.
 setup_train_history() {
-  local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase= merge_commit
+  local case_dir=$1 landing=$2 copy=$3 shape=${4:-merge} tmp="$1/_train" prerebase='' merge_commit
   if [ "$copy" = prerebase ]; then
     wt_commit_file "$case_dir" feature.txt hello "add feature"
     prerebase=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -3383,14 +3383,15 @@ setup_train_history() {
 }
 
 # add_gh_train_fake <case-dir> <member state> <member head>: the member PR's state
-# and head, an empty train search, and a log of every call.
+# and head, an empty train search, and a log of every call. A member-view.once file
+# answers the first full member read and fails every later one.
 add_gh_train_fake() {
   local case_dir=$1 fx="$1/gh-fixture"
   mkdir -p "$fx"
   printf '%s\n' "$2" > "$fx/member-state"
   printf '%s\n' "$3" > "$fx/member-head"
   printf '[]\n' > "$fx/list.json"
-  rm -f "$fx/list.fail" "$fx/calls.log"
+  rm -f "$fx/list.fail" "$fx/calls.log" "$fx/member-view.once" "$fx/member-view.seen"
   cat > "$case_dir/fakebin/gh" <<SH
 #!/usr/bin/env bash
 fx='$fx'
@@ -3398,7 +3399,12 @@ printf '%s\n' "\$*" >> "\$fx/calls.log"
 case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
-      *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' ; exit 0 ;;
+      *"state,headRefOid,url"*)
+        if [ -e "\$fx/member-view.once" ]; then
+          [ ! -e "\$fx/member-view.seen" ] || { echo "error: forge unavailable" >&2 ; exit 1 ; }
+          : > "\$fx/member-view.seen"
+        fi
+        printf '%s\t%s\t%s\n' "\$(cat "\$fx/member-state")" "\$(cat "\$fx/member-head")" '$TRAIN_MEMBER_URL' ; exit 0 ;;
       *"--json state "*) cat "\$fx/member-state" ; exit 0 ;;
     esac ;;
   "pr list")
