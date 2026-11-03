@@ -2713,9 +2713,13 @@ test_auto_review_new_head_voids_the_pass_and_held_prs_are_never_merged() {
   # A push after the PASS: the old PASS no longer counts and the new head is read once.
   case_dir=$(auto_case head-moves)
   auto_step "$case_dir"; auto_wait "$case_dir"
-  auto_push "$case_dir"
+  # A pending check holds the merge, so the pass that collects the old head's read records its PASS and stops.
+  jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
   auto_step "$case_dir"
   expect_code 1 "$(auto_reviews "$case_dir")" "head-moves: the PASS for the old head is recorded for the old head"
+  auto_push "$case_dir"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_reviews "$case_dir")" "head-moves: the push records nothing more"
   expect_code 0 "$(auto_merges "$case_dir")" "head-moves: the old head's PASS must not merge the new head"
   auto_wait "$case_dir"
   expect_code 2 "$(auto_calls "$case_dir")" "head-moves: the new head is read under the same counting rule"
