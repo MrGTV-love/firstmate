@@ -1,0 +1,10 @@
+--- gate-409 leftovers placed before run:
+id=task-x1
+data=/Users/charlesabrooker/tmp/fm-teardown-tests.Gd7yns/gate-409-landed/data
+spawn_gen=teardown-test-task-x1
+cleanup_incomplete=0
+arg=--note
+arg=dropped
+spawn_gen=teardown-test-task-x1
+slot=
+prior_worktree lines in record: 0

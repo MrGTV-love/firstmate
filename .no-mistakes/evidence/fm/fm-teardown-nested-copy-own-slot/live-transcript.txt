@@ -1,0 +1,261 @@
+## head a7e0df5915447affafbc757d2b2d5d239f2985ae
+--- gate-409 leftovers placed before run:
+id=task-x1
+data=/Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/data
+spawn_gen=teardown-test-task-x1
+cleanup_incomplete=0
+arg=--note
+arg=dropped
+spawn_gen=teardown-test-task-x1
+slot=
+prior_worktree lines in record: 0
+=== gate-409 recorded case, slot and copy landed, --force --drop-file
+teardown code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HFFPV5FWB8K5VCJBSSKP2J/bin/fm-teardown.sh
+exit: 0
+observed: exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+--- stderr (last 6 lines)
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 32s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- stdout (last 4 lines)
+/Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/project: already current
+teardown task-x1 complete (window default:wG:pQ; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/pool/1/project/.claude/worktrees/task-x1-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/pool/1/project returned)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- treehouse.log
+return --force /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-landed/pool/1/project
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: yes
+--- state/ after
+terminal-outcomes
+
+slot root HEAD: a3f6017d31a84cfdb185207086104d203a66cdb8
+=== gate-409 recorded case, slot root HEAD unlanded, --force --drop-file
+teardown code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HFFPV5FWB8K5VCJBSSKP2J/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=backlog-close,teardown-return-pending
+--- stderr (last 6 lines)
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-slot-unlanded/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-slot-unlanded/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-slot-unlanded/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-slot-unlanded/pool/1/project would sweep away task task-x1's claimed pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/gate-409-slot-unlanded/pool/1/project, whose HEAD a3f6017d31a84cfdb185207086104d203a66cdb8 is neither landed nor held by a refs/fm/anchor/task-x1-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: no
+--- state/ after
+task-x1.backlog-close
+task-x1.inbox
+task-x1.meta
+task-x1.status
+task-x1.teardown-return-pending
+--- return-pending content
+spawn_gen=teardown-test-task-x1
+slot=
+--- snapshot before vs after: IDENTICAL (23 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+
+=== plain record, own claim, landed, no --force
+teardown code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HFFPV5FWB8K5VCJBSSKP2J/bin/fm-teardown.sh
+exit: 0
+observed: exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+--- stderr (last 6 lines)
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 38s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- stdout (last 4 lines)
+/Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/pool/1/project/.claude/worktrees/x removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/pool/1/project returned)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- treehouse.log
+return --force /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-landed/pool/1/project
+--- endpoint close calls
+kill-window -t =firstmate:=fm-task-x1
+herdr pane closed: no
+--- state/ after
+terminal-outcomes
+
+=== plain record, own claim, nested copy has an uncommitted change
+teardown code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6HFFPV5FWB8K5VCJBSSKP2J/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=none
+--- stderr (last 6 lines)
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-dirty/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.yyTetd/plain-dirty/pool/1/project/.claude/worktrees/x has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: no
+--- state/ after
+task-x1.inbox
+task-x1.meta
+task-x1.status
+--- snapshot before vs after: IDENTICAL (22 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+
+claim=other shape=plain     exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=other shape=enclosing exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=plain     exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=enclosing exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=mine  shape=plain     exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+claim=mine  shape=enclosing exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+
+bash "$E/drive-nested-teardown.sh" "$PWD"  24.04s user 49.90s system 4% cpu 25:08.55 total
+
+## base 012b72f34a60f615d8898b0dd508c4fc115bfa08 (same fixtures, base bin/fm-teardown.sh)
+--- gate-409 leftovers placed before run:
+id=task-x1
+data=/Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-landed/data
+spawn_gen=teardown-test-task-x1
+cleanup_incomplete=0
+arg=--note
+arg=dropped
+spawn_gen=teardown-test-task-x1
+slot=
+prior_worktree lines in record: 0
+=== gate-409 recorded case, slot and copy landed, --force --drop-file
+teardown code: /Users/charlesabrooker/tmp/fm-base-tree.UGgD/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+--- stderr (last 6 lines)
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 34s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-landed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: yes
+--- state/ after
+task-x1.meta
+task-x1.teardown-return-pending
+terminal-outcomes
+--- return-pending content
+spawn_gen=teardown-test-task-x1
+slot=
+
+slot root HEAD: d2f68be8aa143a7af52c91ebc2707315f0db9404
+=== gate-409 recorded case, slot root HEAD unlanded, --force --drop-file
+teardown code: /Users/charlesabrooker/tmp/fm-base-tree.UGgD/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+--- stderr (last 6 lines)
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 48s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: yes
+--- state/ after
+task-x1.meta
+task-x1.teardown-return-pending
+terminal-outcomes
+--- return-pending content
+spawn_gen=teardown-test-task-x1
+slot=
+--- snapshot before vs after: CHANGED
+--- /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/snapshot.before	2026-11-03 14:49:40
++++ /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/snapshot.after	2026-11-03 14:53:16
+@@ -1,13 +1,10 @@
+ dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state
+-file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.backlog-close 35a0eb27d38c664818243016face40fd5ed3242c00374ac14bc7fccb3d467ea7
+-dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.inbox
+-file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.inbox/001.msg f17d0901cfc94e01b590d18ea9dc340e5360c2428ecbf69111ed4a262c95bac1
+ file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.meta 01c26334ace7e1eeeaea755f810b8b670b41094d4a1d26b9135a18ab5bb9c0e4
+-file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.status ca3343e4937fe625acd7e1e3882dadc773812d877256af26d3a6310edc10dd0f
+ file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/task-x1.teardown-return-pending fe45a48385a269ce0e944c8ee47000fb0bc8d09be675bdc79eee0debea8a72d3
+-dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/tasktmp
+-file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/tasktmp/scratch.txt a27110a155b1dd079db5ea8fee149a2b80019f48b359a7852f281a7720fe15a8
++dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/state/terminal-outcomes
+ dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/data
++dir /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/data/task-x1
++file /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/data/task-x1/captain-drop.md 82246f0ef880f083a9ce49a13e5a19e1670538e1f8627c6355dad97fd33d303f
+ copy-head 164631a5dabfc15ab0b3d4b2abf07b48d512a41f
+ ref refs/heads/fm/task-x1 d2f68be8aa143a7af52c91ebc2707315f0db9404
+ ref refs/heads/fm/task-x1-v2 164631a5dabfc15ab0b3d4b2abf07b48d512a41f
+@@ -20,4 +17,4 @@
+ aux /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/pool/treehouse-state.json ae58a17aa8b966ded4a4512b6f697244f0d96344cd194aee46e38e6513f1c880
+ aux /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/endpoint.log absent
+ aux /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/gate-409-slot-unlanded/treehouse.log absent
+-herdr-pane-close-calls 0 closed-marker absent
++herdr-pane-close-calls 1 closed-marker present
+
+=== plain record, own claim, landed, no --force
+teardown code: /Users/charlesabrooker/tmp/fm-base-tree.UGgD/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+--- stderr (last 6 lines)
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 26s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/plain-landed/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+kill-window -t =firstmate:=fm-task-x1
+herdr pane closed: no
+--- state/ after
+task-x1.meta
+task-x1.teardown-return-pending
+terminal-outcomes
+--- return-pending content
+spawn_gen=teardown-test-task-x1
+slot=
+
+=== plain record, own claim, nested copy has an uncommitted change
+teardown code: /Users/charlesabrooker/tmp/fm-base-tree.UGgD/bin/fm-teardown.sh
+exit: 1
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=none
+--- stderr (last 6 lines)
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/plain-dirty/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.u9if0Z/plain-dirty/pool/1/project/.claude/worktrees/x has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+--- stdout (last 4 lines)
+--- treehouse.log
+(none: no treehouse return)
+--- endpoint close calls
+(no tmux kill)
+herdr pane closed: no
+--- state/ after
+task-x1.inbox
+task-x1.meta
+task-x1.status
+--- snapshot before vs after: IDENTICAL (22 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+
+claim=other shape=plain     exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=other shape=enclosing exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=plain     exit=nonzero copy=kept claim=removed record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=none  shape=enclosing exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=mine  shape=plain     exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=mine  shape=enclosing exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+

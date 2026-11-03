@@ -1,0 +1,24 @@
+ok - the recorded gate-409 case tears down, returns the slot and clears both leftover files
+[pool] test_gate_409_recorded_case_tears_down exit=0 secs=303
+ok - the recorded gate-409 case refuses naming the slot root and its HEAD, with every file left as it was
+[pool] test_gate_409_recorded_case_refuses_untouched_when_the_slot_is_unlanded exit=0 secs=177
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned
+[pool] test_plain_nested_copy_in_own_slot_is_removed_and_slot_returned exit=0 secs=285
+ok - a plain nested copy in the task's own claimed slot is removed and the slot returned under --force --drop-file
+[pool] test_plain_nested_copy_in_own_slot_is_removed_with_force_and_drop_file exit=0 secs=249
+ok - an entry refusal for the slot root's unlanded commit or the nested copy's dirt changes nothing, for a prior and a plain record
+[pool] test_nested_entry_refusals_change_nothing exit=0 secs=534
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands, for a prior and a plain record
+[pool] test_nested_slot_reproof_refusal_is_rerunnable exit=0 secs=838
+ok - a plain nested record gets the prior shape's result for every claim state and fixture
+[pool] test_plain_nested_disposition_equals_the_prior_shape exit=0 secs=1531
+ok - a scout with a plain nested copy in its claimed slot is left as before: refused, copy, claim and record kept, no slot returned
+[pool] test_scout_with_a_plain_nested_copy_keeps_its_own_route exit=0 secs=67
+ok - a plain nested record whose commits a verified recorded bundle holds finishes as the prior shape does
+[main] test_plain_nested_bundle_held_commits_match_the_prior_shape exit=0
+ok - a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record
+[cleanup] test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was exit=0
+ok - a held close rerun needs no writable record when every held copy is recorded, and still refuses at entry when a needed entry cannot be recorded
+[cleanup] test_a_held_close_rerun_needs_no_writable_record_when_every_copy_is_recorded exit=0
+ok - a held close whose slot leases finishes and retires the pending-close record an earlier run left
+[cleanup] test_a_held_close_that_leases_retires_an_earlier_pending_close_record exit=0

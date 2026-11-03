@@ -1,0 +1,42 @@
+Head a7e0df5 vs base 012b72f: same throwaway fixtures, real bin/fm-teardown.sh (fakes: treehouse, tmux, herdr).
+
+## head a7e0df5915447affafbc757d2b2d5d239f2985ae
+=== gate-409 recorded case, slot and copy landed, --force --drop-file
+observed: exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+=== gate-409 recorded case, slot root HEAD unlanded, --force --drop-file
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=backlog-close,teardown-return-pending
+REFUSED: returning pool slot <tmp>/gate-409-slot-unlanded/pool/1/project would sweep away task task-x1's claimed pool slot <tmp>/gate-409-slot-unlanded/pool/1/project, whose HEAD a3f6017d31a84cfdb185207086104d203a66cdb8 is neither landed nor held by a refs/fm/
+--- snapshot before vs after: IDENTICAL (23 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+=== plain record, own claim, landed, no --force
+observed: exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+=== plain record, own claim, nested copy has an uncommitted change
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=none
+REFUSED: worktree <tmp>/plain-dirty/pool/1/project/.claude/worktrees/x has uncommitted changes.
+--- snapshot before vs after: IDENTICAL (22 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+claim=other shape=plain     exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=other shape=enclosing exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=plain     exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=enclosing exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=mine  shape=plain     exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+claim=mine  shape=enclosing exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
+## base 012b72f34a60f615d8898b0dd508c4fc115bfa08 (same fixtures, base bin/fm-teardown.sh)
+=== gate-409 recorded case, slot and copy landed, --force --drop-file
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+=== gate-409 recorded case, slot root HEAD unlanded, --force --drop-file
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+--- snapshot before vs after: CHANGED
+=== plain record, own claim, landed, no --force
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+REFUSED: reserved pool slot  lost its durable lease; retaining the task record and contents
+=== plain record, own claim, nested copy has an uncommitted change
+observed: exit=nonzero copy=kept claim=kept record=kept inbox=kept status=kept tasktmp=kept returns=0 markers=none
+REFUSED: worktree <tmp>/plain-dirty/pool/1/project/.claude/worktrees/x has uncommitted changes.
+--- snapshot before vs after: IDENTICAL (22 entries: record, inbox, status, tasktmp, markers, copy, slot, refs, claim, pool state, endpoint calls)
+claim=other shape=plain     exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=other shape=enclosing exit=0 copy=kept claim=kept record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=none  shape=plain     exit=nonzero copy=kept claim=removed record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=none  shape=enclosing exit=0 copy=kept claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=0 markers=none
+claim=mine  shape=plain     exit=nonzero copy=kept claim=kept record=kept inbox=removed status=removed tasktmp=removed returns=0 markers=teardown-return-pending
+claim=mine  shape=enclosing exit=0 copy=removed claim=removed record=removed inbox=removed status=removed tasktmp=removed returns=1 markers=none
