@@ -781,7 +781,7 @@ Under a tracked `data/` or `state/`, any other ignored entry outside such a dire
 A nested repository with no commit no longer fails the comparison with its remotes, and the directory that holds it is still judged by the rules for ignored files.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 The one exact file `.claude/commit-intent.json` is also scratch when it is a valid Vernant `CommitIntent` that is spent.
-Valid means a regular file holding a JSON object with `artifacttype` `CommitIntent`, a non-empty `schemaversion`, `branch` and `head_sha`, string lists `owned_paths` and `validators`, and an ISO-8601 `expires_at_iso` with a timezone.
+Valid means a regular file holding a JSON object with `artifacttype` `CommitIntent`, a non-empty `schemaversion`, `branch` and `head_sha`, `owned_paths` and `validators` that are each a non-empty list of non-blank strings, every `owned_paths` item repo-relative (not absolute, with no `..` part, not empty or `.`), and an ISO-8601 `expires_at_iso` with a timezone.
 Spent means `expires_at_iso` is not in the future, or `branch` equals the task's `branch=` as the prune record kept it from the task record, because teardown deletes that record.
 A file that fails a read, a parse or any of these checks keeps the copy, and so does the same file name at any other path.
 Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.

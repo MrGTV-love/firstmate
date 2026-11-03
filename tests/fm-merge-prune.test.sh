@@ -2462,6 +2462,7 @@ scn_invalid_intent_is_kept() {
   for v in malformed array scalar empty type-missing type-wrong type-case \
     expiry-missing expiry-number expiry-text expiry-no-timezone \
     schema-missing branch-missing head-missing owned-not-a-list validators-not-strings \
+    owned-empty validators-empty owned-blank validators-blank owned-absolute owned-parent \
     directory; do
     intent_world
     case "$v" in
@@ -2481,6 +2482,12 @@ scn_invalid_intent_is_kept() {
       head-missing) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.head_sha = ""' ;;
       owned-not-a-list) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = "docs/a.md"' ;;
       validators-not-strings) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = [1]' ;;
+      owned-empty) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = []' ;;
+      validators-empty) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = []' ;;
+      owned-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = [" "]' ;;
+      validators-blank) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = [""]' ;;
+      owned-absolute) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = ["/etc"]' ;;
+      owned-parent) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = ["../x"]' ;;
       directory) mkdir -p "$COPY/.claude/commit-intent.json" ;;
     esac
     go
@@ -2988,7 +2995,7 @@ test_returned_slot_holding_a_commit_intent_naming_the_task_branch_is_removed() {
 test_fallback_removes_a_copy_holding_a_commit_intent_naming_the_task_branch() { assert_scenario scn_intent_naming_the_task_branch_is_removed_by_the_fallback "an unexpired intent naming the task's recorded branch is spent through the fallback too"; }
 test_commit_intent_branch_survives_the_deletion_of_the_task_record() { assert_scenario scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone "the task's branch is kept in the prune record, so a retry after teardown deleted the task record still sees the intent as spent"; }
 test_fallback_keeps_an_unspent_commit_intent() { assert_scenario scn_unspent_intent_is_kept "an unexpired intent naming another branch (a prefix, a longer name, another case), or any intent when the task record names no branch, keeps the copy with one wake naming the file"; }
-test_fallback_keeps_an_invalid_commit_intent() { assert_scenario scn_invalid_intent_is_kept "a malformed, non-object, empty, mistyped, or incomplete intent, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch"; }
+test_fallback_keeps_an_invalid_commit_intent() { assert_scenario scn_invalid_intent_is_kept "a malformed, non-object, empty, mistyped, or incomplete intent, an empty or blank owned_paths or validators list, an owned path that is not repo-relative, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch"; }
 test_fallback_keeps_an_unreadable_commit_intent() {
   if [ "$(id -u)" = 0 ]; then
     pass "an unreadable intent keeps the copy (skipped: the suite runs as root, which reads it)"
@@ -3193,6 +3200,18 @@ test_unsafe_mutations_are_caught() {
   expect_caught intent-symlink-followed $lib 'os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)' 'os.O_RDONLY | os.O_NONBLOCK' scn_symlinked_intent_is_refused_by_the_predicate "no-follow open of a CommitIntent"
   expect_caught intent-non-regular-file-read $lib '        if not stat.S_ISREG(os.fstat(fd).st_mode):' '        if False:' scn_fifo_intent_is_refused_by_the_predicate "regular-file check of a CommitIntent"
   expect_caught intent-branch-compared-by-prefix $lib 'doc["branch"] == task_branch' 'doc["branch"].startswith(task_branch)' scn_unspent_intent_is_kept "exact branch comparison of a CommitIntent"
+  expect_caught intent-list-and-path-not-validated $lib '        if not isinstance(value, list) or not value or not all(isinstance(item, str) and item.strip() for item in value):
+            sys.exit(1)
+    for item in doc["owned_paths"]:
+        rel = item.strip()
+        if rel.startswith("./"):
+            rel = rel[2:]
+        pure = pathlib.PurePosixPath(rel)
+        if pure.is_absolute() or ".." in pure.parts or pure.as_posix() in ("", "."):
+            sys.exit(1)
+' '        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            sys.exit(1)
+' scn_invalid_intent_is_kept "non-empty list, non-blank item and repo-relative path checks of a CommitIntent"
   expect_caught intent-shape-not-validated $lib '        if not isinstance(value, str) or not value.strip():' '        if False:' scn_invalid_intent_is_kept "string-field checks of a CommitIntent"
   expect_caught intent-allowance-for-any-claude-name $lib '    .claude/commit-intent.json)
       if fm_mp_commit_intent_spent "$copy/$rel"; then' '    .claude/commit-intent.json|.claude/commit-intent.json.bak)

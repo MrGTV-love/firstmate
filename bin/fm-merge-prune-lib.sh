@@ -387,18 +387,21 @@ FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
 
 # Whether the file at <path> is a Vernant CommitIntent that is spent: a regular
 # file whose JSON is an object with artifacttype CommitIntent, non-empty string
-# schemaversion, branch and head_sha, string lists owned_paths and validators,
-# and an ISO-8601 expires_at_iso with a timezone (the checks of Vernant's own
-# reader), and that has expired (expires_at <= now, UTC) or names
-# FM_MP_TASK_BRANCH exactly. The expiry may put a space or T between date and
-# time, because Vernant scripts/hooks/commit_intent.py _parse_expiry uses
-# datetime.fromisoformat, which accepts a space, so the prune calls an intent
-# spent exactly when the owner's reader would.
+# schemaversion, branch and head_sha, owned_paths and validators that are each
+# a non-empty list of non-blank strings, every owned_paths item repo-relative
+# (not absolute, no .. part, not empty or .), and an ISO-8601 expires_at_iso
+# with a timezone (the checks of Vernant's own reader,
+# scripts/hooks/commit_intent.py), and that has expired (expires_at <= now, UTC)
+# or names FM_MP_TASK_BRANCH exactly. The expiry may put a space or T between
+# date and time, because that reader's _parse_expiry uses
+# datetime.fromisoformat, which accepts a space. The prune never calls an intent
+# spent when the reader refuses it; its date pattern is narrower than the
+# reader's, so it may keep a copy whose intent the reader would call valid.
 # The file is only read, from its path. Any other result, a read or parse
 # failure included, is 1.
 fm_mp_commit_intent_spent() {  # <path>
   python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<'PY' >/dev/null 2>&1
-import datetime, json, os, re, stat, sys
+import datetime, json, os, pathlib, re, stat, sys
 path, task_branch = sys.argv[1], sys.argv[2]
 try:
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
@@ -422,7 +425,14 @@ try:
             sys.exit(1)
     for key in ("owned_paths", "validators"):
         value = doc.get(key)
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        if not isinstance(value, list) or not value or not all(isinstance(item, str) and item.strip() for item in value):
+            sys.exit(1)
+    for item in doc["owned_paths"]:
+        rel = item.strip()
+        if rel.startswith("./"):
+            rel = rel[2:]
+        pure = pathlib.PurePosixPath(rel)
+        if pure.is_absolute() or ".." in pure.parts or pure.as_posix() in ("", "."):
             sys.exit(1)
     stamp = doc.get("expires_at_iso")
     if not isinstance(stamp, str) or not re.fullmatch(
