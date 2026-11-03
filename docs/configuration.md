@@ -1604,7 +1604,7 @@ Cursor typed-submit confirmation is verified on tmux and Herdr only.
 On Zellij, cmux, and Orca a typed-plane Cursor send (a harness-native invocation or an explicit backend target; ordinary text steers ride the durable inbox and exit 0 at enqueue) lands, but `fm-send` reports delivery unconfirmed and exits non-zero because their shared submit core does not consult the busy footer; [runtime backend verification](verification/runtime-backends.md#cursor-agent-cli) owns the evidence and transcript-state boundary.
 
 muse is verified for crewmate and scout launches ONLY, and `fm-spawn.sh` refuses it for a secondmate, because muse ships no usable hook surface for a primary session's turn-end supervision; [`docs/verification/muse.md`](verification/muse.md) owns that evidence.
-muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`, because a caller-only `META_API_KEY` does not cross a long-lived backend daemon.
+muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`; [its adapter reference](../.agents/skills/harness-adapters/references/harness/muse.md#credential-preflight) owns when a `META_API_KEY` is accepted instead.
 
 gemini is likewise refused for secondmates because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
 rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns the live launch, OAuth refresh, and pane-liveness evidence, while [Herdr's process-backed liveness contract](herdr-backend.md#stale-agent-registrations) owns current recovery classification.
@@ -1915,7 +1915,7 @@ The check runs with only `HOME`, `PATH`, `TMPDIR`, `USER`, `LOGNAME`, and the pi
 A pinned Claude launch also unsets the environment credentials Claude ranks above a stored login, such as `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and the Bedrock and Vertex switches ([authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence)).
 Pi ranks a root's stored logins above environment variables, so a pinned Pi launch unsets nothing.
 
-A home that authenticates Claude through environment credentials on purpose should leave the pin absent and opt in through the [Claude API key guard](#claude-api-key-guard).
+A home that authenticates Claude through environment credentials on purpose should leave the pin absent, keep `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` through the [Claude API key guard](#claude-api-key-guard) opt-in, and list any other credential, such as `CLAUDE_CODE_OAUTH_TOKEN`, in the [launch environment allowlist](#worker-launch-environment-configlaunch-env-allowlist).
 
 ### Failures, reporting, and inheritance
 
@@ -1933,7 +1933,7 @@ The optional local, gitignored `config/lavish-axi-host` contains one non-empty a
 `fm-spawn.sh` exports that address into every new worker and relaunch for opening boards, and the file is inherited into secondmate homes through the primary-authoritative configuration contract.
 
 Once a board exists, the process-event adapter derives the polling address from that board's own saved Lavish session instead; its header owns the lookup contract.
-When the file is absent, worker launches do not add a board address and retain the existing ambient-environment behavior.
+When the file is absent, worker launches do not add a board address; a `LAVISH_AXI_HOST` the pane sets still reaches the worker through the [launch environment](#worker-launch-environment-configlaunch-env-allowlist)'s operational floor.
 
 Malformed or unreadable values refuse the launch before the worker starts.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
