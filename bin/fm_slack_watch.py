@@ -615,8 +615,6 @@ class Watch:
     def request_from(self, message):
         """The journal row for one new owner message, or None when it is not a request."""
         ts = message.get('ts')
-        if not isinstance(ts, str) or not SLACK_TS.fullmatch(ts):
-            return None
         if not self.allowed(message) or not self.top_level(message):
             return None
         text = message.get('text')

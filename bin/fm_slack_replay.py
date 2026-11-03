@@ -135,8 +135,7 @@ class Replay:
             size = int(fields.get('limit') or 100)
             page = messages[start:start + size]
             self.log({'method': method, 'recipient': os.environ.get('FM_SLACK_DM_USER'),
-                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start,
-                      **({'oldest': fields['oldest']} if fields.get('oldest') else {})})
+                      'channel': channel, 'thread_ts': fields.get('ts'), 'cursor': start})
             data = {'ok': True, 'messages': page,
                     'response_metadata': {'next_cursor': str(start + size)
                                           if len(messages) > start + size else ''}}
