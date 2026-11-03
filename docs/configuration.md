@@ -3636,7 +3636,7 @@ The text is carried as labeled unverified data on one line, with controls replac
 A request reaches no record: it writes nothing outside `state/slack-watch/`, runs no repository script, and gives the captain-hold intake nothing.
 Firstmate handles the wake under `check-result-handling`.
 The starting point is the newest message in the DM when `arm` runs, or at the first poll of a plane armed before requests existed, so no earlier message is taken in, including one typed while the check was disarmed.
-Requests need an owner action that the code cannot take: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it; until then Slack refuses the owner's message with "Sending messages to this app has been turned off."
+A new install first needs one app setting that the code cannot change: in the Firstmate Slack app's settings, App Home, Messages Tab, turn the Messages Tab on and allow users to send messages from it (while it is off, Slack itself refuses a message with "Sending messages to this app has been turned off.").
 They need no new scope or Slack method.
 A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the answer line, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
 When the rendered text changes for a live, tracked, unretired hold and its options are unchanged, the mirror edits that root message with `chat.update`, preserving its timestamp, thread, options, and reactions rather than posting another card.
