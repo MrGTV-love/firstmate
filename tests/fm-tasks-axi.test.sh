@@ -1931,6 +1931,7 @@ test_backlog_guards_log_each_refusal_and_escape() {
   dir=$(make_split guard-logging)
   events="$dir/home/state/guard-events.jsonl"
   friction="$dir/home/state/friction.jsonl"
+  local -x FM_GUARD_EVENT_LOG="$events"
   make_peer_home "$dir/sm1" gl-open
   printf -- '- sm-one - A local home (home: %s; scope: demo scope; projects: p; added 2026-11-01)\n' "$dir/sm1" > "$dir/home/data/secondmates.md"
 
