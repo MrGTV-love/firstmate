@@ -617,7 +617,7 @@ out=$(run_pass)
   || fail "the pass must read the registered PR once and skip the local-only task: $(cat "$CASE/gh.calls")"
 assert_registered zz-new https://github.com/example/project/pull/44
 out=$(run_pass)
-[ "$(grep -c 'pr view .* --json state,isDraft,mergeable,mergeStateStatus' "$CASE/gh.calls")" -eq 1 ] \
+[ "$(grep -c 'pull/42 --json state,isDraft,mergeable,mergeStateStatus' "$CASE/gh.calls")" -eq 1 ] \
   || fail "a task not yet due was read again by the next pass (its marker names the next due time): $(cat "$CASE/gh.calls")"
 pass 'a registered ship gets one review-step forge read per pass, a local-only task none, and a ship still to register is registered in the same pass'
 

@@ -549,10 +549,11 @@ def advance(home, task, url, meta, side):
         return
     if not working and time.time() < due:
         return
+    # A forge read that fails is spaced like one that answers, so an outage is not hammered.
+    side.data["next_at"] = int(time.time()) + INTERVAL
     view = gh_view(url)
     if view is None:
         return
-    side.data["next_at"] = int(time.time()) + INTERVAL
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
     head = side.head(sha)
@@ -664,8 +665,9 @@ def merge(home, task, url, sha, side, meta):
         phase(side, sha, "merged", url)
         emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}")
         return
-    lines = [line for line in (done.stderr + done.stdout).splitlines() if line.startswith("error:")]
-    reason = (lines[0][6:].strip() if lines else f"fm-pr-merge.sh exited {done.returncode}")[:240]
+    output = [line.strip() for line in (done.stderr + done.stdout).splitlines() if line.strip()]
+    errors = [line for line in output if line.startswith("error:")]
+    reason = (errors[0][6:].strip() if errors else output[-1] if output else f"fm-pr-merge.sh exited {done.returncode}")[:240]
     head["merge"] = {"next_at": int(time.time()) + MERGE_RETRY, "reason": reason}
     phase(side, sha, "held", f"merge refused: {reason}")
     emit(home, task, side, sha, f"merge:{hashlib.sha256(reason.encode()).hexdigest()[:12]}", f"held: merge refused at {sha[:12]}: {reason}")
