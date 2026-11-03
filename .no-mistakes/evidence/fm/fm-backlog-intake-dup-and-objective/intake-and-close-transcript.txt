@@ -1,0 +1,571 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.QZ45Mq (marked lab home); tasks-axi 0.2.6
+
+##### M2: objective link #####
+
+=== [1] add with no --objective is refused
+$ fm-tasks-axi.sh add lock-a Lock holder crash --kind ship --repo firstmate
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    completing-command: FM_FRICTION_OPERATION_ID=91775561-3239-48db-94a4-ee237dda7973 FM_FRICTION_EPISODE_ID=91775561-3239-48db-94a4-ee237dda7973 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [2] add with unknown objective O9 is refused
+$ fm-tasks-axi.sh add lock-a Lock holder crash --objective O9
+    REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+    completing-command: FM_FRICTION_OPERATION_ID=951bcd3a-fefa-43d3-8f9d-77f3e2b1e770 FM_FRICTION_EPISODE_ID=951bcd3a-fefa-43d3-8f9d-77f3e2b1e770 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+    fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+    -> exit 2
+
+=== [3] add with --objective none and no reason is refused
+$ fm-tasks-axi.sh add lock-a Lock holder crash --objective none
+    REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+    completing-command: FM_FRICTION_OPERATION_ID=6d0f16a1-0ac4-4a72-aa16-d7661e55d37a FM_FRICTION_EPISODE_ID=6d0f16a1-0ac4-4a72-aa16-d7661e55d37a bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+    fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+    -> exit 2
+
+=== [4] add with --objective O7 files the item
+$ fm-tasks-axi.sh add lock-a Lock holder crash --objective O7 --kind ship --repo firstmate
+    ok: added lock-a (ship, repo firstmate) -> Queued
+    task:
+      id: lock-a
+      title: Lock holder crash
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: ship
+      repo: firstmate
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start lock-a` to move it to in flight
+      - Run `tasks-axi block lock-a --by <other>` to record a dependency
+    -> exit 0
+
+=== [5] add with --objective none + reason files the item
+$ fm-tasks-axi.sh add paint-b Repaint harbour signage colours --objective none --objective-reason fixture: no objective fits
+    ok: added paint-b -> Queued
+    task:
+      id: paint-b
+      title: Repaint harbour signage colours
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start paint-b` to move it to in flight
+      - Run `tasks-axi block paint-b --by <other>` to record a dependency
+    -> exit 0
+
+=== [6] add with --mint and O6 files a minted id
+$ fm-tasks-axi.sh add Quarterly guard registry audit --mint --objective O6
+    ok: added quarterly-guard-registry-audit-71 -> Queued
+    task:
+      id: quarterly-guard-registry-audit-71
+      title: Quarterly guard registry audit
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start quarterly-guard-registry-audit-71` to move it to in flight
+      - Run `tasks-axi block quarterly-guard-registry-audit-71 --by <other>` to record a dependency
+    -> exit 0
+--- backlog.md:
+    ## In flight
+    
+    ## Queued
+    - [ ] lock-a - Lock holder crash (repo: firstmate) (kind: ship) (since 2026-11-03)
+    
+    - [ ] paint-b - Repaint harbour signage colours (since 2026-11-03)
+    - [ ] quarterly-guard-registry-audit-71 - Quarterly guard registry audit (since 2026-11-03)
+    ## Done
+--- backlog-review.tsv:
+    lock-a		O7	
+    paint-b		none	fixture: no objective fits
+    quarterly-guard-registry-audit-71		O6	
+
+##### M1: duplicate check at intake #####
+
+=== [7] overlapping title is refused, shows neighbours and both overrides
+$ fm-tasks-axi.sh add lock-b Lock holder crash recovery --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add lock-b Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add lock-b Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [8] unrelated title is filed with no prompt
+$ fm-tasks-axi.sh add zebra-c Migrate zebra telemetry exporter --objective O3
+    ok: added zebra-c -> Queued
+    task:
+      id: zebra-c
+      title: Migrate zebra telemetry exporter
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start zebra-c` to move it to in flight
+      - Run `tasks-axi block zebra-c --by <other>` to record a dependency
+    -> exit 0
+
+=== [9] --not-dup naming a non-neighbour is refused
+$ fm-tasks-axi.sh add lock-b Lock holder crash recovery --objective O7 --not-dup zebra-c
+    REFUSED: guard=backlog-intake-not-dup rule=not-a-neighbour missing=a neighbour of this title
+    completing-command: FM_FRICTION_OPERATION_ID=54e1d7f0-a0e1-47f7-8725-fcb976fe25ec FM_FRICTION_EPISODE_ID=54e1d7f0-a0e1-47f7-8725-fcb976fe25ec bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+    fm-tasks-axi: --not-dup zebra-c names an item whose title does not overlap this one enough to be a neighbour; nothing was filed
+    -> exit 2
+
+=== [10] --not-dup naming the listed neighbour files the item
+$ fm-tasks-axi.sh add lock-b Lock holder crash recovery --objective O7 --not-dup lock-a
+    ok: added lock-b -> Queued
+    task:
+      id: lock-b
+      title: Lock holder crash recovery
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: task
+      repo: "-"
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start lock-b` to move it to in flight
+      - Run `tasks-axi block lock-b --by <other>` to record a dependency
+    -> exit 0
+
+=== [11] --dup-of appends to the kept item and files nothing
+$ fm-tasks-axi.sh add lock-c Lock holder crash on reboot --objective O7 --body seen again after a reboot --dup-of lock-a
+    ok: merged into lock-a (nothing filed)
+    -> exit 0
+
+=== [12] kept item shows the appended duplicate
+$ fm-tasks-axi.sh show lock-a --full
+    task:
+      id: lock-a
+      title: Lock holder crash
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: ship
+      repo: firstmate
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: "---\nMerged from a duplicate filing: Lock holder crash on reboot\nseen again after a reboot"
+    -> exit 0
+    (lock-c has no row of its own: nothing filed)
+
+=== [13] --backend value is not read as the title (id form): still refused at 0.75
+$ fm-tasks-axi.sh add --backend markdown bid2 Lock holder crash recovery --objective O1
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-b?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-b (Queued, overlap 1.00) Lock holder crash recovery
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-b and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --backend markdown bid2 Lock\ holder\ crash\ recovery --objective O1 --dup-of lock-b
+      the work is different from lock-b - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --backend markdown bid2 Lock\ holder\ crash\ recovery --objective O1 --not-dup lock-b
+    -> exit 2
+
+=== [14] --backend value is not read as the title (--mint form)
+$ fm-tasks-axi.sh add --backend markdown Lock holder crash recovery --mint --objective O1
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-b?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-b (Queued, overlap 1.00) Lock holder crash recovery
+      lock-a (Queued, overlap 0.75) Lock holder crash
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-b and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --backend markdown Lock\ holder\ crash\ recovery --mint --objective O1 --dup-of lock-b
+      the work is different from lock-b - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add --backend markdown Lock\ holder\ crash\ recovery --mint --objective O1 --not-dup lock-b
+    -> exit 2
+
+=== [15] a third overlapping title is refused again (env-var bypass attempts are in the part-2 transcript)
+$ fm-tasks-axi.sh add lock-d Lock holder crash watchdog --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      lock-a (Queued, overlap 0.75) Lock holder crash
+      lock-b (Queued, overlap 0.60) Lock holder crash recovery
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      the work is the same - append this title and body to lock-a and file nothing:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add lock-d Lock\ holder\ crash\ watchdog --objective O7 --dup-of lock-a
+      the work is different from lock-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add lock-d Lock\ holder\ crash\ watchdog --objective O7 --not-dup lock-a
+    -> exit 2
+
+=== [16] close a scratch docs item through tasks-axi path
+$ fm-tasks-axi.sh add arch-a Rotate kraken webhook secret --objective O7 --kind docs
+    ok: added arch-a (docs) -> Queued
+    task:
+      id: arch-a
+      title: Rotate kraken webhook secret
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: docs
+      repo: "-"
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: ""
+    help[2]:
+      - Run `tasks-axi start arch-a` to move it to in flight
+      - Run `tasks-axi block arch-a --by <other>` to record a dependency
+    -> exit 0
+
+=== [17] close it (non-ship row closes as before), prune to archive
+$ fm-tasks-axi.sh done arch-a --note rotated --keep 0
+    ok: done arch-a -> Done; pruned 1
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+--- done-archive.md:
+    
+    ## Archived 2026-11-03
+    - [x] arch-a - Rotate kraken webhook secret (kind: docs) (done 2026-11-03)
+      rotated
+
+=== [18] overlap with an archived Done item is still refused
+$ fm-tasks-axi.sh add arch-b Rotate kraken webhook secret again --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as arch-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+      arch-a (Done, archived, overlap 0.80) Rotate kraken webhook secret
+    Judge them, then run the add again with one of these two overrides (each still needs --objective):
+      (every neighbour is Done and archived, so --dup-of has no item to append to)
+      the work is different from arch-a - file it:
+        /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FV6QMEQ95B71GQTT0XSFER/bin/fm-tasks-axi.sh add arch-b Rotate\ kraken\ webhook\ secret\ again --objective O7 --not-dup arch-a
+    -> exit 2
+
+=== [19] --dup-of an archive-only item is refused with a pointer to --not-dup
+$ fm-tasks-axi.sh add arch-b Rotate kraken webhook secret again --objective O7 --dup-of arch-a
+    REFUSED: guard=backlog-intake-dup-of rule=kept-archived missing=a kept item in the active backlog
+    completing-command: FM_FRICTION_OPERATION_ID=9657d10f-e0f8-4580-b208-93ab4cfa7834 FM_FRICTION_EPISODE_ID=9657d10f-e0f8-4580-b208-93ab4cfa7834 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup arch-a
+    fm-tasks-axi: the kept item arch-a is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup arch-a
+    -> exit 2
+--- backlog.md:
+    ## In flight
+    
+    ## Queued
+    - [ ] lock-a - Lock holder crash (repo: firstmate) (kind: ship) (since 2026-11-03)
+      ---
+      Merged from a duplicate filing: Lock holder crash on reboot
+      seen again after a reboot
+    
+    - [ ] paint-b - Repaint harbour signage colours (since 2026-11-03)
+    - [ ] quarterly-guard-registry-audit-71 - Quarterly guard registry audit (since 2026-11-03)
+    - [ ] zebra-c - Migrate zebra telemetry exporter (since 2026-11-03)
+    - [ ] lock-b - Lock holder crash recovery (since 2026-11-03)
+    ## Done
+--- backlog-review.tsv:
+    lock-a		O7	
+    paint-b		none	fixture: no objective fits
+    quarterly-guard-registry-audit-71		O6	
+    zebra-c		O3	
+    lock-b		O7	
+    arch-a		O7	
+
+##### M3: done --duplicate-of / --moved-to #####
+
+=== [20] done --duplicate-of closes a ship duplicate on proof, no PR, no owner words
+$ fm-tasks-axi.sh done dup-x --duplicate-of dup-k
+    ok: done dup-x -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+
+=== [21] kept item now carries the duplicate's title/body
+$ fm-tasks-axi.sh show dup-k --full
+    task:
+      id: dup-k
+      title: Kestrel cache warmer
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: ship
+      repo: firstmate
+      priority: "-"
+      created: 2026-11-03
+      closed: "-"
+      deps: none
+      links: none
+      body: "---\nMerged from duplicate dup-x: Kestrel cache warmer startup\nduplicate body text"
+    -> exit 0
+    15:  Merged from duplicate dup-x: Kestrel cache warmer startup
+    19:- [x] dup-x - Kestrel cache warmer startup (repo: firstmate) (kind: ship) (done 2026-11-03)
+
+=== [22] --duplicate-of a missing kept item is refused
+$ fm-tasks-axi.sh done dup-y --duplicate-of no-such-item
+    REFUSED: guard=backlog-close-duplicate-of rule=kept-missing missing=a kept item in this backlog
+    completing-command: FM_FRICTION_OPERATION_ID=525481df-8b88-48f3-9db8-880c7035dc73 FM_FRICTION_EPISODE_ID=525481df-8b88-48f3-9db8-880c7035dc73 bin/fm-tasks-axi.sh done dup-y --duplicate-of <kept-id>
+    fm-tasks-axi: the kept item no-such-item does not exist in this backlog
+    -> exit 2
+
+=== [23] --duplicate-of a closed kept item is refused
+$ fm-tasks-axi.sh done dup-y --duplicate-of dup-x
+    REFUSED: guard=backlog-close-duplicate-of rule=kept-not-open missing=a Queued or In flight kept item
+    completing-command: FM_FRICTION_OPERATION_ID=bd7b4a4b-9885-4b05-ae49-6e95473b9206 FM_FRICTION_EPISODE_ID=bd7b4a4b-9885-4b05-ae49-6e95473b9206 bin/fm-tasks-axi.sh done dup-y --duplicate-of <kept-id>
+    fm-tasks-axi: the kept item dup-x is not Queued or In flight; a duplicate closes into open work only
+    -> exit 2
+
+=== [24] owner-filed item (Captain's words) is refused for --duplicate-of
+$ fm-tasks-axi.sh done own-a --duplicate-of dup-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-a, and in what words?
+    fm-tasks-axi: own-a quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+=== [25] owner-filed item (Owner <date>:) is refused for --duplicate-of
+$ fm-tasks-axi.sh done own-b --duplicate-of dup-k
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-b, and in what words?
+    fm-tasks-axi: own-b quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+$ fm-captain-hold.sh hold held-a --reason 'which archive?'
+    held-a
+
+=== [26] item held for the owner is refused for --duplicate-of
+$ fm-tasks-axi.sh done held-a --duplicate-of dup-k
+    REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+    human-only-exit: what is the owner's answer to the call held-a?
+    fm-tasks-axi: held-a is an open owner call; answer it with bin/fm-captain-hold.sh answer held-a --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close held-a
+    -> exit 2
+
+=== [27] item with a live task record is refused for --duplicate-of
+$ fm-tasks-axi.sh done live-a --duplicate-of dup-k
+    REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+    completing-command: FM_FRICTION_OPERATION_ID=355abea6-2d98-4049-b16d-714a10733b5a FM_FRICTION_EPISODE_ID=355abea6-2d98-4049-b16d-714a10733b5a bin/fm-teardown.sh live-a
+    fm-tasks-axi: live-a has a live task record; complete it with bin/fm-teardown.sh live-a, which owns the landing proof
+    -> exit 2
+
+=== [28] item that blocks an open item is refused and names it
+$ fm-tasks-axi.sh done blk-a --duplicate-of dup-k
+    REFUSED: guard=backlog-close-item-eligible rule=open-dependents missing=no open item blocked by this one
+    completing-command: FM_FRICTION_OPERATION_ID=1c5d1a7b-d240-4673-b548-4ba329fe113b FM_FRICTION_EPISODE_ID=1c5d1a7b-d240-4673-b548-4ba329fe113b bin/fm-tasks-axi.sh unblock <dependent> --by blk-a
+    fm-tasks-axi: blk-a still blocks open items: blk-b. Closing it would release them while its work is still open, so nothing was closed. Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by dup-k, then bin/fm-tasks-axi.sh unblock <dependent> --by blk-a (the kept item dup-k itself needs only the unblock step).
+    -> exit 2
+
+=== [29] --duplicate-of with --pr together is refused
+$ fm-tasks-axi.sh done blk-b --duplicate-of dup-k --pr https://github.com/o/r/pull/1
+    fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+    -> exit 2
+
+=== [30] --moved-to an unregistered home is refused
+$ fm-tasks-axi.sh done mov-a --moved-to sm-nope peer-open
+    REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+    completing-command: FM_FRICTION_OPERATION_ID=b6b381e9-2957-44c1-b52a-31edb206f4a6 FM_FRICTION_EPISODE_ID=b6b381e9-2957-44c1-b52a-31edb206f4a6 bin/fm-tasks-axi.sh done mov-a --moved-to <home> <item-id>
+    fm-tasks-axi: sm-nope is not one registered home in /Users/charlesabrooker/tmp/fm-lab.QZ45Mq/data/secondmates.md
+    -> exit 2
+
+=== [31] --moved-to a registered home without that item is refused
+$ fm-tasks-axi.sh done mov-a --moved-to sm-one peer-absent
+    REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+    completing-command: FM_FRICTION_OPERATION_ID=d5bc6cf0-a65d-4d05-bca1-7cebff117bfd FM_FRICTION_EPISODE_ID=d5bc6cf0-a65d-4d05-bca1-7cebff117bfd bin/fm-tasks-axi.sh done mov-a --moved-to sm-one <item-id>
+    fm-tasks-axi: sm-one's backlog has no item peer-absent
+    -> exit 2
+
+=== [32] --moved-to a registered home where the item is closed is refused
+$ fm-tasks-axi.sh done mov-a --moved-to sm-one peer-done
+    REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+    completing-command: FM_FRICTION_OPERATION_ID=e17b91eb-9a60-4a53-b74c-d3856c149fc8 FM_FRICTION_EPISODE_ID=e17b91eb-9a60-4a53-b74c-d3856c149fc8 bin/fm-tasks-axi.sh done mov-a --moved-to sm-one <item-id>
+    fm-tasks-axi: sm-one's item peer-done is not open (Queued or In flight); moved work must be open in the new home
+    -> exit 2
+
+=== [33] --moved-to an alias of this same backlog is refused
+$ fm-tasks-axi.sh done mov-a --moved-to sm-self dup-k
+    REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+    completing-command: FM_FRICTION_OPERATION_ID=a9669849-324a-4da8-9e24-ead1b400f8a1 FM_FRICTION_EPISODE_ID=a9669849-324a-4da8-9e24-ead1b400f8a1 bin/fm-tasks-axi.sh done mov-a --moved-to <home> <item-id>
+    fm-tasks-axi: sm-self is this backlog itself; a moved item must live in a different backlog
+    -> exit 2
+
+=== [34] --moved-to owner-filed item is refused
+$ fm-tasks-axi.sh done own-a --moved-to sm-one peer-open
+    REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+    human-only-exit: does the owner close own-a, and in what words?
+    fm-tasks-axi: own-a quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+    -> exit 2
+
+=== [35] --moved-to a registered home with the item open closes on proof
+$ fm-tasks-axi.sh done mov-a --moved-to sm-one peer-open
+    ok: done mov-a -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+    29:- [x] mov-a - Albatross ingest move (repo: firstmate) (kind: ship) (done 2026-11-03)
+
+##### M4: existing proofs unchanged #####
+
+=== [36] ship row with no proof is refused (as before)
+$ fm-tasks-axi.sh done ship-z
+    fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+    -> exit 2
+
+=== [37] ship row with --note only is refused (as before)
+$ fm-tasks-axi.sh done ship-z --note done
+    fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+    -> exit 2
+
+=== [38] ship row with --drop-file closes (as before)
+$ fm-tasks-axi.sh done ship-z --drop-file /Users/charlesabrooker/tmp/fm-lab.QZ45Mq/words.txt
+    ok: done ship-z -> Done
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+    -rw-------  1 charlesabrooker  staff  30 Nov  3 00:41 /Users/charlesabrooker/tmp/fm-lab.QZ45Mq/data/ship-z/captain-drop.md
+
+=== [39] scout row with --report closes (as before)
+$ fm-tasks-axi.sh done scout-z --report data/scout-z/report.md
+    ok: done scout-z -> Done (report data/scout-z/report.md)
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+
+--- final backlog.md:
+    ## In flight
+    
+    ## Queued
+    - [ ] lock-a - Lock holder crash (repo: firstmate) (kind: ship) (since 2026-11-03)
+      ---
+      Merged from a duplicate filing: Lock holder crash on reboot
+      seen again after a reboot
+    
+    - [ ] paint-b - Repaint harbour signage colours (since 2026-11-03)
+    - [ ] quarterly-guard-registry-audit-71 - Quarterly guard registry audit (since 2026-11-03)
+    - [ ] zebra-c - Migrate zebra telemetry exporter (since 2026-11-03)
+    - [ ] lock-b - Lock holder crash recovery (since 2026-11-03)
+    - [ ] dup-k - Kestrel cache warmer (repo: firstmate) (kind: ship) (since 2026-11-03)
+      ---
+      Merged from duplicate dup-x: Kestrel cache warmer startup
+      duplicate body text
+    
+    - [ ] dup-y - Kestrel cache warmer metrics (since 2026-11-03)
+    - [ ] own-a - Owner flagged heron queue (since 2026-11-03)
+      Captain's words, 2026-10-20 (via /kun): keep this
+    - [ ] own-b - Owner dated heron queue drain (since 2026-11-03)
+      Owner 2026-11-01: do this
+    - [ ] held-a - Pelican archive restore drill (since 2026-11-03) (hold: fm-hold-v1:d2hpY2ggYXJjaGl2ZT8=) (hold-kind: captain)
+      Captain hold set: 2026-11-03T06:40:40Z
+    - [ ] live-a - Osprey shard rebalance (repo: firstmate) (kind: ship) (since 2026-11-03)
+    - [ ] blk-a - Walrus quota sync (since 2026-11-03)
+    - [ ] blk-b - Narwhal billing export blocked-by: blk-a (since 2026-11-03)
+    ## Done
+    - [x] scout-z - Investigate gannet latency data/scout-z/report.md (repo: firstmate) (kind: scout) (reported 2026-11-03)
+    - [x] ship-z - Puffin deploy rewrite (repo: firstmate) (kind: ship) (done 2026-11-03)
+      dropped
+    - [x] mov-a - Albatross ingest move (repo: firstmate) (kind: ship) (done 2026-11-03)
+      moved to sm-one as peer-open
+    - [x] dup-x - Kestrel cache warmer startup (repo: firstmate) (kind: ship) (done 2026-11-03)
+      duplicate body text
+      duplicate of dup-k
+--- final backlog-review.tsv:
+    lock-a		O7	
+    paint-b		none	fixture: no objective fits
+    quarterly-guard-registry-audit-71		O6	
+    zebra-c		O3	
+    lock-b		O7	
+    arch-a		O7	
+    dup-k		O7	
+    dup-x		O7	
+    dup-y		O7	
+    own-a		O7	
+    own-b		O7	
+    held-a		O7	
+    live-a		O7	
+    blk-a		O7	
+    blk-b		O7	
+    mov-a		O7	
+    ship-z		O7	
+    scout-z		O7	
+--- guard events (guard, decision, extra):
+       1 backlog-close-duplicate-of	allow		
+       2 backlog-close-duplicate-of	deny		
+       2 backlog-close-item-eligible	allow		
+       6 backlog-close-item-eligible	deny		
+       1 backlog-close-moved-to	allow		
+       4 backlog-close-moved-to	deny		
+       1 backlog-intake-dup-of	allow		
+       1 backlog-intake-dup-of	deny		
+      14 backlog-intake-duplicate	allow		
+       1 backlog-intake-duplicate	allow		dup-of
+       4 backlog-intake-duplicate	allow	true	not-dup
+       5 backlog-intake-duplicate	deny		
+       4 backlog-intake-not-dup	allow		
+       1 backlog-intake-not-dup	deny		
+      26 backlog-intake-objective	allow		
+       3 backlog-intake-objective	deny		

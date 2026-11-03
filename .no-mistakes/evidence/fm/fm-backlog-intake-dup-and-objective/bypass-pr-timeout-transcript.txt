@@ -1,0 +1,126 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.fpuQ7q (marked lab home); tasks-axi 0.2.6
+
+##### M4: no environment variable bypasses the add checks #####
+$ env FM_INTAKE_SKIP=1 fm-tasks-axi.sh add lock-z 'Lock holder crash recovery' --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+    -> exit 2
+$ env FM_INTAKE_SKIP=1 fm-tasks-axi.sh add lock-y 'Unrelated walrus' (no --objective)
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    -> exit 2
+$ env FM_GATE_REFUSE_BYPASS=1 fm-tasks-axi.sh add lock-z 'Lock holder crash recovery' --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+    -> exit 2
+$ env FM_GATE_REFUSE_BYPASS=1 fm-tasks-axi.sh add lock-y 'Unrelated walrus' (no --objective)
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    -> exit 2
+$ env FM_TASKS_AXI_REFUSE_OPEN_CALL=1 fm-tasks-axi.sh add lock-z 'Lock holder crash recovery' --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+    -> exit 2
+$ env FM_TASKS_AXI_REFUSE_OPEN_CALL=1 fm-tasks-axi.sh add lock-y 'Unrelated walrus' (no --objective)
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    -> exit 2
+$ env FM_BACKLOG_INTAKE_OFF=1 fm-tasks-axi.sh add lock-z 'Lock holder crash recovery' --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+    -> exit 2
+$ env FM_BACKLOG_INTAKE_OFF=1 fm-tasks-axi.sh add lock-y 'Unrelated walrus' (no --objective)
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    -> exit 2
+$ env TASKS_AXI_NO_DUP=1 fm-tasks-axi.sh add lock-z 'Lock holder crash recovery' --objective O7
+    REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+    human-only-exit: is this add the same work as lock-a?
+    fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+    -> exit 2
+$ env TASKS_AXI_NO_DUP=1 fm-tasks-axi.sh add lock-y 'Unrelated walrus' (no --objective)
+    REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+    -> exit 2
+    (no bypass filed lock-z or lock-y)
+
+##### piped --body-file reaches tasks-axi unchanged #####
+$ fm-tasks-axi.sh add pipe-a 'Heron pipeline body' --objective O7 --body-file <(printf 'line one\nline two\n')
+    ok: added pipe-a -> Queued
+      body: "line one\nline two\n"
+$ fm-tasks-axi.sh add pipe-b 'Heron pipeline body dup' --objective O7 --dup-of pipe-a --body-file <(printf 'third line\n')
+    ok: merged into pipe-a (nothing filed)
+      body: "line one\nline two\n\n---\nMerged from a duplicate filing: Heron pipeline body dup\nthird line"
+
+##### M4: --pr proof unchanged (real read-only forge lookup) #####
+$ fm-tasks-axi.sh done ship-p --pr https://github.com/MrGTV-love/firstmate/pull/361   (open, not merged)
+    fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/361
+    -> exit 2
+$ fm-tasks-axi.sh done ship-p --pr https://github.com/MrGTV-love/firstmate/pull/364   (merged)
+    ok: done ship-p -> Done (pr https://github.com/MrGTV-love/firstmate/pull/364)
+    help[1]:
+      - Run `tasks-axi ready` to dispatch work unblocked by this
+    -> exit 0
+    15:- [x] ship-p - Puffin release notes https://github.com/MrGTV-love/firstmate/pull/364 (repo: firstmate) (kind: ship) (merged 2026-11-03)
+
+##### repeated-timeout filer with seven open timeout items #####
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.fresh 1200000 --event-id f1
+    -> exit 0
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.fresh 1200000 --event-id f2
+    timeout_work: "fm-timeout-e3935cad7a311f76"
+    -> exit 0
+    21:- [ ] fm-timeout-e3935cad7a311f76 - Measure and repair repeated timeout: acme/widgets lab.fresh (repo: firstmate) (kind: ship) (since 2026-11-03)
+    22:  Repeated timeout for command key lab.fresh in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 1200000, 1200000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.
+--- other host's open item under the same title takes the occurrence
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.shared 1200000 --event-id s1
+    -> exit 0
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.shared 1200000 --event-id s2
+    timeout_work: "fm-timeout-otherhost"
+    -> exit 0
+      body: "filed on host other-host\n\n---\nMerged from a duplicate filing: Measure and repair repeated timeout: acme/widgets lab.shared\nRepeated timeout for command key lab.shared in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 1200000, 1200000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+    rows naming lab.shared: 3
+--- a hand-filed, closed and archived neighbour goes to the operator, nothing filed
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.archived 1200000 --event-id a1
+    -> exit 0
+$ (cd <scratch repo acme/widgets>) fm-duration.py timeout lab.archived 1200000 --event-id a2
+    error: "timeout work could not be filed: hand-raise may be the same work filed by hand; REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours\nhuman-only-exit: is this add the same work as fm-timeout-e3935cad7a311f76?\nfm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:\n  fm-timeout-e3935cad7a311f76 (Queued, overlap 0.78) Measure and repair repeated timeout: acme/widgets lab.fresh\n  fm-timeout-otherhost (Queued, overlap 0.78) Measure and repair repeated timeout: acme/widgets lab.shared\n  fm-timeout-other0 (Queued, overlap 0.60) Measure and repair repeated timeout: acme/widgets other.key0\nJudge them, then run the add again with one of these two overrides (each still needs --objective):\n  the work is the same - append this title and body to fm-timeout-e3935cad7a311f76 and file nothing:\n    /Users/charlesabrooker/tmp/fm-lab.fpuQ7q/bin/fm-tasks-axi.sh add fm-timeout-dface4b257de8122 Measure\\ and\\ repair\\ repeated\\ timeout:\\ acme/widgets\\ lab.archived --kind ship --repo firstmate --body Repeated\\ timeout\\ for\\ command\\ key\\ lab.archived\\ in\\ repository\\ acme/widgets\\ on\\ host\\ Mac-Studio.local.\\ Observed\\ lower\\ bounds\\ \\(ms\\):\\ 1200000\\,\\ 1200000.\\ Measure\\ completion\\ latency\\ across\\ host\\ load\\,\\ then\\ repair\\ the\\ limit\\ with\\ an\\ explicit\\ margin.\\ A\\ read\\ wait\\ ending\\ is\\ not\\ command\\ failure. --objective O7 --dup-of fm-timeout-e3935cad7a311f76\n  the work is different from fm-timeout-e3935cad7a311f76 - file it:\n    /Users/charlesabrooker/tmp/fm-lab.fpuQ7q/bin/fm-tasks-axi.sh add fm-timeout-dface4b257de8122 Measure\\ and\\ repair\\ repeated\\ timeout:\\ acme/widgets\\ lab.archived --kind ship --repo firstmate --body Repeated\\ timeout\\ for\\ command\\ key\\ lab.archived\\ in\\ repository\\ acme/widgets\\ on\\ host\\ Mac-Studio.local.\\ Observed\\ lower\\ bounds\\ \\(ms\\):\\ 1200000\\,\\ 1200000.\\ Measure\\ completion\\ latency\\ across\\ host\\ load\\,\\ then\\ repair\\ the\\ limit\\ with\\ an\\ explicit\\ margin.\\ A\\ read\\ wait\\ ending\\ is\\ not\\ command\\ failure. --objective O7 --not-dup fm-timeout-e3935cad7a311f76"
+    -> exit 1
+    rows naming lab.archived: 0
+--- backlog-review.tsv:
+    lock-a		O7	
+    pipe-a		O7	
+    ship-p		O6	
+    fm-timeout-e3935cad7a311f76		O7	
+--- ledger filed rows:
+    lab.fresh	fm-timeout-e3935cad7a311f76
+    lab.shared	fm-timeout-otherhost
+--- final backlog.md:
+    ## In flight
+    
+    ## Queued
+    - [ ] lock-a - Lock holder crash (repo: firstmate) (kind: ship) (since 2026-11-03)
+    
+    - [ ] pipe-a - Heron pipeline body (since 2026-11-03)
+      line one
+      line two
+    
+      ---
+      Merged from a duplicate filing: Heron pipeline body dup
+      third line
+    
+    - [ ] fm-timeout-other0 - Measure and repair repeated timeout: acme/widgets other.key0 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other1 - Measure and repair repeated timeout: acme/widgets other.key1 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other2 - Measure and repair repeated timeout: acme/widgets other.key2 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other3 - Measure and repair repeated timeout: acme/widgets other.key3 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other4 - Measure and repair repeated timeout: acme/widgets other.key4 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other5 - Measure and repair repeated timeout: acme/widgets other.key5 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-other6 - Measure and repair repeated timeout: acme/widgets other.key6 (kind: ship) (since 2026-11-03)
+    - [ ] fm-timeout-e3935cad7a311f76 - Measure and repair repeated timeout: acme/widgets lab.fresh (repo: firstmate) (kind: ship) (since 2026-11-03)
+      Repeated timeout for command key lab.fresh in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 1200000, 1200000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.
+    - [ ] fm-timeout-otherhost - Measure and repair repeated timeout: acme/widgets lab.shared (kind: ship) (since 2026-11-03)
+      filed on host other-host
+    
+      ---
+      Merged from a duplicate filing: Measure and repair repeated timeout: acme/widgets lab.shared
+      Repeated timeout for command key lab.shared in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 1200000, 1200000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.
+    
+    ## Done
