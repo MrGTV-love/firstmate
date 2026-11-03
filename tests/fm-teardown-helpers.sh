@@ -2603,10 +2603,10 @@ nested_snapshot() {
 # nested_observe <case-dir> <rc>: the observable result of one teardown on one
 # line, for comparing shapes.
 nested_observe() {
-  local case_dir=$1 rc=$2 class markers= returns name
+  local case_dir=$1 rc=$2 class marker_list='' returns marker_name
   case "$rc" in 0) class=0 ;; *) class=nonzero ;; esac
-  for name in backlog-close teardown-return-pending; do
-    [ ! -e "$case_dir/state/task-x1.$name" ] || markers="$markers${markers:+,}$name"
+  for marker_name in backlog-close teardown-return-pending; do
+    [ ! -e "$case_dir/state/task-x1.$marker_name" ] || marker_list="$marker_list${marker_list:+,}$marker_name"
   done
   returns=$(grep -c '^return' "$case_dir/treehouse.log" 2>/dev/null || true)
   printf 'exit=%s copy=%s claim=%s record=%s inbox=%s status=%s tasktmp=%s returns=%s markers=%s' \
@@ -2617,7 +2617,7 @@ nested_observe() {
     "$([ -e "$case_dir/state/task-x1.inbox" ] && echo kept || echo removed)" \
     "$([ -e "$case_dir/state/task-x1.status" ] && echo kept || echo removed)" \
     "$([ -e "$case_dir/tasktmp" ] && echo kept || echo removed)" \
-    "${returns:-0}" "${markers:-none}"
+    "${returns:-0}" "${marker_list:-none}"
 }
 
 # nested_run <case-dir> [--force]: one teardown (with the fake Herdr's files
