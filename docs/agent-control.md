@@ -360,7 +360,7 @@ For a copy held for unique ignored files: review them with `git -C <copy> status
 The output shows every copy path, slot path and reason with control characters replaced by `?`, and quotes each path in a printed command with `printf %q`; the record carries the same cleaned text.
 Once every proof has passed and before it removes anything, teardown appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
 A line already there for the same task, slot, copy and reason is not written again, and teardown never edits or clears the file.
-A record that cannot be written refuses the close with nothing removed, so a close that happened never lacks its inventory.
+A record that cannot be written refuses the close with nothing removed, so a close that happened never lacks its inventory; when it already cannot be written at entry and some held copy still lacks its line, the close refuses before the slot is reserved.
 A refusal by a later step leaves the line, and the rerun adds nothing.
 Once the task record and the task's own nested copies are gone, which no rerun can bring back, teardown prints the notices below, before the backlog close and the later steps, so a failure of the backlog close, of the fleet sync, or an idle-reaper timeout after that point still leaves them.
 The notices are printed whichever completion line the close later prints, including the line of a `--legacy-record` close.
