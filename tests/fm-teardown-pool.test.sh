@@ -214,6 +214,66 @@ SH
   pass 'a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes'
 }
 
+# A train member whose slot was reassigned retires records-only on the same
+# verified-train rule as a removed copy, without reading the claimant's copy.
+test_reassigned_slot_train_member_retires_only_on_a_verified_train() {
+  local row case_dir slot rc fact kind other=dddddddddddddddddddddddddddddddddddddddd
+  for row in verified wrong-sha open-train search-fails; do
+    train_case "reassigned-train-$row" none head
+    case_dir=$TRAIN_CASE
+    case "$row" in
+      verified) fact=$TRAIN_URL; kind= ;;
+      wrong-sha)
+        train_list "$case_dir" 9 MERGED main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$other")"
+        fact="not the member PR's recorded head"; kind= ;;
+      open-train)
+        train_list "$case_dir" 9 OPEN main "$TRAIN_HEAD" "$(train_body "$TRAIN_MEMBER_URL" "$TRAIN_MEMBER_HEAD")"
+        fact="is OPEN, not merged"; kind= ;;
+      search-fails)
+        : > "$case_dir/gh-fixture/list.fail"
+        fact="the forge search for PRs listing"; kind=unknown ;;
+    esac
+    mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
+    slot="$case_dir/pool/1/project"
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
+    git -C "$slot" checkout -q -b fm/live-task
+    printf 'claimant committed work\n' > "$slot/live.txt"
+    git -C "$slot" add live.txt
+    git -C "$slot" commit -qm 'unlanded claimant work'
+    printf 'claimant untracked work\n' > "$slot/scratch.txt"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+      > "$case_dir/pool/treehouse-state.json"
+    printf 'task=live-task\nhome=%s\n' "$case_dir/primary-home" > "$case_dir/pool/1/.fm-slot-owner"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$slot" "project=$case_dir/project" "kind=ship" \
+      "mode=no-mistakes" "branch=fm/task-x1" "spawn_gen=finished" \
+      "pr=$TRAIN_MEMBER_URL" "pr_head=$TRAIN_MEMBER_HEAD"
+    fm_write_meta "$case_dir/state/live-task.meta" \
+      "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+      "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+    printf 'finished task\n' > "$case_dir/state/task-x1.status"
+    printf 'live task\n' > "$case_dir/state/live-task.status"
+    cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/claim.before"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    assert_absent "$case_dir/treehouse.log" "reassigned-train-$row: the claimant's slot was administered"
+    cmp -s "$case_dir/claim.before" "$case_dir/pool/1/.fm-slot-owner" || fail "reassigned-train-$row: claimant slot claim changed"
+    assert_grep 'claimant untracked work' "$slot/scratch.txt" "reassigned-train-$row: claimant work changed"
+    assert_grep "$fact" "$case_dir/stderr" "reassigned-train-$row: stderr did not name the train fact: $(cat "$case_dir/stderr")"
+    if [ "$row" = verified ]; then
+      expect_code 0 "$rc" "reassigned-train-$row: a verified train must retire the record"$'\n'"$(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "reassigned-train-$row: accepted teardown left the record"
+    else
+      expect_code 1 "$rc" "reassigned-train-$row: an unverified train must refuse"$'\n'"$(cat "$case_dir/stderr")"
+      assert_grep "REFUSED: task task-x1's recorded copy $slot was reassigned" "$case_dir/stderr" "reassigned-train-$row: refusal lost its text"
+      assert_present "$case_dir/state/task-x1.meta" "reassigned-train-$row: refusal removed the record"
+      [ "$kind" != unknown ] || assert_grep "unknown, retry" "$case_dir/stderr" "reassigned-train-$row: unread train was not called unknown"
+    fi
+  done
+  pass "a train member on a reassigned slot retires on a verified merged train only, leaving the claimant alone"
+}
+
 # Reassignment releases the claimant's copy from judgement, not the stale
 # task's own delivery: with no merged PR and an unlanded own branch it refuses.
 test_reassigned_slot_unlanded_task_refuses() {
@@ -3543,6 +3603,7 @@ test_child_return_custody_refusal_keeps_non_pool_worktree
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses
+test_reassigned_slot_train_member_retires_only_on_a_verified_train
 test_reservation_window_reassignment_retires_records_only
 test_reservation_window_reassignment_reproves_own_landing
 test_enclosing_reservation_window_reassignment_leaves_claimant_slot
