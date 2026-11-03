@@ -44,7 +44,7 @@ class ObserverTests(unittest.TestCase):
     def records(self, kind):
         return [json.loads(line) for line in self.cli("records", "--kind", kind).stdout.splitlines()]
 
-    def scaled_owner(self, duration, hung_ps=False):
+    def scaled_owner(self, duration, hung_ps=False, setup="", source="lambda:{}"):
         # A labeled scaled clock runs the real 15 s cadence and a labeled 30 s
         # no-progress interval twenty times faster. The real ps samples CPU.
         env = dict(self.env, FM_DURATION_NO_PROGRESS_SECS="30")
@@ -53,19 +53,27 @@ class ObserverTests(unittest.TestCase):
         else:
             (self.fakebin / "ps").unlink()
         launcher = self.root / "scaled-clock.py"
-        launcher.write_text(f'''import runpy,sys,time
+        launcher.write_text(f'''import os,runpy,signal,sys,time
+{setup}
 scale=20.0
 real_monotonic,real_sleep=time.monotonic,time.sleep
 base=real_monotonic()
 time.monotonic=lambda: base+(real_monotonic()-base)*scale
 time.sleep=lambda seconds: real_sleep(seconds/scale)
 owner=runpy.run_path(sys.argv[1])
-owner["run"](owner["private_root"](),duration={duration},process_source=lambda:{{}})
+owner["run"](owner["private_root"](),duration={duration},process_source={source})
 ''')
         reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], capture_output=True, text=True, timeout=120,
                                env=env)
         self.assertEqual(reply.returncode, 0, reply.stderr)
         return self.records("quota")
+
+    def prune_at(self, now):
+        launcher = self.root / "clock.py"
+        launcher.write_text(f"import sys,time,runpy\ntime.time=lambda:{now!r}\nsys.argv=[sys.argv[1],'prune']\nrunpy.run_path(sys.argv[0],run_name='__main__')\n")
+        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(reply.returncode, 0, reply.stderr)
+        return json.loads(reply.stdout)["removed"]
 
     def assertProcessGone(self, pid):
         # A killed orphan can briefly remain a zombie; /proc on Linux or the
@@ -90,6 +98,8 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
         self.assertEqual([(row["pid"], row["start"]) for row in rows], [
             (201, "Sun Nov 1 13:00:01 2026"), (202, "Sun Nov 1 13:00:03 2026"),
             (201, "Sun Nov 1 13:00:02 2026")])
+        self.assertEqual([(row["pid"], row["start"]) for row in self.records("process_end")],
+                         [(201, "Sun Nov 1 13:00:01 2026")])
         first = rows[0]
         self.assertEqual(first["argv"][:3], ["gh", "pr", "checks"])
         self.assertEqual(first["ancestors"][0]["pid"], 100)
@@ -130,6 +140,45 @@ owner["run"](owner["private_root"](),duration=0.8,process_source=source)
             self.assertEqual(row["ancestors"][0]["argv"], ["python3", "parent.py", "[REDACTED]"])
             self.assertEqual(row["ancestor_end"], "cycle")
         self.assertNotIn("fixture-secret", json.dumps(rows))
+
+    def test_caller_outliving_quota_intervals_has_an_end_row_and_a_survivor_has_none(self):
+        # Labeled table: 71 lives until the fourth quota request starts, one scan
+        # then fails, and later scans omit 71. 70 is listed until the owner stops.
+        self.tool("gh-axi", '''printf 'x\\n' >> "$FIXTURE_ROOT/requests"
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        setup = '''after=0
+def source():
+    global after
+    requests=os.path.join(os.environ["FIXTURE_ROOT"],"requests")
+    table={70:(0,"fixture-survivor",["/fixture/gh","pr","checks","--watch"])}
+    if not os.path.exists(requests) or len(open(requests).readlines())<4:
+        table[71]=(0,"fixture-ender",["/fixture/gh","pr","checks","--watch"])
+        return table
+    after+=1
+    if after==1:
+        raise RuntimeError("fixture scan failure")
+    if after==4:
+        os.kill(os.getpid(),signal.SIGTERM)
+    return table
+'''
+        quota = [row for row in self.scaled_owner(None, setup=setup, source="source") if row["status"] == "observed"]
+        rows = self.records("process")
+        self.assertEqual(sorted(row["pid"] for row in rows), [70, 71])
+        ended = self.records("process_end")
+        self.assertEqual([(row["pid"], row["start"]) for row in ended], [(71, "fixture-ender")])
+        end = ended[0]
+        self.assertEqual(set(end), {"pid", "start", "run_id", "observed_at", "kind"})
+        began = next(row for row in rows if row["pid"] == 71)
+        self.assertEqual(end["run_id"], began["run_id"])
+        self.assertLess(began["observed_at"], quota[1]["observed_at"])
+        self.assertLess(quota[2]["observed_at"], end["observed_at"])
+        self.assertGreaterEqual(sum(row["failures"] for row in self.records("sampling")), 1)
+        self.assertEqual(self.records("owner")[-1]["action"], "stop")
+        self.prune_at(end["observed_at"] + 172799)
+        self.assertEqual(len(self.records("process_end")), 1)
+        self.assertGreaterEqual(self.prune_at(end["observed_at"] + 172801), 1)
+        self.assertEqual(self.records("process_end"), [])
 
     def test_interpreter_flags_keep_script_names_and_withhold_payloads(self):
         launcher = self.root / "injected-forms.py"
@@ -279,11 +328,7 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
             db.execute("INSERT INTO observations VALUES (?,?,?)", (stamp, "fixture", json.dumps({"delta": delta})))
         db.commit()
         db.close()
-        launcher = self.root / "clock.py"
-        launcher.write_text("import sys,time,runpy\ntime.time=lambda:1794000000\nsys.argv=[sys.argv[1],'prune']\nrunpy.run_path(sys.argv[0],run_name='__main__')\n")
-        reply = subprocess.run([sys.executable, str(launcher), str(OWNER)], env=self.env, capture_output=True, text=True)
-        self.assertEqual(reply.returncode, 0, reply.stderr)
-        self.assertEqual(json.loads(reply.stdout)["removed"], 1)
+        self.assertEqual(self.prune_at(now), 1)
         self.assertEqual([row["delta"] for row in self.records("fixture")], [0, 1])
         self.assertEqual(sentinel.read_text(), "keep")
 

@@ -54,7 +54,12 @@ remaining child processes, including a hung ps; a SIGKILL of the owner does not.
 run's process_source callable is a test
 seam returning {pid: (ppid, start_identity, argv_words)}; the default is ps.
 Injected rows prove output behavior, not actual host observations. New gh/gh-axi
-PID/start identities retain sanitized argv and the observed ancestor chain. Payloads and
+PID/start identities retain sanitized argv and the observed ancestor chain in one
+process row. One process_end row, with the pid, start identity and time, follows when
+the first successful scan no longer lists that identity as a caller; a failed scan
+ends nothing and no row is written per scan. A caller still alive when the observer
+stops has no process_end row, nor has one that ends while no owner runs, and a new
+owner records a caller it finds alive as a new process row. Payloads and
 arbitrary argument values are withheld, as in the process census's safe logging
 convention. Executable/script basenames, an interpreter's known no-value flags,
 command words and recognized option names are retained. A flag not known to take no
@@ -415,9 +420,12 @@ def run(root, duration=None, ready=None, *, process_source=None):
             elif finished.error is not None:
                 raise finished.error
             else:
-                found, seen = process_records(finished.rows, seen)
+                found, current = process_records(finished.rows, seen)
+                for pid, start in sorted(seen - current):
+                    record(db, "process_end", {"pid": pid, "start": start, "run_id": run_id})
                 for item in found:
                     record(db, "process", dict(item, run_id=run_id))
+                seen = current
 
         try:
             prune(db, time.time())

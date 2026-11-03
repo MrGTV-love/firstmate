@@ -1106,7 +1106,10 @@ An owner that starts and then dies is restarted at the next cycle and raises no 
 A detached owner's stderr appends to `state/github-accounting/owner.log`, which `start` trims to its newest 32 KiB before a launch once it passes 64 KiB.
 Its selected quota source is the REST `rate_limit` endpoint's `resources.graphql` body through `gh-axi`, not the enforcing response headers used by the sweeps.
 That source was explicitly selected instead of the original GraphQL-query/header proposal; a returned REST counter does not establish agreement between counter shards.
-Stored process observations can identify a locally sampled caller chain in a quota interval, but temporal coincidence cannot prove that caller spent those points, and missed, non-`gh`, or off-host consumers remain unknown.
+A `process` row holds a locally sampled caller chain at its first sighting, and a `process_end` row with the same pid and start identity holds the time of the first successful scan that no longer lists that caller, so the two rows connect a long-lived caller to the quota intervals between them.
+No row is written per scan, and a failed scan ends nothing, so a `process_end` time can follow the real end by the failed or missing scans that `sampling` rows report.
+A caller still alive when the observer stops has no `process_end` row, nor has one that ends while no owner runs, so its `process` row shows when it was first seen and not how long it lived; a new owner records a caller it finds alive as a new `process` row.
+Temporal coincidence cannot prove that a caller spent the points of a quota interval, and missed, non-`gh`, or off-host consumers remain unknown.
 Arguments are a sanitized `ps` command-line projection, not lossless argv; arbitrary values and shell payloads are withheld.
 Its own start/stop commands manage only its private owner, quota child group, and owned `ps` children, never a shared service.
 No wall-clock limit stops a quota request or a `ps`: each is killed only on `bin/fm-duration.py`'s no-progress verdict (15 quiet minutes by default, `FM_DURATION_NO_PROGRESS_SECS`), a killed request is recorded unavailable with `reason=timeout`, and a killed `ps` counts as a sampling failure.
