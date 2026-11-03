@@ -801,7 +801,34 @@ SH
 
   [ "$(head_of "$w/sm")" = "$c2" ] \
     || fail "spawn did not fast-forward the secondmate worktree to the primary's HEAD"
-  pass "T10 spawn fast-forwards a secondmate worktree to the primary's local HEAD before launch"
+  # The host-local launch leg already converged by its parent deliberately
+  # suppresses a second sync/inheritance pass with the internal value: it skips
+  # exactly as an operator's 1 does, but records no escape. An operator's 1 does.
+  bump_primary "$w" instr
+  PATH="$fakebin:$BASE_PATH" TMUX='' \
+    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
+    FM_GUARD_EVENT_LOG="$w/internal-events.jsonl" FM_SKIP_SECONDMATE_SYNC=internal \
+    FM_SKIP_SECONDMATE_INHERIT=internal FM_SPAWN_NO_GUARD=internal \
+    "$ROOT/bin/fm-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>&1 || true
+  [ "$(head_of "$w/sm")" = "$c2" ] || fail "an internally skipped secondmate sync changed HEAD"
+  jq -se '[.[] | select(.rule == "FM_SKIP_SECONDMATE_SYNC" or .rule == "FM_SKIP_SECONDMATE_INHERIT" or .rule == "FM_SPAWN_NO_GUARD")] | length == 0' \
+    "$w/internal-events.jsonl" >/dev/null \
+    || fail "internal host-local skips were recorded as operator escapes"
+  [ -s "$w/internal-events.jsonl" ] || fail "the internally skipped spawn wrote no guard decisions, so the empty escape set is vacuous"
+  PATH="$fakebin:$BASE_PATH" TMUX='' \
+    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
+    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
+    FM_GUARD_EVENT_LOG="$w/skip-events.jsonl" FM_SKIP_SECONDMATE_SYNC=1 \
+    FM_SKIP_SECONDMATE_INHERIT=1 FM_SPAWN_NO_GUARD=1 \
+    "$ROOT/bin/fm-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>&1 || true
+  [ "$(head_of "$w/sm")" = "$c2" ] || fail "an explicitly skipped secondmate sync changed HEAD"
+  jq -se '[.[] | select(.decision == "bypass" and (.rule == "FM_SKIP_SECONDMATE_SYNC" or .rule == "FM_SKIP_SECONDMATE_INHERIT" or .rule == "FM_SPAWN_NO_GUARD"))] |
+    length == 3 and all(.[]; .task == "sm" and .override == true)' "$w/skip-events.jsonl" >/dev/null \
+    || fail "host-local secondmate skips were not attributed to the launched mate"
+  pass "T10 spawn fast-forwards normally and records the host-local sync/inheritance/watcher bypasses"
 }
 
 # --- T11: spawn warns when pre-launch sync is skipped ------------------------
@@ -1337,11 +1364,17 @@ test_remote_launch_does_not_retarget_host_copy() {
   fm_fake_exit0 "$fakebin" gh treehouse tmux node
 
   # The real launch leg, exactly as the parent invokes it after its own sync.
-  launch_out=$(PATH="$fakebin:$BASE_PATH" \
+  launch_out=$(PATH="$fakebin:$BASE_PATH" FM_GUARD_EVENT_LOG="$w/launch-events.jsonl" \
     FM_HOME="$w/launched" FM_ROOT_OVERRIDE="$w/coderoot" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-remote-secondmate-control.sh" launch launched codex - - herdr 2>&1) || true
   [ "$(head_of "$w/launched")" = "$c1" ] \
     || fail "a remote launch moved the home onto the host's own Firstmate copy (out: $launch_out)"
+  # The control script's own skips are internal plumbing and record nothing;
+  # the operator's FM_SPAWN_NO_GUARD=1 on the same launch is still an escape.
+  jq -se '([.[] | select(.rule == "FM_SKIP_SECONDMATE_SYNC" or .rule == "FM_SKIP_SECONDMATE_INHERIT")] | length == 0)
+    and ([.[] | select(.rule == "FM_SPAWN_NO_GUARD" and .decision == "bypass" and .override == true
+      and .task == "launched")] | length == 1)' "$w/launch-events.jsonl" >/dev/null \
+    || fail "the remote launch misclassified internal skips or lost the operator escape: $(cat "$w/launch-events.jsonl" 2>/dev/null)"
 
   # Divergence control: the ordinary secondmate spawn contract DOES follow its
   # FM_ROOT, so the suppressed step above is not vacuously absent.
@@ -1355,6 +1388,8 @@ test_remote_launch_does_not_retarget_host_copy() {
 
   pass "R9 a remote launch leaves the home on the parent's commit while an ordinary spawn follows its own checkout"
 }
+
+fm_test_only
 
 test_ff_updated
 test_ff_current
