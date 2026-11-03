@@ -93,7 +93,11 @@
 # item (id, review-by left empty, objective, reason), because tasks-axi has no
 # field for them. The file is
 # checked writable before anything is filed, and an item whose line fails to
-# write is removed again. An add whose title overlaps a Queued or In flight item,
+# write is removed again. An add whose answer cannot be read gets its line for
+# the one new item the backlog then holds; when there is not exactly one, the
+# add names the items to check and removes nothing. A line that fails to write
+# and an answer tied to no single new item both exit 1, even though tasks-axi
+# accepted the add. An add whose title overlaps a Queued or In flight item,
 # or one of the 50 newest Done items, is refused with the three best neighbours
 # and the two overrides as full commands: `--dup-of <kept-id>` appends the new
 # title and body to that kept item in the active backlog through `tasks-axi
@@ -142,8 +146,9 @@
 # found the id already present (tasks-axi reports `already`) writes nothing, and
 # a failed ledger write costs one stderr line. While config/fleet-ledger is
 # absent the command runs as before.
-# Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
-# in that case the decoder's nonzero status is returned.
+# Otherwise the exit status is tasks-axi's own, unless decoding a read fails, in
+# which case the decoder's nonzero status is returned, or an add's objective line
+# cannot be recorded (exit 1, see "Intake" above).
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
