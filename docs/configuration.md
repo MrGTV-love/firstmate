@@ -3681,7 +3681,7 @@ Every wake line is journaled in `state.json` by the same commit that earns it an
 A mirror failure, or the failure of one thread's own read, is reported once and held back until the other threads' replies have been read, so one card Slack will not accept, or one card the owner deleted, never keeps the other answers unread.
 A thread whose own read failed stays tracked and is not retired until a later poll reads it.
 A deleted card can therefore make `retarget` refuse every time; the last resort above, after reading that thread by hand, is the way out.
-The per-poll answer cap counts only progress made in that poll: a newly staged answer or notice, or an older journaled answer that the poll delivers to the intake.
+The per-poll answer cap counts only progress made in that poll: a newly staged answer, notice, or request, an older journaled answer that the poll delivers to the intake, or an older journaled request whose acknowledgement and wake line the poll completes.
 A journaled row that is only retried or acknowledged again, and a thread read that fails before it delivers an answer, do not count, so a card that can no longer be read, or a row stuck before its acknowledgement, never uses up the cap of the threads after it.
 A journaled row whose thread can no longer be posted to, and a resolution post that fails, are held back the same way: the row stays journaled, the thread stays tracked, and every other thread is still read.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
@@ -4699,8 +4699,8 @@ FM_SMTP_HOST=      # mail-plane SMTP server hostname
 FM_SMTP_PORT=465   # mail-plane SMTP server port
 SLACK_BOT_TOKEN=   # Slack decision-plane bot token; absent means the plane is off (docs/configuration.md "Slack decision plane")
 FM_SLACK_DM_USER=  # required immutable owner member id for the Slack DM target
-FM_SLACK_ALLOWED_AUTHORS=   # required non-empty immutable member ids allowed to answer
-FM_SLACK_POLL_MAX_ANSWERS=20   # optional per-poll answer cap, 1..200; default 20
+FM_SLACK_ALLOWED_AUTHORS=   # required non-empty immutable member ids allowed to answer or send requests
+FM_SLACK_POLL_MAX_ANSWERS=20   # optional per-poll cap on answers and requests, 1..200; default 20 (docs/configuration.md "Slack decision plane")
 FMX_PAIRING_TOKEN=      # Relay pairing token; .env opt-in authorizes replies and eligible lifecycle actions
 FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainly for local relay development
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $FM_HOME/.env
