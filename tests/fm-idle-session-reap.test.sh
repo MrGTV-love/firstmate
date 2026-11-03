@@ -21,7 +21,8 @@ OLD=$((NOW - 7200))
 STUB="$TMP_ROOT/teardown-stub.sh"
 STUB_LOG="$TMP_ROOT/teardown-calls.log"
 STUB_MODE_FILE="$TMP_ROOT/teardown-mode"
-export STUB_LOG STUB_MODE_FILE
+STUB_ADMIT_LOG="$TMP_ROOT/teardown-admission.log"
+export STUB_LOG STUB_MODE_FILE STUB_ADMIT_LOG
 CLOSEOUT_OUT_FILE="$TMP_ROOT/closeout-output.txt"
 export CLOSEOUT_OUT_FILE
 export ROOT
@@ -35,6 +36,19 @@ case "$mode" in
   ok) rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
   closeout) cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
+  closeout-admit)
+    # The admission check bin/fm-teardown.sh runs before it touches the copy.
+    memo=0
+    [ ! -e "$FM_STATE_OVERRIDE/.idle-reap/$1.refused" ] || memo=1
+    class=$(. "$ROOT/bin/fm-idle-reap-lib.sh"
+      fm_idle_reap_classify "$FM_HOME" "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE" "$1"
+      printf '%s' "$IDLE_REAP_CLASS")
+    printf 'memo=%s class=%s\n' "$memo" "$class" >> "$STUB_ADMIT_LOG"
+    if [ "$class" != reap ]; then
+      echo "REFUSED: automatic reap ineligible: $class" >&2
+      exit 1
+    fi
+    cat "$CLOSEOUT_OUT_FILE" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
   nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
   hang) exec sleep 30 ;;
@@ -1238,7 +1252,10 @@ test_closeout_changed_copy_is_retried() {
   local change
   for change in commit untracked modified; do
     closeout_home "closeout-change-$change" own
+    printf 'closeout-admit\n' > "$STUB_MODE_FILE"
+    : > "$STUB_ADMIT_LOG"
     run_reap "$HOME_C" reap >/dev/null || fail "$change: reap failed"
+    assert_present "$HOME_C/state/.idle-reap/cl.refused" "$change: the first refusal leaves a refusal memo"
     case "$change" in
       commit) printf 'more\n' > "$COPY_C/more.txt"; git -C "$COPY_C" add more.txt; git -C "$COPY_C" -c user.name=t -c user.email=t@example.invalid commit -qm more ;;
       untracked) printf 'new\n' > "$COPY_C/new.txt" ;;
@@ -1246,6 +1263,8 @@ test_closeout_changed_copy_is_retried() {
     esac
     run_reap "$HOME_C" reap >/dev/null || fail "$change: second reap failed"
     [ "$(calls)" = 2 ] || fail "$change: a changed copy is offered to teardown again (calls=$(calls))"
+    [ "$(sed -n 2p "$STUB_ADMIT_LOG")" = "memo=0 class=reap" ] \
+      || fail "$change: teardown admission of the changed copy is not held by the older memo: $(sed -n 2p "$STUB_ADMIT_LOG")"
     [ "$(wake_rows "$HOME_C" "$COPY_C")" = 2 ] || fail "$change: the refusal of the changed copy raises one new wake (rows=$(wake_rows "$HOME_C" "$COPY_C"))"
     age_refusal_memo "$HOME_C" cl 100000
     run_reap "$HOME_C" reap >/dev/null || fail "$change: third reap failed"

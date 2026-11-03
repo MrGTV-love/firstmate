@@ -213,10 +213,6 @@ fm_closeout_retained_check() {  # <state> <id> <worktree>
   CLOSEOUT_RETAINED_STATE=stands
 }
 
-fm_closeout_retained_stands() {  # <state> <id> <worktree>
-  fm_closeout_retained_check "$@"
-}
-
 # The task's closeout lock: one holder at a time across both sweeps, taken
 # without waiting and recovered by the shared lock library when its owner is
 # gone. Release it with fm_closeout_lock_drop.

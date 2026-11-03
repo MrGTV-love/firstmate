@@ -294,13 +294,14 @@ reap_one() {  # <task-id> <status-line>
 reap_one_locked() {  # <task-id> <status-line>
   local id=$1 last=$2 out rc=0 reason wt
   wt=$(fm_meta_get "$STATE/$id.meta" worktree)
-  if [ -n "$wt" ] && fm_closeout_retained_stands "$STATE" "$id" "$wt"; then
+  if [ -n "$wt" ] && fm_closeout_retained_check "$STATE" "$id" "$wt"; then
     # The other sweep recorded this refusal after this sweep chose the task.
     add_row refused "$id" - - "$(fm_closeout_retained_reason)"
     closeout_wake_now "$id"
     return 0
   fi
   # A record that no longer stands describes an earlier fingerprint of the copy.
+  [ -z "$wt" ] || [ "$CLOSEOUT_RETAINED_STATE" != changed ] || rm -f -- "$REAP_DIR/$id.refused"
   fm_closeout_retained_clear "$STATE" "$id"
   out=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 \
     fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$id" </dev/null 2>&1) || rc=$?

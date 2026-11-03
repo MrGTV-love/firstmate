@@ -867,7 +867,7 @@ attempt_locked() {
   fi
   FM_MP_TASK_BRANCH=$R_BRANCH
   prove_nested_first || return 0
-  if fm_closeout_retained_stands "$STATE" "$ID" "$wt"; then
+  if fm_closeout_retained_check "$STATE" "$ID" "$wt"; then
     retain_closeout "$wt" "$CLOSEOUT_RETAINED_WAKE"
     return 0
   fi
