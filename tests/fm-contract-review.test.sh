@@ -199,6 +199,7 @@ make_leak_world() { # builds LEAK_* variables
   printf 'an earlier review report\n' >"$LEAK_ROOT/data/case/truth/r23-review.md"
   printf 'assess\n' >"$LEAK_SKILLS/assess-done-and-grade/SKILL.md"
   printf 'define\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md"
+  printf 'old copy\n' >"$LEAK_SKILLS/define-done-and-grading/SKILL.md.backup-20261101-x"
   ln -s "$LEAK_SKILLS" "$TMP_ROOT/leak-skills-link"
   fm_git_init_commit "$LEAK_ROOT"
   git -C "$LEAK_ROOT" add bin docs sources .gitignore
@@ -238,6 +239,10 @@ test_leak_check_judges_what_a_path_is() {
   run_check "$rep"
   assert_equals 0 "$CHECK_RC" "a compliant report was flagged: $CHECK_OUT"
   assert_contains "$CHECK_OUT" "INPUT CLEAN" "a compliant report was not reported clean"
+  # 1b. A backup or note beside the skill is not the skill.
+  write_report "$rep" "$LEAK_PACK/contract.md" "$LEAK_SKILLS/define-done-and-grading/SKILL.md.backup-20261101-x"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a backup file in the skill directory was authorized"
   # 2. A gitignored earlier report under the root.
   write_report "$rep" "$LEAK_PACK/contract.md" "$LEAK_ROOT/data/case/truth/r23-review.md"
   run_check "$rep"

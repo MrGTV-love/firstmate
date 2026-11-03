@@ -31,9 +31,9 @@
 # check: reads the report's `Inputs read` list and, when given, the run log, and
 #   prints INPUT LEAK lines plus ROUND VOID (exit 3) when the list is missing or a
 #   listed path is not an authorized input; prints INPUT CLEAN (exit 0) otherwise.
-#   An authorized input is judged by what it is: a file inside the pack, a file in
-#   the assess-done-and-grade or define-done-and-grading skill directory, the
-#   review rubric, or a file the manifest's root tracks (git ls-files, or
+#   An authorized input is judged by what it is: a file inside the pack, the
+#   SKILL.md of the assess-done-and-grade or define-done-and-grading skill (not
+#   the backups and notes beside them), the review rubric, or a file the manifest's root tracks (git ls-files, or
 #   <rev>:<path> that git can read). A path in the manifest's excluded set is
 #   refused even when it is tracked. A gitignored file is not tracked.
 #   Skill directory: $REVIEW_SKILLS_DIR, default ~/.agents/skills. Rubric:
@@ -401,7 +401,7 @@ EOF
       why="excluded path $excluded"
     elif [ -z "$rev" ] && path_under "$path" "$pack"; then
       ok=1
-    elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || path_under "$path" "$assess_dir" || path_under "$path" "$define_dir"; }; then
+    elif [ -z "$rev" ] && { [ "$path" = "$rubric_real" ] || [ "$path" = "$assess_dir/SKILL.md" ] || [ "$path" = "$define_dir/SKILL.md" ]; }; then
       ok=1
     elif [ -n "$rev" ] && [ "$revpath" = "docs/review-rubric.md" ]; then
       ok=1
