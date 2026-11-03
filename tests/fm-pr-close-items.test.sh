@@ -107,6 +107,8 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   cx_add "$case_dir" fm-fixture-prose-5
   cx_add "$case_dir" fm-fixture-legacy-6
   cx_meta "$case_dir" fm-fixture-live-3 ship
+  cx "$case_dir" start fm-fixture-live-3 >/dev/null || fail "c1: could not start the live ship row In flight"
+  [ "$(cx_state "$case_dir" fm-fixture-live-3)" = in_flight ] || fail "c1: the live ship row is not In flight"
   cx_meta "$case_dir" docs-live-4 docs
   cx_meta "$case_dir" docs-twin docs
   # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
@@ -123,7 +125,7 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   [ "$(cx_state "$case_dir" ship-a)" = "done" ] || fail "c1: ship-a (no fm- prefix) was not closed"
   assert_grep "closed fm-fixture-alpha-1 with $url" "$case_dir/stdout" "c1: alpha's close was not reported"
   assert_grep "$url" "$case_dir/home/data/backlog.md" "c1: the merged PR URL is not on the closed items"
-  [ "$(cx_state "$case_dir" fm-fixture-live-3)" != "done" ] || fail "c1: a ship item with a live record was closed"
+  [ "$(cx_state "$case_dir" fm-fixture-live-3)" = in_flight ] || fail "c1: a ship item with a live record left In flight or was closed"
   assert_match "^actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done did not close it: .*live task record" "$case_dir/stderr" \
     "c1: another task's live item was not reported as actionable with its reason"
   [ "$(cx_state "$case_dir" fm-fixture-prose-5)" != "done" ] || fail "c1: a line that is not a Closes directive closed an item"
@@ -603,6 +605,101 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
   pass "a Forgejo merge reports the completion path's actual result per item and still succeeds"
 }
 
+test_a_gitlab_or_forgejo_merge_naming_its_own_task_reports_the_live_record() {
+  local case_dir rc=0
+  case_dir=$(make_forgejo_case "c1-self-forgejo-${CLOSE_PRUNE:-off}")
+  cx_add "$case_dir" task-x1
+  cx "$case_dir" start task-x1 >/dev/null || fail "c1-self-forgejo: could not start the merging task In flight"
+  set_json_field "$case_dir/pr-post.json" body 'Closes-backlog-item: task-x1'
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "c1-self-forgejo: the merge must succeed"
+  [ "$(cx_state "$case_dir" task-x1)" = in_flight ] || fail "c1-self-forgejo: the merging task left In flight before its teardown"
+  assert_match '^close-at-merge: not closed task-x1: .*live task record' "$case_dir/stdout" "c1-self-forgejo: the live-record refusal was not reported by id"
+  assert_no_grep 'not closed task-x1' "$case_dir/stderr" "c1-self-forgejo: the merged task's own teardown case was reported as actionable"
+
+  rc=0
+  case_dir=$(make_gitlab_case "c1-self-gitlab-${CLOSE_PRUNE:-off}")
+  cx_add "$case_dir" task-x1
+  cx "$case_dir" start task-x1 >/dev/null || fail "c1-self-gitlab: could not start the merging task In flight"
+  set_json_field "$case_dir/mr-post.json" description 'Closes-backlog-item: task-x1'
+  merge_call "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "c1-self-gitlab: the merge must succeed"
+  [ "$(cx_state "$case_dir" task-x1)" = in_flight ] || fail "c1-self-gitlab: the merging task left In flight before its teardown"
+  assert_match '^close-at-merge: not closed task-x1: .*live task record' "$case_dir/stdout" "c1-self-gitlab: the live-record refusal was not reported by id"
+  pass "a GitLab or Forgejo merge that names its own In-flight task reports the live-record refusal and still succeeds"
+}
+
+# A Forgejo train: three members listed with Train-member lines (m1 names its item in its own
+# body, m2 is found only through a task's pr=, m3 names nothing), a PR mentioned in prose only,
+# and a task of another repository that shares a member's number. The member bodies come from
+# the tea mock's per-PR records.
+test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link() {
+  local case_dir rc=0 base="https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls" other="https://$FJ_HOST/$FJ_OWNER/other-repo/pulls" key
+  case_dir=$(make_forgejo_case "c2-forgejo-train-${CLOSE_PRUNE:-off}")
+  key=$FJ_OWNER"_"$FJ_REPO
+  cx_add "$case_dir" fj-m1 docs
+  cx_add "$case_dir" fj-m2 docs
+  cx_add "$case_dir" fj-prose docs
+  cx_add "$case_dir" fj-other-repo docs
+  cx_meta "$case_dir" fj-m2 docs "$base/12"
+  cx_meta "$case_dir" fj-other-repo docs "$other/11"
+  printf '{"merged":true,"body":"Closes-backlog-item: fj-m1"}\n' > "$case_dir/tea-body-$key-11.json"
+  printf '{"merged":true,"body":""}\n' > "$case_dir/tea-body-$key-12.json"
+  printf '{"merged":true,"body":"No item here."}\n' > "$case_dir/tea-body-$key-13.json"
+  printf '{"merged":true,"body":"Closes-backlog-item: fj-prose"}\n' > "$case_dir/tea-body-$key-14.json"
+  set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' "Context: $base/14 stays out." '' \
+    "Train-member: $base/11" "Train-member: $base/12" "Train-member: $base/13")"
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "c2-forgejo-train: the merge must succeed"
+  [ "$(cx_state "$case_dir" fj-m1)" = "done" ] || fail "c2-forgejo-train: the item named in a member body was not closed"
+  [ "$(cx_state "$case_dir" fj-m2)" = "done" ] || fail "c2-forgejo-train: the item behind a member's pr= was not closed"
+  [ "$(cx_state "$case_dir" fj-prose)" = queued ] || fail "c2-forgejo-train: a PR named only in prose closed its item"
+  [ "$(cx_state "$case_dir" fj-other-repo)" = queued ] || fail "c2-forgejo-train: the same number in another repository matched"
+  assert_grep "closed fj-m1 with $FJ_URL" "$case_dir/stdout" "c2-forgejo-train: the train URL is not the proof"
+  assert_match "^actionable: close-at-merge: mentioned $base/14 in the prose of $FJ_URL: no item was closed for it" "$case_dir/stderr" \
+    "c2-forgejo-train: the prose link was not reported"
+  for n in 11 12 13; do
+    assert_grep "pulls/$n" "$case_dir/tea.log" "c2-forgejo-train: member $n was not read"
+  done
+  assert_no_grep "pulls/14" "$case_dir/tea.log" "c2-forgejo-train: a prose-only PR was read as a member"
+  pass "a Forgejo train closes the items of its listed members from bodies and pr=, never a prose-only PR or another repository's number, and reports the prose link"
+}
+
+# The GitLab form of the same train. The completion path takes a merge request URL for no
+# item kind, so each item is reported with the path's own refusal; what the test pins is the
+# member set: three listed merge requests read, a prose-only merge request not read.
+test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link() {
+  local case_dir rc=0 key base n
+  base="$MR_PROJECT_URL/-/merge_requests"
+  case_dir=$(make_gitlab_case "c2-gitlab-train-${CLOSE_PRUNE:-off}")
+  key=${MR_PATH//\//_}
+  cx_add "$case_dir" gl-m1 docs
+  cx_add "$case_dir" gl-m2 docs
+  cx_add "$case_dir" gl-prose docs
+  cx_meta "$case_dir" gl-m2 docs "$base/22"
+  printf '{"state":"merged","description":"Closes-backlog-item: gl-m1"}\n' > "$case_dir/mr-body-$key-21.json"
+  printf '{"state":"merged","description":""}\n' > "$case_dir/mr-body-$key-22.json"
+  printf '{"state":"merged","description":"No item here."}\n' > "$case_dir/mr-body-$key-23.json"
+  printf '{"state":"merged","description":"Closes-backlog-item: gl-prose"}\n' > "$case_dir/mr-body-$key-24.json"
+  set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' "Context: $base/24 stays out." '' \
+    "Train-member: $base/21" "Train-member: $base/22" "Train-member: $base/23")"
+  merge_call "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "c2-gitlab-train: the merge must succeed"
+  assert_match 'not closed gl-m1: .*canonical pull request URL|not closed gl-m1: bin/fm-tasks-axi.sh done did not close it' "$case_dir/stderr" \
+    "c2-gitlab-train: the item named in a member body was neither closed nor reported"
+  assert_match 'not closed gl-m2: .*canonical pull request URL|not closed gl-m2: bin/fm-tasks-axi.sh done did not close it' "$case_dir/stderr" \
+    "c2-gitlab-train: the item behind a member's pr= was neither closed nor reported"
+  assert_no_grep 'gl-prose: bin/fm-tasks-axi.sh' "$case_dir/stderr" "c2-gitlab-train: a prose-only merge request reached the completion path"
+  [ "$(cx_state "$case_dir" gl-prose)" = queued ] || fail "c2-gitlab-train: a merge request named only in prose closed its item"
+  assert_match "^actionable: close-at-merge: mentioned $base/24 in the prose of $MR_URL: no item was closed for it" "$case_dir/stderr" \
+    "c2-gitlab-train: the prose link was not reported"
+  for n in 21 22 23; do
+    assert_grep "mr view $n -R $MR_PROJECT_URL" "$case_dir/glab.log" "c2-gitlab-train: member $n was not read"
+  done
+  assert_no_grep "mr view 24 " "$case_dir/glab.log" "c2-gitlab-train: a prose-only merge request was read as a member"
+  pass "a GitLab train reads each listed member, never a prose-only merge request, and reports the prose link"
+}
+
 # --- parser and blockers ----------------------------------------------------
 
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge() {
@@ -1013,11 +1110,14 @@ test_the_named_item_matrix_with_production_prune_on() {
   [ "$(cx_state "$TMP_ROOT/c1-self-on" task-x1)" != "done" ] || fail "prune-on: the busy self-naming task closed"
   test_a_gitlab_merge_reports_the_completion_paths_actual_result
   test_a_forgejo_merge_reports_the_completion_paths_actual_result
+  test_a_gitlab_or_forgejo_merge_naming_its_own_task_reports_the_live_record
+  test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link
+  test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link
   pass "with production merge prune on and a busy teardown, GitHub, GitLab and Forgejo merges close, report and defer as with prune off"
 }
 
 test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune() {
-  local CLOSE_PRUNE=on case_dir before after mode stub
+  local CLOSE_PRUNE=on case_dir before after mode stub rc
   for mode in present removed; do
     case_dir=$(gh_case "c3-second-merge-$mode" 72)
     cx_add "$case_dir" second-a
@@ -1036,8 +1136,21 @@ test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune(
         || fail "c3-second-$mode: prune never removed the task record"
     fi
     before=$(backlog_text "$case_dir")
-    merge_call "$case_dir" task-x1 "$REPO_URL/72" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || true
+    # The forge now reports the pull request merged, as it does for a real repeat: the second
+    # run is against an already-merged PR, not against the pre-merge answer.
+    "$JQ_BIN" '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/github-view.merged" \
+      && mv "$case_dir/github-view.merged" "$case_dir/github-view.json"
+    rc=0
+    merge_call "$case_dir" task-x1 "$REPO_URL/72" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    # The script's own answer to a repeat: it refuses a merged PR, or a task whose record prune removed.
+    [ "$rc" -ne 0 ] || fail "c3-second-$mode: the second run reported success on a merged PR"
+    if [ "$mode" = removed ]; then
+      assert_grep 'task metadata is unavailable' "$case_dir/stderr2" "c3-second-$mode: the second run gave no reason"
+    else
+      assert_grep 'state is "MERGED", not open' "$case_dir/stderr2" "c3-second-$mode: the second run gave no reason"
+    fi
     after=$(backlog_text "$case_dir")
+    assert_no_grep 'closed second-a' "$case_dir/stdout2" "c3-second-$mode: the second run closed the item again"
     [ "$before" = "$after" ] || fail "c3-second-$mode: the second merge run changed the backlog"
     [ "$(grep -c "$REPO_URL/72" "$case_dir/home/data/backlog.md")" -le 2 ] || fail "c3-second-$mode: a second proof link was written"
   done
@@ -1117,6 +1230,9 @@ test_f1_an_excluded_component_table_under_a_subheading_closes_nothing_and_is_rep
 test_f2_an_indented_fenced_example_closes_nothing
 test_f3_a_component_table_with_a_negated_exclusion_heading_closes_nothing_without_a_member_line
 test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url
+test_a_gitlab_or_forgejo_merge_naming_its_own_task_reports_the_live_record
+test_a_forgejo_train_closes_each_listed_member_source_and_reports_the_prose_link
+test_a_gitlab_train_reads_each_listed_member_and_reports_the_prose_link
 test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once
 test_the_directive_parser_reads_real_lines_and_ignores_every_example
 test_a_gitlab_merge_reports_the_completion_paths_actual_result
