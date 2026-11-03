@@ -327,6 +327,57 @@ test_completion_by_the_captains_own_words() {
   pass "fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task"
 }
 
+# A finished item stops blocking the items that waited on it: the wrapper removes
+# the finished id from every other item's blocked-by edges and reports each cleared
+# edge on stderr, leaving stdout as tasks-axi printed it. An edge to a second,
+# unfinished blocker stays.
+deps_of() {  # <case-dir> <id>
+  wrapper_from_code "$1" show "$2" 2>&1 | sed -n 's/^  deps: *//p' | head -1 | tr -d '"'
+}
+
+test_completion_clears_the_finished_blocker_from_dependents() {
+  local dir words out err
+  dir=$(make_split unblock)
+  words="$dir/words.txt"
+  printf 'Dropped by the captain.\n' > "$words"
+  wrapper_from_code "$dir" add blk-a "first blocker" --kind docs >/dev/null
+  wrapper_from_code "$dir" add blk-b "second blocker" --kind docs >/dev/null
+  wrapper_from_code "$dir" add blk-ship "ship blocker" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add dep-two "waits on two" --kind docs >/dev/null
+  wrapper_from_code "$dir" add dep-one "waits on one" --kind docs >/dev/null
+  wrapper_from_code "$dir" add dep-ship "waits on the ship" --kind docs >/dev/null
+  wrapper_from_code "$dir" add bystander "waits on nothing" --kind docs >/dev/null
+  wrapper_from_code "$dir" block dep-two --by blk-a >/dev/null
+  wrapper_from_code "$dir" block dep-two --by blk-b >/dev/null
+  wrapper_from_code "$dir" block dep-one --by blk-a >/dev/null
+  wrapper_from_code "$dir" block dep-ship --by blk-ship >/dev/null
+  wrapper_from_code "$dir" start dep-ship >/dev/null
+
+  out=$(wrapper_from_code "$dir" "done" blk-a --note finished 2> "$dir/err") \
+    || fail "completing a blocker failed: $out $(cat "$dir/err")"
+  err=$(cat "$dir/err")
+  assert_not_contains "$out" "unblocked:" "the unblock report leaked into tasks-axi's stdout"
+  assert_contains "$err" "unblocked: dep-two no longer waits on blk-a" "a dependent was not reported unblocked"
+  assert_contains "$err" "unblocked: dep-one no longer waits on blk-a" "a second dependent was not reported unblocked"
+  [ "$(deps_of "$dir" dep-two)" = "blocked-by:blk-b" ] \
+    || fail "the second, unfinished blocker did not stay: $(deps_of "$dir" dep-two)"
+  assert_contains "$(wrapper_from_code "$dir" show dep-two 2>&1)" "blocked: yes" "the item with an unfinished blocker was freed"
+  [ "$(deps_of "$dir" dep-one)" = none ] || fail "the only blocker was not cleared: $(deps_of "$dir" dep-one)"
+  [ "$(deps_of "$dir" bystander)" = none ] || fail "an unrelated item changed"
+
+  # A repeat of the completion has nothing left to clear and reports nothing.
+  out=$(wrapper_from_code "$dir" "done" blk-a --note finished 2>&1) || true
+  assert_not_contains "$out" "unblocked:" "a repeat completion reported an edge it had already cleared"
+
+  # A ship completes with the captain's words and clears its dependents the same way,
+  # including a dependent that is already in flight.
+  wrapper_from_code "$dir" "done" blk-ship --drop-file "$words" 2> "$dir/err" >/dev/null \
+    || fail "the ship drop failed: $(cat "$dir/err")"
+  assert_contains "$(cat "$dir/err")" "unblocked: dep-ship no longer waits on blk-ship" "an in-flight dependent was not unblocked by a ship's completion"
+  [ "$(deps_of "$dir" dep-ship)" = none ] || fail "the ship's dependent kept its edge"
+  pass "fm-tasks-axi.sh clears a finished blocker from every dependent, keeps another blocker, and reports on stderr only"
+}
+
 test_completion_preserves_retained_captain_calls() {
   local dir fakebin words before spelling evidence out
   local command_args=() evidence_args=()
@@ -1207,6 +1258,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_single_home
   test_completion_needs_proof_of_the_deliverable
   test_completion_by_the_captains_own_words
+  test_completion_clears_the_finished_blocker_from_dependents
   test_completion_preserves_retained_captain_calls
   test_public_restart_retires_drop_provenance
   test_resumed_deliveries_reach_landed_output

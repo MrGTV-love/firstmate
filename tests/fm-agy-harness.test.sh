@@ -649,8 +649,8 @@ test_agy_launch_carries_the_brief_with_model_effort_and_autonomy() {
   launch=$(cat "$CASE_DIR/launch.log")
   assert_contains "$launch" "$FAKEBIN_DIR/agy" "agy launch did not pin the resolved absolute binary"
   assert_contains "$launch" "--prompt-interactive" "agy launch did not carry the brief via --prompt-interactive"
-  assert_contains "$launch" "--model 'gemini-3.8-flash-low'" "agy launch did not carry the requested model"
-  assert_contains "$launch" "--effort 'low'" "agy launch did not carry the requested effort"
+  assert_launch_contains "$launch" "--model 'gemini-3.8-flash-low'" "agy launch did not carry the requested model"
+  assert_launch_contains "$launch" "--effort 'low'" "agy launch did not carry the requested effort"
   assert_contains "$launch" "--dangerously-skip-permissions" "agy launch omitted unattended autonomy"
   assert_contains "$launch" "env -u CLAUDECODE" "agy launch did not clear the inherited launcher marker"
   assert_not_contains "$launch" "__AGYBIN__" "agy launch left its binary placeholder unsubstituted"
@@ -721,7 +721,7 @@ test_agy_hung_listing_is_cut_off_and_launches() {
   [ "$elapsed" -lt 20 ] || fail "the model probe was not cut off by its bound (took ${elapsed}s)"
   assert_contains "$out" "did not answer within 1s" "a hung listing launched without its timeout notice"
   [ -s "$CASE_DIR/launch.log" ] || fail "a hung listing produced no launch command"
-  assert_contains "$(cat "$CASE_DIR/launch.log")" "--model 'gemini-3.8-flash-low'" \
+  assert_launch_contains "$(cat "$CASE_DIR/launch.log")" "--model 'gemini-3.8-flash-low'" \
     "a hung listing dropped the requested model instead of launching it unvalidated"
   pass "fm-spawn: a hung agy listing is cut off by the shared bound and launches unvalidated"
 }
@@ -936,7 +936,7 @@ SH
     assert_contains "$out" "not validated" "a matching supervisor catalog must not imply worker validation"
     assert_absent "$CASE_DIR/catalog-calls" "neither legacy nor selected-entry agy checks may query the supervisor catalog"
     [ -s "$CASE_DIR/launch.log" ] || fail "an indexed agy spawn must publish a launch command"
-    assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the ordinary agy launch must carry the selected indexed model"
+    assert_launch_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the ordinary agy launch must carry the selected indexed model"
     [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the indexed agy spawn must reach the existing fixture's processing turn"
     assert_agy_trusted "$HOME_DIR/.gemini/antigravity-cli/settings.json" "$WT_DIR" \
       "the indexed agy launch must retain normal worktree trust registration"
@@ -967,7 +967,7 @@ test_agy_unrelated_index_retains_native_literal_validation() {
       [ ! -s "$CASE_DIR/launch.log" ] || fail "an unsupported non-entry agy literal must not launch"
     else
       expect_code 0 "$rc" "supported nonentries and actual indexed agy literals must launch: $out"
-      assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the launch must retain its literal selector"
+      assert_launch_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the launch must retain its literal selector"
       [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the agy literal spawn must complete its processing-turn gate"
       if [ "$selected" = supported ]; then
         assert_contains "$out" "not an index entry" "a supported non-entry literal must retain the warning"

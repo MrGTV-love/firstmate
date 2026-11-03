@@ -14,3 +14,9 @@ fm_compact_adviser_force_off() {
   *) printf '0\n' ;;
   esac
 }
+
+# fm_compact_adviser_bypass_event <task>: record one operator activation of the
+# switch for the launched task. Telemetry never changes the launch.
+fm_compact_adviser_bypass_event() {
+  "$(dirname "${BASH_SOURCE[0]}")/fm-guard-event.sh" compact-adviser bypass --rule FM_COMPACT_ADVISER_DISABLE --task "${1:-}" --override 2>/dev/null || true
+}
