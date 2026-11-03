@@ -348,13 +348,13 @@ test_completion_clears_the_finished_blocker_from_dependents() {
   dir=$(make_split unblock)
   words="$dir/words.txt"
   printf 'Dropped by the captain.\n' > "$words"
-  wrapper_from_code "$dir" add blk-a "first blocker" --kind docs >/dev/null
-  wrapper_from_code "$dir" add blk-b "second blocker" --kind docs >/dev/null
-  wrapper_from_code "$dir" add blk-ship "ship blocker" --kind ship --repo p >/dev/null
-  wrapper_from_code "$dir" add dep-two "waits on two" --kind docs >/dev/null
-  wrapper_from_code "$dir" add dep-one "waits on one" --kind docs >/dev/null
-  wrapper_from_code "$dir" add dep-ship "waits on the ship" --kind docs >/dev/null
-  wrapper_from_code "$dir" add bystander "waits on nothing" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 blk-a "$(ftitle blk-a)" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 blk-b "$(ftitle blk-b)" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 blk-ship "$(ftitle blk-ship)" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add --objective O7 dep-two "$(ftitle dep-two)" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 dep-one "$(ftitle dep-one)" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 dep-ship "$(ftitle dep-ship)" --kind docs >/dev/null
+  wrapper_from_code "$dir" add --objective O7 bystander "$(ftitle bystander)" --kind docs >/dev/null
   wrapper_from_code "$dir" block dep-two --by blk-a >/dev/null
   wrapper_from_code "$dir" block dep-two --by blk-b >/dev/null
   wrapper_from_code "$dir" block dep-one --by blk-a >/dev/null
