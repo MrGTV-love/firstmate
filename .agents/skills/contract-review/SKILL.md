@@ -30,6 +30,7 @@ It builds the pack in a directory it creates fresh, drops the author's sections,
 Keep the register and every earlier report, review history and `truth` file outside the pack, and pass them to the builder with `--exclude` so the leak check refuses them.
 
 Run the review through the existing entrypoint, `data/review-lane/run-review.sh <pack> no-pr <head> <diff-file> <repo-root> [model]`, with the pack's `head.txt` value as the head and the pack's empty diff file.
+For `<repo-root>`, build the snapshot with the builder's `--export-root <repo> [--rev <rev>]` and pass the directory it prints as `root=`: it holds only tracked files, so a gitignored file such as `config/` or `data/` cannot be reached under it.
 Use a reviewer model outside the author's family.
 Never retry a model that failed; switch to another allowed model.
 Never run a review in a pack folder that already holds a report.
