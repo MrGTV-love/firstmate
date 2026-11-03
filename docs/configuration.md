@@ -2608,7 +2608,7 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 - `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
 - The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
 - No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
-- Unset, relative or not executable makes no request and appends one `review-lane review runner unavailable: <why>` status line and one check wake per head.
+- Unset, relative or not executable makes no request and records one `review runner unavailable: <why>` event and one check wake per head.
 
 **What is read, and by whom**
 
@@ -2616,7 +2616,7 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 - A model covers every uncovered author family but its own, and the model covering most is taken, rule order breaking a tie.
 - Uncovered families come from `bin/fm-review-record.py plan`, which applies the verifier's own coverage rule to the author groups derived from the exact head.
 - A model whose read failed without a usable report is not asked again for that head; none left records `no eligible reader`, and an unknown author family records `author family unknown`, each once per head.
-- The contract text is the task's `data/<task>/brief.md` and `dod.md` plus every steering message in `state/<task>.inbox/`; a ruling given only in chat is not in it.
+- The contract text is the task's `data/<task>/brief.md`, `dod.md` and `data/dod/<task>.md`, any file under `data/` that the brief names on an unfenced `DoD file: <absolute path>` line, and every steering message in `state/<task>.inbox/`; a ruling given only in chat is not in it.
 
 **Report format**
 
@@ -2630,7 +2630,8 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 
 - The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
 - A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
-- Outcomes are status lines `note: review-lane ...` (reading, verdict recorded, merged with the full PR URL, fail, held with its reason), which the fleet ledger captures, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `merged`, `fail`, `held: <reason>` or `idle`.
+- Outcomes are sidecar events (read requested, verdict recorded, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `merged`, `fail`, `held: <reason>` or `idle`; a check wake `check: pr-review <task>: ...` tells Main about a FAIL, an INCOMPLETE, a held class or a missing reader or runner.
+- Nothing is written to the task's status log: a trailing `note:` there would replace the worker's `done:` as the latest event and change how `bin/fm-crew-state.sh` reads a ship whose PR is in review.
 - The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes.
 - While an away-posture record exists (quiet mode is a present captain and holds nothing) the merge step holds with `held: away posture` and the verdict is still recorded, so the supervision session keeps reading the captain's away words; a captain-word recorded for the head is likewise left to Main.
 - `state/.pr-auto-review/<task>.next` names the next due time, and the housekeeping pass starts nothing for a task before it; a task is swept with its meta.

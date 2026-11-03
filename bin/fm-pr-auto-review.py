@@ -4,6 +4,7 @@
 Usage (FM_HOME names the absolute home; FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE select state and config):
   fm-pr-auto-review.py step TASK    one bounded pass for one registered ship task
   fm-pr-auto-review.py state TASK   print the task's current review-lane state on one line
+  fm-pr-auto-review.py events TASK  print the task's review-lane events, oldest first, one `<epoch> <head> <text>` line each
 
 The single caller is bin/fm-pr-ready-reconcile.sh, the watcher's bounded housekeeping pass, so no new
 daemon, watcher check, schedule or poll exists. The merge poll (bin/fm-pr-poll.sh) is a static program
@@ -40,11 +41,14 @@ line of config/review-runner. Unset or not executable makes no request and recor
 `review runner unavailable: <why>` line per head.
 
 Everything durable is under <state>/.pr-auto-review/: <task>.json is the sidecar (request, outstanding
-read, verdict, merge attempt, emitted events) and <task>.d/ holds one directory per request with the
+read, verdict, merge attempt, events) and <task>.d/ holds one directory per request with the
 review pack the runner reads, its lock and its report. The reader runs detached under a flock the
-sidecar test can probe, so a restart neither loses a read nor repeats it. Outcomes are status lines
-(`note: review-lane ...`, captured by the fleet ledger when it is on) and, when Main must act, one
-check wake; `state` prints reading, merged, fail, held: <reason> or idle.
+sidecar test can probe, so a restart neither loses a read nor repeats it. Outcomes are sidecar events
+(read requested, verdict recorded, merged with the full PR URL, fail, held with its reason, no eligible
+reader, runner unavailable) and, when Main must act, one check wake; the merge itself also writes the
+merge outcome and fleet-ledger record that bin/fm-pr-merge.sh owns. `state` prints reading, merged, fail,
+held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
+because a `note:` there would replace the worker's `done:` as the latest event.
 
 A report is accepted only when its first line is `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>`, its
 last line is `VERDICT: <same word>`, and the three facts each stand on a line that names the fact
@@ -164,21 +168,22 @@ def phase(side, sha, name, detail=""):
 
 
 def emit(home, task, side, sha, key, text, wake=None):
-    """One durable status line per distinct event, plus one check wake when Main must act."""
+    """One durable event per distinct occurrence, plus one check wake when Main must act.
+
+    Events live in the sidecar, never in the worker's own status log: a trailing `note:` there would
+    replace the worker's `done:` as the latest event and change how bin/fm-crew-state.sh reads a ship
+    whose PR is in review.
+    """
     head = side.head(sha)
     if key in head["emitted"]:
         return
-    stamp = int(time.time())
-    status = home.state / f"{task}.status"
-    rc = run([str(BIN / "fm-status-append.sh"), str(status), f"note [at={stamp}]: review-lane {text}"], home).returncode
-    if rc != 0:
-        return  # not emitted: a later pass tries again, so the event is never lost
-    if (home.config / "fleet-ledger").exists():
-        run([str(BIN / "fm-fleet-ledger.sh"), "appended", str(home.config), str(status)], home)
     if wake:
         script = '. "$1/fm-wake-lib.sh" && fm_wake_append check "$2" "$3"'
         run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), f"pr-review:{task}:{sha[:12]}:{key}",
              f"check: pr-review {task}: {wake}"], home)
+    events = side.data.setdefault("events", [])
+    events.append({"at": int(time.time()), "head": sha[:12], "text": text})
+    del events[:-100]
     head["emitted"].append(key)
     side.save()
 
@@ -433,11 +438,25 @@ def collect(home, task, url, sha, base, side, meta):
 
 
 def contract_text(home, task):
-    parts = []
-    for name in ("brief.md", "dod.md"):
-        path = home.data / task / name
-        if path.is_file():
-            parts.append(f"<!-- {name} -->\n" + path.read_text(encoding="utf-8", errors="replace"))
+    """The brief, its Definition Of Done and every steering message, which is what the reader judges against."""
+    sources = [("brief.md", home.data / task / "brief.md"), ("dod.md", home.data / task / "dod.md"),
+               (f"dod/{task}.md", home.data / "dod" / f"{task}.md")]
+    data_root = Path(os.path.realpath(home.data))
+    parts, seen, visited = [], set(), set()
+    for name, path in sources:
+        if not path.is_file() or os.path.realpath(path) in visited:
+            continue
+        visited.add(os.path.realpath(path))
+        text = path.read_text(encoding="utf-8", errors="replace")
+        # A brief may point at its finished criteria with an unfenced `DoD file: <absolute path>` line;
+        # only a file under the home's data directory is read.
+        for match in re.finditer(r"(?m)^DoD file: (/\S+)\s*$", text):
+            target = Path(os.path.realpath(match.group(1)))
+            if target.is_file() and data_root in target.parents:
+                sources.append((f"DoD file {target.name}", target))
+        if text not in seen:
+            seen.add(text)
+            parts.append(f"<!-- {name} -->\n{text}")
     for folder in (home.state / f"{task}.inbox" / "handled", home.state / f"{task}.inbox"):
         for message in sorted(folder.glob("*.msg")) if folder.is_dir() else []:
             body = message.read_text(encoding="utf-8", errors="replace").split("\n--\n", 1)[-1]
@@ -695,16 +714,28 @@ def state_line(home, task):
             "held": f"held: {detail}"}.get(name, f"waiting: {detail}")
 
 
+def events_text(home, task):
+    try:
+        data = json.loads((home.root / f"{task}.json").read_text(encoding="utf-8"))
+        rows = data.get("events", [])
+    except (OSError, ValueError):
+        return ""
+    return "".join(f"{row['at']} {row['head']} {row['text']}\n" for row in rows)
+
+
 def main(argv):
     if len(argv) == 4 and argv[1] == "_read":
         read_worker(argv[2], argv[3])
         return 0
-    if len(argv) != 3 or argv[1] not in ("step", "state") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", argv[2]):
-        print("usage: fm-pr-auto-review.py step|state <task-id>", file=sys.stderr)
+    if len(argv) != 3 or argv[1] not in ("step", "state", "events") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", argv[2]):
+        print("usage: fm-pr-auto-review.py step|state|events <task-id>", file=sys.stderr)
         return 2
     home = Home()
     if argv[1] == "state":
         print(state_line(home, argv[2]))
+        return 0
+    if argv[1] == "events":
+        sys.stdout.write(events_text(home, argv[2]))
         return 0
     sweep(home)
     try:
