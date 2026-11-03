@@ -306,6 +306,9 @@ FM_SLOT_GUARD_PROJECT=
 FM_SLOT_GUARD_TASK=
 FM_SLOT_GUARD_ARCHIVE_ROOT=
 FM_SLOT_GUARD_PANE_PID=
+# The pool lease identity recorded when this spawn took the slot (see fm_slot_guard_record_lease_identity).
+FM_SLOT_GUARD_LEASE_PID=
+FM_SLOT_GUARD_LEASE_STARTED=
 FM_SLOT_GUARD_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_SLOT_GUARD_REASON=
 FM_SLOT_GUARD_SLOT=
@@ -845,46 +848,67 @@ EOF
   fi
 }
 
+# The lease identity this spawn recorded when it took the slot: the pool entry's owner_pid
+# and owner_started_at at the moment the slot's claim named this task (the spawn holds the
+# project lock then, so the entry is the spawn's own acquisition). It is the only thing that
+# marks a process lease as this spawn's; process ancestry never does.
+fm_slot_guard_record_lease_identity() { # <slot>
+  local real state entries path pid started
+  FM_SLOT_GUARD_LEASE_PID=
+  FM_SLOT_GUARD_LEASE_STARTED=
+  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) || return 0
+  state="${real%/*/*}/treehouse-state.json"
+  [ -f "$state" ] && command -v jq >/dev/null 2>&1 || return 0
+  entries=$(jq -r '.worktrees[]? | [(.path // "" | tostring), (.owner_pid // "" | tostring), (.owner_started_at // "" | tostring)] | join("\u001f")' "$state" 2>/dev/null) || return 0
+  while IFS=$'\037' read -r path pid started; do
+    [ -n "$path" ] && [ "$path" -ef "$real" ] || continue
+    FM_SLOT_GUARD_LEASE_PID=$pid
+    FM_SLOT_GUARD_LEASE_STARTED=$started
+  done <<EOF
+$entries
+EOF
+}
+
 # S4 (c): a live lease on the slot that this spawn did not acquire. The treehouse
-# pool's durable lease is foreign unless its holder label is this task's id (its
-# recorded identity); a process lease is foreign when its owner is alive and not in
-# the acquired endpoint's tree. The governed project's own lease store adds its file
-# lease, read as a plain file: a live holder, or one that cannot be probed and has
-# not expired, refuses.
+# pool's durable lease is foreign unless its holder label is this task's id; a
+# process lease is this spawn's only when its owner_pid (and owner_started_at, when
+# the entry has one) equals the identity recorded at acquisition. Any other live owner
+# refuses, whether or not it sits in the acquired pane's tree. The governed project's
+# own lease store adds its file lease, read as a plain file: a live holder, or one
+# that cannot be probed and has not expired, refuses.
 fm_slot_guard_fact_holders_lease() {
-  local state entries leased holder name path pid verdict common out
+  local state entries leased holder name path pid started verdict common out
   state="${FM_SLOT_GUARD_REAL%/*/*}/treehouse-state.json"
   if fm_treehouse_pool_slot "$FM_SLOT_GUARD_PROJECT" "$FM_SLOT_GUARD_SLOT"; then
     if ! command -v jq >/dev/null 2>&1; then
       fm_slot_guard_refuse unknown_lease "jq is not installed, so the pool's lease state cannot be read"
       return 1
     fi
-    entries=$(jq -r '.worktrees[]? | [(.leased == true | tostring), (.lease_holder // "" | tostring), (.name // "" | tostring), (.path // "" | tostring), (.owner_pid // "" | tostring)] | join("\u001f")' "$state" 2>/dev/null) || {
+    entries=$(jq -r '.worktrees[]? | [(.leased == true | tostring), (.lease_holder // "" | tostring), (.name // "" | tostring), (.path // "" | tostring), (.owner_pid // "" | tostring), (.owner_started_at // "" | tostring)] | join("\u001f")' "$state" 2>/dev/null) || {
       fm_slot_guard_refuse unknown_lease "the pool's lease state $state cannot be read"
       return 1
     }
-    while IFS=$'\037' read -r leased holder name path pid; do
+    while IFS=$'\037' read -r leased holder name path pid started; do
       [ -n "$path" ] || continue
       [ "$path" -ef "$FM_SLOT_GUARD_REAL" ] || continue
       if [ "$leased" = true ] && [ "$holder" != "$FM_SLOT_GUARD_TASK" ]; then
         fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to '${holder:-an unnamed holder}', not to this task"
         return 1
       fi
-      if [ -n "$pid" ]; then
-        fm_slot_guard_probe_processes "$pid" || return 1
-        verdict=$(printf '%s\n' "$FM_SLOT_GUARD_HOLDER_REPORT" | awk -F'\t' -v p="$pid" '$1 == "P" && $2 == p {print $3}')
-        case "$verdict" in
-          own|dead) ;;
-          foreign)
-            fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid outside this spawn's endpoint"
-            return 1
-            ;;
-          *)
-            fm_slot_guard_refuse unknown_lease "the pool entry '$name' is leased to process $pid, which cannot be attributed to this spawn's endpoint"
-            return 1
-            ;;
-        esac
+      [ -n "$pid" ] || continue
+      if [ -n "$FM_SLOT_GUARD_LEASE_PID" ] && [ "$pid" = "$FM_SLOT_GUARD_LEASE_PID" ] &&
+        { [ -z "$started" ] || [ "$started" = "$FM_SLOT_GUARD_LEASE_STARTED" ]; }; then
+        continue
       fi
+      fm_slot_guard_probe_processes "$pid" || return 1
+      verdict=$(printf '%s\n' "$FM_SLOT_GUARD_HOLDER_REPORT" | awk -F'\t' -v p="$pid" '$1 == "P" && $2 == p {print $3}')
+      case "$verdict" in
+        dead) ;;
+        *)
+          fm_slot_guard_refuse holder_lease "the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own"
+          return 1
+          ;;
+      esac
     done <<EOF
 $entries
 EOF

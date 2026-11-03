@@ -1994,7 +1994,7 @@ test_reset_guard_s4_worktree_lock() {
 }
 
 test_reset_guard_s4_foreign_lease() {
-  local rec id holder state
+  local rec id state
   id='guard-s4-lease'
   rec=$(make_case guard-s4iii "$id")
   read_case_record "$rec"
@@ -2004,20 +2004,66 @@ test_reset_guard_s4_foreign_lease() {
   guard_expect_refusal S4 '(iii) a durable lease held by another holder' 'reset refused (holder_lease)' "$id" --scout
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$POOL_DIR" >"$state"
   guard_expect_launch S4 '(iii) paired pass: the lease is released' "$id" --scout
-  # A process lease whose owner is a live process outside this spawn's endpoint.
-  id='guard-s4-lease-process'
-  rec=$(make_case guard-s4iiib "$id")
+  pass 'S4 (iii): a foreign durable lease refuses, and passes once released'
+}
+
+# A process lease is this spawn's own only by the identity recorded when it took the slot
+# (the pool entry's owner_pid at claim time), never by process ancestry.
+guard_set_lease_owner() { # <state-file> <pid>
+  jq --argjson pid "$2" '.worktrees[0].owner_pid = $pid' "$1" >"$1.tmp" && mv "$1.tmp" "$1"
+}
+
+test_reset_guard_s4_process_lease_recorded_identity() {
+  local rec id state own other shell child
+  # The entry's owner at claim time is the spawn's own acquisition: it passes though that
+  # process is alive and in no lineage of the spawn.
+  id='guard-s4-lease-recorded'
+  rec=$(make_case guard-s4lrec "$id")
   read_case_record "$rec"
   lay_out_as_pool_slot
   state="$CASE_DIR/slots/treehouse-state.json"
-  sleep 600 &
-  holder=$!
-  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$holder" >"$state"
-  guard_expect_refusal S4 '(iii-b) a process lease owned by a live process outside the endpoint' 'reset refused (holder_lease)' "$id" --scout
-  kill "$holder" 2>/dev/null || true
-  wait "$holder" 2>/dev/null || true
-  guard_expect_launch S4 '(iii-b) paired pass: the owner process is gone' "$id" --scout
-  pass 'S4 (iii): a foreign durable or process lease refuses, and passes once released'
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  own=$!
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  guard_expect_launch S4 '(iii-b) the live process lease recorded as this spawn'"'"'s own acquisition' "$id" --scout
+  # The owner changes after the claim to another live process: refused.
+  id='guard-s4-lease-swapped'
+  rec=$(make_case guard-s4lsw "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  other=$!
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $other '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S4 '(iii-b) the lease owner changes after the claim to another live process' 'reset refused (holder_lease)' "$id" --scout
+  # The owner changes to a process inside the acquired pane's tree: ancestry does not exempt it.
+  id='guard-s4-lease-pane-tree'
+  rec=$(make_case guard-s4lpt "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  child=$(pgrep -P "$shell" | head -n 1)
+  [ -n "$child" ] || fail 'the pane shell has no child to hold the lease'
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid $child '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S4 '(iii-b) the lease owner is a live process inside the pane tree that is not the recorded acquisition' 'reset refused (holder_lease)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" 2>/dev/null || true
+  # The owner changes to a process that is gone: nothing holds the lease any more.
+  id='guard-s4-lease-dead'
+  rec=$(make_case guard-s4ld "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  state="$CASE_DIR/slots/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s}]}\n' "$POOL_DIR" "$own" >"$state"
+  FM_SLOT_RESET_GUARD_SEAM="jq --argjson pid 2147483000 '.worktrees[0].owner_pid = \$pid' '$state' >'$state.tmp' && mv '$state.tmp' '$state'" \
+    guard_expect_launch S4 '(iii-b) paired pass: the changed owner is a process that is gone' "$id" --scout
+  kill "$own" "$other" 2>/dev/null || true
+  pass 'S4 (iii-b): a process lease is this spawn'"'"'s only by its recorded identity, never by ancestry'
 }
 
 test_reset_guard_s4_vernant_lease_and_contention() {
@@ -2391,6 +2437,7 @@ test_reset_guard_s3b_inventory_failure
 test_reset_guard_s4_cwd_holder
 test_reset_guard_s4_worktree_lock
 test_reset_guard_s4_foreign_lease
+test_reset_guard_s4_process_lease_recorded_identity
 test_reset_guard_s4_vernant_lease_and_contention
 test_reset_guard_s4_pane_pid_exemption
 test_reset_guard_s4_in_pane_probe_without_pane_pid

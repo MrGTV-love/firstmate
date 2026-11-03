@@ -996,11 +996,7 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid outside this spawn's endpoint\""
-        },
-        {
-          "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_guard_refuse unknown_lease \"the pool entry '$name' is leased to process $pid, which cannot be attributed to this spawn's endpoint\""
+          "match": "fm_slot_guard_refuse holder_lease \"the pool entry '$name' is leased to live process $pid, which is not the acquisition this spawn recorded as its own\""
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",

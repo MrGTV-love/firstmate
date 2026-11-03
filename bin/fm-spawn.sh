@@ -6437,6 +6437,12 @@ if [ "$RELAUNCH" -eq 1 ]; then
     }
   fi
 fi
+# Record the pool lease identity of the slot this spawn holds (see the reset guard's header):
+# the claim names this task, so the entry's owner now is this spawn's own acquisition.
+if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
+  fm_treehouse_slot_owner_state "$WT" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || fm_slot_guard_record_lease_identity "$WT"
+fi
 # The in-pane runner is defined here, ahead of the first reset, because the reset guard's
 # working-directory probe uses it on a backend that reports no pane pid.
 spawn_slot_cancel_helper() { # <attempt-dir>
