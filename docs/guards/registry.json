@@ -145,9 +145,133 @@
     "merge-required-reported",
     "merge-landing-tree-tested",
     "merge-auto-not-armed",
-    "merge-single-owner"
+    "merge-single-owner",
+    "backlog-transition",
+    "compact-adviser",
+    "secondmate-inherit",
+    "secondmate-sync"
   ],
   "guards": [
+    {
+      "id": "backlog-transition",
+      "owner": "bin/fm-backlog-transition-lib.sh",
+      "invariant": "automatic backlog transitions defer to the configured manual backend",
+      "source": "config/backlog-backend",
+      "trigger": "manual backlog backend selected",
+      "remedy": "bin/fm-backlog-transition-lib.sh - consult the configured backend before updating the backlog",
+      "test": "tests/fm-guard-telemetry.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-backlog-transition-lib.sh",
+          "match": "backlog-transition bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "compact-adviser",
+      "owner": "bin/fm-compact-adviser-lib.sh",
+      "invariant": "compact adviser emergency disable remains an explicit operator input",
+      "source": "FM_COMPACT_ADVISER_DISABLE",
+      "trigger": "the invoking operator supplies a truthy emergency disable",
+      "remedy": "bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off> with the operator disable unset",
+      "test": "tests/fm-guard-telemetry.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-compact-adviser-lib.sh",
+          "match": "compact-adviser bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "secondmate-inherit",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "secondmate launch normally propagates primary inheritance",
+      "source": "FM_SKIP_SECONDMATE_INHERIT at the host-local launch or convergence boundary",
+      "trigger": "host-local launch or convergence skips inheritance",
+      "remedy": "bin/fm-spawn.sh <id> --secondmate through the parent home inheritance path",
+      "test": "tests/fm-secondmate-sync.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "secondmate-inherit bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "secondmate-sync",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "secondmate launch normally attempts the primary tracked sync",
+      "source": "FM_SKIP_SECONDMATE_SYNC at the host-local launch boundary",
+      "trigger": "host-local launch skips tracked sync after parent convergence",
+      "remedy": "bin/fm-spawn.sh <id> --secondmate through the parent home sync path",
+      "test": "tests/fm-secondmate-sync.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "secondmate-sync bypass"
+        }
+      ],
+      "decision": "warn",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-warn",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
     {
       "id": "live-lab-processes-stopped-before-remove",
       "version": "1",
@@ -5266,6 +5390,7 @@
       "id": "turnend-supervision-block",
       "owner": "bin/fm-turnend-guard.sh",
       "sites": [
+          {"file":"bin/fm-turnend-guard.sh","match":"fm-guard-event.sh\" turnend-supervision-block"},
           {
             "file": "bin/fm-turnend-guard.sh",
             "match": "guard_event deny --source-ok \"$source_ok\""
@@ -5326,6 +5451,8 @@
       "version": "1",
       "id": "guard-watcher-down-warning",
       "owner": "bin/fm-guard.sh",
+      "emitters": ["bin/fm-spawn.sh"],
+      "sites": [{"file":"bin/fm-spawn.sh","match":"guard-watcher-down-warning bypass"}],
       "invariant": "a fleet command warns when supervision is not live",
       "layer": "runtime-warn",
       "source": "fm_supervision_liveness: identity-matched watcher lock or away/quiet daemon and beacon age",
@@ -5542,7 +5669,7 @@
       "sites": [
         {
           "file": "bin/fm-gate-refuse-lib.sh",
-          "match": "gate-agent-containment deny"
+          "match": "gate-agent-containment \"${1:-deny}\""
         },
         {
           "file": "bin/fm-gate-refuse-lib.sh",
@@ -5570,8 +5697,10 @@
         },
         {
           "file": "bin/fm-gate-refuse-lib.sh",
-          "match": "fm_gate_refuse_event"
+          "match": "fm_gate_refuse_event",
+          "count": 4
         },
+        {"file":"bin/fm-watch-arm.sh","match":"fm_gate_refuse_event"},
         {
           "file": "bin/fm-watch-arm.sh",
           "match": "echo \"watcher: FAILED - refusing to arm from a disposable validation checkout: $SCRIPT_DIR\""
@@ -5604,7 +5733,7 @@
       "sites": [
         {
           "file": "bin/fm-role-lib.sh",
-          "match": "upstream-publish-role deny"
+          "match": "upstream-publish-role \"${1:-deny}\""
         },
         {
           "file": "bin/fm-promote.sh",
@@ -5644,6 +5773,7 @@
       "id": "merge-checks-green",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
+        {"file":"bin/fm-pr-merge.sh","match":"merge-checks-green bypass"},
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "merge-checks-green deny"
@@ -5674,6 +5804,7 @@
       "id": "merge-required-reported",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
+        {"file":"bin/fm-pr-merge.sh","match":"merge-required-reported bypass"},
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "merge-required-reported deny"
@@ -5781,6 +5912,7 @@
       "version": "1",
       "id": "merge-away-waiver",
       "sites": [
+        {"file":"bin/fm-pr-merge.sh","match":"merge-away-waiver bypass"},
         {
           "file": "bin/fm-pr-merge.sh",
           "match": "echo \"error: GitHub merge refused while away because the base branch's merge-queue state does not prove an immediate merge; nothing was handed to the forge\" >&2"
@@ -5925,6 +6057,7 @@
       "id": "teardown-unlanded",
       "owner": "bin/fm-teardown.sh",
       "sites": [
+        {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
@@ -5999,7 +6132,7 @@
       "sites": [
         {
           "file": "bin/fm-api-key-guard-lib.sh",
-          "match": "claude-api-billing deny"
+          "match": "claude-api-billing \"$1\""
         },
         {
           "file": "bin/fm-control.sh",
@@ -6418,7 +6551,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision and elapsed time only, keyed to session <task>:<tool-name> so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision and elapsed time only, the task id with the worker actor and rule <tool-name>, so only a later allow of the same rule clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
@@ -6450,7 +6583,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; unreadable live memory settings, an unrecognized backend or llmMode, or embeddings left on prove nothing local, so the memory operation requires provider; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each runtime allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; unconditional device denials are keyed to session <task>:<device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; each dispatch decision on the task grant or native find capability emits one event keyed to <task>:dispatch-grant or <task>:dispatch-find respectively: an allow when the policy yields a valid grant array or on/off find capability, otherwise a deny with source_ok=false, including an invalid brief directive or a failed policy helper; the content-free terminal row in state/jev-guard.jsonl remains the runtime task audit"
+      "telemetry_note": "each runtime allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, the task id with the worker actor and rule <destination-class>, so only a later allow of the same rule clears a deny; unconditional device denials use rule <device-uri>, which no grant-based allow shares, use the compiled device row as their source and report source_ok=true without reading a task grant; each dispatch decision on the task grant or native find capability emits one event with rule dispatch-grant or dispatch-find respectively: an allow when the policy yields a valid grant array or on/off find capability, otherwise a deny with source_ok=false, including an invalid brief directive or a failed policy helper; the content-free terminal row in state/jev-guard.jsonl remains the runtime task audit"
     },
     {
       "decision": "deny",
@@ -6480,7 +6613,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an op that is missing, not a string or not a recognized read op is refused; the read-op list is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, keyed to session <task>:github-read for an allow and <task>:github-write for a deny, so a read op never counts as clearing a write-op refusal, which nothing clears; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, the task id with the worker actor and rule github-read for an allow and github-write for a deny, so a read op never counts as clearing a write-op refusal, which nothing clears; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
