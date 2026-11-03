@@ -1185,7 +1185,7 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     contract_consent=" upstream-consent=$consent"
   fi
   # A merge through bin/fm-pr-merge.sh closes the items the merged PR body names with
-  # `Closes:` lines (bin/fm-pr-close-items.sh; bin/fm-pr-closes-lib.sh owns the syntax),
+  # `Closes-backlog-item:` lines (bin/fm-pr-close-items.sh; bin/fm-pr-closes-lib.sh owns the syntax),
   # on every forge with a PR. The pipeline can rewrite the PR body after the worker's
   # commit, so the instruction names a route that re-checks the body at the end.
   closes_read="\`gh-axi pr view <number> --full\`"
@@ -1198,12 +1198,12 @@ fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<b
     forge_cli=tea
     draft_check="(\`tea api --repo <owner>/<repo> /repos/{owner}/{repo}/pulls/<number>\` must show \`draft\` as false, where <owner>/<repo> and <number> come from your PR URL); Forgejo marks a draft by a work-in-progress title prefix such as \`WIP:\`, so if it is a draft, remove that prefix with \`tea pulls edit <number> --repo <owner>/<repo> --title '<title without the prefix>'\`."
   fi
-  closes_verify="Read the PR body back with $closes_read; if any \`Closes:\` line is missing, $closes_edit, then read the body again and confirm each line is there."
-  closes_note="Name the backlog items your change finishes: put \`Closes: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline can rewrite the PR body after your commit, so as the last step before your final done, $closes_verify
+  closes_verify="Read the PR body back with $closes_read; if any \`Closes-backlog-item:\` line is missing, $closes_edit, then read the body again and confirm each line is there."
+  closes_note="Name the backlog items your change finishes: put \`Closes-backlog-item: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message and in the PR body, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one \`Train-member: <PR URL>\` line of its own for each component pull request that landed in it. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline can rewrite the PR body after your commit, so as the last step before your final done, $closes_verify
 "
-  closes_note_nm="Name the backlog items your change finishes: put \`Closes: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item from the PR body (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline writes the PR body after this handoff, so you check the body only after /no-mistakes reports CI green, as described below.
+  closes_note_nm="Name the backlog items your change finishes: put \`Closes-backlog-item: $id\` on a line of its own, exactly that form with nothing else on the line, in your commit message, and add one such line for each other queued backlog item the change fixes. Only those lines close anything: prose, a table or a quoted example closes nothing. If your PR is a merge train, add one \`Train-member: <PR URL>\` line of its own for each component pull request that landed in it. A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item from the PR body (a queued, --auto or externally seen merge does not; backlog item fm-pr-close-items-queued-and-polled-merges owns that gap). The pipeline writes the PR body after this handoff, so you check the body only after /no-mistakes reports CI green, as described below.
 "
-  closes_check_nm="Before that done, check the PR body for the lines that close backlog items (at least \`Closes: $id\`), because the pipeline wrote the body after your commit. $closes_verify This edits only the PR body: commit nothing.
+  closes_check_nm="Before that done, check the PR body for the lines that close backlog items (at least \`Closes-backlog-item: $id\`), because the pipeline wrote the body after your commit. $closes_verify This edits only the PR body: commit nothing.
 "
   [ "$forge" != gerrit ] || { closes_note=; closes_note_nm=; closes_check_nm=; }
   if [ -n "$base" ]; then

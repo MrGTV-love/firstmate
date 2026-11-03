@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Close at merge: bin/fm-pr-merge.sh closes the backlog items a merged pull request
-# names with `Closes: <item-id>` lines, a merge train's members' items too, and a
+# names with `Closes-backlog-item: <item-id>` lines, a merge train's members' items too, and a
 # finished item stops blocking the items that waited on it.
 #
 # bin/fm-pr-close-items.sh owns the close contract and bin/fm-pr-closes-lib.sh owns the
@@ -105,15 +105,17 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   cx_add "$case_dir" docs-live-4 docs
   cx_add "$case_dir" docs-twin docs
   cx_add "$case_dir" fm-fixture-prose-5
+  cx_add "$case_dir" fm-fixture-legacy-6
   cx_meta "$case_dir" fm-fixture-live-3 ship
   cx_meta "$case_dir" docs-live-4 docs
   cx_meta "$case_dir" docs-twin docs
   # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
   printf '%s\n' 'Fixes things; fm-fixture-prose-5 is related.' '' \
-    'Closes: fm-fixture-alpha-1' 'Closes: fm-fixture-beta-2' 'Closes: fm-fixture-live-3' \
-    'Closes: ship-a' 'Closes: docs-live-4' 'Closes: ship-a' \
-    'Mentions Closes: fm-fixture-prose-5 inline.' 'closes: fm-fixture-prose-5' \
-    '  Closes: fm-fixture-prose-5' 'Closes: fm-fixture-prose-5 # comment' > "$case_dir/bodies/61"
+    'Closes-backlog-item: fm-fixture-alpha-1' 'Closes-backlog-item: fm-fixture-beta-2' 'Closes-backlog-item: fm-fixture-live-3' \
+    'Closes-backlog-item: ship-a' 'Closes-backlog-item: docs-live-4' 'Closes-backlog-item: ship-a' \
+    'Mentions Closes-backlog-item: fm-fixture-prose-5 inline.' 'closes: fm-fixture-prose-5' \
+    '  Closes-backlog-item: fm-fixture-prose-5' 'Closes-backlog-item: fm-fixture-prose-5 # comment' \
+    'Closes: fm-fixture-legacy-6' > "$case_dir/bodies/61"
 
   gh_merge "$case_dir" 61
   [ "$(cx_state "$case_dir" fm-fixture-alpha-1)" = "done" ] || fail "c1: alpha was not closed"
@@ -125,12 +127,20 @@ test_closes_lines_close_each_eligible_item_and_report_the_rest() {
   assert_match "^actionable: close-at-merge: not closed fm-fixture-live-3: bin/fm-tasks-axi.sh done did not close it: .*live task record" "$case_dir/stderr" \
     "c1: another task's live item was not reported as actionable with its reason"
   [ "$(cx_state "$case_dir" fm-fixture-prose-5)" != "done" ] || fail "c1: a line that is not a Closes directive closed an item"
+  [ "$(cx_state "$case_dir" fm-fixture-legacy-6)" != "done" ] || fail "c1: the old Closes: line closed an item"
+  assert_match "^actionable: close-at-merge: not closed fm-fixture-legacy-6: .*Closes: line, which closes nothing; write 'Closes-backlog-item: fm-fixture-legacy-6'" "$case_dir/stderr" \
+    "c1: the old form was not reported with the new form named"
+  assert_match '^actionable: close-at-merge: ignored a malformed directive line in the body of .*: Closes-backlog-item: fm-fixture-prose-5 # comment' "$case_dir/stderr" \
+    "c1: the malformed directive line was not reported"
+  assert_match "^actionable: close-at-merge: mentioned fm-fixture-prose-5 in the prose of $url: nothing was closed for it" "$case_dir/stderr" \
+    "c1: an id mentioned in prose was not reported"
+  [ "$(grep -c 'mentioned fm-fixture-prose-5' "$case_dir/stderr")" = 1 ] || fail "c1: a prose mention was reported more than once"
   # The non-ship item with a live record gets exactly what the unchanged completion path gives.
   [ "$(cx_state "$case_dir" docs-live-4)" = "done" ] || fail "c1: docs-live-4 did not get the completion path's outcome"
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$WRAPPER_SH" "done" docs-twin --pr "$url" >/dev/null 2>&1 \
     || fail "c1: the unchanged path refused the docs twin"
   [ "$(cx_state "$case_dir" docs-twin)" = "done" ] || fail "c1: the unchanged path left the docs twin open"
-  assert_grep '4 closed, 1 left open' "$case_dir/stdout" "c1: summary line missing"
+  assert_grep '4 closed, 3 left open' "$case_dir/stdout" "c1: summary line missing"
   pass "a merge closes each named eligible item with the merged PR URL and reports the one it left open"
 }
 
@@ -138,7 +148,7 @@ test_a_merge_naming_its_own_task_reports_the_live_record() {
   local case_dir
   case_dir=$(gh_case c1-self 62)
   cx_add "$case_dir" task-x1
-  printf '%s\n' 'Closes: task-x1' > "$case_dir/bodies/62"
+  printf '%s\n' 'Closes-backlog-item: task-x1' > "$case_dir/bodies/62"
   gh_merge "$case_dir" 62
   [ "$(cx_state "$case_dir" task-x1)" != "done" ] || fail "c1-self: the merging task was closed before its teardown"
   assert_match '^close-at-merge: not closed task-x1: .*live task record' "$case_dir/stdout" "c1-self: the live-record refusal was not reported by id"
@@ -146,25 +156,31 @@ test_a_merge_naming_its_own_task_reports_the_live_record() {
   pass "a merge that names its own task reports the live-record refusal and still succeeds"
 }
 
-test_no_closes_line_changes_no_item_and_prose_urls_close_nothing() {
+test_no_directive_line_changes_no_item_and_prose_mentions_close_nothing() {
   local case_dir
   case_dir=$(gh_case c1-none 63)
   cx_add "$case_dir" other-item
-  printf '%s\n' "Related to $REPO_URL/9, which says Closes: other-item in prose." > "$case_dir/bodies/63"
-  printf '%s\n' 'Closes: other-item' > "$case_dir/bodies/9"
+  cx_add "$case_dir" quiet-item
+  printf '%s\n' "Related to $REPO_URL/9, which says Closes-backlog-item: other-item in prose." > "$case_dir/bodies/63"
+  printf '%s\n' 'Closes-backlog-item: other-item' > "$case_dir/bodies/9"
   printf '%s\n' 9 >> "$case_dir/merged-prs"
   gh_merge "$case_dir" 63
-  [ "$(cx_state "$case_dir" other-item)" = queued ] || fail "c1-none: an item changed without a Closes line"
-  assert_no_grep 'close-at-merge' "$case_dir/stdout" "c1-none: the close step spoke without a directive"
-  assert_no_grep 'close-at-merge:' "$case_dir/stderr" "c1-none: a body with no member list named a linked PR"
-  pass "a body with no Closes line, even one that links another PR, changes no item"
+  [ "$(cx_state "$case_dir" other-item)" = queued ] || fail "c1-none: an item changed without a directive line"
+  [ "$(cx_state "$case_dir" quiet-item)" = queued ] || fail "c1-none: an unnamed item changed"
+  assert_no_grep 'close-at-merge:' "$case_dir/stdout" "c1-none: the close step closed or counted something without a directive"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/9 in the prose of $REPO_URL/63: no item was closed for it" "$case_dir/stderr" \
+    "c1-none: a linked PR in prose was not reported"
+  assert_match "^actionable: close-at-merge: mentioned other-item in the prose of $REPO_URL/63: nothing was closed for it" "$case_dir/stderr" \
+    "c1-none: an id in prose was not reported"
+  assert_no_grep 'quiet-item' "$case_dir/stderr" "c1-none: an id the body never mentions was reported"
+  pass "a body with no directive line closes nothing and reports each id and pull request it mentions in prose"
 }
 
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items() {
   local case_dir rc=0
   case_dir=$(gh_case c1-unrecorded 64)
   cx_add "$case_dir" unrecorded-a
-  printf '%s\n' 'Closes: unrecorded-a' > "$case_dir/bodies/64"
+  printf '%s\n' 'Closes-backlog-item: unrecorded-a' > "$case_dir/bodies/64"
   # A secondmate home with no readable parent binding cannot place the outcome.
   : > "$case_dir/home/.fm-secondmate-home"
   merge_call "$case_dir" task-x1 "$REPO_URL/64" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -180,7 +196,7 @@ test_a_merge_the_watcher_recorded_first_still_closes_without_a_second_notice() {
   local case_dir queue_before queue_after
   case_dir=$(gh_case c1-watcher 65)
   cx_add "$case_dir" watcher-a
-  printf '%s\n' 'Closes: watcher-a' > "$case_dir/bodies/65"
+  printf '%s\n' 'Closes-backlog-item: watcher-a' > "$case_dir/bodies/65"
   # shellcheck source=bin/fm-pr-lib.sh disable=SC1091
   ( . "$ROOT/bin/fm-pr-lib.sh"; fm_pr_poll_merge_mark_notified "$case_dir/state" task-x1 github github.com example/repo 65 ) \
     || fail "c1-watcher: could not mark the merge as already notified"
@@ -227,9 +243,9 @@ test_every_failure_kind_is_reported_and_the_valid_item_still_closes() {
   cx_add "$case_dir" read-fails-once captain
   cx "$case_dir" hold read-fails-once --reason "owner decides" --kind captain >/dev/null
   cx_add "$case_dir" valid-last
-  printf '%s\n' 'Closes: no-such-item' 'Closes: done-already' 'Closes: a-scout' 'Closes: held-ship' \
-    'Closes: call-open' 'Closes: call-released' 'Closes: call-expired' 'Closes: call-reheld' \
-    'Closes: archived-one' 'Closes: absent-one' 'Closes: read-fails-once' 'Closes: valid-last' > "$case_dir/bodies/67"
+  printf '%s\n' 'Closes-backlog-item: no-such-item' 'Closes-backlog-item: done-already' 'Closes-backlog-item: a-scout' 'Closes-backlog-item: held-ship' \
+    'Closes-backlog-item: call-open' 'Closes-backlog-item: call-released' 'Closes-backlog-item: call-expired' 'Closes-backlog-item: call-reheld' \
+    'Closes-backlog-item: archived-one' 'Closes-backlog-item: absent-one' 'Closes-backlog-item: read-fails-once' 'Closes-backlog-item: valid-last' > "$case_dir/bodies/67"
   # The first read of one held row fails once.
   bin_dir=$case_dir/fakebin
   cat > "$bin_dir/tasks-axi" <<SH
@@ -268,7 +284,7 @@ test_a_hold_placed_after_the_last_look_still_wins() {
   local case_dir bin_dir
   case_dir=$(gh_case c3-interleave 68)
   cx_add "$case_dir" late-hold captain
-  printf '%s\n' 'Closes: late-hold' > "$case_dir/bodies/68"
+  printf '%s\n' 'Closes-backlog-item: late-hold' > "$case_dir/bodies/68"
   bin_dir=$case_dir/fakebin
   # The hold commits right after the close step's own look at the row says "unheld".
   cat > "$bin_dir/tasks-axi" <<SH
@@ -295,7 +311,7 @@ test_a_rerun_closes_nothing_twice() {
   local case_dir before after rc=0
   case_dir=$(gh_case c3-rerun 69)
   cx_add "$case_dir" rerun-a
-  printf '%s\n' 'Closes: rerun-a' > "$case_dir/bodies/69"
+  printf '%s\n' 'Closes-backlog-item: rerun-a' > "$case_dir/bodies/69"
   gh_merge "$case_dir" 69
   [ "$(cx_state "$case_dir" rerun-a)" = "done" ] || fail "c3-rerun: the first run did not close the item"
   before=$(backlog_text "$case_dir")
@@ -322,7 +338,7 @@ test_a_rerun_after_a_partial_close_closes_only_the_rest() {
   case_dir=$(gh_case c3-partial 70)
   cx_add "$case_dir" partial-a
   cx_add "$case_dir" partial-b
-  printf '%s\n' 'Closes: partial-a' 'Closes: partial-b' > "$case_dir/bodies/70"
+  printf '%s\n' 'Closes-backlog-item: partial-a' 'Closes-backlog-item: partial-b' > "$case_dir/bodies/70"
   bin_dir=$case_dir/fakebin
   cat > "$bin_dir/tasks-axi" <<SH
 #!/usr/bin/env bash
@@ -356,7 +372,7 @@ test_a_hand_run_with_an_open_pr_closes_nothing() {
   local case_dir before rc=0
   case_dir=$(gh_case c3-open-github 91)
   cx_add "$case_dir" open-gh-docs docs
-  printf '%s\n' 'Closes: open-gh-docs' > "$case_dir/bodies/92"
+  printf '%s\n' 'Closes-backlog-item: open-gh-docs' > "$case_dir/bodies/92"
   before=$(backlog_text "$case_dir")
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" PATH="$case_dir/fakebin:$PATH" \
     FM_TEST_GH_BODIES="$case_dir/bodies" FM_TEST_GH_MERGED_PRS="$case_dir/merged-prs" FM_TEST_GH_LOG="$case_dir/gh.log" \
@@ -371,7 +387,7 @@ test_a_hand_run_with_an_open_pr_closes_nothing() {
   rc=0
   case_dir=$(make_forgejo_case "c3-open-forgejo-${CLOSE_PRUNE:-off}")
   cx_add "$case_dir" open-fj-docs docs
-  set_json_field "$case_dir/pr.json" body 'Closes: open-fj-docs'
+  set_json_field "$case_dir/pr.json" body 'Closes-backlog-item: open-fj-docs'
   before=$(backlog_text "$case_dir")
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" PATH="$case_dir/fakebin:$PATH" \
     FM_TEST_TEA_LOG="$case_dir/tea.log" HOME="$case_dir/user-home" "$CLOSE_SH" task-x1 "$FJ_URL" \
@@ -386,10 +402,12 @@ test_a_hand_run_with_an_open_pr_closes_nothing() {
 
 # --- trains -----------------------------------------------------------------
 
-# shellcheck disable=SC2016 # Backticks in the fixture bodies are literal Markdown.
 # train_body <layout> <excluded-url> <member-url>...
+# Every body names its members with Train-member lines. The Markdown layouts the old reader
+# understood stay in the body as decoration, and they must change nothing.
+# shellcheck disable=SC2016 # Backticks in the fixture bodies are literal Markdown.
 train_body() {
-  local layout=$1 excluded=$2 member n=0 headless
+  local layout=$1 excluded=$2 member n=0
   shift 2
   printf '%s\n' '## Intent' '' "Context: see $excluded, which stays out of this train." '' '## Train' ''
   case "$layout" in
@@ -400,32 +418,20 @@ train_body() {
       printf '%s\n' '| # | Component PR | Head merged | Merge commit |' '|---|---|---|---|'
       for member in "$@"; do n=$((n + 1)); printf '| %s | %s | `aaaa` | `bbbb` |\n' "$n" "$member"; done ;;
     labeled-bullets)
-      printf '%s\n' '## Train facts' ''
-      for member in "$@"; do n=$((n + 1)); printf -- '- **Component %s:** %s at `aaaa`, merge commit `bbbb`.\n' "$n" "$member"; done
-      printf -- '- **Main merge:** `cccc` merged by `dddd`.\n' ;;
-    heading-table)
-      printf '%s\n' '### Train components' '' '| # | Component PR | Head merged |' '|---|---|---|'
-      for member in "$@"; do n=$((n + 1)); printf '| %s | %s | `aaaa` |\n' "$n" "$member"; done ;;
-    leadin-table)
-      printf '%s\n' 'Components:' '| Component | Unchanged component head |' '| --- | --- |'
-      for member in "$@"; do printf '| %s | `aaaa` |\n' "$member"; done ;;
+      for member in "$@"; do n=$((n + 1)); printf -- '- **Component %s:** %s at `aaaa`, merge commit `bbbb`.\n' "$n" "$member"; done ;;
     heading-bullets)
       printf '%s\n' '### Components and base' ''
-      for member in "$@"; do printf -- '- %s at unchanged head `aaaa`.\n' "$member"; done
-      printf -- '- Latest main integrated at refresh build time: `cccc`.\n' ;;
-    fenced-numbered)
-      printf '%s\n' '```text' '## Train record' 'Components, in order:' ''
-      for member in "$@"; do n=$((n + 1)); printf '%s. %s at `aaaa`, merged by `bbbb`.\n' "$n" "$member"; done
-      printf '%s\n' '' 'Other notes.' '```' ;;
+      for member in "$@"; do printf -- '- %s at unchanged head `aaaa`.\n' "$member"; done ;;
+    plain) ;;
   esac
-  headless=
-  printf '%s\n' '' "Also see $excluded again." ${headless:+x}
+  printf '%s\n' '' "Also see $excluded again." ''
+  for member in "$@"; do printf 'Train-member: %s\n' "$member"; done
 }
 
 # The train fixture: four members, as the contract lists them.
 #   m1 names a ship item; m2 is found only through a live ship task's pr=;
 #   m3 is found only through a live docs task's pr=; m4 names nothing.
-train_case() {  # <name> <layout> <train-number> [extra Closes line for the train body]
+train_case() {  # <name> <layout> <train-number> [extra directive line for the train body]
   local name=$1 layout=$2 number=$3 case_dir base=$REPO_URL
   case_dir=$(gh_case "$name" "$number")
   cx_add "$case_dir" m1-item
@@ -440,8 +446,8 @@ train_case() {  # <name> <layout> <train-number> [extra Closes line for the trai
   cx_meta "$case_dir" prefix-task docs "$base/711"
   cx_add "$case_dir" bare-number-task docs
   cx_meta "$case_dir" bare-number-task docs "71"
-  printf '%s\n' 'Closes: m1-item' > "$case_dir/bodies/71"
-  printf '%s\n' 'Closes: excluded-item' > "$case_dir/bodies/90"
+  printf '%s\n' 'Closes-backlog-item: m1-item' > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes-backlog-item: excluded-item' > "$case_dir/bodies/90"
   printf '%s\n' 71 72 73 74 90 >> "$case_dir/merged-prs"
   {
     train_body "$layout" "$base/90" "$base/71" "$base/72" "$base/73" "$base/74"
@@ -461,37 +467,37 @@ check_train_outcome() {  # <case-dir> <label> <train-url>
   [ "$(cx_state "$case_dir" bare-number-task)" = queued ] || fail "$label: a pr= that is only a number matched"
   assert_grep "closed m1-item with $train" "$case_dir/stdout" "$label: the proof is not the train URL"
   assert_grep "closed m3-live-docs with $train" "$case_dir/stdout" "$label: the pr= task's proof is not the train URL"
-  assert_match "^actionable: close-at-merge: not read $REPO_URL/90: linked from a merge-train body" "$case_dir/stderr" "$label: the linked PR outside the member list was not named"
-  assert_no_grep "not read $REPO_URL/7" "$case_dir/stderr" "$label: a member was named as not read"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/90 in the prose of $train: no item was closed for it" "$case_dir/stderr" "$label: the linked PR outside the block was not reported"
+  assert_no_grep "mentioned $REPO_URL/7" "$case_dir/stderr" "$label: a Train-member line was reported as a mention"
 }
 
-test_a_train_closes_the_items_of_its_listed_members_in_every_layout() {
+test_a_train_closes_the_items_of_its_train_member_lines_whatever_else_the_body_holds() {
   local layout case_dir
-  for layout in url-first-table numbered-table heading-table leadin-table labeled-bullets heading-bullets fenced-numbered; do
-    case_dir=$(train_case "c2-$layout" "$layout" 80 'Closes: train-own-item')
+  for layout in plain url-first-table numbered-table heading-bullets labeled-bullets; do
+    case_dir=$(train_case "c2-$layout" "$layout" 80 'Closes-backlog-item: train-own-item')
     gh_merge "$case_dir" 80 --merge
     check_train_outcome "$case_dir" "c2-$layout" "$REPO_URL/80"
-    [ "$(cx_state "$case_dir" train-own-item)" = "done" ] || fail "c2-$layout: the train's own Closes line was ignored"
+    [ "$(cx_state "$case_dir" train-own-item)" = "done" ] || fail "c2-$layout: the train's own directive line was ignored"
   done
-  pass "a train closes its members' items from bodies and from pr=, in every layout, a Component table under a Component heading or lead-in included, never an excluded PR's"
+  pass "a train closes its Train-member lines' items from bodies and from pr=, never an excluded PR's, whatever decorative layout the body also holds"
 }
 
-test_a_train_with_no_closes_line_of_its_own_still_closes_member_items() {
+test_a_train_with_no_directive_of_its_own_still_closes_member_items() {
   local case_dir
-  case_dir=$(train_case c2-no-own url-first-table 81)
+  case_dir=$(train_case c2-no-own plain 81)
   gh_merge "$case_dir" 81
   check_train_outcome "$case_dir" c2-no-own "$REPO_URL/81"
   [ "$(cx_state "$case_dir" train-own-item)" = queued ] || fail "c2-no-own: an item nobody named closed"
-  pass "a train body without its own Closes line still closes the members' items"
+  pass "a train body without its own Closes-backlog-item line still closes the members' items"
 }
 
 test_a_member_with_both_sources_and_an_unreadable_member() {
   local case_dir base=$REPO_URL
-  case_dir=$(train_case c2-both url-first-table 82)
+  case_dir=$(train_case c2-both plain 82)
   # m3's task is also named by m3's own body; m4's body cannot be read while a docs task holds m4's URL.
   cx_add "$case_dir" m4-docs docs
   cx_meta "$case_dir" m4-docs docs "$base/74"
-  printf '%s\n' 'Closes: m1-item' 'Closes: m3-live-docs' > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes-backlog-item: m1-item' 'Closes-backlog-item: m3-live-docs' > "$case_dir/bodies/71"
   : > "$case_dir/bodies/unreadable-74"
   gh_merge "$case_dir" 82
   [ "$(cx_state "$case_dir" m4-docs)" = "done" ] || fail "c2-both: the task behind an unreadable member was not closed"
@@ -508,41 +514,30 @@ test_two_members_with_one_number_in_different_repos_match_by_full_url() {
   cx_add "$case_dir" repo-b-task docs
   cx_meta "$case_dir" repo-a-task docs "https://github.com/example/repo-a/pull/5"
   cx_meta "$case_dir" repo-b-task docs "https://github.com/example/repo-b/pull/5"
-  # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
-  printf '%s\n' '| Component | Head |' '| --- | --- |' \
-    '| https://github.com/example/repo-a/pull/5 | `a` |' > "$case_dir/bodies/83"
-  printf '%s\n' repo-a/pull/5 >/dev/null
+  printf '%s\n' 'Train-member: https://github.com/example/repo-a/pull/5' \
+    'See https://github.com/example/repo-b/pull/5 for context.' > "$case_dir/bodies/83"
   gh_merge "$case_dir" 83
   [ "$(cx_state "$case_dir" repo-a-task)" = "done" ] || fail "c2-same-number: the matching member's task was not closed"
   [ "$(cx_state "$case_dir" repo-b-task)" = queued ] || fail "c2-same-number: a task with the same number in another repo matched"
+  assert_match 'mentioned https://github.com/example/repo-b/pull/5 in the prose' "$case_dir/stderr" "c2-same-number: the other repository's link was not reported"
   pass "members match by the full URL, never by number"
 }
 
-test_a_train_names_a_linked_pr_outside_its_member_list_and_leaves_its_item_open() {
-  local case_dir base=$REPO_URL
-  case_dir=$(gh_case c2-linked 84)
+test_a_train_member_value_that_is_no_pull_request_or_is_the_train_itself_is_reported() {
+  local case_dir
+  case_dir=$(gh_case c2-bad-member 84)
   cx_add "$case_dir" member-item
-  cx_add "$case_dir" dropped-item
-  printf '%s\n' 'Closes: member-item' > "$case_dir/bodies/71"
-  printf '%s\n' 'Closes: dropped-item' > "$case_dir/bodies/91"
-  printf '%s\n' 71 91 >> "$case_dir/merged-prs"
-  # shellcheck disable=SC2016 # Backticks in the fixture body are literal Markdown.
-  printf '%s\n' '| Additional candidate | Result |' '| --- | --- |' \
-    "| [#91]($base/91/files) | merged |" "| $base/91 | merged |" \
-    "| $base/84 | this train |" '' \
-    '| Component | Head |' '| --- | --- |' "| $base/71 | \`a\` |" '' \
-    "See $base/71 again." '' '```' "$base/92" '```' > "$case_dir/bodies/84"
+  printf '%s\n' 'Closes-backlog-item: member-item' > "$case_dir/bodies/71"
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  printf '%s\n' "Train-member: $REPO_URL/71" 'Train-member: https://example.com/not-a-pr' "Train-member: $REPO_URL/84" \
+    "Train-member: $REPO_URL/71" > "$case_dir/bodies/84"
   gh_merge "$case_dir" 84
-  [ "$(cx_state "$case_dir" member-item)" = "done" ] || fail "c2-linked: the member's item was not closed"
-  [ "$(cx_state "$case_dir" dropped-item)" = queued ] || fail "c2-linked: a linked PR outside the member list closed its item"
-  assert_match "^actionable: close-at-merge: not read $base/91: linked from a merge-train body but not in its Component member list, so its items were not closed; list it in the Component table if it landed\$" \
-    "$case_dir/stderr" "c2-linked: the linked PR was not named with its reason"
-  [ "$(grep -c "not read $base/91:" "$case_dir/stderr")" = 1 ] || fail "c2-linked: one linked PR was named more than once"
-  assert_no_grep "not read $base/84" "$case_dir/stderr" "c2-linked: the merged PR itself was named"
-  assert_no_grep "not read $base/71" "$case_dir/stderr" "c2-linked: a member was named"
-  assert_no_grep "not read $base/92" "$case_dir/stderr" "c2-linked: a URL inside a fenced block was named"
-  assert_grep '1 closed, 0 left open' "$case_dir/stdout" "c2-linked: the linked PR changed the summary counts"
-  pass "a train names a linked PR outside its member list, reads none of its items, and counts nothing for it"
+  [ "$(cx_state "$case_dir" member-item)" = "done" ] || fail "c2-bad-member: the valid member's item was not closed"
+  assert_match 'could not use Train-member https://example.com/not-a-pr: it is not a GitHub, GitLab or Forgejo pull request URL' "$case_dir/stderr" \
+    "c2-bad-member: a Train-member value that is no pull request was not reported"
+  assert_match "ignored Train-member $REPO_URL/84: it is the merged pull request itself" "$case_dir/stderr" "c2-bad-member: the train naming itself was not reported"
+  [ "$(grep -c "closed member-item" "$case_dir/stdout")" = 1 ] || fail "c2-bad-member: a repeated member closed twice"
+  pass "a Train-member line that is no pull request URL, or is the train itself, is reported and the valid member still closes"
 }
 
 # --- other forges -----------------------------------------------------------
@@ -561,8 +556,7 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result() {
   cx_add "$case_dir" gl-member-docs docs
   cx_meta "$case_dir" gl-member-docs docs "$MR_PROJECT_URL/-/merge_requests/8"
   train=$MR_URL
-  # shellcheck disable=SC2016 # Literal Markdown.
-  set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| $MR_PROJECT_URL/-/merge_requests/8 | \`a\` |" '' 'Closes: gl-ship' 'Closes: gl-docs')"
+  set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' "Train-member: $MR_PROJECT_URL/-/merge_requests/8" '' 'Closes-backlog-item: gl-ship' 'Closes-backlog-item: gl-docs')"
   rc=0
   merge_call "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ -z "${CLOSE_DEBUG:-}" ] || { cat "$case_dir/stdout" "$case_dir/stderr" >&2; cat "$case_dir/glab.log" >&2; }
@@ -592,8 +586,7 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
     cx_add "$case_dir" fj-other-repo docs
     cx_meta "$case_dir" fj-member-docs docs "https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/10"
     cx_meta "$case_dir" fj-other-repo docs "https://$FJ_HOST/$FJ_OWNER/other-repo/pulls/10"
-    # shellcheck disable=SC2016 # Literal Markdown.
-    set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/10 | \`a\` |" '' 'Closes: fj-ship' 'Closes: fj-docs')"
+    set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' "Train-member: https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/10" '' 'Closes-backlog-item: fj-ship' 'Closes-backlog-item: fj-docs')"
     rc=0
     if [ "$mode" = merge ]; then
       merge_call "$case_dir" task-x1 "$FJ_URL" -- --merge > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -633,16 +626,38 @@ test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge() {
   pass "a dependent whose id the list prints in quotes still loses the finished edge"
 }
 
-test_the_closes_parser_reads_real_ids_and_ignores_examples() {
+lib_call() {  # <function> [args...]; the body comes on standard input
+  bash -c '. "$1"; shift; "$@"' _ "$ROOT/bin/fm-pr-closes-lib.sh" "$@"
+}
+
+# shellcheck disable=SC2016 # Backticks in the fixture lines are literal Markdown.
+test_the_directive_parser_reads_real_lines_and_ignores_every_example() {
   local out
-  out=$(printf '%s\n' 'Closes: fm-backlog-close-at-merge' 'Closes: fm-backlog-finished-blocker-auto-clear' \
-    'Closes: ship-a' 'Closes: a.b_c-1' 'Closes:   spaced-id   ' 'Closes: .hidden' 'Closes: two words' \
-    'Closes: tail # comment' 'closes: lower' ' Closes: indented' '> Closes: quoted' '- Closes: listed' \
-    '```' 'Closes: fm-fixture-other' '```' '~~~' 'Closes: tilde-other' '~~~' 'Closes: ship-a' \
-    | bash -c '. "$1"; fm_pr_closes_ids -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$out" = "$(printf '%s\n' fm-backlog-close-at-merge fm-backlog-finished-blocker-auto-clear ship-a a.b_c-1 spaced-id)" ] \
+  out=$(printf '%s\n' 'Closes-backlog-item: fm-backlog-close-at-merge' 'Closes-backlog-item: fm-backlog-finished-blocker-auto-clear' \
+    'Closes-backlog-item: ship-a' 'Closes-backlog-item: a.b_c-1' 'Closes-backlog-item:   spaced-id   ' $'Closes-backlog-item: crlf-id\r' \
+    'Closes-backlog-item: .hidden' 'Closes-backlog-item: two words' 'Closes-backlog-item: tail # comment' \
+    'closes-backlog-item: lower' ' Closes-backlog-item: indented' '> Closes-backlog-item: quoted' '- Closes-backlog-item: listed' \
+    '| Closes-backlog-item: cell |' 'Closes: old-form' \
+    '```' 'Closes-backlog-item: fm-fixture-other' '```' '~~~' 'Closes-backlog-item: tilde-other' '~~~' \
+    '   ```text' 'Closes-backlog-item: indented-fence' '   ```' \
+    '````' 'Closes-backlog-item: long-fence' '```' 'Closes-backlog-item: short-close-still-fenced' '````' \
+    '~~~' 'Closes-backlog-item: mixed-fence' '```' 'Closes-backlog-item: mixed-still-fenced' '~~~' \
+    '``` has `tick`' 'Closes-backlog-item: info-with-tick-is-no-fence' \
+    'Closes-backlog-item: ship-a' \
+    | lib_call fm_pr_closes_ids -)
+  [ "$out" = "$(printf '%s\n' fm-backlog-close-at-merge fm-backlog-finished-blocker-auto-clear ship-a a.b_c-1 spaced-id crlf-id info-with-tick-is-no-fence)" ] \
     || fail "parser: unexpected ids: $(printf '%s' "$out" | tr '\n' ' ')"
-  pass "the parser takes real ids, ignores fenced examples and non-directive lines"
+  out=$(printf '%s\n' 'Closes-backlog-item: unclosed' '```' 'Closes-backlog-item: never-closed' 'Closes-backlog-item: also-never' | lib_call fm_pr_closes_ids -)
+  [ "$out" = unclosed ] || fail "parser: a fence that never closes did not run to the end: $out"
+  out=$(printf '%s\n' 'Train-member: https://github.com/a/b/pull/1' 'Train-member:  https://github.com/a/b/pull/2  ' 'Train-member: https://github.com/a/b/pull/1' \
+    '  Train-member: https://github.com/a/b/pull/3' '| Train-member: https://github.com/a/b/pull/4 |' '   ```' 'Train-member: https://github.com/a/b/pull/5' '   ```' \
+    | lib_call fm_pr_closes_members -)
+  [ "$out" = "$(printf '%s\n' https://github.com/a/b/pull/1 https://github.com/a/b/pull/2)" ] || fail "parser: unexpected members: $(printf '%s' "$out" | tr '\n' ' ')"
+  out=$(printf '%s\n' 'Closes-backlog-item: .hidden' 'Closes-backlog-item: two words' 'Closes-backlog-item:' 'Train-member: a b' 'Closes: x y' \
+    'Closes-backlog-item: fine' 'Train-member: https://github.com/a/b/pull/1' 'Closes: old-form' '```' 'Closes-backlog-item: ' '```' | lib_call fm_pr_closes_malformed -)
+  [ "$out" = "$(printf '%s\n' 'Closes-backlog-item: .hidden' 'Closes-backlog-item: two words' 'Closes-backlog-item:' 'Train-member: a b' 'Closes: x y')" ] \
+    || fail "parser: unexpected malformed lines: $(printf '%s' "$out" | tr '\n' ' ')"
+  pass "the parser takes the two directive forms, and reads no example, indented line, table cell, quote or malformed line as one"
 }
 
 test_completion_clears_the_finished_blocker_on_every_route() {
@@ -778,7 +793,7 @@ test_a_merge_reports_each_cleared_edge_and_each_failed_clear_on_its_own_channel(
   cx_add "$case_dir" dep-fails
   cx "$case_dir" block dep-clears --by edge-blocker >/dev/null
   cx "$case_dir" block dep-fails --by edge-blocker >/dev/null
-  printf '%s\n' 'Closes: edge-blocker' > "$case_dir/bodies/91"
+  printf '%s\n' 'Closes-backlog-item: edge-blocker' > "$case_dir/bodies/91"
   real=$(command -v tasks-axi)
   cat > "$case_dir/fakebin/tasks-axi" <<SH
 #!/usr/bin/env bash
@@ -853,116 +868,137 @@ test_an_explicit_data_root_gets_the_same_clear() {
   pass "an explicit data root gets the same blocker clear"
 }
 
-test_a_data_row_that_mentions_component_is_no_member_list() {
-  local out
-  out=$(printf '%s\n' '| Note |' '| --- |' '| seven-member Component table below |' \
-    '| https://github.com/example/repo/pull/1 |' '| https://github.com/example/repo/pull/2 |' \
-    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ -z "$out" ] || fail "overmatch: a data row that mentions Component made a member list: $out"
-  # shellcheck disable=SC2016 # Backticks in the fixture row are literal Markdown.
-  out=$(printf '%s\n' '| Component PR | Head |' '| --- | --- |' '| https://github.com/example/repo/pull/3 | `a` |' \
-    '| seven-member Component table below | x |' \
-    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$out" = https://github.com/example/repo/pull/3 ] || fail "overmatch: a real header lost its member or a text row added one: $out"
-  pass "only a table's header row names the Component column; a data row that mentions it does not"
-}
+# --- review findings F1-F4 of the Markdown reader: each closes nothing now and reports ---------
 
-test_a_table_under_a_component_heading_keeps_the_bullets_after_it() {
-  local out
-  out=$(printf '%s\n' '## Components' '| Note | Value |' '| --- | --- |' '| https://github.com/example/repo/pull/8 | b |' '' \
-    '- https://github.com/example/repo/pull/9 at head a' '## Notes' '| Note |' '| --- |' '| x |' '' \
-    '- https://github.com/example/repo/pull/10 is context' \
-    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$out" = https://github.com/example/repo/pull/9 ] || fail "heading list: wrong members after a table: $out"
-  out=$(printf '%s\n' '## Components' '| Component | Head |' '| --- | --- |' '| https://github.com/example/repo/pull/1 | a |' '' \
-    '- https://github.com/example/repo/pull/2 at head a' \
-    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ "$out" = "$(printf '%s\n' https://github.com/example/repo/pull/1 https://github.com/example/repo/pull/2)" ] \
-    || fail "heading list: a Component table and the bullets after it did not both count: $out"
-  out=$(printf '%s\n' 'Components:' '| Note |' '| --- |' '| x |' '- https://github.com/example/repo/pull/3 at head a' \
-    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
-  [ -z "$out" ] || fail "lead-in list: an item after a table counted, though a table is not an item: $out"
-  pass "a table does not end a Component heading's list, and it does end a lead-in's list"
-}
-
-test_a_markdown_link_in_the_component_column_is_a_member() {
+test_f1_an_excluded_component_table_under_a_subheading_closes_nothing_and_is_reported() {
   local case_dir
-  case_dir=$(gh_case c2-md-link 80)
-  cx_add "$case_dir" markdown-member
-  printf '%s\n' 71 >> "$case_dir/merged-prs"
-  printf '%s\n' 'Closes: markdown-member' > "$case_dir/bodies/71"
-  # shellcheck disable=SC2016 # Backticks in the fixture row are literal Markdown.
-  printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| [PR 71]($REPO_URL/71) | \`a\` |" > "$case_dir/bodies/80"
-  gh_merge "$case_dir" 80
-  [ "$(cx_state "$case_dir" markdown-member)" = "done" ] || fail "c2-md-link: a Markdown-link member was lost"
-  assert_grep "closed markdown-member with $REPO_URL/80" "$case_dir/stdout" "c2-md-link: the proof is not the train URL"
-  pass "a Component cell holding a Markdown link is a member"
-}
-
-test_a_component_table_under_an_exclusion_heading_closes_nothing() {
-  local case_dir
-  case_dir=$(gh_case c2-excluded 80)
+  case_dir=$(gh_case c2-f1 80)
   cx_add "$case_dir" actually-landed
   cx_add "$case_dir" explicitly-excluded
   cx_add "$case_dir" waits-on-excluded
   cx "$case_dir" block waits-on-excluded --by explicitly-excluded >/dev/null
   printf '%s\n' 71 91 >> "$case_dir/merged-prs"
-  printf '%s\n' 'Closes: actually-landed' > "$case_dir/bodies/71"
-  printf '%s\n' 'Closes: explicitly-excluded' > "$case_dir/bodies/91"
+  printf '%s\n' 'Closes-backlog-item: actually-landed' > "$case_dir/bodies/71"
+  printf '%s\n' 'Closes-backlog-item: explicitly-excluded' > "$case_dir/bodies/91"
+  # The reviewer's shape: an exclusion heading, a subheading, then a Component table.
   # shellcheck disable=SC2016 # Backticks in the fixture rows are literal Markdown.
   printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| $REPO_URL/71 | \`a\` |" '' \
-    '## Excluded Components' '' 'The following PR did not land:' '' '| Component | Reason |' '| --- | --- |' "| $REPO_URL/91 | excluded |" \
+    '## Excluded Components' '### Details' '' '| Component | Reason |' '| --- | --- |' "| $REPO_URL/91 | excluded |" \
     > "$case_dir/bodies/80"
   gh_merge "$case_dir" 80
-  [ "$(cx_state "$case_dir" actually-landed)" = "done" ] || fail "c2-excluded: the legitimate member was not closed"
-  [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "c2-excluded: an excluded PR's item was closed"
-  case "$(cx_deps "$case_dir" waits-on-excluded)" in *explicitly-excluded*) ;; *) fail "c2-excluded: an excluded item's dependency edge was cleared" ;; esac
-  pass "a Component table under an exclusion heading is no member list, so its items and edges stay"
+  [ "$(cx_state "$case_dir" actually-landed)" = queued ] || fail "f1: a Component table closed a member without a Train-member line"
+  [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "f1: an excluded PR's item was closed"
+  case "$(cx_deps "$case_dir" waits-on-excluded)" in *explicitly-excluded*) ;; *) fail "f1: an excluded item's dependency edge was cleared" ;; esac
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/91 in the prose of $REPO_URL/80: no item was closed for it" "$case_dir/stderr" "f1: the excluded link was not reported"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it" "$case_dir/stderr" "f1: the unlisted legitimate link was not reported"
+  assert_no_grep 'close-at-merge: closed' "$case_dir/stdout" "f1: something closed without a directive line"
+  # Control: the same body with the legitimate member on a Train-member line closes it, and only it.
+  printf '%s\n' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" actually-landed)" = "done" ] || fail "f1 control: a Train-member line did not close the member's item"
+  [ "$(cx_state "$case_dir" explicitly-excluded)" = queued ] || fail "f1 control: the excluded item closed"
+  case "$(cx_deps "$case_dir" waits-on-excluded)" in *explicitly-excluded*) ;; *) fail "f1 control: the excluded item's edge was cleared" ;; esac
+  pass "F1: an excluded descendant Component table closes nothing, keeps its item and edge, and is reported; a Train-member line closes the member"
 }
 
-test_a_declared_member_list_with_no_readable_member_reports_the_links() {
-  local case_dir form label
-  for form in bare markdown upper heading; do
-    label=c2-declared-zero-$form
-    case_dir=$(gh_case "$label" 80)
-    cx_add "$case_dir" unread-member
-    printf '%s\n' 71 >> "$case_dir/merged-prs"
-    printf '%s\n' 'Closes: unread-member' > "$case_dir/bodies/71"
-    case "$form" in
-      bare) printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" > "$case_dir/bodies/80" ;;
-      markdown) printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| merged [PR 71]($REPO_URL/71) | a |" > "$case_dir/bodies/80" ;;
-      upper) printf '%s\n' '| Head |  COMPONENT  |' '| --- | --- |' "| a | merged: $REPO_URL/71 |" > "$case_dir/bodies/80" ;;
-      heading) printf '%s\n' '## Components' '' "The one member, [PR 71]($REPO_URL/71), landed." > "$case_dir/bodies/80" ;;
-    esac
-    gh_merge "$case_dir" 80
-    [ "$(cx_state "$case_dir" unread-member)" = queued ] || fail "$label: an unrecognized cell closed an item"
-    assert_match "^actionable: close-at-merge: not read $REPO_URL/71: linked from a merge-train body" "$case_dir/stderr" \
-      "$label: the unread link was not reported"
-  done
-  pass "a body that declares a member list (an exact Component header cell or heading) but yields no member still names each linked PR as not read"
+test_f2_an_indented_fenced_example_closes_nothing() {
+  local case_dir
+  case_dir=$(gh_case c8-f2 80)
+  cx_add "$case_dir" real-one
+  cx_add "$case_dir" example-only
+  cx_add "$case_dir" waits-on-example
+  cx "$case_dir" block waits-on-example --by example-only >/dev/null
+  printf '%s\n' 91 >> "$case_dir/merged-prs"
+  printf '%s\n' 'Closes-backlog-item: member-example' > "$case_dir/bodies/91"
+  # A fence indented three spaces is a valid CommonMark fence; its lines are examples.
+  printf '%s\n' 'Closes-backlog-item: real-one' '' 'An example of the form:' '   ```' 'Closes-backlog-item: example-only' \
+    "Train-member: $REPO_URL/91" '   ```' > "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" real-one)" = "done" ] || fail "f2: the real directive outside the block was not closed"
+  [ "$(cx_state "$case_dir" example-only)" = queued ] || fail "f2: an indented fenced example closed an item"
+  case "$(cx_deps "$case_dir" waits-on-example)" in *example-only*) ;; *) fail "f2: the example's dependent lost its edge" ;; esac
+  assert_no_grep 'train member' "$case_dir/stdout" "f2: a fenced Train-member line was read"
+  assert_no_grep "$REPO_URL/91" "$case_dir/stderr" "f2: a fenced example was reported as a mention"
+  pass "F2: a fence indented three spaces keeps its Closes-backlog-item and Train-member lines examples, and the real directive still closes"
 }
 
-test_a_body_that_only_mentions_a_component_names_no_linked_pr() {
-  local case_dir form label
-  for form in slot-heading prose leadin label component-pr-header; do
-    label=c2-undeclared-$form
-    case_dir=$(gh_case "$label" 80)
-    cx_add "$case_dir" linked-item
-    printf '%s\n' 71 72 >> "$case_dir/merged-prs"
-    printf '%s\n' 'Closes: linked-item' > "$case_dir/bodies/71"
-    case "$form" in
-      slot-heading) printf '%s\n' '### Slot 42: two root records and component-aware scout custody' '' \
-        "This builds on $REPO_URL/71 and replaces $REPO_URL/72." > "$case_dir/bodies/80" ;;
-      prose) printf '%s\n' '## Summary' '' "Follows $REPO_URL/71 and $REPO_URL/72 in the custody component." > "$case_dir/bodies/80" ;;
-      leadin) printf '%s\n' 'Components:' '' "See $REPO_URL/71 and $REPO_URL/72 for context." > "$case_dir/bodies/80" ;;
-      label) printf '%s\n' '- **Component 1:** the scout custody record' '' "Context: $REPO_URL/71 and $REPO_URL/72." > "$case_dir/bodies/80" ;;
-      component-pr-header) printf '%s\n' '| Component PR | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" '' "Context: $REPO_URL/72." > "$case_dir/bodies/80" ;;
-    esac
-    gh_merge "$case_dir" 80
-    [ "$(cx_state "$case_dir" linked-item)" = queued ] || fail "$label: a linked PR's item was closed"
-    assert_no_grep "not read https" "$case_dir/stderr" "$label: a body that declares no member list named a linked PR"
-  done
-  pass "a body whose longer heading, prose, lead-in, label or longer header only mentions a component names no linked PR"
+test_f3_a_component_table_with_a_negated_exclusion_heading_closes_nothing_without_a_member_line() {
+  local case_dir
+  case_dir=$(gh_case c2-f3 80)
+  cx_add "$case_dir" included-item
+  printf '%s\n' 71 >> "$case_dir/merged-prs"
+  printf '%s\n' 'Closes-backlog-item: included-item' > "$case_dir/bodies/71"
+  # shellcheck disable=SC2016 # Backticks in the fixture row are literal Markdown.
+  printf '%s\n' '## Components - none excluded' '' '| Component | Head |' '| --- | --- |' "| $REPO_URL/71 | \`a\` |" > "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" included-item)" = queued ] || fail "f3: a table without a Train-member line closed an item"
+  assert_match "^actionable: close-at-merge: mentioned $REPO_URL/71 in the prose of $REPO_URL/80: no item was closed for it; list it as a Train-member: line" "$case_dir/stderr" \
+    "f3: the unlisted member was silent"
+  # Control: the Train-member line closes it, whatever the heading says.
+  printf '%s\n' "Train-member: $REPO_URL/71" >> "$case_dir/bodies/80"
+  gh_merge "$case_dir" 80
+  [ "$(cx_state "$case_dir" included-item)" = "done" ] || fail "f3 control: the Train-member line did not close the member's item"
+  pass "F3: a negated exclusion heading no longer decides anything; the unlisted member is reported and a Train-member line closes it"
+}
+
+test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url() {
+  local case_dir rc=0 member
+  case_dir=$(make_forgejo_case "c2-f4-forgejo-${CLOSE_PRUNE:-off}")
+  member="https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/10"
+  cx_add "$case_dir" fj-unlisted docs
+  cx_meta "$case_dir" fj-unlisted docs "$member"
+  set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $member | a |")"
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "f4-forgejo: the merge must succeed"
+  [ "$(cx_state "$case_dir" fj-unlisted)" = queued ] || fail "f4-forgejo: an unlisted member's task closed"
+  assert_match "^actionable: close-at-merge: mentioned $member in the prose of $FJ_URL: no item was closed for it" "$case_dir/stderr" "f4-forgejo: the unlisted member was silent"
+  # Control: on a fresh merge, the Train-member line closes the task that records it.
+  case_dir=$(make_forgejo_case "c2-f4-forgejo-control-${CLOSE_PRUNE:-off}")
+  cx_add "$case_dir" fj-unlisted docs
+  cx_meta "$case_dir" fj-unlisted docs "$member"
+  set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' "Train-member: $member")"
+  rc=0
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "f4-forgejo control: the merge must succeed"
+  [ "$(cx_state "$case_dir" fj-unlisted)" = "done" ] || fail "f4-forgejo control: the Train-member line did not close the recorded task"
+
+  case_dir=$(make_gitlab_case "c2-f4-gitlab-${CLOSE_PRUNE:-off}")
+  member="$MR_PROJECT_URL/-/merge_requests/8"
+  cx_add "$case_dir" gl-unlisted docs
+  set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $member | a |")"
+  rc=0
+  merge_call "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "f4-gitlab: the merge must succeed"
+  [ "$(cx_state "$case_dir" gl-unlisted)" = queued ] || fail "f4-gitlab: an unlisted member's task closed"
+  assert_match "^actionable: close-at-merge: mentioned $member in the prose of $MR_URL: no item was closed for it" "$case_dir/stderr" "f4-gitlab: the unlisted member was silent"
+  # Non-train negative: a body with no link names nothing.
+  case_dir=$(make_forgejo_case "c2-f4-none-${CLOSE_PRUNE:-off}")
+  set_json_field "$case_dir/pr-post.json" body "Plain change, nothing linked."
+  rc=0
+  merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "f4-none: the merge must succeed"
+  assert_no_grep 'close-at-merge:' "$case_dir/stderr" "f4-none: a body that links nothing was reported"
+  pass "F4: an unlisted Forgejo or GitLab member is reported by its URL and closes nothing; a Train-member line closes it; a plain body is silent"
+}
+
+test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once() {
+  local case_dir
+  case_dir=$(gh_case c1-unlistable 85)
+  cx_add "$case_dir" unlistable-a
+  printf '%s\n' 'Closes-backlog-item: unlistable-a' '' 'Notes mention some-other-id in prose.' > "$case_dir/bodies/85"
+  cat > "$case_dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = list ]; then
+  echo "error: simulated list failure" >&2
+  exit 1
+fi
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/tasks-axi"
+  gh_merge "$case_dir" 85
+  [ "$(cx_state "$case_dir" unlistable-a)" = "done" ] || fail "c1-unlistable: the named item was not closed"
+  [ "$(grep -c 'could not list the backlog to check which ids the prose' "$case_dir/stderr")" = 1 ] || fail "c1-unlistable: the failed id check was not reported exactly once"
+  pass "a failed backlog listing reports the skipped id check once and still closes the named item"
 }
 
 # --- exact-head evidence with production merge prune on (contract C1, C3) ----------------
@@ -985,7 +1021,7 @@ test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune(
   for mode in present removed; do
     case_dir=$(gh_case "c3-second-merge-$mode" 72)
     cx_add "$case_dir" second-a
-    printf '%s\n' 'Closes: second-a' > "$case_dir/bodies/72"
+    printf '%s\n' 'Closes-backlog-item: second-a' > "$case_dir/bodies/72"
     if [ "$mode" = removed ]; then
       # A teardown that succeeds and removes the task record, as normal prune does.
       stub="$case_dir/teardown-stub"
@@ -1063,7 +1099,7 @@ test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone() {
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
-test_no_closes_line_changes_no_item_and_prose_urls_close_nothing
+test_no_directive_line_changes_no_item_and_prose_mentions_close_nothing
 test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items
 test_a_merge_the_watcher_recorded_first_still_closes_without_a_second_notice
 test_an_unreadable_body_is_reported_with_the_url_and_the_error
@@ -1072,20 +1108,19 @@ test_a_hold_placed_after_the_last_look_still_wins
 test_a_rerun_closes_nothing_twice
 test_a_rerun_after_a_partial_close_closes_only_the_rest
 test_a_hand_run_with_an_open_pr_closes_nothing
-test_a_train_closes_the_items_of_its_listed_members_in_every_layout
-test_a_train_with_no_closes_line_of_its_own_still_closes_member_items
+test_a_train_closes_the_items_of_its_train_member_lines_whatever_else_the_body_holds
+test_a_train_with_no_directive_of_its_own_still_closes_member_items
 test_a_member_with_both_sources_and_an_unreadable_member
+test_a_train_member_value_that_is_no_pull_request_or_is_the_train_itself_is_reported
 test_two_members_with_one_number_in_different_repos_match_by_full_url
-test_a_train_names_a_linked_pr_outside_its_member_list_and_leaves_its_item_open
+test_f1_an_excluded_component_table_under_a_subheading_closes_nothing_and_is_reported
+test_f2_an_indented_fenced_example_closes_nothing
+test_f3_a_component_table_with_a_negated_exclusion_heading_closes_nothing_without_a_member_line
+test_f4_an_unlisted_forgejo_or_gitlab_member_is_reported_by_its_url
+test_a_merge_with_directive_lines_and_an_unlistable_backlog_says_so_once
+test_the_directive_parser_reads_real_lines_and_ignores_every_example
 test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result
-test_the_closes_parser_reads_real_ids_and_ignores_examples
-test_a_data_row_that_mentions_component_is_no_member_list
-test_a_markdown_link_in_the_component_column_is_a_member
-test_a_component_table_under_an_exclusion_heading_closes_nothing
-test_a_declared_member_list_with_no_readable_member_reports_the_links
-test_a_body_that_only_mentions_a_component_names_no_linked_pr
-test_a_table_under_a_component_heading_keeps_the_bullets_after_it
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge

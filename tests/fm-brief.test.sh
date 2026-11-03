@@ -1650,9 +1650,11 @@ test_ship_scaffolds_teach_the_closes_line() {
       FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" --forge "$forge" >/dev/null 2>&1 \
         || fail "fm-brief.sh --mode $mode --forge $forge exited non-zero"
       brief="$home/data/$id/brief.md"
-      assert_grep "Closes: $id" "$brief" "$mode/$forge ship brief did not teach the Closes: line with this task's id"
-      assert_no_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief left the placeholder instead of the task id"
+      assert_grep "Closes-backlog-item: $id" "$brief" "$mode/$forge ship brief did not teach the Closes-backlog-item: line with this task's id"
+      assert_no_grep 'Closes-backlog-item: <task-id>' "$brief" "$mode/$forge ship brief left the placeholder instead of the task id"
       assert_grep 'in your commit message' "$brief" "$mode/$forge ship brief did not say where the line goes"
+      assert_grep 'Train-member: <PR URL>' "$brief" "$mode/$forge ship brief did not teach the Train-member: line for a merge train"
+      assert_grep 'closes nothing' "$brief" "$mode/$forge ship brief did not say that only the directive lines close an item"
       assert_grep 'A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
       assert_grep 'fm-pr-close-items-queued-and-polled-merges' "$brief" "$mode/$forge ship brief did not name the queued-merge gap"
       assert_grep 'ead the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body"
@@ -1678,14 +1680,14 @@ test_ship_scaffolds_teach_the_closes_line() {
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-local alpha --mode local-only >/dev/null 2>&1 \
     || fail "fm-brief.sh --mode local-only exited non-zero"
-  assert_no_grep 'Closes: brief-closes-local' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes-backlog-item: brief-closes-local' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes-backlog-item: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-gerrit alpha --mode direct-PR --forge gerrit --shape squash >/dev/null 2>&1 \
     || fail "fm-brief.sh --forge gerrit exited non-zero"
-  assert_no_grep 'Closes: brief-closes-gerrit' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes-backlog-item: brief-closes-gerrit' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes-backlog-item: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
-  assert_no_grep 'Closes: brief-closes-scout' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes: line"
-  pass "fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not"
+  assert_no_grep 'Closes-backlog-item: brief-closes-scout' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes-backlog-item: line"
+  pass "fm-brief.sh: every forge-PR delivery teaches the Closes-backlog-item: line and its re-check route; local-only, Gerrit and scout briefs do not"
 }
 
 test_crewmate_scaffolds_teach_the_docker_task_marker() {

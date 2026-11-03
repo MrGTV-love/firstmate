@@ -1097,14 +1097,12 @@ Ship and scout completion requires delivery evidence or the captain's own words,
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A ship or scout task with a live record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
-A pull request that finishes a queued item names it with a `Closes: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge in that same call.
+A pull request that finishes a queued item names it with a `Closes-backlog-item: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge in that same call.
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
-A merge train closes its members' items too, with the train as the proof: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
-[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the exact `Closes:` line syntax and of which URLs in a train body are members; a line inside a fenced code block is an example, not a directive, and a pull request the body only mentions is not a member.
-A Component table under a heading that says its pull requests were excluded, did not land, or were dropped, deferred, rejected or skipped is no member list, and a Component cell may hold a Markdown link.
-When a train body links any other GitHub pull request outside a fenced code block, the merge names that URL in an `actionable:` line, because its items were not read.
-A body is a train for this report when its member list yielded a member, or when it declares a member list that yielded none: a table header cell that is exactly `Component`, or a heading that is exactly `Component` or `Components`, trimmed and in any letter case.
-Any other body prints no such line, including one whose longer heading, lead-in line, label bullet or prose only mentions a component.
+A merge train names each landed pull request with a `Train-member: <pull request URL>` line and closes its members' items too, with the train as the proof: each member's own `Closes-backlog-item:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
+[`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the two directive lines, and only those lines close anything: a table, heading, bullet, link, sentence or fenced example closes nothing.
+A body that mentions a backlog id or another pull request outside those lines closes nothing for it, and the merge prints one `actionable:` line per mention so nothing is silent.
+An old `Closes: <item-id>` line, a malformed directive line and a train body written without the block are reported the same way; a train body without the block keeps the manual close.
 A ship or scout task that still has a live record stays open.
 When it is the merged pull request's own task, its own teardown closes it, so the merge only reports it; any other such task is reported as an `actionable:` line.
 A task of any other kind that still has a live record closes like any other named item.
