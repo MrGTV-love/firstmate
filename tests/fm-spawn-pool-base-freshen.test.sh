@@ -1778,11 +1778,11 @@ test_successor_of_refuses_untrustworthy_predecessors() {
 
   make_successor_case silent silent
   successor_pred pred-live
-  run_successor_refusal_row 'verb not advertised' 'to advertise --supersedes' --successor-of pred-live
+  run_successor_refusal_row 'verb not advertised' "primary checkout $PROJECT_DIR to advertise --supersedes" --successor-of pred-live
   [ -f "$CALLS.help" ] || fail 'the advertise check never asked the provisioner'
   make_successor_case none none
   successor_pred pred-live
-  run_successor_refusal_row 'no provisioner' 'the successor record needs the Vernant verb' --successor-of pred-live
+  run_successor_refusal_row 'no provisioner' 'update that checkout, since the successor record needs the Vernant verb' --successor-of pred-live
   pass '--successor-of refuses every untrustworthy predecessor before any resource is used'
 }
 
@@ -2029,11 +2029,42 @@ test_successor_of_refuses_before_any_lock() {
   pass 'a refused declaration leaves a pre-existing stale lock and every state file untouched'
 }
 
+# Review finding: a fresh spawn over a refused declaration cannot drop it.
+test_successor_of_fresh_respawn_keeps_declaration() {
+  local out rc=0 meta before row
+  make_successor_case respawn advertise
+  successor_pred pred-live
+  successor_pred pred-other
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  "$FAKEBIN_DIR/tmux-real" kill-window -t "fm-$SUCC_ID" 2>/dev/null || true
+  : > "$LAUNCH_LOG"
+  before=$(successor_snapshot_deep)
+  for row in 'no flag' 'other predecessor'; do
+    rc=0
+    if [ "$row" = 'no flag' ]; then
+      out=$(run_successor_spawn) || rc=$?
+    else
+      out=$(run_successor_spawn --successor-of pred-other) || rc=$?
+    fi
+    [ "$rc" -ne 0 ] || fail "$row: a fresh spawn replaced an unfulfilled declaration: $out"
+    assert_contains "$out" "unfulfilled successor declaration of pred-live" "$row: the refusal does not name the kept declaration: $out"
+    assert_contains "$out" "fm-spawn.sh $SUCC_ID --relaunch" "$row: the refusal does not point to --relaunch: $out"
+    [ "$(successor_snapshot_deep)" = "$before" ] || fail "$row: the refusal changed the state or data directory"
+    [ "$(successor_calls)" = 1 ] || fail "$row: the fresh spawn reached the provisioner"
+    [ ! -s "$LAUNCH_LOG" ] || fail "$row: the fresh spawn started an agent"
+  done
+  pass 'a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -2057,6 +2088,7 @@ test_successor_of_branch_is_rechecked_at_handover
 test_successor_of_task_record_is_rechecked_at_handover
 test_successor_of_batch_is_refused
 test_successor_of_refuses_before_any_lock
+test_successor_of_fresh_respawn_keeps_declaration
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness

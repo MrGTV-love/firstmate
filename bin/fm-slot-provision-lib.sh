@@ -105,7 +105,7 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
   [ -n "$head" ] || { echo "error: --successor-of $pred copy $wt has a detached HEAD, not its recorded branch $branch" >&2; return 1; }
   [ "$head" = "refs/heads/$branch" ] || { echo "error: --successor-of $pred copy $wt is on ${head#refs/heads/}, not its recorded branch $branch" >&2; return 1; }
   fm_slot_advertises_supersedes "$project" || {
-    echo "error: --successor-of needs project $(basename "$project") to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; the successor record needs the Vernant verb" >&2
+    echo "error: --successor-of needs the project's primary checkout $project to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; update that checkout, since the successor record needs the Vernant verb" >&2
     return 1
   }
   FM_SLOT_SUCCESSOR_WT=$real
@@ -117,7 +117,9 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
 # The predecessor must still be the task and branch the resolver verified. The
 # project's helper corroborates only the copy's current branch, so this binds
 # the proof to the branch recorded for the declared task: run it at the point
-# the path is handed over, with nothing slow between it and the call.
+# the path is handed over. A window remains: spawn's pane runner can wait up to
+# SPAWN_ACQUIRE_STALL (600 seconds) for the shell to start the call, and the
+# predecessor can leave its branch in that time.
 fm_slot_successor_still_bound() {
   local real head
   { [ -n "$FM_SLOT_SUPERSEDES" ] && [ -n "$FM_SLOT_SUCCESSOR_META" ] && [ -n "$FM_SLOT_SUCCESSOR_BRANCH" ]; } || {

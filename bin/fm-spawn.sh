@@ -2374,6 +2374,14 @@ fi
 # A declared successor is checked before the first lock or state write, so a
 # refusal leaves the state directory exactly as it was. The same checks run
 # again once the project is resolved; this pass only reads.
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ] && [ -f "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+  [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ]; then
+  spawn_kept_pred=$(fm_meta_get "$STATE/$ID.meta" successor_of)
+  if [ -n "$spawn_kept_pred" ] && [ "$spawn_kept_pred" != "$SUCCESSOR_OF" ]; then
+    echo "error: $ID keeps an unfulfilled successor declaration of $spawn_kept_pred; retry it with fm-spawn.sh $ID --relaunch" >&2
+    exit 1
+  fi
+fi
 if [ "$SUCCESSOR_OF_SET" -eq 1 ] && [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   spawn_early_proj=${POS[1]:-}
   case "$spawn_early_proj" in projects/*) spawn_early_proj=$PROJECTS/${spawn_early_proj#projects/} ;; esac
