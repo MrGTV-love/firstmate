@@ -1,0 +1,24 @@
+Tue Nov  3 05:59:45 CST 2026
+......................................
+----------------------------------------------------------------------
+Ran 38 tests in 0.426s
+
+OK
+ok - DOD-01
+ok - DOD-02
+ok - DOD-03
+ok - DOD-04
+ok - DOD-05
+ok - DOD-06
+ok - DOD-07
+ok - DOD-08
+ok - DOD-09
+ok - DOD-10
+ok - DOD-12
+ok - DOD-13
+ok - DOD-14
+ok - DOD-15
+ok - DOD-16
+ok - DOD-17
+Terminated: 15
+REDUCED, STOPPED by the test agent at Tue Nov  3 07:15:14 CST 2026 after DOD-16 (more than 80 min on a host at load ~110). Not a pass of the whole file; the INTAKE section ran separately in suite-intake-section.log.

@@ -1,0 +1,9 @@
+### bash tests/fm-slack-secret-scan.test.sh
+Tue Nov  3 06:33:52 CST 2026
+ok - scan redacted and detected both planted copies
+rc=0
+Tue Nov  3 06:48:52 CST 2026
+### bash tests/fm-slack-intake-unchanged.test.sh
+ok - intake refusals hold
+rc=0
+Tue Nov  3 06:49:31 CST 2026
