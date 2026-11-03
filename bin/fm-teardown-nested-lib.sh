@@ -1548,7 +1548,7 @@ teardown_closeout_retained_paths() {  # <copy>
 # Writes the complete retained record for <copy> (see teardown_retained_receipt),
 # atomically, from the last teardown_retained_snapshot. The first four lines keep
 # the form bin/fm-copy-sweep.sh reads.
-teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity> <preserve-dir> <archive-path> <archive-sha256>   (unique paths on stdin)
+teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity> <preserve-dir>   (unique paths on stdin)
   local rec tmp path
   rec=$(teardown_retained_receipt "$DATA" "$2") || return 1
   mkdir -p "${rec%/*}" || return 1
@@ -1560,8 +1560,6 @@ teardown_retained_write() {  # <slot> <copy> <lock-sha256> <identity> <preserve-
     printf 'task=%s\nslot=%s\npreserve=%s\nreason=%s\nclosed-at=%s\nhead=%s\nstatus-sha256=%s\npayload-sha256=%s\n' \
       "$ID" "$1" "$5" "$TEARDOWN_RETAINED_REASON" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       "$TEARDOWN_RET_HEAD" "$TEARDOWN_RET_STATUS" "$TEARDOWN_RET_PAYLOAD"
-    [ -z "$6" ] || printf 'driver-archive=%s\n' "$6"
-    [ -z "$7" ] || printf 'driver-archive-sha256=%s\n' "$7"
     while IFS= read -r path; do
       [ -z "$path" ] || printf 'unique=%s\n' "$path"
     done
@@ -1673,7 +1671,7 @@ teardown_retained_confirm() {  # <slot> <copy>
 # checked. Only then does it write the retained record and return 0, leaving the
 # copy exactly as it was. Returns 1 after printing the cause; nothing is removed.
 teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
-  local slot=$1 copy=$2 lock_hash=$3 identity=$4 paths=$5 dir before archive='' archive_sha=''
+  local slot=$1 copy=$2 lock_hash=$3 identity=$4 paths=$5 dir before
   paths=$(printf '%s\n' "$paths" | sed 's#/*$##')
   if ! [[ $lock_hash =~ ^[0-9a-f]{64}$ ]] || ! [[ $identity =~ ^[0-9]+:[0-9]+$ ]]; then
     echo "REFUSED: the creation lock and identity of own nested copy $(fm_refuse_text "$copy") could not be read, so its retained state cannot be recorded; the task was not closed." >&2
@@ -1705,9 +1703,7 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
     echo "REFUSED: own nested copy $(fm_refuse_text "$copy") changed while its ignored files were verified; the task was not closed." >&2
     return 1
   fi
-  archive=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].ignored_payload_preservation[0].archive_path // empty' 2>/dev/null) || archive=
-  archive_sha=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r '.[0].ignored_payload_preservation[0].archive_sha256 // empty' 2>/dev/null) || archive_sha=
-  if ! printf '%s\n' "$paths" | teardown_retained_write "$slot" "$copy" "$lock_hash" "$identity" "$dir" "$archive" "$archive_sha"; then
+  if ! teardown_retained_write "$slot" "$copy" "$lock_hash" "$identity" "$dir" <<< "$paths"; then
     echo "REFUSED: the retained record for own nested copy $(fm_refuse_text "$copy") could not be written; the task was not closed." >&2
     return 1
   fi
@@ -1717,9 +1713,14 @@ teardown_retained_accept() {  # <slot> <copy> <lock-sha256> <identity> <paths>
 
 # A task that keeps a retained own nested copy never returns its pool slot: the
 # slot must stay under a durable lease (a later treehouse get could reset it over
-# the copy), and the held-close route then applies to it.
+# the copy), and the held-close route then applies to it. A slot another live
+# task still works in is not this task's to hold, so a kept copy there refuses.
 teardown_retained_hold() {
-  [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ] && [ -n "${TEARDOWN_RETURN_SLOT:-}" ] || return 0
+  [ "${#TEARDOWN_RETAINED[@]}" -gt 0 ] || return 0
+  if [ -z "${TEARDOWN_RETURN_SLOT:-}" ]; then
+    echo "REFUSED: own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") was kept by Vernant's closeout driver (record $(fm_refuse_text "$(teardown_retained_receipt "$DATA" "${TEARDOWN_RETAINED[0]}")")) in pool slot $(fm_refuse_text "${TEARDOWN_PEER_SLOT:-}"), which another live task still works in, so this task cannot hold the slot under its lease; the copy, the slot and the retained record stay as they are, the task was not closed, and a retry asks the driver nothing." >&2
+    return 1
+  fi
   if [ "${TEARDOWN_SLOT_CUSTODY:-}" != lease ]; then
     echo "REFUSED: pool slot $(fm_refuse_text "$TEARDOWN_RETURN_SLOT") could not be durably leased, and a close that keeps own nested copy $(fm_refuse_text "${TEARDOWN_RETAINED[0]}") never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the retained record stay as they are, and a retry asks the driver nothing." >&2
     return 1

@@ -528,6 +528,10 @@
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: own nested copy $(fm_refuse_text \"${TEARDOWN_RETAINED[0]}\") was kept by Vernant's closeout driver (record $(fm_refuse_text \"$(teardown_retained_receipt \"$DATA\" \"${TEARDOWN_RETAINED[0]}\")\")) in pool slot $(fm_refuse_text \"${TEARDOWN_PEER_SLOT:-}\"), which another live task still works in, so this task cannot hold the slot under its lease; the copy, the slot and the retained record stay as they are, the task was not closed, and a retry asks the driver nothing.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
           "match": "echo \"REFUSED: pool slot $(fm_refuse_text \"$TEARDOWN_RETURN_SLOT\") could not be durably leased, and a close that keeps own nested copy $(fm_refuse_text \"${TEARDOWN_RETAINED[0]}\") never leaves its slot without a durable lease, since a later treehouse get could reset it over the copy; the copy, the slot and the retained record stay as they are, and a retry asks the driver nothing.\" >&2"
         }
       ]

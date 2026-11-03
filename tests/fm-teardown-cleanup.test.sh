@@ -6482,6 +6482,7 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps() {
     case "$(retained_field "$record" closed-at)" in 20*Z) ;; *) fail "retained-close-$shape: the record carries no time" ;; esac
     case "$(retained_field "$record" identity)" in [0-9]*:[0-9]*) ;; *) fail "retained-close-$shape: the record carries no identity" ;; esac
     assert_equals ".claude/channel-outbox/a.jsonl .claude/channel-outbox/b.jsonl" "$(retained_field "$record" unique | paste -sd ' ' -)" "retained-close-$shape: the record does not list the driver's unique paths"
+    assert_equals "task slot preserve reason closed-at head status-sha256 payload-sha256 unique unique" "$(sed -n '5,$p' "$record" | sed 's/=.*//' | paste -sd ' ' -)" "retained-close-$shape: the record does not hold exactly its fields"
     assert_no_grep 'REFUSED' "$FOREIGN_CASE/stderr" "retained-close-$shape: a close that succeeded printed a refusal"
     assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-close-$shape: a close saved a refusal output"
   done
@@ -6551,6 +6552,37 @@ test_a_changed_kept_copy_is_assessed_afresh() {
   pass "a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call"
 }
 
+# A kept copy in a slot another live task still works in (the peer route) cannot
+# be held under this task's lease, so the close refuses, and its retry, with the
+# record matching, asks the driver nothing.
+test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver_nothing() {
+  local rc record peer run
+  make_retained_case retained-peer enclosing
+  peer=$FOREIGN_SLOT/peer-copy
+  mkdir -p "$peer"
+  fm_write_meta "$FOREIGN_CASE/state/task-y1.meta" \
+    "window=firstmate:fm-task-y1" "endpoint_task_id=task-y1" \
+    "worktree=$peer" "branch=fm/task-y1" "project=$FOREIGN_CASE/project" \
+    "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-y1" \
+    "prior_worktree=$FOREIGN_SLOT"
+  record=$(retained_record_path)
+  for run in 1 2; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "retained-peer: run $run of a kept-copy close in the peer route must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "REFUSED: own nested copy $FOREIGN_COPY was kept by Vernant's closeout driver (record $record)" "$FOREIGN_CASE/stderr" "retained-peer: run $run did not name the kept copy and its record"
+    assert_grep 'which another live task still works in' "$FOREIGN_CASE/stderr" "retained-peer: run $run did not say why"
+    assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-peer: run $run did not leave the driver asked exactly once"
+    assert_present "$record" "retained-peer: run $run left no record"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-peer: run $run removed the task record"
+    assert_equals in_flight "$(backlog_row_state "$FOREIGN_CASE")" "retained-peer: run $run moved the backlog item"
+    held_fingerprint "$FOREIGN_COPY" | cmp -s - "$FOREIGN_CASE/held-before.$(basename "$FOREIGN_COPY")" || fail "retained-peer: run $run changed the kept copy"
+    assert_absent "$FOREIGN_CASE/treehouse.log" "retained-peer: run $run returned the pool slot"
+    assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-peer: run $run saved a driver output"
+    [ "$run" = 2 ] || cp "$record" "$FOREIGN_CASE/record.run1"
+  done
+  cmp -s "$FOREIGN_CASE/record.run1" "$record" || fail "retained-peer: the retry rewrote the matching record"
+  pass "a kept-copy close in a slot a peer still works in refuses with the copy and its record named, and its retry asks the driver nothing"
+}
 
 # retained_variant <variant> <plain|force>: the C1 fixture with one fact changed
 # (or none, for c1-input), run with or without --force and the --drop-file it needs.
@@ -6878,6 +6910,7 @@ test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 test_teardown_retires_the_dsh_launch_state
 test_a_landed_task_closes_around_an_own_copy_the_driver_keeps
 test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing
+test_a_kept_copy_in_a_slot_a_peer_works_in_refuses_and_its_retry_asks_the_driver_nothing
 test_a_changed_kept_copy_is_assessed_afresh
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
 test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
