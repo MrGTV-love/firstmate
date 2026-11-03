@@ -1622,6 +1622,26 @@ test_completion_refuses_a_legacy_record_without_an_incarnation() {
   pass "completion leaves legacy records open when no incarnation can be recorded"
 }
 
+test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrapper() {
+  local case_dir id meta out dep
+  id=atomic-legacy-unblock-b7
+  dep=atomic-legacy-dep-b7
+  case_dir=$(make_home legacy-unblock)
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" "$dep"
+  tasks-axi block "$dep" --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  start_item "$case_dir" "$id"
+  write_task_meta "$case_dir" "$id" ship local-only
+  meta="$(home_of "$case_dir")/state/$id.meta"
+
+  # The same command the lab ran, here without any wrapper around it.
+  out=$(run_teardown "$case_dir" "$id" --legacy-record) || fail "legacy-record teardown failed: $out"
+  assert_absent "$meta" "legacy-record teardown left the task record"
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "legacy-record teardown left the item $(row_state "$case_dir" "$id"): $out"
+  assert_contains "$out" "unblocked: $dep no longer waits on $id" "legacy-record teardown did not report the cleared edge"
+  pass "a --legacy-record teardown closes the item and clears its dependents, run with no timeout wrapper"
+}
+
 test_completion_refuses_ambiguous_incarnation_metadata() {
   local case_dir id meta marker out rc=0
   id=atomic-close-ambiguous-incarnation-b7
@@ -2109,6 +2129,31 @@ test_recovery_replays_a_close_an_interrupted_cleanup_left_open() {
   assert_not_contains "$out" "endpoint or local copy may remain" \
     "recovery claimed incomplete cleanup without task metadata"
   pass "session start finishes a close an interrupted cleanup recorded but never landed"
+}
+
+test_recovery_replay_clears_the_finished_blocker_from_its_dependents() {
+  local case_dir id out deps
+  id=atomic-heal-unblock-b9
+  case_dir=$(make_home heal-unblock)
+  add_item "$case_dir" "$id"
+  add_item "$case_dir" atomic-heal-open
+  add_item "$case_dir" atomic-heal-dep-one
+  add_item "$case_dir" atomic-heal-dep-two
+  tasks-axi block atomic-heal-dep-one --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block atomic-heal-dep-two --by "$id" --file "$(backlog_of "$case_dir")" >/dev/null
+  tasks-axi block atomic-heal-dep-two --by atomic-heal-open --file "$(backlog_of "$case_dir")" >/dev/null
+  start_item "$case_dir" "$id"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-unblock\narg=--pr\narg=https://github.com/example/repo/pull/12\n' \
+    "$id" "$(home_of "$case_dir")/data" \
+    > "$(home_of "$case_dir")/state/$id.backlog-close"
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "replay left the item at $(row_state "$case_dir" "$id"): $out"
+  deps=$(tasks-axi show atomic-heal-dep-one --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = none ] || fail "replay left the finished edge on its only dependent: $deps"
+  deps=$(tasks-axi show atomic-heal-dep-two --file "$(backlog_of "$case_dir")" 2>/dev/null | sed -n 's/^  deps: *//p' | tr -d '"')
+  [ "$deps" = "blocked-by:atomic-heal-open" ] || fail "replay lost the other blocker: $deps"
+  pass "the close replay clears the finished blocker from its dependents and keeps another blocker"
 }
 
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note() {
@@ -3589,6 +3634,7 @@ test_dispatch_fails_when_its_row_vanishes_after_preflight
 test_completion_closes_a_local_only_ship_before_reporting_success
 test_completion_closes_a_scout_with_its_report
 test_completion_refuses_a_legacy_record_without_an_incarnation
+test_a_legacy_record_teardown_clears_the_finished_blocker_with_no_timeout_wrapper
 test_completion_refuses_ambiguous_incarnation_metadata
 test_completion_records_a_relative_report_for_relocated_data
 test_space_containing_scout_report_marker_replays
@@ -3608,6 +3654,7 @@ test_recovery_releases_nonqueued_worker_locks
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open
+test_recovery_replay_clears_the_finished_blocker_from_its_dependents
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
 test_recovery_records_a_replayed_close_in_the_fleet_ledger

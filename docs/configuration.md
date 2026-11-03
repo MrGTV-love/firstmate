@@ -1087,6 +1087,7 @@ A pull request that finishes a queued item names it with a `Closes: <item-id>` l
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
 A merge train closes its members' items too, with the train as the proof: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
 [`bin/fm-pr-closes-lib.sh`](../bin/fm-pr-closes-lib.sh)'s header is the one owner of the exact `Closes:` line syntax and of which URLs in a train body are members; a line inside a fenced code block is an example, not a directive, and a pull request the body only mentions is not a member.
+A Component table under a heading that says its pull requests were excluded, did not land, or were dropped, deferred, rejected or skipped is no member list, and a Component cell may hold a Markdown link.
 When a train body links any other GitHub pull request outside a fenced code block, the merge names that URL in an `actionable:` line, because its items were not read; a body with no member list prints no such line.
 A ship or scout task that still has a live record stays open.
 When it is the merged pull request's own task, its own teardown closes it, so the merge only reports it; any other such task is reported as an `actionable:` line.

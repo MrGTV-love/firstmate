@@ -46,11 +46,29 @@ cx_meta() {  # <case-dir> <id> <kind> [pr-url]
     "model=gpt-5.1-codex" "branch=fm/$id" "mode=no-mistakes" ${pr:+"pr=$pr"}
 }
 
+# CLOSE_PRUNE=on runs the merge with production merge prune left at its default (on), against
+# a teardown that is busy (it refuses and exits non-zero), so the self-naming case defers.
+# Any other value keeps the shared harness default, FM_MERGE_PRUNE=0.
+merge_call() {  # <case-dir> <run_pr_merge args...>
+  local case_dir=$1 stub
+  if [ "${CLOSE_PRUNE:-off}" = on ]; then
+    stub="$case_dir/teardown-stub"
+    if [ ! -x "$stub" ]; then
+      # shellcheck disable=SC2016 # The stub's own text is single-quoted on purpose.
+      printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s"\necho "refused: the worker is busy" >&2\nexit 1\n' "$case_dir/teardown-calls" > "$stub"
+      chmod +x "$stub"
+    fi
+    ( unset FM_MERGE_PRUNE; FM_MERGE_PRUNE_TEARDOWN_BIN="$stub" run_pr_merge "$@" )
+  else
+    run_pr_merge "$@"
+  fi
+}
+
 # A merge fixture for the GitHub path: PR <number> is the merged pull request, and every
 # PR listed in $case_dir/merged-prs counts as merged for the completion proof.
 gh_case() {  # <name> <number>
   local case_dir
-  case_dir=$(make_case "$1")
+  case_dir=$(make_case "$1-${CLOSE_PRUNE:-off}")
   mkdir -p "$case_dir/wt" "$case_dir/bodies"
   add_gh_mocks "$case_dir" "$(printf '%040d' "$2")"
   : > "$case_dir/gh-axi.log"
@@ -61,7 +79,7 @@ gh_case() {  # <name> <number>
 gh_merge() {  # <case-dir> <number> [merge args...]; the merge must succeed
   local case_dir=$1 number=$2 rc=0
   shift 2
-  run_pr_merge "$case_dir" task-x1 "$REPO_URL/$number" "$@" \
+  merge_call "$case_dir" task-x1 "$REPO_URL/$number" "$@" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ -z "${CLOSE_DEBUG:-}" ] || { printf '%s\n' '--- stdout' >&2; cat "$case_dir/stdout" >&2; printf '%s\n' '--- stderr' >&2; cat "$case_dir/stderr" >&2; }
   expect_code 0 "$rc" "close-at-merge: the merge itself must succeed"
@@ -149,7 +167,7 @@ test_an_unrecorded_merge_closes_nothing_and_lists_the_named_items() {
   printf '%s\n' 'Closes: unrecorded-a' > "$case_dir/bodies/64"
   # A secondmate home with no readable parent binding cannot place the outcome.
   : > "$case_dir/home/.fm-secondmate-home"
-  run_pr_merge "$case_dir" task-x1 "$REPO_URL/64" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  merge_call "$case_dir" task-x1 "$REPO_URL/64" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "c1-unrecorded: today's merge result must not change"
   assert_match 'merged .* but could not report it upward' "$case_dir/stderr" "c1-unrecorded: today's message changed"
   [ "$(cx_state "$case_dir" unrecorded-a)" = queued ] || fail "c1-unrecorded: an item closed though the merge was not recorded"
@@ -351,7 +369,7 @@ test_a_hand_run_with_an_open_pr_closes_nothing() {
     "c3-open-github: the item was not reported as left open because the pull request is not merged"
 
   rc=0
-  case_dir=$(make_forgejo_case c3-open-forgejo)
+  case_dir=$(make_forgejo_case "c3-open-forgejo-${CLOSE_PRUNE:-off}")
   cx_add "$case_dir" open-fj-docs docs
   set_json_field "$case_dir/pr.json" body 'Closes: open-fj-docs'
   before=$(backlog_text "$case_dir")
@@ -537,7 +555,7 @@ set_json_field() {  # <file> <field> <text>
 
 test_a_gitlab_merge_reports_the_completion_paths_actual_result() {
   local case_dir url=$MR_URL train rc
-  case_dir=$(make_gitlab_case c1-gitlab)
+  case_dir=$(make_gitlab_case "c1-gitlab-${CLOSE_PRUNE:-off}")
   cx_add "$case_dir" gl-ship
   cx_add "$case_dir" gl-docs docs
   cx_add "$case_dir" gl-member-docs docs
@@ -546,7 +564,7 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result() {
   # shellcheck disable=SC2016 # Literal Markdown.
   set_json_field "$case_dir/mr-post.json" description "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| $MR_PROJECT_URL/-/merge_requests/8 | \`a\` |" '' 'Closes: gl-ship' 'Closes: gl-docs')"
   rc=0
-  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  merge_call "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ -z "${CLOSE_DEBUG:-}" ] || { cat "$case_dir/stdout" "$case_dir/stderr" >&2; cat "$case_dir/glab.log" >&2; }
   expect_code 0 "$rc" "c1-gitlab: the merge result must be the normal success"
   # tasks-axi accepts a pull request link only in the GitHub or Forgejo form, so the
@@ -567,7 +585,7 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result() {
 test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
   local case_dir rc mode
   for mode in default merge; do
-    case_dir=$(make_forgejo_case "c1-forgejo-$mode")
+    case_dir=$(make_forgejo_case "c1-forgejo-$mode-${CLOSE_PRUNE:-off}")
     cx_add "$case_dir" fj-ship
     cx_add "$case_dir" fj-docs docs
     cx_add "$case_dir" fj-member-docs docs
@@ -578,9 +596,9 @@ test_a_forgejo_merge_reports_the_completion_paths_actual_result() {
     set_json_field "$case_dir/pr-post.json" body "$(printf '%s\n' '| Component | Head |' '| --- | --- |' "| https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/10 | \`a\` |" '' 'Closes: fj-ship' 'Closes: fj-docs')"
     rc=0
     if [ "$mode" = merge ]; then
-      run_pr_merge "$case_dir" task-x1 "$FJ_URL" -- --merge > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      merge_call "$case_dir" task-x1 "$FJ_URL" -- --merge > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     else
-      run_pr_merge "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      merge_call "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     expect_code 0 "$rc" "c1-forgejo-$mode: the merge result must be the normal success"
     [ "$(cx_state "$case_dir" fj-docs)" = "done" ] || fail "c1-forgejo-$mode: the non-ship item was not closed"
@@ -915,6 +933,101 @@ test_a_declared_member_list_with_no_readable_member_reports_the_links() {
   pass "a body that declares a member list but yields no member still names each linked PR as not read"
 }
 
+# --- exact-head evidence with production merge prune on (contract C1, C3) ----------------
+
+test_the_named_item_matrix_with_production_prune_on() {
+  local CLOSE_PRUNE=on
+  test_closes_lines_close_each_eligible_item_and_report_the_rest
+  test_a_merge_naming_its_own_task_reports_the_live_record
+  # The busy teardown was really asked (production prune ran), and the item stayed open.
+  fm_test_wait_until --progress-file "$TMP_ROOT/c1-self-on/home/data/task-x1/merge-prune.log" -- test -s "$TMP_ROOT/c1-self-on/teardown-calls" \
+    || fail "prune-on: the production prune never asked teardown for the merged task"
+  [ "$(cx_state "$TMP_ROOT/c1-self-on" task-x1)" != "done" ] || fail "prune-on: the busy self-naming task closed"
+  test_a_gitlab_merge_reports_the_completion_paths_actual_result
+  test_a_forgejo_merge_reports_the_completion_paths_actual_result
+  pass "with production merge prune on and a busy teardown, GitHub, GitLab and Forgejo merges close, report and defer as with prune off"
+}
+
+test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune() {
+  local CLOSE_PRUNE=on case_dir before after mode stub
+  for mode in present removed; do
+    case_dir=$(gh_case "c3-second-merge-$mode" 72)
+    cx_add "$case_dir" second-a
+    printf '%s\n' 'Closes: second-a' > "$case_dir/bodies/72"
+    if [ "$mode" = removed ]; then
+      # A teardown that succeeds and removes the task record, as normal prune does.
+      stub="$case_dir/teardown-stub"
+      # shellcheck disable=SC2016 # The stub's own text is single-quoted on purpose.
+      printf '#!/usr/bin/env bash\nrm -f "%s/task-x1.meta"\nexit 0\n' "$case_dir/state" > "$stub"
+      chmod +x "$stub"
+    fi
+    gh_merge "$case_dir" 72
+    [ "$(cx_state "$case_dir" second-a)" = "done" ] || fail "c3-second-$mode: the first merge did not close the item"
+    if [ "$mode" = removed ]; then
+      fm_test_wait_until --progress-file "$case_dir/home/data/task-x1/merge-prune.log" -- test ! -e "$case_dir/state/task-x1.meta" \
+        || fail "c3-second-$mode: prune never removed the task record"
+    fi
+    before=$(backlog_text "$case_dir")
+    merge_call "$case_dir" task-x1 "$REPO_URL/72" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || true
+    after=$(backlog_text "$case_dir")
+    [ "$before" = "$after" ] || fail "c3-second-$mode: the second merge run changed the backlog"
+    [ "$(grep -c "$REPO_URL/72" "$case_dir/home/data/backlog.md")" -le 2 ] || fail "c3-second-$mode: a second proof link was written"
+  done
+  pass "a second bin/fm-pr-merge.sh run on the merged PR changes nothing, with the task record present and after prune removed it"
+}
+
+# --- completion routes at the wrapper boundary (contract C4) -------------------------------
+
+test_the_typed_record_delivery_completion_clears_the_finished_edge() {
+  local case_dir shim real
+  case_dir=$(make_case c4-record-delivery)
+  cx_add "$case_dir" pf-delivered docs
+  cx_add "$case_dir" waits-on-delivery
+  cx_add "$case_dir" other-blocker docs
+  cx "$case_dir" block waits-on-delivery --by pf-delivered >/dev/null
+  cx "$case_dir" block waits-on-delivery --by other-blocker >/dev/null
+  # The tasks-axi record-delivery subcommand needs a relay-owned delivery attempt that no
+  # fixture here can create, so a shim in front of the real tasks-axi completes the same
+  # row (a real Done transition) when it sees the exact command; everything else is real.
+  real=$(command -v tasks-axi)
+  shim="$case_dir/shimbin"
+  mkdir -p "$shim"
+  cat > "$shim/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = public-followup ] && [ "\${2:-}" = record-delivery ]; then
+  exec "$real" "done" "\${3:-}" --note posted
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$shim/tasks-axi"
+  printf '{}\n' > "$case_dir/receipt.json"
+  (cd "$case_dir/home" && PATH="$shim:$PATH" FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$WRAPPER_SH" public-followup record-delivery pf-delivered --receipt-file "$case_dir/receipt.json" \
+    > "$case_dir/out" 2> "$case_dir/err") || { cat "$case_dir/err" >&2; fail "c4-record-delivery: the command failed"; }
+  [ "$(cx_state "$case_dir" pf-delivered)" = "done" ] || fail "c4-record-delivery: the row was not completed"
+  assert_grep 'unblocked: waits-on-delivery no longer waits on pf-delivered; it still waits on other-blocker' "$case_dir/err" \
+    "c4-record-delivery: the cleared edge was not reported with the remaining blocker"
+  case "$(cx_deps "$case_dir" waits-on-delivery)" in *pf-delivered*) fail "c4-record-delivery: the stored edge stayed" ;; esac
+  pass "a typed record-delivery completion through the wrapper clears the finished edge and keeps another blocker"
+}
+
+test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone() {
+  local one two a b
+  command -v jq >/dev/null 2>&1 || { printf 'ok - skipped (jq is not installed)\n'; return 0; }
+  one=$(make_case c4-json-wrapper)
+  two=$(make_case c4-json-direct)
+  for d in "$one" "$two"; do
+    cx_add "$d" json-blocker docs
+    cx_add "$d" json-dep
+    cx "$d" block json-dep --by json-blocker >/dev/null
+  done
+  a=$(FM_HOME="$one/home" FM_STATE_OVERRIDE="$one/state" "$WRAPPER_SH" "done" json-blocker --note finished --json 2>/dev/null) || fail "c4-json: wrapper done failed"
+  b=$(cx "$two" "done" json-blocker --note finished --json 2>/dev/null) || fail "c4-json: direct done failed"
+  [ "$(printf '%s' "$a" | jq -S .)" = "$(printf '%s' "$b" | jq -S .)" ] \
+    || fail "c4-json: the wrapper's --json differs from tasks-axi alone"
+  pass "done --json through the wrapper has the same fields and values as tasks-axi alone"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -949,5 +1062,9 @@ test_a_merge_reports_each_cleared_edge_and_each_failed_clear_on_its_own_channel
 test_an_answered_captain_call_clears_the_edge
 test_a_withdrawn_captain_call_clears_the_edge
 test_an_explicit_data_root_gets_the_same_clear
+test_the_named_item_matrix_with_production_prune_on
+test_a_second_merge_run_changes_nothing_with_the_record_present_and_after_prune
+test_the_typed_record_delivery_completion_clears_the_finished_edge
+test_done_json_has_the_same_fields_and_values_as_tasks_axi_alone
 )
 fm_test_run_cases "${pr_close_test_cases[@]}" -- "$@"
