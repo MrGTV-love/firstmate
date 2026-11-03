@@ -23,6 +23,7 @@ resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
 newest depth-zero session, or prints nothing when the binding changed.
 bound STATE ID prints the binding's model as deepseek/<id> and its effort
 (default when none) on two lines.
+api-key-env prints the environment name every launch patch reads its key from.
 own-model prints, as deepseek/<id>, the model bound to the Firstmate-prepared
 generation that DSH_HOME names, and fails unless that binding still names it.
 preferred-model OPERATOR_HOME prints, as deepseek/<id>, the operator's persisted
@@ -60,6 +61,7 @@ import shutil
 import sys
 
 CHUNK = 1024 * 1024
+API_KEY_ENV = "DEEPSEEK_API_KEY"
 
 
 def deepseek_id(model, provider=""):
@@ -135,7 +137,7 @@ def launch_patch(model, effort, cwd, dsh, session_id, primary_root=None):
             "cwd": str(Path(cwd).resolve()), "fullscreen": False, "launchpad": False,
             **({"effort": effort} if effort not in ("", "default") else {}),
             **({"sessionId": session_id} if session_id else {})}},
-        {"id": "llm-deepseek", "config": {"apiKeyEnv": "DEEPSEEK_API_KEY", "models": [{"id": model}]}},
+        {"id": "llm-deepseek", "config": {"apiKeyEnv": API_KEY_ENV, "models": [{"id": model}]}},
         {"id": "session-persistence-jsonl", "config": {"root": str(dsh / "sessions"), "compression": "none"}},
         *([{"insert": [{"id": "firstmate-primary", "name": str(Path(primary_root) / ".dsh" / "fm-primary.mjs"),
             "config": {"root": primary_root, "home": str(Path(cwd).resolve())}}]}] if primary_root else []),
@@ -429,6 +431,7 @@ def main():
     p.add_argument("state")
     p.add_argument("task")
     sub.add_parser("own-model")
+    sub.add_parser("api-key-env")
     p = sub.add_parser("preferred-model")
     p.add_argument("operator_home")
     p = sub.add_parser("session-file")
@@ -465,6 +468,8 @@ def main():
             bound(args.state, args.task)
         elif args.command == "own-model":
             own_model()
+        elif args.command == "api-key-env":
+            print(API_KEY_ENV)
         elif args.command == "preferred-model":
             preferred_model(args.operator_home)
         elif args.command == "session-file":

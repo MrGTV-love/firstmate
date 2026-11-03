@@ -597,7 +597,7 @@ PY
 
 python3 "$ROOT/tests/fm-cpu-pass-admission.py" "$ROOT" "$TMP_ROOT" "$REAL_PYTHON" \
   || fail "pipeline admission and child-descriptor regression failed"
-pass "pipeline admission preserves count/load boundaries, priority, start registration, timing and descriptor ownership"
+pass "pipeline admission follows measured reservations, the fallback count, the pause-only backstop, priority, start registration, timing and descriptor ownership"
 
 test_size_follows_host
 test_run_passes_status_and_marks_child

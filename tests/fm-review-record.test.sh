@@ -204,6 +204,15 @@ test_review_only_rejections_are_typed_not_qualified() {
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "unknown author must not qualify"
   expect_not_qualified "$out" "uncovered commit group ship, family unknown" "unknown author"
+  assert_contains "$out" "two different known reader families" "unknown author refusal must name the second-family read"
+
+  case_dir=$(make_case reject-unknown-author-one-family mystery-9)
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["mystery-9"]}' >/dev/null || fail "record first same-family PASS"
+  record_review "$case_dir" "$HEAD1" PASS claude-opus-4 '{"all":["mystery-9"]}' >/dev/null || fail "record second same-family PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "two readers of one family must not cover an unknown author"
+  expect_not_qualified "$out" "uncovered commit group ship, family unknown" "unknown author, one reader family"
 
   case_dir=$(make_case reject-trigger)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["gpt-5.1"]}' --widens-guard yes >/dev/null \
@@ -213,6 +222,26 @@ test_review_only_rejections_are_typed_not_qualified() {
   expect_code 1 "$rc" "yes trigger must not qualify"
   expect_not_qualified "$out" "widens_guard is yes" "yes trigger"
   pass "stale head, FAIL, same family, unknown families and triggers are typed not-qualified"
+}
+
+test_unknown_author_covered_by_two_reader_families() {
+  local case_dir out rc=0
+  case_dir=$(make_case unknown-author-two-families mystery-9)
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["mystery-9"]}' >/dev/null || fail "record anthropic PASS"
+  record_review "$case_dir" "$HEAD1" PASS gpt-5.1 '{"all":["mystery-9"]}' >/dev/null || fail "record openai PASS"
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "two known reader families must cover an unknown author: $out"
+  "$JQ_BIN" -e '.ok == true and .basis == "independent-review"' <<<"$out" >/dev/null \
+    || fail "two-family cover must be independent review, not captain words: $out"
+
+  case_dir=$(make_case unknown-author-stale-second-head mystery-9)
+  record_review "$case_dir" "$HEAD2" PASS gpt-5.1 '{"all":["mystery-9"]}' >/dev/null || fail "record other-head PASS"
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["mystery-9"]}' >/dev/null || fail "record head PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "a second family read of another head must not cover an unknown author"
+  expect_not_qualified "$out" "uncovered commit group ship, family unknown" "unknown author, second family on another head"
+  pass "an unknown author family is covered only by exact-head PASS reads from two known reader families"
 }
 
 test_native_claude_aliases_are_anthropic() {
@@ -347,6 +376,7 @@ test_review_only_json_is_immutable_record_time_evidence
 test_default_text_and_captain_word_json
 test_review_only_cannot_be_satisfied_by_captain_word
 test_review_only_rejections_are_typed_not_qualified
+test_unknown_author_covered_by_two_reader_families
 test_native_claude_aliases_are_anthropic
 test_stored_family_fields_cannot_retroactively_change_independence
 test_typed_failures_distinguish_unavailable_and_invalid_input
