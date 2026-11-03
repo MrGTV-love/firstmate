@@ -9,6 +9,8 @@ set -u
 PACK_BIN="$ROOT/bin/fm-contract-review-pack.sh"
 POLICY="$ROOT/.agents/skills/contract-review/SKILL.md"
 TMP_ROOT=$(fm_test_tmproot fm-contract-review)
+export TMPDIR="$TMP_ROOT"
+mkdir -p "$TMPDIR"
 
 # A contract with a planted marker in every section type.
 write_fixture_contract() { # <file> [extra-heading]
@@ -293,6 +295,32 @@ test_leak_check_revision_paths_and_excluded_directories() {
   pass "revision paths, excluded directories and the run log are judged by the same rules"
 }
 
+test_leak_check_reads_common_report_shapes() {
+  local rep="$TMP_ROOT/report3.md"
+  make_leak_world
+  # A numbered heading with a parenthetical, and line references after the paths.
+  # shellcheck disable=SC2016 # literal backticks in generated Markdown
+  {
+    printf 'VERDICT: FAIL head=abc\n\n### 2. Inputs read (3 files)\n\n'
+    printf -- '- %s:12\n' "$LEAK_PACK/contract.md"
+    printf -- '- `%s`:L10-L40 - the target\n' "$LEAK_PACK/target.md"
+    printf -- '* %s#L5\n' "$LEAK_ROOT/bin/fm-spawn.sh"
+    printf '\n## Findings\n\nEXIT: needs-revision\nVERDICT: FAIL\n'
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 0 "$CHECK_RC" "a numbered heading or a line reference was flagged: $CHECK_OUT"
+  assert_contains "$CHECK_OUT" "3 listed input(s)" "the list under a numbered heading was not read"
+  # The same shapes still catch a leak.
+  {
+    printf 'VERDICT: FAIL head=abc\n\n### 2. Inputs read (2 files)\n\n'
+    printf -- '- %s:12\n' "$LEAK_PACK/contract.md"
+    printf -- '- %s:7\n' "$LEAK_ROOT/data/case/truth/r23-review.md"
+  } >"$rep"
+  run_check "$rep"
+  assert_equals 3 "$CHECK_RC" "a leak behind a line reference was allowed"
+  pass "the leak check reads numbered headings and line references without voiding a clean round"
+}
+
 fm_test_run_cases \
   test_markers_kept_and_dropped \
   test_unrecognised_section_refused \
@@ -302,4 +330,5 @@ fm_test_run_cases \
   test_context_file_with_author_section_refused \
   test_leak_check_judges_what_a_path_is \
   test_leak_check_revision_paths_and_excluded_directories \
+  test_leak_check_reads_common_report_shapes \
   -- "$@"

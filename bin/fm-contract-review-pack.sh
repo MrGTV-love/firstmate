@@ -294,8 +294,8 @@ inputs_read() { # <report>
       gsub(/^[`*"(<]+|[`*",;:.)>]+$/, "", t)
       return t
     }
-    state == 0 && tolower($0) ~ /^[#*[:space:]-]*inputs read[*:[:space:]]*$/ { state = 1; next }
-    state == 0 && tolower($0) ~ /^[#*[:space:]-]*inputs read[*]*:[*]*[ \t]+[^ \t]/ {
+    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*[:space:]]*(\([^)]*\))?[*:[:space:]]*$/ { state = 1; next }
+    state == 0 && tolower($0) ~ /^[#*[:space:]-]*([0-9]+[.)][[:space:]]*)?inputs read[*]*:[*]*[ \t]+[^ \t]/ {
       line = $0
       sub(/^[^:]*:[*]*[ \t]+/, "", line)
       n = split(line, parts, /,[ \t]*/)
@@ -353,7 +353,7 @@ cmd_check() {
   assess_dir=$(real "$skills/assess-done-and-grade")
   define_dir=$(real "$skills/define-done-and-grading")
 
-  local leaks=0 count=0 entry path revpath rel rev excluded x ok why
+  local leaks=0 count=0 entry prev path revpath rel rev excluded x ok why
   local list
   list=$(inputs_read "$report" | grep -e '/' -e '\.' || true)
   if [ -z "$list" ]; then
@@ -365,6 +365,12 @@ cmd_check() {
     [ -n "$entry" ] || continue
     count=$((count + 1))
     rev=''
+    # A trailing line reference (path:12, path:12-40, path:L10-L40, path#L10) names the same file.
+    prev=''
+    while [ "$prev" != "$entry" ]; do
+      prev=$entry
+      entry=$(printf '%s' "$entry" | sed -E 's/(:[0-9]+(-[0-9]+)?|:L[0-9]+(-L?[0-9]+)?|#L[0-9]+(-L?[0-9]+)?)$//')
+    done
     path=$entry
     if printf '%s' "$entry" | grep -Eq '^[0-9A-Za-z_./-]+:[^:]+$' && ! printf '%s' "$entry" | grep -Eq '^(/|~|\./|\.\./)' &&
       printf '%s' "${entry%%:*}" | grep -Eq '^([0-9a-fA-F]{7,40}|HEAD|[A-Za-z][A-Za-z0-9_./-]*)$' && [ ! -e "$entry" ]; then
