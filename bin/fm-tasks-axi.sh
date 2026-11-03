@@ -654,19 +654,6 @@ parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
   ARGS=("${kept[@]}")
 }
 
-intake_archive() {  # prints the markdown done archive path; empty for another backend
-  local archive
-  [ -n "$FM_BACKLOG_AXI_FILE" ] || return 0
-  archive=$(sed -n "s/^[[:space:]]*archive[[:space:]]*=[[:space:]]*[\"']\\([^\"']*\\)[\"'].*/\\1/p" \
-    "$FM_BACKLOG_AXI_ROOT/.tasks.toml" 2>/dev/null | sed -n '1p')
-  case "$archive" in
-    '') archive="$DATA/done-archive.md" ;;
-    /*) ;;
-    *) archive="$FM_BACKLOG_AXI_ROOT/$archive" ;;
-  esac
-  printf '%s' "$archive"
-}
-
 # The objective sidecar must be writable before anything is filed, so a filed
 # item is never left without its row.
 intake_sidecar_ready() {
@@ -718,7 +705,7 @@ guard_intake() {
   list=$(fm_backlog_row_list "$DATA") \
     || backlog_source_stop backlog-intake-duplicate "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
   ADD_PRE_IDS=$(printf '%s\n' "$list" | list_ids)
-  ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(intake_archive)" "$ADD_ID")
+  ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(fm_backlog_done_archive "$DATA")" "$ADD_ID")
   status=$?
   case "$status" in
     0|1) ;;
@@ -727,7 +714,7 @@ guard_intake() {
   if [ -n "$ADD_DUP_OF" ]; then
     [[ "$ADD_DUP_OF" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$ADD_DUP_OF'"
     if ! printf '%s\n' "$list" | intake_python exists "$ADD_DUP_OF"; then
-      if intake_python archived "$(intake_archive)" "$ADD_DUP_OF"; then
+      if intake_python archived "$(fm_backlog_done_archive "$DATA")" "$ADD_DUP_OF"; then
         backlog_refuse backlog-intake-dup-of kept-archived "a kept item in the active backlog" machine "$add_step --objective <objective-id> --not-dup $ADD_DUP_OF" "$subject" "the kept item $ADD_DUP_OF is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup $ADD_DUP_OF"
       fi
       backlog_refuse backlog-intake-dup-of kept-missing "a kept item in this backlog" machine "$add_step --objective <objective-id> --dup-of <kept-id>" "$subject" "the kept item $ADD_DUP_OF does not exist in this backlog"
@@ -747,7 +734,7 @@ NEIGHBOURS
     case "$neighbour_ids" in
       *" $ADD_NOT_DUP "*) ;;
       *)
-        if printf '%s\n' "$list" | intake_python exists "$ADD_NOT_DUP" || intake_python archived "$(intake_archive)" "$ADD_NOT_DUP"; then
+        if printf '%s\n' "$list" | intake_python exists "$ADD_NOT_DUP" || intake_python archived "$(fm_backlog_done_archive "$DATA")" "$ADD_NOT_DUP"; then
           backlog_refuse backlog-intake-not-dup not-a-neighbour "a neighbour of this title" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names an item whose title does not overlap this one enough to be a neighbour; nothing was filed"
         fi
         backlog_refuse backlog-intake-not-dup item-missing "an item in this backlog" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names no item in this backlog; nothing was filed"

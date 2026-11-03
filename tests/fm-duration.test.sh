@@ -784,7 +784,23 @@ if shutil.which('tasks-axi'):
     assert seven_filed(shared) == ['fm-timeout-otherhost']
     assert shared_task not in (seven / 'data/backlog.md').read_text()
     assert len((seven / 'data/backlog-review.tsv').read_text().splitlines()) == 2
-    print('ok - with seven open timeout items, a new key is filed, a recurrence files the next item, and an open item under the same title takes the occurrence')
+    kept = subprocess.run([str(seven / 'bin/fm-tasks-axi.sh'), 'show', 'fm-timeout-otherhost', '--full'], env=dict(seven_env, FM_HOME=str(seven)), capture_output=True, text=True, check=True)
+    assert f'on host {platform.node()}' in kept.stdout and 'Observed lower bounds (ms): 1200000, 1200000' in kept.stdout, kept.stdout
+    # A hand-filed item that was closed and pruned into the done archive ranks below the printed three; the
+    # filer reads the archive as the duplicate check does, names the item to the operator, and files nothing.
+    archived_key = 'seven.archived'
+    archived_task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + archived_key).encode()).hexdigest()[:16]
+    subprocess.run(['tasks-axi', 'add', 'hand-archived-raise', 'Raise the seven archived timeout', '--kind', 'ship'], cwd=seven, env=seven_raw, check=True, capture_output=True)
+    subprocess.run(['tasks-axi', 'done', 'hand-archived-raise', '--note', 'raised by hand', '--keep', '0'], cwd=seven, env=seven_raw, check=True, capture_output=True)
+    assert 'hand-archived-raise' not in (seven / 'data/backlog.md').read_text()
+    assert 'hand-archived-raise' in (seven / 'data/done-archive.md').read_text()
+    seven_timeout(archived_key, 'a1')
+    result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), 'timeout', archived_key, '1200000', '--event-id', 'a2'], env=seven_env, cwd=workrepo, capture_output=True, text=True)
+    out = result.stdout + result.stderr
+    assert result.returncode != 0 and 'hand-archived-raise may be the same work filed by hand' in out, (result.returncode, out)
+    assert archived_task not in (seven / 'data/backlog.md').read_text()
+    assert seven_filed(archived_key) == []
+    print('ok - with seven open timeout items, a new key is filed, a recurrence files the next item, an open item under the same title takes the occurrence on the item, and an archived hand-filed neighbour goes to the operator')
 
 # Repeated-timeout work goes to the project registered under the repository's name in
 # the owning home's data/projects.md, and to firstmate when there is no such project.
