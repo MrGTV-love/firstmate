@@ -1,0 +1,4 @@
+class_rc=0
+paths=/Users/charlesabrooker/.treehouse/vernant-2ee7ec/126/vernant/.claude/worktrees/fm-vernant-d1-intake-limits-estimate-l2
+bytes=  358167 lines=      11 longest=356150
+9:REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/.treehouse/vernant-2ee7ec/126/vernant/.claude/worktrees/fm-vernant-d1-intake-limits-estimate-l2 (exit 3): full output: /Users/ch

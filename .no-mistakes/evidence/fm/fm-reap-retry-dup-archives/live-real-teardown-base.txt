@@ -1,0 +1,139 @@
+=== A. idle-reap only, real teardown, unchanged copy
+teardown-refused	task-x1	-	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/charlesabrooker/tmp/fm-lab.fuZNpA/data/t
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+[sweep 1] teardown_calls=1 driver_calls=1 tars=1 tar_kib=1028 wakes=0 record=no
+  PASS sweep 1 asks the driver once (got 1)
+--- real teardown output kept by the driver:
+nested-copy-preserved
+vernant-closeout.F1R0cJ
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[sweep 2 (memo older than 6 h)] teardown_calls=2 driver_calls=2 tars=2 tar_kib=2056 wakes=0 record=no
+  FAIL sweep 2 asks the driver no more: got 2, want 1
+  FAIL no new archive: got 2, want 1
+refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/charlesabrooker/tmp/fm-lab.fuZNpA/data/task-x1
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[sweep 3 (a further day)] teardown_calls=3 driver_calls=3 tars=3 tar_kib=3084 wakes=0 record=no
+  FAIL sweep 3 asks the driver no more: got 3, want 1
+  FAIL one wake: got 0, want 1
+--- record:
+--- wake rows:
+--- drain the wake, sweep again
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[after drain] teardown_calls=4 driver_calls=4 tars=4 tar_kib=4112 wakes=0 record=no
+  PASS drained wake stays gone (got 0)
+  FAIL drain does not lift the hold: got 4, want 1
+--- merge-prune after idle-reap on the same task
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[prune run --now] teardown_calls=4 driver_calls=4 tars=4 tar_kib=4112 wakes=0 record=no
+  FAIL prune asks the driver no more: got 4, want 1
+  PASS prune raises no second wake (got 0)
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+[prune sweep when due] teardown_calls=4 driver_calls=4 tars=4 tar_kib=4112 wakes=0 record=no
+  FAIL sweep asks the driver no more: got 4, want 1
+  PASS copy stays (got yes)
+--- change the nested copy (new untracked file): teardown runs again, and real teardown itself refuses a dirty copy before the driver
+teardown-refused	task-x1	-	-	REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project would sweep away task task-x1's recorded prior_worktree /Users/charlesabrooker/tmp/fm-teardow
+  scan: refused	task-x1	ship	-	REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project would sweep away task task-x1's recorded prior_worktree /Users/charlesabrooker/
+[changed status] teardown_calls=5 driver_calls=4 tars=4 tar_kib=4112 wakes=0 record=no
+  PASS a changed copy is offered to teardown again (got 5)
+--- the same file is removed: the copy reads as the record again
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[restored] teardown_calls=6 driver_calls=5 tars=5 tar_kib=5140 wakes=0 record=no
+  FAIL restored copy is held again: got 6, want 5
+  PASS no wake for the held fingerprint (got 0)
+--- a new landed commit in the nested copy: same class again
+teardown-refused	task-x1	-	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[changed HEAD] teardown_calls=7 driver_calls=6 tars=6 tar_kib=6168 wakes=0 record=no
+  PASS a new HEAD reaches the driver again (got 6)
+  FAIL one new wake for the new fingerprint: got 0, want 1
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/a/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[changed HEAD, swept again] teardown_calls=8 driver_calls=7 tars=7 tar_kib=7196 wakes=0 record=no
+  FAIL the new fingerprint is held: got 7, want 6
+  FAIL still one new wake: got 0, want 1
+--- change once more, and the driver now releases: teardown completes
+reaped	task-x1	-	-	teardown completed
+[released] teardown_calls=9 driver_calls=8 meta=no record=no
+  PASS record cleared (got no)
+
+=== B. merge-prune first, real teardown, then idle-reap
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+  merge-prune.log:
+    2026-11-03T04:55:56Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T04:56:37Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+[prune run 1] teardown_calls=1 driver_calls=1 tars=1 tar_kib=1028 wakes=1 record=no
+  PASS first prune asks the driver once (got 1)
+attempts=1
+state=retained
+reason=REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/ch
+  PASS prune state is retained (got retained)
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+  merge-prune.log:
+    2026-11-03T04:55:56Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T04:56:37Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:57:46Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+[prune run 2] teardown_calls=2 driver_calls=2 tars=2 tar_kib=2056 wakes=1 record=no
+  FAIL second run asks no more: got 2, want 1
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+  merge-prune.log:
+    2026-11-03T04:56:37Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:57:46Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:58:13Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+[prune sweep due] teardown_calls=3 driver_calls=3 tars=3 tar_kib=3084 wakes=1 record=no
+  FAIL sweep asks no more: got 3, want 1
+  FAIL tars: got 3, want 1
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+  merge-prune.log:
+    2026-11-03T04:56:37Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:57:46Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:58:13Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+[idle-reap after prune] teardown_calls=4 driver_calls=4 tars=4 tar_kib=4112 wakes=1 record=no
+  FAIL idle-reap asks no more: got 4, want 1
+  PASS one wake across both sweeps (got 1)
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+  merge-prune.log:
+    2026-11-03T04:57:46Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:58:13Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+    2026-11-03T04:58:39Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/b/pool/1/project/.claude/worktr
+[after drain] teardown_calls=6 driver_calls=6 tars=6 tar_kib=6168 wakes=0 record=no
+  PASS drained wake not raised by either sweep (got 0)
+  FAIL no more calls: got 6, want 1
+
+=== C. another top-level reason, retained token only nested: real teardown
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+[sweep 1] teardown_calls=1 driver_calls=1 tars=1 tar_kib=1028 wakes=0 record=no
+  PASS no record (got no)
+  PASS no wake (got 0)
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[sweep 2 due] teardown_calls=2 driver_calls=2 tars=2 tar_kib=2056 wakes=0 record=no
+  PASS ordinary retry stays (got 2)
+
+=== C2. the same other-class refusal through merge-prune first: real teardown
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+  merge-prune.log:
+    2026-11-03T04:59:17Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T04:59:40Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project/.claude/work
+[prune run 1] teardown_calls=1 driver_calls=1 tars=1 tar_kib=1028 wakes=1 record=no
+state=retained
+reason=REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/c
+  PASS prune makes one try (got 1)
+  PASS no record (got no)
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+  merge-prune.log:
+    2026-11-03T04:59:17Z armed for https://github.com/acme/widget/pull/7
+    2026-11-03T04:59:40Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project/.claude/work
+    2026-11-03T04:59:52Z retained /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/c2/pool/1/project/.claude/work
+[prune retry due] teardown_calls=2 driver_calls=2 tars=2 tar_kib=2056 wakes=1 record=no
+  PASS prune retries when due (got 2)
+  PASS still no record (got no)
+
+=== D. a closeout refusal next to another refusal line, through a wrapper around real teardown
+  scan: reap	task-x1	ship	-	closed by teardown; its pool slot return is pending
+[sweep 1] teardown_calls=1 driver_calls=1 tars=1 tar_kib=1028 wakes=0 record=no
+  PASS a mixed refusal makes no record (got no)
+  PASS no closeout wake (got 0)
+  scan: refused	task-x1	ship	-	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.tHJQYi/d/pool/1/project/.claude/worktrees/fc-one (exit 3): full o
+[sweep 2 due] teardown_calls=2 driver_calls=2 tars=2 tar_kib=2056 wakes=0 record=no
+  PASS a mixed refusal keeps its retry (got 2)
+
+FAILS=16
