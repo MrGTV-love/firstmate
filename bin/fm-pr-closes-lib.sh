@@ -41,8 +41,12 @@
 # A list that sits under a heading that says the pull requests were excluded, did not
 # land, were dropped, deferred, rejected or skipped is no member list, and a Component
 # column cell may hold a bare URL or a Markdown link `[PR 7](url)`. With `--declared` the
-# reader prints one line `declared` instead of members when the body states a member list
-# at all, even if no member URL was recognized.
+# reader prints one line `declared` instead of members when the body declares a member
+# list, even if no member URL was recognized. Only two things declare one: a table header
+# row (followed by its separator row, not under an exclusion heading) with a cell that is
+# exactly `Component`, and a heading whose whole text is exactly `Component` or
+# `Components`, each trimmed and in any letter case. A longer heading, a lead-in line, a
+# label bullet or a word in prose declares nothing, even when it yields members.
 # The reader prints each candidate URL once, in body order; the caller validates and
 # canonicalizes it with fm_pr_url_parse (GitHub pull, GitLab merge_requests, Forgejo
 # pulls) and matches by the full URL, never by number or prefix.
@@ -94,7 +98,7 @@ fm_pr_closes_linked_prs() {  # <body-file|->
 }
 
 fm_pr_closes_train_members() {  # <body-file|-> [--declared]
-  local line mode=none list_kind='' items=0 cells i col=0 rest url excluded=0 declared=0 only_declared=0
+  local line mode=none list_kind='' items=0 cells i col=0 rest url excluded=0 declared=0 only_declared=0 header_declares=0
   [ "${2:-}" != --declared ] || only_declared=1
   local seen=$'\n' cell
   local url_re='https?://[^][:space:]|)<>`*,;]+'
@@ -108,6 +112,8 @@ fm_pr_closes_train_members() {  # <body-file|-> [--declared]
   local md_link_re='^[[]([^]]*)[]][(]('"$url_re"')'
   local sep_re='^[[:space:]]*[|]?[[:space:]]*:?-+:?[[:space:]]*([|][[:space:]]*:?-+:?[[:space:]]*)*[|]?[[:space:]]*$'
   local header_cell_re='^[Cc]omponent([[:space:]]+[A-Za-z]+)?$'
+  local declared_cell_re='^[Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt]$'
+  local declared_heading_re='^[[:space:]]{0,3}#+[[:space:]]+[Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt][Ss]?[[:space:]]*$'
   while IFS= read -r line || [ -n "$line" ]; do
     line=${line%$'\r'}
     url=
@@ -116,18 +122,20 @@ fm_pr_closes_train_members() {  # <body-file|-> [--declared]
       if [ "$mode" = list ]; then mode=none; fi
       if [ "$mode" = header ]; then
         # The row under a candidate header must be the separator row, or it was no header.
-        if [[ "$line" =~ $sep_re ]]; then mode=table; else mode=other; fi
+        if [[ "$line" =~ $sep_re ]]; then mode=table; [ "$header_declares" = 0 ] || declared=1; else mode=other; fi
         continue
       fi
       if [ "$mode" = none ]; then
         # Only the first row of a table can be its header; a later row is a data row.
         col=0
+        header_declares=0
         for ((i = 1; i < ${#cells[@]}; i++)); do
           cell=${cells[i]#"${cells[i]%%[![:space:]]*}"}
           cell=${cell%"${cell##*[![:space:]]}"}
-          if [[ "$cell" =~ $header_cell_re ]]; then col=$i; break; fi
+          if [ "$col" = 0 ] && [[ "$cell" =~ $header_cell_re ]]; then col=$i; fi
+          if [[ "$cell" =~ $declared_cell_re ]]; then header_declares=1; fi
         done
-        if [ "$col" -gt 0 ] && [ "$excluded" = 0 ]; then mode=header; declared=1; else mode=other; fi
+        if { [ "$col" -gt 0 ] || [ "$header_declares" = 1 ]; } && [ "$excluded" = 0 ]; then mode=header; else mode=other; fi
         continue
       fi
       [ "$mode" = table ] || continue
@@ -144,13 +152,13 @@ fm_pr_closes_train_members() {  # <body-file|-> [--declared]
         list_kind=''
         excluded=0
         if [[ "$line" =~ $excluded_re ]]; then excluded=1; fi
-        if [ "$excluded" = 0 ] && [[ "$line" =~ $heading_component_re ]]; then mode=list; list_kind=heading; items=0; declared=1; fi
+        if [ "$excluded" = 0 ] && [[ "$line" =~ $heading_component_re ]]; then mode=list; list_kind=heading; items=0; fi
+        if [[ "$line" =~ $declared_heading_re ]]; then declared=1; fi
         continue
       fi
       if [ "$excluded" = 1 ]; then continue; fi
-      if [[ "$line" =~ $leadin_re ]]; then mode=list; list_kind=leadin; items=0; declared=1; continue; fi
+      if [[ "$line" =~ $leadin_re ]]; then mode=list; list_kind=leadin; items=0; continue; fi
       if [[ "$line" =~ $label_re ]]; then
-        declared=1
         rest=${BASH_REMATCH[1]}
         if [[ "$rest" =~ $url_re ]]; then url=${BASH_REMATCH[0]}; fi
       elif [ "$mode" = list ]; then
@@ -169,7 +177,7 @@ fm_pr_closes_train_members() {  # <body-file|-> [--declared]
     seen="$seen$url"$'\n'
     printf '%s\n' "$url"
   done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
-  # --declared: print one line when the body states a member list, whether or not any
+  # --declared: print one line when the body declares a member list, whether or not any
   # member URL was recognized, so the caller can report links it could not read.
   [ "$only_declared" = 0 ] || [ "$declared" = 0 ] || printf '%s\n' declared
 }

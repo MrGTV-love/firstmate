@@ -16,8 +16,11 @@
 # each member by its own URL. The proof is always the merged pull request this script was
 # given (the train's own URL for a train), because a train's members close unmerged.
 # Any other GitHub pull request a train body links outside a fenced code block is not
-# read and closes nothing, so it is named on stderr for someone to check; a body with no
-# member list gets no such line.
+# read and closes nothing, so it is named on stderr for someone to check. A body gets
+# such lines only when the reader found a member, or when the body declares a member list
+# that yielded none (a table header cell that is exactly `Component`, or a heading that is
+# exactly `Component` or `Components`, as the library header defines); any other body,
+# such as one whose longer heading or prose only mentions a component, gets none.
 # The same read gives that pull request's merge state: when it is not merged (a hand run
 # with a pull request that is still open, or a state it cannot read), nothing is closed
 # and every named item in the active backlog that is not done yet is reported as not

@@ -921,16 +921,48 @@ test_a_component_table_under_an_exclusion_heading_closes_nothing() {
 }
 
 test_a_declared_member_list_with_no_readable_member_reports_the_links() {
-  local case_dir
-  case_dir=$(gh_case c2-declared-zero 80)
-  cx_add "$case_dir" unread-member
-  printf '%s\n' 71 >> "$case_dir/merged-prs"
-  printf '%s\n' 'Closes: unread-member' > "$case_dir/bodies/71"
-  printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" > "$case_dir/bodies/80"
-  gh_merge "$case_dir" 80
-  [ "$(cx_state "$case_dir" unread-member)" = queued ] || fail "c2-declared-zero: an unrecognized cell closed an item"
-  assert_grep "not read $REPO_URL/71" "$case_dir/stderr" "c2-declared-zero: the unread link was not reported"
-  pass "a body that declares a member list but yields no member still names each linked PR as not read"
+  local case_dir form label
+  for form in bare markdown upper heading; do
+    label=c2-declared-zero-$form
+    case_dir=$(gh_case "$label" 80)
+    cx_add "$case_dir" unread-member
+    printf '%s\n' 71 >> "$case_dir/merged-prs"
+    printf '%s\n' 'Closes: unread-member' > "$case_dir/bodies/71"
+    case "$form" in
+      bare) printf '%s\n' '| Component | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" > "$case_dir/bodies/80" ;;
+      markdown) printf '%s\n' '## Train' '| Component | Head |' '| --- | --- |' "| merged [PR 71]($REPO_URL/71) | a |" > "$case_dir/bodies/80" ;;
+      upper) printf '%s\n' '| Head |  COMPONENT  |' '| --- | --- |' "| a | merged: $REPO_URL/71 |" > "$case_dir/bodies/80" ;;
+      heading) printf '%s\n' '## Components' '' "The one member, [PR 71]($REPO_URL/71), landed." > "$case_dir/bodies/80" ;;
+    esac
+    gh_merge "$case_dir" 80
+    [ "$(cx_state "$case_dir" unread-member)" = queued ] || fail "$label: an unrecognized cell closed an item"
+    assert_match "^actionable: close-at-merge: not read $REPO_URL/71: linked from a merge-train body" "$case_dir/stderr" \
+      "$label: the unread link was not reported"
+  done
+  pass "a body that declares a member list (an exact Component header cell or heading) but yields no member still names each linked PR as not read"
+}
+
+test_a_body_that_only_mentions_a_component_names_no_linked_pr() {
+  local case_dir form label
+  for form in slot-heading prose leadin label component-pr-header; do
+    label=c2-undeclared-$form
+    case_dir=$(gh_case "$label" 80)
+    cx_add "$case_dir" linked-item
+    printf '%s\n' 71 72 >> "$case_dir/merged-prs"
+    printf '%s\n' 'Closes: linked-item' > "$case_dir/bodies/71"
+    case "$form" in
+      slot-heading) printf '%s\n' '### Slot 42: two root records and component-aware scout custody' '' \
+        "This builds on $REPO_URL/71 and replaces $REPO_URL/72." > "$case_dir/bodies/80" ;;
+      prose) printf '%s\n' '## Summary' '' "Follows $REPO_URL/71 and $REPO_URL/72 in the custody component." > "$case_dir/bodies/80" ;;
+      leadin) printf '%s\n' 'Components:' '' "See $REPO_URL/71 and $REPO_URL/72 for context." > "$case_dir/bodies/80" ;;
+      label) printf '%s\n' '- **Component 1:** the scout custody record' '' "Context: $REPO_URL/71 and $REPO_URL/72." > "$case_dir/bodies/80" ;;
+      component-pr-header) printf '%s\n' '| Component PR | Head |' '| --- | --- |' "| merged: $REPO_URL/71 | a |" '' "Context: $REPO_URL/72." > "$case_dir/bodies/80" ;;
+    esac
+    gh_merge "$case_dir" 80
+    [ "$(cx_state "$case_dir" linked-item)" = queued ] || fail "$label: a linked PR's item was closed"
+    assert_no_grep "not read https" "$case_dir/stderr" "$label: a body that declares no member list named a linked PR"
+  done
+  pass "a body whose longer heading, prose, lead-in, label or longer header only mentions a component names no linked PR"
 }
 
 # --- exact-head evidence with production merge prune on (contract C1, C3) ----------------
@@ -1052,6 +1084,7 @@ test_a_data_row_that_mentions_component_is_no_member_list
 test_a_markdown_link_in_the_component_column_is_a_member
 test_a_component_table_under_an_exclusion_heading_closes_nothing
 test_a_declared_member_list_with_no_readable_member_reports_the_links
+test_a_body_that_only_mentions_a_component_names_no_linked_pr
 test_a_table_under_a_component_heading_keeps_the_bullets_after_it
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
