@@ -98,7 +98,7 @@ crew_state_ready_url() {  # <id>
 # Metadata is read once, without sourcing worker-controlled bytes.
 reconcile_one() {  # <meta> <id>
   local meta=$1 id=$2 line kind='' mode='' pr='' note url=''
-  local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
+  local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0 due=''
   if [ ! -f "$meta" ] || [ -L "$meta" ] || [ ! -r "$meta" ]; then
     printf 'pr-ready: %s: unreadable task record; skipped\n' "$id"
     return 0
@@ -117,6 +117,9 @@ reconcile_one() {  # <meta> <id>
   [ "$kind" = ship ] || return 0
   case "$mode" in no-mistakes|direct-PR) ;; *) return 0 ;; esac
   if [ -n "$pr" ]; then
+    # The step names its next due time in this marker; nothing starts before then.
+    due=$(cat -- "$STATE/.pr-auto-review/$id.next" 2>/dev/null || true)
+    case "$due" in ''|*[!0-9]*) ;; *) [ "$due" -le "$(date +%s)" ] || return 0 ;; esac
     rc=0
     fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
       "$AUTO_REVIEW_BIN" step "$id" || rc=$?

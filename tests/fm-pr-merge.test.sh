@@ -2696,6 +2696,27 @@ test_auto_review_survives_slow_hung_and_killed_readers() {
   pass "a hung reader stalls nothing and is not duplicated, a killed reader is not retried, and a replay after a kill records and merges exactly once"
 }
 
+test_auto_review_holds_the_merge_while_the_captain_is_away() {
+  local case_dir
+  case_dir=$(auto_case away)
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-afk-contract.sh" enter --words 'merge task-x1 when green' >/dev/null \
+    || fail "away: could not enter the away posture"
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_reviews "$case_dir")" "away: the verdict is still recorded"
+  expect_code 0 "$(auto_merges "$case_dir")" "away: the machinery must not merge under the away record"
+  expect_code 1 "$(auto_notes "$case_dir" 'review-lane held: away posture')" "away: held once, with its reason"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away: could not archive the record"
+  auto_step "$case_dir"
+  expect_code 1 "$(auto_merges "$case_dir")" "away: once the captain is back the covered PR merges"
+  # Quiet mode is a present captain: nothing is held.
+  case_dir=$(auto_case quiet)
+  FM_AFK_MODE=quiet FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet: could not enter quiet mode"
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 1 "$(auto_merges "$case_dir")" "quiet: a present captain must not hold the merge"
+  pass "an away record holds the merge for the supervision session while the verdict is still recorded, and quiet mode holds nothing"
+}
+
 test_auto_review_events_reach_the_fleet_ledger() {
   local case_dir
   case_dir=$(auto_case ledger)
@@ -2740,6 +2761,7 @@ test_auto_review_switches_after_a_failed_read_and_never_retries_the_failed_model
 test_auto_review_records_each_verdict_and_merges_only_a_covering_pass
 test_auto_review_new_head_voids_the_pass_and_held_prs_are_never_merged
 test_auto_review_survives_slow_hung_and_killed_readers
+test_auto_review_holds_the_merge_while_the_captain_is_away
 test_auto_review_events_reach_the_fleet_ledger
 test_auto_review_three_prs_through_the_housekeeping_pass
 test_seeded_homes_cannot_create_a_second_landing_owner

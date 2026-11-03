@@ -52,7 +52,8 @@ followed by yes or no: `loosens a deny or allow list`, `widens what a guard perm
 customer data, billing or spend`. A PASS missing a fact is unusable. A line
 `Protected class: destructive|irreversible|security-sensitive`, or a `protected=<class>` field in the
 task's meta, holds the merge for Main with that class named. A local-only task never reaches this
-script's merge path. Exit status: 0 for every pass that ran, 2 for a usage error.
+script's merge path, and while an away-posture record exists the merge step holds
+(`held: away posture ...`) so the supervision session keeps reading the captain's away words. Exit status: 0 for every pass that ran, 2 for a usage error.
 """
 import fcntl
 import hashlib
@@ -113,8 +114,11 @@ class Home:
 
 
 def run(command, home=None, **kwargs):
-    return subprocess.run(command, capture_output=True, text=True, check=False,
-                          env=home.env() if home else None, **kwargs)
+    try:
+        return subprocess.run(command, capture_output=True, text=True, check=False,
+                              env=home.env() if home else None, **kwargs)
+    except OSError as exc:  # a missing tool is a failed read, never a crash of the pass
+        return subprocess.CompletedProcess(command, 127, "", str(exc))
 
 
 def read_meta(home, task):
@@ -510,6 +514,20 @@ def step(home, task):
             or not PR_URL.fullmatch(url)):
         return
     side = Sidecar(home, task, url)
+    try:
+        advance(home, task, url, meta, side)
+    finally:
+        side.save()
+        # The housekeeping pass skips a task before it starts this program while nothing is due.
+        marker = home.root / f"{task}.next"
+        reading = any(a["state"] == "requested" for h in side.data["heads"].values() for a in h["attempts"].values())
+        if reading or side.data.get("phase", {}).get("state") == "merged":
+            marker.unlink(missing_ok=True)
+        else:
+            write_atomic(marker, f"{side.data.get('next_at', 0)}\n")
+
+
+def advance(home, task, url, meta, side):
     view = None
     head_sha = side.data.get("phase", {}).get("head")
     prior = side.head(head_sha) if head_sha else None
@@ -606,6 +624,13 @@ def step(home, task):
     side.save()
 
 
+def away_posture(home):
+    """True while an away-posture record exists; bin/fm-afk-contract.sh owns the reading."""
+    script = '. "$1/fm-afk-contract.sh" && fm_afk_contract_away_present "$2"'
+    # Status 1 is "no away record"; an unreadable record holds, as bin/fm-pr-merge.sh refuses on one.
+    return run(["bash", "-c", script, "fm-pr-auto-review", str(BIN), str(home.state)], home).returncode != 1
+
+
 def merge(home, task, url, sha, side, meta):
     head = side.head(sha)
     classes = sorted({c for c in (meta.get("protected", "").split(",")) if c in CLASSES}
@@ -615,6 +640,10 @@ def merge(home, task, url, sha, side, meta):
         phase(side, sha, "held", f"protected class {','.join(classes)}")
         emit(home, task, side, sha, "protected", f"held: protected class {','.join(classes)} at {sha[:12]}; the merge is the captain's",
              f"{url} is marked {','.join(classes)}; not merged, Main takes it to the captain")
+        return
+    if away_posture(home):
+        phase(side, sha, "held", "away posture: the supervision session decides this merge")
+        emit(home, task, side, sha, "away", f"held: away posture at {sha[:12]}; the supervision session decides this merge")
         return
     attempt = head.get("merge") or {}
     if time.time() < attempt.get("next_at", 0):
@@ -664,7 +693,11 @@ def main(argv):
         print(state_line(home, argv[2]))
         return 0
     sweep(home)
-    step(home, argv[2])
+    try:
+        step(home, argv[2])
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        print(f"pr-auto-review: {argv[2]}: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 
