@@ -605,9 +605,9 @@
 #   tree, no ignored work at a path the reset target tracks, no live holder, every
 #   unknown refused, all re-proved right before the reset. A refusal leaves the slot
 #   untouched and names the fact and the slot path. The acquired pane's own shell is
-#   excluded from the cwd check by its pane pid, which tmux and herdr report; a backend
-#   that reports none (zellij, cmux, orca) refuses on holder_cwd while that shell is in
-#   the slot.
+#   excluded from the cwd check by its pane pid, which tmux and herdr report; on a
+#   backend that reports none (zellij, cmux, orca) the check is repeated from inside
+#   the acquired pane, where that shell is a true ancestor of the probe.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
@@ -5043,6 +5043,8 @@ spawn_reset_guard_context() {
   FM_SLOT_GUARD_TASK=$ID
   FM_SLOT_GUARD_ARCHIVE_ROOT=$DATA
   FM_SLOT_GUARD_PANE_PID=$(spawn_endpoint_shell_pid)
+  FM_SLOT_GUARD_PANE_RUNNER=spawn_slot_run_in_pane
+  FM_SLOT_GUARD_REPORT_DIR=$DATA/$ID
 }
 
 # The origin default branch's name for a look taken before this spawn fetches:
@@ -6435,68 +6437,8 @@ if [ "$RELAUNCH" -eq 1 ]; then
     }
   fi
 fi
-spawn_validate_local_base "$WT" || exit 1
-SLOT_GOVERNED=0
-SLOT_FRESH_BASE=0
-if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
-  SLOT_GOVERNED=1
-  if [ "$RELAUNCH" -eq 1 ]; then
-    while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
-  fi
-  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
-  BRANCH=${BRANCH:-fm/$ID}
-  if [ "$RELAUNCH" -eq 0 ]; then
-    SLOT_FRESH_BASE=1
-    spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
-    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
-  elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
-    prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
-    if [ -n "$prepared_head" ]; then
-      fm_slot_resume_prepared "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$prepared_head" || spawn_slot_refused
-    else
-      # No agent was admitted and preparation itself had not completed.
-      # Finish the original fresh-base contract without resetting old refs.
-      SLOT_FRESH_BASE=1
-      if [ -z "$SLOT_SOURCE_REF" ]; then
-        SPAWN_FRESH_SOURCE=1
-        [ "$BACKEND" = orca ] || spawn_fetch_base_evidence
-        spawn_validate_local_base "$WT" || spawn_slot_refused
-      fi
-      spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
-      fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
-      if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
-        # No worker was admitted and no prepared branch existed. Finish that
-        # original immutable local plan, not a newly derived origin baseline.
-        spawn_reset_guard_context
-        fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
-          "refs/remotes/origin/${SLOT_SOURCE_REF#refs/heads/}" || spawn_slot_refused
-        SLOT_FRESH_BASE=0
-      fi
-    fi
-  fi
-elif [ "$RELAUNCH" -eq 1 ] && [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ]; then
-  echo "error: --relaunch accepts --owned-path only to scope a governed task with no recorded slot scope" >&2
-  exit 1
-fi
-if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" = 1 ]; }; then
-  if ! freshen_spawn_worktree_base "$WT" "$BASE_BRANCH"; then
-    [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
-    exit 1
-  fi
-fi
-# Freshness can introduce the project owner after the initial classification.
-# Keep early governance sticky (including when freshness removes its owner),
-# but require the same explicit scope and preparation for a newly governed copy.
-if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
-  SLOT_GOVERNED=1
-  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
-  BRANCH=${BRANCH:-fm/$ID}
-  fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
-fi
-# Stop this attempt's own helper before any checkout restore, lock release or
-# refusal record. The attempt directory is private to this spawn: the claim is
-# created exclusively, so a helper that has not started can never start, and a
-# started helper's provisioner runs in the process group it recorded itself.
+# The in-pane runner is defined here, ahead of the first reset, because the reset guard's
+# working-directory probe uses it on a backend that reports no pane pid.
 spawn_slot_cancel_helper() { # <attempt-dir>
   local attempt=$1 job pid pgid target i
   if (set -C; : >"$attempt/claim") 2>/dev/null; then
@@ -6586,6 +6528,68 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
+spawn_validate_local_base "$WT" || exit 1
+SLOT_GOVERNED=0
+SLOT_FRESH_BASE=0
+if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
+  SLOT_GOVERNED=1
+  if [ "$RELAUNCH" -eq 1 ]; then
+    while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
+  fi
+  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
+  BRANCH=${BRANCH:-fm/$ID}
+  if [ "$RELAUNCH" -eq 0 ]; then
+    SLOT_FRESH_BASE=1
+    spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
+    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
+    prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
+    if [ -n "$prepared_head" ]; then
+      fm_slot_resume_prepared "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$prepared_head" || spawn_slot_refused
+    else
+      # No agent was admitted and preparation itself had not completed.
+      # Finish the original fresh-base contract without resetting old refs.
+      SLOT_FRESH_BASE=1
+      if [ -z "$SLOT_SOURCE_REF" ]; then
+        SPAWN_FRESH_SOURCE=1
+        [ "$BACKEND" = orca ] || spawn_fetch_base_evidence
+        spawn_validate_local_base "$WT" || spawn_slot_refused
+      fi
+      spawn_reset_preflight "$WT" "$BASE_BRANCH" || spawn_slot_refused
+      fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+      if [ "$SPAWN_FRESH_SOURCE" = 0 ]; then
+        # No worker was admitted and no prepared branch existed. Finish that
+        # original immutable local plan, not a newly derived origin baseline.
+        spawn_reset_guard_context
+        fm_slot_guarded_reset "$WT" "$SLOT_SOURCE_SHA" "$SLOT_SOURCE_REF" \
+          "refs/remotes/origin/${SLOT_SOURCE_REF#refs/heads/}" || spawn_slot_refused
+        SLOT_FRESH_BASE=0
+      fi
+    fi
+  fi
+elif [ "$RELAUNCH" -eq 1 ] && [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ]; then
+  echo "error: --relaunch accepts --owned-path only to scope a governed task with no recorded slot scope" >&2
+  exit 1
+fi
+if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" = 1 ]; }; then
+  if ! freshen_spawn_worktree_base "$WT" "$BASE_BRANCH"; then
+    [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
+    exit 1
+  fi
+fi
+# Freshness can introduce the project owner after the initial classification.
+# Keep early governance sticky (including when freshness removes its owner),
+# but require the same explicit scope and preparation for a newly governed copy.
+if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
+  SLOT_GOVERNED=1
+  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
+  BRANCH=${BRANCH:-fm/$ID}
+  fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+fi
+# Stop this attempt's own helper before any checkout restore, lock release or
+# refusal record. The attempt directory is private to this spawn: the claim is
+# created exclusively, so a helper that has not started can never start, and a
+# started helper's provisioner runs in the process group it recorded itself.
 if [ "$SLOT_GOVERNED" = 1 ]; then
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused

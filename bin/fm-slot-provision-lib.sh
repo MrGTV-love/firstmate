@@ -688,27 +688,30 @@ open(sys.argv[3], "wb").write(b"".join(item + b"\n" for item in sorted(found)))
 # S4 (a): processes with their cwd inside the slot, from one lsof read.
 # The spawn's own lineage (its ancestors, its descendants) and the acquired
 # endpoint's pane tree are the only exclusions; a holder whose parent chain cannot
-# be followed counts as a holder. Arguments after the first three are extra pids
-# whose ownership is wanted: each is answered "own", "dead" or "foreign".
+# be followed counts as a holder. Arguments are extra pids whose ownership is
+# wanted: each is answered "own", "dead", "foreign" or "unknown".
+# The pane tree comes from the endpoint's pane pid (tmux, herdr). A backend that
+# reports none (zellij, cmux, orca) is probed once more from INSIDE the acquired
+# pane through the caller's runner: the pane's shell is then a real ancestor of the
+# probe, so it is excluded exactly and nothing else is.
+FM_SLOT_GUARD_PANE_RUNNER=
+FM_SLOT_GUARD_REPORT_DIR=
 FM_SLOT_GUARD_HOLDER_REPORT=
-fm_slot_guard_probe_processes() { # [<pid>...]
-  local lsof_out rc=0
-  command -v lsof >/dev/null 2>&1 || {
-    fm_slot_guard_refuse unknown_holder_probe "lsof is not installed, so processes inside the slot cannot be ruled out"
-    return 1
-  }
-  # lsof exits 1 when nothing matched a selection; a clean working-directory list
-  # always holds this process, so an empty or failed read proves nothing.
-  lsof_out=$(lsof -n -P -w -d cwd -F pRcn 2>/dev/null </dev/null) || rc=$?
-  if [ "$rc" -gt 1 ] || [ -z "$lsof_out" ]; then
-    fm_slot_guard_refuse unknown_holder_probe "lsof could not list the processes' working directories (exit $rc)"
-    return 1
-  fi
-  FM_SLOT_GUARD_HOLDER_REPORT=$(printf '%s\n' "$lsof_out" | python3 -I -c '
-import os, sys
-slot, selfpid, pane = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+FM_SLOT_GUARD_PROBE_PY=$(cat <<'FMPROBEPY'
+import os, subprocess, sys
+slot, selfspec, pane = sys.argv[1:4]
+extra = sys.argv[4:]
+if selfspec == "@self":
+    selfpid = os.getpid()
+    proc = subprocess.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pRcn"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if proc.returncode > 1 or not proc.stdout:
+        sys.exit(5)
+    data = proc.stdout
+else:
+    selfpid = int(selfspec)
+    data = sys.stdin.read()
 rows, cur = {}, None
-for line in sys.stdin.read().split("\n"):
+for line in data.split("\n"):
     if not line:
         continue
     tag, value = line[0], line[1:]
@@ -748,7 +751,7 @@ for pid, row in sorted(rows.items()):
     cwd = row["cwd"]
     if cwd and (cwd == slot or cwd.startswith(slot.rstrip("/") + "/")) and not own(pid):
         print("H\t%d\t%s" % (pid, row["cmd"]))
-for arg in sys.argv[4:]:
+for arg in extra:
     if not arg.isdigit():
         print("P\t%s\tunknown" % arg)
         continue
@@ -761,8 +764,45 @@ for arg in sys.argv[4:]:
     except PermissionError:
         pass
     print("P\t%d\t%s" % (pid, "own" if own(pid) else ("foreign" if pid in rows else "unknown")))
-' "$FM_SLOT_GUARD_REAL" "$$" "${FM_SLOT_GUARD_PANE_PID:-}" "$@") || {
+FMPROBEPY
+)
+
+# One probe from inside the acquired pane (the runner is the spawn's own in-pane
+# runner, the one governed provisioning already uses on every backend).
+fm_slot_guard_probe_in_pane() { # [<pid>...]
+  local dir=$FM_SLOT_GUARD_REPORT_DIR script report rc=0
+  [ -n "$FM_SLOT_GUARD_PANE_RUNNER" ] && [ -d "$dir" ] || return 1
+  script=$(mktemp "$dir/.slot-probe.py.XXXXXX") && report=$(mktemp "$dir/.slot-probe.out.XXXXXX") || return 1
+  printf '%s\n' "$FM_SLOT_GUARD_PROBE_PY" >"$script"
+  "$FM_SLOT_GUARD_PANE_RUNNER" "$FM_SLOT_GUARD_PROJECT" "$report" "$script" "$FM_SLOT_GUARD_REAL" @self '' "$@" || rc=$?
+  if [ "$rc" -eq 0 ]; then FM_SLOT_GUARD_HOLDER_REPORT=$(cat "$report"); fi
+  rm -f -- "$script" "$report"
+  return "$rc"
+}
+
+fm_slot_guard_probe_processes() { # [<pid>...]
+  local lsof_out rc=0
+  command -v lsof >/dev/null 2>&1 || {
+    fm_slot_guard_refuse unknown_holder_probe "lsof is not installed, so processes inside the slot cannot be ruled out"
+    return 1
+  }
+  # lsof exits 1 when nothing matched a selection; a clean working-directory list
+  # always holds this process, so an empty or failed read proves nothing.
+  lsof_out=$(lsof -n -P -w -d cwd -F pRcn 2>/dev/null </dev/null) || rc=$?
+  if [ "$rc" -gt 1 ] || [ -z "$lsof_out" ]; then
+    fm_slot_guard_refuse unknown_holder_probe "lsof could not list the processes' working directories (exit $rc)"
+    return 1
+  fi
+  FM_SLOT_GUARD_HOLDER_REPORT=$(printf '%s\n' "$lsof_out" | python3 -I -c "$FM_SLOT_GUARD_PROBE_PY" "$FM_SLOT_GUARD_REAL" "$$" "${FM_SLOT_GUARD_PANE_PID:-}" "$@") || {
     fm_slot_guard_refuse unknown_holder_probe "the working-directory listing could not be read (the spawn's own process is absent from it)"
+    return 1
+  }
+  [ -z "${FM_SLOT_GUARD_PANE_PID:-}" ] || return 0
+  printf '%s\n' "$FM_SLOT_GUARD_HOLDER_REPORT" | awk -F'\t' '$1 == "H" || ($1 == "P" && $3 != "dead" && $3 != "own") {found = 1} END {exit !found}' || return 0
+  # Something is not attributed and no pane pid is known: judge it again from inside the pane.
+  [ -n "$FM_SLOT_GUARD_PANE_RUNNER" ] || return 0
+  fm_slot_guard_probe_in_pane "$@" || {
+    fm_slot_guard_refuse unknown_holder_probe "the working-directory probe could not run inside the acquired pane"
     return 1
   }
 }

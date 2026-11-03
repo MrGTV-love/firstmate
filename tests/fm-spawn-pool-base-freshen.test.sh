@@ -2055,6 +2055,143 @@ test_reset_guard_s4_vernant_lease_and_contention() {
   pass 'S4 (iii-c, iv): a live store lease and recent contention refuse, and pass once released or aged out'
 }
 
+# ---- S4: the acquired pane's own shell is not a foreign holder ---------------------------------
+# A real shell holds the slot as its cwd, as the pane's `treehouse get` subshell does, with a
+# real child that does too. The pane pid comes from the vendor (tmux `#{pane_pid}`), so the
+# fake tmux here answers it with the pid of that real shell.
+guard_start_pane_shell() { # <slot> <ready-file>  -> prints the shell's pid
+  bash -c 'cd "$1" && touch "$2" && { sleep 600 & wait; }' _ "$1" "$2" >/dev/null 2>&1 </dev/null &
+  printf '%s' "$!"
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -e "$2" ] && break
+    command sleep 0.2
+  done
+  [ -e "$2" ] || fail 'the pane shell never reached the slot'
+}
+
+guard_wrap_tmux_pane_pid() { # <fakebin> <file-holding-the-pid>
+  mv "$1/tmux" "$1/tmux.real"
+  cat >"$1/tmux" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *"#{pane_pid}"*) cat "$2"; exit 0 ;;
+esac
+exec "$1/tmux.real" "\$@"
+SH
+  chmod +x "$1/tmux"
+}
+
+test_reset_guard_s4_pane_pid_exemption() {
+  local rec id shell foreign bystander
+  # Healthy control: the pane shell and its child hold the slot cwd; the endpoint reports the shell's pid.
+  id='guard-s4-pane-pid'
+  rec=$(make_case guard-s4pane "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  guard_expect_launch S4 'the acquired pane shell and its child hold the slot cwd and are excluded by the endpoint pane pid' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" 2>/dev/null || true
+  # Paired refusal: the same holders, but the endpoint reports some other pid.
+  id='guard-s4-pane-pid-mismatch'
+  rec=$(make_case guard-s4panemis "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  (cd / && exec sleep 600) >/dev/null 2>&1 </dev/null &
+  bystander=$!
+  printf '%s' "$bystander" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  guard_expect_refusal S4 'the same holders, with the endpoint reporting an unrelated pid' 'reset refused (holder_cwd)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$shell" "$bystander" 2>/dev/null || true
+  # A foreign holder beside the excluded pane shell still refuses.
+  id='guard-s4-pane-pid-foreign'
+  rec=$(make_case guard-s4panefor "$id")
+  read_case_record "$rec"
+  shell=$(guard_start_pane_shell "$POOL_DIR" "$CASE_DIR/pane.ready")
+  printf '%s' "$shell" >"$CASE_DIR/pane.pid"
+  guard_wrap_tmux_pane_pid "$FAKEBIN_DIR" "$CASE_DIR/pane.pid"
+  (cd "$POOL_DIR" && exec sleep 600) &
+  foreign=$!
+  guard_expect_refusal S4 'a foreign holder beside the excluded pane shell' 'reset refused (holder_cwd)' "$id" --scout
+  pkill -P "$shell" 2>/dev/null || true
+  kill "$foreign" "$shell" 2>/dev/null || true
+  pass 'S4: the pane shell is excluded by the endpoint pane pid, a mismatching pid or a foreign holder still refuses'
+}
+
+# A backend that reports no pane pid (zellij, cmux, orca): the pane is a real shell that runs the
+# lines it is sent, as a pane does. The probe runs inside it, so the shell is a true ancestor.
+guard_start_pane_emulator() { # <slot> <dir> -> prints the emulator's pid
+  mkdir -p "$2"
+  cat >"$2/pane.sh" <<'SH'
+#!/usr/bin/env bash
+cd "$1" || exit 1
+: >"$2/ready"
+while :; do
+  if [ -s "$2/cmd" ]; then
+    line=$(cat "$2/cmd")
+    : >"$2/cmd"
+    bash -c "$line" </dev/null >/dev/null 2>&1
+    : >"$2/done"
+  else
+    command sleep 0.1
+  fi
+done
+SH
+  bash "$2/pane.sh" "$1" "$2" >/dev/null 2>&1 </dev/null &
+  printf '%s' "$!"
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -e "$2/ready" ] && break
+    command sleep 0.2
+  done
+  [ -e "$2/ready" ] || fail 'the pane emulator never reached the slot'
+}
+
+guard_wrap_tmux_into_pane() { # <fakebin> <emulator-dir>
+  mv "$1/tmux" "$1/tmux.real"
+  cat >"$1/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = send-keys ]; then
+  for a in "\$@"; do
+    case "\$a" in
+      "bash -- '"*".slot-provision."*)
+        rm -f "$2/done"
+        printf '%s\n' "\$a" >"$2/cmd"
+        for i in \$(seq 1 300); do [ -e "$2/done" ] && exit 0; command sleep 0.1; done
+        exit 1
+        ;;
+    esac
+  done
+fi
+exec "$1/tmux.real" "\$@"
+SH
+  chmod +x "$1/tmux"
+}
+
+test_reset_guard_s4_in_pane_probe_without_pane_pid() {
+  local rec id pane foreign
+  id='guard-s4-in-pane'
+  rec=$(make_case guard-s4inpane "$id")
+  read_case_record "$rec"
+  pane=$(guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
+  guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
+  guard_expect_launch S4 'no pane pid is reported; the pane shell holds the slot cwd and is excluded by running the probe inside it' "$id" --scout
+  kill "$pane" 2>/dev/null || true
+  id='guard-s4-in-pane-foreign'
+  rec=$(make_case guard-s4inpanef "$id")
+  read_case_record "$rec"
+  pane=$(guard_start_pane_emulator "$POOL_DIR" "$CASE_DIR/emulator")
+  guard_wrap_tmux_into_pane "$FAKEBIN_DIR" "$CASE_DIR/emulator"
+  (cd "$POOL_DIR" && exec sleep 600) &
+  foreign=$!
+  guard_expect_refusal S4 'no pane pid is reported; a foreign holder beside the pane shell' 'reset refused (holder_cwd)' "$id" --scout
+  kill "$foreign" "$pane" 2>/dev/null || true
+  pass 'S4: with no pane pid the probe runs inside the pane, excluding its shell and still refusing a foreign holder'
+}
+
 # ---- S5: unknown refuses --------------------------------------------------------------------
 test_reset_guard_s5_unknown_classes() {
   local rec id common farm
@@ -2255,6 +2392,8 @@ test_reset_guard_s4_cwd_holder
 test_reset_guard_s4_worktree_lock
 test_reset_guard_s4_foreign_lease
 test_reset_guard_s4_vernant_lease_and_contention
+test_reset_guard_s4_pane_pid_exemption
+test_reset_guard_s4_in_pane_probe_without_pane_pid
 test_reset_guard_s5_unknown_classes
 test_reset_guard_s5b_transitions
 

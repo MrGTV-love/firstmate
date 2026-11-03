@@ -956,6 +956,10 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_holder_probe \"the working-directory probe could not run inside the acquired pane\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
           "match": "fm_slot_guard_refuse unknown_holder_probe \"lsof could not list the processes' working directories (exit $rc)\""
         },
         {
