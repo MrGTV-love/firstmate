@@ -2060,11 +2060,26 @@ test_successor_of_fresh_respawn_keeps_declaration() {
   pass 'a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch'
 }
 
+test_successor_of_respawn_refusal_names_both_routes() {
+  local out rc=0
+  make_successor_case routes advertise
+  successor_pred pred-live
+  out=$(OWNER_MODE=refuse-supersedes run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor'
+  "$FAKEBIN_DIR/tmux-real" kill-window -t "fm-$SUCC_ID" 2>/dev/null || true
+  rc=0
+  out=$(run_successor_spawn) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a fresh spawn replaced an unfulfilled declaration: $out"
+  assert_contains "$out" "fm-spawn.sh $SUCC_ID --relaunch while the window lives" "the refusal does not name the --relaunch route: $out"
+  assert_contains "$out" "a fresh spawn naming the same --successor-of pred-live once it is gone" "the refusal does not name the same-flag respawn route: $out"
+  pass 'the respawn-drop refusal names --relaunch and the same-flag respawn'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_task_record_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock|test_successor_of_fresh_respawn_keeps_declaration|test_successor_of_respawn_refusal_names_both_routes) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -2089,6 +2104,7 @@ test_successor_of_task_record_is_rechecked_at_handover
 test_successor_of_batch_is_refused
 test_successor_of_refuses_before_any_lock
 test_successor_of_fresh_respawn_keeps_declaration
+test_successor_of_respawn_refusal_names_both_routes
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness

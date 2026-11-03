@@ -2378,7 +2378,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ] && [ -f "$STATE/$ID.meta" ] && [ 
   [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ]; then
   spawn_kept_pred=$(fm_meta_get "$STATE/$ID.meta" successor_of)
   if [ -n "$spawn_kept_pred" ] && [ "$spawn_kept_pred" != "$SUCCESSOR_OF" ]; then
-    echo "error: $ID keeps an unfulfilled successor declaration of $spawn_kept_pred; retry it with fm-spawn.sh $ID --relaunch" >&2
+    echo "error: $ID keeps an unfulfilled successor declaration of $spawn_kept_pred; retry it with fm-spawn.sh $ID --relaunch while the window lives, or a fresh spawn naming the same --successor-of $spawn_kept_pred once it is gone" >&2
     exit 1
   fi
 fi
