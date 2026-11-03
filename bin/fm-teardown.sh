@@ -391,9 +391,9 @@
 # delivery as the reassigned-slot cleanup above does, before its next
 # destructive step, refusing with its records in place when that proof fails.
 # That holds when the record's copy is the slot itself. A current copy nested
-# inside the slot, reassociated or not, stays this task's own whoever the claim
-# names: only the slot steps are dropped, and the copy's runtime is retired and
-# its landing proved exactly as for any reassociated copy.
+# inside the slot, reassociated or, for a ship, not, stays this task's own
+# whoever the claim names: only the slot steps are dropped, and the copy's
+# runtime is retired and its landing proved exactly as for any reassociated copy.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
 # unreadable, or needing jq), or an unleased slot whose installed treehouse is
 # missing or has no lease command (probed once with treehouse lease --help),
