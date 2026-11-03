@@ -3458,14 +3458,16 @@ test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver() {
     else
       route_sweep --apply
     fi
-    with=$(route_line_of held)
+    # A live launcher's reason carries its start age, which ticks between the two
+    # runs; the age is the clock, not the hold, so it is masked before comparing.
+    with=$(route_line_of held | sed 's/start age=[0-9][0-9]*s/start age=<n>s/')
     mv "$HOMED/data/supersedence-records.tsv" "$HOMED/data/supersedence-records.off"
     if [ "$class" = no-interpreter ]; then
       FM_TEARDOWN_VERNANT_PYTHON="$W/no-such-python" run_sweep --apply
     else
       route_sweep --apply
     fi
-    without=$(route_line_of held)
+    without=$(route_line_of held | sed 's/start age=[0-9][0-9]*s/start age=<n>s/')
     [ -n "$with" ] || fail "hold $class: the copy is missing from the report"
     assert_equals "$without" "$with" "hold $class: a valid record changed how the copy is held"
     printf 'hold %s: with a record: %s\n' "$class" "$(printf '%s' "$with" | awk -F '\t' '{ print $1 ": " substr($NF, 1, 160) }')"
