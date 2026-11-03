@@ -1,0 +1,16 @@
+### role gate (set -eu script) with FM_GUARD_EVENT_LOG=/dev/null/x
+no consent: rc=1 (expect 1)
+authorized: task consent for github.com/mrgtv-love/firstmate
+consent: rc=0 (expect 0)
+### gate refusal with an unwritable log, unmarked home
+spawn rc=3 (expect 3)
+### api-key refusal with an unwritable log
+listed+set rc=1 (expect 1)
+### writer removed from PATH lookup: event script not executable copy is irrelevant; writer missing jq
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FJ8XSS0AWB1CFHTT675C3M/bin/fm-guard-event.sh: line 66: dirname: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FJ8XSS0AWB1CFHTT675C3M/bin/fm-guard-event.sh: line 91: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FJ8XSS0AWB1CFHTT675C3M/fm-session-lock-lib.sh: No such file or directory
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FJ8XSS0AWB1CFHTT675C3M/bin/fm-guard-event.sh: line 103: date: command not found
+writer without jq on PATH: rc=0
+### main-added emitter: fm-worker-env.py --startup attributes the task from FM_TASK_ID
+rc=0
+{"guard":"spawn-shell-startup-confinement","rule":"spawn-shell-startup-confinement","task":"w-start","decision":"allow"}

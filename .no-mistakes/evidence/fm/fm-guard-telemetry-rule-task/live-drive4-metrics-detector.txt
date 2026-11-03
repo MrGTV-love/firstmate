@@ -1,0 +1,88 @@
+### S-metrics text (lab log:       32 rows from the real emitters above)
+METRIC claude-api-billing opportunities=13 denies=2 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=11 overrides=2 bypasses=0 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+METRIC compact-adviser opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC gate-agent-containment opportunities=6 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=6 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC guard-watcher-down-warning opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+METRIC upstream-publish-role opportunities=7 denies=5 warns=0 override_rate=0.0 median_clear_attempts=1.0 recurrences=1 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=2 deny_only=false zero_events_days=0
+RULE claude-api-billing rule=inherited-credential opportunities=13 denies=2 warns=0 override_rate=1.0 median_clear_attempts=1 recurrences=0 verdict=unmeasured allows=11 overrides=2 bypasses=0 workarounds=null refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=false zero_events_days=0
+RULE compact-adviser rule=FM_COMPACT_ADVISER_DISABLE opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE gate-agent-containment rule=gate-context opportunities=6 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=6 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE guard-watcher-down-warning rule=FM_SPAWN_NO_GUARD opportunities=0 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=1 bypasses=1 workarounds=null refusal_to_bypass_ratio=null repeat_denies=0 deny_only=false zero_events_days=0
+RULE upstream-publish-role rule=publication-authority opportunities=7 denies=5 warns=0 override_rate=0.0 median_clear_attempts=1.0 recurrences=1 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=2 deny_only=false zero_events_days=0
+REPEAT upstream-publish-role rule=publication-authority task=rep-t denies=2 repeat_denies=1
+REPEAT upstream-publish-role rule=publication-authority task=role-t1 denies=2 repeat_denies=1
+QUIET secondmate-sync zero_events_days=30
+METRICS_SUMMARY guards=5 measured=0 cut=0 unmeasured=5 malformed_rows=0
+rc=0
+
+### S-metrics json (selected fields)
+{
+  "window_days": 30,
+  "malformed_rows": null,
+  "zero_event_guards": [],
+  "guards": [
+    {
+      "guard": null,
+      "denies": 2,
+      "overrides": 2,
+      "bypasses": 0,
+      "refusal_to_bypass_ratio": 1.0,
+      "repeat_denies": 0,
+      "deny_only": false,
+      "zero_events_days": 0
+    },
+    {
+      "guard": null,
+      "denies": 0,
+      "overrides": 1,
+      "bypasses": 1,
+      "refusal_to_bypass_ratio": null,
+      "repeat_denies": 0,
+      "deny_only": false,
+      "zero_events_days": 0
+    },
+    {
+      "guard": null,
+      "denies": 0,
+      "overrides": 0,
+      "bypasses": 0,
+      "refusal_to_bypass_ratio": null,
+      "repeat_denies": 0,
+      "deny_only": false,
+      "zero_events_days": 0
+    },
+    {
+      "guard": null,
+      "denies": 5,
+      "overrides": 0,
+      "bypasses": 0,
+      "refusal_to_bypass_ratio": 0.0,
+      "repeat_denies": 2,
+      "deny_only": false,
+      "zero_events_days": 0
+    }
+  ]
+}
+
+### S-metrics read-only: log hash before/after
+log unchanged by metrics
+
+### S-detector: real instance 5ad471a2b
+GUARD_WORKAROUND task=train-5 signatures=tree-equal-merge:5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c (read-only evidence; reassess the guard)
+rc=0
+{"guard": "merge-landing-tree-tested", "rule": "base-containment", "task": "train-5", "head": "5ad471a2bcdbe867ce73d1c880b8cb2a0371f68c", "kind": "tree-equal-merge"}
+refs unchanged by detector
+5ad471a2b tree = 38202b99eb945630588286dee09d91b76cca111b; first parent tree = 38202b99eb945630588286dee09d91b76cca111b
+
+### S-detector negative: an ordinary merge head is not reported
+rc=0
+
+### S-detector + metrics: signature feed counts in the ratio
+METRIC upstream-publish-role opportunities=7 denies=5 warns=0 override_rate=0.0 median_clear_attempts=1.0 recurrences=1 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=2 deny_only=false zero_events_days=0
+RULE upstream-publish-role rule=publication-authority opportunities=7 denies=5 warns=0 override_rate=0.0 median_clear_attempts=1.0 recurrences=1 verdict=unmeasured allows=2 overrides=0 bypasses=0 workarounds=0 refusal_to_bypass_ratio=0.0 repeat_denies=2 deny_only=false zero_events_days=0
+REPEAT upstream-publish-role rule=publication-authority task=rep-t denies=2 repeat_denies=1
+REPEAT upstream-publish-role rule=publication-authority task=role-t1 denies=2 repeat_denies=1
+METRICS_SUMMARY guards=1 measured=0 cut=0 unmeasured=1 malformed_rows=0
+
+### CORRECTION: the JSON excerpt above used a wrong jq path (my query, not the product), so it printed guard=null. Real JSON, same log:
+{"window_days":30,"zero_event_guards":["secondmate-sync"],"guards":[{"id":"claude-api-billing","opportunities":13,"denies":2,"warns":0,"override_rate":1.0,"median_clear_attempts":1,"recurrences":0,"verdict":"unmeasured","harm":"irreversible","allows":11,"overrides":2,"bypasses":0,"workarounds":null,"refusal_to_bypass_ratio":1.0,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":false,"zero_events_days":0},{"id":"compact-adviser","opportunities":0,"denies":0,"warns":0,"override_rate":0,"median_clear_attempts":0,"recurrences":0,"verdict":"unmeasured","harm":"reversible","allows":0,"overrides":1,"bypasses":1,"workarounds":null,"refusal_to_bypass_ratio":null,"repeat_denies":0,"repeat_denies_per_task":[],"deny_only":false,"zero_events_days":0},{"id":"upstream-publish-role","opportunities":7,"denies":5,"warns":0,"override_rate":0.0,"median_clear_attempts":1.0,"recurrences":1,"verdict":"unmeasured","harm":"irreversible","allows":2,"overrides":0,"bypasses":0,"workarounds":null,"refusal_to_bypass_ratio":0.0,"repeat_denies":2,"repeat_denies_per_task":[{"task":"rep-t","denies":2,"repeat_denies":1,"rule":"publication-authority"},{"task":"role-t1","denies":2,"repeat_denies":1,"rule":"publication-authority"}],"deny_only":false,"zero_events_days":0}],"summary":{"guards":3,"measured":0,"cut":0,"unmeasured":3,"malformed_rows":0}}

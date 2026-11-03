@@ -1,0 +1,13 @@
+ok - padded API selectors are refused while subscription selectors remain admitted
+ok - padded role and fallback selectors are diagnosed without writes or secret output
+approval absent:
+retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+approval present: no billing findings
+ok - recorded fallback entries are exact and entry-scoped; other entries, roles, GPT and openai stay flagged
+ok - a first-time seed reads the code root record only when the home has none, and honors only the recorded entries
+ok - malformed and unreadable approval records diagnose configuration problems without granting exceptions
+ok - an approval record alone never produces a diagnostic when no omp config exists
+ok - all ordered role patterns are inspected and subscription-only lists stay unflagged
+all fm-api-key-guard-lib tests passed

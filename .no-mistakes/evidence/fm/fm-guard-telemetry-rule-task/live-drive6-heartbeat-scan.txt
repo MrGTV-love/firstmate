@@ -1,0 +1,10 @@
+### home scan (what the heartbeat runs) over 3 lab task records
+GUARD_WORKAROUND task=wa-base-only signatures=base-merge-only-after-refusal:7f6a75d802901db2ee4b3a3db52d78d4f0b0afb4 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=wa-tree-eq signatures=tree-equal-merge:318b132b5648ddae795b8788ce4d951c55ad2ea7 (read-only evidence; reassess the guard)
+rc=0
+fixture refs unchanged
+lab state dir unchanged
+### heartbeat function: guard_workarounds_detached publishes state/.guard-workarounds-next
+report:
+GUARD_WORKAROUND task=wa-base-only signatures=base-merge-only-after-refusal:7f6a75d802901db2ee4b3a3db52d78d4f0b0afb4 (read-only evidence; reassess the guard)
+GUARD_WORKAROUND task=wa-tree-eq signatures=tree-equal-merge:318b132b5648ddae795b8788ce4d951c55ad2ea7 (read-only evidence; reassess the guard)

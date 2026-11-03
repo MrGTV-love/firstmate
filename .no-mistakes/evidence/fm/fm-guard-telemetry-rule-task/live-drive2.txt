@@ -1,0 +1,30 @@
+### S-spawn-switches: real fm-spawn.sh in the marked lab home with FM_SPAWN_NO_GUARD=1 FM_COMPACT_ADVISER_DISABLE=1
+spawn rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.dv6CoH
+bin/fm-spawn.sh: line 4399: cd: /tmp/fmtest-01M6/no-such-project: No such file or directory
+{"guard":"gate-agent-containment","rule":"gate-context","task":"lab-t1","decision":"allow","override":false,"cleared_by":"","actor":"gate"}
+{"guard":"guard-watcher-down-warning","rule":"FM_SPAWN_NO_GUARD","task":"lab-t1","decision":"bypass","override":true,"cleared_by":"","actor":"main"}
+{"guard":"compact-adviser","rule":"FM_COMPACT_ADVISER_DISABLE","task":"lab-t1","decision":"bypass","override":true,"cleared_by":"","actor":"main"}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"lab-t1","decision":"allow","override":false,"cleared_by":"","actor":"main"}
+### S-spawn-internal: FM_SPAWN_NO_GUARD=internal (firstmate's own re-exec) records no bypass
+spawn rc=1
+{"guard":"gate-agent-containment","rule":"gate-context","task":"lab-t2","decision":"allow","override":false,"cleared_by":"","actor":"gate"}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"lab-t2","decision":"allow","override":false,"cleared_by":"","actor":"main"}
+
+### S-apikey: claude-api-billing via the real library entrypoint (dummy non-credential value)
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+/tmp/fmtest-01M6/drive2.sh: line 26: $6: unbound variable
+credential value in log: 0
+
+### S-role-nm: main's no-mistakes registration check still refuses a mismatched registration, and records deny
+refused: origin names github.com/mrgtv-love/firstmate but the no-mistakes registration for /tmp/fmtest-01M6/fmclone publishes to github.com/someone-else/firstmate; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open its pull request against github.com/someone-else/firstmate instead; the owner must reconcile the no-mistakes registration with origin, then dispatch again
+check rc=1
+authorized: task consent for github.com/mrgtv-love/firstmate
+check rc=0 (unregistered)
+{"guard":"upstream-publish-role","rule":"publication-authority","task":"role-nm","decision":"deny","override":false,"cleared_by":"","actor":"main"}
+{"guard":"upstream-publish-role","rule":"publication-authority","task":"role-nm","decision":"allow","override":false,"cleared_by":"","actor":"main"}

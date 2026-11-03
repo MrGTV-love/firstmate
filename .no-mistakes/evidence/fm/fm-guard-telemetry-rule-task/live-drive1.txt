@@ -1,0 +1,45 @@
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6FJ8XSS0AWB1CFHTT675C3M/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.dv6CoH && rm -rf /Users/charlesabrooker/tmp/fm-lab.dv6CoH
+== FM_HOME=/Users/charlesabrooker/tmp/fm-lab.dv6CoH
+
+### S-writer: stable session, rule, task
+rc=0
+rc=0 (other process)
+rc=0 (no harness session)
+rc=0 (task)
+-- log rows:
+{"guard":"demo-guard","rule":"sub-a","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.dv6CoH:sessA","decision":"deny","override":false,"actor":"main","cleared_by":""}
+{"guard":"demo-guard","rule":"sub-a","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.dv6CoH:sessA","decision":"deny","override":false,"actor":"main","cleared_by":""}
+{"guard":"demo-guard","rule":"sub-a","task":"","session":"/Users/charlesabrooker/tmp/fm-lab.dv6CoH:unattributed","decision":"deny","override":false,"actor":"main","cleared_by":""}
+{"guard":"demo-guard","rule":"sub-a","task":"T-1","session":"T-1","decision":"allow","override":false,"actor":"main","cleared_by":""}
+pid-like sessions in log: 0
+
+### S-writer-failure: unwritable log never fails caller
+fm-guard-event: cannot append to /tmp/fmtest-01M6/ro/sub/x.jsonl
+rc=0 (unwritable dir)
+fm-guard-event: cannot append to /dev/null/x
+rc=0 (path under a file)
+rc=0 (bad decision)
+
+### S-gate-deny: real fm-spawn.sh in gate context against an UNMARKED home refuses and records deny with task
+spawn rc=3
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+
+{"guard":"gate-agent-containment","rule":"gate-context","task":"gate-t1","decision":"deny","override":false,"actor":"gate"}
+
+### S-gate-bypass: FM_GATE_REFUSE_BYPASS=1 records a bypass row
+refuse fn rc=0
+{"guard":"gate-agent-containment","rule":"FM_GATE_REFUSE_BYPASS","task":"gate-t2","decision":"bypass","override":true}
+
+### S-role: real fm-role.sh check on a firstmate clone (deny, then allow with consent)
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/mrgtv-love/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in /Users/charlesabrooker/tmp/fm-lab.dv6CoH/config/firstmate-role, or one-task consent recorded at dispatch as --upstream-consent <host>/<owner>/<repo>
+check rc=1
+authorized: task consent for github.com/mrgtv-love/firstmate
+check rc=0
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/mrgtv-love/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in /Users/charlesabrooker/tmp/fm-lab.dv6CoH/config/firstmate-role, or one-task consent recorded at dispatch as --upstream-consent <host>/<owner>/<repo>
+check rc=1
+-- log rows:
+{"guard":"upstream-publish-role","rule":"publication-authority","task":"role-t1","session":"role-t1","decision":"deny","override":false,"actor":"main","cleared_by":""}
+{"guard":"upstream-publish-role","rule":"publication-authority","task":"role-t1","session":"role-t1","decision":"allow","override":false,"actor":"main","cleared_by":""}
+{"guard":"upstream-publish-role","rule":"publication-authority","task":"role-t1","session":"role-t1","decision":"deny","override":false,"actor":"main","cleared_by":""}

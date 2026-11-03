@@ -1,0 +1,34 @@
+### S-apikey-spawn: real fm-spawn.sh, config/launch-env-allowlist lists ANTHROPIC_API_KEY, dummy value set
+spawn rc=1
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist
+{"guard":"gate-agent-containment","rule":"gate-context","task":"key-t1","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-t1","decision":"deny","override":false,"cleared_by":""}
+### same, with --allow-api-key (waiver used)
+spawn rc=1
+{"guard":"gate-agent-containment","rule":"gate-context","task":"key-t2","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-t2","decision":"allow","override":true,"cleared_by":"allow-api-key"}
+### same allowlist, key unset, --allow-api-key (waiver not used)
+spawn rc=1
+{"guard":"gate-agent-containment","rule":"gate-context","task":"key-t3","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-t3","decision":"allow","override":false,"cleared_by":""}
+### no allowlist (main's default boundary), dummy key set, no opt-in: allowed
+spawn rc=1
+{"guard":"gate-agent-containment","rule":"gate-context","task":"key-t4","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-t4","decision":"allow","override":false,"cleared_by":""}
+credential value in log: 0
+
+### S-apikey-lib: library entrypoint matrix
+allowlist lists key, key set       rc=1
+allowlist lists key, key unset     rc=0
+default boundary, key set          rc=0
+--allow-api-key, key set (waiver)  rc=0
+--allow-api-key, key unset         rc=0
+--allow-api-key, allowlist omits   rc=0
+worker-account pin, key set        rc=0
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"deny","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":true,"cleared_by":"allow-api-key"}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":false,"cleared_by":""}
+{"guard":"claude-api-billing","rule":"inherited-credential","task":"key-lib","decision":"allow","override":false,"cleared_by":""}

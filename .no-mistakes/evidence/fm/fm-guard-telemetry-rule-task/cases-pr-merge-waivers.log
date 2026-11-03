@@ -1,0 +1,3 @@
+ok - fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure
+ok - fm-pr-merge --allow-missing waives only its named unreported check
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge

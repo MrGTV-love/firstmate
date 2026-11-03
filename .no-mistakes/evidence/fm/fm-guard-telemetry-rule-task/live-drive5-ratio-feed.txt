@@ -1,0 +1,10 @@
+### S-detector feed into metrics: the merge guard that owns the signature, with one deny for the same task
+METRIC merge-landing-tree-tested opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+RULE merge-landing-tree-tested rule=base-containment opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=1 refusal_to_bypass_ratio=1.0 repeat_denies=0 deny_only=true zero_events_days=0
+METRICS_SUMMARY guards=1 measured=0 cut=0 unmeasured=1 malformed_rows=0
+### without the feed:
+METRIC merge-landing-tree-tested opportunities=1 denies=1 warns=0 override_rate=0.0 median_clear_attempts=0 recurrences=0 verdict=unmeasured allows=0 overrides=0 bypasses=0 workarounds=null refusal_to_bypass_ratio=0.0 repeat_denies=0 deny_only=true zero_events_days=0
+### JSON shape
+["guards","log","present","rules","summary","window_days","zero_event_guards"]
+["secondmate-sync"]
+30
