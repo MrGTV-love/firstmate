@@ -1340,35 +1340,78 @@ teardown_retained_fields() {  # <record> <key>
   awk -v k="$2" 'NR > 3 && index($0, k "=") == 1 { print substr($0, length(k) + 2) }' "$1"
 }
 
+# Writes to <list> the NUL-separated "./<path>" of every file, symlink and FIFO
+# under the given <entry>... of <root> (a socket holds no bytes and is skipped).
+# Fails when any cannot be listed.
+teardown_retained_files() {  # <root> <list> <entry>...
+  local root=$1 list=$2 entry
+  shift 2
+  : > "$list" || return 1
+  for entry in "$@"; do
+    if [ -d "$root/$entry" ] && [ ! -L "$root/$entry" ]; then
+      (cd "$root" && find -P "./$entry" ! -type d ! -type s -print0) >> "$list" 2>/dev/null || return 1
+    else
+      printf './%s\0' "$entry" >> "$list" || return 1
+    fi
+  done
+}
+
+# Prints "<sha256><TAB><path>" for every regular file in the NUL-separated "./<path>"
+# <list> under <root>, hashing in batches. Fails when a path holds a newline, a
+# file cannot be read, or the hasher answers anything else.
+teardown_retained_sums() {  # <root> <list>
+  local root=$1 list=$2 out line
+  local -a hasher=(shasum -a 256)
+  command -v shasum >/dev/null 2>&1 || hasher=(sha256sum)
+  [ -s "$list" ] || return 0
+  [ "$(tr -d '\0' < "$list" | wc -l | tr -d ' ')" = 0 ] || return 1
+  out=$(cd "$root" && xargs -0 "${hasher[@]}" < "$list") || return 1
+  while IFS= read -r line; do
+    [[ $line =~ ^[0-9a-f]{64}\ \ \./ ]] || return 1
+    printf '%s\t%s\n' "${line:0:64}" "${line:68}"
+  done <<< "$out"
+}
+
 # One SHA-256 over the path, type and bytes or link target of every file,
 # symlink and FIFO in <copy>'s ignored entries other than the regenerable class
-# (all mode of teardown_preservable_ignored); a socket holds no bytes and is
-# skipped. Fails when any of it cannot be listed or read.
+# (all mode of teardown_preservable_ignored). Fails when any cannot be listed or read.
 teardown_retained_payload() {  # <copy>
-  local copy=$1 entries entry rel digest list tmp rc=0
+  local copy=$1 entries entry p rel work rc=0
+  local -a named=()
   entries=$(teardown_preservable_ignored "$copy" all) || return 1
-  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-retained-payload.XXXXXX") || return 1
-  list=$(mktemp "${TMPDIR:-/tmp}/fm-retained-list.XXXXXX") || { rm -f "$tmp"; return 1; }
   while IFS= read -r entry; do
-    [ -n "$entry" ] || continue
-    find -P "$copy/$entry" ! -type d ! -type s -print0 > "$list" 2>/dev/null || { rc=1; break; }
-    while IFS= read -r -d '' rel; do
-      rel=${rel#"$copy"/}
+    [ -z "$entry" ] || named+=("$entry")
+  done <<< "$entries"
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-payload.XXXXXX") || return 1
+  if [ "${#named[@]}" -gt 0 ]; then
+    teardown_retained_files "$copy" "$work/all" "${named[@]}" || rc=1
+  else
+    : > "$work/all"
+  fi
+  : > "$work/reg"
+  : > "$work/lines"
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' p; do
+      rel=${p#./}
       if [ -L "$copy/$rel" ]; then
-        digest=l$(readlink "$copy/$rel") || { rc=1; break 2; }
+        printf '%s\tl%s\n' "$rel" "$(readlink "$copy/$rel")" >> "$work/lines" || { rc=1; break; }
       elif [ -f "$copy/$rel" ]; then
-        digest=f$(teardown_ignored_sha256 "$copy/$rel") || { rc=1; break 2; }
+        printf '%s\0' "$p" >> "$work/reg" || { rc=1; break; }
       elif [ -p "$copy/$rel" ]; then
-        digest=p
+        printf '%s\tp\n' "$rel" >> "$work/lines" || { rc=1; break; }
       else
         rc=1
-        break 2
+        break
       fi
-      printf '%s\t%s\0' "$rel" "$digest" >> "$tmp" || { rc=1; break 2; }
-    done < "$list"
-  done <<< "$entries"
-  [ "$rc" != 0 ] || LC_ALL=C sort -z "$tmp" | teardown_ignored_sha256 || rc=1
-  rm -f "$tmp" "$list"
+    done < "$work/all"
+  fi
+  if [ "$rc" = 0 ]; then
+    teardown_retained_sums "$copy" "$work/reg" > "$work/sums" || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    { cat "$work/lines"; awk -F'\t' '{ print $2 "\tf" $1 }' "$work/sums"; } | LC_ALL=C sort -u | teardown_ignored_sha256 || rc=1
+  fi
+  rm -rf "$work"
   return "$rc"
 }
 
@@ -1396,13 +1439,17 @@ teardown_retained_preserve_dir() {  # <copy>
 # Is <entry> a plain path inside <copy> that exists and is reached through no
 # symlink? Driver-named paths are never trusted to stay inside the copy.
 teardown_retained_entry_ok() {  # <copy> <entry>
-  local copy=$1 entry=$2 part prefix=
+  local copy=$1 entry=$2 rest part prefix=
   case "$entry" in ''|/*|*$'\n'*) return 1 ;; esac
-  while IFS= read -r part; do
+  rest=$entry
+  while :; do
+    part=${rest%%/*}
     case "$part" in ''|.|..) return 1 ;; esac
     prefix=${prefix:+$prefix/}$part
     [ "$prefix" = "$entry" ] || [ ! -L "$copy/$prefix" ] || return 1
-  done < <(printf '%s\n' "$entry" | tr '/' '\n')
+    [ "$part" != "$rest" ] || break
+    rest=${rest#*/}
+  done
   [ -e "$copy/$entry" ] || [ -L "$copy/$entry" ]
 }
 
@@ -1414,40 +1461,63 @@ teardown_retained_entry_ok() {  # <copy> <entry>
 # the driver may still call unique); a different one still returns 1, so a
 # preserved byte is never overwritten.
 teardown_retained_cover() {  # <strict|adopt> <copy> <dir> <entry>...
-  local mode=$1 copy=$2 dir=$3 entry rel have want list rc=0
+  local mode=$1 copy=$2 dir=$3 p rel work rc=0
   shift 3
-  list=$(mktemp "${TMPDIR:-/tmp}/fm-retained-list.XXXXXX") || return 1
-  for entry in "$@"; do
-    find -P "$copy/$entry" ! -type d ! -type s -print0 > "$list" 2>/dev/null || { rc=1; break; }
-    while IFS= read -r -d '' rel; do
-      rel=${rel#"$copy"/}
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-retained-cover.XXXXXX") || return 1
+  teardown_retained_files "$copy" "$work/all" "$@" || rc=1
+  : > "$work/reg"
+  : > "$work/missing"
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' p; do
+      rel=${p#./}
       if [ ! -e "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; then
-        [ "$mode" = adopt ] || { rc=1; break 2; }
-        if ! mkdir -p "$(dirname "$dir/$rel")" || ! cp -Pp "$copy/$rel" "$dir/$rel"; then
-          rc=1
-          break 2
-        fi
+        [ "$mode" = adopt ] || { rc=1; break; }
+        printf '%s\0' "$rel" >> "$work/missing" || { rc=1; break; }
       fi
+    done < "$work/all"
+  fi
+  # Adopted entries are copied in one pass, only where the preserve has nothing.
+  if [ "$rc" = 0 ] && [ -s "$work/missing" ]; then
+    (set -o pipefail; cd "$copy" && tar -cf - --null -T "$work/missing" | tar -xpf - -C "$dir") || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' p; do
+      rel=${p#./}
       if [ -L "$copy/$rel" ]; then
-        [ -L "$dir/$rel" ] && [ "$(readlink "$copy/$rel")" = "$(readlink "$dir/$rel")" ] || { rc=1; break 2; }
+        { [ -L "$dir/$rel" ] && [ "$(readlink "$copy/$rel")" = "$(readlink "$dir/$rel")" ]; } || { rc=1; break; }
       elif [ -f "$copy/$rel" ]; then
-        { [ -f "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; } || { rc=1; break 2; }
-        have=$(teardown_ignored_sha256 "$copy/$rel") || { rc=1; break 2; }
-        want=$(teardown_ignored_sha256 "$dir/$rel") || { rc=1; break 2; }
-        { [ "$have" = "$want" ] && cmp -s "$copy/$rel" "$dir/$rel"; } || { rc=1; break 2; }
-        if ! grep -qxF -- "$have  $rel" "$dir/SHA256SUMS" 2>/dev/null; then
-          [ "$mode" = adopt ] || { rc=1; break 2; }
-          printf '%s  %s\n' "$have" "$rel" >> "$dir/SHA256SUMS" || { rc=1; break 2; }
-        fi
+        { [ -f "$dir/$rel" ] && [ ! -L "$dir/$rel" ]; } || { rc=1; break; }
+        printf '%s\0' "$p" >> "$work/reg" || { rc=1; break; }
       elif [ -p "$copy/$rel" ]; then
-        [ -p "$dir/$rel" ] || { rc=1; break 2; }
+        [ -p "$dir/$rel" ] || { rc=1; break; }
       else
         rc=1
-        break 2
+        break
       fi
-    done < "$list"
-  done
-  rm -f "$list"
+    done < "$work/all"
+  fi
+  if [ "$rc" = 0 ]; then
+    teardown_retained_sums "$copy" "$work/reg" > "$work/copy.sums" || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    teardown_retained_sums "$dir" "$work/reg" > "$work/dir.sums" || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    cmp -s "$work/copy.sums" "$work/dir.sums" || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    awk -F'\t' '{ print $1 "  " $2 }' "$work/copy.sums" | LC_ALL=C sort -u > "$work/want"
+    LC_ALL=C sort -u "$dir/SHA256SUMS" > "$work/have" 2>/dev/null || : > "$work/have"
+    LC_ALL=C comm -23 "$work/want" "$work/have" > "$work/unlisted"
+    if [ -s "$work/unlisted" ]; then
+      if [ "$mode" = adopt ]; then
+        cat "$work/unlisted" >> "$dir/SHA256SUMS" || rc=1
+      else
+        rc=1
+      fi
+    fi
+  fi
+  rm -rf "$work"
   return "$rc"
 }
 

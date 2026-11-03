@@ -6649,6 +6649,29 @@ test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses() {
   pass "each other state of an own copy the driver keeps refuses with its cause and the same disposition with and without --force, and the clean input closes the same way with --force"
 }
 
+# The recorded d1 case names thousands of derived files (graphify-out/cache/*.json)
+# as unique; the route must stay linear in them and still verify each one.
+test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each() {
+  local rc i unique='' preserve exclude
+  make_retained_case retained-many enclosing
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' 'graphify-out/' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/graphify-out/cache"
+  for i in $(seq 1 600); do
+    printf 'derived %s\n' "$i" > "$FOREIGN_COPY/graphify-out/cache/f$i.json"
+    unique="$unique graphify-out/cache/f$i.json"
+  done
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained "FM_STUB_UNIQUE=$unique"
+  expect_code 0 "$rc" "retained-many: a driver naming many unique paths must still close: $(tail -n 5 "$FOREIGN_CASE/stderr")"
+  retained_assert_closed retained-many
+  preserve=$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  assert_equals 600 "$(find "$preserve/graphify-out/cache" -type f | wc -l | tr -d ' ')" "retained-many: not every named file reached the preserve"
+  assert_equals 600 "$(grep -c ' graphify-out/cache/f' "$preserve/SHA256SUMS")" "retained-many: SHA256SUMS does not list every named file"
+  assert_equals 600 "$(retained_field "$(retained_record_path)" unique | grep -c graphify-out)" "retained-many: the record does not list every named file"
+  pass "a driver that names 600 derived files as unique still closes the task, with every one verified byte for byte, copied into the preserve and listed once in the record"
+}
+
 teardown_test_cases=(
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
@@ -6858,6 +6881,7 @@ test_a_landed_task_closes_around_an_own_copy_the_driver_keeps
 test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing
 test_a_changed_kept_copy_is_assessed_afresh
 test_every_other_state_of_an_own_copy_the_driver_keeps_still_refuses
+test_a_driver_that_names_many_unique_paths_still_closes_after_verifying_each
 )
 
 # In the combined tests/fm-teardown.test.sh run,
