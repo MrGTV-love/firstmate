@@ -956,9 +956,11 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
         if timeout is not None:
             (home / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\nagent_timeout: "%s"\n' % timeout)
         with sqlite3.connect(db) as connection:
-            connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT, duration_ms INTEGER)')
-            connection.executemany('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)',
-                                   [('i%d' % i, 'old', 'ci', 'ci', ms) for i, ms in enumerate(ci_ms)])
+            connection.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT, duration_ms INTEGER, exit_status TEXT)')
+            connection.executemany('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)',
+                                   [('i%d' % i, 'old', 'ci', 'ci', ms, 'ok') for i, ms in enumerate(ci_ms)] +
+                                   # A refused or timed-out invocation is recorded too, and never counts toward the bound.
+                                   [('refused', 'old', 'ci', 'ci', 10 ** 9, 'error'), ('review', 'old', 'review', 'review', 10 ** 9, 'ok')])
         for run, step, status, pid in runs:
             (folder / ('wt-' + run)).mkdir()
             change(db, "INSERT INTO runs (id, status, repo_id, worktree_dir, branch) VALUES (?, 'running', 'repo', ?, ?)",

@@ -982,10 +982,16 @@ def agent_budget_secs() -> Optional[float]:
 
 
 def ci_fix_p99_secs() -> Optional[float]:
-    """The nearest-rank 99th percentile of recorded CI-step agent invocation durations, or None."""
+    """The nearest-rank 99th percentile of completed CI-step agent invocation durations, or None.
+
+    Only invocations that ended ok count: a refused launch, a timed-out or
+    cancelled one is also recorded by the daemon, and counting it would let
+    refusals and holds shrink the next bound.
+    """
     try:
         values = [row[0] for row in read_host_db(
-            "SELECT duration_ms FROM agent_invocations WHERE step_name = ? AND duration_ms > 0", (CI_STEP,))]
+            "SELECT duration_ms FROM agent_invocations WHERE step_name = ? AND exit_status = 'ok' AND duration_ms > 0",
+            (CI_STEP,))]
     except (OSError, sqlite3.Error, ValueError):
         return None
     return rank_quantile(values, CI_FIX_QUANTILE) / 1000.0 if values else None
