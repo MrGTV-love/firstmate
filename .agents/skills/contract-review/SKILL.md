@@ -127,9 +127,11 @@ This part is never given to a reviewer.
 Give every finding and every note one disposition, with its reason.
 - **material:** the finding meets the finding test above.
 - **excess:** the finding asks for an obligation that the requirement and a usable, safe outcome do not need.
-- **outside the DoD:** the finding is real but belongs to work the contract does not cover; record it as a follow-up.
+- **outside the DoD:** the finding is real but belongs to work the contract does not cover, or it is wording, polish or an optional clarification whose absence changes no result that a criterion decides; record it as a follow-up.
 
 Add `recurrence-of: <id>` when the finding has the same requirement and the same failing result as a recorded one.
+A finding on the same theme with a different failing result is not a recurrence.
+For example, a compliant result that the current text would reject is a different result from a missing protection that an earlier finding asked for.
 Add `covered-by: <criterion>` when an existing criterion already keeps the protection.
 A finding that matches a recorded withdrawal or owner resolution, with no new counterexample against the current text, is closed by that record.
 It is neither a new finding nor a trigger for `stalled`.
