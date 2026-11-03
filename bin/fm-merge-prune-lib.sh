@@ -386,34 +386,33 @@ fm_mp_tooling_path() {  # <real-copy> <relative-path>
 FM_MP_TASK_BRANCH=${FM_MP_TASK_BRANCH-}
 
 # Whether the file at <path> is a Vernant CommitIntent that is spent: a regular
-# file of at most 1 MiB (a real one is under 1 KiB) whose JSON is an object with
-# artifacttype CommitIntent, non-empty string schemaversion, branch and
-# head_sha, string lists owned_paths and validators, and an ISO-8601
-# expires_at_iso with a timezone (the checks of Vernant's own reader), and
-# that has expired (expires_at <= now, UTC) or names FM_MP_TASK_BRANCH exactly.
+# file whose JSON is an object with artifacttype CommitIntent, non-empty string
+# schemaversion, branch and head_sha, string lists owned_paths and validators,
+# and an ISO-8601 expires_at_iso with a timezone (the checks of Vernant's own
+# reader), and that has expired (expires_at <= now, UTC) or names
+# FM_MP_TASK_BRANCH exactly. The expiry may put a space or T between date and
+# time, because Vernant scripts/hooks/commit_intent.py _parse_expiry uses
+# datetime.fromisoformat, which accepts a space, so the prune calls an intent
+# spent exactly when the owner's reader would.
 # The file is only read, from its path. Any other result, a read or parse
 # failure included, is 1.
 fm_mp_commit_intent_spent() {  # <path>
-  [ -f "$1" ] && [ ! -L "$1" ] || return 1
   python3 -I - "$1" "${FM_MP_TASK_BRANCH-}" <<'PY' >/dev/null 2>&1
 import datetime, json, os, re, stat, sys
 path, task_branch = sys.argv[1], sys.argv[2]
-LIMIT = 1048576
 try:
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             sys.exit(1)
         raw = b""
-        while len(raw) <= LIMIT:
-            chunk = os.read(fd, LIMIT + 1 - len(raw))
+        while True:
+            chunk = os.read(fd, 65536)
             if not chunk:
                 break
             raw += chunk
     finally:
         os.close(fd)
-    if len(raw) > LIMIT:
-        sys.exit(1)
     doc = json.loads(raw.decode("utf-8"))
     if not isinstance(doc, dict) or doc.get("artifacttype") != "CommitIntent":
         sys.exit(1)

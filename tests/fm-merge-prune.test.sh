@@ -2388,9 +2388,8 @@ intent_direct_verdict() {  # <real-copy> [<task branch>]
 #   branch          unexpired but naming the task's recorded branch, returned slot
 #   branch-fallback the same through the fallback
 #   branch-resume   the same, resumed from the prune record after the task record is gone
-#   limit-edge      expired, padded to exactly 1 MiB
 scn_spent_intent_is_removed() {  # <variant>
-  local lock holder out size
+  local lock holder out
   intent_world
   case "$1" in
     fallback) put_intent "$COPY" "$INTENT_EXPIRED" other/branch; go ;;
@@ -2420,13 +2419,6 @@ scn_spent_intent_is_removed() {  # <variant>
       set_rec t1 next_at 0
       prune run t1 >/dev/null 2>&1
       ;;
-    limit-edge)
-      put_intent "$COPY" "$INTENT_EXPIRED" other/branch
-      size=$(wc -c < "$COPY/.claude/commit-intent.json" | tr -d ' ')
-      head -c $((1048576 - size)) /dev/zero | tr '\0' ' ' >> "$COPY/.claude/commit-intent.json"
-      [ "$(wc -c < "$COPY/.claude/commit-intent.json" | tr -d ' ')" = 1048576 ] || why "the fixture is not 1 MiB" || return 1
-      go
-      ;;
   esac
   intent_removed "$1" || return 1
   return 0
@@ -2438,7 +2430,6 @@ scn_spent_intent_passes_the_ignored_proof() { scn_spent_intent_is_removed direct
 scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot() { scn_spent_intent_is_removed branch; }
 scn_intent_naming_the_task_branch_is_removed_by_the_fallback() { scn_spent_intent_is_removed branch-fallback; }
 scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone() { scn_spent_intent_is_removed branch-resume; }
-scn_intent_of_exactly_the_size_limit_is_removed() { scn_spent_intent_is_removed limit-edge; }
 
 # An intent that is not provably spent keeps the copy: unexpired and naming
 # another branch (a prefix of the task's, longer than it, different case), or
@@ -2467,11 +2458,11 @@ scn_unspent_intent_is_kept() {
 # A file that is not a valid CommitIntent keeps the copy, even when it is
 # expired and names the task's branch.
 scn_invalid_intent_is_kept() {
-  local v pad
+  local v
   for v in malformed array scalar empty type-missing type-wrong type-case \
     expiry-missing expiry-number expiry-text expiry-no-timezone \
     schema-missing branch-missing head-missing owned-not-a-list validators-not-strings \
-    directory over-limit; do
+    directory; do
     intent_world
     case "$v" in
       malformed) mkdir -p "$COPY/.claude"; printf '{"artifacttype": "CommitIntent",' > "$COPY/.claude/commit-intent.json" ;;
@@ -2491,12 +2482,6 @@ scn_invalid_intent_is_kept() {
       owned-not-a-list) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.owned_paths = "docs/a.md"' ;;
       validators-not-strings) put_intent "$COPY" "$INTENT_EXPIRED" fm/t1 '.validators = [1]' ;;
       directory) mkdir -p "$COPY/.claude/commit-intent.json" ;;
-      over-limit)
-        # One byte over 1 MiB: the payload itself is valid and spent.
-        put_intent "$COPY" "$INTENT_EXPIRED" fm/t1
-        pad=$(wc -c < "$COPY/.claude/commit-intent.json" | tr -d ' ')
-        head -c $((1048577 - pad)) /dev/zero | tr '\0' ' ' >> "$COPY/.claude/commit-intent.json"
-        ;;
     esac
     go
     intent_kept "invalid intent ($v)" .claude/commit-intent.json || return 1
@@ -2559,6 +2544,53 @@ scn_symlinked_intent_path_stays_scratch() {
   ln -s /nonexistent "$COPY/.claude/commit-intent.json"
   go
   intent_removed "symlink at the intent path" || return 1
+  return 0
+}
+
+# fm_mp_commit_intent_spent on one path under the suite's bounded runner: its
+# exit status, 124 when it did not return.
+intent_spent_status() {  # <path> [<task branch>]
+  bash -c 'set -u; . "$1/fm-timeout-lib.sh"; . "$1/fm-merge-prune-lib.sh"; FM_MP_TASK_BRANCH=${3-}; fm_run_bash_timeout 10 fm_mp_commit_intent_spent "$2"; printf "%s" "$?"' _ "$BIN_DIR" "$1" "${2-}" 2>/dev/null
+}
+
+# The predicate opens the path without following a symlink: a regular spent
+# intent is spent, and a symlink at the path to that same file is not.
+scn_symlinked_intent_is_refused_by_the_predicate() {
+  local d rc
+  make_world
+  d="$W/intent-link"
+  mkdir -p "$d/.claude"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/target.json"
+  cp "$d/target.json" "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 0 ] || why "a regular spent intent said $rc, want 0" || return 1
+  rm "$d/.claude/commit-intent.json"
+  ln -s ../target.json "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 1 ] || why "a symlink to a spent intent said $rc, want 1" || return 1
+  return 0
+}
+
+# The predicate reads only a regular file and never waits on a FIFO: a regular
+# spent intent is spent, and a FIFO at the path that holds the same bytes, with
+# no writer left, is refused at once.
+scn_fifo_intent_is_refused_by_the_predicate() {
+  local d rc writer
+  make_world
+  d="$W/intent-fifo"
+  mkdir -p "$d/.claude"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/.claude/commit-intent.json"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  [ "$rc" = 0 ] || why "a regular spent intent said $rc, want 0" || return 1
+  rm "$d/.claude/commit-intent.json"
+  mkfifo "$d/.claude/commit-intent.json"
+  intent_json "$INTENT_EXPIRED" other/branch > "$d/.claude/commit-intent.json" &
+  writer=$!
+  exec 8< "$d/.claude/commit-intent.json"
+  wait "$writer"
+  rc=$(intent_spent_status "$d/.claude/commit-intent.json")
+  exec 8<&-
+  [ "$rc" = 1 ] || why "a FIFO holding a spent intent said $rc, want 1 (124 is a hang)" || return 1
   return 0
 }
 
@@ -2955,9 +2987,8 @@ test_ignored_proof_passes_an_expired_commit_intent() { assert_scenario scn_spent
 test_returned_slot_holding_a_commit_intent_naming_the_task_branch_is_removed() { assert_scenario scn_intent_naming_the_task_branch_is_removed_with_a_returned_slot "an unexpired intent naming the task's recorded branch is spent: the returned slot is removed with no wake"; }
 test_fallback_removes_a_copy_holding_a_commit_intent_naming_the_task_branch() { assert_scenario scn_intent_naming_the_task_branch_is_removed_by_the_fallback "an unexpired intent naming the task's recorded branch is spent through the fallback too"; }
 test_commit_intent_branch_survives_the_deletion_of_the_task_record() { assert_scenario scn_intent_naming_the_task_branch_is_removed_after_the_task_record_is_gone "the task's branch is kept in the prune record, so a retry after teardown deleted the task record still sees the intent as spent"; }
-test_commit_intent_of_exactly_the_size_limit_is_read() { assert_scenario scn_intent_of_exactly_the_size_limit_is_removed "an expired intent of exactly 1 MiB is read in full and is spent"; }
 test_fallback_keeps_an_unspent_commit_intent() { assert_scenario scn_unspent_intent_is_kept "an unexpired intent naming another branch (a prefix, a longer name, another case), or any intent when the task record names no branch, keeps the copy with one wake naming the file"; }
-test_fallback_keeps_an_invalid_commit_intent() { assert_scenario scn_invalid_intent_is_kept "a malformed, non-object, empty, mistyped, incomplete or oversized intent, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch"; }
+test_fallback_keeps_an_invalid_commit_intent() { assert_scenario scn_invalid_intent_is_kept "a malformed, non-object, empty, mistyped, or incomplete intent, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch"; }
 test_fallback_keeps_an_unreadable_commit_intent() {
   if [ "$(id -u)" = 0 ]; then
     pass "an unreadable intent keeps the copy (skipped: the suite runs as root, which reads it)"
@@ -2968,6 +2999,8 @@ test_fallback_keeps_an_unreadable_commit_intent() {
 test_fallback_keeps_lookalike_commit_intent_paths() { assert_scenario scn_lookalike_intent_paths_are_kept "a spent payload at .bak, .old.json, .claude/sub and the copy root keeps the copy with one wake"; }
 test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file() { assert_scenario scn_spent_intent_does_not_cover_another_ignored_file "a spent intent beside .env.local or .claude/private/x keeps the copy for the other file"; }
 test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch() { assert_scenario scn_symlinked_intent_path_stays_scratch "a symlink at .claude/commit-intent.json stays reclaimable as before"; }
+test_commit_intent_predicate_refuses_a_symlink() { assert_scenario scn_symlinked_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a symlink at the path to that file"; }
+test_commit_intent_predicate_refuses_a_fifo_without_hanging() { assert_scenario scn_fifo_intent_is_refused_by_the_predicate "fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a FIFO holding the same bytes without hanging"; }
 test_fallback_judges_a_nested_clones_commit_intent_on_its_own() { assert_scenario scn_nested_copy_intent_is_judged_on_its_own "a nested clone with a spent intent goes with the slot and one with an unspent intent naming another branch keeps the whole copy"; }
 test_commit_intent_verdict_against_teardown_is_recorded() { assert_scenario scn_commit_intent_verdict_against_teardown "a spent intent passes both classifiers; an unspent or invalid intent and other unique .claude entries pass teardown and keep the copy in the prune"; }
 test_fallback_keeps_the_copy_when_the_process_probe_fails_after_listing() { assert_scenario scn_partial_process_probe_keeps_the_copy "a process probe that lists a process and then fails keeps the copy and retries"; }
@@ -3157,7 +3190,8 @@ test_unsafe_mutations_are_caught() {
   expect_caught intent-expiry-not-checked $lib '    if expires.astimezone(datetime.timezone.utc) <= now:' '    if True:' scn_unspent_intent_is_kept "expiry check of a CommitIntent"
   expect_caught intent-artifact-type-not-checked $lib '    if not isinstance(doc, dict) or doc.get("artifacttype") != "CommitIntent":' '    if not isinstance(doc, dict):' scn_invalid_intent_is_kept "artifact-type check of a CommitIntent"
   expect_caught intent-timezone-not-required $lib '(Z|[+-][0-9]{2}:[0-9]{2})", stamp' '(Z|[+-][0-9]{2}:[0-9]{2})?", stamp' scn_invalid_intent_is_kept "timezone requirement of a CommitIntent expiry"
-  expect_caught intent-oversize-read-accepted $lib '    if len(raw) > LIMIT:' '    if False:' scn_invalid_intent_is_kept "size limit of a CommitIntent read"
+  expect_caught intent-symlink-followed $lib 'os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)' 'os.O_RDONLY | os.O_NONBLOCK' scn_symlinked_intent_is_refused_by_the_predicate "no-follow open of a CommitIntent"
+  expect_caught intent-non-regular-file-read $lib '        if not stat.S_ISREG(os.fstat(fd).st_mode):' '        if False:' scn_fifo_intent_is_refused_by_the_predicate "regular-file check of a CommitIntent"
   expect_caught intent-branch-compared-by-prefix $lib 'doc["branch"] == task_branch' 'doc["branch"].startswith(task_branch)' scn_unspent_intent_is_kept "exact branch comparison of a CommitIntent"
   expect_caught intent-shape-not-validated $lib '        if not isinstance(value, str) or not value.strip():' '        if False:' scn_invalid_intent_is_kept "string-field checks of a CommitIntent"
   expect_caught intent-allowance-for-any-claude-name $lib '    .claude/commit-intent.json)
@@ -3696,13 +3730,14 @@ ALL_TESTS=(
   test_returned_slot_holding_a_commit_intent_naming_the_task_branch_is_removed
   test_fallback_removes_a_copy_holding_a_commit_intent_naming_the_task_branch
   test_commit_intent_branch_survives_the_deletion_of_the_task_record
-  test_commit_intent_of_exactly_the_size_limit_is_read
   test_fallback_keeps_an_unspent_commit_intent
   test_fallback_keeps_an_invalid_commit_intent
   test_fallback_keeps_an_unreadable_commit_intent
   test_fallback_keeps_lookalike_commit_intent_paths
   test_fallback_keeps_a_spent_commit_intent_beside_another_ignored_file
   test_fallback_still_treats_a_symlink_at_the_intent_path_as_scratch
+  test_commit_intent_predicate_refuses_a_symlink
+  test_commit_intent_predicate_refuses_a_fifo_without_hanging
   test_fallback_judges_a_nested_clones_commit_intent_on_its_own
   test_commit_intent_verdict_against_teardown_is_recorded
   test_fallback_keeps_the_copy_when_the_process_probe_fails
