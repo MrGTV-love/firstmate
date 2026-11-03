@@ -1061,7 +1061,12 @@ def start_watched(command: List[str]) -> Tuple[subprocess.Popen, int]:
         finally:
             os._exit(0)
     os.close(read_end)
-    child = subprocess.Popen(command, close_fds=True, preexec_fn=_restore_default_signals)
+    try:
+        child = subprocess.Popen(command, close_fds=True, preexec_fn=_restore_default_signals)
+    except OSError:
+        os.write(write_end, b"0".ljust(32) + b"d")
+        os.close(write_end)
+        raise
     os.write(write_end, str(child.pid).encode().ljust(32))
     return child, write_end
 
@@ -1110,7 +1115,13 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
             reservation_fd, _ = publish_locked(directory, "launch-", {
                 "run": run, "repo": repo, "pid": os.getpid(), "started_ns": admitted_ns})
             published_ns = time.time_ns()
-            child, watch_fd = start_watched(command)
+            try:
+                child, watch_fd = start_watched(command)
+            except (FileNotFoundError, PermissionError) as exc:
+                # The shell's statuses for an agent that cannot be launched, reported unchanged.
+                os.close(reservation_fd)
+                log(2, "launch-gate: agent %s: %s" % ("not found" if isinstance(exc, FileNotFoundError) else "not executable", command[0]))
+                return 127 if isinstance(exc, FileNotFoundError) else 126
             started_ns = time.time_ns()
         finally:
             os.close(admission_fd)
