@@ -787,7 +787,9 @@ if len(sys.argv) > 2:
         try:
             if os.fstat(fd).st_ino in inodes: descriptors.append(fd)
         except OSError: pass
-    (folder / (str(os.getpid()) + '.child')).write_text(json.dumps(dict(pid=os.getpid(), fds=descriptors, marker=os.environ['FM_CPU_PASS_HELD'])))
+    # Publish whole: the parent may read the file the moment its name exists.
+    (folder / (str(os.getpid()) + '.partial')).write_text(json.dumps(dict(pid=os.getpid(), fds=descriptors, marker=os.environ['FM_CPU_PASS_HELD'])))
+    (folder / (str(os.getpid()) + '.partial')).rename(folder / (str(os.getpid()) + '.child'))
     while not (folder / 'release-children').exists(): time.sleep(0.025)
 else:
     children = [subprocess.Popen([sys.executable, __file__, str(folder), 'child'], close_fds=False) for _ in range(6)]
