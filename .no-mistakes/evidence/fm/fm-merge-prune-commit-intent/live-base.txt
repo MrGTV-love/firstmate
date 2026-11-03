@@ -1,0 +1,146 @@
+== BASE 012b72f34: product under test: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-base-tree.XXXXXX.tkb1Mz7v7S/bin (8a5d1260e suite helpers)
+== python3: /opt/homebrew/bin/python3 Python 3.14.0
+
+################ BASE 012b72f34 :: L1 returned slot holding only an EXPIRED valid CommitIntent (slot 252 shape), merge path arm --run
+   intent: {"artifacttype":"CommitIntent","schemaversion":"1.0.0","branch":"other/branch","head_sha":"cd916701e5388f24c741a905c7be6a1348cf4e03","owned_paths":["docs/a.md"],"validators":["ruff-check","ruff-format-check"],"expires_at_iso":"2000-01-01T00:00:00+00:00","base_ref":"origin/main","base_sha":"5b0a1a5417792a35526caa7b517ce13b187bd923","content_fingerprint":"c67ef77ed530"}
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731099	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:38:00Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:38:20Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L2 returned slot holding an UNEXPIRED intent naming the task's branch fm/t1
+   task record after teardown: deleted
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731122	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:38:25Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:38:43Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L3 ADVERSARIAL unexpired intent naming another branch (fm/t1-extra)
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731151	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:38:46Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:39:13Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L4 ADVERSARIAL expired, names task branch, artifacttype ReviewIntent
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731196	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:39:17Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:39:57Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L5 ADVERSARIAL expiry with no timezone (2000-01-01T00:00:00), names task branch
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731218	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:40:01Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:40:19Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w5/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L6 ADVERSARIAL owned_paths ["../x"], expired
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731244	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:40:21Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:40:45Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w6/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L7 ADVERSARIAL lookalike .claude/commit-intent.json.bak with a spent payload
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731261	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+   merge-prune.log:
+     2026-11-03T18:40:49Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:41:01Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w7/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json.bak
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L8 ADVERSARIAL spent intent beside .claude/private/x
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731271	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:41:03Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:41:11Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w8/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L9 fallback after a teardown refusal, only an EXPIRED valid intent
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w9/th/pool1/1/repo)
+   treehouse calls: 
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731274	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w9/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w9/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:41:12Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:41:14Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w9/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w9/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+################ BASE 012b72f34 :: L10 ADVERSARIAL prune's python3 reports 3.10: expired valid intent
+-- result:
+   copy: STILL ON DISK (/Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo)
+   treehouse calls: pool-dir;status --json;return --force /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo;
+   destroy calls: 0   wakes: 1
+   prune record state: retained   branch kept: 
+   wake queue:
+     1793731282	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo for t1: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   merge-prune.log:
+     2026-11-03T18:41:15Z armed for https://github.com/acme/widget/pull/7
+     2026-11-03T18:41:22Z retained /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo: /Users/charlesabrooker/tmp/fm-merge-prune.xXDyzu/w10/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .claude/commit-intent.json
+   ignored files left in copy:
+     !! .claude/
+
+== BASE 012b72f34 done

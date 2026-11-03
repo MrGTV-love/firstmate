@@ -1,0 +1,20 @@
+== record armed by BASE prune:
+   version=fm-merge-prune-v1
+   pr=https://github.com/acme/widget/pull/7
+   attempts=0
+   next_at=1793731315
+   state=pending
+   reason=
+   wake_sent=0
+   copy=
+   armed_at=1793731315
+   project=
+   returned=0
+== after HEAD prune run:
+   copy: GONE
+   destroy calls: 1   wakes: 0
+   task record: deleted by real teardown
+   prune record: cleared
+   log: 2026-11-03T18:41:56Z armed for https://github.com/acme/widget/pull/7
+   log: 2026-11-03T18:42:26Z removed the returned copy /Users/charlesabrooker/tmp/fm-merge-prune.uBc8zZ/w1/th/pool1/1/repo (head a7936af); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.uBc8zZ/w1/home/data/t1/merge-prune-preserved/1793731316
+   log: 2026-11-03T18:42:26Z reaped: teardown completed; removed the returned copy

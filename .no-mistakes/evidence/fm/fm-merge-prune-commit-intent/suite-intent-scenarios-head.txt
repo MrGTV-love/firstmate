@@ -1,0 +1,27 @@
+ok - the task's branch is kept in the prune record, so a retry after teardown deleted the task record still sees the intent as spent
+ok - on python3 3.11 or later, the prune calls an intent spent exactly when Vernant's reader would, and fails on prune=keep reader=valid as well as prune=spent reader=refused
+ok - fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a FIFO holding the same bytes without hanging
+ok - fm_mp_commit_intent_spent says spent for a regular spent intent and refuses a symlink at the path to that file
+ok - a spent intent passes both classifiers; an unspent or invalid intent and other unique .claude entries pass teardown and keep the copy in the prune
+ok - a nested clone with a spent intent goes with the slot and one with an unspent intent naming another branch keeps the whole copy
+ok - a spent intent beside .env.local or .claude/private/x keeps the copy for the other file
+ok - a malformed, non-object, empty, mistyped, or incomplete intent, an empty or blank owned_paths or validators list, an owned path that is not repo-relative, and a directory at the path, keep the copy with one wake naming the file even when expired and naming the task's branch
+ok - an intent the proof cannot read keeps the copy with one wake naming the file
+ok - an unexpired intent naming another branch (a prefix, a longer name, another case), or any intent when the task record names no branch, keeps the copy with one wake naming the file
+ok - a spent payload at .bak, .old.json, .claude/sub and the copy root keeps the copy with one wake
+ok - a .claude directory that cannot be listed keeps the copy and is never read as empty
+ok - ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake
+ok - an unexpired intent naming the task's recorded branch is spent through the fallback too
+ok - a copy refused by a false positive whose only ignored file is an expired, valid .claude/commit-intent.json is removed with no wake
+ok - a symlink at .claude/commit-intent.json stays reclaimable as before
+ok - fm_mp_prove_ignored returns 0 with an empty or ok verdict for an expired, valid .claude/commit-intent.json
+ok - a prune whose python3 is older than 3.11 keeps an expired, valid intent with one wake that names the interpreter reason
+ok - an unexpired intent naming the task's recorded branch is spent: the returned slot is removed with no wake
+ok - a returned slot whose only ignored file is an expired, valid .claude/commit-intent.json is removed with one destroy and no wake
+ok - on python3 3.11 or later, expired intents and branch-matched unexpired intents are spent in every timezone-aware spelling Vernant's reader accepts (no seconds, +HHMM, a space for T, Z, fractions, other offsets), end to end
+ok - a returned copy with a unique ignored file is kept with one wake
+ok - the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal
+
+real	15m6.827s
+user	1m27.508s
+sys	2m13.821s

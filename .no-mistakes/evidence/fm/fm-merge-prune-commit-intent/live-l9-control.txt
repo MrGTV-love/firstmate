@@ -1,0 +1,14 @@
+== BASE 012b72f34 L9 control (only node_modules/x, teardown refuses, fallback decides)
+   copy: GONE
+   destroy calls: 1   wakes: 0   record state: pending
+   log: 2026-11-03T18:44:11Z armed for https://github.com/acme/widget/pull/7
+   log: 2026-11-03T18:44:18Z fallback destroyed /Users/charlesabrooker/tmp/fm-merge-prune.5PSw8P/w1/th/pool1/1/repo (head 0a6e6c6); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.5PSw8P/w1/home/data/t1/merge-prune-preserved/1793731452
+   log: 2026-11-03T18:44:27Z retry in 60s (attempt 1): copy removed; teardown could not finish its records yet: REFUSED: automatic reap ineligible: active: busy state unknown missing
+   tmp root: /Users/charlesabrooker/tmp/fm-merge-prune.5PSw8P
+== HEAD 8a5d1260e L9 control (only node_modules/x, teardown refuses, fallback decides)
+   copy: GONE
+   destroy calls: 1   wakes: 0   record state: pending
+   log: 2026-11-03T18:44:44Z armed for https://github.com/acme/widget/pull/7
+   log: 2026-11-03T18:44:53Z fallback destroyed /Users/charlesabrooker/tmp/fm-merge-prune.fa4FGx/w1/th/pool1/1/repo (head 431419e); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-merge-prune.fa4FGx/w1/home/data/t1/merge-prune-preserved/1793731484
+   log: 2026-11-03T18:44:56Z retry in 60s (attempt 1): copy removed; teardown could not finish its records yet: REFUSED: automatic reap ineligible: active: busy state unknown missing
+   tmp root: /Users/charlesabrooker/tmp/fm-merge-prune.fa4FGx
