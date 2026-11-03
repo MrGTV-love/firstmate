@@ -72,11 +72,20 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
+# FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes that guard
+# also refuse an open captain hold on a row of any kind, inside the lock; without it a
+# row that is not a ship or scout closes as before.
+# A `done`/`close` (or a `public-followup record-delivery`/`waive` that left the row Done
+# or archived it) that tasks-axi accepted also removes the finished id from every other
+# item's blocked-by list, so work stops waiting on a blocker that is done; the cleared
+# edges are reported on stderr as `unblocked:` lines
+# (bin/fm-backlog-transition-lib.sh's fm_backlog_unblock_dependents owns the rule).
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): an `add` that created a
 # new item also appends one task.filed record, and a `done`/`close` that passed
 # the proof check above and moved a row to Done appends one task.closed record
 # (bin/fm-backlog-transition-lib.sh, which writes a repeat of a close once). The
-# command's stdout, stderr, and exit status stay tasks-axi's own; an add that
+# command's stdout and exit status stay tasks-axi's own (stderr carries only the
+# `unblocked:`/`actionable:` lines above and tasks-axi's own diagnostics); an add that
 # found the id already present (tasks-axi reports `already`) writes nothing, and
 # a failed ledger write costs one stderr line. While config/fleet-ledger is
 # absent the command runs as before.
@@ -262,6 +271,12 @@ guard_completion() {
     [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
   }
+  # Opt-in for bin/fm-pr-close-items.sh only: refuse an open owner call for every row kind,
+  # under the lock this command already holds, so a hold placed before the close wins.
+  if [ "${FM_TASKS_AXI_REFUSE_OPEN_CALL:-}" = 1 ] && [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
+    && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    fail "$id is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it"
+  fi
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
     || fail "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
@@ -407,6 +422,37 @@ if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
   task_status=$?
   [ "$task_status" -ne 0 ] || [ "${#LEDGER_CLOSE_ARGS[@]}" -eq 0 ] \
     || fm_backlog_ledger_closed "$task_state" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TASK_ID" "${LEDGER_CLOSE_ARGS[@]}"
+  # A completed item stops blocking its dependents (fm_backlog_unblock_dependents).
+  if [ "$task_status" -eq 0 ] && [ "$TASK_HELP" = 0 ]; then
+    case "$TASK_COMMAND" in
+      done|close) fm_backlog_unblock_dependents "$DATA" "$TASK_ID" >&2 ;;
+    esac
+  fi
   exit "$task_status"
 fi
+case "${ARGS[0]:-}:${ARGS[1]:-}" in
+  public-followup:record-delivery|public-followup:waive)
+    # These typed completions can move a row to Done, and a done_keep of 0 archives it at
+    # once. Run them without exec so a row they finished stops blocking its dependents,
+    # exactly like done/close.
+    pf_id=${ARGS[2]:-}
+    tasks-axi "${ARGS[@]}"
+    pf_status=$?
+    pf_help=0
+    for pf_arg in "${ARGS[@]}"; do
+      case "$pf_arg" in -h|--help) pf_help=1 ;; esac
+    done
+    if [ "$pf_status" -eq 0 ] && [ "$pf_help" = 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]; then
+      if fm_backlog_row_probe "$DATA" "$pf_id"; then
+        [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] || fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+      elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+        fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+      else
+        printf 'actionable: tasks-axi accepted the %s of %s, but its state could not be read (%s); if it is done, clear the items it blocked with tasks-axi unblock <item> --by %s\n' \
+          "${ARGS[1]}" "$pf_id" "${FM_BACKLOG_ROW_ERROR:-unknown error}" "$pf_id" >&2
+      fi
+    fi
+    exit "$pf_status"
+    ;;
+esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

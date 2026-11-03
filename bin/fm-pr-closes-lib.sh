@@ -1,0 +1,120 @@
+# shellcheck shell=bash
+# fm-pr-closes-lib.sh - the one owner of the `Closes:` syntax and of the merge-train
+# member list that bin/fm-pr-close-items.sh reads from a merged pull request body.
+# Usage: . bin/fm-pr-closes-lib.sh
+#
+# `Closes:` syntax (fm_pr_closes_ids). A pull request body names a backlog item it
+# finishes with a line of its own:
+#
+#   Closes: <item-id>
+#
+# - The line starts at column 0 with the case-sensitive word `Closes:`, then one space or
+#   more, one id, and optional trailing whitespace. Nothing else may share the line, so
+#   an indented line, a trailing comment, a quote (`>`), a list item, a code span or an
+#   inline `Closes: x` inside a sentence names nothing, and so does a lowercase
+#   `closes:`.
+# - The id is letters, digits, `.`, `_` and `-`, not starting with `.` (the ids
+#   bin/fm-pr-lib.sh's fm_pr_task_id_valid and bin/fm-tasks-axi.sh accept), for example
+#   `fm-backlog-close-at-merge` or `ship-a` or `a.b_c-1`.
+# - A line inside a fenced code block (``` or ~~~) is an example, not a directive,
+#   because pipeline bodies quote text they do not own.
+# - A trailing carriage return is ignored, because GitHub bodies often use CRLF.
+# - One id per line; list several items with several lines. A repeated id counts once.
+#
+# Merge-train member list (fm_pr_closes_train_members). A pull request is a merge train
+# when its body has a member list, and the members are the pull request URLs that list
+# holds, in the layouts the firstmate trains use. A URL anywhere else in the body (the
+# intent paragraph, an excluded or context pull request, an earlier train) is not a
+# member, because it did not land with this merge. A member list is one of:
+#   - a table whose header has a cell containing `Component`; the member is the URL in
+#     that column of each following row (the table ends at the first line that does not
+#     start with `|`), whether the URL column comes first or after a `#` column;
+#   - a bullet whose label contains `Component`, such as `- **Component 1:** <url> ...`;
+#   - the bullets under a heading containing `Component` (until the next heading), each
+#     of which starts with a URL (a bullet that does not start with a URL is skipped);
+#   - a numbered or bulleted list right after a line that starts with `Component` and
+#     ends with a colon (until the first line that is not an item), whether or not it
+#     sits inside a fenced block, because train bodies quote their record that way.
+# The reader prints each candidate URL once, in body order; the caller validates and
+# canonicalizes it with fm_pr_url_parse (GitHub pull, GitLab merge_requests, Forgejo
+# pulls) and matches by the full URL, never by number or prefix.
+#
+# Both readers take a body file path (or `-` for standard input) and print one value
+# per line. They never fail on a body without matches; they print nothing.
+
+fm_pr_closes_ids() {  # <body-file|->
+  local line id in_fence=0 fence='' closes_re='^Closes:[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*$'
+  local seen=$'\n'
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    if [ "$in_fence" = 1 ]; then
+      case "$line" in
+        "$fence"*) in_fence=0 ;;
+      esac
+      continue
+    fi
+    case "$line" in
+      '```'*) in_fence=1; fence='```'; continue ;;
+      '~~~'*) in_fence=1; fence='~~~'; continue ;;
+    esac
+    [[ "$line" =~ $closes_re ]] || continue
+    id=${BASH_REMATCH[1]}
+    case "$id" in .*) continue ;; esac
+    case "$seen" in *$'\n'"$id"$'\n'*) continue ;; esac
+    seen="$seen$id"$'\n'
+    printf '%s\n' "$id"
+  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+}
+
+fm_pr_closes_train_members() {  # <body-file|->
+  local line mode=none list_kind='' items=0 cells i col=0 rest url
+  local seen=$'\n' cell
+  local url_re='https?://[^][:space:]|)<>`*,;]+'
+  local table_re='^[[:space:]]*[|]'
+  local label_re='^[[:space:]]*[-*][[:space:]]+[*_]*[Cc]omponent[^:]*:[*_]*[[:space:]]*(.*)$'
+  local heading_re='^[[:space:]]{0,3}#+[[:space:]]'
+  local heading_component_re='^[[:space:]]{0,3}#+[[:space:]].*[Cc]omponent'
+  local leadin_re='^[Cc]omponents?[^:]*:[[:space:]]*$'
+  local item_re='^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+(.*)$'
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    url=
+    if [[ "$line" =~ $table_re ]]; then
+      IFS='|' read -r -a cells <<< "$line"
+      if [ "$mode" != table ]; then
+        col=0
+        for ((i = 1; i < ${#cells[@]}; i++)); do
+          if [[ "${cells[i]}" =~ [Cc]omponent ]]; then col=$i; break; fi
+        done
+        if [ "$col" -gt 0 ]; then mode=table; fi
+        continue
+      fi
+      cell=${cells[col]:-}
+      if [[ "$cell" =~ $url_re ]]; then url=${BASH_REMATCH[0]}; fi
+    else
+      [ "$mode" != table ] || mode=none
+      if [[ "$line" =~ $heading_re ]]; then
+        mode=none
+        if [[ "$line" =~ $heading_component_re ]]; then mode=list; list_kind=heading; items=0; fi
+        continue
+      fi
+      if [[ "$line" =~ $leadin_re ]]; then mode=list; list_kind=leadin; items=0; continue; fi
+      if [[ "$line" =~ $label_re ]]; then
+        rest=${BASH_REMATCH[1]}
+        if [[ "$rest" =~ $url_re ]]; then url=${BASH_REMATCH[0]}; fi
+      elif [ "$mode" = list ]; then
+        if [[ "$line" =~ $item_re ]]; then
+          rest=${BASH_REMATCH[2]}
+          if [[ "$rest" =~ ^($url_re) ]]; then url=${BASH_REMATCH[1]}; items=$((items + 1)); fi
+        elif [ "$list_kind" = leadin ] && { [ "$items" -gt 0 ] || [ -n "${line//[[:space:]]/}" ]; }; then
+          mode=none
+        fi
+      fi
+    fi
+    [ -n "$url" ] || continue
+    url=${url%[.:]}
+    case "$seen" in *$'\n'"$url"$'\n'*) continue ;; esac
+    seen="$seen$url"$'\n'
+    printf '%s\n' "$url"
+  done < <(if [ "${1:--}" = - ]; then cat; else cat -- "$1"; fi)
+}
