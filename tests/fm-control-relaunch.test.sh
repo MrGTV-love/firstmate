@@ -564,7 +564,9 @@ test_relaunch_trace_prepare_rejects_failed_setup() {
     await_relaunch_fixture_marker "$dir/unrelated-prepare" "$unrelated" "$dir/setup.out" 'relaunch trace preparation' > "$dir/unrelated-wait.out" 2>&1; status=$?
     numeric_live=0
     builtin kill -0 "$unrelated" 2>/dev/null && numeric_live=1
-    printf 'process-identity probe: live=%s supplied_marker=1 helper_exit=%s wrapper=%s unrelated=%s\n' "$numeric_live" "$status" "$holder" "$unrelated"
+    if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+      printf 'process-identity probe: live=%s supplied_marker=1 helper_exit=%s wrapper=%s unrelated=%s\n' "$numeric_live" "$status" "$holder" "$unrelated"
+    fi
     printf 'release\n' > "$dir/unrelated-release"
     wait "$holder" || fail 'could not release the fixture-owned unrelated process'
     expect_code 1 "$numeric_live" 'the process-identity negative must use a genuinely live PID'

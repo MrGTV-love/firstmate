@@ -23,7 +23,6 @@ It does not change the selected delivery path, review authority, or merge policy
   - Green end-to-end tests alone do not authorize weakening a unit assertion that protects an obligation.
   - Builders may not redefine, remove, or weaken accepted outcomes or their required protection to obtain a pass; changing accepted outcomes or granting waivers requires escalating to Main for the owner.
 - Distinguish a demonstrated intent-breaking defect from missing evidence for a mandatory DoD item:
-  - Report missing evidence as unverified rather than as proof that the implementation is defective.
   - Apply the existing review outcomes, guard-reassessment requirements, and scope-escalation rules below.
 
 ## Review outcomes
