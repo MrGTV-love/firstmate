@@ -124,7 +124,11 @@ Launch gate:
     ~/.no-mistakes/config.yaml, else the daemon's 30-minute default) minus the
     nearest-rank 99th percentile of completed (exit_status ok) agent_invocations
     durations of step ci; no hold when that is not positive or either input is
-    unreadable. At the bound, or on a mapping refusal, it does not start AGENT,
+    unreadable. Only completed invocations count (Main 3210): the daemon also
+    records refused and held launches and timed-out runs as step ci, and
+    counting them would let holds shrink their own bound and pull it to zero
+    (on this host 2026-11-03: ok rows p99 152.45 min, bound about 87.5 min of
+    240; all rows 156.83 min, about 83.2 min). At the bound, or on a mapping refusal, it does not start AGENT,
     prints one "launch-gate refused: <cause>: run <id>; <detail>; next action:
     <action>" line and exits 75; every number in it carries a unit suffix and
     it uses none of the daemon's retry or fallback phrases. The first hold, an
