@@ -130,7 +130,8 @@ Give every finding and every note one disposition, with its reason.
 - **outside the DoD:** the finding is real but belongs to work the contract does not cover, or it is wording, polish or an optional clarification whose absence changes no result that a criterion decides; record it as a follow-up.
 
 Add `recurrence-of: <id>` when the finding has the same requirement and the same failing result as a recorded one.
-A finding whose witness rests on a fact that the reviewer says it could not check has no concrete witness; its protection stays, and it is recorded as a follow-up to verify at implementation.
+A finding whose witness rests on a fact that the reviewer says it could not obtain, such as a file it was not allowed to read, has no concrete witness; its protection stays, and it is recorded as a follow-up to verify at implementation.
+A witness that depends on a condition which a compliant run may or may not meet is still a concrete witness.
 A finding on the same theme with a different failing result is not a recurrence.
 For example, a compliant result that the current text would reject is a different result from a missing protection that an earlier finding asked for.
 Add `covered-by: <criterion>` when an existing criterion already keeps the protection.
