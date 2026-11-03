@@ -1,0 +1,6 @@
+ok - a pool copy whose only ignored files are the exact tooling files under data/ and state/ is removed with no wake
+ok - data/report.md beside the tooling files keeps the copy with one wake naming it
+ok - lookalike suffixes, scratch names under a wholly ignored data/ and state/, wrong or deeper directories, directories in place of files, and other ignored trees all keep the copy
+ok - an empty nested git init, which has no commit to compare, goes with the slot with no wake
+ok - a nested repo whose HEAD is unborn but whose other branch holds a commit on no remote keeps the slot
+ok - the task's own copy with an unborn HEAD is not proved landed

@@ -1,0 +1,21 @@
+session=fm-lab-t9envboundary-50930-19792
+provision rc=0
+control: the lab Herdr server pid 51404 holds: OPENAI_API_KEY= FM_CANARY_SECRET= JAVA_HOME= AWS_SECRET_ACCESS_KEY= ANTHROPIC_API_KEY= GITHUB_TOKEN= 
+spawned labh50380 harness=bash kind=ship mode=local-only yolo=on window=fm-lab-t9envboundary-50930-19792:w1:p2 worktree=<lab>/treehouse/.treehouse/notes-c08926/1/notes
+meta: backend=herdr herdr_session=fm-lab-t9envboundary-50930-19792 
+  worker absent  FM_CANARY_SECRET
+  worker absent  GITHUB_TOKEN
+  worker absent  OPENAI_API_KEY
+  worker absent  ANTHROPIC_API_KEY
+  worker absent  AWS_SECRET_ACCESS_KEY
+  worker present JAVA_HOME
+  worker present HERDR_ENV
+  worker present HERDR_SESSION
+  worker present HERDR_PANE_ID
+  worker present HERDR_SOCKET_PATH
+  worker absent  HERDR_TAB_ID
+  worker absent  HERDR_WORKSPACE_ID
+  worker present FM_TASK_ID
+  worker present FM_WRITE_CONFINEMENT
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+herdr lab teardown rc=0

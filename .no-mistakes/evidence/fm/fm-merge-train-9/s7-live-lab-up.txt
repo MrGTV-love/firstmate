@@ -1,0 +1,20 @@
+lab: /private/tmp/fmlabt9.yCEMiS (tear down with: bin/fm-live-lab.sh down /private/tmp/fmlabt9.yCEMiS)
+tree: 75ee82c9c4e951d10ba8caae04228aabc7f4d756 from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F7P8T36RV6VVEZC248ER42
+local-only source: local=main@72a45188d5ed5d22509e52aa7b6622b8ccc7622b origin=main@72a45188d5ed5d22509e52aa7b6622b8ccc7622b selected=origin/main@72a45188d5ed5d22509e52aa7b6622b8ccc7622b
+skill selection for labae6d8585edf2-worker: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned labae6d8585edf2-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labae6d8585edf2-worker worktree=/private/tmp/fmlabt9.yCEMiS/treehouse/.treehouse/notes-ba0d10/1/notes
+gate: /private/tmp/fmlabt9.yCEMiS/home/data/labae6d8585edf2-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model haiku --effort low --permission-mode auto
+ok primary: claude pid 60999 in /private/tmp/fmlabt9.yCEMiS/home
+ok probe: the primary answered LABREADY-ae6d8585edf2
+ok trust: /private/tmp/fmlabt9.yCEMiS/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: supervision host pid 42589
+ok watcher: live watcher with a fresh beacon
+ok worker: labae6d8585edf2-worker parked on /private/tmp/fmlabt9.yCEMiS/home/data/labae6d8585edf2-worker/gate
+ok treehouse: ~/.treehouse unchanged
+ready: /private/tmp/fmlabt9.yCEMiS
+up rc=0

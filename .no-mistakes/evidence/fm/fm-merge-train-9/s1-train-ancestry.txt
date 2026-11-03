@@ -1,0 +1,19 @@
+# train ancestry at 75ee82c9c4e951d10ba8caae04228aabc7f4d756
+member 356 8d7e5d1254fdd66a25227bce50f8bc957c54acc5 ancestor=yes
+member 339 3b530bbc4befda3bab303064270c72ae70dc5b65 ancestor=yes
+member 352 f455622033a51bd217aa68728d9029efdb881b07 ancestor=yes
+member 349 f64d484af613bf5123baad550f8e7a72dcdc0ddf ancestor=yes
+member 359 78bb3bced2a3111f34827115af9526586944b3a2 ancestor=yes
+member 358 d826cb7debd40f6ae3520919020e248f400c8c8c ancestor=yes
+member 360 fc1b2ef31b5a6d84430cf0a2a1a924c58b0bbc03 ancestor=yes
+base main 25c4d9a1d ancestor=yes (merge to main is fast-forward-able)
+dropped 347 a8c40bc708c197855f18a8c6032c6da7257df18a ancestor=no
+dropped 361 1490ba257867ab818c0c2dfb0f4bc7816635bf81 ancestor=no
+# unresolved conflict markers in changed files:
+none
+# registry vs main (ids):
+main count 167 train count 168
+added ['spawn-shell-startup-confinement']
+removed []
+# files named by intent, change against main:
+(empty above = equal to main)

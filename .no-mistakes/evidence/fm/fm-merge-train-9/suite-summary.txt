@@ -1,0 +1,14 @@
+tests/fm-review-record.test.sh exit=0 secs=17 not_ok=0 ok=10
+tests/fm-pr-merge.test.sh exit=0 secs=624 not_ok=0 ok=152
+tests/fm-guard-audit-closure.test.sh exit=0 secs=116 not_ok=0 ok=22
+tests/fm-pr-close-items.test.sh exit=0 secs=242 not_ok=0 ok=25
+tests/fm-self-repo-role.test.sh exit=0 secs=113 not_ok=0 ok=33
+tests/fm-copy-sweep-orphan.test.sh exit=0 secs=182 not_ok=0 ok=10
+tests/fm-tasks-axi.test.sh exit=0 secs=265 not_ok=0 ok=29
+batch-A-done
+tests/fm-slack-deadline.test.sh exit=0 secs=130 not_ok=0 ok=3
+tests/fm-write-confinement.test.sh exit=0 secs=90 not_ok=0 ok=1
+tests/fm-spawn-claude-api-key-guard.test.sh exit=0 secs=243 not_ok=0 ok=27
+tests/fm-merge-prune.test.sh (6 new cases) exit=0 secs=38 not_ok=0 ok=6
+batch-B-done
+tests/fm-guard-lint.test.sh exit=0 secs=84 not_ok=0 ok=116

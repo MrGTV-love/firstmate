@@ -1,0 +1,49 @@
+spawned labp39794-tool harness=sleep kind=ship mode=local-only yolo=on window=primary:fm-labp39794-tool worktree=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/1/notes
+spawned labp39794-report harness=sleep kind=ship mode=local-only yolo=on window=primary:fm-labp39794-report worktree=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/2/notes
+spawned labp39794-nested harness=sleep kind=ship mode=local-only yolo=on window=primary:fm-labp39794-nested worktree=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/3/notes
+spawned labp39794-hidden harness=sleep kind=ship mode=local-only yolo=on window=primary:fm-labp39794-hidden worktree=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/4/notes
+zsh fm-labp39794-tool fm-labp39794-report fm-labp39794-nested fm-labp39794-hidden 
+=== tool: ignored files in the copy: !! data/ !! state/ 
+arm rc=0
+run rc=0
+copy on disk: no
+report file: none
+2026-11-02T23:51:22Z armed for https://github.com/acme/widget/pull/7
+2026-11-02T23:51:39Z removed the returned copy /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/1/notes (head bacbbd4); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.OXyCWW/data/labp39794-tool/merge-prune-preserved/1793663482
+2026-11-02T23:51:39Z reaped: teardown completed; removed the returned copy
+meta exists: no   wakes naming it: 
+=== report: ignored files in the copy: !! data/ !! state/ 
+arm rc=0
+run rc=0
+copy on disk: yes  (.git README.md data state work-hidden.txt work-nested.txt work-report.txt work-tool.txt )
+report file: still-there
+  rec: attempts=1
+  rec: state=retained
+  rec: reason=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/2/notes holds an ignored file that is neither scratch nor on the preserve list: data/report.md
+2026-11-02T23:51:39Z armed for https://github.com/acme/widget/pull/8
+2026-11-02T23:51:54Z retained /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/2/notes: /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/2/notes holds an ignored file that is neither scratch nor on the preserve list: data/report.md
+meta exists: no   wakes naming it: 1
+=== nested: ignored files in the copy: !! .claude/ !! data/ !! state/ 
+arm rc=0
+run rc=0
+copy on disk: no
+report file: none
+2026-11-02T23:51:54Z armed for https://github.com/acme/widget/pull/9
+2026-11-02T23:52:16Z removed the returned copy /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/3/notes (head bacbbd4); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.OXyCWW/data/labp39794-nested/merge-prune-preserved/1793663514
+2026-11-02T23:52:16Z reaped: teardown completed; removed the returned copy
+meta exists: no   wakes naming it: 0
+=== hidden: ignored files in the copy: !! .claude/ !! data/ !! state/ 
+arm rc=0
+run rc=0
+copy on disk: yes  (.claude .git README.md data state work-hidden.txt work-nested.txt work-report.txt work-tool.txt )
+report file: none
+  rec: attempts=1
+  rec: state=retained
+  rec: reason=/Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/4/notes/.claude/worktrees/n2 has changed or untracked files (1 entries, first: ?? f)
+2026-11-02T23:52:17Z armed for https://github.com/acme/widget/pull/10
+2026-11-02T23:52:17Z retained /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/4/notes: /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/4/notes/.claude/worktrees/n2 has changed or untracked files (1 entries, first: ?? f)
+meta exists: yes   wakes naming it: 1
+--- real pool state
+2 /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/2/notes free
+4 /Users/charlesabrooker/tmp/fm-lab.OXyCWW/treehouse/.treehouse/notes-85885d/4/notes free
+DONE

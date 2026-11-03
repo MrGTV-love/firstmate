@@ -1,0 +1,126 @@
+=== CONTROL: a plain window with no launch boundary sees the planted names
+=== A: default launch, raw worker, secrets planted in pane
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kW9IFp
+local-only source: local=main@46360b4a4f0fa573c5156534d49a56bccd830e41 origin=main@46360b4a4f0fa573c5156534d49a56bccd830e41 selected=origin/main@46360b4a4f0fa573c5156534d49a56bccd830e41
+skill selection for labt981852-a: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=bash write_confinement=unconfined-macos-bash
+spawned labt981852-a harness=bash kind=ship mode=local-only yolo=on window=primary:fm-labt981852-a worktree=/Users/charlesabrooker/tmp/fm-lab.kW9IFp/treehouse/.treehouse/notes-3cab5b/1/notes
+spawn labt981852-a rc=0
+=== B: default launch, REAL claude -p under fake ambient ANTHROPIC_API_KEY
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kW9IFp
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F7P8T36RV6VVEZC248ER42/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local-only source: local=main@46360b4a4f0fa573c5156534d49a56bccd830e41 origin=main@46360b4a4f0fa573c5156534d49a56bccd830e41 selected=origin/main@46360b4a4f0fa573c5156534d49a56bccd830e41
+skill selection for labt981852-b: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=bash write_confinement=unconfined-macos-bash
+spawned labt981852-b harness=bash kind=ship mode=local-only yolo=on window=primary:fm-labt981852-b worktree=/Users/charlesabrooker/tmp/fm-lab.kW9IFp/treehouse/.treehouse/notes-3cab5b/2/notes
+spawn labt981852-b rc=0
+=== C: allowlist file replaces the default set
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kW9IFp
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+local-only source: local=main@46360b4a4f0fa573c5156534d49a56bccd830e41 origin=main@46360b4a4f0fa573c5156534d49a56bccd830e41 selected=origin/main@46360b4a4f0fa573c5156534d49a56bccd830e41
+skill selection for labt981852-c: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=bash write_confinement=unconfined-macos-bash
+spawned labt981852-c harness=bash kind=ship mode=local-only yolo=on window=primary:fm-labt981852-c worktree=/Users/charlesabrooker/tmp/fm-lab.kW9IFp/treehouse/.treehouse/notes-3cab5b/3/notes
+spawn labt981852-c rc=0
+=== D: adversarial: allowlist carries ANTHROPIC_API_KEY to a claude worker, expect refusal
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kW9IFp
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: model freshness unverified - claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'haiku' not checked
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API
+spawn d rc=1
+no state record for labt981852-d
+=== D2: adversarial: same allowlist, key only in tmux, not in the spawn process, expect refusal
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kW9IFp
+error: ANTHROPIC_API_KEY is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t primary -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+spawn d2 rc=1
+=== E: guard event for new registry id
+guard-event rc=0
+unknown-guard rc=0
+{"ts":"2026-11-02T23:35:08Z","guard":"claude-api-billing","version":"1","system":"firstmate","session":"pid-5257","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-02T23:35:12Z","guard":"spawn-shell-startup-confinement","version":"1","system":"firstmate","session":"labproof","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-02T23:35:12Z","guard":"not-a-registered-guard","version":"1","system":"firstmate","session":"labproof","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+6:METRIC spawn-shell-startup-confinement opportunities=1 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=unmeasured
+DONE
+primary:zsh
+primary:control
+primary:fm-labt981852-a
+primary:fm-labt981852-b
+primary:fm-labt981852-c
+pools inside lab: 
+--- worker control env names vs canaries
+  present FM_CANARY_SECRET
+  present GITHUB_TOKEN
+  present OPENAI_API_KEY
+  present ANTHROPIC_API_KEY
+  present ANTHROPIC_AUTH_TOKEN
+  present AWS_SECRET_ACCESS_KEY
+  present SSH_AUTH_SOCK
+  present JAVA_HOME
+  present FM_KEPT
+  present HOME
+  present PATH
+  present TMUX
+  absent  FM_TASK_ID
+  absent  FM_TASK_INBOX
+  absent  FM_WRITE_CONFINEMENT
+  total-names 86
+--- worker a env names vs canaries
+  absent  FM_CANARY_SECRET
+  absent  GITHUB_TOKEN
+  absent  OPENAI_API_KEY
+  absent  ANTHROPIC_API_KEY
+  absent  ANTHROPIC_AUTH_TOKEN
+  absent  AWS_SECRET_ACCESS_KEY
+  present SSH_AUTH_SOCK
+  present JAVA_HOME
+  absent  FM_KEPT
+  present HOME
+  present PATH
+  present TMUX
+  present FM_TASK_ID
+  present FM_TASK_INBOX
+  present FM_WRITE_CONFINEMENT
+  total-names 36
+--- worker b env names vs canaries
+  absent  FM_CANARY_SECRET
+  absent  GITHUB_TOKEN
+  absent  OPENAI_API_KEY
+  absent  ANTHROPIC_API_KEY
+  absent  ANTHROPIC_AUTH_TOKEN
+  absent  AWS_SECRET_ACCESS_KEY
+  present SSH_AUTH_SOCK
+  present JAVA_HOME
+  absent  FM_KEPT
+  present HOME
+  present PATH
+  present TMUX
+  present FM_TASK_ID
+  present FM_TASK_INBOX
+  present FM_WRITE_CONFINEMENT
+  total-names 36
+--- worker c env names vs canaries
+  absent  FM_CANARY_SECRET
+  absent  GITHUB_TOKEN
+  absent  OPENAI_API_KEY
+  absent  ANTHROPIC_API_KEY
+  absent  ANTHROPIC_AUTH_TOKEN
+  absent  AWS_SECRET_ACCESS_KEY
+  absent  SSH_AUTH_SOCK
+  absent  JAVA_HOME
+  present FM_KEPT
+  present HOME
+  present PATH
+  present TMUX
+  present FM_TASK_ID
+  present FM_TASK_INBOX
+  present FM_WRITE_CONFINEMENT
+  total-names 23
+--- real claude output
+BOUNDARYOK
+claude-exit=0

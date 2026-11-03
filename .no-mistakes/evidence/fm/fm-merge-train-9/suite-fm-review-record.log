@@ -1,0 +1,17 @@
+FM_TEST_BEGIN 2026-11-02T23:25:36Z tests/fm-review-record.test.sh family=pr-forge expected_gate_skip=none
+ok - review-only --json reports immutable record-time independent evidence
+ok - default verify text and JSON preserve captain-word precedence
+ok - captain-word alone cannot satisfy review-only
+ok - stale head, FAIL, same family, unknown families and triggers are typed not-qualified
+ok - an unknown author family is covered only by exact-head PASS reads from two known reader families
+ok - bare opus, sonnet and haiku ids map to anthropic while unknown ids stay untrusted
+ok - stored family fields cannot retroactively change recorded independence
+ok - not-qualified, unavailable and invalid-input failures stay distinguishable without parsing prose
+ok - default captain-word/FAIL precedence holds
+ok - a legacy record without report_sha256 omits the digest instead of fabricating it
+FM_TEST_END 2026-11-02T23:25:49Z tests/fm-review-record.test.sh exit=0 duration_ms=12314 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F7P8T36RV6VVEZC248ER42/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=16278
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=12314 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-review-record.test.sh duration_ms=12314
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6F7P8T36RV6VVEZC248ER42/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

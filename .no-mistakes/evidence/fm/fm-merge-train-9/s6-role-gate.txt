@@ -1,0 +1,25 @@
+origin=fork-owner/firstmate  upstream=github=MrGTV-love/firstmate  role=maintainer scope=fork
+fm-role: maintainer github.com/fork-owner/firstmate (local)
+1 no-mistakes, no registry: origin is the target           rc=0 authorized: maintainer scope github.com/fork-owner/firstmate 
+2 direct-PR: gh order picks upstream, refused              rc=1 refused: this home runs as firstmate user/operator and holds no publication authority for github.com/mrgtv-love/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/
+3 no mode: same as direct-PR                               rc=1 refused: this home runs as firstmate user/operator and holds no publication authority for github.com/mrgtv-love/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/
+4 no-mistakes, registry agrees with origin                 rc=0 authorized: maintainer scope github.com/fork-owner/firstmate 
+5 no-mistakes, registry names parent: refused              rc=1 refused: origin names github.com/fork-owner/firstmate but the no-mistakes registration for /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/projects/fm-fork publishes to github.com/mrgtv-love/firstmate; w
+   registry bytes unchanged by the read
+6 no-mistakes, unreadable registry: refused                rc=1 refused: cannot read the no-mistakes registration for /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/projects/fm-fork (registry /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/nm/state.sqlite needs python3 and
+7 scope fits origin, stray consent for parent: scope wins  rc=0 authorized: maintainer scope github.com/fork-owner/firstmate 
+8 consent for parent, direct-PR: authorized                rc=0 authorized: task consent for github.com/mrgtv-love/firstmate 
+9 bad mode: refused as a usage error                       rc=1  error: mode must be no-mistakes or direct-PR (got 'local-only')
+10 no role, no-mistakes: refused, needs a grant            rc=1 refused: this home runs as firstmate user/operator and holds no publication authority for github.com/fork-owner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/
+11 no role, consent for parent, no-mistakes targets fork: refused rc=1 refused: this home runs as firstmate user/operator and holds no publication authority for github.com/fork-owner/firstmate; only the captain grants either a maintainer scope for one <host>/<
+12 no role, consent for fork, no-mistakes: authorized      rc=0 authorized: task consent for github.com/fork-owner/firstmate 
+
+== real fm-spawn refusals, mode no-mistakes
+-- A: no role: refusal plus grant advice
+error: spawn refused for labr: this home runs as firstmate user/operator and holds no publication authority for github.com/fork-owner/firstmate; only the captain grants either a maintainer scope for one <host>/<owner>/<repo>, written as 'maintainer <host>/<owner>/<repo>' in /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/config/firstma
+error: to let this home publish to github.com/fork-owner/firstmate, write 'maintainer github.com/fork-owner/firstmate' into /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/config/firstmate-role (docs/configuration.md "Firstmate role"), or pass --upstream-consent github.com/fork-owner/firstmate for this one task with the captain's expli
+spawn rc=1
+-- B: scope fits origin, registry disagrees: refusal, no grant advice
+error: spawn refused for labr: origin names github.com/fork-owner/firstmate but the no-mistakes registration for /Users/charlesabrooker/tmp/fm-lab.yiBFeJ/projects/fm-fork publishes to github.com/mrgtv-love/firstmate; when its run-start refresh from origin fails the pipeline keeps the registered destination, so a run could open i
+spawn rc=1
+no labr task state

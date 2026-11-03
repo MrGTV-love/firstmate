@@ -1,0 +1,1 @@
+{"protected_paths": [".gitignore", ".ignore"], "disable_project_settings": true, "rebase": {"strategy": "merge"}, "commands": {"lint": "bin/fm-lint.sh"}}
