@@ -40,7 +40,7 @@ the model that covers most is taken (rule order breaks a tie), and a model of an
 is never taken to cover that family. An unknown author family is never asked for: it is reported once
 per head as `author family unknown`.
 The review runner is a home setting, never a path in this script: FM_REVIEW_RUNNER, else the first
-line of config/review-runner. Unset or not executable makes no request and records one
+non-comment line of config/review-runner. Unset, relative or not executable makes no request and records one
 `review runner unavailable: <why>` line per head.
 
 Everything durable is under <state>/.pr-auto-review/: <task>.json is the sidecar (request, outstanding
@@ -51,7 +51,7 @@ sidecar test can probe, so a restart neither loses a read nor repeats it. Outcom
 (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no
 eligible reader, runner unavailable) and, for every lasting hold, one check wake per head and reason;
 the merge itself also writes the merge outcome and fleet-ledger record that bin/fm-pr-merge.sh owns.
-`state` prints reading, queued, merged, fail, held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
+`state` prints reading, waiting: <reason>, queued, merged, fail, held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
 because a `note:` there would replace the worker's `done:` as the latest event.
 
 A report is accepted only when its raw first line is exactly `VERDICT: <PASS|FAIL|INCOMPLETE> head=<head>`
