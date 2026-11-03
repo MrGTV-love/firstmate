@@ -489,6 +489,10 @@
         {
           "file": "bin/fm-teardown-nested-lib.sh",
           "match": "printf \"REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\\n\" \\"
+        },
+        {
+          "file": "bin/fm-idle-reap-lib.sh",
+          "match": "line_re = re.compile(r\"REFUSED: Vernant"
         }
       ]
     },
