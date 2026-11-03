@@ -1,0 +1,579 @@
+
+=================== S1 objective required ===================
+
+$ bin/fm-tasks-axi.sh add lock-a Lock holder crash
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=bc13944c-37ec-4a28-986c-2e1c700e0447 FM_FRICTION_EPISODE_ID=bc13944c-37ec-4a28-986c-2e1c700e0447 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-a Lock holder crash --objective O9
+REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+completing-command: FM_FRICTION_OPERATION_ID=fdad5a5b-5dde-477f-b35e-ff870edf7e8d FM_FRICTION_EPISODE_ID=fdad5a5b-5dde-477f-b35e-ff870edf7e8d bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-a Lock holder crash --objective none
+REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+completing-command: FM_FRICTION_OPERATION_ID=1b621052-8276-470b-953e-a67a00387531 FM_FRICTION_EPISODE_ID=1b621052-8276-470b-953e-a67a00387531 bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-a Lock holder crash --objective O7
+ok: added lock-a -> Queued
+task:
+  id: lock-a
+  title: Lock holder crash
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-a` to move it to in flight
+  - Run `tasks-axi block lock-a --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add misc-a Unrelated widget polish --objective none --objective-reason housekeeping, no objective applies
+ok: added misc-a -> Queued
+task:
+  id: misc-a
+  title: Unrelated widget polish
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start misc-a` to move it to in flight
+  - Run `tasks-axi block misc-a --by <other>` to record a dependency
+[exit=0]
+--- data/backlog-review.tsv:
+lock-a		O7	
+misc-a		none	housekeeping, no objective applies
+
+=================== S2 duplicate check: documented worked pairs ===================
+
+$ bin/fm-tasks-axi.sh add lock-b Lock holder crash recovery --objective O7
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as lock-a?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  lock-a (Queued, overlap 0.75) Lock holder crash
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to lock-a and file nothing:
+    bin/fm-tasks-axi.sh add lock-b Lock\ holder\ crash\ recovery --objective O7 --dup-of lock-a
+  the work is different from lock-a - file it:
+    bin/fm-tasks-axi.sh add lock-b Lock\ holder\ crash\ recovery --objective O7 --not-dup lock-a
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-c Lock timeout --objective O7
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as lock-a?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  lock-a (Queued, overlap 0.25) Lock holder crash
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to lock-a and file nothing:
+    bin/fm-tasks-axi.sh add lock-c Lock\ timeout --objective O7 --dup-of lock-a
+  the work is different from lock-a - file it:
+    bin/fm-tasks-axi.sh add lock-c Lock\ timeout --objective O7 --not-dup lock-a
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-d Lock timeout retry loop --objective O7
+ok: added lock-d -> Queued
+task:
+  id: lock-d
+  title: Lock timeout retry loop
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-d` to move it to in flight
+  - Run `tasks-axi block lock-d --by <other>` to record a dependency
+[exit=0]
+--- lock-b/lock-c must be absent, lock-d present:
+- [ ] lock-d - Lock timeout retry loop (since 2026-11-02)
+
+=================== S3 --not-dup override files the item ===================
+
+$ bin/fm-tasks-axi.sh add lock-c Lock timeout --objective O7 --not-dup lock-a
+ok: added lock-c -> Queued
+task:
+  id: lock-c
+  title: Lock timeout
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start lock-c` to move it to in flight
+  - Run `tasks-axi block lock-c --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add lock-e Lock holder crash again --objective O7 --not-dup misc-a
+REFUSED: guard=backlog-intake-not-dup rule=not-a-neighbour missing=a neighbour of this title
+completing-command: FM_FRICTION_OPERATION_ID=beb82c79-37ae-4743-9dbe-649594b500ed FM_FRICTION_EPISODE_ID=beb82c79-37ae-4743-9dbe-649594b500ed bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+fm-tasks-axi: --not-dup misc-a names an item whose title does not overlap this one enough to be a neighbour; nothing was filed
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add lock-e Lock holder crash again --objective O7 --not-dup lock-e
+REFUSED: guard=backlog-intake-not-dup rule=item-missing missing=an item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=b8979886-a13b-4a5e-b169-2d4db259a376 FM_FRICTION_EPISODE_ID=b8979886-a13b-4a5e-b169-2d4db259a376 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+fm-tasks-axi: --not-dup lock-e names no item in this backlog; nothing was filed
+[exit=2]
+- [ ] lock-c - Lock timeout (since 2026-11-02)
+
+=================== S4 --dup-of appends to kept item and files nothing ===================
+
+$ bin/fm-tasks-axi.sh add lock-f Lock holder crash recovery --body seen again on host b --objective O7 --dup-of lock-a
+ok: merged into lock-a (nothing filed)
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add lock-f Lock holder crash recovery --objective O7 --dup-of lock-f
+REFUSED: guard=backlog-intake-dup-of rule=kept-is-self missing=a kept item other than this add
+completing-command: FM_FRICTION_OPERATION_ID=0abfa116-a56c-4878-ac0e-b28a185507a8 FM_FRICTION_EPISODE_ID=0abfa116-a56c-4878-ac0e-b28a185507a8 bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --dup-of <kept-id>
+fm-tasks-axi: --dup-of names this add's own id lock-f; an item cannot be a duplicate of itself, so nothing was filed or appended
+[exit=2]
+0
+--- kept item lock-a:
+task:
+  id: lock-a
+  title: Lock holder crash
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: "---\nMerged from a duplicate filing: Lock holder crash recovery\nseen again on host b"
+
+=================== S5 done --duplicate-of closes on checked proof ===================
+
+$ bin/fm-tasks-axi.sh add dup-x Rotate signing keyring quarterly --objective O5
+ok: added dup-x -> Queued
+task:
+  id: dup-x
+  title: Rotate signing keyring quarterly
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dup-x` to move it to in flight
+  - Run `tasks-axi block dup-x --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add dup-y Rotate signing keyring --objective O5 --not-dup dup-x
+ok: added dup-y -> Queued
+task:
+  id: dup-y
+  title: Rotate signing keyring
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dup-y` to move it to in flight
+  - Run `tasks-axi block dup-y --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh done dup-y --duplicate-of dup-y
+REFUSED: guard=backlog-close-duplicate-of rule=kept-is-self missing=a kept item other than this one
+completing-command: FM_FRICTION_OPERATION_ID=bf116ecd-cef7-430b-966a-cc351a74e521 FM_FRICTION_EPISODE_ID=bf116ecd-cef7-430b-966a-cc351a74e521 bin/fm-tasks-axi.sh done dup-y --duplicate-of <kept-id>
+fm-tasks-axi: an item cannot be a duplicate of itself
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done dup-y --duplicate-of nope-zz
+REFUSED: guard=backlog-close-duplicate-of rule=kept-missing missing=a kept item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=6e519d0a-bc14-45c9-92fe-1810d80cb8f2 FM_FRICTION_EPISODE_ID=6e519d0a-bc14-45c9-92fe-1810d80cb8f2 bin/fm-tasks-axi.sh done dup-y --duplicate-of <kept-id>
+fm-tasks-axi: the kept item nope-zz does not exist in this backlog
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done dup-y --duplicate-of dup-x --note extra
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done dup-y --duplicate-of dup-x
+ok: done dup-y -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit=0]
+--- dup-y row and dup-x body:
+14:  Merged from duplicate dup-y: Rotate signing keyring
+17:- [x] dup-y - Rotate signing keyring (done 2026-11-02)
+task:
+  id: dup-x
+  title: Rotate signing keyring quarterly
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: "---\nMerged from duplicate dup-y: Rotate signing keyring"
+
+=================== S6 guards: closed kept item, owner-filed item, item that blocks open work ===================
+
+$ bin/fm-tasks-axi.sh done misc-a --duplicate-of dup-y
+REFUSED: guard=backlog-close-duplicate-of rule=kept-not-open missing=a Queued or In flight kept item
+completing-command: FM_FRICTION_OPERATION_ID=8ccae0c7-4571-42e3-b349-f524251e6bba FM_FRICTION_EPISODE_ID=8ccae0c7-4571-42e3-b349-f524251e6bba bin/fm-tasks-axi.sh done misc-a --duplicate-of <kept-id>
+fm-tasks-axi: the kept item dup-y is not Queued or In flight; a duplicate closes into open work only
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add own-a Owner widget quota --body Captain's words, 2026-10-20 (via /kun): 'keep this one'. --objective O7
+ok: added own-a -> Queued
+task:
+  id: own-a
+  title: Owner widget quota
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain's words, 2026-10-20 (via /kun): 'keep this one'."
+help[2]:
+  - Run `tasks-axi start own-a` to move it to in flight
+  - Run `tasks-axi block own-a --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add own-b Owner widget quota limit --objective O7 --not-dup own-a
+ok: added own-b -> Queued
+task:
+  id: own-b
+  title: Owner widget quota limit
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start own-b` to move it to in flight
+  - Run `tasks-axi block own-b --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh done own-a --duplicate-of own-b
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-a, and in what words?
+fm-tasks-axi: own-a quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>
+[exit=2]
+
+$ bin/fm-tasks-axi.sh add blk-a Blocker cache warming --objective O6
+ok: added blk-a -> Queued
+task:
+  id: blk-a
+  title: Blocker cache warming
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blk-a` to move it to in flight
+  - Run `tasks-axi block blk-a --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh add blk-b Dependent cache shard rollout --objective O6
+ok: added blk-b -> Queued
+task:
+  id: blk-b
+  title: Dependent cache shard rollout
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blk-b` to move it to in flight
+  - Run `tasks-axi block blk-b --by <other>` to record a dependency
+[exit=0]
+20:- [ ] blk-b - Dependent cache shard rollout blocked-by: blk-a (since 2026-11-02)
+
+$ bin/fm-tasks-axi.sh add blk-k Blocker cache warming kept --objective O6 --not-dup blk-a
+ok: added blk-k -> Queued
+task:
+  id: blk-k
+  title: Blocker cache warming kept
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blk-k` to move it to in flight
+  - Run `tasks-axi block blk-k --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh done blk-a --duplicate-of blk-k
+REFUSED: guard=backlog-close-item-eligible rule=open-dependents missing=no open item blocked by this one
+completing-command: FM_FRICTION_OPERATION_ID=c78cabdc-4c99-4759-87df-796d20383193 FM_FRICTION_EPISODE_ID=c78cabdc-4c99-4759-87df-796d20383193 bin/fm-tasks-axi.sh unblock <dependent> --by blk-a
+fm-tasks-axi: blk-a still blocks open items: blk-b. Closing it would release them while its work is still open, so nothing was closed. Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by blk-k, then bin/fm-tasks-axi.sh unblock <dependent> --by blk-a (the kept item blk-k itself needs only the unblock step).
+[exit=2]
+
+=================== S7 done --moved-to closes on a registered home ===================
+
+$ bin/fm-tasks-axi.sh add mv-a Lighthouse importer cleanup --objective O3
+ok: added mv-a -> Queued
+task:
+  id: mv-a
+  title: Lighthouse importer cleanup
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start mv-a` to move it to in flight
+  - Run `tasks-axi block mv-a --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh done mv-a --moved-to sm-nowhere peer-open
+REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+completing-command: FM_FRICTION_OPERATION_ID=53e911da-efb9-428f-b50d-8138d7671256 FM_FRICTION_EPISODE_ID=53e911da-efb9-428f-b50d-8138d7671256 bin/fm-tasks-axi.sh done mv-a --moved-to <home> <item-id>
+fm-tasks-axi: sm-nowhere is not one registered home in /Users/charlesabrooker/tmp/fm-lab.SqPmJ8/data/secondmates.md
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer peer-absent
+REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=11f57603-d8cc-46aa-8f68-702dec937abf FM_FRICTION_EPISODE_ID=11f57603-d8cc-46aa-8f68-702dec937abf bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer <item-id>
+fm-tasks-axi: sm-peer's backlog has no item peer-absent
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer peer-gone
+REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=7c6320d9-290b-47da-bb5a-9ba6a2b2c0e8 FM_FRICTION_EPISODE_ID=7c6320d9-290b-47da-bb5a-9ba6a2b2c0e8 bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer <item-id>
+fm-tasks-axi: sm-peer's item peer-gone is not open (Queued or In flight); moved work must be open in the new home
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer
+fm-tasks-axi: --moved-to takes two values: --moved-to <home> <item-id>
+[exit=2]
+
+$ bin/fm-tasks-axi.sh done mv-a --moved-to sm-peer peer-open
+ok: done mv-a -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit=0]
+23:- [x] mv-a - Lighthouse importer cleanup (done 2026-11-02)
+
+=================== S8 Done window: overlap with a recently closed item is refused ===================
+
+$ bin/fm-tasks-axi.sh add lock-g Lighthouse importer cleanup followup --objective O3
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as mv-a?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  mv-a (Done, overlap 0.75) Lighthouse importer cleanup
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to mv-a and file nothing:
+    bin/fm-tasks-axi.sh add lock-g Lighthouse\ importer\ cleanup\ followup --objective O3 --dup-of mv-a
+  the work is different from mv-a - file it:
+    bin/fm-tasks-axi.sh add lock-g Lighthouse\ importer\ cleanup\ followup --objective O3 --not-dup mv-a
+[exit=2]
+
+=================== S9 ship row still needs a deliverable without a proof ===================
+
+$ bin/fm-tasks-axi.sh add ship-a Quartz palette exporter --objective O2 --kind ship
+ok: added ship-a (ship) -> Queued
+task:
+  id: ship-a
+  title: Quartz palette exporter
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-02
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start ship-a` to move it to in flight
+  - Run `tasks-axi block ship-a --by <other>` to record a dependency
+[exit=0]
+
+$ bin/fm-tasks-axi.sh done ship-a
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+[exit=2]
+
+=================== guard events ===================
+{"ts":"2026-11-03T03:06:24Z","guard":"backlog-close-moved-to","version":"1","system":"firstmate","session":"pid-98634","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:06:56Z","guard":"backlog-close-moved-to","version":"1","system":"firstmate","session":"pid-92904","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:17Z","guard":"backlog-close-item-eligible","version":"1","system":"firstmate","session":"pid-53009","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:18Z","guard":"backlog-close-moved-to","version":"1","system":"firstmate","session":"pid-55175","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:24Z","guard":"backlog-intake-objective","version":"1","system":"firstmate","session":"pid-73900","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:27Z","guard":"backlog-intake-duplicate","version":"1","system":"firstmate","session":"pid-81463","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:32Z","guard":"backlog-intake-objective","version":"1","system":"firstmate","session":"pid-91119","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-11-03T03:07:35Z","guard":"backlog-intake-duplicate","version":"1","system":"firstmate","session":"pid-96156","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+
+=================== final backlog ===================
+## In flight
+
+## Queued
+- [ ] lock-a - Lock holder crash (since 2026-11-02)
+  ---
+  Merged from a duplicate filing: Lock holder crash recovery
+  seen again on host b
+
+- [ ] misc-a - Unrelated widget polish (since 2026-11-02)
+- [ ] lock-d - Lock timeout retry loop (since 2026-11-02)
+- [ ] lock-c - Lock timeout (since 2026-11-02)
+- [ ] dup-x - Rotate signing keyring quarterly (since 2026-11-02)
+  ---
+  Merged from duplicate dup-y: Rotate signing keyring
+
+- [ ] own-a - Owner widget quota (since 2026-11-02)
+  Captain's words, 2026-10-20 (via /kun): 'keep this one'.
+- [ ] own-b - Owner widget quota limit (since 2026-11-02)
+- [ ] blk-a - Blocker cache warming (since 2026-11-02)
+- [ ] blk-b - Dependent cache shard rollout blocked-by: blk-a (since 2026-11-02)
+- [ ] blk-k - Blocker cache warming kept (since 2026-11-02)
+- [ ] ship-a - Quartz palette exporter (kind: ship) (since 2026-11-02)
+## Done
+- [x] mv-a - Lighthouse importer cleanup (done 2026-11-02)
+  moved to sm-peer as peer-open
+- [x] dup-y - Rotate signing keyring (done 2026-11-02)
+  duplicate of dup-x
