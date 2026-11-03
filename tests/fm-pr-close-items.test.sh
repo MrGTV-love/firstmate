@@ -299,6 +299,40 @@ test_a_rerun_closes_nothing_twice() {
   pass "a repeat of the close step changes nothing, with the task record present and after it is gone"
 }
 
+test_a_rerun_after_a_partial_close_closes_only_the_rest() {
+  local case_dir bin_dir before_a rc=0
+  case_dir=$(gh_case c3-partial 70)
+  cx_add "$case_dir" partial-a
+  cx_add "$case_dir" partial-b
+  printf '%s\n' 'Closes: partial-a' 'Closes: partial-b' > "$case_dir/bodies/70"
+  bin_dir=$case_dir/fakebin
+  cat > "$bin_dir/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\${2:-}" = partial-b ] && [ ! -e "$case_dir/read-failed" ]; then
+  : > "$case_dir/read-failed"
+  echo "error: simulated read failure" >&2
+  exit 1
+fi
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$bin_dir/tasks-axi"
+  gh_merge "$case_dir" 70
+  [ "$(cx_state "$case_dir" partial-a)" = "done" ] || fail "c3-partial: the first run did not close partial-a"
+  [ "$(cx_state "$case_dir" partial-b)" != "done" ] || fail "c3-partial: the first run closed the item it could not read"
+  assert_grep 'not closed partial-b: the item could not be read' "$case_dir/stderr" "c3-partial: the item left open was not reported"
+  before_a=$(cx "$case_dir" show partial-a 2>&1)
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" PATH="$case_dir/fakebin:$PATH" \
+    FM_TEST_GH_BODIES="$case_dir/bodies" FM_TEST_GH_MERGED_PRS="$case_dir/merged-prs" FM_TEST_GH_LOG="$case_dir/gh.log" \
+    FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" "$CLOSE_SH" task-x1 "$REPO_URL/70" > "$case_dir/rerun" 2>&1 || rc=$?
+  expect_code 0 "$rc" "c3-partial: the rerun must close the rest"
+  assert_grep 'partial-a is already done' "$case_dir/rerun" "c3-partial: the rerun did not say partial-a is done"
+  [ "$before_a" = "$(cx "$case_dir" show partial-a 2>&1)" ] || fail "c3-partial: the rerun changed the item it had already closed"
+  assert_grep "closed partial-b with $REPO_URL/70" "$case_dir/rerun" "c3-partial: the rerun did not close the rest"
+  [ "$(grep -c '^close-at-merge: closed ' "$case_dir/rerun")" = 1 ] || fail "c3-partial: the rerun closed more than the rest"
+  [ "$(cx_state "$case_dir" partial-b)" = "done" ] || fail "c3-partial: partial-b is still open after the rerun"
+  pass "a rerun after a partial close only reports the closed item and closes the rest"
+}
+
 # A hand run with a pull request that is still open closes nothing, on every forge.
 test_a_hand_run_with_an_open_pr_closes_nothing() {
   local case_dir before rc=0
@@ -351,6 +385,12 @@ train_body() {
       printf '%s\n' '## Train facts' ''
       for member in "$@"; do n=$((n + 1)); printf -- '- **Component %s:** %s at `aaaa`, merge commit `bbbb`.\n' "$n" "$member"; done
       printf -- '- **Main merge:** `cccc` merged by `dddd`.\n' ;;
+    heading-table)
+      printf '%s\n' '### Train components' '' '| # | Component PR | Head merged |' '|---|---|---|'
+      for member in "$@"; do n=$((n + 1)); printf '| %s | %s | `aaaa` |\n' "$n" "$member"; done ;;
+    leadin-table)
+      printf '%s\n' 'Components:' '| Component | Unchanged component head |' '| --- | --- |'
+      for member in "$@"; do printf '| %s | `aaaa` |\n' "$member"; done ;;
     heading-bullets)
       printf '%s\n' '### Components and base' ''
       for member in "$@"; do printf -- '- %s at unchanged head `aaaa`.\n' "$member"; done
@@ -409,13 +449,13 @@ check_train_outcome() {  # <case-dir> <label> <train-url>
 
 test_a_train_closes_the_items_of_its_listed_members_in_every_layout() {
   local layout case_dir
-  for layout in url-first-table numbered-table labeled-bullets heading-bullets fenced-numbered; do
+  for layout in url-first-table numbered-table heading-table leadin-table labeled-bullets heading-bullets fenced-numbered; do
     case_dir=$(train_case "c2-$layout" "$layout" 80 'Closes: train-own-item')
     gh_merge "$case_dir" 80 --merge
     check_train_outcome "$case_dir" "c2-$layout" "$REPO_URL/80"
     [ "$(cx_state "$case_dir" train-own-item)" = "done" ] || fail "c2-$layout: the train's own Closes line was ignored"
   done
-  pass "a train closes its members' items from bodies and from pr=, in all five layouts, never an excluded PR's"
+  pass "a train closes its members' items from bodies and from pr=, in every layout, a Component table under a Component heading or lead-in included, never an excluded PR's"
 }
 
 test_a_train_with_no_closes_line_of_its_own_still_closes_member_items() {
@@ -809,6 +849,24 @@ test_a_data_row_that_mentions_component_is_no_member_list() {
   pass "only a table's header row names the Component column; a data row that mentions it does not"
 }
 
+test_a_table_under_a_component_heading_keeps_the_bullets_after_it() {
+  local out
+  out=$(printf '%s\n' '## Components' '| Note | Value |' '| --- | --- |' '| https://github.com/example/repo/pull/8 | b |' '' \
+    '- https://github.com/example/repo/pull/9 at head a' '## Notes' '| Note |' '| --- |' '| x |' '' \
+    '- https://github.com/example/repo/pull/10 is context' \
+    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ "$out" = https://github.com/example/repo/pull/9 ] || fail "heading list: wrong members after a table: $out"
+  out=$(printf '%s\n' '## Components' '| Component | Head |' '| --- | --- |' '| https://github.com/example/repo/pull/1 | a |' '' \
+    '- https://github.com/example/repo/pull/2 at head a' \
+    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ "$out" = "$(printf '%s\n' https://github.com/example/repo/pull/1 https://github.com/example/repo/pull/2)" ] \
+    || fail "heading list: a Component table and the bullets after it did not both count: $out"
+  out=$(printf '%s\n' 'Components:' '| Note |' '| --- |' '| x |' '- https://github.com/example/repo/pull/3 at head a' \
+    | bash -c '. "$1"; fm_pr_closes_train_members -' _ "$ROOT/bin/fm-pr-closes-lib.sh")
+  [ -z "$out" ] || fail "lead-in list: an item after a table counted, though a table is not an item: $out"
+  pass "a table does not end a Component heading's list, and it does end a lead-in's list"
+}
+
 pr_close_test_cases=(
 test_closes_lines_close_each_eligible_item_and_report_the_rest
 test_a_merge_naming_its_own_task_reports_the_live_record
@@ -819,6 +877,7 @@ test_an_unreadable_body_is_reported_with_the_url_and_the_error
 test_every_failure_kind_is_reported_and_the_valid_item_still_closes
 test_a_hold_placed_after_the_last_look_still_wins
 test_a_rerun_closes_nothing_twice
+test_a_rerun_after_a_partial_close_closes_only_the_rest
 test_a_hand_run_with_an_open_pr_closes_nothing
 test_a_train_closes_the_items_of_its_listed_members_in_every_layout
 test_a_train_with_no_closes_line_of_its_own_still_closes_member_items
@@ -829,6 +888,7 @@ test_a_gitlab_merge_reports_the_completion_paths_actual_result
 test_a_forgejo_merge_reports_the_completion_paths_actual_result
 test_the_closes_parser_reads_real_ids_and_ignores_examples
 test_a_data_row_that_mentions_component_is_no_member_list
+test_a_table_under_a_component_heading_keeps_the_bullets_after_it
 test_a_dependent_id_the_list_prints_in_quotes_loses_its_edge
 test_completion_clears_the_finished_blocker_on_every_route
 test_the_task_noun_forms_and_typed_completions_clear_the_edge

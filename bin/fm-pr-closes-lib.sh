@@ -30,8 +30,8 @@
 #     has a cell that is `Component` or `Component` plus one word, such as `Component PR`;
 #     the member is the URL that starts that column's cell in each following row (the
 #     table ends at the first line that does not start with `|`), whether the URL column
-#     comes first or after a `#` column. A data row that merely mentions Component is no
-#     header;
+#     comes first or after a `#` column, under any heading or lead-in line. A data row
+#     that merely mentions Component is no header;
 #   - a bullet whose label contains `Component`, such as `- **Component 1:** <url> ...`;
 #   - the bullets under a heading containing `Component` (until the next heading), each
 #     of which starts with a URL (a bullet that does not start with a URL is skipped);
@@ -105,6 +105,7 @@ fm_pr_closes_train_members() {  # <body-file|->
     url=
     if [[ "$line" =~ $table_re ]]; then
       IFS='|' read -r -a cells <<< "$line"
+      if [ "$mode" = list ]; then mode=none; fi
       if [ "$mode" = header ]; then
         # The row under a candidate header must be the separator row, or it was no header.
         if [[ "$line" =~ $sep_re ]]; then mode=table; else mode=other; fi
@@ -126,9 +127,12 @@ fm_pr_closes_train_members() {  # <body-file|->
       cell=${cell#"${cell%%[![:space:]]*}"}
       if [[ "$cell" =~ ^($url_re) ]]; then url=${BASH_REMATCH[1]}; fi
     else
-      case "$mode" in table|header|other) mode=none ;; esac
+      case "$mode" in
+        table|header|other) if [ "$list_kind" = heading ]; then mode=list; else mode=none; fi ;;
+      esac
       if [[ "$line" =~ $heading_re ]]; then
         mode=none
+        list_kind=''
         if [[ "$line" =~ $heading_component_re ]]; then mode=list; list_kind=heading; items=0; fi
         continue
       fi

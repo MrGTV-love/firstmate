@@ -33,10 +33,12 @@
 #     owner call check (a captain hold that is not released, an expired but unanswered one
 #     included): FM_TASKS_AXI_REFUSE_OPEN_CALL, set only here, makes it refuse one inside
 #     the lock it holds while it completes the item, so a hold placed before the close
-#     takes effect wins. An open owner call, a live task record, a scout item, a proof it
-#     cannot verify (a non-GitHub pull request) or any other refusal is reported with its
-#     first line. Only the merged pull request's own task is left for its own teardown to
-#     close; any other task with a live record stays open until someone acts on the report.
+#     takes effect wins. An open owner call, a live task record of a ship or scout item, a
+#     scout item, a proof it cannot verify (a non-GitHub pull request) or any other refusal
+#     is reported with its first line. A ship or scout item with a live record stays open:
+#     the merged pull request's own task is left for its own teardown to close, and any
+#     other stays open until someone acts on the report. A live item of any other kind
+#     closes like any other named item.
 # A completed item also clears itself from every other item's blocked-by list
 # (bin/fm-backlog-transition-lib.sh), reported as `unblocked:`.
 #
@@ -46,10 +48,10 @@
 #
 # Output. One `close-at-merge:` line per closed item on stdout, one line per item left
 # open (`close-at-merge: not closed <id>: <reason>`: on stdout only when the merged pull
-# request's own task still has its live record, which its teardown closes; on stderr
-# behind `actionable:` for every other item), and a summary line. A closed item's cleared
-# blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge it could not
-# clear is an `actionable: close-at-merge:` line on stderr. A linked pull request of a
+# request's own ship or scout task still has its live record, which its teardown closes;
+# on stderr behind `actionable:` for every other item), and a summary line. A closed
+# item's cleared blocked-by edge is a `close-at-merge: unblocked:` line on stdout; an edge
+# it could not clear is an `actionable: close-at-merge:` line on stderr. A linked pull request of a
 # train that is not a member is an `actionable: close-at-merge: not read <url>:` line on
 # stderr; it names no item, so it changes neither the summary counts nor the exit status.
 # Exit 0 when every named item was closed or was already done; exit 3 when any item was
