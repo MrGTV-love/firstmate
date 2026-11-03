@@ -1,0 +1,9 @@
+command: fm_closeout_retained_class "$(cat <unmodified incident log>)" from extracted head 5bff1059f
+log: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/main2662-disk/vernant-d1-intake-limits-estimate-teardown.log (  358167 bytes, 11 lines)
+result: recognised as the retained class (rc=0)
+named copies parsed: 1
+  /Users/charlesabrooker/.treehouse/vernant-2ee7ec/126/vernant/.claude/worktrees/fm-vernant-d1-intake-limits-estimate-l2
+negative: same bytes with the top-level reason changed:
+  result: not recognised (correct)
+negative: same bytes plus one more REFUSED line:
+  result: not recognised (correct)

@@ -1,0 +1,23 @@
+ok - a teardown that completes clears the closeout record
+ok - a consumed wake is not raised again by either sweep (idle-reap first)
+ok - a consumed wake is not raised again by either sweep (merge-prune first)
+ok - a closeout wake that could not be appended is raised again, once
+ok - idle-reap alone: one teardown call and one wake
+ok - idle-reap then merge-prune: one teardown call and one wake
+ok - a task copy that cannot be fingerprinted makes no record
+ok - a closeout refusal next to another refusal line makes no record
+ok - a modified tracked file in the retained copy lifts the hold
+ok - a closeout refusal whose top-level reason differs, with the retained token only nested, makes no record
+ok - a new commit in the retained copy lifts the hold, and its refusal raises a new wake
+ok - a new untracked file in the retained copy lifts the hold
+ok - a refusal of another retained class makes no closeout record and is retried when due
+ok - a merge-prune attempt that starts while idle-reap's first refusal is not yet recorded calls no second teardown and raises one wake
+ok - an idle-reap sweep that starts while merge-prune's first refusal is not yet recorded calls no second teardown and raises one wake
+ok - merge-prune then idle-reap: one teardown call and one wake
+ok - the same holds for a foreign copy refusal
+ok - an unchanged own nested copy the closeout driver retained is not offered to teardown again by run, run --now or sweep, and raises one wake
+ok - the same holds when the driver output could not be saved
+ok - a driver JSON line that cannot be parsed makes no record
+ok - a named copy that cannot be fingerprinted makes no record
+ok - two sweeps that both hold the same unsent wake raise it once
+merge-prune rc=0

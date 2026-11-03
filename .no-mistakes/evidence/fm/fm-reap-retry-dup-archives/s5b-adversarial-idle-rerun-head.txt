@@ -1,0 +1,144 @@
+
+=== [head] adversarial refusal 'nested-token' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'nested-token' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'mixed' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'mixed' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'broken-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'broken-json' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'no-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'no-json' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'exit1' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'exit1' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'not-a-repo' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'not-a-repo' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'missing-named' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-named' through idle: no record, no hold: PASS
+
+=== [head] adversarial refusal 'missing-task-copy' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-task-copy' through idle: no record, no hold: PASS

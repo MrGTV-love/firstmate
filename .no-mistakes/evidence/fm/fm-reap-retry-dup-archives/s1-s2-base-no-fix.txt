@@ -1,0 +1,51 @@
+
+=== [base] idle-reap own: three sweeps over six hours on an unchanged copy
+  ok       first sweep runs teardown once (got 1)
+  MISMATCH first sweep wrote the record: got 'no', want 'yes'
+  MISMATCH second sweep, memo past six hours: no new teardown: got '2', want '1'
+  scan row: refused	t1	ship	7214	REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-live.zN5b9x/worlds/base-idle3-own-1/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate/data/ver
+  ok       scan class (got refused)
+  MISMATCH scan detail says unchanged and retained: got 'no', want 'yes'
+  MISMATCH third sweep, one more day: no new teardown: got '3', want '1'
+  MISMATCH exactly one wake names the copy: got '0', want '1'
+  MISMATCH stand-in archives written: got '3', want '1'
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 3 (3072 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [base] idle-reap own: three sweeps over six hours on an unchanged copy: FAIL (6 mismatches)
+
+=== [base] merge-prune own: run --now, run --now, sweep when due on an unchanged copy
+  ok       first run calls teardown once (got 1)
+  ok       record state (got retained)
+  MISMATCH later attempts: no new teardown: got '4', want '1'
+  ok       record state stays (got retained)
+  ok       copy stays (got yes)
+  ok       exactly one wake names the copy (got 1)
+  MISMATCH stand-in archives written: got '4', want '1'
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793726527	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/base-prune3-own-2/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/base-prune3-own-2/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2/firstmate
+  stand-in archives on disk: 4 (4096 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [base] merge-prune own: run --now, run --now, sweep when due on an unchanged copy: FAIL (2 mismatches)

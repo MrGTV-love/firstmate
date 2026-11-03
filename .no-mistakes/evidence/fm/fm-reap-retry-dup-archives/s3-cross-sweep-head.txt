@@ -1,0 +1,50 @@
+
+=== [head] both sweeps (idle-prune), then the wake is consumed and both sweep again
+  ok       one teardown across both sweeps (got 1)
+  ok       one wake across both sweeps (got 1)
+  wake-queue before drain:
+    1793726666	1	check	idle-reap:t1	check: idle-reap kept <scratch>/worlds/head-cross-idle-prune-1/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       after drain: no new teardown (got 1)
+  ok       after drain: no new wake (got 0)
+  ok       copy stays (got yes)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+  admission results:
+    admission=admitted
+  record <scratch>/worlds/head-cross-idle-prune-1/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793726666
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    a05ddfeb2d8ba756b7b01177a5f21af3178ec71b e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 <scratch>/worlds/head-cross-idle-prune-1/th/pool1/1/repo
+    826af848d50dbc11d2cc894785f514465a1c4767 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 <scratch>/worlds/head-cross-idle-prune-1/nested-copy
+  wake queue rows naming the copy:
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] both sweeps (idle-prune), then the wake is consumed and both sweep again: PASS
+
+=== [head] both sweeps (prune-idle), then the wake is consumed and both sweep again
+  ok       one teardown across both sweeps (got 1)
+  ok       one wake across both sweeps (got 1)
+  wake-queue before drain:
+    1793726677	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-cross-prune-idle-2/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  ok       after drain: no new teardown (got 1)
+  ok       after drain: no new wake (got 0)
+  ok       copy stays (got yes)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+  record <scratch>/worlds/head-cross-prune-idle-2/home/state/.closeout-retained/t1:
+    fm-closeout-retained-v1
+    1793726679
+    cleanup_ignored_payload_archived_tree_retained
+    wake_sent=1
+    750a65e6433524df38ccdb68c01704f50ba93536 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 <scratch>/worlds/head-cross-prune-idle-2/th/pool1/1/repo
+    3f026d3656c3a04b6bc61b139b83ee32fd330fed e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 <scratch>/worlds/head-cross-prune-idle-2/nested-copy
+  wake queue rows naming the copy:
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] both sweeps (prune-idle), then the wake is consumed and both sweep again: PASS

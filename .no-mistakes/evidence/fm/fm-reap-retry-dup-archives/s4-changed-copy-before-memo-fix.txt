@@ -1,0 +1,81 @@
+
+=== [before-memo-fix] idle-reap: copy changed by commit, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  MISMATCH memo was gone when teardown was called: got '1', want '0'
+  MISMATCH real admission on the second call: got 'admission=REFUSED: ', want 'admission=admitted'
+  MISMATCH a new record exists: got 'no', want 'yes'
+  ok       record has a new fingerprint (got yes)
+  MISMATCH two wakes name the copy in all: got '1', want '2'
+  ok       next sweep holds the new fingerprint (got 2)
+  MISMATCH no third wake: got '1', want '2'
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/before-memo-fix-changed-commit-1/nested-copy (exit 3): full output: /Users/char...
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=REFUSED: REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-live.zN5b9x/worlds/before-memo-fix-changed-commit-1/nested
+  record: none
+  wake queue rows naming the copy:
+    1793726713	1	check	idle-reap:t1	check: idle-reap kept <scratch>/worlds/before-memo-fix-changed-commit-1/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [before-memo-fix] idle-reap: copy changed by commit, retried at once through real admission (fresh memo, same status line): FAIL (5 mismatches)
+
+=== [before-memo-fix] idle-reap: copy changed by untracked, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  MISMATCH memo was gone when teardown was called: got '1', want '0'
+  MISMATCH real admission on the second call: got 'admission=REFUSED: ', want 'admission=admitted'
+  MISMATCH a new record exists: got 'no', want 'yes'
+  ok       record has a new fingerprint (got yes)
+  MISMATCH two wakes name the copy in all: got '1', want '2'
+  ok       next sweep holds the new fingerprint (got 2)
+  MISMATCH no third wake: got '1', want '2'
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/before-memo-fix-changed-untracked-2/nested-copy (exit 3): full output: /Users/c...
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=REFUSED: REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-live.zN5b9x/worlds/before-memo-fix-changed-untracked-2/nes
+  record: none
+  wake queue rows naming the copy:
+    1793726723	1	check	idle-reap:t1	check: idle-reap kept <scratch>/worlds/before-memo-fix-changed-untracked-2/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [before-memo-fix] idle-reap: copy changed by untracked, retried at once through real admission (fresh memo, same status line): FAIL (5 mismatches)
+
+=== [before-memo-fix] idle-reap: copy changed by modified, retried at once through real admission (fresh memo, same status line)
+  ok       first sweep runs teardown once (got 1)
+  ok       memo is fresh and on disk (got yes)
+  ok       second sweep starts teardown (got 2)
+  MISMATCH memo was gone when teardown was called: got '1', want '0'
+  MISMATCH real admission on the second call: got 'admission=REFUSED: ', want 'admission=admitted'
+  MISMATCH a new record exists: got 'no', want 'yes'
+  ok       record has a new fingerprint (got yes)
+  MISMATCH two wakes name the copy in all: got '1', want '2'
+  ok       next sweep holds the new fingerprint (got 2)
+  MISMATCH no third wake: got '1', want '2'
+  second sweep rows:
+    teardown-refused	t1	-	-	REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/before-memo-fix-changed-modified-3/nested-copy (exit 3): full output: /Users/ch...
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=REFUSED: REFUSED: automatic reap ineligible: refused: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-live.zN5b9x/worlds/before-memo-fix-changed-modified-3/nest
+  record: none
+  wake queue rows naming the copy:
+    1793726747	1	check	idle-reap:t1	check: idle-reap kept <scratch>/worlds/before-memo-fix-changed-modified-3/th/pool1/1/repo for t1: the closeout driver retained the copy and archived its ignored files; it is not retried while the copy is unchanged; a human or Main decides the release
+  stand-in archives on disk: 1 (1024 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [before-memo-fix] idle-reap: copy changed by modified, retried at once through real admission (fresh memo, same status line): FAIL (5 mismatches)

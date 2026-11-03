@@ -1,0 +1,329 @@
+
+=== [head] another refusal class keeps its six-hour retry and makes no record
+  ok       idle-reap: first call (got 1)
+  ok       idle-reap: no record (got no)
+  ok       idle-reap: no closeout wake (got 0)
+  ok       idle-reap: fresh memo still holds (got 1)
+  ok       idle-reap: aged memo retries (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 0 (0 KB)
+  copy still exists: yes; destroy calls: 0
+  ok       merge-prune: first call (got 1)
+  ok       merge-prune: no record (got no)
+  ok       merge-prune: due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793726906	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-other-prune-2/th/pool1/1/repo for t1: REFUSED: no-mistakes run for t1 is still parked after axi abort
+  stand-in archives on disk: 0 (0 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] another refusal class keeps its six-hour retry and makes no record: PASS
+
+=== [head] adversarial refusal 'nested-token' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'nested-token' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'nested-token' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793726940	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-nested-token-prune-4/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-nested-token-prune-4/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firs
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'nested-token' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'mixed' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'mixed' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'mixed' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793726967	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-mixed-prune-6/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-mixed-prune-6/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20/2
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'mixed' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'broken-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'broken-json' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'broken-json' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793726990	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-broken-json-prune-8/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-broken-json-prune-8/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstm
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'broken-json' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'no-json' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'no-json' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'no-json' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793727007	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-no-json-prune-10/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-no-json-prune-10/nested-copy (exit 3): full output: /Users/charlesabrooker/.treehouse/firstmate-7b
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'no-json' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'exit1' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'exit1' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'exit1' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793727024	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-exit1-prune-12/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-exit1-prune-12/nested-copy (exit 1): full output: /Users/charlesabrooker/.treehouse/firstmate-7bab20
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'exit1' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'not-a-repo' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'not-a-repo' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'not-a-repo' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793727058	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-not-a-repo-prune-14/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-not-a-repo-prune-14/not-a-repo (exit 3): full output: /Users/charlesabrooker/.treehouse/firstma
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'not-a-repo' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'missing-named' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-named' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'missing-named' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+    1793727103	1	check	merge-prune:t1	check: merge-prune kept <scratch>/worlds/head-adv-missing-named-prune-16/th/pool1/1/repo for t1: REFUSED: Vernant's closeout driver did not release own nested copy <scratch>/worlds/head-adv-missing-named-prune-16/no-such-dir (exit 3): full output: /Users/charlesabrooker/.treehouse/
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-named' through prune: no record, no hold: PASS
+
+=== [head] adversarial refusal 'missing-task-copy' through idle: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  MISMATCH no closeout wake: got '', want '0'
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=|memo_at_call=0
+    args=t1|admission=1|prune=|memo_at_call=1
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-task-copy' through idle: no record, no hold: FAIL (1 mismatches)
+
+=== [head] adversarial refusal 'missing-task-copy' through prune: no record, no hold
+  ok       first call (got 1)
+  ok       no record (got no)
+  ok       no closeout wake (got 0)
+  ok       due retry runs (got 2)
+  --- evidence ---
+  teardown calls:
+    args=t1|admission=1|prune=1|memo_at_call=0
+    args=t1|admission=1|prune=1|memo_at_call=0
+  admission results:
+    admission=admitted
+    admission=admitted
+  record: none
+  wake queue rows naming the copy:
+  stand-in archives on disk: 2 (2048 KB)
+  copy still exists: yes; destroy calls: 0
+RESULT [head] adversarial refusal 'missing-task-copy' through prune: no record, no hold: PASS
