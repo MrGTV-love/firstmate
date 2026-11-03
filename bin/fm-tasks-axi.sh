@@ -473,7 +473,7 @@ remote_item_state() {  # <home> <item>
 # The checks both closing proofs share: the item must not belong to the owner.
 # Runs with the item's row already probed (FM_BACKLOG_ROW_*).
 guard_owner_items() {  # <id> <title> <body>
-  local id=$1 hold_status
+  local id=$1 hold_status words_route
   local hold_env=(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA")
   [ -z "${FM_STATE_OVERRIDE:-}" ] || hold_env+=(FM_STATE_OVERRIDE="$FM_STATE_OVERRIDE")
   [ -z "${FM_CONFIG_OVERRIDE:-}" ] || hold_env+=(FM_CONFIG_OVERRIDE="$FM_CONFIG_OVERRIDE")
@@ -489,7 +489,12 @@ guard_owner_items() {  # <id> <title> <body>
     *) backlog_source_stop backlog-close-item-eligible "cannot tell whether $id is an open owner call, so it counts as undecided; run bin/fm-captain-hold.sh open $id and fix what it reports" ;;
   esac
   if printf '%s\n%s\n' "$2" "$3" | intake_python owner-filed; then
-    backlog_refuse backlog-close-item-eligible owner-filed "the owner's words" human-only "does the owner close $id, and in what words?" "$id" "$id quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with --drop-file <words-file>"
+    # --drop-file is a proof for ship and scout rows only; other kinds take the words as a note.
+    case "$FM_BACKLOG_ROW_KIND" in
+      ship|scout) words_route="record them with bin/fm-tasks-axi.sh done $id --drop-file <words-file>" ;;
+      *) words_route="record them with bin/fm-tasks-axi.sh done $id --note \"<the owner's words>\"" ;;
+    esac
+    backlog_refuse backlog-close-item-eligible owner-filed "the owner's words" human-only "does the owner close $id, and in what words?" "$id" "$id quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then $words_route"
   fi
 }
 

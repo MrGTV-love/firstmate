@@ -2235,7 +2235,7 @@ owner_marker_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
   for id in "${positive[@]}"; do
     out=$(refusal_of "$dir" "$id via $label" "done" "$id" "$@")
     assert_contains "$out" "the owner's own item" "$id did not read as owner-filed through $label"
-    assert_contains "$out" "--drop-file" "the owner-filed refusal did not name the owner's words"
+    assert_contains "$out" "done $id --note" "the owner-filed refusal did not name a route that closes a task row"
   done
   for id in "${negative[@]}"; do
     out=$(wrapper_from_code "$dir" "done" "$id" "$@" 2>&1) || fail "$id mentions the owner without a marker and was stopped through $label: $out"
@@ -2384,6 +2384,23 @@ test_closing_proofs_leave_the_owners_items_alone() {
     || fail "could not file dated-captain"
   out=$(refusal_of "$dir" "dated captain" "done" dated-captain --duplicate-of ow-kept)
   assert_contains "$out" "the owner's own item" "a dated Captain item in a later year closed without the owner's words"
+  # The refusal names a route that closes the row: --drop-file for a ship, a note for a task.
+  wrapper_from_code "$dir" add own-route-task "$(ftitle own-route-task)" --objective O7 --body "Captain: hold it" >/dev/null \
+    || fail "could not file own-route-task"
+  out=$(refusal_of "$dir" "owner task route" "done" own-route-task --duplicate-of ow-kept)
+  assert_contains "$out" "done own-route-task --note" "the owner refusal for a task row did not name --note"
+  case "$out" in *--drop-file*) fail "the owner refusal for a task row named --drop-file, which a task row refuses: $out" ;; esac
+  out=$(wrapper_from_code "$dir" "done" own-route-task --note "Captain 2026-11-03: close it" 2>&1) \
+    || fail "the route the owner refusal named for a task row did not close it: $out"
+  [ "$(row_state "$dir" own-route-task)" = x ] || fail "own-route-task did not close through its named route"
+  wrapper_from_code "$dir" add own-route-ship "$(ftitle own-route-ship)" --objective O7 --kind ship --body "Captain: hold it" >/dev/null \
+    || fail "could not file own-route-ship"
+  out=$(refusal_of "$dir" "owner ship route" "done" own-route-ship --duplicate-of ow-kept)
+  assert_contains "$out" "done own-route-ship --drop-file" "the owner refusal for a ship row did not name --drop-file"
+  printf 'Captain 2026-11-03: close it\n' > "$dir/owner-words.txt"
+  out=$(wrapper_from_code "$dir" "done" own-route-ship --drop-file "$dir/owner-words.txt" 2>&1) \
+    || fail "the route the owner refusal named for a ship row did not close it: $out"
+  [ "$(row_state "$dir" own-route-ship)" = x ] || fail "own-route-ship did not close through its named route"
   pass "both closing proofs stop at every owner-filed marker, open owner call, unreadable hold, and live task, and close an item that only mentions the owner"
 }
 
