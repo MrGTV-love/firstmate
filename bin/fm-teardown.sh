@@ -4699,8 +4699,9 @@ teardown_held_copies_report() {
 # Succeeds when no held-copy record write is needed that could not be made: every
 # held copy already has its identical line in the record (the write skips it, so
 # a retry needs no append and a read-only record does not stop it), or the record
-# is a regular file that is not a symlink and is writable, or it does not exist
-# yet and the nearest existing directory above it is writable. It writes nothing.
+# resolves to a writable regular file (the shape test the write uses, so a symlink
+# to one passes and a directory or dangling symlink does not), or it does not
+# exist yet and the nearest existing directory above it is writable. It writes nothing.
 teardown_held_copies_record_writable() {
   local record="$DATA/held-foreign-copies.log" dir=$DATA entry missing=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
@@ -4709,8 +4710,9 @@ teardown_held_copies_record_writable() {
       "$(fm_refuse_text "${entry%%$'\t'*}")" "$(fm_refuse_text "${entry#*$'\t'}")" || missing=1
   done
   [ "$missing" = 1 ] || return 0
+  teardown_held_copies_record_shape_ok "$record" || return 1
   if [ -e "$record" ] || [ -L "$record" ]; then
-    [ -f "$record" ] && [ ! -L "$record" ] && [ -w "$record" ]
+    [ -w "$record" ]
     return
   fi
   while [ ! -e "$dir" ] && [ ! -L "$dir" ] && [ "$dir" != / ] && [ -n "$dir" ]; do

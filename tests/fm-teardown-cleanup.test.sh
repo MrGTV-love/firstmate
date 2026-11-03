@@ -5427,109 +5427,205 @@ held_task_files() {
     done
 }
 
-test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was() {
-  local rc shape mode label fragment
-  for shape in plain enclosing; do
-    for mode in no-lease-command lease-fails held-record-is-a-directory; do
-      label="held-marker-$shape-$mode"
-      held_marker_case "$label" "$shape"
-      case "$mode" in
-        held-record-is-a-directory)
-          mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
-          nested_seed_task_files "$FOREIGN_CASE"
-          held_task_files "$FOREIGN_CASE" > "$FOREIGN_CASE/task-files.before"
-          fragment="REFUSED: the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log could not be written"
-          ;;
-        *)
-          : > "$FOREIGN_CASE/$mode"
-          fragment="REFUSED: pool slot $FOREIGN_SLOT could not be durably leased"
-          ;;
-      esac
-      held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
-      run_foreign_teardown rc
-      expect_code 1 "$rc" "$label: a held close that cannot lease its slot or write its record must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "$fragment" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
-      cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" \
-        || fail "$label: the refusal changed the pending-close record"
-      cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" \
-        || fail "$label: the refusal changed the return-pending record"
-      assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
-      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
-      if [ "$mode" = held-record-is-a-directory ]; then
-        assert_absent "$FOREIGN_CASE/lease.log" "$label: the refusal took a lease"
-        held_task_files "$FOREIGN_CASE" | cmp -s - "$FOREIGN_CASE/task-files.before" \
-          || fail "$label: the refusal changed the inbox, status or tasktmp"
-        assert_absent "$FOREIGN_CASE/endpoint.log" "$label: the refusal closed the endpoint"
-      fi
-      jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
-        || fail "$label: the slot's lease record changed"
-      held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
-    done
-  done
-  pass "a held close that cannot durably lease its slot or write its held-copy record leaves a pending-close record and a return-pending record as they were, for a prior and a plain record"
+# The entry checks of a held close, one named test per control and record shape.
+# held_entry_case <label> <plain|enclosing> <scenario> runs one teardown of a
+# held close whose record, lease or inventory is in the state the scenario
+# names. The refusal scenarios must leave a pending-close record and a
+# return-pending record placed beforehand byte for byte, take no lease and
+# write no held-copy record, before the slot is reserved; the others close.
+held_entry_refused() {  # <label> <fragment>
+  local label=$1 fragment=$2
+  expect_code 1 "$HELD_RC" "$label: the held close must refuse at entry: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "$fragment" "$FOREIGN_CASE/stderr" "$label: the refusal did not name its cause"
+  cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" || fail "$label: the refusal changed the pending-close record"
+  cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
+  jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
+  assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  held_assert_untouched "$label" "$FOREIGN_CASE" "$HELD_COPY"
 }
 
-# The entry check of the held-copy record never strands a retry that needs no
-# write: when a stuck endpoint refused the first close after it recorded every
-# held copy, a read-only record still lets the rerun close, byte-identical, like
-# a writable one. An entry the record does not hold yet, in a read-only record,
-# still refuses before the slot is reserved: no lease, no return-pending record
-# and the earlier markers as they were.
-test_a_held_close_rerun_needs_no_writable_record_when_every_copy_is_recorded() {
-  local rc shape access label
-  for shape in plain enclosing; do
-    for access in read-only writable; do
-      label="held-recorded-$shape-$access"
-      held_marker_case "$label" "$shape"
+held_entry_case() {  # <label> <plain|enclosing> <scenario>
+  local label=$1 shape=$2 scenario=$3 data
+  held_marker_case "$label" "$shape"
+  data=$FOREIGN_CASE/data
+  mkdir -p "$data"
+  HELD_RC=0
+  case "$scenario" in
+    lease-no-command) : > "$FOREIGN_CASE/no-lease-command" ;;
+    lease-fails) : > "$FOREIGN_CASE/lease-fails" ;;
+    record-directory) mkdir "$data/held-foreign-copies.log" ;;
+    unrecorded-readonly | symlink-unrecorded-readonly)
+      printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$data/real-held-log"
+      chmod a-w "$data/real-held-log"
+      if [ "$scenario" = unrecorded-readonly ]; then mv "$data/real-held-log" "$data/held-foreign-copies.log"; else ln -s real-held-log "$data/held-foreign-copies.log"; fi
+      # A user who can write a read-only file (root) cannot show this refusal.
+      if [ -w "$data/held-foreign-copies.log" ]; then HELD_RC=skip; return 0; fi
+      ;;
+    symlink-dangling) ln -s no-such-target "$data/held-foreign-copies.log" ;;
+    symlink-directory) mkdir "$data/real-held-dir"; ln -s real-held-dir "$data/held-foreign-copies.log" ;;
+    symlink-writable)
+      printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$data/real-held-log"
+      ln -s real-held-log "$data/held-foreign-copies.log"
+      ;;
+    recorded-readonly | recorded-writable)
       stuck_endpoint_tmux "$FOREIGN_CASE"
       : > "$FOREIGN_CASE/endpoint-stuck"
-      run_foreign_teardown rc
-      expect_code 1 "$rc" "$label: a stuck endpoint must refuse the first close: $(cat "$FOREIGN_CASE/stderr")"
-      assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "$label: the first close did not record its one held copy"
-      cp "$FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
-      [ "$access" = writable ] || chmod a-w "$FOREIGN_CASE/data/held-foreign-copies.log"
+      run_foreign_teardown HELD_RC
+      expect_code 1 "$HELD_RC" "$label: a stuck endpoint must refuse the first close: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals 1 "$(wc -l < "$data/held-foreign-copies.log" | tr -d ' ')" "$label: the first close did not record its one held copy"
+      cp "$data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
+      [ "$scenario" = recorded-writable ] || chmod a-w "$data/held-foreign-copies.log"
       rm -f "$FOREIGN_CASE/endpoint-stuck"
-      run_foreign_teardown rc
-      expect_code 0 "$rc" "$label: the rerun must close, since every held copy is already recorded: $(cat "$FOREIGN_CASE/stderr")"
-      held_assert_closed "$label"
-      cmp -s "$FOREIGN_CASE/record.before" "$FOREIGN_CASE/data/held-foreign-copies.log" || fail "$label: the rerun changed the record"
-      chmod u+w "$FOREIGN_CASE/data/held-foreign-copies.log"
-    done
-    label="held-unrecorded-read-only-$shape"
-    held_marker_case "$label" "$shape"
-    mkdir -p "$FOREIGN_CASE/data"
-    printf '2000-01-01T00:00:00Z\ttask-x1\t/elsewhere\t/elsewhere/copy\tother reason\n' > "$FOREIGN_CASE/data/held-foreign-copies.log"
-    chmod a-w "$FOREIGN_CASE/data/held-foreign-copies.log"
-    # A user who can write a read-only file (root) cannot show this refusal.
-    if [ -w "$FOREIGN_CASE/data/held-foreign-copies.log" ]; then continue; fi
-    cp "$FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/record.before"
-    run_foreign_teardown rc
-    expect_code 1 "$rc" "$label: a needed entry that cannot be recorded must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "REFUSED: the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log could not be written" "$FOREIGN_CASE/stderr" \
-      "$label: the refusal did not name the record"
-    cmp -s "$FOREIGN_CASE/backlog-close.before" "$FOREIGN_CASE/state/task-x1.backlog-close" || fail "$label: the refusal changed the pending-close record"
-    cmp -s "$FOREIGN_CASE/return-pending.before" "$FOREIGN_CASE/state/task-x1.teardown-return-pending" || fail "$label: the refusal changed the return-pending record"
-    cmp -s "$FOREIGN_CASE/record.before" "$FOREIGN_CASE/data/held-foreign-copies.log" || fail "$label: the refusal changed the record"
-    jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null || fail "$label: the refusal took a lease"
-    assert_present "$FOREIGN_COPY" "$label: the task's own nested copy was removed"
-    chmod u+w "$FOREIGN_CASE/data/held-foreign-copies.log"
-  done
-  pass "a held close rerun needs no writable record when every held copy is recorded, and still refuses at entry when a needed entry cannot be recorded"
+      ;;
+  esac
+  cp "$data/held-foreign-copies.log" "$FOREIGN_CASE/record.start" 2>/dev/null || true
+  held_snapshot "$FOREIGN_CASE" "$HELD_COPY"
+  run_foreign_teardown HELD_RC
 }
 
-test_a_held_close_that_leases_retires_an_earlier_pending_close_record() {
-  local rc shape label
-  for shape in plain enclosing; do
-    label="held-marker-close-$shape"
-    held_marker_case "$label" "$shape"
-    run_foreign_teardown rc
-    expect_code 0 "$rc" "$label: a held close whose slot leases must finish: $(cat "$FOREIGN_CASE/stderr")"
-    held_assert_closed "$label"
-    assert_absent "$FOREIGN_CASE/state/task-x1.backlog-close" "$label: the earlier pending-close record survived"
-    assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: the return-pending record survived"
-    assert_no_grep "dropped" "$FOREIGN_CASE/data/backlog.md" "$label: the earlier record's drop note was replayed"
-  done
-  pass "a held close whose slot leases finishes and retires the pending-close record an earlier run left"
+held_entry_scenario() {  # <plain|enclosing> <scenario>
+  local shape=$1 scenario=$2 label="held-entry-$2-$1" data
+  held_entry_case "$label" "$shape" "$scenario"
+  data=$FOREIGN_CASE/data
+  [ "$HELD_RC" != skip ] || return 0
+  case "$scenario" in
+    lease-no-command | lease-fails)
+      held_entry_refused "$label" "REFUSED: pool slot $FOREIGN_SLOT could not be durably leased"
+      assert_absent "$data/held-foreign-copies.log" "$label: a refused close wrote a held-copy record"
+      ;;
+    record-directory | unrecorded-readonly | symlink-dangling | symlink-directory | symlink-unrecorded-readonly)
+      held_entry_refused "$label" "REFUSED: the held-copy record $data/held-foreign-copies.log could not be written"
+      ;;
+    symlink-writable)
+      expect_code 0 "$HELD_RC" "$label: a symlink to a writable record must let the close finish: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      assert_equals 2 "$(wc -l < "$data/real-held-log" | tr -d ' ')" "$label: the close did not append through the symlink"
+      ;;
+    recorded-readonly | recorded-writable)
+      expect_code 0 "$HELD_RC" "$label: the rerun must close, since every held copy is already recorded: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      cmp -s "$FOREIGN_CASE/record.before" "$data/held-foreign-copies.log" || fail "$label: the rerun changed the record"
+      ;;
+    close)
+      expect_code 0 "$HELD_RC" "$label: a held close whose slot leases must finish: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "$label"
+      assert_absent "$FOREIGN_CASE/state/task-x1.backlog-close" "$label: the earlier pending-close record survived"
+      assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "$label: the return-pending record survived"
+      assert_no_grep "dropped" "$FOREIGN_CASE/data/backlog.md" "$label: the earlier record's drop note was replayed"
+      ;;
+  esac
+  chmod -R u+w "$data" 2>/dev/null || true
+}
+
+test_held_entry_lease_no_command_plain() {
+  held_entry_scenario plain lease-no-command
+  pass "held close entry check, lease-no-command, plain record"
+}
+
+test_held_entry_lease_no_command_enclosing() {
+  held_entry_scenario enclosing lease-no-command
+  pass "held close entry check, lease-no-command, enclosing record"
+}
+
+test_held_entry_lease_fails_plain() {
+  held_entry_scenario plain lease-fails
+  pass "held close entry check, lease-fails, plain record"
+}
+
+test_held_entry_lease_fails_enclosing() {
+  held_entry_scenario enclosing lease-fails
+  pass "held close entry check, lease-fails, enclosing record"
+}
+
+test_held_entry_record_directory_plain() {
+  held_entry_scenario plain record-directory
+  pass "held close entry check, record-directory, plain record"
+}
+
+test_held_entry_record_directory_enclosing() {
+  held_entry_scenario enclosing record-directory
+  pass "held close entry check, record-directory, enclosing record"
+}
+
+test_held_entry_unrecorded_readonly_plain() {
+  held_entry_scenario plain unrecorded-readonly
+  pass "held close entry check, unrecorded-readonly, plain record"
+}
+
+test_held_entry_unrecorded_readonly_enclosing() {
+  held_entry_scenario enclosing unrecorded-readonly
+  pass "held close entry check, unrecorded-readonly, enclosing record"
+}
+
+test_held_entry_symlink_dangling_plain() {
+  held_entry_scenario plain symlink-dangling
+  pass "held close entry check, symlink-dangling, plain record"
+}
+
+test_held_entry_symlink_dangling_enclosing() {
+  held_entry_scenario enclosing symlink-dangling
+  pass "held close entry check, symlink-dangling, enclosing record"
+}
+
+test_held_entry_symlink_directory_plain() {
+  held_entry_scenario plain symlink-directory
+  pass "held close entry check, symlink-directory, plain record"
+}
+
+test_held_entry_symlink_directory_enclosing() {
+  held_entry_scenario enclosing symlink-directory
+  pass "held close entry check, symlink-directory, enclosing record"
+}
+
+test_held_entry_symlink_unrecorded_readonly_plain() {
+  held_entry_scenario plain symlink-unrecorded-readonly
+  pass "held close entry check, symlink-unrecorded-readonly, plain record"
+}
+
+test_held_entry_symlink_unrecorded_readonly_enclosing() {
+  held_entry_scenario enclosing symlink-unrecorded-readonly
+  pass "held close entry check, symlink-unrecorded-readonly, enclosing record"
+}
+
+test_held_entry_symlink_writable_plain() {
+  held_entry_scenario plain symlink-writable
+  pass "held close entry check, symlink-writable, plain record"
+}
+
+test_held_entry_symlink_writable_enclosing() {
+  held_entry_scenario enclosing symlink-writable
+  pass "held close entry check, symlink-writable, enclosing record"
+}
+
+test_held_entry_recorded_readonly_plain() {
+  held_entry_scenario plain recorded-readonly
+  pass "held close entry check, recorded-readonly, plain record"
+}
+
+test_held_entry_recorded_readonly_enclosing() {
+  held_entry_scenario enclosing recorded-readonly
+  pass "held close entry check, recorded-readonly, enclosing record"
+}
+
+test_held_entry_recorded_writable_plain() {
+  held_entry_scenario plain recorded-writable
+  pass "held close entry check, recorded-writable, plain record"
+}
+
+test_held_entry_recorded_writable_enclosing() {
+  held_entry_scenario enclosing recorded-writable
+  pass "held close entry check, recorded-writable, enclosing record"
+}
+
+test_held_entry_close_plain() {
+  held_entry_scenario plain close
+  pass "held close entry check, close, plain record"
+}
+
+test_held_entry_close_enclosing() {
+  held_entry_scenario enclosing close
+  pass "held close entry check, close, enclosing record"
 }
 
 # A held close of a copy in a superseded pool folder: the project's current pool
@@ -6676,9 +6772,28 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
-test_a_held_close_refusal_keeps_a_pending_close_record_as_it_was
-test_a_held_close_rerun_needs_no_writable_record_when_every_copy_is_recorded
-test_a_held_close_that_leases_retires_an_earlier_pending_close_record
+test_held_entry_lease_no_command_plain
+test_held_entry_lease_no_command_enclosing
+test_held_entry_lease_fails_plain
+test_held_entry_lease_fails_enclosing
+test_held_entry_record_directory_plain
+test_held_entry_record_directory_enclosing
+test_held_entry_unrecorded_readonly_plain
+test_held_entry_unrecorded_readonly_enclosing
+test_held_entry_symlink_dangling_plain
+test_held_entry_symlink_dangling_enclosing
+test_held_entry_symlink_directory_plain
+test_held_entry_symlink_directory_enclosing
+test_held_entry_symlink_unrecorded_readonly_plain
+test_held_entry_symlink_unrecorded_readonly_enclosing
+test_held_entry_symlink_writable_plain
+test_held_entry_symlink_writable_enclosing
+test_held_entry_recorded_readonly_plain
+test_held_entry_recorded_readonly_enclosing
+test_held_entry_recorded_writable_plain
+test_held_entry_recorded_writable_enclosing
+test_held_entry_close_plain
+test_held_entry_close_enclosing
 test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
 test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path
 test_a_refused_held_close_releases_no_misdirected_lease

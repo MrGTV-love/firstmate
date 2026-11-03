@@ -1184,13 +1184,22 @@ teardown_held_copy_recorded() {  # <slot> <copy> <reason>
     '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$DATA/held-foreign-copies.log" 2>/dev/null
 }
 
+# Whether <record> has a shape an append can go through: it is absent, or it
+# resolves to a regular file (a symlink to one included). A directory, another
+# kind of file, or a dangling symlink has not. The one test the write and the
+# entry check share; whether a needed append is writable is each caller's.
+teardown_held_copies_record_shape_ok() {  # <record>
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  [ -f "$1" ]
+}
+
 teardown_held_copies_record() {
   local record="$DATA/held-foreign-copies.log" entry copy why slot stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   slot=$(fm_refuse_text "$TEARDOWN_HELD_SLOT")
   mkdir -p "$DATA" 2>/dev/null || return 1
-  [ ! -e "$record" ] || [ -f "$record" ] || return 1
+  teardown_held_copies_record_shape_ok "$record" || return 1
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=$(fm_refuse_text "${entry%%$'\t'*}")
     why=$(fm_refuse_text "${entry#*$'\t'}")
