@@ -498,7 +498,7 @@ def collect(home, task, url, sha, base, side, meta):
                 command += [f"--{key.replace('_', '-')}", facts[key]]
             recorded = run(command, home)
             if recorded.returncode != 0:
-                why = f"the record owner refused it: {(recorded.stdout or recorded.stderr).strip()[:200]}"
+                why = f"the record owner did not record it: {(recorded.stdout or recorded.stderr).strip()[:200]}"
                 if verdict == "FAIL":
                     stand_failed(att, served, report, why)
                 else:
@@ -760,9 +760,9 @@ def merge(home, task, url, sha, side, meta):
     errors = [line for line in output if line.startswith("error:")]
     reason = (errors[0][6:].strip() if errors else output[-1] if output else f"fm-pr-merge.sh exited {done.returncode}")[:240]
     head["merge"] = {"next_at": int(time.time()) + MERGE_RETRY, "reason": reason}
-    phase(side, sha, "held", f"merge refused: {reason}")
-    emit(home, task, side, sha, f"merge:{hashlib.sha256(reason.encode()).hexdigest()[:12]}", f"held: merge refused at {sha[:12]}: {reason}",
-         f"merge of {url} at {sha[:12]} refused: {reason}")
+    phase(side, sha, "held", f"merge not landed: {reason}")
+    emit(home, task, side, sha, f"merge:{hashlib.sha256(reason.encode()).hexdigest()[:12]}", f"held: merge not landed at {sha[:12]}: {reason}",
+         f"merge of {url} at {sha[:12]} did not land: {reason}")
 
 
 def sweep(home):

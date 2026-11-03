@@ -2741,7 +2741,7 @@ test_auto_review_new_head_voids_the_pass_and_held_prs_are_never_merged() {
   auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
   expect_code 1 "$(auto_merges "$case_dir")" "merge-refused: one merge attempt"
   state=$(auto_state "$case_dir")
-  case $state in "held: merge refused"*) ;; *) fail "merge-refused: current state should read held: merge refused, got: $state" ;; esac
+  case $state in "held: merge not landed"*) ;; *) fail "merge-refused: current state should read held: merge not landed, got: $state" ;; esac
   auto_step "$case_dir"; auto_step "$case_dir"
   expect_code 1 "$(auto_merges "$case_dir")" "merge-refused: no error loop inside the back-off"
   expect_code 1 "$(auto_count ':merge:' "$case_dir/state/.wake-queue")" "merge-refused: Main must be woken once for the refusal, not again while it is unchanged"
@@ -2880,7 +2880,7 @@ test_auto_review_leaves_the_away_record_to_the_merge_script() {
   expect_code 1 "$(auto_reviews "$case_dir")" "away: the verdict is recorded"
   expect_code 0 "$(auto_notes "$case_dir" 'away posture')" "away: the machinery must not hold on the away record itself"
   state=$(auto_state "$case_dir")
-  case $state in "merged $AUTO_URL"|"held: merge refused: "*) ;; *) fail "away: fm-pr-merge.sh must decide under the away record, got: $state" ;; esac
+  case $state in "merged $AUTO_URL"|"held: merge not landed: "*) ;; *) fail "away: fm-pr-merge.sh must decide under the away record, got: $state" ;; esac
   auto_dump "$case_dir" "G4 away record left to fm-pr-merge.sh"
   # Quiet mode is a present captain: nothing is held.
   case_dir=$(auto_case quiet)
