@@ -1082,7 +1082,7 @@ Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test
 Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
-A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
+A ship or scout task with a live record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.
 A pull request that finishes a queued item names it with a `Closes: <item-id>` line in its body, and [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) closes each named item through that same direct completion, with the merged pull request as proof, once it has proved and recorded the merge in that same call.
 A queued (`--auto`), forge-unconfirmed or externally seen merge runs no close, and the items its body names stay open; backlog item `fm-pr-close-items-queued-and-polled-merges` owns that gap.
 A merge train closes its members' items too, with the train as the proof: each member's own `Closes:` lines, and any task whose `state/<task>.meta` records `pr=` equal to the full member URL.
