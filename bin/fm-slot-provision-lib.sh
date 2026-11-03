@@ -10,6 +10,7 @@
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # A declared successor passes the resolved predecessor copy to that provisioner
 # as --supersedes through FM_SLOT_SUPERSEDES; the provisioner alone records it.
+# fm_slot_provision re-checks the predecessor's recorded branch just before that call.
 # fm_slot_resolve_successor needs fm-pr-lib.sh (fm_task_id_path_safe) and fm_meta_get.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
@@ -25,6 +26,9 @@ FM_SLOT_PREVIOUS_HEAD=
 # Input to fm_slot_provision, reset here so an inherited value never reaches it.
 FM_SLOT_SUPERSEDES=
 FM_SLOT_SUCCESSOR_WT=
+FM_SLOT_SUCCESSOR_ID=
+FM_SLOT_SUCCESSOR_META=
+FM_SLOT_SUCCESSOR_BRANCH=
 
 fm_slot_required() { # <project> <copy>
   [ -f "$1/scripts/git-stability/provision_existing_slot.py" ] ||
@@ -74,6 +78,9 @@ fm_slot_advertises_supersedes() { # <project>
 fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
   local project=$1 state=$2 id=$3 pred=$4 meta kind wt branch head real top pcommon scommon
   FM_SLOT_SUCCESSOR_WT=
+  FM_SLOT_SUCCESSOR_ID=
+  FM_SLOT_SUCCESSOR_META=
+  FM_SLOT_SUCCESSOR_BRANCH=
   fm_task_id_path_safe "$pred" || { echo 'error: --successor-of needs a safe predecessor task id' >&2; return 1; }
   [ "$pred" != "$id" ] || { echo "error: --successor-of $pred names the task itself" >&2; return 1; }
   meta=$state/$pred.meta
@@ -102,6 +109,33 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
     return 1
   }
   FM_SLOT_SUCCESSOR_WT=$real
+  FM_SLOT_SUCCESSOR_ID=$pred
+  FM_SLOT_SUCCESSOR_META=$meta
+  FM_SLOT_SUCCESSOR_BRANCH=$branch
+}
+
+# The predecessor must still be the task and branch the resolver verified. The
+# project's helper corroborates only the copy's current branch, so this binds
+# the proof to the branch recorded for the declared task: run it at the point
+# the path is handed over, with nothing slow between it and the call.
+fm_slot_successor_still_bound() {
+  local real head
+  { [ -n "$FM_SLOT_SUPERSEDES" ] && [ -n "$FM_SLOT_SUCCESSOR_META" ] && [ -n "$FM_SLOT_SUCCESSOR_BRANCH" ]; } || {
+    echo 'error: --successor-of lost its resolved predecessor; refusing to hand an unverified path to the provisioner' >&2
+    return 1
+  }
+  { [ -f "$FM_SLOT_SUCCESSOR_META" ] && [ ! -L "$FM_SLOT_SUCCESSOR_META" ] &&
+    [ "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" branch)" = "$FM_SLOT_SUCCESSOR_BRANCH" ] &&
+    [ "$(fm_slot_realdir "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" worktree)")" = "$FM_SLOT_SUPERSEDES" ]; } || {
+    echo "error: --successor-of $FM_SLOT_SUCCESSOR_ID changed its task record after it was checked; refusing to hand it to the provisioner" >&2
+    return 1
+  }
+  real=$(fm_slot_realdir "$FM_SLOT_SUPERSEDES") || real=
+  head=$(git -C "${real:-/nonexistent}" symbolic-ref -q HEAD 2>/dev/null) || head=
+  { [ "$real" = "$FM_SLOT_SUPERSEDES" ] && [ "$head" = "refs/heads/$FM_SLOT_SUCCESSOR_BRANCH" ]; } || {
+    echo "error: --successor-of $FM_SLOT_SUCCESSOR_ID copy is no longer on its recorded branch $FM_SLOT_SUCCESSOR_BRANCH (now ${head#refs/heads/}); refusing to hand it to the provisioner" >&2
+    return 1
+  }
 }
 
 fm_slot_prepare_base() { # <project> <copy> <task-id>
@@ -223,9 +257,15 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
   # live holders. Promotion's same-owner declaration uses the local runner.
-  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
-    --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
-    --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
+  if [ -n "$FM_SLOT_SUPERSEDES" ] && ! fm_slot_successor_still_bound; then
+    # Same refusal path as the provisioner's own: the checkout is restored below.
+    printf '{"state": "REFUSED", "reason": "successor_predecessor_moved"}\n' > "$report"
+    rc=2
+  else
+    "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+      --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
+      --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
+  fi
   if [ "$rc" -eq 0 ]; then
     python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$@" <<'PY' || rc=$?
 import json

@@ -1551,6 +1551,7 @@ write_successor_slot_owner() { # <repository> <advertise|silent>
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -1565,6 +1566,15 @@ calls = os.environ["FM_TEST_CALLS"]
 if "--help" in sys.argv[1:]:
     with open(calls + ".help", "a", encoding="utf-8") as log:
         log.write("help\n")
+    # FM_TEST_HELP_SWITCH=<n>::<repo>::<branch>: another actor moves a copy to a
+    # new branch during the n-th probe, after the caller's own branch check.
+    switch = os.environ.get("FM_TEST_HELP_SWITCH")
+    if switch:
+        at, repo, moved = switch.split("::")
+        with open(calls + ".help", encoding="utf-8") as log:
+            probes = len(log.read().splitlines())
+        if probes == int(at):
+            subprocess.run(["git", "-C", repo, "checkout", "-q", "-b", moved], check=True)
     ap.parse_args()
 with open(calls, "a", encoding="utf-8") as log:
     log.write(json.dumps(sys.argv[1:]) + "\n")
@@ -1638,6 +1648,7 @@ successor_real() { (cd -P -- "$1" && pwd -P); }
 
 run_successor_spawn() { # <arg>...: a fresh ship spawn of $SUCC_ID
   FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE="${OWNER_MODE:-pass}" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    FM_TEST_HELP_SWITCH="${HELP_SWITCH:-}" \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" run_spawn "$SUCC_ID" --mode local-only --yolo off --owned-path README.md "$@"
 }
 
@@ -1647,6 +1658,9 @@ run_successor_relaunch() { # a relaunch of $SUCC_ID
 }
 
 successor_snapshot() { (cd "$HOME_DIR" && find state data -print | sort); }
+
+# Names and contents, so a reclaimed or rewritten lock shows too.
+successor_snapshot_deep() { (cd "$HOME_DIR" && { find state data -print | sort; find state data -type f -exec cksum {} + | sort; }); }
 
 # The provisioner's recorded (non-help) calls, one argv JSON per line.
 successor_calls() {
@@ -1882,6 +1896,11 @@ test_successor_of_checks_are_load_bearing() {
     out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || true
     assert_contains "$out" "$expect" "the $row control did not refuse"
     sed -i.bak "$pattern" "$mut/bin/fm-slot-provision-lib.sh"
+    if [ "$row" = branch ]; then
+      # The handover re-check is a second guard on the same branch; remove it too.
+      # shellcheck disable=SC2016 # sed text, not shell expansion
+      sed -i.bak 's#^  if \[ -n "\$FM_SLOT_SUPERSEDES" \] && ! fm_slot_successor_still_bound; then#  if false; then#' "$mut/bin/fm-slot-provision-lib.sh"
+    fi
     rm -f "$mut/bin/fm-slot-provision-lib.sh.bak"
     ! cmp -s "$mut/bin/fm-slot-provision-lib.sh" "$ROOT/bin/fm-slot-provision-lib.sh" || fail "the $row mutation changed nothing"
     # A fresh case of the same shape, now on the mutant.
@@ -1906,11 +1925,85 @@ successor_mutation_case() { # <branch|advertise>
   fi
 }
 
+# Review finding 1: the proof binds to the recorded branch of the declared
+# predecessor, checked again where the path is handed to the provisioner.
+test_successor_of_branch_is_rechecked_at_handover() {
+  local out rc=0 before meta head branch
+  make_successor_case handover advertise
+  successor_pred pred-live
+  meta="$HOME_DIR/state/$SUCC_ID.meta"
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch=$(git -C "$POOL_DIR" branch --show-current)
+  # The copy moves during the second help probe, after the resolver's branch check.
+  out=$(HELP_SWITCH="2::$CASE_DIR/pred-pred-live::fm/elsewhere" run_successor_spawn --successor-of pred-live) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a predecessor that moved after preflight was admitted'
+  assert_contains "$out" 'no longer on its recorded branch fm/pred-live' 'the moved predecessor refusal does not name the branch'
+  [ "$(git -C "$CASE_DIR/pred-pred-live" branch --show-current)" = fm/elsewhere ] || fail 'the probe did not move the predecessor, so the row is vacuous'
+  [ "$(wc -l < "$CALLS.help" | tr -d ' ')" = 2 ] || fail 'the stub was probed an unexpected number of times, so the switch point is wrong'
+  [ "$(successor_calls)" = 0 ] || fail 'the provisioner was called for a predecessor that had moved, so a proof could be minted'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused declaration started an agent'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$POOL_DIR" branch --show-current)" = "$branch" ] \
+    || fail 'the refusal did not restore the assigned checkout'
+  assert_grep 'recovery=slot-provision-refused' "$meta" 'the refusal lost its recovery record'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the recovery record lost the unfulfilled declaration'
+  # The retry re-resolves the predecessor and refuses it while it is on the wrong branch.
+  before=$(successor_snapshot_deep)
+  rc=0
+  out=$(run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'the retry admitted a predecessor that is not on its recorded branch'
+  assert_contains "$out" 'not its recorded branch fm/pred-live' 'the retry refusal does not name the recorded branch'
+  [ "$(successor_snapshot_deep)" = "$before" ] || fail 'the refused retry changed the state directory'
+  [ "$(successor_calls)" = 0 ] || fail 'the refused retry reached the provisioner'
+  pass 'a predecessor that leaves its recorded branch after preflight is refused before the provisioner and mints nothing'
+}
+
+# Review finding 2: an id=repo batch never drops the declaration silently.
+test_successor_of_batch_is_refused() {
+  local before out rc=0 pred
+  make_successor_case batch advertise
+  successor_pred pred-live
+  before=$(successor_snapshot_deep)
+  for pred in pred-live ghost; do
+    rc=0
+    out=$(FM_TEST_CALLS="$CALLS" FM_TEST_OWNER_MODE=pass FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+      fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$SUCC_ID=$PROJECT_DIR" --mode local-only --yolo off --owned-path README.md --successor-of "$pred") || rc=$?
+    [ "$rc" -ne 0 ] || fail "an id=repo batch admitted --successor-of $pred: $out"
+    assert_contains "$out" 'applies to one task' "the batch refusal for $pred does not say why"
+    [ "$(successor_snapshot_deep)" = "$before" ] || fail "the batch refusal for $pred changed the state or data directory"
+    assert_successor_untouched "batch $pred" "$(successor_snapshot)"
+  done
+  pass 'an id=repo batch refuses --successor-of instead of dropping it'
+}
+
+# Review finding 3: a refused declaration leaves existing state, including a stale
+# lifecycle lock, exactly as it found it.
+test_successor_of_refuses_before_any_lock() {
+  local before out rc=0 dead lock
+  make_successor_case prelock advertise
+  successor_pred pred-live
+  lock="$HOME_DIR/state/.control-$SUCC_ID.lock"
+  mkdir "$lock"
+  dead=$(bash -c 'echo $$')
+  printf '%s\n' "$dead" > "$lock/pid"
+  before=$(successor_snapshot_deep)
+  out=$(run_successor_spawn --successor-of ghost) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a missing predecessor was admitted'
+  assert_contains "$out" 'has no task record' 'the missing predecessor refusal reason is missing'
+  [ -d "$lock" ] || fail 'the refusal reclaimed a stale lock that belongs to an earlier action'
+  [ "$(successor_snapshot_deep)" = "$before" ] || fail 'the refusal changed the state or data directory'
+  assert_successor_untouched 'prelock' "$(successor_snapshot)"
+  # The same stale lock does not stop a valid declaration, which reclaims it as before.
+  rc=0
+  out=$(run_successor_spawn --successor-of pred-live) || rc=$?
+  expect_code 0 "$rc" "a valid declaration was blocked by a stale lock: $out"
+  pass 'a refused declaration leaves a pre-existing stale lock and every state file untouched'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption|test_successor_of_reaches_the_provisioner|test_successor_of_refuses_untrustworthy_predecessors|test_successor_of_scope|test_successor_of_retained_retry|test_successor_of_checks_are_load_bearing|test_successor_of_branch_is_rechecked_at_handover|test_successor_of_batch_is_refused|test_successor_of_refuses_before_any_lock) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1930,6 +2023,9 @@ test_successor_of_refuses_untrustworthy_predecessors
 test_successor_of_scope
 test_successor_of_retained_retry
 test_successor_of_checks_are_load_bearing
+test_successor_of_branch_is_rechecked_at_handover
+test_successor_of_batch_is_refused
+test_successor_of_refuses_before_any_lock
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness

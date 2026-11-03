@@ -586,13 +586,14 @@
 #   than replaced by origin; a selected local source is saved with the prepared commit.
 #   --successor-of <predecessor-task-id> (fresh ship spawns only; --scout,
 #   --secondmate and --relaunch refuse it) declares this task the successor of
-#   another task's live copy. Before any pool, backlog, state or window action it
-#   resolves state/<predecessor>.meta and refuses unless the recorded worktree is a
+#   another task's live copy. Before any lock, pool, backlog, state or window action
+#   it resolves state/<predecessor>.meta and refuses unless the recorded worktree is a
 #   git worktree root of this project, checked out on the recorded branch, and the
 #   project's provision_existing_slot.py lists --supersedes in its --help.
-#   Spawn then passes the resolved copy to that provisioner as --supersedes in the
-#   one provisioning call and records successor_of=<predecessor>; the project's
-#   provisioner alone writes the successor record, never firstmate.
+#   Spawn then re-checks that branch just before the one provisioning call, refuses
+#   if the copy moved, passes the resolved copy to the provisioner as --supersedes
+#   and records successor_of=<predecessor>; the project's provisioner alone writes
+#   the successor record, never firstmate. An id=repo batch refuses the flag.
 #   A provisioner refusal keeps successor_of beside recovery=slot-provision-refused
 #   as an unfulfilled declaration. Its retry, fm-spawn.sh <id> --relaunch, repeats
 #   those checks and passes --supersedes again, refusing if the predecessor is no
@@ -2298,6 +2299,10 @@ if [ "$RELAUNCH" -eq 1 ] && [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart"
   exit 1
 fi
 if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in */*) false ;; *) true ;; esac then
+  if [ "$SUCCESSOR_OF_SET" -eq 1 ]; then
+    echo 'error: --successor-of applies to one task; spawn a declared successor on its own, not in an id=repo batch' >&2
+    exit 1
+  fi
   if [ "$KIND" != secondmate ] && [ -z "$HARNESS_ARG" ] && [ -f "$CONFIG/crew-dispatch.json" ]; then
     echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
     exit 1
@@ -2363,6 +2368,26 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   BRANCH="$BRANCH_PREFIX$ID"
   if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
+    exit 1
+  fi
+fi
+# A declared successor is checked before the first lock or state write, so a
+# refusal leaves the state directory exactly as it was. The same checks run
+# again once the project is resolved; this pass only reads.
+if [ "$SUCCESSOR_OF_SET" -eq 1 ] && [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
+  spawn_early_proj=${POS[1]:-}
+  case "$spawn_early_proj" in projects/*) spawn_early_proj=$PROJECTS/${spawn_early_proj#projects/} ;; esac
+  spawn_early_proj=$(cd "$spawn_early_proj" 2>/dev/null && pwd) || spawn_early_proj=
+  if [ -n "$spawn_early_proj" ]; then
+    fm_slot_resolve_successor "$spawn_early_proj" "$STATE" "$ID" "$SUCCESSOR_OF" || exit 1
+  fi
+elif [ "$RELAUNCH" -eq 1 ] && [ -f "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+  [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ] &&
+  [ -n "$(fm_meta_get "$STATE/$ID.meta" successor_of)" ]; then
+  # The retry of a refused declaration carries it, so it is checked the same way.
+  spawn_early_proj=$(cd "$(fm_meta_get "$STATE/$ID.meta" project)" 2>/dev/null && pwd) || spawn_early_proj=
+  if [ -n "$spawn_early_proj" ] && ! fm_slot_resolve_successor "$spawn_early_proj" "$STATE" "$ID" "$(fm_meta_get "$STATE/$ID.meta" successor_of)"; then
+    echo "error: --relaunch of $ID keeps its unfulfilled successor declaration of $(fm_meta_get "$STATE/$ID.meta" successor_of) and cannot continue without it" >&2
     exit 1
   fi
 fi
