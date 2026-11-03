@@ -89,17 +89,21 @@ Pipeline starts:
     No burst passes or FM_CPU_PASS_HELD budget are assigned to pipeline starts.
     With --only-fresh, a COMMAND that fresh_pipeline_start does not judge a new
     run runs at once without admission. An admitted COMMAND receives
-    FM_PIPELINE_START_ADMITTED, a digest of its no-mistakes invocation; an inner
-    route that would admit the identical invocation again runs it at once, and
-    any other start still queues.
+    FM_PIPELINE_START_ADMITTED, a digest of the new run's no-mistakes arguments
+    as pipeline_start_arguments reads them; an inner route that would admit the
+    identical invocation again runs it at once, and any other start still queues.
+    Limit: a nested start the outer reading cannot see as the same one (a -c
+    string whose text a shell expansion changes, such as ~, $VAR, $(...) or a
+    glob, or a script that starts the run) queues behind the outer start's lock.
+    When that nested start is the outer start's only run, the outer never
+    registers a run, so the wait never ends until someone stops it, and every
+    later fresh start on the host waits behind it.
   - A short start lock bridges the check-to-registration race until a new
     running run ID appears, or COMMAND returns. It does not reserve a run's
     lifetime or poll after registration; status changes release capacity.
-    At registration the new run's class is kept as run-class-<run>.json in the
-    pool directory for its later fix rounds; files of runs no longer running are
-    removed then. Participating starts serialize this handshake, not their
-    required checks. A registered run whose process tree the reading cannot see
-    yet reserves its full R in the next decision.
+    Participating starts serialize this handshake, not their required checks.
+    A registered run whose process tree the reading cannot see yet reserves its
+    full R in the next decision.
     Bypassing this owner or external daemon status changes cannot be made
     atomic with a read-only external database; deployment must route starts here.
   - An unreadable run database or CPU count refuses with 125 instead of
@@ -112,9 +116,8 @@ Launch gate:
     (the directory or its real path); none, more than one, or an unreadable
     database refuses. A launch whose run's open step is not ci execs AGENT at
     once, unchanged. Any other launch (ci, or a step it cannot read) queues as
-    a pipeline-start waiter in the class recorded for its run (other when none)
-    and asks the same rule for one more active run, its own run counted as a
-    waiter. On a grant, still under the start lock, it publishes the run's
+    a pipeline-start waiter in class other and asks the same rule for one more
+    active run, its own run counted as a waiter. On a grant, still under the start lock, it publishes the run's
     reservation (a locked launch-*.lock entry it holds while AGENT lives),
     starts AGENT at once as its child in its own process group, then releases
     the lock; it never waits for AGENT to appear in memory. A launch entry
@@ -444,18 +447,19 @@ PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
 HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 INTENT_OPTIONS = ("--intent", "--intent-file")
 SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
+SHELL_OPERATOR_CHARS = "();<>|&\n"
 
 
 ADMITTED_ENV = "FM_PIPELINE_START_ADMITTED"
 
 
 def start_digest(command: List[str]) -> Optional[str]:
-    """A digest of COMMAND from its no-mistakes token on, or None when it names no no-mistakes binary."""
+    """A digest of the new run COMMAND begins (its no-mistakes arguments), or None when it begins none."""
     import hashlib
-    for index, part in enumerate(command):
-        if os.path.basename(part) == "no-mistakes":
-            return hashlib.sha256("\0".join(command[index + 1:]).encode("utf-8", "replace")).hexdigest()
-    return None
+    arguments = pipeline_start_arguments(command)
+    if arguments is None:
+        return None
+    return hashlib.sha256("\0".join(arguments).encode("utf-8", "replace")).hexdigest()
 
 
 def already_admitted(command: List[str], env: dict) -> bool:
@@ -472,33 +476,74 @@ def already_admitted(command: List[str], env: dict) -> bool:
 
 
 def fresh_pipeline_start(command: List[str]) -> bool:
-    """Whether COMMAND begins a new no-mistakes run, judged by the facts the CLI itself uses.
+    """Whether COMMAND begins a new no-mistakes run (see pipeline_start_arguments)."""
+    return pipeline_start_arguments(command) is not None
+
+
+def shell_command_string(command: List[str], index: int) -> Optional[str]:
+    """The -c command string of the shell at command[index], after its other options; None when it has none."""
+    position = index + 1
+    while position < len(command):
+        option = command[position]
+        if option in ("-", "--") or option[:1] not in ("-", "+"):
+            return None
+        if option.startswith("-") and not option.startswith("--") and "c" in option[1:]:
+            return command[position + 1] if position + 1 < len(command) else None
+        takes_value = option in ("--rcfile", "--init-file") or (not option.startswith("--") and option[-1] in "oO")
+        position += 2 if takes_value else 1
+    return None
+
+
+def shell_string_start(string: str) -> Optional[List[str]]:
+    """The first new run that one of the simple commands of a shell command string begins, if any."""
+    import shlex
+    try:
+        lexer = shlex.shlex(string, posix=True, punctuation_chars=SHELL_OPERATOR_CHARS)
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        words = list(lexer)
+    except ValueError:
+        return None
+    simple: List[str] = []
+    for word in words + [";"]:
+        if word and not word.strip(SHELL_OPERATOR_CHARS):
+            arguments = pipeline_start_arguments(simple)
+            if arguments is not None:
+                return arguments
+            simple = []
+        else:
+            simple.append(word)
+    return None
+
+
+def pipeline_start_arguments(command: List[str]) -> Optional[List[str]]:
+    """The no-mistakes arguments of the new run COMMAND begins, or None, judged by the facts the CLI itself uses.
 
     `no-mistakes rerun` always creates a new run. `no-mistakes axi run` creates one
     only with an intent input (--intent TEXT, --intent -, --intent-file PATH or
     their = forms); without one it reattaches an active run or exits 2. The
     no-mistakes binary is found at any position and by basename, so a wrapper
-    prefix (env, fm-mem-guard.sh run --, an absolute path) or a shell's -c
-    command string does not hide it; other arguments are data. respond, status
-    and every other subcommand are not starts.
+    prefix (env, fm-mem-guard.sh run --, an absolute path) does not hide it; a
+    shell's -c string, after the shell's other options, is read as a command line
+    split at its control operators, newlines and redirections; other arguments are data. respond, status
+    and every other subcommand are not starts. This one reading decides both
+    whether a command is a start and the digest of the start an admission exports.
     """
     for index, part in enumerate(command):
-        if os.path.basename(part) == "no-mistakes":
+        name = os.path.basename(part)
+        if name == "no-mistakes":
             rest = command[index + 1:]
-            if rest[:1] == ["rerun"]:
-                return True
-            return rest[:2] == ["axi", "run"] and any(
-                option in INTENT_OPTIONS or option.startswith(tuple(name + "=" for name in INTENT_OPTIONS))
+            fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
+                option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
                 for option in rest[2:])
-        shell_flags = part.startswith("-") and not part.startswith("--") and "c" in part[1:]
-        if shell_flags and index and os.path.basename(command[index - 1]) in SHELLS and index + 1 < len(command):
-            # A shell's -c string is a command line; any other argument is data, such as a commit message.
-            try:
-                import shlex
-                return fresh_pipeline_start(shlex.split(command[index + 1]))
-            except ValueError:
-                return False
-    return False
+            return rest if fresh else None
+        if name in SHELLS:
+            string = shell_command_string(command, index)
+            if string is not None:
+                # A shell's -c string is a command line; any other argument is data, such as a commit message.
+                return shell_string_start(string)
+    return None
 
 
 def read_host_db(sql: str, parameters: tuple = ()) -> list:
@@ -530,7 +575,6 @@ def running_runs() -> dict:
 
 
 CI_STEP = "ci"
-OPEN_STEP_STATUSES = ("running", "fixing")
 
 
 def open_steps() -> Optional[dict]:
@@ -838,27 +882,6 @@ def publish_locked(directory: str, prefix: str, entry: dict) -> Tuple[int, str]:
     return fd, final
 
 
-def run_class(directory: str, run: str) -> Optional[str]:
-    """The start class recorded for a run when its fresh start registered, if any."""
-    try:
-        value = json.loads((Path(directory) / ("run-class-%s.json" % run)).read_text())["priority"]
-        return value if value in PIPELINE_PRIORITIES else None
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-
-
-def record_run_classes(directory: str, new_runs, priority: str, running) -> None:
-    """Remember the class of newly registered runs; forget classes of runs no longer running."""
-    for run in new_runs:
-        target = Path(directory) / ("run-class-%s.json" % run)
-        temporary = target.with_name("." + target.name + ".%d" % os.getpid())
-        temporary.write_text(json.dumps({"priority": priority}))
-        os.replace(str(temporary), str(target))
-    for path in Path(directory).glob("run-class-*.json"):
-        if path.name[len("run-class-"):-len(".json")] not in running:
-            path.unlink(missing_ok=True)
-
-
 def first_pipeline_waiter(directory: str) -> str:
     """Locked entries are live waiters; a dead waiter's unlocked file is inert."""
     entries = []
@@ -973,11 +996,6 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 if new_runs:
                     # Serialize only the check-to-registration gap. The daemon
                     # owns status after this handoff; no lifetime watcher remains.
-                    # The class is kept so the run's later fix rounds queue in it.
-                    try:
-                        record_run_classes(directory, new_runs, args.priority, running)
-                    except OSError as exc:
-                        log(2, "cannot record the start class of %s: %s" % (", ".join(sorted(new_runs)), exc))
                     fcntl.flock(admission_fd, fcntl.LOCK_UN)
                     return True
             except (OSError, sqlite3.Error, ValueError) as exc:
@@ -1156,7 +1174,6 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
         directory = pool_dir()
         ensure_pool_dir(directory)
         bound, bound_text = hold_bound()
-        priority = run_class(directory, run) or "other"
         held = []
 
         def on_wait(reason: str) -> None:
@@ -1165,7 +1182,7 @@ def cmd_launch_gate(args: argparse.Namespace) -> int:
                 run, branch, reason, bound_text), "launch-gate-" + run)
 
         try:
-            admission_fd, _, reason, waited = wait_for_admission(directory, priority, run, bound, on_wait)
+            admission_fd, _, reason, waited = wait_for_admission(directory, "other", run, bound, on_wait)
         except HoldBound as reached:
             raise LaunchRefused("hold bound reached", "%s; held %ds; last reading: %s" % (
                 bound_text, time.monotonic() - started, reached),

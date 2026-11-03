@@ -137,7 +137,7 @@ The [engine header](../bin/fm-cpu-pass.py) owns its exact sequence, refusal text
 
 1. It maps its working directory to exactly one `runs.worktree_dir`; an unmapped or ambiguous directory or an unreadable database refuses, visibly, and never passes through.
 2. A launch for any step other than `ci` runs the agent at once, unchanged, because that run is already counted.
-3. A `ci` launch waits in this same class-ordered queue, in the class its fresh start was admitted in (`other` when none was recorded), and asks this same rule for one more active run, with its own run counted as a waiter.
+3. A `ci` launch waits in this same class-ordered queue in class `other` and asks this same rule for one more active run, with its own run counted as a waiter.
 4. On admission it publishes the run's reservation, a lock file it holds for the agent's life, under the start lock, then starts the agent at once without waiting for it to appear in memory, then releases the lock.
    Every later decision counts that run at `R` while it is invisible and at its resident memory or `A` afterwards, until the agent's process tree has exited.
 5. It holds at most the daemon's per-invocation agent budget minus the 99th percentile of completed CI-fix invocation durations, and refuses at that bound.
@@ -154,12 +154,16 @@ The [engine header](../bin/fm-cpu-pass.py) owns the registration handoff, failur
 Unusable run-database, CPU-count, memory or process observations do not imply an empty host.
 
 Every route that begins a new run joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
-The engine's `fresh_pipeline_start` finds the `no-mistakes` binary at any position and by basename, so a wrapper prefix (`env`, `fm-mem-guard.sh run --`, an absolute path) or a shell `-c` string does not hide a start, as `env ... fm-mem-guard.sh run -- no-mistakes axi run --intent-file ...` once did.
+The engine's `fresh_pipeline_start` finds the `no-mistakes` binary at any position and by basename, so a wrapper prefix (`env`, `fm-mem-guard.sh run --`, an absolute path) does not hide a start, as `env ... fm-mem-guard.sh run -- no-mistakes axi run --intent-file ...` once did.
+A shell's `-c` string, after the shell's other options (`bash -l -c`, `bash -o pipefail -c`), is read as a command line split at its control operators, newlines and redirections, so `cd x&&no-mistakes axi run --intent ...` is a start too.
 `bin/fm-duration.py run` routes such a command through this owner before starting its execution clock; its `--pipeline-priority` option selects the class.
 `bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own memory reading: a new run queues in class `other`, and every other command runs unchanged.
 Generated worker delivery instructions name both routes.
 Existing-run reattachment, responses and status reads do not requeue, restart a run or consume another start.
 Only the measured runner the owner re-executes skips a second admission, through an internal argument it consumes, and a wrapper inside an admitted command that routes the identical no-mistakes invocation again sees the digest the owner exports in `FM_PIPELINE_START_ADMITTED` and runs it without queueing twice; the wrapped client and every descendant receive no other exemption, so any other nested fresh start queues like any other.
+The digest comes from the same reading that judges the start, so the outer and inner routes agree on a literal `-c` string.
+A nested start the outer reading cannot see as the same one queues behind the outer start's lock: a `-c` string whose text a shell expansion changes (`~`, `$VAR`, `$(...)` or a glob), or a script that starts the run.
+When that nested start is the outer start's only run, the outer never registers a run, so the wait never ends until someone stops it, and every later fresh start on the host waits behind it.
 Every route resolves the same pool directory from `HOME`, so every home and worker of one user shares one queue; a home whose checkout predates this route does not ask the queue at all until that home is updated.
 A fresh-start call that ends - killed, timed out, or by its harness command limit - before it prints `fm-cpu-pass: pipeline-start admitted` was still queued and created no run.
 Issue the same fresh start again through `bin/fm-duration.py run`, not a flagless reattach or a status read; the new request queues again from its own arrival time.

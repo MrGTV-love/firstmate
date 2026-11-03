@@ -908,6 +908,12 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         'env-wrapped': ['env', 'A=B', 'no-mistakes', 'axi', 'run', '--intent', 'goal'],
         'shell-string': ['sh', '-c', 'no-mistakes axi run --intent goal'],
         'shell-flags': ['bash', '-ec', 'no-mistakes axi run --intent goal'],
+        'shell-options': ['bash', '--noprofile', '--norc', '-o', 'pipefail', '-e', '-c', 'no-mistakes axi run --intent goal'],
+        'shell-operator': ['sh', '-c', 'cd .&&no-mistakes axi run --intent goal'],
+        'shell-lines': ['sh', '-c', 'no-mistakes axi status\nno-mistakes axi run --intent "two\nlines"'],
+        # A route nested in an admitted route's shell string is that one start: it never queues behind itself.
+        'nested-mem-guard': ['sh', '-c', 'bash MEMGUARD_PLACEHOLDER run -- no-mistakes axi run --intent goal'],
+        'nested-measured': ['sh', '-c', 'PYTHON_PLACEHOLDER DURATION_PLACEHOLDER run no-mistakes.inner -- no-mistakes axi run --intent goal'],
         'rerun': ['no-mistakes', 'rerun'],
         # PR 366's recorded fresh start (nm-r2-1.log): fm-duration around env around fm-mem-guard.sh run.
         'pr-366': ['env', 'FM_HOME=HOME_PLACEHOLDER'] + mem_guard[1:] + ['no-mistakes', 'axi', 'run', '--intent-file', str(intent),
@@ -922,12 +928,16 @@ with (folder / 'order').open('a') as out: out.write(os.environ['CASE_NAME'] + '\
         'other-command': (['true'], 0, True),
         # Data that mentions a start, such as a commit message, is not a start.
         'start-as-data': (['echo', 'no-mistakes axi run --intent goal'], 0, True),
+        # A later simple command's words are not the reattachment's arguments.
+        'shell-later-command': (['sh', '-c', 'no-mistakes axi run; echo --intent'], 0, True),
+        'shell-later-line': (['sh', '-c', 'no-mistakes axi run\necho --intent'], 0, True),
     }
     for route_name, route in (('measured', measured_run), ('mem-guard', mem_guard)):
         for name, shape in list(fresh_shapes.items()) + [(n, v[0]) for n, v in not_starts.items()]:
             folder, db, env = case('p6-%s-%s' % (route_name, name), cores=3)
             env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], CASE_NAME=name, FM_DURATION_FILE='off')
-            shape = [part.replace('HOME_PLACEHOLDER', str(folder / 'fmhome')) for part in shape]
+            shape = [part.replace('HOME_PLACEHOLDER', str(folder / 'fmhome')).replace('MEMGUARD_PLACEHOLDER', str(repo / 'bin/fm-mem-guard.sh'))
+                     .replace('PYTHON_PLACEHOLDER', python).replace('DURATION_PLACEHOLDER', str(repo / 'bin/fm-duration.py')) for part in shape]
             code, active = (0, False) if name in fresh_shapes else not_starts[name][1:]
             if active:
                 change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
@@ -1113,6 +1123,8 @@ while not (folder / (run + '.release')).exists(): time.sleep(0.025)
     wait_for(lambda: 'launch-gate waiting: counted=3 projected=%d ' % (14 * GIB) in (folder / 'gate-c.stderr').read_text() or
              'held for capacity' in wakes(folder), 'third holds')
     assert 'run c (fm/c) held for capacity' in wakes(folder), wakes(folder)
+    # A fix round waits in the one queue at class other.
+    assert all('priority=other' in line for line in wakes(folder).splitlines() if 'held for capacity' in line), wakes(folder)
     (folder / 'a.release').touch()
     finish(gates['a'])
     wait_for(lambda: (folder / 'c.agent').exists(), 'third starts by itself')

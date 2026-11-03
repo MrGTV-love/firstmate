@@ -27,7 +27,8 @@
 # .memory-baseline.json, which only the baseline command writes.
 # FM_MEMORY_FIXTURE_DIR supplies sysctl, vm_stat and processes.json native facts
 # for isolated tests; every fixture reading is explicitly marked in the log.
-# Non-macOS admission is unchanged; its legacy diagnostic remains available.
+# Off macOS, run takes no memory reading and hands COMMAND straight to
+# pipeline-start --only-fresh; its legacy diagnostic remains available.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "${1:-}" = --help ] || [ "${2:-}" = --help ]; then
