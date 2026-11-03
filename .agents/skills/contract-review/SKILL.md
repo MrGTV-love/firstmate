@@ -109,6 +109,8 @@ A finding is accepted only with all of these:
 - A concrete result that passes every criterion yet fails that text, or a compliant result that a criterion rejects.
 - The affected criterion id or contract rule.
 
+A requirement or constraint that no criterion grades is accepted with the uncovered text and a concrete violating result that no criterion's check rejects.
+Judge it on its own: a defect in another criterion, or a finding raised elsewhere in the same report, does not suppress it.
 An observation that meets this test is a finding, not a note.
 A note that fails this test says which part of the test it fails.
 A criterion is judged at the task's stage.
