@@ -60,7 +60,8 @@
 # again until its newest status line changes or six hours pass. The exception is
 # a copy that Vernant's closeout driver retained after archiving its ignored
 # files: another try would only write another archive, so the task is held,
-# with one wake, until the copy's HEAD or status changes
+# with one wake ("check: idle-reap kept <copy> for <id>: <reason>"), until the
+# copy's HEAD or status changes
 # (bin/fm-idle-reap-lib.sh, fm_closeout_retained_check, owns the record that
 # bin/fm-merge-prune.sh shares).
 # A refusal because the other supervision actor holds the task's lease
