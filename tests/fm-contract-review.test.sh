@@ -786,10 +786,10 @@ test_author_history_in_every_heading_position_refused() {
   awk '{ print } /^- \*\*A1\*\*/ { print ""; print "### Context (prior art)"; print ""; print "ZZ-KEEP-HP4-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
   build_pack pack --contract "$src" || fail "a kept level 3 heading in a contract was refused: $(cat "$TMP_ROOT/build.err")"
   assert_grep "ZZ-KEEP-HP4-ZZ" "$pack/target.md" "the kept level 3 section was dropped"
-  # Noncompliant: an unrecognised heading with bare "prior", a recognised level 3 heading under
+  # Noncompliant: an unrecognised heading with prior before a history noun, a recognised level 3 heading under
   # a kept or an unrecognised parent, and a recognised first title, each naming author history.
   for case in \
-    'context|# Owner context\n\n## Prior analysis\n\nZZ-X-ZZ text.\n' \
+    'context|# Owner context\n\n## My prior round and fixes\n\nZZ-X-ZZ text.\n' \
     'context|# Owner context\n\n## Owner background\n\n### Context and earlier findings\n\nZZ-A-ZZ F1 answered; all-green.\n' \
     'request|# Context and earlier findings\n\nZZ-B-ZZ F1 answered.\n' \
     'contract|' \
@@ -820,7 +820,44 @@ test_author_history_in_every_heading_position_refused() {
     assert_contains "$(cat "$TMP_ROOT/hp.err")" "unrecognised section:" "case $n ($kind) refusal does not name the section"
     assert_absent "$TMP_ROOT/hp-out$n" "a refused case $n ($kind) left an output directory"
   done
-  pass "author history is refused in every recognised heading position and an unrecognised heading with prior"
+  pass "author history is refused in every recognised heading position and in an unrecognised heading"
+}
+
+test_prior_counts_only_before_a_history_noun() {
+  local src="$TMP_ROOT/pr.md" in="$TMP_ROOT/pr-in.md" pack rc flag heading manifest
+  write_fixture_contract "$src"
+  # Compliant: a prior-art section with a sub-heading and a bold-only line builds in a request
+  # and a context file, and in a contract.
+  printf '# Owner context\n\n## Context (prior art)\n\n### Current owner ruling\n\n**Owner note**\n\nZZ-KEEP-PRIORART-ZZ neutral.\n' >"$in"
+  build_pack pack --contract "$src" --request "$in" --context "$in" || fail "a prior-art section with a sub-heading was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-PRIORART-ZZ" "$pack/request.md" "the prior-art request was not copied whole"
+  awk '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context (prior art)"; print ""; print "### Current owner ruling"; print ""; print "ZZ-KEEP-PRIORART-C-ZZ" }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+  build_pack pack --contract "$src" || fail "a prior-art contract section with a sub-heading was refused: $(cat "$TMP_ROOT/build.err")"
+  assert_grep "ZZ-KEEP-PRIORART-C-ZZ" "$pack/target.md" "the prior-art contract section was dropped"
+  # Noncompliant: prior followed by a history noun keeps the section out of every input.
+  for heading in 'Prior findings' 'Prior review notes'; do
+    write_fixture_contract "$src"
+    printf '# Owner context\n\n## %s\n\nZZ-PRIOR-HIST-ZZ F1 answered.\n' "$heading" >"$in"
+    for flag in --request --context; do
+      rc=0
+      "$PACK_BIN" --contract "$src" "$flag" "$in" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
+      [ "$rc" != 0 ] || fail "a $flag file with '## $heading' was accepted"
+      assert_absent "$TMP_ROOT/pr-out" "a refused $flag file with '## $heading' left an output directory"
+    done
+    # A contract drops the recognised author section and lists it; under a kept heading it refuses.
+    awk -v h="$heading" '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## " h; print ""; print "ZZ-PRIOR-HIST-ZZ F1 answered." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+    build_pack pack --contract "$src" || fail "a contract with '## $heading' was refused: $(cat "$TMP_ROOT/build.err")"
+    manifest="$(dirname "$pack").excluded-paths"
+    assert_no_grep "ZZ-PRIOR-HIST-ZZ" "$pack/target.md" "the '## $heading' section reached the pack"
+    grep -qxF "$(printf 'dropped\t%s' "$heading")" "$manifest" || fail "the '## $heading' section is not listed as dropped"
+    write_fixture_contract "$src"
+    awk -v h="$heading" '{ print } /^ZZ-KEEP-CONTEXT-ZZ/ { print ""; print "## Context: " h; print ""; print "ZZ-PRIOR-HIST-ZZ F1 answered." }' "$src" >"$src.tmp" && mv "$src.tmp" "$src"
+    rc=0
+    "$PACK_BIN" --contract "$src" --out-root "$TMP_ROOT/pr-out" >/dev/null 2>"$TMP_ROOT/pr.err" || rc=$?
+    assert_equals 3 "$rc" "a contract with '## Context: $heading' was accepted"
+    assert_absent "$TMP_ROOT/pr-out" "a refused contract left an output directory"
+  done
+  pass "prior counts as author history only before a history noun"
 }
 
 test_inline_backticks_do_not_open_a_fence() {
@@ -917,6 +954,7 @@ fm_test_run_cases \
   test_request_or_context_with_author_history_heading_refused \
   test_recognised_heading_with_author_history_refused \
   test_author_history_in_every_heading_position_refused \
+  test_prior_counts_only_before_a_history_noun \
   test_inline_backticks_do_not_open_a_fence \
   test_definition_of_done_in_every_heading_form \
   test_fences_and_headings_accept_up_to_three_spaces \
