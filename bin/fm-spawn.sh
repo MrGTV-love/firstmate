@@ -595,9 +595,11 @@
 #   and records successor_of=<predecessor>; the project's provisioner alone writes
 #   the successor record, never firstmate. An id=repo batch refuses the flag.
 #   A provisioner refusal keeps successor_of beside recovery=slot-provision-refused
-#   as an unfulfilled declaration. Its retry, fm-spawn.sh <id> --relaunch, repeats
-#   those checks and passes --supersedes again, refusing if the predecessor is no
-#   longer live; it never provisions without the declaration. A relaunch of an
+#   as an unfulfilled declaration. Its retry, fm-spawn.sh <id> --relaunch while the
+#   window lives or a fresh spawn naming the same --successor-of once it is gone,
+#   repeats those checks and passes --supersedes again, refusing if the predecessor
+#   is no longer live; a fresh spawn that names no or another predecessor refuses,
+#   so no retry provisions without the declaration. A relaunch of an
 #   admitted successor attests as for any task and sends no --supersedes.
 #   If provisioning still refuses after preparation finishes, that commit is
 #   saved once in the retained record; later retries never replace an existing

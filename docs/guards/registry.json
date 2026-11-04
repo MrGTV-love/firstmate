@@ -5202,7 +5202,7 @@
       "layer": "runtime-block",
       "source": "the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch",
       "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, a declared successor predecessor whose task record or recorded branch changed or whose copy left that branch after the check and before the provisioner call, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
-      "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path>",
+      "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path> [--successor-of <predecessor-task-id> when the retained record keeps successor_of]",
       "budget": 1,
       "test": "tests/fm-spawn-pool-base-freshen.test.sh",
       "tier": "C",
