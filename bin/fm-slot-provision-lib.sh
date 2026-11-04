@@ -271,12 +271,13 @@ EOF
 # or untracked file at a path the reset target tracks. Before it runs, the
 # guard proves these facts about the slot, each from one removable fact call in
 # fm_slot_guard_observe, and refuses on the first fact it cannot prove:
-#   head_not_contained (S1)   a detached HEAD is not an ancestor of origin's
-#                             current default branch (the remote's ls-remote answer;
-#                             with --base-branch, the recorded origin/HEAD, else
-#                             ls-remote), by refs/remotes/origin/<that branch> and the
-#                             tip the spawn fetched of it, never a --base-branch, or
-#                             of the manifest's base_sha
+#   head_not_contained (S1)   a detached HEAD is not an ancestor of the tip this spawn
+#                             fetched of origin's current default branch (the remote's
+#                             ls-remote answer; with --base-branch, the recorded
+#                             origin/HEAD, else ls-remote), never a --base-branch, nor
+#                             of the manifest's base_sha. The slot's remote-tracking ref
+#                             is no anchor: it keeps what an earlier fetch left, so it
+#                             can still hold a commit origin has since dropped
 #   owner_branch_not_contained (S2)  the attached branch, or the branch the slot's
 #                             lifecycle manifest names, has an uncontained tip
 #   tree_not_clean (S3)       any tracked, staged or untracked change
@@ -295,12 +296,11 @@ EOF
 #                             the ignored entries, then the manifest bytes; any
 #                             difference refuses.
 # A refusal runs no reset and no checkout. On a refusal HEAD, local branches, the
-# index, the files and every other ref stay byte-identical, with exactly two
-# exceptions, neither of which changes local work, made by the spawn before its final
-# check: (1) the spawn's fetch moves refs/remotes/origin/<b>, where <b> is the branch it
-# fetched to start from (origin's default branch, or the --base-branch), only forward
-# by compare-and-set, and repoints refs/remotes/origin/HEAD at origin's default branch;
-# (2) the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD.
+# index, the files and every other ref stay byte-identical, with one exception that
+# changes no local work: the governed path adds refs/fm/anchor/<task>-<sha> to preserve a
+# detached HEAD. The spawn records the origin tip in refs/remotes/origin/<b> and
+# refs/remotes/origin/HEAD only after this function has reset the slot, so a refusal moves
+# no origin ref.
 # The window between the final manifest read and the reset is a stated residual: a
 # writer that takes no lock can still change the slot in it.
 # The manifest, lease store and contention log are the governed project's
@@ -448,12 +448,24 @@ import hashlib, json, os, re, sys
 slot, common, override, legacy = sys.argv[1:5]
 name = hashlib.sha256(os.path.realpath(slot).encode()).hexdigest()[:16] + ".json"
 store = override if override else os.path.join(common, "vernant-worktree-lifecycle")
+def present(path):
+    # Absent only when the path genuinely does not exist. A path that cannot be searched (a
+    # directory without search permission, a parent that is a file) is unknown, never absent.
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return True
 found = None
-for directory in (store, os.path.join(legacy, "worktree-lifecycle")):
-    path = os.path.join(directory, name)
-    if os.path.lexists(path):
-        found = path
-        break
+try:
+    for directory in (store, os.path.join(legacy, "worktree-lifecycle")):
+        path = os.path.join(directory, name)
+        if present(path):
+            found = path
+            break
+except OSError as exc:
+    print("%s: %s" % (os.path.join(store, name), exc), file=sys.stderr)
+    sys.exit(3)
 if found is None:
     print("absent")
     sys.exit(0)
@@ -596,10 +608,17 @@ fm_slot_guard_check_clean() { # <slot>
 # One ignored entry is scratch when the existing closeout classifier says so, with
 # nothing it would preserve. The classifier is sourced in a subshell, so the guard
 # adds no names to the spawn.
-fm_slot_guard_entry_is_scratch() { # <slot-relative path> <whole-ignored-directory list>
+fm_slot_guard_entry_is_scratch() { # <slot-relative path> <NUL-delimited whole-ignored-directory list>
   local rel=$1 dirs=$2 prefix='' part rest=$1
   (
     set +e
+    listed() { # <path>: whether the NUL-delimited directory list names it
+      local listed_dir
+      while IFS= read -r -d '' listed_dir; do
+        [ "${listed_dir%/}" != "$1" ] || return 0
+      done <"$dirs"
+      return 1
+    }
     # shellcheck source=bin/fm-merge-prune-lib.sh
     . "$FM_SLOT_GUARD_LIB_DIR/fm-merge-prune-lib.sh" >/dev/null 2>&1 || exit 2
     scratch() {
@@ -617,7 +636,7 @@ fm_slot_guard_entry_is_scratch() { # <slot-relative path> <whole-ignored-directo
       [ "$part" != "$rest" ] || exit 1
       prefix="${prefix:+$prefix/}$part"
       rest=${rest#*/}
-      grep -Fxq -- "$prefix" "$dirs" 2>/dev/null || continue
+      listed "$prefix" || continue
       scratch "$prefix" && exit 0
     done
   )
@@ -628,6 +647,9 @@ fm_slot_guard_entry_is_scratch() { # <slot-relative path> <whole-ignored-directo
 # which must itself verify.
 fm_slot_guard_entry_archived() { # <slot-relative path>
   local rel=$1 file sum sums
+  # shasum escapes a newline or a backslash in a name, and grep -F reads a newline as two
+  # patterns, so such a name can never be matched exactly; it is never counted as archived.
+  case "$rel" in *$'\n'* | *\\*) return 1 ;; esac
   file="$FM_SLOT_GUARD_REAL/$rel"
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   [ -n "$FM_SLOT_GUARD_ARCHIVE_ROOT" ] || return 1
@@ -659,12 +681,11 @@ fm_slot_guard_fact_ignored() { # <strict:0|1>
   }
   ignored="$scratch/ignored" tracked="$scratch/tracked" hits="$scratch/hits" dirs="$scratch/dirs"
   if ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard -z >"$ignored" 2>/dev/null ||
-    ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard --directory -z >"$dirs.z" 2>/dev/null; then
+    ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard --directory -z >"$dirs" 2>/dev/null; then
     rm -rf -- "$scratch"
     fm_slot_guard_refuse unknown_ignored_inventory "the slot's ignored entries cannot be listed"
     return 1
   fi
-  tr '\0' '\n' <"$dirs.z" | sed -n 's|/$||p' >"$dirs"
   settings=$(git -C "$FM_SLOT_GUARD_SLOT" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' 2>/dev/null) || {
     [ "$?" = 1 ] || {
       rm -rf -- "$scratch"
@@ -706,19 +727,21 @@ for entry in names(sys.argv[2]):
     inside = any("/".join(parts[:i]) in tracked for i in range(1, len(parts)))
     if folded in tracked or folded in below or inside:
         found.add(entry)
-open(sys.argv[3], "wb").write(b"".join(item + b"\n" for item in sorted(found)))
+open(sys.argv[3], "wb").write(b"".join(item + b"\0" for item in sorted(found)))
 ' "$tracked" "$ignored" "$hits" "$settings" 2>/dev/null; then
     rm -rf -- "$scratch"
     fm_slot_guard_refuse unknown_ignored_inventory "the ignored entries could not be compared with the reset target"
     return 1
   fi
-  while IFS= read -r entry || [ -n "$entry" ]; do
-    [ -n "$entry" ] || continue
+  # The paths stay NUL-delimited from the git inventory to this loop, so a name holding a
+  # newline is one entry and is classified by its whole name, never by its pieces.
+  while IFS= read -r -d '' entry; do
     if fm_slot_guard_entry_is_scratch "$entry" "$dirs"; then
       continue
     elif fm_slot_guard_entry_archived "$entry"; then
       continue
     fi
+    entry=${entry//$'\n'/\\n}
     bad="${bad:+$bad, }$entry"
   done <"$hits"
   rm -rf -- "$scratch"
@@ -959,7 +982,7 @@ EOF
     return 1
   }
   out=$(fm_slot_guard_store_read lease "$common") || {
-    fm_slot_guard_refuse unknown_lease "the project's lease store is unreadable ($out)"
+    fm_slot_guard_refuse unknown_lease "the project's lease store cannot be proven clear ($out)"
     return 1
   }
   case "$out" in
@@ -1003,12 +1026,21 @@ def epoch(value):
 def fail(text):
     print(text, file=sys.stderr)
     sys.exit(3)
+def present(path):
+    # Absent only when the path genuinely does not exist; an unsearchable path is unknown.
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        fail("%s: %s" % (os.path.basename(path), exc))
+    return True
 now = time.time()
 if kind == "lease":
     for path in sorted({slot, real}):
         name = "lease-" + hashlib.sha256(("worktree:" + path).encode()).hexdigest()[:16] + ".json"
         file = os.path.join(store, name)
-        if not os.path.lexists(file):
+        if not present(file):
             continue
         try:
             if not os.path.isfile(file):
@@ -1030,8 +1062,6 @@ if kind == "lease":
                 pass
             print("a live lease held by %s (pid %d)" % (owner, pid))
             sys.exit(0)
-        if lease.get("creation_minted") is True:
-            continue
         try:
             expired = epoch(lease["expires_at_iso"]) <= now
         except (KeyError, ValueError):
@@ -1040,7 +1070,7 @@ if kind == "lease":
             fail("%s: the holder cannot be probed and the lease has not expired" % name)
 else:
     file = os.path.join(store, "contention.jsonl")
-    if not os.path.lexists(file):
+    if not present(file):
         sys.exit(0)
     try:
         text = open(file, encoding="utf-8", errors="replace").read()
