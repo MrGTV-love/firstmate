@@ -122,10 +122,6 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
 # predecessor can leave its branch in that time.
 fm_slot_successor_still_bound() {
   local real head
-  { [ -n "$FM_SLOT_SUPERSEDES" ] && [ -n "$FM_SLOT_SUCCESSOR_META" ] && [ -n "$FM_SLOT_SUCCESSOR_BRANCH" ]; } || {
-    echo 'error: --successor-of lost its resolved predecessor; refusing to hand an unverified path to the provisioner' >&2
-    return 1
-  }
   { [ -f "$FM_SLOT_SUCCESSOR_META" ] && [ ! -L "$FM_SLOT_SUCCESSOR_META" ] &&
     [ "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" branch)" = "$FM_SLOT_SUCCESSOR_BRANCH" ] &&
     [ "$(fm_slot_realdir "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" worktree)")" = "$FM_SLOT_SUPERSEDES" ]; } || {
