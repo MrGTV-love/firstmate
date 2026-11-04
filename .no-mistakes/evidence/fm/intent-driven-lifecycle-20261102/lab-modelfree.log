@@ -1,9 +1,9 @@
-head=8b64863c4fb49c32ec307603a63ce0540b86a79b
-lab=/Users/charlesabrooker/tmp/fm-lab.gnxa2M tmux=/tmp/fml.pWWzml
+head=c2be9593474c6e561bbae42ca343e23fceef7a38
+lab=/Users/charlesabrooker/tmp/fm-lab.XAtLjJ tmux=/tmp/fml.8SoQoe
 == scenario 2: base-commit fm-brief vs head fm-brief (docs-only task)
 base brief exit=0
 head brief exit=0
-scaffolded: /Users/charlesabrooker/tmp/fm-lab.gnxa2M/data/mfhead-docs/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.XAtLjJ/data/mfhead-docs/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
 placeholders identical (base vs head)
 docs brief base-vs-head diff exit=0 lines=0
 head docs brief mentions intent-to-test: 0
@@ -59,7 +59,7 @@ rubric lines missing from role: 0 of 36
 base role exit=0 base cue_count=0 base alignment_section=0
 == adversarial: role rendered from a root whose rubric lacks the alignment section
 neg role exit=0 alignment_section=0 (cue still points at 'below'; shows the cue depends on the rubric owner)
-== teardown: /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.gnxa2M && rm -rf /Users/charlesabrooker/tmp/fm-lab.gnxa2M
+== teardown: /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.XAtLjJ && rm -rf /Users/charlesabrooker/tmp/fm-lab.XAtLjJ
 teardown exit=0
 lab-left: none
 worktree changed paths: 0

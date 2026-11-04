@@ -1,0 +1,7 @@
+source: /Users/charlesabrooker/.no-mistakes/evidence/01M6JWCK13QKYX35VNMKYBVERE/fm-control-relaunch-recovery.c2be9593.log (exact head c2be9593, FM_TEST_EVIDENCE=1)
+role_line=1 cue_lines=10  cue_count=1 rubric_heading=26 recovery_line=60
+62:You are recovering an exited instruction owner, not resuming implementation.
+ok - reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority
+ok - tmux: real lsof permits worktree-local exit, relaunch, reconciliation and direct replacement
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+6:ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority

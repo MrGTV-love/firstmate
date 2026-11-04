@@ -1,0 +1,21 @@
+calibration: "0 of 5 samples for test.tests/fm-documentation-audiences.test.sh on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=1.2s output_bytes=0 tree_cpu=0.07s"
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=63.0s output_bytes=0 tree_cpu=3.93s"
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=122.9s output_bytes=0 tree_cpu=11.46s"
+FM_TEST_BEGIN 2026-11-04T17:36:07Z tests/fm-documentation-audiences.test.sh family=pure-contract-unit expected_gate_skip=none
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=188.8s output_bytes=126 tree_cpu=24.90s"
+ok - documentation inventory classifies every maintained prose surface exactly once
+ok - classification, setup routing, and maintained-prose scope fail safely
+ok - required documentation owner pointers cannot silently disappear
+ok - local links resolve while dates, versions, commands, and incident prose remain semantically reviewed
+ok - nested skill references use their owner while ordinary links, anchors, and path boundaries remain enforced
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=249.8s output_bytes=572 tree_cpu=30.52s"
+progress: "test.tests/fm-documentation-audiences.test.sh elapsed=310.3s output_bytes=572 tree_cpu=40.89s"
+FM_TEST_END 2026-11-04T17:39:04Z tests/fm-documentation-audiences.test.sh exit=0 duration_ms=176686 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=321295
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=176686 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-documentation-audiences.test.sh duration_ms=176686
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M6KS2CS6GX0GDVNTT34X3QMC/fm-documentation-audiences.c2be9593.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

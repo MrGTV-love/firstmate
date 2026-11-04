@@ -1,0 +1,11 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38
+lab=/Users/charlesabrooker/tmp/fm-lab.ICm7du
+nm brief exit=0
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.ICm7du/data/mfu-nm/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE})
+unfilled placeholders in brief: {DOD_CAPABILITY} {DOD_HARD_GATES} {DOD_HONESTY_RULE} {DOD_MANDATORY_ITEMS} {DOD_SUPPORTING_ITEMS} {FIRSTMATE_SPEC} {TASK} 
+plan exit=1
+plan stdout bytes=0 ; plan stderr:
+error: verification plan refuses the task Definition Of Done: no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+== teardown
+teardown exit=0 lab-left: none worktree changed paths: 0

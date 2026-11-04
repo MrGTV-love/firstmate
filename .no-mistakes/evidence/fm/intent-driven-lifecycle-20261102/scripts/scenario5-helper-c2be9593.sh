@@ -5,7 +5,7 @@
 #  M2 marker checked before producer ownership (accepts a supplied marker from an unowned PID)
 # Each mutant must make the case fail; the head must pass.
 set -u
-WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE
+WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC
 cd "$WT" || exit 1; echo "head=$(git rev-parse HEAD) dirty=$(git status --short | wc -l | tr -d ' ')"
 c=test_relaunch_trace_prepare_rejects_failed_setup
 run() { (cd "$1" && FM_TEST_EVIDENCE=1 bash tests/fm-control-relaunch.test.sh "$c" 2>&1); echo "case exit=$?"; }

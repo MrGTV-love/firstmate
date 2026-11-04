@@ -1,67 +1,86 @@
 calibration: "0 of 5 samples for test.tests/fm-task-delivery.test.sh on Mac-Studio.local"
 fallback: "no destructive deadline; collect samples"
-progress: "test.tests/fm-task-delivery.test.sh elapsed=1.0s output_bytes=0 tree_cpu=0.86s"
-FM_TEST_BEGIN 2026-11-04T13:29:51Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1.0s output_bytes=0 tree_cpu=1.33s"
+FM_TEST_BEGIN 2026-11-04T19:46:57Z tests/fm-task-delivery.test.sh family=pure-contract-unit expected_gate_skip=none
 ok - scaffold headings cannot hide active spec placeholders; fenced examples remain valid
 ok - complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly
-progress: "test.tests/fm-task-delivery.test.sh elapsed=61.5s output_bytes=290 tree_cpu=45.17s"
-progress: "test.tests/fm-task-delivery.test.sh elapsed=122.2s output_bytes=290 tree_cpu=73.78s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=61.4s output_bytes=290 tree_cpu=50.73s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=121.8s output_bytes=290 tree_cpu=92.38s"
 ok - fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks
 ok - fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent
+progress: "test.tests/fm-task-delivery.test.sh elapsed=181.1s output_bytes=483 tree_cpu=114.80s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=243.8s output_bytes=483 tree_cpu=136.60s"
 ok - fm-spawn/fm-promote: authorized intent preserves exact words and refuses operator-address lines
-progress: "test.tests/fm-task-delivery.test.sh elapsed=183.1s output_bytes=584 tree_cpu=133.26s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=304.4s output_bytes=584 tree_cpu=164.00s"
 ok - fm-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions
 ok - fm-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created
 ok - fm-spawn: scout and secondmate spawns refuse ship delivery flags
 ok - fm-spawn: the brief's recorded mode and the spawn's explicit mode must agree
+progress: "test.tests/fm-task-delivery.test.sh elapsed=365.3s output_bytes=949 tree_cpu=198.89s"
 ok - fm-spawn: a rigor downgrade against the registered posture is announced, never blocked
 ok - fm-spawn: a scout spawn resolves no delivery posture from the registry
 ok - fm-promote: promotion requires the delivery contract and records it exactly once
 ok - fm-promote: a symlinked task record is refused and its target is left untouched
-progress: "test.tests/fm-task-delivery.test.sh elapsed=245.2s output_bytes=1288 tree_cpu=185.33s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=426.4s output_bytes=1288 tree_cpu=219.39s"
 ok - fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does
+progress: "test.tests/fm-task-delivery.test.sh elapsed=487.0s output_bytes=1392 tree_cpu=227.14s"
 ok - promotion teaches the Closes: line in the delivered text and the relaunch brief for PR modes only
+progress: "test.tests/fm-task-delivery.test.sh elapsed=549.9s output_bytes=1495 tree_cpu=234.56s"
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ●  WATCHER DOWN - SUPERVISION IS OFF
 ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
 ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
 ●  This is a supervision warning only; the guarded operation WILL still run.
-●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ok - fm-promote: a selected branch prefix reaches both worker instructions and durable task state
-Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-task-delivery.ucLOcp/promote-branch-shell-safe-marker)/promote-branch-safe-e3'
+Switched to a new branch '$(touch${IFS}/Users/charlesabrooker/tmp/fm-task-delivery.k2hhQj/promote-branch-shell-safe-marker)/promote-branch-safe-e3'
 ok - fm-promote: ref-format-valid shell metacharacters stay literal in promotion branch commands
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ●  WATCHER DOWN - SUPERVISION IS OFF
 ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
 ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
 ●  This is a supervision warning only; the guarded operation WILL still run.
-●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ok - fm-merge-local: a registry change cannot redirect an in-flight local-only task
 ok - fm-project-mode: the registry lookup matches a whole multi-word name, not just its first token
 ok - fm-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw
+progress: "test.tests/fm-task-delivery.test.sh elapsed=609.5s output_bytes=4220 tree_cpu=243.39s"
 ok - fm-project-mode: the forge binds from its own token and is reported only through --forge
 ok - fm-project-mode: only a malformed forge binding refuses; every other token keeps its old tolerance
+progress: "test.tests/fm-task-delivery.test.sh elapsed=671.6s output_bytes=4418 tree_cpu=251.52s"
 ok - forge=gerrit: yolo is refused with its reason, never silently dropped
 ok - forge=gerrit: no-mistakes runs with its forge steps skipped, recovers its fixes, then publishes one change
 ok - forge=gerrit: direct-PR publishes one squashed change and a stack is refused with its reason
-progress: "test.tests/fm-task-delivery.test.sh elapsed=305.8s output_bytes=4703 tree_cpu=235.31s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=732.4s output_bytes=4703 tree_cpu=266.16s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=793.1s output_bytes=4703 tree_cpu=279.24s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=853.0s output_bytes=4703 tree_cpu=283.78s"
 ok - fm-spawn: a registered forge must reach the worker's brief
+progress: "test.tests/fm-task-delivery.test.sh elapsed=915.4s output_bytes=4767 tree_cpu=292.97s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=974.7s output_bytes=4767 tree_cpu=306.68s"
 ok - fm-spawn: the brief must carry the spawn's selected ship branch, and the selection is validated before anything is created
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1037.1s output_bytes=4895 tree_cpu=317.56s"
 ok - fm-spawn: a ship branch that deviates from the registered prefix is announced, never blocked
 ok - fm-spawn: a registry forge token the parser refuses stops the launch, reason included
 ok - fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1098.5s output_bytes=5193 tree_cpu=333.53s"
 ok - forge=forgejo: spawn agreement and promotion carry the binding, name tea, and keep yolo
-progress: "test.tests/fm-task-delivery.test.sh elapsed=366.3s output_bytes=5286 tree_cpu=298.00s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1157.7s output_bytes=5286 tree_cpu=348.94s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1219.5s output_bytes=5286 tree_cpu=364.12s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1280.1s output_bytes=5286 tree_cpu=379.82s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1339.9s output_bytes=5286 tree_cpu=387.97s"
 ok - fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1399.8s output_bytes=5385 tree_cpu=400.31s"
 ok - fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1461.1s output_bytes=5481 tree_cpu=414.86s"
 ok - fm-spawn: the Definition of Done check reads the whole section and matches placeholders only where the scaffold puts them
-progress: "test.tests/fm-task-delivery.test.sh elapsed=426.5s output_bytes=5608 tree_cpu=361.30s"
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1521.3s output_bytes=5608 tree_cpu=433.32s"
 ok - fm-spawn: a DoD file line outside the task Definition of Done section is ignored
 ok - fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape
 ok - fm-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix
 warning: re-init: ignored --initial-branch=main
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1581.8s output_bytes=5972 tree_cpu=450.01s"
 ok - governed promotion preserves scout metadata, instructions, checkout and work on refusal, and a retry after the scout advances reaches the project owner
 warning: re-init: ignored --initial-branch=main
 warning: re-init: ignored --initial-branch=main
@@ -69,14 +88,15 @@ ok - refused promotion preserves a pre-existing task branch and one that gained 
 warning: re-init: ignored --initial-branch=main
 ok - refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner
 warning: re-init: ignored --initial-branch=main
+progress: "test.tests/fm-task-delivery.test.sh elapsed=1643.4s output_bytes=6529 tree_cpu=466.24s"
 ok - refused promotion preserves a task branch the project declared before attestation refused it
 warning: re-init: ignored --initial-branch=main
 ok - promotion refuses to override recorded slot scope before provisioning or rewriting the record
 # all fm-task-delivery tests passed
-FM_TEST_END 2026-11-04T13:37:43Z tests/fm-task-delivery.test.sh exit=0 duration_ms=471547 gate_skip=false
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=474649
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=471547 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-task-delivery.test.sh duration_ms=471547
-fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M6JWCK13QKYX35VNMKYBVERE/fm-task-delivery.c2be9593.json
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_END 2026-11-04T20:14:37Z tests/fm-task-delivery.test.sh exit=0 duration_ms=1659652 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1665536
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1659652 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-task-delivery.test.sh duration_ms=1659652
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M6KS2CS6GX0GDVNTT34X3QMC/fm-task-delivery.c2be9593.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

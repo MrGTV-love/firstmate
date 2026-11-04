@@ -1,0 +1,14 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38 dirty=0
+== variant D:  1 file changed, 1 insertion(+)
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+recovery case exit=0
+not ok - relaunch did not deliver the existing-criteria implementation/verification route exactly once
+relaunch case exit=0
+left: none
+== variant R:  1 file changed, 1 insertion(+), 1 deletion(-)
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+recovery case exit=0
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+relaunch case exit=0
+left: none
+worktree dirty=0

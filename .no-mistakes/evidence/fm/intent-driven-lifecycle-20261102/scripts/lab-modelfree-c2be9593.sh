@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Model-free lab for run 01M6JWCK13QKYX35VNMKYBVERE: real fm-brief (base vs head), fm-dod-lib
+# Model-free lab for run 01M6KS2CS6GX0GDVNTT34X3QMC: real fm-brief (base vs head), fm-dod-lib
 # --verification-plan, and the fm_brief_worker_role generated interface. No agent CLI is started.
 set -u
-WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE
-N=/Users/charlesabrooker/.no-mistakes/evidence/01M6JWCK13QKYX35VNMKYBVERE; E=$N/lab-c2be9593
+WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC
+N=/Users/charlesabrooker/.no-mistakes/evidence/01M6KS2CS6GX0GDVNTT34X3QMC; E=$N/lab-c2be9593
 mkdir -p "$E"; cd "$WT" || exit 1
 head=$(git rev-parse HEAD); echo "head=$head"; [ "$head" = c2be9593474c6e561bbae42ca343e23fceef7a38 ] || exit 1
 unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_GATE_REFUSE_BYPASS TMUX TMUX_PANE

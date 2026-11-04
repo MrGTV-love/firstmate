@@ -1,0 +1,29 @@
+SUITE_START fm-documentation-audiences 2026-11-04T09:03:59Z load={ 36.89 39.84 39.36 }
+SUITE_END fm-documentation-audiences exit=0 2026-11-04T09:04:06Z
+SUITE_START fm-dod-lib 2026-11-04T09:05:38Z head=8b64863c load={ 34.30 38.07 38.71 } fmlab_procs=0
+SUITE_END fm-dod-lib exit=0 2026-11-04T09:06:29Z load={ 27.00 35.54 37.74 }
+SUITE_START fm-control-relaunch-recovery 2026-11-04T09:06:36Z head=8b64863c load={ 27.24 35.45 37.69 } fmlab_procs=0
+SUITE_END fm-control-relaunch-recovery exit=0 2026-11-04T09:39:04Z load={ 35.27 35.04 38.86 }
+SUITE_START fm-spawn-dispatch-profile 2026-11-04T09:39:25Z head=8b64863c load={ 30.17 33.92 38.36 } fmlab_procs=0
+SUITE_END fm-spawn-dispatch-profile exit=0 2026-11-04T09:56:04Z load={ 17.42 19.83 27.03 }
+SUITE_START fm-control-relaunch 2026-11-04T09:56:16Z head=8b64863c load={ 16.43 19.54 26.84 } fmlab_procs=0
+SUITE_END fm-control-relaunch exit=0 2026-11-04T10:05:42Z load={ 19.73 18.73 22.22 }
+SUITE_START fm-task-delivery 2026-11-04T10:05:53Z head=8b64863c load={ 19.44 18.69 22.16 } fmlab_procs=0
+SUITE_ABORTED fm-task-delivery 2026-11-04T10:06:15Z reason=tester stopped its own job seconds after start (wrong 10-min tool limit); no processes left; rerun follows
+SUITE_START fm-task-delivery 2026-11-04T10:06:15Z head=8b64863c load={ 16.13 18.00 21.83 } fmlab_procs=0
+SUITE_END fm-task-delivery exit=0 2026-11-04T10:11:32Z load={ 11.18 14.74 19.26 }
+NOTE 2026-11-04T11:27:36Z fixture fix (owned per-case Herdr sessions) applied as uncommitted change on 8b64863c; tests/fm-control-relaunch-{helpers,recovery,backends} changed; reruns below test that tree
+SUITE_START fm-control-relaunch-recovery 2026-11-04T11:27:36Z head=8b64863c load={ 16.16 14.40 13.50 } fmlab_procs=0
+SUITE_END fm-control-relaunch-recovery exit=0 2026-11-04T11:46:32Z load={ 14.07 18.14 18.48 }
+SUITE_START fm-control-relaunch-backends 2026-11-04T11:46:45Z head=8b64863c load={ 17.42 18.70 18.68 } fmlab_procs=0
+SUITE_END fm-control-relaunch-backends exit=0 2026-11-04T12:03:42Z load={ 16.67 15.70 16.11 }
+SUITE_START fm-control-relaunch 2026-11-04T12:04:02Z head=8b64863c load={ 15.29 15.46 16.01 } fmlab_procs=0
+SUITE_END fm-control-relaunch exit=0 2026-11-04T12:13:28Z load={ 14.57 15.37 15.70 }
+SUITE_START fm-control-relaunch-recovery 2026-11-04T12:23:44Z head=c2be9593 load={ 21.01 20.23 18.04 } fmlab_procs=0
+SUITE_END fm-control-relaunch-recovery exit=0 2026-11-04T12:41:10Z load={ 18.70 19.80 19.08 }
+SUITE_START fm-control-relaunch-backends 2026-11-04T12:54:11Z head=c2be9593 load={ 24.01 20.15 18.85 } fmlab_procs=0
+SUITE_END fm-control-relaunch-backends exit=0 2026-11-04T13:15:13Z load={ 17.36 18.12 19.26 }
+SUITE_START fm-control-relaunch 2026-11-04T13:15:35Z head=c2be9593 load={ 17.26 18.03 19.19 } fmlab_procs=0
+SUITE_END fm-control-relaunch exit=0 2026-11-04T13:26:26Z load={ 18.19 18.77 19.12 }
+SUITE_START fm-task-delivery 2026-11-04T13:29:48Z head=c2be9593 load={ 15.85 17.01 18.24 } fmlab_procs=0
+SUITE_END fm-task-delivery exit=0 2026-11-04T13:37:43Z load={ 23.35 23.19 21.53 }

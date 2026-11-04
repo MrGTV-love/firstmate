@@ -4,7 +4,7 @@
 # directory without its own repo inherits firstmate's lineage. A = head; B = head minus the fixture's
 # `git -C "$home/projects/proj" init -q` line. A must pass the promotion case; B must fail it.
 set -u
-WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE
+WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC
 cd "$WT" || exit 1; echo "head=$(git rev-parse HEAD) dirty=$(git status --short | wc -l | tr -d ' ')"
 # Only the promotion case is invoked: every other bare top-level case call becomes ':' (definitions untouched),
 # so no unrelated fixture that also lacks its own repo can fail first under the in-checkout TMPDIR.

@@ -1,0 +1,21 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38 dirty=0
+== head
+process-identity probe: live=1 supplied_marker=1 helper_exit=1 wrapper=21508 unrelated=21511
+ok - fm-control relaunch: an exited setup cannot satisfy the actual preparation marker
+case exit=0
+ tests/fm-control-relaunch.test.sh | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+== M1 mutant: kill -0 liveness
+process-identity probe: live=1 supplied_marker=1 helper_exit=0 wrapper=43308 unrelated=43313
+not ok - a live PID outside the running owned jobs must not establish setup readiness: expected exit 1, got 0
+not ok - setup readiness lost its owned-child identity
+case exit=1
+ tests/fm-control-relaunch.test.sh | 1 +
+ 1 file changed, 1 insertion(+)
+== M2 mutant: marker before ownership
+process-identity probe: live=1 supplied_marker=1 helper_exit=0 wrapper=73322 unrelated=73325
+not ok - a live PID outside the running owned jobs must not establish setup readiness: expected exit 1, got 0
+not ok - setup readiness lost its owned-child identity
+case exit=1
+left: none
+worktree dirty=0

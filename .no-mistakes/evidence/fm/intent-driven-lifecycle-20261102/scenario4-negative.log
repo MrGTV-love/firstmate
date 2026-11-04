@@ -1,0 +1,19 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38 dirty=0
+== head control
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+recovery order case exit=0
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+relaunch case exit=0
+== variant D:  1 file changed, 1 insertion(+)
+not ok - existing-criteria routing did not precede the stricter reconciliation-only recovery contract
+recovery order case exit=1
+not ok - relaunch did not deliver the existing-criteria implementation/verification route exactly once
+relaunch case exit=1
+left: none
+== variant R:  1 file changed, 1 insertion(+), 1 deletion(-)
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+recovery order case exit=0
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+relaunch case exit=0
+left: none
+worktree dirty=0

@@ -1,0 +1,15 @@
+head=c2be9593474c6e561bbae42ca343e23fceef7a38 dirty=0
+cases still invoked: 1
+== A head fixture: copy=/tmp/fm-nm-s6.flTTPB TMPDIR=/tmp/fm-nm-s6.flTTPB/.nm-tmp start=2026-11-04T19:43:24Z
+suite exit=0 end=2026-11-04T19:43:30Z
+1:ok - fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember
+fake project inside enclosing checkout? lineage probe: /private/tmp/fm-nm-s6.flTTPB
+cases still invoked: 1
+ tests/fm-task-delivery.test.sh | 1 -
+ 1 file changed, 1 deletion(-)
+== B fixture without its own project repo: copy=/tmp/fm-nm-s6.8jA8PG TMPDIR=/tmp/fm-nm-s6.8jA8PG/.nm-tmp start=2026-11-04T19:43:34Z
+suite exit=1 end=2026-11-04T19:43:39Z
+1:not ok - promotion should take the registered forge with no flag to remember
+fake project inside enclosing checkout? lineage probe: /private/tmp/fm-nm-s6.8jA8PG
+left: none
+worktree dirty=0

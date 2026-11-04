@@ -1,0 +1,30 @@
+head=c2be9593
+renamed literals: 13 lines; remaining fmlab in backends: 0
+== test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation: no collider
+ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
+exit=0
+== test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once: no collider
+ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
+exit=0
+== test_bounded_reboot_recovery_advances_after_interrupted_inspection: no collider
+ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
+exit=0
+colliders: 8 live, e.g. bash /tmp/fm-nm-sib.yB8XVm/herdr server --session fmnmsib62407-4
+== test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation: steady colliders on every renamed session
+ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
+exit=0
+== test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once: steady colliders on every renamed session
+ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
+exit=0
+== test_bounded_reboot_recovery_advances_after_interrupted_inspection: steady colliders on every renamed session
+ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
+exit=0
+collider 4215 wait=143
+collider 4217 wait=143
+collider 4220 wait=143
+collider 4221 wait=143
+collider 4223 wait=143
+collider 4225 wait=143
+collider 4226 wait=143
+collider 4231 wait=143
+left: none

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
-WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6JWCK13QKYX35VNMKYBVERE
-N=/Users/charlesabrooker/.no-mistakes/evidence/01M6JWCK13QKYX35VNMKYBVERE; E=$N/lab-c2be9593
+WT=/Users/charlesabrooker/.no-mistakes/worktrees/624bc6fbd7a5/01M6KS2CS6GX0GDVNTT34X3QMC
+N=/Users/charlesabrooker/.no-mistakes/evidence/01M6KS2CS6GX0GDVNTT34X3QMC; E=$N/lab-c2be9593
 cd "$WT" || exit 1; echo "head=$(git rev-parse HEAD)"
 unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_GATE_REFUSE_BYPASS TMUX TMUX_PANE
 eval "$(bin/fm-lab-home.sh env 2>"$E/lab-s3-env.err")" || exit 1; LAB=$FM_HOME; echo "lab=$LAB"
