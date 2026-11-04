@@ -272,10 +272,11 @@ EOF
 # guard proves these facts about the slot, each from one removable fact call in
 # fm_slot_guard_observe, and refuses on the first fact it cannot prove:
 #   head_not_contained (S1)   a detached HEAD is not an ancestor of origin's
-#                             default branch (refs/remotes/origin/<origin default>,
-#                             named by origin/HEAD, else ls-remote, plus the tip the
-#                             spawn fetched of it; never a --base-branch) or of the
-#                             manifest's base_sha
+#                             current default branch (the remote's ls-remote answer;
+#                             with --base-branch, the recorded origin/HEAD, else
+#                             ls-remote), by refs/remotes/origin/<that branch> and the
+#                             tip the spawn fetched of it, never a --base-branch, or
+#                             of the manifest's base_sha
 #   owner_branch_not_contained (S2)  the attached branch, or the branch the slot's
 #                             lifecycle manifest names, has an uncontained tip
 #   tree_not_clean (S3)       any tracked, staged or untracked change
@@ -289,8 +290,10 @@ EOF
 #   unknown_* (S5)            any read that fails (git, manifest, lsof, lease,
 #                             lock, contention source) refuses with its own name
 #   changed_since_first_read (S5b)  the facts are observed twice, the second pass
-#                             right before the reset, and the manifest bytes are
-#                             read again after it; any difference refuses.
+#                             right before the reset: the slow holder probes first,
+#                             then HEAD, owner tips, anchor tips, the clean tree and
+#                             the ignored entries, then the manifest bytes; any
+#                             difference refuses.
 # A refusal runs no reset and no checkout. On a refusal HEAD, local branches, the
 # index, the files and every other ref stay byte-identical, with exactly two
 # exceptions, neither of which changes local work, made by the spawn before its final
@@ -310,7 +313,8 @@ EOF
 #   FM_SLOT_GUARD_TASK         this spawn's task id
 #   FM_SLOT_GUARD_ARCHIVE_ROOT the data directory holding */merge-prune-preserved
 #   FM_SLOT_GUARD_PANE_PID     the acquired endpoint's shell pid, or empty
-# FM_SLOT_RESET_GUARD_SEAM (test only) is run once between the two observations.
+# FM_SLOT_RESET_GUARD_SEAM (test only) is run once between the two observations, and
+# FM_SLOT_RESET_GUARD_HOLDER_SEAM (test only) right after the final pass's holder probes.
 FM_SLOT_GUARD_PROJECT=
 FM_SLOT_GUARD_TASK=
 FM_SLOT_GUARD_ARCHIVE_ROOT=
@@ -511,6 +515,7 @@ fm_slot_guard_fact_anchors() { # <strict:0|1>
     sha=$(git -C "$FM_SLOT_GUARD_SLOT" rev-parse --verify --quiet "$FM_SLOT_GUARD_MANIFEST_BASE^{commit}" 2>/dev/null) || sha=
     [ -z "$sha" ] || FM_SLOT_GUARD_ANCHOR_SHAS+=("$sha")
   fi
+  fm_slot_guard_record "anchors=${FM_SLOT_GUARD_ANCHOR_SHAS[*]-}"
   if [ "${#FM_SLOT_GUARD_ANCHOR_SHAS[@]}" -eq 0 ] && [ "$strict" = 1 ]; then
     fm_slot_guard_refuse unknown_anchor "neither the fetched origin default branch nor a recorded base resolves to a commit, so containment cannot be proved"
     return 1
@@ -589,8 +594,8 @@ fm_slot_guard_check_clean() { # <slot>
 # One ignored entry is scratch when the existing closeout classifier says so, with
 # nothing it would preserve. The classifier is sourced in a subshell, so the guard
 # adds no names to the spawn.
-fm_slot_guard_entry_is_scratch() { # <slot-relative path>
-  local rel=$1 prefix='' part rest=$1
+fm_slot_guard_entry_is_scratch() { # <slot-relative path> <whole-ignored-directory list>
+  local rel=$1 dirs=$2 prefix='' part rest=$1
   (
     set +e
     # shellcheck source=bin/fm-merge-prune-lib.sh
@@ -601,13 +606,16 @@ fm_slot_guard_entry_is_scratch() { # <slot-relative path>
       [ "${#FM_MP_PRESERVE[@]}" -eq 0 ]
     }
     scratch "$rel" && exit 0
-    # git lists an ignored directory as one entry; a path inside one is judged
-    # by the same name rules at each ancestor.
+    # `git ls-files -o -i` lists each ignored file on its own. A file inside a
+    # directory that `--directory` lists as wholly ignored is judged, like the
+    # closeout classifier judges it, by that directory's name; an ancestor that is
+    # not wholly ignored (it holds tracked or unignored files) is never judged.
     while :; do
       part=${rest%%/*}
       [ "$part" != "$rest" ] || exit 1
       prefix="${prefix:+$prefix/}$part"
       rest=${rest#*/}
+      grep -Fxq -- "$prefix" "$dirs" 2>/dev/null || continue
       scratch "$prefix" && exit 0
     done
   )
@@ -639,7 +647,7 @@ fm_slot_guard_entry_archived() { # <slot-relative path>
 # target path, lies inside one, or is an ancestor of one (a tracked path below an
 # ignored file makes the reset delete that file to create the directory).
 fm_slot_guard_fact_ignored() { # <strict:0|1>
-  local scratch ignored tracked hits entry bad=
+  local scratch ignored tracked hits dirs entry bad='' settings
   if [ "$1" = 0 ] && ! git -C "$FM_SLOT_GUARD_SLOT" rev-parse --verify --quiet "$FM_SLOT_GUARD_TARGET^{tree}" >/dev/null 2>&1; then
     return 0
   fi
@@ -647,43 +655,64 @@ fm_slot_guard_fact_ignored() { # <strict:0|1>
     fm_slot_guard_refuse unknown_ignored_inventory "a scratch file for the ignored-entry inventory cannot be created"
     return 1
   }
-  ignored="$scratch/ignored" tracked="$scratch/tracked" hits="$scratch/hits"
-  if ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard -z >"$ignored" 2>/dev/null; then
+  ignored="$scratch/ignored" tracked="$scratch/tracked" hits="$scratch/hits" dirs="$scratch/dirs"
+  if ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard -z >"$ignored" 2>/dev/null ||
+    ! git -C "$FM_SLOT_GUARD_SLOT" ls-files -o -i --exclude-standard --directory -z >"$dirs.z" 2>/dev/null; then
     rm -rf -- "$scratch"
     fm_slot_guard_refuse unknown_ignored_inventory "the slot's ignored entries cannot be listed"
     return 1
   fi
+  tr '\0' '\n' <"$dirs.z" | sed -n 's|/$||p' >"$dirs"
+  settings=$(git -C "$FM_SLOT_GUARD_SLOT" config --bool --get-regexp '^core\.(ignorecase|precomposeunicode)$' 2>/dev/null) || {
+    [ "$?" = 1 ] || {
+      rm -rf -- "$scratch"
+      fm_slot_guard_refuse unknown_ignored_inventory "the slot's path-comparison settings cannot be read"
+      return 1
+    }
+    settings=
+  }
   if ! git -C "$FM_SLOT_GUARD_SLOT" ls-tree -r --name-only -z "$FM_SLOT_GUARD_TARGET" >"$tracked" 2>/dev/null; then
     rm -rf -- "$scratch"
     fm_slot_guard_refuse unknown_ignored_inventory "the reset target's tracked paths cannot be listed"
     return 1
   fi
   if ! python3 -I -c '
-import sys
+import sys, unicodedata
+settings = dict(line.split(" ", 1) for line in sys.argv[4].splitlines() if " " in line)
+ignorecase = settings.get("core.ignorecase") == "true"
+precompose = settings.get("core.precomposeunicode") == "true"
+def key(path):
+    text = path.decode("utf-8", "surrogateescape")
+    if precompose:
+        text = unicodedata.normalize("NFC", text)
+    if ignorecase:
+        text = text.casefold()
+    return text
 def names(path):
     return [item for item in open(path, "rb").read().split(b"\0") if item]
-tracked = set(names(sys.argv[1]))
+tracked = set(key(item) for item in names(sys.argv[1]))
 below = set()
 for path in tracked:
-    parts = path.split(b"/")
+    parts = path.split("/")
     for i in range(1, len(parts)):
-        below.add(b"/".join(parts[:i]))
+        below.add("/".join(parts[:i]))
 found = set()
 for entry in names(sys.argv[2]):
     entry = entry.rstrip(b"/")
-    parts = entry.split(b"/")
-    inside = any(b"/".join(parts[:i]) in tracked for i in range(1, len(parts)))
-    if entry in tracked or entry in below or inside:
+    folded = key(entry)
+    parts = folded.split("/")
+    inside = any("/".join(parts[:i]) in tracked for i in range(1, len(parts)))
+    if folded in tracked or folded in below or inside:
         found.add(entry)
 open(sys.argv[3], "wb").write(b"".join(item + b"\n" for item in sorted(found)))
-' "$tracked" "$ignored" "$hits" 2>/dev/null; then
+' "$tracked" "$ignored" "$hits" "$settings" 2>/dev/null; then
     rm -rf -- "$scratch"
     fm_slot_guard_refuse unknown_ignored_inventory "the ignored entries could not be compared with the reset target"
     return 1
   fi
   while IFS= read -r entry || [ -n "$entry" ]; do
     [ -n "$entry" ] || continue
-    if fm_slot_guard_entry_is_scratch "$entry"; then
+    if fm_slot_guard_entry_is_scratch "$entry" "$dirs"; then
       continue
     elif fm_slot_guard_entry_archived "$entry"; then
       continue
@@ -1042,14 +1071,19 @@ fm_slot_guard_fact_holders() {
   fm_slot_guard_fact_holders_contention || return 1
 }
 
-# One full observation of the facts above, in order. The caller has read the
-# manifest first (fm_slot_guard_fact_manifest). Each line is one removable fact. An
-# early look (strict 0) leaves the clean-tree fact to the check that precedes it, which
-# is fm_slot_guard_check_clean in the freshness path and fm_slot_check_copy in the
-# governed one.
-fm_slot_guard_observe() { # <strict:0|1>
+# One full observation of the facts above, in order: the slow holder probes first,
+# so the git facts after them are the freshest reads before the reset. The caller
+# reads the manifest after it (fm_slot_guard_fact_manifest). Each line is one
+# removable fact. An early look (strict 0) leaves the clean-tree fact to the check
+# that precedes it, which is fm_slot_guard_check_clean in the freshness path and
+# fm_slot_check_copy in the governed one.
+fm_slot_guard_observe() { # <strict:0|1> [final]
   FM_SLOT_GUARD_RECORD=
   FM_SLOT_GUARD_REASON=
+  fm_slot_guard_fact_holders || return 1
+  if [ "${2:-}" = final ] && [ -n "${FM_SLOT_RESET_GUARD_HOLDER_SEAM:-}" ]; then
+    (eval "$FM_SLOT_RESET_GUARD_HOLDER_SEAM") || true
+  fi
   fm_slot_guard_fact_head || return 1
   fm_slot_guard_fact_owners || return 1
   fm_slot_guard_fact_anchors "$1" || return 1
@@ -1057,7 +1091,6 @@ fm_slot_guard_observe() { # <strict:0|1>
   fm_slot_guard_fact_owners_contained || return 1
   [ "$1" = 0 ] || fm_slot_guard_fact_clean || return 1
   fm_slot_guard_fact_ignored "$1" || return 1
-  fm_slot_guard_fact_holders || return 1
 }
 
 # Set the slot, reset target and anchors for the next observation.
@@ -1087,7 +1120,8 @@ fm_slot_reset_preflight() { # <slot> <target> <anchor>...
   fm_slot_guard_observe 0
 }
 
-# The guarded reset. Both observations, the manifest bytes read again, then the one
+# The guarded reset. Both observations (the final one probes the holders first, then
+# re-reads every git fact), the manifest bytes read again, then the one
 # destroying command.
 fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
   local slot=$1 target=$2 label=$3 first manifest_first branch_first base_first
@@ -1100,9 +1134,9 @@ fm_slot_guarded_reset() { # <slot> <target-sha> <target-label> <anchor>...
   if [ -n "${FM_SLOT_RESET_GUARD_SEAM:-}" ]; then
     (eval "$FM_SLOT_RESET_GUARD_SEAM") || true
   fi
-  fm_slot_guard_observe 1 || return 1
+  fm_slot_guard_observe 1 final || return 1
   if [ "$FM_SLOT_GUARD_RECORD" != "$first" ]; then
-    fm_slot_guard_refuse changed_since_first_read "the slot's HEAD or owner branches changed between the first observation and the final one"
+    fm_slot_guard_refuse changed_since_first_read "the slot's HEAD, owner branches or anchors changed between the first observation and the final one"
     return 1
   fi
   fm_slot_guard_fact_manifest || return 1

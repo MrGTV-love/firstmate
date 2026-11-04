@@ -845,7 +845,7 @@
       "invariant": "A pooled slot is reset only after proof that it holds no unique work and no live holder. A refusal leaves the slot's HEAD, local branches, index, files and every other ref byte-identical, with exactly two exceptions that change no local work: (1) the spawn's fetch moves refs/remotes/origin/<b>, where <b> is the branch it fetched to start from (origin's default branch, or the --base-branch), only forward by compare-and-set, and repoints refs/remotes/origin/HEAD at origin's default branch; (2) the governed path adds refs/fm/anchor/<task>-<sha> to preserve a detached HEAD.",
       "layer": "runtime-block",
       "source": "the slot's HEAD, owner branches, status, ignored entries, lifecycle manifest, lease and contention sources, and the working-directory list; decided by fm_slot_guard_observe in bin/fm-slot-provision-lib.sh",
-      "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's default branch (refs/remotes/origin/<origin default> from origin/HEAD, else ls-remote, plus the tip this spawn fetched of it; never a --base-branch) or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
+      "trigger": "a pooled slot's HEAD or owner branch is not contained in origin's current default branch (the remote's ls-remote answer; with --base-branch, the recorded origin/HEAD, else ls-remote), by refs/remotes/origin/<that branch> and the tip this spawn fetched of it, never a --base-branch, or the recorded base, its tree is dirty, an ignored entry collides with a path the reset target tracks, a process outside the spawn has its cwd in it, it is locked or leased to another holder, recent contention names it, any of those sources cannot be read, or the evidence changed before the reset",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task's current copy and endpoint; read the named reason in the refusal, resolve that cause with its owner (land or archive the work, release the holder), then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> without forcing or discarding work.",
@@ -940,6 +940,10 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
+          "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the slot's path-comparison settings cannot be read\""
+        },
+        {
+          "file": "bin/fm-slot-provision-lib.sh",
           "match": "fm_slot_guard_refuse unknown_ignored_inventory \"the reset target's tracked paths cannot be listed\""
         },
         {
@@ -1028,7 +1032,7 @@
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",
-          "match": "fm_slot_guard_refuse changed_since_first_read \"the slot's HEAD or owner branches changed between the first observation and the final one\""
+          "match": "fm_slot_guard_refuse changed_since_first_read \"the slot's HEAD, owner branches or anchors changed between the first observation and the final one\""
         },
         {
           "file": "bin/fm-slot-provision-lib.sh",

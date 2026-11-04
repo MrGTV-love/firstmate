@@ -2510,6 +2510,65 @@ test_sibling_clone_pool_fetches_under_the_lock() {
   pass 'a sibling-clone pool fetches under the lock and starts from the origin tip, with and without --base-branch'
 }
 
+# S3b on a case-insensitive file system (core.ignorecase): the ignored Notes.local and the
+# target's notes.local are one file there, so the reset would overwrite it.
+test_reset_guard_s3b_case_insensitive_collision() {
+  local rec id
+  id='guard-s3b-ignorecase'
+  rec=$(make_case guard-s3b-icase "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" config core.ignorecase true
+  guard_ignore Notes.local
+  printf 'private notes under another case\n' >"$POOL_DIR/Notes.local"
+  guard_publish_tracked notes.local $'tracked content\n'
+  guard_expect_refusal S3b '(i-d) an ignored path equal to a tracked target path but for case, under core.ignorecase' \
+    'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'private notes under another case' "$POOL_DIR/Notes.local" 'the ignored file bytes changed'
+  pass 'S3b (i-d): under core.ignorecase a case-only collision is refused and keeps its bytes'
+}
+
+# S3b: an ancestor with a scratch name (venv) that holds tracked files is not wholly ignored,
+# so an ignored file inside it is judged by its own name and kept.
+test_reset_guard_s3b_tracked_scratch_named_ancestor() {
+  local rec id
+  id='guard-s3b-venv-secret'
+  rec=$(make_case guard-s3b-venv "$id")
+  read_case_record "$rec"
+  guard_publish_tracked venv/keep.txt $'kept\n'
+  guard_prefetch
+  git -C "$POOL_DIR" checkout --quiet --detach refs/remotes/origin/main
+  guard_ignore venv/secrets.env
+  printf 'secret the target tracks something else at\n' >"$POOL_DIR/venv/secrets.env"
+  guard_publish_tracked venv/secrets.env $'tracked\n'
+  guard_expect_refusal S3b '(i-e) an ignored file inside a tracked directory named like scratch' \
+    'reset refused (ignored_collision)' "$id" --scout
+  assert_grep 'secret the target tracks' "$POOL_DIR/venv/secrets.env" 'the ignored file bytes changed'
+  pass 'S3b (i-e): an ignored file inside a tracked venv/ is not scratch by its ancestor and is refused'
+}
+
+# S5b: the final pass probes the holders first, so a change landing during or right after
+# that slow probe is still seen by the git reads that follow it.
+test_reset_guard_s5b_after_holder_probe() {
+  local rec id
+  id='guard-s5b-holder-edit'
+  rec=$(make_case guard-s5b-h-i "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="printf 'late edit\\n' >>'$POOL_DIR/README.md'; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(vi) a tracked edit lands after the final holder probe' 'is not clean' "$id" --scout
+  assert_grep 'late edit' "$POOL_DIR/README.md" 'S5b (vi): the late edit was lost'
+  id='guard-s5b-holder-commit'
+  rec=$(make_case guard-s5b-h-ii "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m late; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(vii) a new commit lands on HEAD after the final holder probe' 'reset refused (head_not_contained)' "$id" --scout
+  id='guard-s5b-holder-anchor'
+  rec=$(make_case guard-s5b-h-iii "$id")
+  read_case_record "$rec"
+  FM_SLOT_RESET_GUARD_HOLDER_SEAM="git -C '$POOL_DIR' update-ref refs/remotes/origin/main \"\$(git -C '$POOL_DIR' -c user.name=t -c user.email=t@e.invalid commit-tree 'refs/remotes/origin/main^{tree}' -p refs/remotes/origin/main -m later)\"; guard_snapshot '$POOL_DIR' '$CASE_DIR/post-seam.snap'" \
+    guard_expect_refusal S5b '(viii) the origin default anchor moves after the final holder probe' 'reset refused (changed_since_first_read)' "$id" --scout
+  pass 'S5b: a change after the final holder probe refuses with the work preserved'
+}
+
 # Explicit selection keeps focused regressions independently runnable by name.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
@@ -2581,6 +2640,8 @@ test_reset_guard_s3_dirty_kinds
 test_reset_guard_s3b_same_path
 test_reset_guard_s3b_ancestor_path
 test_reset_guard_s3b_inside_tracked_file
+test_reset_guard_s3b_case_insensitive_collision
+test_reset_guard_s3b_tracked_scratch_named_ancestor
 test_reset_guard_s3b_control_no_collision
 test_reset_guard_s3b_scratch_and_archive
 test_reset_guard_s3b_inventory_failure
@@ -2593,5 +2654,6 @@ test_reset_guard_s4_pane_pid_exemption
 test_reset_guard_s4_in_pane_probe_without_pane_pid
 test_reset_guard_s5_unknown_classes
 test_reset_guard_s5b_transitions
+test_reset_guard_s5b_after_holder_probe
 
 echo "# all fm-spawn-pool-base-freshen tests passed"
