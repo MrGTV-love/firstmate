@@ -93,13 +93,12 @@
 # switch it to the base branch even on a plan. The landing branch is the task's
 # base_branch= (TEARDOWN_ROUTE_BASE) or else the clone's default branch. A forge read that
 # fails, times out (FM_TEARDOWN_FORGE_TIMEOUT seconds, 60 by default) or cannot be
-# parsed is unknown, never merged. The read runs as a background job of the caller
-# in the caller's own process group, never in a group of its own, and ends itself
-# at its bound; so the sweep's plan stop, which kills the plan's whole group, and an
-# interrupted teardown end it with the caller (fm_run_timed puts its command in a
-# group of its own with every mechanism and would outlive both). A record that
-# names the copy and fails any of these keeps the copy with no driver call and the
-# failed condition named.
+# parsed is unknown, never merged. The read is bounded by fm_timeout_perl_bound: gh
+# and its descendants share a process group that the bound kills at its limit, and
+# the bound kills that group when the caller goes away, so the sweep's plan stop
+# and an interrupted teardown end the read with the caller (it needs perl; without
+# perl the read is unknown). A record that names the copy and fails any of these
+# keeps the copy with no driver call and the failed condition named.
 # The route's call is closeout_pr.py --cleanup-worktree <copy> [--execute-cleanup]
 # --pr <PR> --supersedence-profile <profile> --no-evidence-files, run from the
 # slot with the same interpreter and no other option. Its answer has no top-level
@@ -1400,43 +1399,22 @@ teardown_route_profile_ok() {  # <profile> <pr> <tip>
   return 1
 }
 
-# The forge read of PR <pr> in <owner/repo>, bounded by <seconds> and run in the
-# caller's own process group, never in one of its own. The sweep stops a plan by
-# killing the plan's whole group, and an interrupted teardown signals its
-# foreground group; a read in a group of its own (what fm_run_timed makes with
-# every mechanism) would outlive both. gh therefore runs as a plain background job
-# of the caller and this function polls it, ending it itself when the bound
-# passes. Its answer goes through an unlinked file, so a kill leaves nothing on
-# disk. Sets TEARDOWN_ROUTE_FORGE_OUT; returns gh's status, 124 when the bound
-# passed, 125 when the answer could not be captured.
+# The forge read of PR <pr> in <owner/repo>, bounded by <seconds> with
+# fm_timeout_perl_bound (bin/fm-timeout-lib.sh), not with fm_run_timed. That bound
+# runs gh in a process group of its own and kills the whole group at its limit, so
+# a descendant of gh ends with the read, and it watches its parent and kills the
+# group when the caller goes away, so a sweep plan that is stopped (a kill of the
+# plan's own group, which does not reach a group of its own) or a teardown that is
+# interrupted ends the read with the caller. fm_run_timed picks `timeout` where it
+# exists, which never watches its caller. Sets TEARDOWN_ROUTE_FORGE_OUT; returns
+# gh's status, 124 when the bound passed, 125 when there is no perl to bound it.
 TEARDOWN_ROUTE_FORGE_OUT=
 teardown_route_forge_read() {  # <seconds> <pr> <owner/repo>
-  local limit=$1 pr=$2 slug=$3 pid wfd rfd ticks=0 rc=0 waited=0
+  local rc=0
   TEARDOWN_ROUTE_FORGE_OUT=
-  fm_timeout_open_status fm-route-forge || return 125
-  wfd=$FM_TIMEOUT_WFD
-  rfd=$FM_TIMEOUT_RFD
-  (
-    exec 1>&"$wfd"
-    eval "exec $wfd>&- $rfd<&-"
-    exec gh pr view "$pr" --repo "$slug" --json state,mergeCommit,headRefName \
-      -q '[.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")' 2>/dev/null </dev/null
-  ) &
-  pid=$!
-  while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt $((limit * 10)) ]; do
-    sleep 0.1
-    ticks=$((ticks + 1))
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -s KILL "$pid" 2>/dev/null || true
-    rc=124
-  fi
-  wait "$pid" 2>/dev/null || waited=$?
-  [ "$rc" = 124 ] || rc=$waited
-  if [ "$rc" = 0 ]; then
-    TEARDOWN_ROUTE_FORGE_OUT=$(cat <&"$rfd" 2>/dev/null) || rc=125
-  fi
-  eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
+  command -v perl >/dev/null 2>&1 || return 125
+  TEARDOWN_ROUTE_FORGE_OUT=$(fm_timeout_perl_bound "$1" gh pr view "$2" --repo "$3" --json state,mergeCommit,headRefName \
+    -q '[.state, (.mergeCommit.oid // ""), .headRefName] | join("\t")' 2>/dev/null </dev/null) || rc=$?
   return "$rc"
 }
 
@@ -1478,6 +1456,8 @@ teardown_route_pr_landed() {  # <slot> <pr>
   if [ "$rc" != 0 ]; then
     if fm_timed_out "$rc"; then
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr timed out after ${limit}s (unknown, not merged)"
+    elif [ "$rc" = 125 ]; then
+      TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr cannot be bounded here (perl is not available), so it is unknown, not merged"
     else
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the forge read of PR $pr failed (exit $rc; unknown, not merged)"
     fi
@@ -1564,13 +1544,22 @@ teardown_closeout_route_publish() {
 # answer that shows the driver keeping a tree for its unique ignored files, does
 # not allow. WHY names what the answer lacked.
 teardown_closeout_route_answer() {  # <plan|execute> <driver-exit>
-  local stage=$1 rc=$2 want
+  local stage=$1 rc=$2 want contradiction
   case "$TEARDOWN_CLOSEOUT_STDOUT$TEARDOWN_CLOSEOUT_OUT" in
     *cleanup_ignored_payload_archived_tree_retained* | *archive_then_retain_tree*)
       TEARDOWN_CLOSEOUT_ROUTE_WHY="the driver keeps a tree with unique ignored files after archiving them and never removes it automatically"
       return 1
       ;;
   esac
+  # An answer that contradicts the call or itself is refused by name. The call
+  # always names --cleanup-worktree, so cleanup_requested false is wrong, and a
+  # BLOCKED state that claims a removal is wrong; neither is read as a refusal
+  # that released nothing.
+  contradiction=$(printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -r 'if length == 1 and (.[0] | type) == "object" then .[0] | (if .cleanup_requested == false then "cleanup_requested is false although the call asked for cleanup" elif .state == "BLOCKED" and .worktree_removed == true then "it reports worktree_removed true while the state is BLOCKED" else empty end) else empty end' 2>/dev/null) || contradiction=
+  if [ -n "$contradiction" ]; then
+    TEARDOWN_CLOSEOUT_ROUTE_WHY="the driver's answer contradicts the call or itself ($contradiction), so it is not read as proof that nothing was released"
+    return 1
+  fi
   if [ "$stage" = plan ]; then
     want=3
     if [ "$rc" = "$want" ] && printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .state == "BLOCKED" and .predicates_failed == ["cleanup_not_executed"] and .cleanup_requested == true and .worktree_removed == false)' >/dev/null 2>&1; then

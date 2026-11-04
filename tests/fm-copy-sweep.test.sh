@@ -3396,23 +3396,6 @@ test_a_matching_record_row_that_is_empty_or_conflicts_holds_the_copy_in_either_r
 # is stopped, the read stops with it (Main 010 F2). The fake forge records its pid
 # and becomes `sleep`, so the pid it records is the sleeper's own and a read that
 # outlives the plan is visible. The control is a forge that answers at once.
-forge_reads_are_gone() {  # <log-dir> <seconds>
-  local pid waited=0 alive
-  while [ "$waited" -le $(($2 * 10)) ]; do
-    alive=
-    if [ -f "$1/gh.pids" ]; then
-      while IFS= read -r pid; do
-        ! kill -0 "$pid" 2>/dev/null || alive="$alive $pid"
-      done < "$1/gh.pids"
-    fi
-    [ -n "$alive" ] || return 0
-    sleep 0.1
-    waited=$((waited + 1))
-  done
-  FORGE_ALIVE=$alive
-  return 1
-}
-
 test_a_plan_that_times_out_or_is_stopped_leaves_no_forge_read_running() {
   local sweep waited=0 pid
   FORGE_ALIVE=
@@ -3564,7 +3547,7 @@ test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed() {
 # stays (Main 010 F3). The first malformed kind is the reviewer's reproduction.
 test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt() {
   local kind receipt line
-  local -a kinds=(temporary-string temporary-string-kept temporary-removed temporary-removed-null)
+  local -a kinds=(temporary-string temporary-string-kept temporary-removed temporary-removed-null temporary-not-requested)
   route_world route-temporary-shapes
   route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
   for kind in "${kinds[@]}" temporary; do
@@ -3588,7 +3571,80 @@ test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt(
   # The message is printed once per recognised refusal and names the copy by a
   # shortened path, so it is counted over the whole output: only the control reads.
   assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c 'names this refusal temporary')" "temporary shapes: a malformed answer was read as a temporary refusal, or the valid one was not"
+  # A contradiction is refused by name: the reason says what the answer contradicts.
+  assert_contains "$OUT" "cleanup_requested is false" "temporary shapes: the contradictory cleanup request is not named in the refusal"
+  assert_contains "$OUT" "worktree_removed true while the state is BLOCKED" "temporary shapes: the contradictory removal claim is not named in the refusal"
   pass "only the valid temporary refusal (BLOCKED, predicates_failed an array with cleanup_gate, worktree_removed false, a lease conflict) clears the retention receipt; a string predicates_failed, a removal claim or a null worktree_removed keeps the receipt and reports a failure"
+}
+
+# A retained-payload signal anywhere in the driver's answer keeps the copy: on the
+# --pr route a stderr line that carries cleanup_ignored_payload_archived_tree_retained
+# beats a valid temporary envelope on stdout, so the receipt stays, the copy is KEPT
+# and no later sweep asks the driver again (Main 011 N1). The control is the valid
+# temporary refusal with a quiet stderr: its receipt goes and the next sweep plans it again.
+test_a_retained_payload_signal_on_stderr_beats_the_temporary_retry() {
+  local line receipt calls
+  route_world route-retained-stderr
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy x-stderr 7 allowed temporary-retained-stderr
+  route_copy x-control 7 allowed temporary
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  receipt="$HOMED/data/copy-sweep/retained/$(printf '%s' "$(copy_path x-stderr)" | shasum -a 256 | awk '{print $1}')"
+  route_assert_kept x-stderr "retained stderr"
+  route_assert_kept x-control "retained stderr control"
+  assert_present "$receipt" "retained stderr: the receipt was cleared for a copy whose answer shows a retained tree"
+  assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c 'names this refusal temporary')" "retained stderr: only the control may read as a temporary refusal"
+  line=$(route_line_of x-stderr)
+  assert_contains "$line" "KEPT" "retained stderr: a retained tree is KEPT"
+  assert_equals 2 "$(route_calls_for x-stderr | wc -l | tr -d ' ')" "retained stderr: wanted one plan and one execute"
+  assert_equals 2 "$(route_calls_for x-control | wc -l | tr -d ' ')" "retained stderr control: wanted one plan and one execute"
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=100 route_sweep --apply
+  calls=$(route_calls_for x-stderr | wc -l | tr -d ' ')
+  assert_equals 2 "$calls" "retained stderr: a later sweep asked the driver again (calls $calls)"
+  assert_present "$receipt" "retained stderr: the receipt went on the later sweep"
+  assert_equals 4 "$(route_calls_for x-control | wc -l | tr -d ' ')" "retained stderr control: the valid temporary refusal was not planned again"
+  printf 'retained stderr: KEPT, receipt kept, driver calls %s after two sweeps; control: temporary, planned again, calls %s\n' "$calls" "$(route_calls_for x-control | wc -l | tr -d ' ')"
+  pass "a retained-tree signal on stderr only beats a valid temporary envelope on stdout: the copy is KEPT, its receipt stays and no later sweep asks the driver, while the valid temporary refusal is planned again"
+}
+
+# A forge read that times out ends with its descendants, not only its direct child
+# (Main 011 N3): the fake forge starts a sleeper child and waits, the bound is one
+# second, and nothing it started may survive, at the plan and at the execute (the
+# second read, after a plan that succeeded). The control reads a fast forge.
+test_a_forge_read_that_times_out_leaves_no_descendant_running() {
+  local line pid
+  route_world route-forge-child-plan
+  route_set_pr "$W/forge" 7 HANGCHILD
+  route_copy slow 7
+  FM_TEARDOWN_FORGE_TIMEOUT=1 FM_COPY_SWEEP_PLAN_TIMEOUT=60 route_sweep --apply
+  [ "$RC" = 0 ] || fail "forge child (plan): a held plan must not fail the run ($RC): $OUT"
+  route_assert_kept slow "forge child (plan)"
+  assert_contains "$(route_line_of slow)" "forge read of PR 7 timed out" "forge child (plan): the timeout is not named"
+  assert_equals "" "$(route_calls_for slow)" "forge child (plan): the copy reached the driver"
+  assert_equals 2 "$(wc -l < "$W/forge/gh.pids" | tr -d ' ')" "forge child (plan): the fake forge did not record itself and its child"
+  forge_reads_are_gone "$W/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "forge child (plan): the timed-out read left a descendant running (pid$FORGE_ALIVE)"; }
+  printf 'forge child (plan): forge bound 1s: kept, no driver call, pids %s all gone\n' "$(tr '\n' ' ' < "$W/forge/gh.pids")"
+  route_world route-forge-child-execute
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy late 7
+  # shellcheck disable=SC2016 # the hook expands its own variable when it runs
+  printf '#!/usr/bin/env bash\nprintf "HANGCHILD\\n" > "%s/pr-7"\n' "$W/forge" > "$W/ans/late/plan.hook"
+  FM_TEARDOWN_FORGE_TIMEOUT=1 FM_COPY_SWEEP_PLAN_TIMEOUT=60 route_sweep --apply
+  route_assert_kept late "forge child (execute)"
+  line=$(route_line_of late)
+  assert_contains "$line" "forge read of PR 7 timed out" "forge child (execute): the timeout is not named"
+  assert_equals 1 "$(route_calls_for late | grep -c .)" "forge child (execute): wanted the plan only, got: $(route_calls_for late)"
+  assert_not_contains "$(route_calls_for late)" "--execute-cleanup" "forge child (execute): the execute ran after a read that timed out"
+  assert_equals 2 "$(wc -l < "$W/forge/gh.pids" | tr -d ' ')" "forge child (execute): the fake forge did not record itself and its child"
+  forge_reads_are_gone "$W/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "forge child (execute): the timed-out read left a descendant running (pid$FORGE_ALIVE)"; }
+  printf 'forge child (execute): second read timed out after a plan that succeeded: kept, one driver call (the plan), pids %s all gone\n' "$(tr '\n' ' ' < "$W/forge/gh.pids")"
+  route_world route-forge-child-control
+  route_set_pr "$W/forge" 7 MERGED "$ROUTE_MERGE"
+  route_copy fast 7
+  FM_TEARDOWN_FORGE_TIMEOUT=1 route_sweep --apply
+  route_assert_released fast "forge child control"
+  route_assert_calls fast 7 "forge child control"
+  pass "a forge read that times out at the plan or at the execute leaves neither its direct child nor a descendant running, and a fast forge still routes"
 }
 
 # The two facts the hold matrix needs before it trusts a comparison: the prior
@@ -3884,6 +3940,8 @@ test_a_plan_that_times_out_or_is_stopped_leaves_no_forge_read_running
 test_a_plan_never_asks_the_driver_while_the_slots_checkout_is_on_the_prs_head_branch
 test_the_routes_answers_are_read_in_their_real_shape_and_fail_closed
 test_a_malformed_or_contradictory_temporary_refusal_keeps_the_retention_receipt
+test_a_retained_payload_signal_on_stderr_beats_the_temporary_retry
+test_a_forge_read_that_times_out_leaves_no_descendant_running
 test_the_hold_matrix_checks_fail_without_a_receipt_and_after_any_driver_call
 test_a_valid_record_releases_no_copy_that_the_sweep_holds_before_the_driver
 test_the_recorded_cases_are_decided_by_their_records_and_the_drivers_scripted_answers

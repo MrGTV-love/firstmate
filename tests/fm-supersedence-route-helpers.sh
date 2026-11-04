@@ -103,9 +103,11 @@ route_argv_selftest() {
 
 # The driver's compact envelopes, as the --pr lane prints them (Vernant
 # closeout_pr.py _compact_envelope): no top-level "allowed". Scripted answers only.
+# ROUTE_CLEANUP_REQUESTED (default true, what the real driver prints for a call
+# that names --cleanup-worktree) lets a case script the contradictory false.
 route_envelope() {  # <state> <predicates-json> <worktree_removed> <recovery-reason-or-null> [<pr>]
-  printf '{"base_ref":"origin/main","base_strategy":"merge-base","branch_delete":null,"branch_reap":null,"cleanup_recovery_reason":%s,"cleanup_requested":true,"evidence_digest":"0","launch_cwd":null,"next_command":"scripted","owner":"agent","pr":%s,"predicates_failed":%s,"primary_checkout_repair":null,"state":"%s","worktree_removed":%s}\n' \
-    "$4" "${5:-7}" "$2" "$1" "$3"
+  printf '{"base_ref":"origin/main","base_strategy":"merge-base","branch_delete":null,"branch_reap":null,"cleanup_recovery_reason":%s,"cleanup_requested":%s,"evidence_digest":"0","launch_cwd":null,"next_command":"scripted","owner":"agent","pr":%s,"predicates_failed":%s,"primary_checkout_repair":null,"state":"%s","worktree_removed":%s}\n' \
+    "$4" "${ROUTE_CLEANUP_REQUESTED:-true}" "${5:-7}" "$2" "$1" "$3"
 }
 route_plan_allowed_envelope() { route_envelope BLOCKED '["cleanup_not_executed"]' false null "$@"; }
 route_plan_refusal_envelope() { route_envelope BLOCKED '["cleanup_gate"]' false '"verification_stale_or_uncovered_paths"' "$@"; }
@@ -126,6 +128,8 @@ route_write_profile() {
 # <table-dir>/pr-<n> (state TAB merge-commit TAB head-branch; FAIL; HANG; GARBAGE)
 # and logs each such call to <table-dir>/gh.log. HANG records its pid in
 # <table-dir>/gh.pids and becomes `sleep`, so that pid is the sleeper's own.
+# HANGCHILD records its own pid and that of a `sleep` child it starts and waits
+# for, both in gh.pids, so a read that is ended without its descendants is visible.
 # Anything else goes to the fixture's own gh (kept as gh.base) or fails.
 route_install_gh() {
   local fakebin=$1 dir=$2
@@ -147,6 +151,7 @@ file="$dir/pr-\$3"
 case "\$(head -n 1 "\$file")" in
   FAIL) echo "forge unavailable" >&2; exit 1 ;;
   HANG) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; exec sleep 30 ;;
+  HANGCHILD) printf '%s\\n' "\$\$" >> "$dir/gh.pids"; sleep 60 & printf '%s\\n' "\$!" >> "$dir/gh.pids"; wait ;;
   GARBAGE) echo "not a state row"; exit 0 ;;
   *) cat "\$file"; exit 0 ;;
 esac
@@ -159,7 +164,7 @@ SH
 route_set_pr() {
   mkdir -p "$1"
   case "$3" in
-    FAIL | HANG | GARBAGE) printf '%s\n' "$3" > "$1/pr-$2" ;;
+    FAIL | HANG | HANGCHILD | GARBAGE) printf '%s\n' "$3" > "$1/pr-$2" ;;
     *) printf '%s\t%s\t%s\n' "$3" "${4:-}" "${5:-fm/pr-$2-head}" > "$1/pr-$2" ;;
   esac
 }
@@ -206,6 +211,7 @@ if [ -e "\$dir/exec.remove" ]; then
   git worktree unlock "\$2" || exit 4
   git worktree remove "\$2" || exit 4
 fi
+[ ! -e "\$dir/exec.err" ] || cat "\$dir/exec.err" >&2
 cat "\$dir/exec.out"
 exit "\$(cat "\$dir/exec.exit")"
 SH
@@ -278,7 +284,10 @@ route_assert_digest_sees() {
 # and four malformed or contradictory temporary refusals that must not read as one:
 # temporary-string (predicates_failed a string and worktree_removed true, the shape
 # Main 010 F3 reproduced), temporary-string-kept (a string, worktree_removed false),
-# temporary-removed (an array but worktree_removed true) and temporary-removed-null.
+# temporary-removed (an array but worktree_removed true), temporary-removed-null,
+# temporary-not-requested (a valid temporary envelope whose cleanup_requested is
+# false although the call asked for cleanup) and temporary-retained-stderr (a valid
+# temporary envelope on stdout with the archived-tree-retained signal on stderr only).
 route_script_row() {
   local dir=$1/ans/$2 pr=${5:-7}
   mkdir -p "$dir"
@@ -306,6 +315,8 @@ route_script_row() {
     temporary-string-kept) route_envelope BLOCKED '"cleanup_gate"' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-removed) route_envelope BLOCKED '["cleanup_gate"]' true '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
     temporary-removed-null) route_envelope BLOCKED '["cleanup_gate"]' null '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-not-requested) ROUTE_CLEANUP_REQUESTED=false route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit" ;;
+    temporary-retained-stderr) route_envelope BLOCKED '["cleanup_gate"]' false '"cleanup_lease_conflict"' "$pr" > "$dir/exec.out"; printf 3 > "$dir/exec.exit"; echo "closeout_pr: cleanup_ignored_payload_archived_tree_retained" > "$dir/exec.err" ;;
     allowed-doc) echo '{"allowed": true}' > "$dir/exec.out"; printf 0 > "$dir/exec.exit" ;;
   esac
 }
@@ -349,4 +360,28 @@ route_table_counts() {
   printf '%s\n' "$1" | awk -F '\t' '
     $1 ~ /^[0-9]+$/ { if ($3 == "a") a++; else if ($3 == "other (history)") h++; else if ($3 == "b") b++; else if ($3 == "other") o++ }
     END { printf "%d/%d/%d/%d\n", a, h, b, o }'
+}
+
+# forge_reads_are_gone <table-dir> <seconds>: true once every pid the fake forge
+# recorded in <table-dir>/gh.pids (a HANG read's sleeper, a HANGCHILD read's
+# script and its child) is gone, polled for up to <seconds>. A killed process can
+# stay a zombie for a moment, so it is polled, not read once. FORGE_ALIVE names
+# the pids that remained.
+FORGE_ALIVE=
+forge_reads_are_gone() {
+  local pid waited=0 alive
+  FORGE_ALIVE=
+  while [ "$waited" -le $(($2 * 10)) ]; do
+    alive=
+    if [ -f "$1/gh.pids" ]; then
+      while IFS= read -r pid; do
+        ! kill -0 "$pid" 2>/dev/null || alive="$alive $pid"
+      done < "$1/gh.pids"
+    fi
+    [ -n "$alive" ] || return 0
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  FORGE_ALIVE=$alive
+  return 1
 }

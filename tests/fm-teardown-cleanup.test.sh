@@ -6556,9 +6556,9 @@ route_teardown_release_branch() {
 # goes first (reverse path order) and is released; the bad copy stays and the
 # teardown refuses, with no driver call for the bad copy.
 test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_the_driver() {
-  local rc row phrase tip other second ok bad calls bad_pr
+  local rc row phrase tip other second ok bad calls bad_pr pid
   other=$(printf '%040d' 0 | tr 0 b)
-  for row in empty-row-first empty-row-after tip-differs profile-missing profile-pr-mismatch pr-closed forge-fails forge-hangs merge-commit-absent \
+  for row in empty-row-first empty-row-after tip-differs profile-missing profile-pr-mismatch pr-closed forge-fails forge-hangs forge-hangs-child merge-commit-absent \
     merge-commit-off-main other-copy base-merge-off-base base-control; do
     route_teardown_world "route-condition-$row" foreign
     bad=$FOREIGN_COPY
@@ -6599,6 +6599,9 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
       pr-closed) route_set_pr "$FOREIGN_CASE/forge" 8 CLOSED; route_teardown_record "$bad" 8; phrase="PR 8 as CLOSED, not MERGED" ;;
       forge-fails) route_set_pr "$FOREIGN_CASE/forge" 8 FAIL; route_teardown_record "$bad" 8; phrase="forge read of PR 8 failed" ;;
       forge-hangs) route_set_pr "$FOREIGN_CASE/forge" 8 HANG; route_teardown_record "$bad" 8; phrase="forge read of PR 8 timed out" ;;
+      # The read's descendants end with it (Main 011 N3): the fake forge starts a
+      # sleeper child and waits, and nothing it started may survive the timeout.
+      forge-hangs-child) route_set_pr "$FOREIGN_CASE/forge" 8 HANGCHILD; route_teardown_record "$bad" 8; phrase="forge read of PR 8 timed out" ;;
       merge-commit-absent) route_set_pr "$FOREIGN_CASE/forge" 8 MERGED "$other"; route_teardown_record "$bad" 8; phrase="merge commit $other of PR 8 is not in the clone" ;;
       merge-commit-off-main)
         route_set_pr "$FOREIGN_CASE/forge" 8 MERGED "$(git -C "$FOREIGN_CASE/project" commit-tree 'HEAD^{tree}' -p HEAD -m side)"
@@ -6638,6 +6641,10 @@ test_a_record_that_fails_a_condition_keeps_the_foreign_copy_and_never_reaches_th
     assert_equals "$calls" "$(route_teardown_calls "$bad" | grep -c .)" "$row: wrong number of driver calls for the bad copy: $(route_teardown_calls "$bad")"
     [ "$row" = other-copy ] || assert_not_contains "$(route_teardown_calls "$bad")" "--pr" "$row: the bad copy reached the driver by the route"
     assert_absent "$FOREIGN_CASE/treehouse.log" "$row: the pool slot was returned beside a kept copy"
+    if [ "$row" = forge-hangs-child ]; then
+      assert_equals 2 "$(wc -l < "$FOREIGN_CASE/forge/gh.pids" | tr -d ' ')" "$row: the fake forge did not record itself and its child"
+      forge_reads_are_gone "$FOREIGN_CASE/forge" 3 || { for pid in $FORGE_ALIVE; do kill -s KILL "$pid" 2>/dev/null; done; fail "$row: the timed-out read left a descendant running (pid$FORGE_ALIVE)"; }
+    fi
   done
   pass "a teardown keeps a foreign copy whose record has an empty row at its tip before or after the valid row, names another tip, a bad profile, a closed PR, an unreadable or hanging forge, or a merge commit that is missing or off the landing branch (origin/main, or the task's base_branch), with no driver call, after releasing a valid one; a PR merged onto the task's base routes"
 }
