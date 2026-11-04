@@ -1170,6 +1170,57 @@ PL
   pass "stale records are reclaimed, unknown records and an unreadable table are charged the worst case, a root with no record is charged the worst case, a root past its record is charged its current peak, records only rise and only after a complete analysis, and slots beyond a run's cap count"
 }
 
+test_fast_record_does_not_lower_the_full_charge() {
+  local tmp limit record budget holder waiter starts deadline
+  tmp=$(fm_test_tmproot fm-lint-memory-mode)
+  mkdir -p "$tmp/bin"
+  for root in a b; do printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$root.sh"; done
+  fm_lint_write_memory_shellcheck "$tmp/bin" 1 "$tmp/mem.starts"
+  limit=$((65536 * 4))
+  # A --fast lint records the small peak of a.sh in fast mode only.
+  FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" PATH="$tmp/bin:$PATH" \
+    "$LINT" --fast --jobs 1 "$tmp/a.sh" > "$tmp/fast.out" 2>&1 || fail "the fast seeding run failed"$'\n'"$(cat "$tmp/fast.out")"
+  record=$(fm_lint_max_recorded_peak "$tmp/pool")
+  { [ "$record" -gt 0 ] && [ $((record * 2)) -lt "$limit" ]; } \
+    || fail "the fast run recorded a peak of $record KiB, expected above 0 and below half of $limit"
+  # The budget fits an unrecorded holder plus a.sh at its fast record, but not
+  # two unrecorded roots.
+  budget=$((limit + record * 2))
+  : > "$tmp/mem.starts"
+  FM_TEST_MEM_HOLD=60 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/b.sh" > "$tmp/holder.out" 2>&1 &
+  holder=$!
+  deadline=$((SECONDS + 20))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 1 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$holder" 2>/dev/null; fail "the holding run never started its root"; }
+    sleep 0.1
+  done
+  # A fast request of a.sh is charged its fast record and joins the holder.
+  FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --fast --jobs 1 "$tmp/a.sh" > "$tmp/fast2.out" 2>&1 &
+  waiter=$!
+  deadline=$((SECONDS + 20))
+  until [ "$(wc -l < "$tmp/mem.starts" | tr -d ' ')" -ge 2 ]; do
+    [ "$SECONDS" -lt "$deadline" ] || { kill "$holder" "$waiter" 2>/dev/null; fail "a fast request was not charged its fast record"; }
+    sleep 0.1
+  done
+  wait "$waiter" || { kill "$holder" 2>/dev/null; fail "the fast request failed beside the holder"$'\n'"$(cat "$tmp/fast2.out")"; }
+  # A full request of a.sh has no full record, so it is charged the worst case and waits.
+  FM_TEST_MEM_HOLD=0.1 FM_LINT_SLOT_DIR="$tmp/pool" FM_LINT_ROOT_RSS_KIB="$limit" FM_LINT_HOST_RSS_KIB="$budget" \
+    PATH="$tmp/bin:$PATH" "$LINT" --jobs 1 "$tmp/a.sh" > "$tmp/full.out" 2>&1 &
+  waiter=$!
+  sleep 2
+  starts=$(wc -l < "$tmp/mem.starts" | tr -d ' ')
+  if [ "$starts" -ne 2 ]; then
+    kill "$holder" "$waiter" 2>/dev/null
+    fail "a full request of a root with only a fast record started beside an unrecorded holder ($starts starts)"
+  fi
+  kill -TERM "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  wait "$waiter" || fail "the full request failed after the holder ended"$'\n'"$(cat "$tmp/full.out")"
+  pass "a --fast record charges later fast requests only; a full request of the same root is still charged the worst case"
+}
+
 test_default_pool_is_one_directory_for_every_home() {
   local tmp pool after run user
   tmp=$(fm_test_tmproot fm-lint-default-pool)
@@ -2330,6 +2381,7 @@ test_slot_file_failures_refuse_and_never_run_unbounded
 test_memory_budget_bounds_the_aggregate_across_homes
 test_root_larger_than_the_budget_runs_alone_and_a_killed_run_frees_its_charge
 test_memory_charge_survives_unknown_records_and_an_unreadable_table
+test_fast_record_does_not_lower_the_full_charge
 test_default_pool_is_one_directory_for_every_home
 test_slot_survives_gate_death
 test_queued_roots_use_high_resolution_timings
