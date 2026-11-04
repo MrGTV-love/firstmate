@@ -2699,7 +2699,8 @@ fm_wake_append() {
 # waiting. It is appended when the queue lock is free now; otherwise, or while
 # this process already holds that lock, it is spilled to STATE/.wake-spill.<seq>
 # (temp file, then a hard link that never replaces an existing spill: a
-# sequence another producer took meanwhile moves this row to the next one).
+# failed link moves this row to the next sequence and tries again, whether or
+# not the contested spill was replayed away before the failure returned).
 # Returns 1 only when the row is neither appended nor spilled.
 fm_wake_pending_settle() {
   local status=1 f n seq=0 tmp current held='' tries=0
@@ -2734,7 +2735,6 @@ fm_wake_pending_settle() {
         FM_WAKE_PENDING_KIND=
         return 0
       fi
-      [ -e "$STATE/.wake-spill.$n" ] || break
     done
   fi
   rm -f "$tmp"

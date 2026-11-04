@@ -223,9 +223,17 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB):
     if measured:
         calibrate(folder)
     (folder / 'fmhome').mkdir(exist_ok=True)
+    # The agent the daemon starts: claude on PATH resolves to a versioned install, as Claude Code's does
+    # (~/.local/bin/claude -> versions/2.1.318), so an agent process is named 2.1.318.
+    versions = folder / 'agent' / 'versions'
+    versions.mkdir(parents=True)
+    (versions / '2.1.318').write_text('#!/bin/sh\nexit 0\n')
+    (versions / '2.1.318').chmod(0o700)
+    (folder / 'agent' / 'bin').mkdir()
+    (folder / 'agent' / 'bin' / 'claude').symlink_to(versions / '2.1.318')
     env = dict(base, CASE_LOAD=str(load_file), CASE_DB=str(db), CASE_FOLDER=str(folder), FM_CPU_POOL_DIR=str(folder / 'pool'),
                CASE_CORES=str(cores), CASE_PROCS=str(folder / 'procs.json'), FM_MEMORY_FIXTURE_DIR=str(folder / 'native'),
-               FM_HOME=str(folder / 'fmhome'))
+               FM_HOME=str(folder / 'fmhome'), PATH=str(folder / 'agent' / 'bin') + os.pathsep + base['PATH'])
     return folder, db, env
 
 
@@ -1515,12 +1523,21 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             review[name] = 'FAIL: %s: %s' % (type(exc).__name__, str(exc)[:600])
 
     def idle_leftover():
-        # R1: a CI waiter's leftover reparented to launchd holds only its bytes; a process a live owner outside
-        # the run started (the agent, whatever its name, or one the daemon has not recorded yet) reserves A.
+        # R1, corrected by D1 of the delta review: a CI waiter whose tree holds no agent charges only its bytes,
+        # whatever its processes' parents; a process carrying the agent's identity reserves A, attached or
+        # reparented to launchd; when the identity cannot be derived every visible process counts as an agent.
         held = GIB // 5
         for label, parent, comm, admitted in (('leftover', 1, 'sleep', True), ('leftover-tree', 'tree', 'sleep', True),
-                                              ('attached-unnamed', 50, 'sleep', False), ('agent', 50, '2.1.318', False)):
+                                              ('nonagent-live-parent', 50, 'sleep', True), ('agent', 50, '2.1.318', False),
+                                              ('agent-reparented', 1, '2.1.318', False), ('agent-older-version', 1, '2.1.317', False),
+                                              ('no-identity', 1, 'sleep', False)):
             folder, db, env = case('review-r1-' + label, measured=True, available=int(8.5 * GIB))
+            if label == 'agent-older-version':  # an agent started before an update keeps the older install's name
+                (folder / 'agent' / 'versions' / '2.1.317').write_text('#!/bin/sh\nexit 0\n')
+                (folder / 'agent' / 'versions' / '2.1.317').chmod(0o700)
+            if label == 'no-identity':  # a config.yaml that exists but cannot be read
+                (folder / 'home' / '.no-mistakes' / 'config.yaml').mkdir(parents=True)
+                env['HOME'] = str(folder / 'home')
             change(db, "INSERT INTO runs (id, status, repo_id) VALUES ('x', 'running', 'repo')")
             change(db, "INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid) VALUES ('x-ci', 'x', 'ci', 1, 'running', NULL)")
             facts(folder, available=int(8.5 * GIB), runs=[('repo', 'x', held)])
@@ -1625,6 +1642,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         gate = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', '/bin/true'], env=dict(env, **(extra or {})),
                               cwd=str(folder), stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
         assert gate.returncode == 75 and 'unmapped worktree' in gate.stderr, gate.stderr
+        return gate
 
     def spills(folder):
         return [p.read_text() for p in sorted((folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))]
@@ -1651,6 +1669,37 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         found = spills(folder)
         assert (folder / 'first-publication').exists() and not (folder / 'watcher-failed').exists(), 'the collision never happened'
         assert len(found) == 2 and sum('launch-gate-unmapped' in s for s in found) == 1 and sum('watcher-test-event' in s for s in found) == 1, found
+
+    def collision_then_replay():
+        # D3 (delta review of fadebacc4): the watcher takes the gate's spill number, the gate's link fails, and the
+        # queue is freed and replayed (removing that spill) before the failed link returns; the gate row still survives.
+        folder, db, env = case('review-d3-collision-replay', measured=True)
+        env['HOME'] = str(folder)
+        shim = folder / 'race-bin'
+        shim.mkdir()
+        (shim / 'ln').write_text(r"""#!/bin/bash
+for last do :; done
+case "$last" in
+  */.wake-spill.[0-9]*)
+    if [ -z "${IN_WATCHER:-}" ] && mkdir "$CASE_FOLDER/first-publication" 2>/dev/null; then
+      IN_WATCHER=1 bash -c '. "$1" && FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=watcher-test FM_WAKE_PENDING_PAYLOAD=watcher-test-event && fm_wake_pending_settle' bash "$CASE_WAKE_LIB" || exit 91
+      /bin/ln "$@"
+      result=$?
+      touch "$CASE_FOLDER/release-queue"
+      bash -c '. "$1" && fm_wake_spill_replay' bash "$CASE_WAKE_LIB" || exit 92
+      touch "$CASE_FOLDER/replayed"
+      exit "$result"
+    fi;;
+esac
+exec /bin/ln "$@"
+""")
+        (shim / 'ln').chmod(0o700)
+        holder, release = wake_holder(env, folder)
+        gate = refuse(env, folder, dict(PATH=str(shim) + os.pathsep + env['PATH'], CASE_WAKE_LIB=str(repo / 'bin/fm-wake-lib.sh')))
+        holder.wait(timeout=30)
+        assert (folder / 'replayed').exists(), 'the collision and replay never happened'
+        kept = wakes(folder) + ''.join(spills(folder))
+        assert 'watcher-test-event' in kept and 'launch-gate-unmapped' in kept and 'durable line not recorded' not in gate.stderr, (kept, gate.stderr)
 
     def spill_controls():
         # R3 controls: a free queue lock appends at once; a busy one spills one file; the next append replays it first.
@@ -1697,9 +1746,10 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                                  r'another start is registering', queue), queue
                 assert re.search(r'run x \(fm/x\) admitted after \d+\.\d\ds held: ', queue), queue
 
-    for name, body in (('R1 a CI waiter holding only a leftover', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
+    for name, body in (('R1 a CI waiter holding no agent', idle_leftover), ('R2 wrapper forms join the queue once', wrapper_shapes),
                        ('R2 env -S starts wait behind a full pool in class order', split_held_order),
-                       ('R3 gate and watcher spills collide', watcher_collision), ('R3 controls: free lock, lone spill, replay', spill_controls),
+                       ('R3 gate and watcher spills collide', watcher_collision),
+                       ('D3 a collision replayed before the failed link returns', collision_then_replay), ('R3 controls: free lock, lone spill, replay', spill_controls),
                        ('R4 a short start-lock hold is recorded', short_hold_record)):
         review_case(name, body)
     (root / 'review-5e36d93a.json').write_text(json.dumps(review, indent=2))

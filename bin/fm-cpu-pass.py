@@ -63,8 +63,10 @@ Pipeline starts:
     is counted (a one-start minimum). The projection is S for the new run plus,
     per counted run: only what it holds when it waits on remote CI (open step ci
     in running, no recorded agent pid, no live launch reservation, and no
-    process of it whose parent is a live process outside the run, so only
-    leftovers reparented to launchd, if any) or while its launch gate waits in
+    process of it carrying an agent's identity: the configured agent's command
+    resolved on PATH, its real file and the versions beside it; whatever the
+    process's parent; any visible process counts as an agent when that identity
+    cannot be derived) or while its launch gate waits in
     this queue with no live launch reservation; its resident memory or A,
     whichever is larger, when the reading sees it; R while the reading cannot see it. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
@@ -839,42 +841,98 @@ def active_term(report: dict) -> Optional[Tuple[int, int]]:
         return None
 
 
-def attached_runs(processes) -> Optional[set]:
-    """Run keys whose tree holds a process a live owner outside the run is running, or None without a census.
+# The daemon's binary for each native agent name (no-mistakes fork 935aedf,
+# internal/config/config.go defaultBinary); agent: auto probes all of them.
+AGENT_BINARIES = {"claude": "claude", "codex": "codex", "grok": "grok", "rovodev": "acli",
+                  "opencode": "opencode", "pi": "pi", "copilot": "copilot", "antigravity": "agy"}
 
-    A run process whose parent is neither another process of the same run nor
-    launchd (pid 1) was started by a live process outside the run, such as the
-    daemon's agent launch, the launch gate, or an agent the daemon has not
-    recorded yet, whatever its name. A tree whose every root was reparented to
-    launchd is left over from earlier work: no live owner can drive it further.
-    A parent pid that cannot be read counts as attached.
+
+def agent_identities() -> Optional[frozenset]:
+    """Process names an agent the daemon starts can carry, or None when they cannot be derived.
+
+    The agents are config.yaml's agent list (its absence is the daemon's own
+    default, agent: auto, every native agent); each is its binary and any
+    agent_path_override for it. Each is resolved on PATH to its real file: the
+    command name, every name along that resolution and, when the real file is
+    named otherwise (a versioned install such as Claude Code's
+    versions/2.1.318), every executable beside it, so an agent of an earlier
+    installed version is still known. A config that exists but cannot be read
+    or parsed gives None.
     """
-    if not isinstance(processes, list):
+    import re
+    import shutil
+    try:
+        text = Path(NO_MISTAKES_CONFIG).expanduser().read_text()
+    except FileNotFoundError:
+        text = ""
+    except (OSError, ValueError):
         return None
-    members: dict = {}
-    for row in processes:
-        if isinstance(row, dict) and row.get("run"):
-            members.setdefault(row["run"], set()).add(row.get("pid"))
-    return {row["run"] for row in processes if isinstance(row, dict) and row.get("run")
-            and (type(row.get("ppid")) is not int or row["ppid"] != 1 and row["ppid"] not in members[row["run"]])}
+    match = re.search(r"^agent:[ \t]*(.*)$", text, re.MULTILINE)
+    value = match.group(1).split("#", 1)[0].strip() if match else "auto"
+    if value.startswith("[") and value.endswith("]"):
+        names = [part.strip().strip("\"'") for part in value[1:-1].split(",") if part.strip()]
+    elif value:
+        names = [value.strip("\"'")]
+    else:
+        listed = re.match(r"\n((?:[ \t]+.*\n?)*)", text[match.end():])
+        names = re.findall(r"^[ \t]+-[ \t]*[\"']?([^\"'\s#]+)", listed.group(1) if listed else "", re.MULTILINE)
+    if not names:
+        return None
+    if names == ["auto"]:
+        names = list(AGENT_BINARIES)
+    block = re.search(r"^agent_path_override:[ \t]*(?:#.*)?\n((?:[ \t]+.*\n?)*)", text, re.MULTILINE)
+    overrides = dict(re.findall(r"^[ \t]+([A-Za-z0-9_:-]+):[ \t]*[\"']?([^\"'\s#]+)", block.group(1) if block else "", re.MULTILINE))
+    commands = [AGENT_BINARIES.get(name, name) for name in names] + [overrides[name] for name in names if name in overrides]
+    identities = set()
+    for command in commands:
+        identities.add(os.path.basename(command))
+        found = shutil.which(command)
+        if not found:
+            continue
+        identities.add(os.path.basename(found))
+        real = os.path.realpath(found)
+        identities.add(os.path.basename(real))
+        if os.path.basename(real) != os.path.basename(found):
+            try:
+                identities.update(entry.name for entry in os.scandir(os.path.dirname(real))
+                                  if entry.is_file() and os.access(entry.path, os.X_OK))
+            except OSError:
+                pass
+    return frozenset(identities)
+
+
+def agent_runs(processes, identities: Optional[frozenset]) -> Optional[set]:
+    """Run keys whose tree holds a process carrying an agent identity, or None when that cannot be judged.
+
+    None (no census, or identities that cannot be derived) makes every visible
+    process count as a possible agent. A process name the kernel cut to its
+    first 15 or more characters matches the identity it begins.
+    """
+    if not isinstance(processes, list) or identities is None:
+        return None
+
+    def agent(comm) -> bool:
+        return isinstance(comm, str) and any(comm == name or len(comm) >= 15 and name.startswith(comm) for name in identities)
+    return {row["run"] for row in processes if isinstance(row, dict) and row.get("run") and agent(row.get("comm"))}
 
 
 def project(available: int, rss: dict, counted: dict, steps: Optional[dict], launches: dict,
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
-            waiting: frozenset = frozenset(), attached: Optional[set] = None) -> dict:
+            waiting: frozenset = frozenset(), agents: Optional[set] = None) -> dict:
     """The reservation fit for one more active run; a pure function of its facts.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map
     (keyed no-mistakes:<repo>/<run>); steps is open_steps() or None; launches maps
-    run IDs to their live launch-gate reservations; attached is attached_runs()
-    of the reading's census, or None without one. A run waiting on remote CI
-    (open step ci, status running, no recorded agent pid, no live launch) whose
-    tree holds no attached process reserves only the resident memory it holds:
-    nothing when the reading cannot see it, the bytes of a left-over process
-    otherwise. Once its tree holds an attached process it is never read as idle:
-    an agent may have started before its pid was recorded, whatever it is named,
-    so it reserves its resident memory or A, whichever is larger, like any active
-    run; without a census every visible process counts as attached. Every other counted or launched run reserves its
+    run IDs to their live launch-gate reservations; agents is agent_runs() of
+    the reading's census, or None when it cannot be judged. A run waiting on
+    remote CI (open step ci, status running, no recorded agent pid, no live
+    launch) whose tree holds no agent reserves only the resident memory it
+    holds: nothing when the reading cannot see it, its processes' bytes
+    otherwise. A tree holding a process with an agent's identity is never read
+    as idle, whatever its parent: an agent may have started before its pid was
+    recorded, or outlived the daemon, so it reserves its resident memory or A,
+    whichever is larger, like any active run; when agents is None every visible
+    process counts as an agent. Every other counted or launched run reserves its
     resident memory or the active-run term A, whichever is larger, once its tree
     is visible, and its full R while the reading cannot see it yet. The new run
     reserves S. With no live launch, the waiting launch's own run (self_run) and
@@ -900,7 +958,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         elif run == self_run or run in waiting:
             kind, demand = "waiter", size
         elif (steps is not None and step is not None and step[0] == CI_STEP and step[1] == "running"
-              and step[2] is None and not (visible and (attached is None or key in attached))):
+              and step[2] is None and not (visible and (agents is None or key in agents))):
             kind, demand = "ci-waiting", size
         else:
             kind = "step-unreadable" if steps is None else ("no-open-step" if step is None else "active")
@@ -985,7 +1043,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
         return others < limit, "counted=%d limit=%d basis=fallback priority=%s" % (others, limit, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting, attached_runs(report.get("processes")))
+                  waiting, agent_runs(report.get("processes"), agent_identities()))
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
